@@ -340,19 +340,36 @@
         "step",
         "checkpoint",
         "result",
-        "cancellation"
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken"
       ],
       "construction": [
         "make steps idempotent",
         "persist plan state",
         "bound fan-out",
-        "require authority per action"
+        "require authority per action",
+        "make skeleton/intelligence/execution_runtime.py the single owner of the model-turn/tool-turn loop",
+        "keep immutable execution envelopes in skeleton/contracts/ai_execution.py",
+        "keep persistence adapters behind skeleton/persistence/execution_repository.py",
+        "commit checkpoints before and after external side-effect boundaries",
+        "treat waiting_for_user as durable suspension rather than a fresh operation",
+        "bind finalization to verification, actual usage, governed memory writes and terminal operation state"
       ],
       "acceptance": [
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "failure_mode": "checkpoint and stop safely"
     },
@@ -1407,7 +1424,11 @@
         "support waiting_for_user for approval or missing information and resume from the same durable checkpoint",
         "enforce max model turns, max tool calls, max parallel tools, token/cost budget, wall-clock deadline and cancellation at every iteration",
         "persist final result, memory writes, artifacts, usage and all receipts under the operation identity before terminal completion",
-        "emit operation stream events from committed state transitions rather than treating the client stream as authority"
+        "emit operation stream events from committed state transitions rather than treating the client stream as authority",
+        "materialize contracts in skeleton/contracts/ai_execution.py",
+        "materialize the single cognitive-loop coordinator in skeleton/intelligence/execution_runtime.py",
+        "materialize execution/turn/checkpoint/approval/idempotency/usage persistence behind skeleton/persistence/execution_repository.py",
+        "use the cognitive_runtime_blueprint recovery matrix and finalization protocol as mandatory implementation semantics"
       ],
       "closure_evidence": [
         "prompt-only execution reaches completed with one bound result receipt",
@@ -1421,7 +1442,8 @@
         "provider fallback preserves operation/turn lineage",
         "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
-      ]
+      ],
+      "status_detail": "detailed runtime blueprint added; implementation modules and durable state binding remain"
     },
     {
       "id": "gap-streaming-protocol",
@@ -2501,7 +2523,10 @@
         "skeleton/skills",
         "skeleton/memory",
         "skeleton/retrieval",
-        "skeleton/frontier/operation_stream.py"
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/persistence/execution_repository.py"
       ],
       "objective": "One canonical durable AI execution transaction from admitted user intent through model/tool turns to a verified, persisted and streamable result.",
       "steps": [
@@ -2526,7 +2551,29 @@
         "provider failover lineage",
         "full evidence-binding assertion"
       ],
-      "exit": "one operation can deterministically retrieve, reason, call governed tools, wait/resume, verify, persist and stream a terminal answer without bypassing any canonical plane"
+      "exit": "one operation can deterministically retrieve, reason, call governed tools, wait/resume, verify, persist and stream a terminal answer without bypassing any canonical plane",
+      "progress": {
+        "state": "architecture-detailed",
+        "completed": [
+          "canonical execution loop ownership selected",
+          "execution/turn/result envelope fields defined",
+          "turn substate and recovery semantics defined",
+          "tool authority/idempotency/approval protocol defined",
+          "memory writeback policy defined",
+          "verification and finalization protocol defined",
+          "usage and observability contract defined",
+          "implementation slices ordered"
+        ],
+        "remaining": [
+          "materialize contract modules",
+          "bind durable repositories",
+          "extend provider structured/tool output boundary",
+          "implement governed tool runtime integration",
+          "implement execution loop",
+          "implement frontend/backend transport integration",
+          "prove fault and golden-journey evidence"
+        ]
+      }
     },
     {
       "id": "WP-P0-STREAM",
@@ -2905,6 +2952,587 @@
       "committed operation state is authoritative; transport streams are projections",
       "terminal completion occurs only after final result and required receipts are durably bound",
       "loop limits are monotonic and cannot be reset by a model response"
+    ]
+  },
+  "cognitive_runtime_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-cognitive-execution-loop",
+    "objective": "Specify the exact runtime, state, contracts, recovery, safety and evidence semantics required for one fully functional AI execution path without introducing a second orchestration framework.",
+    "target_modules": {
+      "contracts": {
+        "path": "skeleton/contracts/ai_execution.py",
+        "owns": [
+          "AIExecutionRequest",
+          "AIExecutionResult",
+          "AgentTurn",
+          "ExecutionCheckpoint",
+          "StopPolicy",
+          "ToolCallProposal",
+          "ToolCallResultRef",
+          "VerificationReceiptRef",
+          "ExecutionUsage"
+        ],
+        "rule": "immutable/provider-neutral value contracts only; no provider SDK, database client, HTTP transport or tool implementation imports"
+      },
+      "runtime": {
+        "path": "skeleton/intelligence/execution_runtime.py",
+        "owns": [
+          "canonical cognitive loop",
+          "turn state transitions",
+          "stop-condition evaluation",
+          "checkpoint coordination",
+          "approval suspension/resume",
+          "finalization coordination"
+        ],
+        "rule": "the only engine module allowed to coordinate repeated model->tool->model turns for product operations"
+      },
+      "repository": {
+        "path": "skeleton/persistence/execution_repository.py",
+        "owns": [
+          "execution ledger persistence",
+          "turn persistence",
+          "checkpoint compare-and-set",
+          "approval state persistence",
+          "tool idempotency ledger",
+          "usage ledger",
+          "final result persistence"
+        ],
+        "rule": "storage-neutral interface plus production Mongo adapter; no orchestration policy"
+      },
+      "provider_boundary": {
+        "path": "skeleton/provider_runtime.py",
+        "adds": [
+          "provider-neutral structured response envelope",
+          "provider-neutral tool schema projection",
+          "normalized tool-call proposals",
+          "provider response usage metadata",
+          "stable provider request/response identity"
+        ],
+        "rule": "provider-native response/tool-call objects terminate here"
+      },
+      "tool_boundary": {
+        "path": "skeleton/skills",
+        "adds": [
+          "canonical ToolManifest projection for model exposure",
+          "schema validation before authority checks",
+          "ToolExecutionRequest",
+          "ToolExecutionReceipt",
+          "idempotency/compensation declaration",
+          "approval class",
+          "resource/cost estimate"
+        ],
+        "rule": "a model can propose a tool call but cannot grant itself authority or bypass execution policy"
+      },
+      "stream_adapter": {
+        "path": "backend",
+        "owns": [
+          "SSE/WebSocket transport adapter",
+          "client acknowledgement/cursor handling",
+          "disconnect cancellation policy"
+        ],
+        "rule": "transport projects committed operation events and never becomes state authority"
+      },
+      "frontend_reducer": {
+        "path": "frontend",
+        "owns": [
+          "operation event reducer",
+          "cursor persistence",
+          "event-id dedupe",
+          "sequence gap detection",
+          "approval UI",
+          "cancel/retry controls"
+        ],
+        "rule": "client state is reconstructable from authoritative operation/result APIs plus replayable events"
+      }
+    },
+    "execution_states": [
+      "created",
+      "loading",
+      "assembling_context",
+      "routing",
+      "provider_pending",
+      "provider_completed",
+      "classifying_output",
+      "waiting_for_tool_authority",
+      "waiting_for_user",
+      "tool_pending",
+      "tool_completed",
+      "checkpointing",
+      "verifying",
+      "repairing",
+      "finalizing",
+      "completed",
+      "degraded",
+      "failed",
+      "cancelled"
+    ],
+    "state_rules": [
+      "execution state refines but never replaces OperationState",
+      "OperationState is the user-visible lifecycle authority",
+      "execution states are durable substate required for exact recovery",
+      "terminal execution state and terminal OperationState must agree",
+      "waiting_for_user maps to OperationState.WAITING_FOR_USER",
+      "tool_pending/tool_completed map through OperationState.WAITING_FOR_TOOL or RUNNING as appropriate",
+      "repairing and provider retries remain bounded by the original StopPolicy"
+    ],
+    "turn_contract": {
+      "identity": [
+        "execution_id is stable for the full operation execution attempt",
+        "turn_id is globally unique and immutable",
+        "turn_index starts at zero and is strictly monotonic inside one execution",
+        "parent_turn_id forms a single canonical lineage for serial turns",
+        "parallel tool children use call_id lineage but do not create competing model-turn parents"
+      ],
+      "input_snapshot": [
+        "instruction_digest",
+        "conversation_digest",
+        "retrieval_evidence_ids",
+        "memory_record_ids",
+        "artifact_refs",
+        "tool_result_refs",
+        "context_digest",
+        "remaining_budget"
+      ],
+      "output_snapshot": [
+        "route_decision_id",
+        "provider_request_id",
+        "provider_response_id",
+        "normalized_text",
+        "structured_output_ref",
+        "tool_call_proposals",
+        "provider_usage",
+        "finish_reason"
+      ],
+      "invariant": "the exact inputs necessary to explain a model turn are addressable by immutable ids/digests even when raw sensitive content is retained elsewhere"
+    },
+    "model_output_protocol": {
+      "modes": [
+        "final_text",
+        "structured_result",
+        "tool_calls",
+        "mixed_text_and_tool_calls",
+        "refusal_or_abstention"
+      ],
+      "normalization": [
+        "normalize provider finish reason",
+        "normalize tool name/call id/arguments",
+        "reject unknown or duplicate call ids",
+        "validate structured output against declared JSON-schema-equivalent contract",
+        "bound raw response size before parsing",
+        "preserve provider request id and usage without preserving credentials"
+      ],
+      "repair_policy": {
+        "enabled": true,
+        "max_repairs": 2,
+        "may_repair": [
+          "invalid structured output",
+          "syntactically invalid tool arguments when schema-safe repair is possible"
+        ],
+        "may_not_repair": [
+          "authority denial",
+          "unknown tool",
+          "restricted data transfer",
+          "budget exhaustion",
+          "cancelled operation",
+          "expired deadline"
+        ],
+        "rule": "repair consumes the same original execution budget and creates a new AgentTurn"
+      }
+    },
+    "context_policy": {
+      "ordering": [
+        "immutable system/product policy",
+        "operation objective and user request",
+        "durable conversation summary",
+        "relevant recent conversation turns",
+        "authorized memory",
+        "authorized retrieval evidence",
+        "artifact metadata/content under explicit budget",
+        "tool results from the current execution"
+      ],
+      "trust_marking": [
+        "system instructions are trusted control data",
+        "user content is untrusted task data",
+        "retrieved/tool/artifact content remains untrusted evidence",
+        "memory preserves provenance and never upgrades trust"
+      ],
+      "budgeting": [
+        "reserve output budget before context packing",
+        "reserve tool-result headroom when tools are enabled",
+        "trim by deterministic priority then recency then relevance",
+        "summaries are derived state and keep source ids",
+        "never trim mandatory policy, authority, stop-policy or operation identity"
+      ],
+      "compaction": [
+        "compaction may replace old conversational text with a provenance-bearing summary",
+        "compaction cannot delete authoritative user/tool action receipts",
+        "summary generation is itself a metered model operation when a model is used",
+        "compaction output is untrusted until schema/invariant validation"
+      ]
+    },
+    "tool_execution_protocol": {
+      "phases": [
+        "proposal_normalization",
+        "tool_lookup",
+        "argument_schema_validation",
+        "data_classification",
+        "identity_and_scope_authorization",
+        "risk_classification",
+        "approval_decision",
+        "resource_admission",
+        "idempotency_reservation",
+        "execution",
+        "receipt_commit",
+        "result_governance",
+        "context_projection"
+      ],
+      "authority_classes": {
+        "read": "may execute without interactive approval when principal scopes and policy permit",
+        "write": "requires explicit write authority and idempotency",
+        "destructive": "requires explicit destructive authority plus approval policy",
+        "external_commit": "requires idempotency or compensation and a durable pre-execution reservation"
+      },
+      "idempotency": [
+        "call_id is stable across retries",
+        "tool manifest declares none/idempotent/idempotency-key/compensatable",
+        "unknown side-effect semantics fail closed",
+        "completed call_id returns the durable prior receipt rather than executing again",
+        "in-progress reservation uses fencing/lease semantics to prevent concurrent duplicate execution"
+      ],
+      "parallelism": [
+        "parallel calls require no declared ordering dependency",
+        "parallel calls share the execution budget",
+        "max_parallel_tools is enforced before scheduling",
+        "results are joined deterministically by proposal order/call id",
+        "one failure cannot silently cancel already-committed sibling side effects"
+      ]
+    },
+    "human_approval_protocol": {
+      "approval_record_fields": [
+        "approval_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "tool_id",
+        "arguments_digest",
+        "risk_class",
+        "requested_at",
+        "expires_at",
+        "decision",
+        "decided_by",
+        "decided_at"
+      ],
+      "invariants": [
+        "approval is bound to the exact tool arguments digest",
+        "edited arguments require a new approval",
+        "approval expiry fails closed",
+        "resume revalidates identity, policy, budget and deadline",
+        "approval never overrides restricted data-transfer or missing tool authority"
+      ]
+    },
+    "memory_writeback_policy": {
+      "default": "no durable memory write merely because a model mentioned a fact",
+      "candidates": [
+        "explicit user preference or instruction",
+        "verified durable task outcome",
+        "tool-produced authoritative fact",
+        "conversation summary needed for continuity",
+        "user-approved long-term note"
+      ],
+      "required_checks": [
+        "tenant/user namespace",
+        "data class",
+        "purpose",
+        "provenance",
+        "confidence or authority source",
+        "retention class",
+        "deduplication key",
+        "deletion/export eligibility"
+      ],
+      "prohibited": [
+        "raw secrets or credentials",
+        "unverified model speculation presented as fact",
+        "cross-tenant content",
+        "provider hidden metadata",
+        "tool output outside the principal's authority"
+      ],
+      "finalization_rule": "memory writes are staged as proposals and committed only after governance and final-result verification; failure to persist optional memory does not rewrite the already-verified answer"
+    },
+    "verification_policy": {
+      "levels": {
+        "none": "low-risk generative output where no factual/action guarantee is claimed",
+        "structural": "schema, type, bounds and invariant validation",
+        "evidence": "claims checked against retrieved/tool evidence and provenance",
+        "action": "tool receipts and postconditions checked after side effects",
+        "high_impact": "requires configured stronger verifier and/or human approval before action/finalization"
+      },
+      "outcomes": [
+        "verified",
+        "qualified",
+        "abstain",
+        "repair",
+        "block"
+      ],
+      "rules": [
+        "verification level is selected by capability/risk policy, not by the model",
+        "repair creates a new bounded turn and preserves failed-verification evidence",
+        "high-impact block cannot be converted to success by a plain model retry",
+        "qualified results surface uncertainty/provenance to the application",
+        "verification receipts are immutable release/evaluation evidence"
+      ]
+    },
+    "finalization_protocol": {
+      "ordered_commit": [
+        "persist final candidate and verification receipt",
+        "persist actual usage and cost",
+        "commit required tool receipts/postconditions",
+        "commit governed memory writes",
+        "commit artifact references",
+        "compare-and-set execution checkpoint to finalizing",
+        "commit AIExecutionResult",
+        "transition OperationState to terminal",
+        "append terminal operation event",
+        "acknowledge terminal result to client"
+      ],
+      "atomicity_target": "operation/result/checkpoint must be transactionally committed together when supported; otherwise use transactional outbox or deterministic reconciliation with terminal fencing",
+      "invariant": "a client must never observe terminal completed while the canonical final result is absent"
+    },
+    "cancellation_protocol": {
+      "sources": [
+        "user",
+        "operator",
+        "deadline",
+        "policy",
+        "budget",
+        "shutdown"
+      ],
+      "checks": [
+        "before routing",
+        "before provider I/O",
+        "after provider response normalization",
+        "before each tool reservation",
+        "before executing a tool when cancellation is safe",
+        "after tool receipt commit",
+        "before repair/retry",
+        "before finalization"
+      ],
+      "rule": "cancellation is cooperative around non-interruptible external side effects; committed side effects remain recorded and may require compensation rather than pretending they did not occur"
+    },
+    "recovery_matrix": [
+      {
+        "crash_point": "before provider request dispatch",
+        "recovery": "resume same turn from committed checkpoint; provider call has not been allocated"
+      },
+      {
+        "crash_point": "after provider dispatch with unknown provider outcome",
+        "recovery": "use provider request identity/idempotency when available; otherwise mark ambiguous and retry only under provider policy that prevents duplicate side effects"
+      },
+      {
+        "crash_point": "after provider response before checkpoint",
+        "recovery": "recover response by durable provider receipt when available or reissue as a new bounded turn; never duplicate tool side effects"
+      },
+      {
+        "crash_point": "after tool reservation before execution",
+        "recovery": "lease/fence reservation and execute once"
+      },
+      {
+        "crash_point": "after tool side effect before receipt commit",
+        "recovery": "reconcile via tool idempotency key/postcondition lookup; do not blindly execute again"
+      },
+      {
+        "crash_point": "after receipt commit before next model turn",
+        "recovery": "reuse durable tool receipt/result and continue"
+      },
+      {
+        "crash_point": "waiting_for_user",
+        "recovery": "reload exact approval/checkpoint; resume only after decision revalidation"
+      },
+      {
+        "crash_point": "during finalization",
+        "recovery": "terminal fence plus transaction/outbox reconciliation produces exactly one canonical AIExecutionResult and terminal event"
+      }
+    ],
+    "usage_accounting": {
+      "estimated_before_execution": [
+        "input tokens",
+        "reserved output tokens",
+        "provider cost",
+        "tool cost",
+        "artifact bytes",
+        "wall time",
+        "concurrency"
+      ],
+      "actual_after_each_boundary": [
+        "provider input/output/cached/reasoning tokens where exposed",
+        "provider billed cost when derivable",
+        "tool duration/cost",
+        "artifact bytes",
+        "retry/repair count",
+        "wall time"
+      ],
+      "invariants": [
+        "actual usage never resets remaining budget",
+        "unknown usage is represented explicitly, never as zero",
+        "billing/telemetry data is not trusted for authority decisions until normalized",
+        "operation completion records estimate-versus-actual delta"
+      ]
+    },
+    "observability_contract": {
+      "required_spans": [
+        "ai.execution",
+        "ai.context.assemble",
+        "ai.route",
+        "ai.provider.turn",
+        "ai.output.normalize",
+        "ai.tool.authorize",
+        "ai.tool.execute",
+        "ai.checkpoint",
+        "ai.verify",
+        "ai.memory.writeback",
+        "ai.finalize",
+        "ai.stream.append"
+      ],
+      "required_dimensions": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "tenant-safe principal class",
+        "capability",
+        "provider/model",
+        "tool id",
+        "status/reason code",
+        "latency",
+        "token/cost usage",
+        "retry/repair counts"
+      ],
+      "redaction": [
+        "never log provider credentials",
+        "never log restricted raw content",
+        "tool arguments default to digest/allowlisted metadata",
+        "model prompts/responses require explicit debug policy and data classification"
+      ]
+    },
+    "failure_taxonomy": [
+      "invalid_request",
+      "identity_denied",
+      "policy_denied",
+      "governance_denied",
+      "budget_denied",
+      "no_route",
+      "provider_unavailable",
+      "provider_invalid_response",
+      "structured_output_invalid",
+      "tool_unknown",
+      "tool_arguments_invalid",
+      "tool_authority_denied",
+      "approval_required",
+      "approval_expired",
+      "tool_failed",
+      "tool_result_invalid",
+      "verification_failed",
+      "checkpoint_conflict",
+      "replay_ambiguous",
+      "deadline_exceeded",
+      "cancelled",
+      "internal_invariant_violation"
+    ],
+    "implementation_slices": [
+      {
+        "order": 1,
+        "id": "contracts-and-state",
+        "deliver": [
+          "skeleton/contracts/ai_execution.py",
+          "repository interfaces for execution/turn/checkpoint/approval/idempotency/usage",
+          "state topology entries",
+          "pure contract tests"
+        ],
+        "blocks": [
+          "runtime loop implementation"
+        ]
+      },
+      {
+        "order": 2,
+        "id": "provider-structured-output",
+        "deliver": [
+          "provider-neutral tool schema",
+          "normalized tool proposals",
+          "structured-result schema",
+          "usage/finish-reason normalization"
+        ],
+        "blocks": [
+          "tool loop"
+        ]
+      },
+      {
+        "order": 3,
+        "id": "tool-governance-runtime",
+        "deliver": [
+          "manifest projection",
+          "schema validation",
+          "authority/risk/approval decision",
+          "idempotency reservation and durable receipt"
+        ],
+        "blocks": [
+          "side-effecting agent loop"
+        ]
+      },
+      {
+        "order": 4,
+        "id": "cognitive-loop",
+        "deliver": [
+          "execution_runtime.py",
+          "StopPolicy enforcement",
+          "turn/checkpoint persistence",
+          "provider->tool->provider repetition",
+          "wait/resume/cancel"
+        ],
+        "blocks": [
+          "golden journeys"
+        ]
+      },
+      {
+        "order": 5,
+        "id": "verification-writeback-finalization",
+        "deliver": [
+          "risk-selected verification",
+          "memory write proposals",
+          "actual usage accounting",
+          "atomic finalization/outbox"
+        ],
+        "blocks": [
+          "production completion claim"
+        ]
+      },
+      {
+        "order": 6,
+        "id": "transport-and-product",
+        "deliver": [
+          "SSE/WebSocket adapter",
+          "frontend reducer/cursor",
+          "approval UI",
+          "cancel/reconnect UX"
+        ],
+        "blocks": [
+          "end-to-end functional AI"
+        ]
+      },
+      {
+        "order": 7,
+        "id": "fault-evidence",
+        "deliver": [
+          "crash injection matrix",
+          "duplicate-side-effect tests",
+          "reconnect and slow-client tests",
+          "cross-plane golden journeys",
+          "trace/evidence assertions"
+        ],
+        "blocks": [
+          "P0 closure"
+        ]
+      }
     ]
   }
 }
