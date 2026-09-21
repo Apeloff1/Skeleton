@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.4",
+  "schema_version": "5.5",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -440,24 +440,14 @@
       "note": "existing integration PRs reused; zero-file comparisons remain lineage-only"
     },
     "feature_wave": {
-      "new_pr": "#1875 feat/asm-vector-microkernel",
-      "revalidated": [
-        "automerge control plane",
-        "autonomous supervisor",
-        "backlog reasoning adapter",
-        "build-capable automation",
-        "builder plane/control",
-        "repair receipts",
-        "durable checkpoints",
-        "agent squads/studios",
-        "galaxy lifecycle",
-        "Java batch/control/observability/retrieval"
-      ],
-      "lineage_only": [
-        "build-capable automation plane",
-        "build incremental graph"
-      ],
-      "note": "existing integration PRs reused; large/overlapping waves remain staged rather than blindly merged"
+      "revalidated": 46,
+      "note": "Feature family revalidated against assembly. Existing integration PRs cover the meaningful staged branches; zero-file branches remain lineage. Large overlapping shell, PR-runner, Jeeves topology, and physics families remain held for reconciliation.",
+      "held": [
+        "feat/bounded-shell-runner-20260918",
+        "feat/jeeves-topology-learning",
+        "feat/pr-runner-hygiene-pack-e-20260920",
+        "physics feature family"
+      ]
     },
     "jeeves_frontier_wave": {
       "revalidated": [
