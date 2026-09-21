@@ -91,6 +91,14 @@ jobs:
           python -m pytest -q \
             skeleton/testing/test_asm_vector_accelerator.py \
             skeleton/testing/test_asm_vector_store.py
+          python scripts/benchmark_asm_vector_accelerator.py \
+            --library "$SKELETON_ASM_CACHE_DIR/libskeleton_asm_v4_aarch64.so" \
+            --dimensions 33 \
+            --rows 32 \
+            --queries 3 \
+            --iterations 1 \
+            --warmup 0 \
+            --json
 
       - name: Run ARM64 smoke tests
         env:
