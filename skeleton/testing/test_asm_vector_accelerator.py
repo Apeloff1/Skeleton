@@ -177,6 +177,29 @@ def test_loader_rejects_claimed_avx_without_avx_symbol(
         AsmVectorAccelerator(library)
 
 
+def test_loader_rejects_unknown_capability_bits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    library = tmp_path / "future-capability.so"
+    library.write_bytes(b"placeholder")
+    monkeypatch.setattr(asm_module.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(
+        asm_module.ctypes,
+        "CDLL",
+        lambda _path: _CompleteFakeLibrary(capabilities=(1 | (1 << 7))),
+    )
+
+    with pytest.raises(AsmAcceleratorAbiError, match="unknown capability bits"):
+        AsmVectorAccelerator(library)
+
+
+@pytest.mark.parametrize("timeout", [0, -1, float("nan"), float("inf"), True])
+def test_build_rejects_invalid_timeout_before_side_effects(timeout: object) -> None:
+    with pytest.raises(ValueError, match="timeout_seconds"):
+        AsmVectorAccelerator.build(timeout_seconds=timeout)  # type: ignore[arg-type]
+
+
 def test_loader_rejects_wrong_abi_version(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -234,6 +257,49 @@ def test_build_load_and_numeric_contract(tmp_path: Path) -> None:
     else:
         assert runtime.capabilities == ("neon",)
         assert runtime.matrix_backend == "neon"
+
+
+def test_dot_batch_rejects_huge_zero_dimension_output_before_iteration(
+    tmp_path: Path,
+) -> None:
+    status = _supported_preflight(tmp_path)
+    if not status.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    accelerator = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+
+    class HugeCandidates:
+        def __len__(self) -> int:
+            return 16_000_001
+
+        def __iter__(self):
+            raise AssertionError("candidate rows must not be iterated")
+
+    with pytest.raises(ValueError, match="output row count"):
+        accelerator.dot_batch_f32([], HugeCandidates())  # type: ignore[arg-type]
+    assert accelerator.status().calls == 0
+
+
+def test_dot_matrix_rejects_huge_zero_dimension_output_before_allocation(
+    tmp_path: Path,
+) -> None:
+    status = _supported_preflight(tmp_path)
+    if not status.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    accelerator = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+    with pytest.raises(ValueError, match="output row count"):
+        accelerator.dot_matrix_f32(
+            [],
+            [],
+            rows=16_000_001,
+            dimensions=0,
+        )
+    assert accelerator.status().calls == 0
 
 
 def test_batch_dot_scores_rows_and_tail_dimensions(tmp_path: Path) -> None:
