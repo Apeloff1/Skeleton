@@ -12,6 +12,10 @@ Master plan: [`MASTER_PLAN.md`](MASTER_PLAN.md)
 
 Construction authority: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
 
+Edge/historical catalogue: [`EDGE_CASES_HISTORICAL.md`](EDGE_CASES_HISTORICAL.md)
+
+Machine edge-case mirror: [`machine/ai_edge_case_catalog.json`](../../machine/ai_edge_case_catalog.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -35,6 +39,8 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 11. `docs/plan/MASTER_INDEX.md`
 12. `docs/plan/MASTER_PLAN.md`
 13. `machine/ai_master_plan.json`
+14. `docs/plan/EDGE_CASES_HISTORICAL.md`
+15. `machine/ai_edge_case_catalog.json`
 
 The first ten remain the present implementation/construction authority. Items 11–13 add the canonical long-range index and planning authority.
 
@@ -553,5 +559,17 @@ architecture manifests
 ## Maintenance rule
 
 When a plan chapter is implemented, update the machine mirror with concrete `requirements`, `capabilities`, `contracts`, `implementation_paths`, `tests`, `evaluations`, `evidence`, `risks`, and `gaps`. Do not change a plan entry to production merely because a file exists.
+
+## Cross-cutting edge/historical depth
+
+The frozen volume structure is supplemented by a machine-validated catalogue of historical architecture lessons, obscure systems principles, and concrete failure cases. The catalogue maps every case back into existing volumes instead of bypassing the breadth freeze.
+
+At initial publication it contains **240 mapped entries**:
+
+- 70 historical AI/software/distributed-system patterns;
+- 140 concrete edge/failure cases;
+- 30 obscure cross-cutting architecture lessons.
+
+Relevant catalogue entries should be converted into requirements, invariants, tests, fuzz/property suites, chaos cases, runbooks, or explicit accepted risks when their mapped capabilities enter implementation.
 
 The architecture breadth freeze at Volume 420 is deliberate: the next phase is construction depth, not additional top-level-box accumulation.
