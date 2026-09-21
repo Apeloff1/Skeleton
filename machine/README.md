@@ -104,6 +104,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Security resolution wave:** deserialization, token parsing, content-type, scraper DNS/SSRF, CORS, vault atomicity, and scan-evidence branches revalidated; zero-file SAST traversal branch remains lineage-only.
 
+- **Automation/CI wave:** revalidated action runners, queue pressure, reconciliation, branch control, CI hygiene, bot ledger, CodeQL, Dependabot, frontier push coalescing, and housekeeping sources; existing integration PRs reused.
+
 ## Target layout
 
 ```text
