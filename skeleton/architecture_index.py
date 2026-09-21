@@ -129,6 +129,47 @@ EVOLUTION_CONTRACT = {
     "verifier_score_is_not_truth": True,
 }
 
+CONSTRUCTION_TRACKS = {
+    "Q": "research_evidence_substrate",
+    "R": "model_and_training_substrate",
+    "S": "adaptive_reasoning_test_time_compute",
+    "T": "context_compiler_hierarchical_memory",
+    "U": "tool_authority_instruction_security",
+    "V": "inference_serving_systems",
+    "W": "controlled_learning_post_training",
+    "X": "evaluation_verification_formal_correctness",
+    "Y": "scientific_experiment_promotion_rollback_refresh",
+    "Z": "deep_internals_optimizer_control",
+    "AA": "rare_massive_upgrades_full_stack_step_changes",
+}
+
+PLAN_CHECKPOINTS = {
+    "PLAN-20260921-INTERNALS-OPTIMIZERS-MASSIVE-UPGRADES": {
+        "created_at": "2026-09-21T21:33:00+02:00",
+        "tracks": ("Z", "AA"),
+        "implementation_claims_require_signed_evidence": True,
+        "production_authority_granted": False,
+    }
+}
+
+OPTIMIZER_CONTROL_INVARIANTS = {
+    "framework_default_is_authority": False,
+    "optimizer_choice_is_versioned_policy": True,
+    "parameter_class_mapping_is_explicit": True,
+    "checkpoint_binds_optimizer_state": True,
+    "promotion_requires_equal_token_and_wallclock_views": True,
+    "promotion_requires_failure_recovery_evidence": True,
+}
+
+MASSIVE_UPGRADE_INVARIANTS = {
+    "microbenchmark_alone_can_promote": False,
+    "production_promotion_requires_full_stack_evidence": True,
+    "migration_plan_required": True,
+    "rollback_plan_required": True,
+    "signed_adr_required": True,
+    "negative_evidence_is_retained": True,
+}
+
 
 def full_summary() -> Dict[str, Any]:
     """Return the complete architecture summary across all indexed rounds."""
@@ -144,6 +185,10 @@ def full_summary() -> Dict[str, Any]:
         "research_promotion_stages": list(RESEARCH_PROMOTION_STAGES),
         "research_side_states": list(RESEARCH_TERMINAL_OR_SIDE_STATES),
         "evolution_contract": dict(EVOLUTION_CONTRACT),
+        "construction_tracks": dict(CONSTRUCTION_TRACKS),
+        "plan_checkpoints": {key: dict(value) for key, value in PLAN_CHECKPOINTS.items()},
+        "optimizer_control_invariants": dict(OPTIMIZER_CONTROL_INVARIANTS),
+        "massive_upgrade_invariants": dict(MASSIVE_UPGRADE_INVARIANTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
