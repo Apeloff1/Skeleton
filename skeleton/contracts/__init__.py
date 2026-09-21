@@ -6,6 +6,14 @@ from .canonical import (
     EvidenceRef,
     Identity,
 )
+from .conversation import (
+    CONVERSATION_SCHEMA_VERSION,
+    ConversationAuthorType,
+    ConversationContractError,
+    ConversationMessage,
+    ConversationThread,
+    ConversationThreadState,
+)
 from .operation import (
     OperationContractError,
     OperationEnvelope,
@@ -19,6 +27,12 @@ __all__ = [
     "CanonicalEnvelope",
     "EvidenceRef",
     "Identity",
+    "CONVERSATION_SCHEMA_VERSION",
+    "ConversationAuthorType",
+    "ConversationContractError",
+    "ConversationMessage",
+    "ConversationThread",
+    "ConversationThreadState",
     "OperationContractError",
     "OperationEnvelope",
     "OperationState",
