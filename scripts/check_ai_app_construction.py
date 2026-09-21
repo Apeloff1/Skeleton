@@ -451,6 +451,79 @@ def _validate_runtime_providers(
     return providers
 
 
+def _validate_gap_register(
+    contract: dict[str, Any],
+    planes: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> dict[str, int]:
+    raw = contract.get("gap_register")
+    if not isinstance(raw, list):
+        errors.append("gap_register must be a list")
+        return {}
+    seen: set[str] = set()
+    by_plane: dict[str, int] = defaultdict(int)
+    p0_open = 0
+    for index, item in enumerate(raw):
+        label = f"gap_register[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        gap_id = item.get("id")
+        plane_id = item.get("plane")
+        if not isinstance(gap_id, str) or not gap_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if gap_id in seen:
+            errors.append(f"duplicate gap id: {gap_id}")
+        seen.add(gap_id)
+        if plane_id not in planes:
+            errors.append(f"gap {gap_id} references unknown plane {plane_id!r}")
+            continue
+        by_plane[str(plane_id)] += 1
+        if item.get("status") not in {"open", "closed"}:
+            errors.append(f"gap {gap_id}.status must be open or closed")
+        if item.get("priority") not in {"P0", "P1", "P2"}:
+            errors.append(f"gap {gap_id}.priority must be P0, P1, or P2")
+        if item.get("status") == "open" and item.get("priority") == "P0":
+            p0_open += 1
+        if not isinstance(item.get("gap"), str) or not item["gap"].strip():
+            errors.append(f"gap {gap_id}.gap must be non-empty")
+        _nonempty_strings(
+            item.get("construction"),
+            label=f"gap {gap_id}.construction",
+            errors=errors,
+        )
+        _nonempty_strings(
+            item.get("closure_evidence"),
+            label=f"gap {gap_id}.closure_evidence",
+            errors=errors,
+        )
+
+    for plane_id, plane in planes.items():
+        if plane.get("state") == "partial" and by_plane.get(plane_id, 0) == 0:
+            errors.append(f"partial plane lacks a construction gap: {plane_id}")
+
+    policy = contract.get("gap_closure_policy")
+    if not isinstance(policy, dict):
+        errors.append("gap_closure_policy must be an object")
+    else:
+        for key in (
+            "partial_plane_requires_open_gap",
+            "p0_gaps_block_sota_complete",
+            "closure_requires_evidence",
+            "closure_requires_state_update",
+            "no_silent_gap_deletion",
+        ):
+            if policy.get(key) is not True:
+                errors.append(f"gap_closure_policy.{key} must be true")
+
+    return {
+        "total": len(raw),
+        "p0_open": p0_open,
+        "planes_with_gaps": len(by_plane),
+    }
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -498,6 +571,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     must_read = _validate_provider_bootstrap(contract, repo_root, errors)
     providers = _validate_runtime_providers(contract, errors)
     gates = _validate_acceptance_gates(contract, errors)
+    gaps = _validate_gap_register(contract, planes, errors)
 
     gap_policy = contract.get("gap_policy")
     if not isinstance(gap_policy, dict):
@@ -528,6 +602,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "runtime_providers": providers,
         "provider_documents": must_read,
         "acceptance_gates": gates,
+        "gaps": gaps,
         "errors": errors,
     }
     return errors, summary
@@ -555,7 +630,9 @@ def main(argv: list[str] | None = None) -> int:
             f"version={summary['construction_version']}; "
             f"planes={summary['planes']}; states={states}; "
             f"providers={','.join(summary['runtime_providers'])}; "
-            f"gates={len(summary['acceptance_gates'])})"
+            f"gates={len(summary['acceptance_gates'])}; "
+            f"gaps={summary['gaps'].get('total', 0)}; "
+            f"p0-open={summary['gaps'].get('p0_open', 0)})"
         )
     return 1 if errors else 0
 
