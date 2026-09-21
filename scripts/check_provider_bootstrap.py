@@ -19,6 +19,7 @@ _PROVIDER_SDK_ROOTS = frozenset(
         "cohere",
         "groq",
         "mistralai",
+        "litellm",
         "google.generativeai",
         "google.genai",
     }
