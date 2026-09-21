@@ -20,7 +20,8 @@
     "capability_interface_registry": "machine/capability_interfaces.json",
     "capability_interface_validator": "scripts/check_capability_interfaces.py",
     "state_topology": "machine/state_topology.json",
-    "state_topology_validator": "scripts/check_state_topology.py"
+    "state_topology_validator": "scripts/check_state_topology.py",
+    "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json"
   },
   "objectives": [
     "one product shell",
@@ -43,7 +44,8 @@
     "one transport-neutral resumable event contract with explicit replay and fail-closed backpressure",
     "every construction-plane relationship is materialized as an explicit capability interface contract",
     "one machine-readable state authority topology separating authoritative, derived, scratch, recovery, and transitional stores",
-    "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections"
+    "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections",
+    "one typed machine-readable schema catalog for cross-plane AI runtime envelopes"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -551,7 +553,8 @@
     "state authority topology architecture tag matches the active architecture",
     "derived and scratch state cannot become sole canonical authority",
     "mixed-authority and unbound-authority state is transitional and attached to an open P0 gap",
-    "authoritative state recovery precedes derived projection rebuild"
+    "authoritative state recovery precedes derived projection rebuild",
+    "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
