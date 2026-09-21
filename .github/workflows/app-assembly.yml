@@ -12,6 +12,7 @@ on:
       - "skeleton/testing/test_architecture_map.py"
       - "skeleton/testing/test_ai_app_construction.py"
       - "skeleton/testing/test_capability_interfaces.py"
+      - "skeleton/testing/test_state_topology.py"
       - "skeleton/testing/test_provider_contract.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
@@ -36,11 +37,13 @@ on:
       - "scripts/check_architecture_map.py"
       - "scripts/check_ai_app_construction.py"
       - "scripts/check_capability_interfaces.py"
+      - "scripts/check_state_topology.py"
       - "scripts/check_provider_bootstrap.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
       - "machine/ai_app_construction.json"
       - "machine/capability_interfaces.json"
+      - "machine/state_topology.json"
       - "docs/ARCHITECTURE_MAP.md"
       - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
       - "AGENTS.md"
@@ -86,6 +89,9 @@ jobs:
 
       - name: Validate capability interface registry
         run: python scripts/check_capability_interfaces.py
+
+      - name: Validate state authority topology
+        run: python scripts/check_state_topology.py
 
       - name: Validate mandatory provider bootstrap
         run: python scripts/check_provider_bootstrap.py
@@ -135,7 +141,7 @@ jobs:
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_capability_interfaces.py
-          scripts/check_provider_bootstrap.py
+          scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
         run: python scripts/check_app_assembly.py
@@ -148,6 +154,7 @@ jobs:
           skeleton/testing/test_architecture_map.py
           skeleton/testing/test_ai_app_construction.py
           skeleton/testing/test_capability_interfaces.py
+          skeleton/testing/test_state_topology.py
           skeleton/testing/test_provider_contract.py
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_cost_admission.py
