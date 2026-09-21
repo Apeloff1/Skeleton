@@ -21,6 +21,7 @@ from skeleton.provider_runtime import (
     ProviderError,
     ProviderRequest,
     _MAX_PROVIDER_RESPONSE_BYTES as _RUNTIME_MAX_PROVIDER_RESPONSE_BYTES,
+    _read_provider_json,
 )
 
 # Historical test/caller compatibility. Network transport now lives in the
