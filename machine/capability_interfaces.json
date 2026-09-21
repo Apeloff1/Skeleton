@@ -242,9 +242,16 @@
         "namespace",
         "retention class",
         "write/read/delete",
-        "provenance"
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
       ],
-      "target_failure_contract": "memory miss without authority escalation",
+      "target_failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
@@ -258,7 +265,12 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "status": "partial"
     },
@@ -994,9 +1006,16 @@
         "namespace",
         "retention class",
         "write/read/delete",
-        "provenance"
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
       ],
-      "target_failure_contract": "memory miss without authority escalation",
+      "target_failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
@@ -1012,7 +1031,12 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "status": "partial"
     },
@@ -1553,7 +1577,12 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "target_acceptance": [
         "migration forward/backward tests",
@@ -1586,14 +1615,19 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
         "no heavy imports in skeleton/__init__.py"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:memory->governance",
@@ -1622,7 +1656,12 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "target_acceptance": [
         "deletion propagation",
@@ -1657,14 +1696,19 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
         "tenant isolation tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:model-provider->configuration-secrets",
@@ -2070,9 +2114,16 @@
         "namespace",
         "retention class",
         "write/read/delete",
-        "provenance"
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
       ],
-      "target_failure_contract": "memory miss without authority escalation",
+      "target_failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
       "source_acceptance": [
         "resume tests",
         "cancellation tests",
@@ -2088,7 +2139,12 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
       "status": "partial"
     },
@@ -2837,9 +2893,16 @@
         "namespace",
         "retention class",
         "write/read/delete",
-        "provenance"
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
       ],
-      "target_failure_contract": "memory miss without authority escalation",
+      "target_failure_contract": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state",
       "source_acceptance": [
         "recall/precision eval",
         "citation correctness",
@@ -2850,9 +2913,14 @@
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:retrieval->model-provider",
