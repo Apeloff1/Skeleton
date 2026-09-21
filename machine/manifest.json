@@ -37,7 +37,7 @@
         "state": "ready",
         "ref": "integration/architecture-map-v1",
         "pr": 1904,
-        "tag": "arch-map/v2.0"
+        "tag": "arch-map/v2.6"
       }
     ],
     "product_shell_pr": 1902,
@@ -705,7 +705,7 @@
     "contract": "machine/architecture.json",
     "documentation": "docs/ARCHITECTURE_MAP.md",
     "validator": "scripts/check_architecture_map.py",
-    "tag": "arch-map/v2.0",
+    "tag": "arch-map/v2.6",
     "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit",
     "zone_policy": "acyclic dependency graph; tooling may consume machine metadata, machine metadata does not depend on tooling",
     "construction_contract": "machine/ai_app_construction.json",
