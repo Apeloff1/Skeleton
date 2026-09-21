@@ -2588,6 +2588,110 @@
         "data_class"
       ],
       "owner_plane": "application-api"
+    },
+    "context_envelope": {
+      "required_fields": [
+        "context_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "tenant_id",
+        "instruction_segments",
+        "evidence_segments",
+        "tool_schema_segments",
+        "budget",
+        "selected_tokens_estimate",
+        "omitted_segment_ids",
+        "source_snapshot",
+        "context_digest",
+        "compiled_at"
+      ],
+      "owner_plane": "prompt-context"
+    },
+    "provider_response": {
+      "required_fields": [
+        "provider",
+        "model",
+        "request_id",
+        "response_id",
+        "text",
+        "structured_output",
+        "tool_calls",
+        "finish_reason",
+        "usage",
+        "latency_ms",
+        "governance_decision_id",
+        "admission_decision_id",
+        "data_class"
+      ],
+      "owner_plane": "model-provider"
+    },
+    "provider_tool_call": {
+      "required_fields": [
+        "call_id",
+        "tool_id",
+        "arguments",
+        "arguments_digest"
+      ],
+      "owner_plane": "model-provider"
+    },
+    "tool_execution_request": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "tool_id",
+        "arguments",
+        "arguments_digest",
+        "principal",
+        "tenant_id",
+        "authority_context",
+        "resource_budget",
+        "deadline",
+        "trace_id"
+      ],
+      "owner_plane": "tool-runtime"
+    },
+    "verification_request": {
+      "required_fields": [
+        "verification_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "capability",
+        "risk_class",
+        "required_level",
+        "candidate_ref",
+        "context_snapshot_id",
+        "evidence_refs",
+        "tool_receipt_refs",
+        "artifact_refs",
+        "budget",
+        "deadline"
+      ],
+      "owner_plane": "reasoning-verification"
+    },
+    "verification_receipt": {
+      "required_fields": [
+        "verification_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "candidate_ref",
+        "level",
+        "outcome",
+        "reason_codes",
+        "claim_checks",
+        "postcondition_checks",
+        "evidence_refs",
+        "verifier_route_refs",
+        "repair_directive",
+        "confidence_band",
+        "created_at",
+        "completed_at"
+      ],
+      "owner_plane": "reasoning-verification"
     }
   },
   "release_evidence_bundle": [
@@ -4122,7 +4226,11 @@
       "POST /api/v1/conversations/{thread_id}/messages/{message_id}/edit",
       "DELETE /api/v1/conversations/{thread_id}"
     ],
-    "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land"
+    "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land",
+    "schema_version": 1,
+    "contract_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-conversation-state-authority"
   },
   "tool_runtime_blueprint": {
     "schema_version": 1,
@@ -5006,5 +5114,84 @@
       "native usage objects"
     ],
     "invariant": "all provider-native types terminate inside skeleton/provider_runtime.py"
+  },
+  "functional_ai_closure": {
+    "version": "1.0.0",
+    "status": "active",
+    "purpose": "Mandatory closure ledger for the fully functional AI path. Every listed blueprint is required until its associated P0 gap closes with executable evidence.",
+    "required_blueprints": [
+      {
+        "key": "conversation_runtime_contract",
+        "gap": "gap-conversation-state-authority",
+        "plane": "application-api",
+        "work_package": "WP-P0-CONVERSATION-STATE"
+      },
+      {
+        "key": "tool_runtime_blueprint",
+        "gap": "gap-tool-runtime-convergence",
+        "plane": "tool-runtime",
+        "work_package": "WP-P0-TOOL-RUNTIME"
+      },
+      {
+        "key": "context_compiler_blueprint",
+        "gap": "gap-context-compiler-convergence",
+        "plane": "prompt-context",
+        "work_package": "WP-P0-CONTEXT-COMPILER"
+      },
+      {
+        "key": "provider_interaction_protocol",
+        "gap": "gap-provider-interaction-protocol",
+        "plane": "model-provider",
+        "work_package": "WP-P0-PROVIDER-PROTOCOL"
+      },
+      {
+        "key": "verification_runtime_blueprint",
+        "gap": "gap-verification-evidence-contract",
+        "plane": "reasoning-verification",
+        "work_package": "WP-P0-VERIFICATION"
+      },
+      {
+        "key": "cognitive_runtime_blueprint",
+        "gap": "gap-cognitive-execution-loop",
+        "plane": "orchestration",
+        "work_package": "WP-P0-COGNITIVE-LOOP"
+      }
+    ],
+    "required_envelopes": [
+      "operation",
+      "conversation_thread",
+      "conversation_message",
+      "context_envelope",
+      "ai_execution",
+      "agent_turn",
+      "provider_request",
+      "provider_response",
+      "provider_tool_call",
+      "tool_call_proposal",
+      "tool_execution_request",
+      "tool_receipt",
+      "verification_request",
+      "verification_receipt",
+      "ai_execution_result",
+      "stream_event"
+    ],
+    "required_state_domains": [
+      "conversation-thread-state",
+      "conversation-message-state",
+      "cognitive-execution-ledger",
+      "tool-idempotency-ledger",
+      "human-approval-ledger",
+      "execution-usage-ledger",
+      "verification-receipt-ledger",
+      "final-ai-result-ledger"
+    ],
+    "closure_order": [
+      "conversation + state authority",
+      "tool runtime + provider interaction + context compiler + verification",
+      "cognitive execution loop",
+      "realtime transport/recovery",
+      "cross-plane golden journeys"
+    ],
+    "invariant": "No fully-functional-AI completion claim is valid while a listed P0 gap is open or its blueprint/envelope/state/work-package contract is missing."
   }
 }
