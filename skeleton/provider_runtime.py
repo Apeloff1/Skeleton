@@ -26,8 +26,9 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+from skeleton.contracts.context import ContextEnvelope
 from skeleton.provider_contract import (
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
@@ -200,6 +201,9 @@ class ProviderRequest:
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
+    context_id: str | None = None
+    context_digest: str | None = None
+    tool_schemas: tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +218,8 @@ class ProviderResponse:
     governance_decision_id: str | None = None
     admission_decision_id: str | None = None
     data_class: str | None = None
+    context_id: str | None = None
+    context_digest: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -503,6 +509,29 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         not isinstance(request.operation_id, str) or not request.operation_id.strip()
     ):
         raise ProviderPolicyError("model provider operation identity is invalid")
+    if (request.context_id is None) != (request.context_digest is None):
+        raise ProviderPolicyError(
+            "model provider context_id and context_digest must be supplied together"
+        )
+    if request.context_id is not None:
+        try:
+            parsed_context_id = UUID(request.context_id)
+        except (ValueError, AttributeError) as exc:
+            raise ProviderPolicyError("model provider context identity is invalid") from exc
+        if str(parsed_context_id) != request.context_id:
+            raise ProviderPolicyError("model provider context identity is invalid")
+        digest = request.context_digest
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in digest)
+        ):
+            raise ProviderPolicyError("model provider context digest is invalid")
+    for schema in request.tool_schemas:
+        if not isinstance(schema, Mapping) or not schema:
+            raise ProviderPolicyError(
+                "model provider tool schema must be a non-empty mapping"
+            )
     if isinstance(request.estimated_cost_usd, bool):
         raise ProviderPolicyError("model provider estimated cost is invalid")
     try:
@@ -519,7 +548,124 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
 def _estimated_input_tokens(request: ProviderRequest) -> int:
     characters = len(request.instructions) + len(request.prompt)
     characters += sum(len(message.content) for message in request.history)
+    characters += sum(
+        len(
+            json.dumps(
+                dict(schema),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        )
+        for schema in request.tool_schemas
+    )
     return max(1, math.ceil(characters / 4))
+
+
+_CONTEXT_DATA_CLASS_RANK = {
+    "public": 0,
+    "internal": 1,
+    "confidential": 2,
+    "restricted": 3,
+}
+
+
+def _context_data_class(envelope: ContextEnvelope) -> str:
+    if not envelope.selected_segments:
+        return "internal"
+    return max(
+        (segment.data_class for segment in envelope.selected_segments),
+        key=lambda label: _CONTEXT_DATA_CLASS_RANK[label],
+    )
+
+
+def provider_request_from_context(
+    envelope: ContextEnvelope,
+    *,
+    purpose: str = "model-inference",
+    model: str | None = None,
+    max_output_tokens: int | None = None,
+    estimated_cost_usd: float = 0.0,
+    resource_budget: ResourceBudget | None = None,
+    governance_context: GovernanceContext | None = None,
+) -> ProviderRequest:
+    """Project one immutable ContextEnvelope into the provider boundary."""
+
+    if not isinstance(envelope, ContextEnvelope):
+        raise TypeError("envelope must be a ContextEnvelope")
+    if not isinstance(purpose, str) or not purpose.strip():
+        raise ProviderPolicyError("model provider transfer purpose is invalid")
+    normalized_purpose = purpose.strip()
+
+    for segment in envelope.selected_segments:
+        if segment.purpose not in {normalized_purpose, "*"}:
+            raise ProviderPolicyError(
+                "context segment purpose does not match provider request purpose"
+            )
+
+    from skeleton.context.compiler import project_provider_context
+
+    projection = project_provider_context(envelope)
+    if not projection.prompt.strip():
+        raise ProviderInvocationError(
+            "compiled context requires a final canonical user message"
+        )
+
+    reserved_output = envelope.budget.reserved_output_tokens
+    requested_output = reserved_output if max_output_tokens is None else max_output_tokens
+    if (
+        isinstance(requested_output, bool)
+        or not isinstance(requested_output, int)
+        or requested_output <= 0
+    ):
+        raise ProviderPolicyError(
+            "compiled context requires a positive provider output reservation"
+        )
+    if requested_output > reserved_output:
+        raise ProviderPolicyError(
+            "provider output request exceeds context output reservation"
+        )
+
+    if resource_budget is None:
+        resource_budget = ResourceBudget(
+            max_input_tokens=envelope.budget.max_context_tokens,
+            max_output_tokens=reserved_output,
+        )
+    if not isinstance(resource_budget, ResourceBudget):
+        raise ProviderPolicyError("model provider resource budget is invalid")
+
+    parsed_tools: list[Mapping[str, Any]] = []
+    for raw in projection.tool_schema_contents:
+        try:
+            schema = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ProviderPolicyError("compiled tool schema is invalid JSON") from exc
+        if not isinstance(schema, Mapping) or not schema:
+            raise ProviderPolicyError(
+                "compiled tool schema must be a non-empty JSON object"
+            )
+        parsed_tools.append(dict(schema))
+
+    return ProviderRequest(
+        instructions=projection.instructions,
+        prompt=projection.prompt,
+        history=tuple(
+            AIMessage(role=item["role"], content=item["content"])
+            for item in projection.history
+        ),
+        max_output_tokens=requested_output,
+        model=model,
+        data_class=_context_data_class(envelope),
+        purpose=normalized_purpose,
+        tenant_id=envelope.tenant_id,
+        operation_id=envelope.operation_id,
+        estimated_cost_usd=estimated_cost_usd,
+        resource_budget=resource_budget,
+        governance_context=governance_context,
+        context_id=envelope.context_id,
+        context_digest=envelope.context_digest,
+        tool_schemas=tuple(parsed_tools),
+    )
 
 
 def _provider_operation_id(request: ProviderRequest) -> str:
@@ -534,6 +680,19 @@ def _provider_operation_id(request: ProviderRequest) -> str:
         digest.update(message.role.encode("utf-8"))
         digest.update(b"\x1f")
         digest.update(message.content.encode("utf-8"))
+    if request.context_digest is not None:
+        digest.update(b"\x1d")
+        digest.update(request.context_digest.encode("ascii"))
+    for schema in request.tool_schemas:
+        digest.update(b"\x1c")
+        digest.update(
+            json.dumps(
+                dict(schema),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        )
     return "provider-" + digest.hexdigest()[:24]
 
 
