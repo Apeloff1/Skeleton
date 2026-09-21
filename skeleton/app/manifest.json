@@ -51,7 +51,8 @@
       "SKELETON_MASTER_SECRET",
       "GF_SEAL_SECRET",
       "EXPO_PUBLIC_BACKEND_URL",
-      "EXPO_PUBLIC_SKELETON_URL"
+      "EXPO_PUBLIC_SKELETON_URL",
+      "SKELETON_INTERNAL_URL"
     ]
   },
   "services": [
