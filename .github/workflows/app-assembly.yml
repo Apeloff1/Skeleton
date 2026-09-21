@@ -70,6 +70,7 @@ on:
       - "machine/manifest.json"
       - "machine/architecture.json"
       - "machine/ai_app_construction.json"
+      - "machine/ai_build_queue.json"
       - "machine/ai_master_plan.json"
       - "machine/ai_edge_case_catalog.json"
       - "machine/ai_p0_edge_case_matrix.json"
