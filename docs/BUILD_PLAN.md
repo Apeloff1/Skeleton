@@ -1559,6 +1559,11 @@ This is the preferred dependency order for construction.
 13. ⬜ Implement controlled adaptation lanes.
 14. ⬜ Implement shadow/canary/rollback scientific promotion.
 15. ⬜ Add continuous evidence refresh and architecture-deprecation machinery.
+16. ⬜ Implement the optimizer contract, stable baseline adapters, and `ParameterOptimizationMap`.
+17. ⬜ Add optimizer flight-recorder telemetry, numerical circuit breakers, and atomic optimizer checkpoint binding.
+18. 🧪 Run optimizer challengers (memory-efficient, structure-aware, orthogonalized, sign/schedule-light) through equal-token/equal-wall-clock gates.
+19. 🧪 Build Track AA fork harnesses for sparse attention, hybrid blocks, MoE, long context, low precision, and distributed/serving step changes.
+20. ⬜ Bind every Z/AA validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
 Parallel work is allowed where contracts are already frozen; promotion gates are not bypassed to gain speed.
 
