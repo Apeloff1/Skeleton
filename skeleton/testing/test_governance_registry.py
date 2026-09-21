@@ -304,3 +304,41 @@ def test_register_canonical_write_requires_purpose_and_preserves_registry_author
             purposes=("model-inference",),
             created_at=10.0,
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "kwargs", "match"),
+    [
+        (
+            "purposes",
+            {"purposes": "model-inference"},
+            "purpose must be a collection",
+        ),
+        (
+            "deletion_targets",
+            {
+                "purposes": ("model-inference",),
+                "deletion_targets": "memory",
+            },
+            "deletion target must be a collection",
+        ),
+    ],
+)
+def test_register_canonical_write_rejects_scalar_string_collections(
+    field: str,
+    kwargs: dict[str, object],
+    match: str,
+) -> None:
+    registry = GovernanceRegistry()
+    base: dict[str, object] = {
+        "record_id": f"bad-{field}",
+        "tenant_id": "tenant-a",
+        "source_ref": f"memory://bad-{field}",
+        "data_class": "internal",
+        "purposes": ("model-inference",),
+        "created_at": 10.0,
+    }
+    base.update(kwargs)
+
+    with pytest.raises(DataGovernanceDenied, match=match):
+        registry.register_canonical_write("memory", **base)
