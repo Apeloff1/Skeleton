@@ -173,6 +173,39 @@ def test_build_and_get_uses_exact_built_artifact(tmp_path: Path) -> None:
     assert registry.status().abi_version == 4
 
 
+def test_status_serializes_against_concurrent_close(tmp_path: Path) -> None:
+    probe = _preflight(tmp_path)
+    status_started = threading.Event()
+    status_release = threading.Event()
+
+    class BlockingStatusAccelerator(_FakeNativeAccelerator):
+        def status(self) -> SimpleNamespace:
+            status_started.set()
+            assert status_release.wait(timeout=2.0)
+            return super().status()
+
+    instance = BlockingStatusAccelerator(Path(probe.library))
+    registry = NativeAcceleratorRegistry(
+        factory=lambda: instance,
+        preflight_provider=lambda: probe,
+    )
+    registry.get()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        reading = pool.submit(registry.status)
+        assert status_started.wait(timeout=1.0)
+        closing = pool.submit(registry.close)
+        time.sleep(0.05)
+        assert closing.done() is False
+        status_release.set()
+        snapshot = reading.result(timeout=2.0)
+        closing.result(timeout=2.0)
+
+    assert snapshot.initialized is True
+    assert instance.close_calls == 1
+    assert registry.initialized() is False
+
+
 def test_health_probe_reports_prebuilt_and_loaded_states(tmp_path: Path) -> None:
     probe = _preflight(tmp_path)
     instance = _FakeNativeAccelerator(Path(probe.library))
