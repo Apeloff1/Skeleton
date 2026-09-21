@@ -6,6 +6,7 @@ executors are deterministic and attested; effectful executors must be replay-saf
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Callable
 
 from core.academy_product import continue_learning, practice, progress as academy_progress
@@ -129,10 +130,12 @@ class NativeProductExecutors:
             files = [dict(item) for item in supplied]
 
         builder = build_web_artifact if kind == "web" else build_source_artifact
+        built_at = datetime.fromisoformat(operation.admitted_at).timestamp()
         artifact = builder(
             game_name,
             files=files,
             build_token=operation.id,
+            built_at=built_at,
         )
         public = dict(artifact)
         public.pop("path", None)
