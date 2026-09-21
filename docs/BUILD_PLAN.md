@@ -15,6 +15,7 @@ Research experiment protocols: [architecture/frontier-research-experiment-protoc
 Research saturation accountability: [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md)
 Historical research lineage: [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md)
 Research source topology: [architecture/research-source-topology.md](architecture/research-source-topology.md)
+Research dependency map: [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md)
 
 ## 0. Construction constitution
 
@@ -3577,6 +3578,23 @@ The extended protocols add:
 - source-adapter conformance.
 
 **Gate:** every high-priority unresolved question has either a direct RXP protocol or an explicitly documented reason it cannot yet be tested locally.
+
+### AD83. Research dependency graph — ⬜
+
+Maintain explicit edges:
+
+```text
+RQ -> RDE -> RXP -> evidence -> ADR -> AA/AC candidate -> AB compatibility -> promotion
+```
+
+For each of the nineteen research domains, record:
+- affected construction targets;
+- blocking debt;
+- relevant protocol;
+- non-research production blockers;
+- cross-domain side effects.
+
+**Gate:** architecture progress cannot be reported as nearly complete while unnamed blocking research/system edges remain hidden.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
