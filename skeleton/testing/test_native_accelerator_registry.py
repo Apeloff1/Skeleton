@@ -387,3 +387,20 @@ def test_unknown_native_accelerator_names_fail_closed(tmp_path: Path) -> None:
     ):
         with pytest.raises(NativeAcceleratorRegistryError, match="unknown"):
             operation()
+
+
+def test_default_native_registry_is_process_singleton_and_thread_safe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(registry_module, "_default_registry", None)
+    barrier = threading.Barrier(16)
+
+    def resolve() -> NativeAcceleratorRegistry:
+        barrier.wait()
+        return get_default_native_registry()
+
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        registries = list(pool.map(lambda _index: resolve(), range(16)))
+
+    assert all(registry is registries[0] for registry in registries)
+    assert registries[0].names == ("vector",)
