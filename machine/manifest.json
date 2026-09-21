@@ -667,7 +667,7 @@
   ],
   "machine_rules": [
     "Do not add a provider SDK import outside the canonical provider boundary.",
-    "All runtime model providers must activate through backend/core/ai_provider.py after backend/core/provider_architecture.py issues a valid architecture receipt.",
+    "All credential-bearing AI provider families must obtain a valid receipt from skeleton/provider_contract.py before network I/O; product runtime models additionally activate through backend/core/ai_provider.py.",
     "Read machine/ai_app_construction.json and docs/AI_APP_CONSTRUCTION_MANUAL.md before implementing or assembling AI capabilities.",
     "Read machine/architecture.json before modifying runtime structure.",
     "Read this manifest before modifying the repository.",
@@ -719,7 +719,7 @@
     "validator": "scripts/check_ai_app_construction.py",
     "provider_validator": "scripts/check_provider_bootstrap.py",
     "construction_version": "3.0.0",
-    "provider_rule": "all runtime providers must load/acknowledge active contracts before activation; undeclared providers are denied",
+    "provider_rule": "all credential-bearing AI provider families must load and acknowledge the active contracts through skeleton/provider_contract.py before activation; undeclared providers are denied",
     "shared_provider_contract": "skeleton/provider_contract.py",
     "provider_families": [
       "runtime_model",
