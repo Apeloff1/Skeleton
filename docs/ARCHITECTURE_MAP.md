@@ -304,7 +304,7 @@ A production store may replace SQLite, but it must pass the same semantics.
 Persistence technology is replaceable; stream ordering and recovery behavior are
 not.
 
-## 14. Structural blueprint — `structure-map/v1.2`
+## 14. Structural blueprint — `structure-map/v1.3`
 
 The architecture now has an explicit physical-placement layer. The purpose is to
 prevent a common failure mode in a large AI repository: a capability is logically
@@ -444,7 +444,7 @@ The validator now rejects all of the following:
 - a composition root outside its declared zone;
 - drift between architecture, repository, and runtime structure tags.
 
-The repository and runtime manifests carry `structure-map/v1.2` so a build
+The repository and runtime manifests carry `structure-map/v1.3` so a build
 cannot silently validate an architecture map while running a differently
 structured application.
 
@@ -552,4 +552,30 @@ operator/CI scope instead of pretending to be another application service.
 The validator rejects missing or duplicate plane execution mappings, unknown
 profiles or hosts, host/zone mismatches, runtime-node/zone mismatches, and
 incomplete execution-profile semantics.
+
+### 14.10 Runtime lifecycle
+
+Startup, readiness, shutdown, upgrade, and crash behavior are now part of the
+structural contract under `runtime_lifecycle`.
+
+Startup is dependency ordered:
+
+0. **data-foundation** — `mongo`, `chroma` (parallel); barrier: started-and-health-probe-eligible
+1. **core-services** — `skeleton`, `backend` (parallel); barrier: ready-before-dependent-product-start
+2. **product-shell** — `frontend` (serial); barrier: ready-after-backend-and-engine
+
+Shutdown is the inverse dependency order:
+
+0. **stop-product-admission** — `frontend` (parallel); stop new user mutations and preserve bounded resume state
+1. **drain-core-services** — `backend`, `skeleton` (parallel); stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence
+2. **stop-data-foundation** — `chroma`, `mongo` (parallel); fence writers, flush durable state, then stop stores
+
+The validator proves that each runtime node appears exactly once in both
+sequences, that every dependency is started before its consumer, and that every
+consumer stops before its dependency.
+
+Readiness is not liveness. A surviving process cannot report ready while a
+required dependency is unavailable, while protected provider execution lacks
+its architecture receipt, or while the product shell lacks a service it
+declares as required.
 
