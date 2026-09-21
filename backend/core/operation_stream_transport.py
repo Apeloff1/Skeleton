@@ -31,7 +31,10 @@ from skeleton.frontier.operation_stream import (
     StreamEvent,
     StreamReplayGapError,
 )
-from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
+from skeleton.frontier.operation_stream_store import (
+    SQLiteOperationEventStore,
+    StreamConsumerCheckpoint,
+)
 from skeleton.persistence.operation_store import (
     OperationStoreConflict,
     OperationStoreError,
@@ -231,6 +234,8 @@ class OperationStreamTransport:
         tenant_id: str,
         after_sequence: int = 0,
         limit: int = 1000,
+        consumer_id: str | None = None,
+        consumer_lease_seconds: int = 300,
     ) -> OperationStreamBatch:
         """Drain committed state transitions, then replay events after cursor."""
 
@@ -238,6 +243,12 @@ class OperationStreamTransport:
             operation_id,
             tenant_id=tenant_id,
         )
+        if consumer_id is not None:
+            self.event_store.register_consumer(
+                operation_id,
+                consumer_id,
+                lease_seconds=consumer_lease_seconds,
+            )
         self.dispatch_pending(
             operation_id,
             tenant_id=tenant_id,
@@ -261,6 +272,36 @@ class OperationStreamTransport:
             events=events,
             after_sequence=after_sequence,
         )
+
+    def acknowledge(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        consumer_id: str,
+        sequence: int,
+        consumer_lease_seconds: int = 300,
+    ) -> StreamConsumerCheckpoint:
+        """Advance one tenant-owned consumer cursor after client-side apply."""
+
+        self._authorized_operation(operation_id, tenant_id=tenant_id)
+        return self.event_store.acknowledge_consumer(
+            operation_id,
+            consumer_id,
+            sequence,
+            lease_seconds=consumer_lease_seconds,
+        )
+
+    def compact_acknowledged(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+    ) -> int:
+        """Compact only history acknowledged by every active consumer."""
+
+        self._authorized_operation(operation_id, tenant_id=tenant_id)
+        return self.event_store.compact_acknowledged(operation_id)
 
     def cancel(
         self,
@@ -306,6 +347,7 @@ __all__ = [
     "OperationStreamBatch",
     "OperationStreamTransport",
     "OperationTransportConflict",
+    "StreamConsumerCheckpoint",
     "OperationTransportError",
     "StreamReplayGapError",
     "encode_sse_event",
