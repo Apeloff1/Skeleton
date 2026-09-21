@@ -276,3 +276,51 @@ def test_backend_does_not_claim_skeleton_api_v1_prefix():
 
     assert "/api/v1" not in registry
     assert "/api/v1" not in server
+
+
+def test_manifest_declares_explicit_runtime_modes():
+    manifest = load_manifest()
+
+    assert manifest.hot_compose_file == "docker-compose.hot.yml"
+    assert manifest.mode_env("development")["BUILD_TARGET"] == "development"
+    production = manifest.mode_env("production")
+    assert production["BUILD_TARGET"] == "production"
+    assert production["FRONTEND_BUILD_TARGET"] == "production"
+    assert production["FRONTEND_CONTAINER_PORT"] == "8080"
+
+
+def test_hot_compose_command_adds_only_explicit_overlay():
+    command = compose_command("up", hot=True, build=False)
+
+    assert command[:6] == (
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.yml",
+        "-f",
+        "docker-compose.hot.yml",
+    )
+    assert command[6:8] == ("up", "-d")
+
+
+def test_base_compose_is_image_based_and_hot_overlay_owns_source_mounts():
+    root = find_repo_root(Path(__file__))
+    base = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    hot = (root / "docker-compose.hot.yml").read_text(encoding="utf-8")
+
+    assert "./backend:/app" not in base
+    assert "./skeleton:/app/skeleton" not in base
+    assert "./frontend:/app" not in base
+
+    assert "./backend:/app:ro" in hot
+    assert "./skeleton:/app/skeleton:ro" in hot
+    assert "./frontend:/app" in hot
+
+
+def test_cli_rejects_production_hot_combination_before_preflight(capsys):
+    from skeleton.app.cli import run_app_cli
+
+    exit_code = run_app_cli(["up", "--production", "--hot"])
+
+    assert exit_code == 2
+    assert "mutually exclusive" in capsys.readouterr().out
