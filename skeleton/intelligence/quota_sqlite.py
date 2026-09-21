@@ -735,7 +735,7 @@ class SqliteTenantQuotaLedger:
         if not isinstance(actual, UsageEstimate):
             raise QuotaError("actual must be UsageEstimate")
         timestamp = time.time() if now is None else _finite_nonnegative(now, "now")
-        actual_usage = QuotaUsage.from_estimate(actual)
+        reported_usage = QuotaUsage.from_estimate(actual)
 
         with self._write() as conn:
             row = conn.execute(
@@ -743,8 +743,21 @@ class SqliteTenantQuotaLedger:
                 (key,),
             ).fetchone()
             if row is None:
+                completed = conn.execute(
+                    "SELECT * FROM quota_completions WHERE reservation_id = ?",
+                    (key,),
+                ).fetchone()
+                if completed is not None:
+                    existing = self._completion(completed)
+                    if existing.actual == reported_usage:
+                        return existing
+                    raise QuotaConflict(
+                        "completed reservation replayed with different actual usage"
+                    )
                 raise QuotaError("unknown active quota reservation")
             reservation = self._reservation(row)
+            observed_usage = self._metered_usage(conn, key)
+            actual_usage = self._usage_max(reported_usage, observed_usage)
             quota_row = self._quota_row(conn, reservation.tenant_id)
             quota = self._quota(quota_row)
             committed = self._committed(quota_row)
@@ -844,6 +857,30 @@ class SqliteTenantQuotaLedger:
                     (tenant,),
                 ).fetchone()[0]
             )
+            usage_events = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM quota_usage_events WHERE tenant_id = ?",
+                    (tenant,),
+                ).fetchone()[0]
+            )
+            category_rows = conn.execute(
+                """
+                SELECT category,
+                       COALESCE(SUM(delta_tool_calls), 0) AS tool_calls,
+                       COALESCE(SUM(delta_artifact_bytes), 0) AS artifact_bytes
+                FROM quota_usage_events
+                WHERE tenant_id = ?
+                GROUP BY category
+                """,
+                (tenant,),
+            ).fetchall()
+            metered_by_category = {
+                str(row["category"]): {
+                    "tool_calls": int(row["tool_calls"]),
+                    "artifact_bytes": int(row["artifact_bytes"]),
+                }
+                for row in category_rows
+            }
             return {
                 "tenant_id": tenant,
                 "window_id": quota.window_id,
@@ -861,6 +898,8 @@ class SqliteTenantQuotaLedger:
                 "projected": projected.as_dict(),
                 "active_reservations": active,
                 "completions": completions,
+                "usage_events": usage_events,
+                "metered_by_category": metered_by_category,
                 "over_quota_dimensions": list(
                     _quota_excess(quota, projected)
                 ),
@@ -890,6 +929,10 @@ class SqliteTenantQuotaLedger:
                 raise QuotaConflict("new quota window_id must change")
             conn.execute(
                 "DELETE FROM quota_completions WHERE tenant_id = ?",
+                (tenant,),
+            )
+            conn.execute(
+                "DELETE FROM quota_usage_events WHERE tenant_id = ?",
                 (tenant,),
             )
             conn.execute(
