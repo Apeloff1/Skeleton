@@ -194,7 +194,7 @@ def test_structural_blueprint_partitions_every_construction_plane() -> None:
         for plane_id in domain["planes"]
     ]
 
-    assert blueprint["structure_tag"] == "structure-map/v1.1"
+    assert blueprint["structure_tag"] == "structure-map/v1.2"
     assert len(placed_ids) == len(set(placed_ids))
     assert set(placed_ids) == plane_ids
     assert len(recovery_ids) == len(set(recovery_ids))
@@ -316,6 +316,9 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "recovery_domains": 8,
         "dependency_exceptions": 0,
         "acceptance_edges": 3,
+        "execution_hosts": 4,
+        "execution_profiles": 10,
+        "plane_execution": 27,
     }
 
 
@@ -334,3 +337,57 @@ def test_repository_manifest_links_architecture_and_structure_tags() -> None:
     assert layer["tag"] == architecture["architecture_tag"]
     assert layer["structure_tag"] == architecture["structural_blueprint"]["structure_tag"]
     assert layer["ref"] == assembly["architecture_branch"]
+
+def test_execution_topology_covers_every_plane_once() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    blueprint = architecture["structural_blueprint"]
+
+    plane_ids = {plane["id"] for plane in construction["planes"]}
+    executions = blueprint["plane_execution"]
+    execution_planes = [item["plane"] for item in executions]
+    profiles = {profile["id"] for profile in blueprint["execution_profiles"]}
+    hosts = {host["id"] for host in blueprint["execution_hosts"]}
+
+    assert len(execution_planes) == len(set(execution_planes))
+    assert set(execution_planes) == plane_ids
+    assert all(item["profile"] in profiles for item in executions)
+    assert all(item["host"] in hosts for item in executions)
+
+
+def test_execution_hosts_match_structural_placement_zones() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    blueprint = architecture["structural_blueprint"]
+    placements = {
+        item["plane"]: item
+        for item in blueprint["plane_placements"]
+    }
+    hosts = {
+        item["id"]: item
+        for item in blueprint["execution_hosts"]
+    }
+
+    for execution in blueprint["plane_execution"]:
+        plane = execution["plane"]
+        assert execution["zone"] == placements[plane]["zone"]
+        assert execution["zone"] in hosts[execution["host"]]["allowed_zones"]
+
+
+def test_structural_validator_rejects_execution_host_zone_drift() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    broken = deepcopy(architecture)
+    execution = next(
+        item
+        for item in broken["structural_blueprint"]["plane_execution"]
+        if item["plane"] == "application-api"
+    )
+    execution["host"] = "frontend-client"
+    zones = {zone["id"]: zone for zone in broken["zones"]}
+    errors: list[str] = []
+
+    _validate_structural_blueprint(broken, zones, REPO_ROOT, errors)
+
+    assert any(
+        "application-api zone application is not allowed by host frontend-client" in error
+        for error in errors
+    )
