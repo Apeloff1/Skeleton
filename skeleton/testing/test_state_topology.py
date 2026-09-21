@@ -60,23 +60,37 @@ def test_chroma_is_not_the_target_authority_for_canonical_product_state() -> Non
         for domain in chroma_domains
         if domain["id"] == "backend-rag-local-chroma"
     )
-    assert legacy["authority"] == "mixed-transitional"
-    assert legacy["gap"] == "gap-state-authority-convergence"
+    assert legacy["authority"] == "derived"
+    assert legacy["rebuildable"] is True
+    assert "gap" not in legacy
 
 
-def test_operation_state_unbound_authority_is_explicitly_blocked_by_p0_gap() -> None:
+def test_operation_state_is_production_bound_and_stream_is_non_authoritative() -> None:
     topology = _topology()
-    operation = next(
-        domain
-        for domain in topology["state_domains"]
-        if domain["id"] == "canonical-operation-state"
-    )
+    domains = {domain["id"]: domain for domain in topology["state_domains"]}
+    stores = {store["id"]: store for store in topology["physical_stores"]}
 
-    assert operation["authority"] == "authoritative-unbound"
-    assert operation["physical_store"] == "operation-state-unbound"
-    assert operation["status"] == "transitional"
-    assert operation["gap"] == "gap-streaming-protocol"
+    operation = domains["canonical-operation-state"]
+    stream = domains["operation-event-stream"]
+
+    assert operation["authority"] == "authoritative"
+    assert operation["source_of_truth"] is True
+    assert operation["physical_store"] == "operation-state-sqlite"
+    assert operation["status"] == "production-bound"
     assert operation["rebuildable"] is False
+    assert operation["gap"] == "gap-state-authority-convergence"
+
+    assert stream["authority"] == "durable-projection"
+    assert stream["source_of_truth"] is False
+    assert stream["physical_store"] == "operation-stream-sqlite"
+    assert stream["status"] == "production-bound"
+    assert stream["derived_from"] == ["canonical-operation-state"]
+
+    for store_id in ("operation-state-sqlite", "operation-stream-sqlite"):
+        store = stores[store_id]
+        assert store["runtime_service"] == "skeleton"
+        assert store["compose_file"] == "docker-compose.yml"
+        assert store["volumes"] == ["skeleton_data"]
 
 
 def test_operation_event_log_does_not_replace_operation_state_contract() -> None:
@@ -188,3 +202,17 @@ def test_functional_ai_state_domains_are_required_by_construction_closure() -> N
     required = set(construction["functional_ai_closure"]["required_state_domains"])
     assert required
     assert required <= domain_ids
+
+
+def test_durable_projection_is_non_authoritative_but_not_required_to_be_rebuildable() -> None:
+    topology = _topology()
+    stream = next(
+        domain
+        for domain in topology["state_domains"]
+        if domain["id"] == "operation-event-stream"
+    )
+
+    assert stream["authority"] == "durable-projection"
+    assert stream["source_of_truth"] is False
+    assert stream["rebuildable"] is False
+    assert stream["derived_from"] == ["canonical-operation-state"]
