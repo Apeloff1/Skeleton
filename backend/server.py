@@ -3351,7 +3351,7 @@ async def health_ready():
                            "error": "probe_failed",
                            "note": "DB warming/unreachable — readiness not failed (soft check)"}
 
-    # 2) AI key
+    # 2) Canonical AI provider + architecture receipt
     try:
         checks["ai_provider"] = {
             "ok": ai_service.available,
@@ -3362,8 +3362,8 @@ async def health_ready():
                 "AI provider is unavailable or has not acknowledged the active construction contract"
             )
     except Exception as e:
-        logger.warning("health probe failed (ai_key): %s", type(e).__name__)
-        checks["ai_key"] = {"ok": False, "error": "probe_failed"}
+        logger.warning("health probe failed (ai_provider): %s", type(e).__name__)
+        checks["ai_provider"] = {"ok": False, "error": "probe_failed"}
 
     # 3) Vault writable (galaxy-studio)
     try:
