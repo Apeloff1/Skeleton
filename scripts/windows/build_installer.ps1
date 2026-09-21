@@ -40,8 +40,31 @@ foreach ($Path in @($BuildRoot, $OutputDir)) {
 }
 New-Item -ItemType Directory -Force -Path $BuildRoot, $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec, $OutputDir | Out-Null
 
-Write-Host "==> Staging exact Git payload from $SourceRef"
-& git -C $RepoRoot archive --format=zip --output=$ArchivePath $SourceRef
+Write-Host "==> Staging curated application payload from $SourceRef"
+$RuntimePaths = @(
+    ".dockerignore",
+    ".env.example",
+    "Dockerfile",
+    "README.md",
+    "docker-compose.yml",
+    "docker-compose.hot.yml",
+    "pyproject.toml",
+    "requirements.txt",
+    "backend",
+    "frontend",
+    "skeleton",
+    "scripts",
+    "packaging"
+)
+$ArchiveArgs = @(
+    "-C", $RepoRoot,
+    "archive",
+    "--format=zip",
+    "--output=$ArchivePath",
+    $SourceRef,
+    "--"
+) + $RuntimePaths
+& git @ArchiveArgs
 if ($LASTEXITCODE -ne 0) {
     throw "git archive failed"
 }
