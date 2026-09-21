@@ -26,7 +26,7 @@ _PROVIDER_SDK_ROOTS = frozenset(
 )
 _ALLOWED_PROVIDER_SDK_IMPORTERS = frozenset(
     {
-        "backend/core/ai_provider.py",
+        "skeleton/provider_runtime.py",
     }
 )
 _SHADOW_PROVIDER_RUNTIME_MODULES = frozenset(
@@ -355,18 +355,23 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             + ", ".join(undeclared_surfaces)
         )
 
-    backend = repo_root / "backend"
-    if backend.is_dir():
-        for path in sorted(backend.rglob("*.py")):
+    for root_name in ("backend", "skeleton"):
+        source_root = repo_root / root_name
+        if not source_root.is_dir():
+            continue
+        for path in sorted(source_root.rglob("*.py")):
             relative = path.relative_to(repo_root).as_posix()
-            if relative in _ALLOWED_PROVIDER_SDK_IMPORTERS:
-                continue
-            hits = _provider_sdk_imports(path)
-            if hits:
-                errors.append(
-                    f"provider SDK bypass outside canonical boundary: {relative}: {', '.join(hits)}"
-                )
-            if relative not in _ALLOWED_SHADOW_RUNTIME_IMPORTERS:
+            if relative not in _ALLOWED_PROVIDER_SDK_IMPORTERS:
+                hits = _provider_sdk_imports(path)
+                if hits:
+                    errors.append(
+                        "provider SDK bypass outside canonical boundary: "
+                        f"{relative}: {', '.join(hits)}"
+                    )
+
+            # The frontier protocol/runtime is engine-local library code. Backend
+            # feature code may not import it as an alternate model execution path.
+            if root_name == "backend" and relative not in _ALLOWED_SHADOW_RUNTIME_IMPORTERS:
                 shadow_hits = _shadow_provider_runtime_imports(path)
                 if shadow_hits:
                     errors.append(
