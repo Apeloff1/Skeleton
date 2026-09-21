@@ -124,11 +124,6 @@ def test_append_user_message_passes_version_and_idempotency(
 ):
     original = _thread()
     message = _message(original)
-    updated = ConversationThread(
-        **{
-            **original.__dict__,
-        }
-    ) if False else _thread(version=2, sequence=1)
     # Keep identity stable while advancing version/sequence.
     updated = ConversationThread(
         thread_id=original.thread_id,
