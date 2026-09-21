@@ -199,3 +199,59 @@ Hive `bundle`/`pull`/`consensus` interchange both neos and both LoRA banks.
 Sleep replay SGD both neos. Dodecahedron seal has twelve faces; `number == 12` is complete.
 Birth is closed-world. HuggingFace and Kimi bind as teachers (`bind_hf`, `bind_kimi`);
 neo distills their text. No import-time download.
+
+---
+
+## 10. Scientific evidence and architecture evolution
+
+Skeleton separates **knowledge absorption**, **research evaluation**, and **production
+promotion**. Papers, preprints, benchmarks, model reports, and external implementations are
+evidence inputs; none are production authority by themselves.
+
+The canonical research path is:
+
+```text
+source -> versioned evidence -> claim/provenance graph -> local experiment
+       -> benchmark + ablation + challenge -> architecture decision
+       -> shadow -> canary -> promoted version -> monitoring / rollback
+```
+
+Serving continues to consume only promoted state. Research workers, ingestion workers,
+challenger policies, and training jobs cannot directly mutate serving-visible knowledge,
+deployed weights, privileged tool policy, or runtime authority.
+
+The model substrate is intentionally replaceable. Dense Transformer, sparse, state-space,
+hybrid, mixture-of-experts, adapters, and future model families must sit behind stable model
+and runtime contracts rather than leak family-specific assumptions into the kernel.
+
+Reasoning is also a budgeted runtime policy. Direct generation, self-consistency,
+decomposition, search, verifier-guided reasoning, and tool-assisted investigation are modes
+selected by task difficulty, uncertainty, consequence, latency, cost, and measured marginal
+benefit. No reasoning mode receives unbounded compute.
+
+Memory is split conceptually into working, episodic, semantic, and procedural classes, each
+with different write/promotion semantics. Retrieved or remembered content retains provenance
+and trust metadata and cannot elevate its own instruction authority.
+
+Tool side effects follow the canonical sequence:
+
+```text
+ToolIntent -> capability/policy checks -> validation -> approval/risk gate
+           -> ValidatedToolCall -> execution -> ToolExecutionReceipt
+           -> observation -> verification
+```
+
+Verification is plural: deterministic checks, tests, properties, fuzzing, source validation,
+learned critics, process/outcome verifiers, and formal techniques may all contribute. No
+single learned judge is treated as truth.
+
+Canonical navigation for this layer:
+
+- [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md) — master human index and authority order;
+- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–Y construction sequence;
+- [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md) — scientific evidence, experiment, and promotion contract;
+- [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
+- [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion.
+
+The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
+numbered architecture round. A future architecture round that is not indexed is incomplete.
