@@ -96,6 +96,7 @@ FIRST_PARTY_PREFIXES = (
     "memory/",
     "satellites/",
     ".emergent/",
+    ".machine/",
 )
 
 BINARY_SUFFIXES = frozenset(

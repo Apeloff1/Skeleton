@@ -141,6 +141,51 @@ jobs:
             skeleton/testing/test_jvm_accelerator_registry.py \
             skeleton/testing/test_jvm_accelerator_runtime_status.py
 
+  assembly-accelerators:
+    if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
+    name: "Assembly Vector Accelerators"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - name: Install focused Assembly runtime/test slice
+        run: |
+          python -m pip install \
+            "pytest>=8,<9" \
+            "pydantic>=2.5,<3" \
+            "pydantic-settings>=2.1,<3"
+      - name: Build and self-test x86-64 Assembly kernels
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64"
+          python scripts/build_asm_accelerator.py \
+            --output-dir "$RUNNER_TEMP/skeleton-asm" \
+            --self-test \
+            --json
+      - name: Python bridge, fallback, and real-kernel tests
+        env:
+          PYTHONPATH: "."
+          SKELETON_ASM_CACHE_DIR: ${{ runner.temp }}/skeleton-asm
+        run: |
+          set -euo pipefail
+          python -m compileall -q skeleton/native skeleton/memory
+          python -m pytest -q \
+            skeleton/testing/test_asm_vector_accelerator.py \
+            skeleton/testing/test_asm_vector_store.py \
+            skeleton/testing/test_asm_c_abi.py \
+            skeleton/testing/test_native_accelerator_registry.py
+          python scripts/benchmark_asm_vector_accelerator.py \
+            --library "$SKELETON_ASM_CACHE_DIR/libskeleton_asm_v4_x86_64.so" \
+            --dimensions 33 \
+            --rows 32 \
+            --queries 3 \
+            --iterations 1 \
+            --warmup 0 \
+            --json
+
   school-jeeves-test:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     name: "Jeeves School Reasoning"
@@ -253,7 +298,7 @@ jobs:
     name: "Docker Build"
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    needs: [skeleton-test, java-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
+    needs: [skeleton-test, java-accelerators, assembly-accelerators, school-jeeves-test, cockpit-smoke, backend-test, backend-import-smoke, frontend]
     if: github.ref == 'refs/heads/main'
     permissions: {contents: read, packages: write}
     steps:

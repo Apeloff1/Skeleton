@@ -159,8 +159,6 @@ class GovernanceReorganizationTests(unittest.TestCase):
     def test_governance_report_is_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            builder = RepositoryModelBuilder(root)
-            # build config after creating it
             model = fixture(root)
             builder = RepositoryModelBuilder(root)
             first = validate_governance(model, builder.config)

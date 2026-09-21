@@ -73,12 +73,18 @@ class VectorStore:
         *,
         use_jvm_acceleration: bool = False,
         accelerator: Any = None,
+        use_asm_acceleration: bool = False,
+        asm_accelerator: Any = None,
     ):
         self._embedder_fn: Callable[[str], List[float]] = embedder or HashEmbedder(dims).embed
         self._entries: Dict[str, VectorEntry] = {}
         self._stats = {"added": 0, "queries": 0}
         self._use_jvm_acceleration = bool(use_jvm_acceleration)
         self._accelerator = accelerator
+        self._use_asm_acceleration = bool(use_asm_acceleration)
+        self._asm_accelerator = asm_accelerator
+        self._asm_revision = 0
+        self._asm_prepared_cache: tuple[int, Any] | None = None
         self._acceleration = {
             "attempts": 0,
             "successes": 0,
@@ -89,12 +95,26 @@ class VectorStore:
             "range_attempts": 0,
             "range_successes": 0,
         }
+        self._asm_acceleration = {
+            "attempts": 0,
+            "successes": 0,
+            "fallbacks": 0,
+            "bypassed_small_batch": 0,
+            "batch_attempts": 0,
+            "batch_successes": 0,
+            "range_attempts": 0,
+            "range_successes": 0,
+            "prepared_builds": 0,
+            "prepared_hits": 0,
+            "prepared_invalidations": 0,
+        }
 
     def add(self, chunk: Chunk) -> None:
         vector = self._embedder_fn(chunk.text)
         norm = math.sqrt(sum(v * v for v in vector)) or 1.0
         self._entries[chunk.chunk_id] = VectorEntry(chunk=chunk, vector=vector, norm=norm)
         self._stats["added"] += 1
+        self._invalidate_asm_prepared_cache()
 
     def add_texts(self, texts: List[str], metadata: Optional[Dict[str, Any]] = None) -> int:
         for i, text in enumerate(texts):
@@ -140,6 +160,33 @@ class VectorStore:
                 self._acceleration["bypassed_small_batch"] += 1
             except Exception:
                 self._acceleration["fallbacks"] += 1
+
+        if self._use_asm_acceleration and top_k > 0:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    hits = self._asm_top_k(
+                        asm_accelerator,
+                        qv,
+                        qnorm,
+                        candidates,
+                        min(top_k, len(candidates)),
+                        metadata_filter=metadata_filter,
+                    )
+                    self._asm_acceleration["successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
 
         scored: List[Tuple[float, VectorEntry]] = []
         for entry in candidates:
@@ -218,6 +265,41 @@ class VectorStore:
                 self._acceleration["bypassed_small_batch"] += 1
             except Exception:
                 self._acceleration["fallbacks"] += 1
+
+        if self._use_asm_acceleration and top_k > 0:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    self._asm_acceleration["batch_attempts"] += 1
+                    batches = self._asm_top_k_many(
+                        asm_accelerator,
+                        embedded,
+                        candidates,
+                        min(top_k, len(candidates)),
+                        metadata_filter=metadata_filter,
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError(
+                            "Assembly accelerator returned wrong batch query count"
+                        )
+                    self._asm_acceleration["successes"] += 1
+                    self._asm_acceleration["batch_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
 
         output: List[List[ScoredChunk]] = []
         for query_vector, query_norm in embedded:
@@ -306,6 +388,36 @@ class VectorStore:
                 self._acceleration["bypassed_small_batch"] += 1
             except Exception:
                 self._acceleration["fallbacks"] += 1
+
+        if self._use_asm_acceleration:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    self._asm_acceleration["range_attempts"] += 1
+                    hits = self._asm_range_search(
+                        asm_accelerator,
+                        qv,
+                        qnorm,
+                        candidates,
+                        cosine_threshold,
+                        max_hits=bounded_results,
+                        metadata_filter=metadata_filter,
+                    )
+                    self._asm_acceleration["successes"] += 1
+                    self._asm_acceleration["range_successes"] += 1
+                    return [
+                        ScoredChunk(
+                            chunk=candidates[hit.index].chunk,
+                            score=(hit.similarity + 1.0) / 2.0,
+                            plane="rag",
+                        )
+                        for hit in hits
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
 
         scored: List[Tuple[float, VectorEntry]] = []
         for entry in candidates:
@@ -403,6 +515,42 @@ class VectorStore:
             except Exception:
                 self._acceleration["fallbacks"] += 1
 
+        if self._use_asm_acceleration:
+            try:
+                asm_accelerator = self._resolve_asm_accelerator()
+                minimum = int(getattr(asm_accelerator, "minimum_candidates", 1))
+                if len(candidates) >= minimum:
+                    self._asm_acceleration["attempts"] += 1
+                    self._asm_acceleration["range_attempts"] += 1
+                    batches = self._asm_range_search_many(
+                        asm_accelerator,
+                        embedded,
+                        candidates,
+                        cosine_threshold,
+                        max_total_hits=max_total_results,
+                        metadata_filter=metadata_filter,
+                    )
+                    if len(batches) != len(embedded):
+                        raise RuntimeError(
+                            "Assembly accelerator returned wrong range batch count"
+                        )
+                    self._asm_acceleration["successes"] += 1
+                    self._asm_acceleration["range_successes"] += 1
+                    return [
+                        [
+                            ScoredChunk(
+                                chunk=candidates[hit.index].chunk,
+                                score=(hit.similarity + 1.0) / 2.0,
+                                plane="rag",
+                            )
+                            for hit in hits
+                        ]
+                        for hits in batches
+                    ]
+                self._asm_acceleration["bypassed_small_batch"] += 1
+            except Exception:
+                self._asm_acceleration["fallbacks"] += 1
+
         output: List[List[ScoredChunk]] = []
         total = 0
         for query_vector, query_norm in embedded:
@@ -429,17 +577,25 @@ class VectorStore:
             )
         return output
     def delete(self, chunk_id: str) -> bool:
-        return self._entries.pop(chunk_id, None) is not None
+        removed = self._entries.pop(chunk_id, None) is not None
+        if removed:
+            self._invalidate_asm_prepared_cache()
+        return removed
 
     @staticmethod
     def _matches(metadata: Dict[str, Any], filt: Dict[str, Any]) -> bool:
         return all(metadata.get(k) == v for k, v in filt.items())
 
     def acceleration_stats(self) -> Dict[str, int | bool]:
-        """Return optional JVM fast-path counters without changing store stats."""
+        """Return optional fast-path counters without changing store stats."""
         return {
             "enabled": self._use_jvm_acceleration,
             **self._acceleration,
+            "asm_enabled": self._use_asm_acceleration,
+            **{
+                f"asm_{name}": value
+                for name, value in self._asm_acceleration.items()
+            },
         }
 
     def _resolve_accelerator(self) -> Any:
@@ -448,6 +604,154 @@ class VectorStore:
 
             self._accelerator = get_default_vector_accelerator()
         return self._accelerator
+
+    def _resolve_asm_accelerator(self) -> Any:
+        if self._asm_accelerator is None:
+            from skeleton.memory.asm_vector_accelerator import (
+                get_default_asm_vector_accelerator,
+            )
+
+            self._asm_accelerator = get_default_asm_vector_accelerator()
+        return self._asm_accelerator
+
+    def _invalidate_asm_prepared_cache(self) -> None:
+        self._asm_revision += 1
+        if self._asm_prepared_cache is not None:
+            self._asm_acceleration["prepared_invalidations"] += 1
+            self._asm_prepared_cache = None
+
+    def _asm_candidate_payload(
+        self,
+        accelerator: Any,
+        candidates: List[VectorEntry],
+        *,
+        metadata_filter: Optional[Dict[str, Any]],
+    ) -> tuple[Any | None, List[Tuple[List[float], float]]]:
+        raw = [(entry.vector, entry.norm) for entry in candidates]
+        prepare = getattr(accelerator, "prepare_candidates", None)
+        if not callable(prepare):
+            return None, raw
+
+        if metadata_filter:
+            prepared = prepare(raw)
+            self._asm_acceleration["prepared_builds"] += 1
+            return prepared, raw
+
+        cache = self._asm_prepared_cache
+        if cache is not None and cache[0] == self._asm_revision:
+            self._asm_acceleration["prepared_hits"] += 1
+            return cache[1], raw
+
+        prepared = prepare(raw)
+        self._asm_acceleration["prepared_builds"] += 1
+        self._asm_prepared_cache = (self._asm_revision, prepared)
+        return prepared, raw
+
+    def _asm_top_k(
+        self,
+        accelerator: Any,
+        query: List[float],
+        query_norm: float,
+        candidates: List[VectorEntry],
+        top_k: int,
+        *,
+        metadata_filter: Optional[Dict[str, Any]],
+    ) -> Any:
+        prepared, raw = self._asm_candidate_payload(
+            accelerator,
+            candidates,
+            metadata_filter=metadata_filter,
+        )
+        prepared_method = getattr(accelerator, "top_k_prepared", None)
+        if prepared is not None and callable(prepared_method):
+            return prepared_method(query, query_norm, prepared, top_k)
+        return accelerator.top_k(query, query_norm, raw, top_k)
+
+    def _asm_top_k_many(
+        self,
+        accelerator: Any,
+        queries: List[Tuple[List[float], float]],
+        candidates: List[VectorEntry],
+        top_k: int,
+        *,
+        metadata_filter: Optional[Dict[str, Any]],
+    ) -> Any:
+        prepared, raw = self._asm_candidate_payload(
+            accelerator,
+            candidates,
+            metadata_filter=metadata_filter,
+        )
+        prepared_method = getattr(accelerator, "top_k_many_prepared", None)
+        if prepared is not None and callable(prepared_method):
+            return prepared_method(queries, prepared, top_k)
+        return accelerator.top_k_many(queries, raw, top_k)
+
+    def _asm_range_search(
+        self,
+        accelerator: Any,
+        query: List[float],
+        query_norm: float,
+        candidates: List[VectorEntry],
+        threshold: float,
+        *,
+        max_hits: int,
+        metadata_filter: Optional[Dict[str, Any]],
+    ) -> Any:
+        prepared, raw = self._asm_candidate_payload(
+            accelerator,
+            candidates,
+            metadata_filter=metadata_filter,
+        )
+        prepared_method = getattr(accelerator, "range_search_prepared", None)
+        if prepared is not None and callable(prepared_method):
+            return prepared_method(
+                query,
+                query_norm,
+                prepared,
+                threshold,
+                max_hits=max_hits,
+            )
+        return accelerator.range_search(
+            query,
+            query_norm,
+            raw,
+            threshold,
+            max_hits=max_hits,
+        )
+
+    def _asm_range_search_many(
+        self,
+        accelerator: Any,
+        queries: List[Tuple[List[float], float]],
+        candidates: List[VectorEntry],
+        threshold: float,
+        *,
+        max_total_hits: int,
+        metadata_filter: Optional[Dict[str, Any]],
+    ) -> Any:
+        prepared, raw = self._asm_candidate_payload(
+            accelerator,
+            candidates,
+            metadata_filter=metadata_filter,
+        )
+        prepared_method = getattr(
+            accelerator,
+            "range_search_many_prepared",
+            None,
+        )
+        if prepared is not None and callable(prepared_method):
+            return prepared_method(
+                queries,
+                prepared,
+                threshold,
+                max_total_hits=max_total_hits,
+            )
+        return accelerator.range_search_many(
+            queries,
+            raw,
+            threshold,
+            max_total_hits=max_total_hits,
+        )
 
     def stats(self) -> Dict[str, Any]:
         return {

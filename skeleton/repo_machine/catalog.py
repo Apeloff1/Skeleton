@@ -68,7 +68,7 @@ def build_catalog(model: RepositoryModel) -> RepositoryCatalog:
             kind = "workflow"
         elif item.path in entrypoints:
             kind = "entrypoint"
-        elif item.kind == "source" and item.symbols >= 5:
+        elif item.kind == "source":
             kind = "module"
         elif item.kind == "config" and PurePosixPath(item.path).name in {
             "pyproject.toml", "package.json", "docker-compose.yml",

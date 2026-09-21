@@ -1675,9 +1675,10 @@ class AutonomousPublicationEvidenceTests(unittest.TestCase):
         self.assertIn('"pull_request_url"', source)
         self.assertIn('"--json"', source)
         self.assertIn('"number,url"', source)
-        self.assertIn('"gh",
-                    "pr",
-                    "create"', source)
+        self.assertRegex(
+            source,
+            r'"gh",\s*"pr",\s*"create"',
+        )
 
 
 if __name__ == "__main__":

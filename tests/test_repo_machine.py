@@ -73,7 +73,10 @@ class RepoMachineTests(unittest.TestCase):
 
             model = RepositoryModelBuilder(root).build()
 
-            self.assertEqual({s.name for s in model.subsystems}, {"alpha", "beta", "unclassified"})
+            self.assertEqual(
+                {s.name for s in model.subsystems},
+                {"alpha", "beta", "tests", "unclassified"},
+            )
             self.assertTrue(any(e.source == "alpha" and e.target == "beta" for e in model.edges))
             self.assertGreaterEqual(model.metadata["file_count"], 4)
             self.assertEqual(len(model.fingerprint), 64)
