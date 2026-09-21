@@ -176,6 +176,32 @@ class QuotaReservation:
 
 
 @dataclass(frozen=True, slots=True)
+class QuotaUsageEvent:
+    """Idempotent incremental actual-usage observation for one reservation."""
+
+    event_id: str
+    reservation_id: str
+    tenant_id: str
+    window_id: str
+    operation_id: str
+    category: str
+    delta: QuotaUsage
+    recorded_at: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "event_id": self.event_id,
+            "reservation_id": self.reservation_id,
+            "tenant_id": self.tenant_id,
+            "window_id": self.window_id,
+            "operation_id": self.operation_id,
+            "category": self.category,
+            "delta": self.delta.as_dict(),
+            "recorded_at": self.recorded_at,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class QuotaCompletion:
     reservation_id: str
     tenant_id: str
@@ -474,6 +500,7 @@ __all__ = [
     "QuotaExceeded",
     "QuotaReservation",
     "QuotaUsage",
+    "QuotaUsageEvent",
     "TenantQuota",
     "TenantQuotaLedger",
 ]
