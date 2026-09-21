@@ -342,3 +342,47 @@ def test_register_canonical_write_rejects_scalar_string_collections(
 
     with pytest.raises(DataGovernanceDenied, match=match):
         registry.register_canonical_write("memory", **base)
+
+
+def test_canonical_write_registration_is_idempotent_for_identical_replay() -> None:
+    registry = GovernanceRegistry()
+    kwargs = {
+        "record_id": "memory-replay",
+        "tenant_id": "tenant-a",
+        "source_ref": "memory://memory-replay",
+        "data_class": "internal",
+        "purposes": ("retrieval-synthesis",),
+        "deletion_targets": ("memory", "retrieval"),
+        "created_at": 10.0,
+        "retention_until": 20.0,
+    }
+
+    first = registry.register_canonical_write("memory", **kwargs)
+    second = registry.register_canonical_write("memory", **kwargs)
+
+    assert second == first
+    assert registry.export_inventory("tenant-a")["count"] == 1
+
+
+def test_canonical_write_registration_rejects_identity_reuse_with_changed_metadata() -> None:
+    registry = GovernanceRegistry()
+    registry.register_canonical_write(
+        "artifact",
+        record_id="artifact-1",
+        tenant_id="tenant-a",
+        source_ref="artifact://artifact-1",
+        data_class="internal",
+        purposes=("model-inference",),
+        created_at=10.0,
+    )
+
+    with pytest.raises(LifecycleConflict, match="identity conflicts"):
+        registry.register_canonical_write(
+            "artifact",
+            record_id="artifact-1",
+            tenant_id="tenant-a",
+            source_ref="artifact://artifact-1",
+            data_class="confidential",
+            purposes=("model-inference",),
+            created_at=10.0,
+        )
