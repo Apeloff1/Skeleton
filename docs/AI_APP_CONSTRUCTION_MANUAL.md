@@ -2769,6 +2769,8 @@ Critical/high obligations are also extracted into `machine/ai_edge_case_priority
 
 The build accountability source of truth is `machine/ai_build_accountability.json`; its visible projection is `docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md`.
 
+The ledger currently tracks **742 accountability units**: 421 volumes, 31 work packages, 42 AIQ tasks, 8 vertical slices, and 240 historical/edge/obscure obligations.
+
 Every implementation unit must follow this sequence:
 
 ```text
@@ -2782,7 +2784,7 @@ Every implementation unit must follow this sequence:
  -> [x] complete
 ```
 
-All timestamps are UTC RFC3339. Sign-offs bind to a full git SHA and non-empty evidence references. A checkbox is not completion evidence by itself and may not be manually checked. CI rejects checked-but-unsigned items, unsigned completed states, missing timestamps, partial sign-offs, stale queue/volume mirrors, malformed history ordering and non-independent verification without an explicit signed exception.
+All timestamps are UTC RFC3339. Sign-offs bind to a full git SHA and non-empty evidence references. Only identity-bound signing methods (`github_identity`, GPG, SSH, Sigstore, CI OIDC) are valid; unbound/manual attestations do not count. A checkbox is not completion evidence by itself and may not be manually checked. CI rejects checked-but-unsigned items, unsigned completed states, missing timestamps, partial sign-offs, stale queue/volume mirrors, malformed history ordering and non-independent verification without an explicit signed exception.
 
 The ledger is append-oriented: corrections supersede earlier events instead of rewriting history.
 
