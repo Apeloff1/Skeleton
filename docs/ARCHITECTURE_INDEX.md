@@ -282,7 +282,8 @@ P0 families include:
 - training poisoning/backdoor defense;
 - safe artifact loading;
 - tamper-evident authority audit;
-- unified safe mode/break-glass recovery.
+- unified safe mode/break-glass recovery;
+- root signing/trust key compromise, revocation, re-root and historical verification.
 
 No subsystem with an applicable open P0 gap may claim production-grade status.
 
@@ -291,5 +292,5 @@ The audit also defines a multi-axis fault campaign across state, network, worker
 Planning checkpoint:
 
 PLAN-20260921-HOSTILE-GAP-AUDIT  
-scope=G001..G070 + Track AB  
+scope=G001..G130 + Track AB  
 production_readiness_blocked_by_applicable_open_P0=true
