@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "1.0.0",
-  "architecture_tag": "arch-map/v1.0",
+  "architecture_version": "1.3.0",
+  "architecture_tag": "arch-map/v1.3",
   "status": "active",
   "scope": "assembled application, machine control, and validation topology",
   "sources": {
@@ -88,59 +88,123 @@
   "zones": [
     {
       "id": "product",
-      "roots": ["frontend"],
+      "roots": [
+        "frontend"
+      ],
       "responsibility": "browser/native product experience and ingress",
-      "may_depend_on": ["application", "engine"],
-      "must_not_own": ["durable-state", "engine-primitives", "repository-write-authority"]
+      "may_depend_on": [
+        "application",
+        "engine"
+      ],
+      "must_not_own": [
+        "durable-state",
+        "engine-primitives",
+        "repository-write-authority"
+      ]
     },
     {
       "id": "application",
-      "roots": ["backend"],
+      "roots": [
+        "backend"
+      ],
       "responsibility": "product API, product control, application workflows",
-      "may_depend_on": ["engine", "data"],
-      "must_not_own": ["browser-routing", "repository-write-authority"]
+      "may_depend_on": [
+        "engine",
+        "data"
+      ],
+      "must_not_own": [
+        "browser-routing",
+        "repository-write-authority"
+      ]
     },
     {
       "id": "engine",
-      "roots": ["skeleton"],
+      "roots": [
+        "skeleton"
+      ],
       "responsibility": "AI engine, orchestration, memory, retrieval, resilience, APIs",
-      "may_depend_on": ["acceleration", "data"],
-      "must_not_own": ["product-shell-routing"]
+      "may_depend_on": [
+        "acceleration",
+        "data"
+      ],
+      "must_not_own": [
+        "product-shell-routing"
+      ]
     },
     {
       "id": "acceleration",
-      "roots": ["skeleton/native", "java-accelerators"],
+      "roots": [
+        "skeleton/native",
+        "java-accelerators"
+      ],
       "responsibility": "optional native/JVM acceleration with deterministic fallback",
       "may_depend_on": [],
-      "must_not_own": ["business-policy", "public-routing"]
+      "must_not_own": [
+        "business-policy",
+        "public-routing"
+      ]
     },
     {
       "id": "data",
-      "roots": ["docker-compose.yml"],
+      "roots": [
+        "docker-compose.yml"
+      ],
       "responsibility": "declared durable and vector stores",
       "may_depend_on": [],
-      "must_not_own": ["application-policy"]
+      "must_not_own": [
+        "application-policy"
+      ]
     },
     {
       "id": "machine",
-      "roots": ["machine", ".machine"],
+      "roots": [
+        "machine",
+        ".machine"
+      ],
       "responsibility": "repository structure, integration metadata, machine-facing policy",
-      "may_depend_on": ["tooling"],
-      "must_not_own": ["runtime-business-logic"]
+      "may_depend_on": [
+        "tooling"
+      ],
+      "must_not_own": [
+        "runtime-business-logic"
+      ]
     },
     {
       "id": "tooling",
-      "roots": ["scripts", ".github"],
+      "roots": [
+        "scripts",
+        ".github"
+      ],
       "responsibility": "validation, CI, operator and repository automation",
-      "may_depend_on": ["product", "application", "engine", "machine"],
-      "must_not_own": ["runtime-state"]
+      "may_depend_on": [
+        "product",
+        "application",
+        "engine",
+        "machine"
+      ],
+      "must_not_own": [
+        "runtime-state"
+      ]
     },
     {
       "id": "knowledge",
-      "roots": ["docs", "tests", "skeleton/testing", "backend/tests"],
+      "roots": [
+        "docs",
+        "tests",
+        "skeleton/testing",
+        "backend/tests"
+      ],
       "responsibility": "documentation, regression evidence, fixtures and test harnesses",
-      "may_depend_on": ["product", "application", "engine", "machine", "tooling"],
-      "must_not_own": ["production-entrypoints"]
+      "may_depend_on": [
+        "product",
+        "application",
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "must_not_own": [
+        "production-entrypoints"
+      ]
     }
   ],
   "runtime_nodes": [
@@ -169,7 +233,9 @@
       "path": "skeleton",
       "kind": "fastapi",
       "canonical": true,
-      "depends_on": ["mongo"]
+      "depends_on": [
+        "mongo"
+      ]
     },
     {
       "id": "backend",
@@ -178,7 +244,9 @@
       "path": "backend",
       "kind": "fastapi",
       "canonical": true,
-      "depends_on": ["mongo"]
+      "depends_on": [
+        "mongo"
+      ]
     },
     {
       "id": "frontend",
@@ -187,7 +255,10 @@
       "path": "frontend",
       "kind": "expo",
       "canonical": true,
-      "depends_on": ["backend", "skeleton"]
+      "depends_on": [
+        "backend",
+        "skeleton"
+      ]
     }
   ],
   "interfaces": [
@@ -237,41 +308,88 @@
   "change_routing": [
     {
       "lane": "ui",
-      "paths": ["frontend/**"],
-      "minimum_checks": ["frontend-typecheck", "frontend-export", "architecture-map"]
+      "paths": [
+        "frontend/**"
+      ],
+      "minimum_checks": [
+        "frontend-typecheck",
+        "frontend-export",
+        "architecture-map"
+      ]
     },
     {
       "lane": "api",
-      "paths": ["backend/**"],
-      "minimum_checks": ["backend-quality", "app-assembly", "architecture-map"]
+      "paths": [
+        "backend/**"
+      ],
+      "minimum_checks": [
+        "backend-quality",
+        "app-assembly",
+        "architecture-map"
+      ]
     },
     {
       "lane": "engine",
-      "paths": ["skeleton/**"],
-      "minimum_checks": ["backend-quality", "app-assembly", "architecture-map"]
+      "paths": [
+        "skeleton/**"
+      ],
+      "minimum_checks": [
+        "backend-quality",
+        "app-assembly",
+        "architecture-map"
+      ]
     },
     {
       "lane": "accelerator",
-      "paths": ["skeleton/native/**", "java-accelerators/**"],
-      "minimum_checks": ["native-or-java-contract", "architecture-map"]
+      "paths": [
+        "skeleton/native/**",
+        "java-accelerators/**"
+      ],
+      "minimum_checks": [
+        "native-or-java-contract",
+        "architecture-map"
+      ]
     },
     {
       "lane": "machine",
-      "paths": ["machine/**", ".machine/**"],
-      "minimum_checks": ["repository-hygiene", "architecture-map"]
+      "paths": [
+        "machine/**",
+        ".machine/**"
+      ],
+      "minimum_checks": [
+        "repository-hygiene",
+        "architecture-map"
+      ]
     },
     {
       "lane": "automation",
-      "paths": [".github/**", "scripts/**"],
-      "minimum_checks": ["workflow-input-security", "repository-hygiene", "architecture-map"]
+      "paths": [
+        ".github/**",
+        "scripts/**"
+      ],
+      "minimum_checks": [
+        "workflow-input-security",
+        "repository-hygiene",
+        "architecture-map"
+      ]
     }
   ],
   "optimization": {
     "parallel_validation_lanes": [
-      ["ui"],
-      ["api"],
-      ["engine", "accelerator"],
-      ["machine", "automation"]
+      [
+        "ui"
+      ],
+      [
+        "api"
+      ],
+      [
+        "engine",
+        "accelerator"
+      ],
+      [
+        "machine",
+        "automation"
+      ]
     ],
     "critical_path": [
       "architecture-map",
@@ -295,10 +413,33 @@
   },
   "top_level_policy": {
     "new_runtime_root": "forbidden-unless-declared",
-    "runtime_roots": ["frontend", "backend", "skeleton", "java-accelerators"],
-    "control_roots": ["machine", ".machine", ".github", "scripts"],
-    "evidence_roots": ["docs", "tests"],
-    "legacy_or_support_roots_are_not_runtime_owners": true
+    "runtime_roots": [
+      "frontend",
+      "backend",
+      "skeleton",
+      "java-accelerators"
+    ],
+    "control_roots": [
+      "machine",
+      ".machine",
+      ".github",
+      "scripts"
+    ],
+    "evidence_roots": [
+      "docs",
+      "tests"
+    ],
+    "legacy_or_support_roots_are_not_runtime_owners": true,
+    "transitional_roots": [
+      "core",
+      "eval",
+      "memory",
+      "satellites",
+      ".emergent"
+    ],
+    "legacy_root_entrypoints": [
+      "deploy.py"
+    ]
   },
   "migration": {
     "strategy": "strangler-by-domain",
@@ -314,7 +455,15 @@
       "main",
       "integration/app-product-shell",
       "integration/architecture-map-v1"
-    ]
+    ],
+    "root_disposition": {
+      "core": "transitional compatibility/control root; converge by import ownership into canonical skeleton domains",
+      "eval": "evaluation fixtures/support; converge under repository test/evidence ownership",
+      "memory": "repository session/evidence and backup material; non-runtime, archive generated state",
+      "satellites": "branch snapshots and recovery material; archive-only, never runtime ownership",
+      ".emergent": "external integration metadata; non-runtime",
+      "deploy.py": "legacy root operator entrypoint; converge on python -m skeleton app"
+    }
   },
   "invariants": [
     "frontend is the only canonical human-interface root",
