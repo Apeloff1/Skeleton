@@ -1482,6 +1482,330 @@ Targets: AD74–AD80 and RDE036.
 
 ---
 
+
+# RXP051 — Scratch vs compressed family derivation
+
+Question: When is it cheaper and better to derive smaller models from a parent than train each size independently?
+
+Compare:
+- scratch-trained small/medium variants;
+- structured pruning + retraining;
+- pruning + distillation;
+- quantization-only;
+- prune + distill + quantize compound.
+
+Count:
+- parent training cost;
+- architecture/search cost;
+- retraining tokens;
+- distillation cost;
+- validation;
+- serving kernels;
+- storage.
+
+Metrics:
+- capability;
+- long-tail quality;
+- calibration;
+- safety;
+- structured output;
+- latency;
+- memory;
+- energy;
+- lifecycle compute.
+
+Targets: RQ068, RDE037.
+
+---
+
+# RXP052 — Teacher/student correlated-error transfer
+
+Question: Which teacher blind spots survive distillation?
+
+Teachers:
+- one strong teacher;
+- multiple same-family teachers;
+- different-family teachers;
+- deterministic/verifier-backed teacher labels where possible.
+
+Measure:
+- teacher/student error correlation;
+- calibration;
+- safety failures;
+- rare-domain failures;
+- robustness;
+- disagreement with ground truth.
+
+Targets: RQ069, RDE038.
+
+---
+
+# RXP053 — Compression stack factorial
+
+Factors:
+- pruning;
+- distillation;
+- PTQ/quantization-aware tuning;
+- low-rank recovery;
+- architecture surgery.
+
+Required:
+- single-factor baselines;
+- pairwise combinations;
+- final compound.
+
+Measure:
+- contribution of each mechanism;
+- interaction effects;
+- interpretability/monitorability drift;
+- portability;
+- real-kernel performance.
+
+Targets: RQ070, RDE037–RDE038.
+
+---
+
+# RXP054 — Privacy dataflow threat map
+
+Enumerate and attack:
+- raw input;
+- tokens;
+- embeddings/activations;
+- gradients;
+- optimizer state;
+- LoRA/adapters;
+- aggregate updates;
+- logs/telemetry;
+- final model.
+
+Attack families:
+- membership inference;
+- reconstruction/input inversion;
+- gradient leakage;
+- prompt/data extraction;
+- cross-client inference.
+
+Output:
+- per-dataflow sensitivity class;
+- attack success;
+- mitigation;
+- residual risk;
+- required privacy guarantee.
+
+Targets: RQ071, RDE040.
+
+---
+
+# RXP055 — Central vs federated vs split vs DP adaptation
+
+Compare:
+- centralized fine-tuning;
+- federated LoRA;
+- DP federated LoRA;
+- split learning;
+- privacy-protected split learning;
+- secure aggregation where applicable.
+
+Workloads:
+- IID;
+- non-IID;
+- small/large clients;
+- client dropout;
+- bandwidth limits.
+
+Metrics:
+- utility;
+- privacy attack success;
+- formal privacy parameters;
+- communication;
+- latency;
+- energy;
+- convergence;
+- client fairness.
+
+Targets: RQ072, RDE040.
+
+---
+
+# RXP056 — Privacy-budget composition under continual adaptation
+
+Simulate repeated:
+- fine-tuning rounds;
+- analytics;
+- evaluation queries;
+- release events;
+- adapter updates.
+
+Track:
+- per-event privacy cost;
+- cumulative accountant;
+- rollover/expiry semantics;
+- aborted/retried jobs;
+- client-specific budgets.
+
+Failure probes:
+- replayed release;
+- duplicated accounting event;
+- stale budget snapshot;
+- partial rollback.
+
+Targets: RQ073, RDE039.
+
+---
+
+# RXP057 — Code-agent failure-stage decomposition
+
+Tasks:
+- real bug fixes;
+- environment repair;
+- failing tests;
+- spec-bound defects;
+- performance regression;
+- security bug.
+
+Score separately:
+- environment bootstrap;
+- localization;
+- diagnosis;
+- plan;
+- patch;
+- compile/build;
+- tests;
+- hidden regression;
+- final issue resolution.
+
+Targets: RQ074, RDE041–RDE042.
+
+---
+
+# RXP058 — Coding-agent context/retrieval budget
+
+Compare:
+- no retrieval;
+- repository lexical search;
+- semantic code search;
+- issue/spec retrieval;
+- dependency/docs retrieval;
+- agentic browsing.
+
+Measure:
+- resolve rate;
+- context tokens;
+- irrelevant-context rate;
+- latency;
+- retrieval precision;
+- spec-dependent vs generic bugs.
+
+Targets: RQ075.
+
+---
+
+# RXP059 — Agent patch validation stack
+
+Validation layers:
+1. visible tests;
+2. hidden tests;
+3. static analysis;
+4. type/lint;
+5. dependency/API compatibility;
+6. security scanning;
+7. performance regression;
+8. diff review;
+9. rollback rehearsal where relevant.
+
+Measure incremental catches and false positives by layer.
+
+Targets: RQ076, RDE042.
+
+---
+
+# RXP060 — Human uncertainty and autonomy-boundary study
+
+Scenarios vary:
+- model confidence;
+- consequence severity;
+- reversibility;
+- evidence quality;
+- time pressure;
+- alert frequency.
+
+Interfaces:
+- raw probability;
+- categorical confidence;
+- confidence + evidence;
+- confidence + recommended next action;
+- forced confirmation;
+- reversible preview;
+- automatic action.
+
+Metrics:
+- decision quality;
+- overreliance;
+- underreliance;
+- correction rate;
+- reaction time;
+- alert fatigue;
+- trust calibration.
+
+Targets: RQ077–RQ079, RDE043–RDE044.
+
+---
+
+# RXP061 — Formal counterfactual reasoning benchmark
+
+Compare:
+- direct LLM;
+- CoT;
+- search/revision;
+- explicit causal-graph representation;
+- symbolic structural-causal-model solver;
+- hybrid LLM + solver.
+
+Tasks:
+- intervention;
+- counterfactual;
+- abduction-action-prediction;
+- nonsensical-name controls;
+- graph depth/branching variants.
+
+Metrics:
+- exact correctness;
+- consistency;
+- sensitivity to naming;
+- faithfulness to stated rules;
+- cost.
+
+Targets: RQ080, RDE045.
+
+---
+
+# RXP062 — Counterfactual shortcut battery
+
+For each supported task family, generate paired examples where:
+- causal structure is fixed and spurious surface changes;
+- causal variable changes and surface remains similar;
+- action labels are permuted;
+- irrelevant metadata changes;
+- retrieval distractors change;
+- modality/style changes.
+
+Apply to:
+- world-model planning;
+- retrieval;
+- classifiers;
+- agent tool selection;
+- interpretability hypotheses.
+
+Metrics:
+- invariant accuracy;
+- causal sensitivity;
+- shortcut sensitivity;
+- representation-transfer gap.
+
+Targets: RQ081–RQ082, RDE046.
+
+---
+
 # 36. Experiment sequencing policy
 
 Recommended first wave:
