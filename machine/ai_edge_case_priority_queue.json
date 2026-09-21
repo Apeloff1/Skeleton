@@ -49,7 +49,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-019",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 2,
@@ -76,7 +80,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-018",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 3,
@@ -102,7 +110,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 4,
@@ -127,7 +139,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-009",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 5,
@@ -153,7 +169,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 6,
@@ -178,7 +198,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-008",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 7,
@@ -204,7 +228,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-009",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 8,
@@ -228,7 +256,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 9,
@@ -252,7 +284,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 10,
@@ -276,7 +312,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-013",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 11,
@@ -300,7 +340,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-030",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 12,
@@ -324,7 +368,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 13,
@@ -348,7 +396,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-020",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 14,
@@ -372,7 +424,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-005",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 15,
@@ -397,7 +453,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-006",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 16,
@@ -422,7 +482,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 17,
@@ -448,7 +512,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-024",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 18,
@@ -471,7 +539,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 19,
@@ -491,7 +563,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-009",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 20,
@@ -512,7 +588,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 21,
@@ -533,7 +613,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-011",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 22,
@@ -554,7 +638,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-015",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 23,
@@ -575,7 +663,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-016",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 24,
@@ -597,7 +689,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-018",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 25,
@@ -621,7 +717,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-020",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 26,
@@ -646,7 +746,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-025",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 27,
@@ -668,7 +772,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-003",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 28,
@@ -689,7 +797,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 29,
@@ -712,7 +824,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-003",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 30,
@@ -735,7 +851,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-004",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 31,
@@ -755,7 +875,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-012",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 32,
@@ -775,7 +899,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-013",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 33,
@@ -795,7 +923,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-014",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 34,
@@ -816,7 +948,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-017",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 35,
@@ -838,7 +974,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-019",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 36,
@@ -861,7 +1001,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 37,
@@ -890,7 +1034,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-AI-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 38,
@@ -917,7 +1065,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-020",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 39,
@@ -944,7 +1096,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 40,
@@ -969,7 +1125,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-003",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 41,
@@ -994,7 +1154,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 42,
@@ -1019,7 +1183,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 43,
@@ -1044,7 +1212,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 44,
@@ -1067,7 +1239,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-027",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 45,
@@ -1092,7 +1268,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-005",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 46,
@@ -1118,7 +1298,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 47,
@@ -1144,7 +1328,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-029",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 48,
@@ -1169,7 +1357,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-005",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 49,
@@ -1193,7 +1385,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-025",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 50,
@@ -1218,7 +1414,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-014",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 51,
@@ -1239,7 +1439,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 52,
@@ -1261,7 +1465,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-013",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 53,
@@ -1282,7 +1490,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 54,
@@ -1305,7 +1517,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-006",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 55,
@@ -1326,7 +1542,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 56,
@@ -1345,7 +1565,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-024",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     },
     {
       "rank": 57,
@@ -1366,7 +1590,11 @@
       "status": "planned",
       "disposition": null,
       "evidence": [],
-      "accepted_risk": null
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true
     }
   ]
 }
