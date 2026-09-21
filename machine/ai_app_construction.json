@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.3.0",
-  "architecture_tag": "arch-map/v3.3",
+  "construction_version": "3.4.0",
+  "architecture_tag": "arch-map/v3.4",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
@@ -1370,20 +1370,19 @@
       "plane": "streaming-realtime",
       "priority": "P0",
       "status": "open",
-      "gap": "The canonical operation and resumable event contracts now exist, but durable transport/storage and frontend reconnect/cancel integration are not yet proven end-to-end.",
+      "gap": "Canonical operation, event, replay, backpressure, and durable SQLite persistence semantics exist; backend transport, cancellation/heartbeat integration, frontend resume/reducer behavior, and end-to-end recovery evidence remain.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
         "use skeleton/frontier/operation_stream.py as the stream conformance contract",
-        "add durable replay storage preserving sequence/event IDs",
         "add backend SSE or WebSocket adapter without changing envelope semantics",
         "bridge cancellation into the canonical operation state machine",
         "add frontend reducer, reconnect cursor, duplicate/out-of-order handling",
         "prove heartbeat, idle timeout, backpressure, reconnect and terminal semantics end-to-end"
       ],
       "closure_evidence": [
+        "durable replay/compaction/terminal/backpressure persistence tests",
         "operation lifecycle conformance tests",
         "stream protocol conformance tests",
-        "durable replay adapter tests",
         "disconnect/reconnect browser/API test",
         "duplicate/out-of-order client reducer test",
         "cancel race test",
@@ -2275,6 +2274,8 @@
       "owners": [
         "skeleton/contracts/operation.py",
         "skeleton/frontier/operation_stream.py",
+        "skeleton/testing/test_operation_stream_store.py",
+        "skeleton/frontier/operation_stream_store.py",
         "skeleton/frontier/runtime_events.py",
         "skeleton/testing/test_operation_contract.py",
         "skeleton/testing/test_operation_stream.py",
@@ -2311,10 +2312,15 @@
           "terminal event finality",
           "bounded reference log with fail-closed backpressure",
           "explicit compaction and replay-gap semantics",
-          "focused operation/stream conformance tests"
+          "focused operation/stream conformance tests",
+          "durable SQLite operation event store",
+          "transactional sequence enforcement",
+          "durable terminal fencing",
+          "durable replay compaction watermark",
+          "persisted corruption rejection",
+          "durable capacity backpressure"
         ],
         "remaining": [
-          "durable stream storage adapter",
           "backend SSE or WebSocket transport",
           "heartbeat and idle timeout integration",
           "cancellation bridge from transport to operation state",
@@ -2539,6 +2545,15 @@
       "replay gap detection"
     ],
     "reference_implementation": "OperationEventLog",
-    "production_storage_policy": "replace storage only; preserve protocol semantics"
+    "production_storage_policy": "replace storage only; preserve protocol semantics",
+    "durable_reference_store": "skeleton/frontier/operation_stream_store.py:SQLiteOperationEventStore",
+    "persistence_semantics": [
+      "transactional exact-next sequence",
+      "durable terminal fence",
+      "durable compaction watermark",
+      "explicit replay gap after compaction",
+      "strict JSON corruption rejection",
+      "per-operation bounded retention with backpressure"
+    ]
   }
 }
