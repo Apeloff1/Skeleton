@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v3.4`
+**Architecture tag:** `arch-map/v3.5`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
