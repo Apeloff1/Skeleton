@@ -2896,3 +2896,43 @@ Only the provider boundary formats the envelope into provider-specific messages.
 ### Closure
 
 The prompt-context plane remains `partial` until deterministic packing, policy-reserve, injection, tenant/data authorization, budget headroom, oversized evidence, compaction provenance, context-digest and legacy-delegation tests pass.
+
+## Fully Functional AI Closure: Evidence-Bound Verification
+
+Verification is not a confidence score. The canonical runtime verifies observable claims, source support, schemas, tool receipts and action postconditions under a policy-selected verification level.
+
+### Durable contract
+
+`VerificationRequest` binds operation/execution/turn, capability, risk, candidate result, context snapshot, evidence/tool/artifact refs, budget and deadline. `VerificationReceipt` records level, outcome, reason codes, claim checks, postcondition checks, evidence refs, optional verifier route refs, repair directive and calibrated confidence band.
+
+The durable audit record contains observable claims, evidence IDs/digests, checks and outcomes. Hidden chain-of-thought is neither required nor persisted.
+
+### Verification levels
+
+- `none`: low-risk creative output with no factual/action guarantee;
+- `structural`: schemas, types, bounds and invariants;
+- `evidence`: material claims must map to authorized source evidence;
+- `action`: tool receipts, exact arguments and postconditions must prove the action result;
+- `high-impact`: policy-selected stronger verifier and/or human approval in addition to required checks.
+
+### Evidence support
+
+For evidence-required output, material claims receive stable claim IDs and statuses such as supported, partially supported, unsupported, contradicted or insufficient evidence. A citation marker alone is not evidence of support; source identity, authorization, recorded digest/version and relevance must be checked.
+
+### Tool/action verification
+
+Action completion checks the terminal tool receipt, operation/execution/turn/call lineage, authorized argument digest, declared postcondition, result/artifact references and compensation state. An ambiguous external side effect cannot be presented as completed.
+
+### Model-based verifier
+
+A semantic verifier may be used, but it is another bounded provider turn through canonical routing, governance and admission. It receives the candidate and evidence—not hidden generator reasoning—and returns a structurally validated verdict.
+
+Candidate agreement or self-reported confidence can trigger escalation or lower a confidence band, but cannot independently verify a fact or action that requires evidence.
+
+### Repair
+
+Repair receives observable failed check IDs/reason codes plus an allowed remediation instruction. It creates a new `AgentTurn` and a new immutable verification receipt. Authority/policy/high-impact blocks cannot be bypassed by generic self-revision.
+
+### Closure
+
+The reasoning-verification plane remains `partial` until claim grounding, citation integrity, unsupported-claim handling, tool postconditions, canonical model-verifier routing, self-confidence non-authority, repair lineage, high-impact block and receipt-privacy tests pass.
