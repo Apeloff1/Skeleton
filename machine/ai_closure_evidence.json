@@ -422,7 +422,8 @@
         "oversized tool/artifact result externalization tests",
         "summary/compaction provenance tests",
         "citation/source ids survive context projection",
-        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
+        "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "outstanding_evidence": [
         "deterministic context snapshot/digest tests",
@@ -434,7 +435,8 @@
         "oversized tool/artifact result externalization tests",
         "summary/compaction provenance tests",
         "citation/source ids survive context projection",
-        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
+        "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "blockers": [
         "dependency must close: gap-conversation-state-authority",
