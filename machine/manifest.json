@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.3",
+  "schema_version": "4.4",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -412,6 +412,32 @@
         "ARM/nonpreemptive housekeeping"
       ],
       "note": "existing integration PRs reused; source branches remain available for controlled reconciliation"
+    },
+    "reconciliation_wave": {
+      "revalidated": [
+        "closed bot ledger",
+        "hardened repo bots",
+        "inventory gates",
+        "Jeeves adaptive scientific core",
+        "compiler pipeline assurance",
+        "cortex cost learning",
+        "lens science",
+        "probability frontier",
+        "relational semantics",
+        "semantic plane",
+        "network replication",
+        "physics simulation stack",
+        "repository bots",
+        "security scan evidence",
+        "X harness"
+      ],
+      "lineage_only": [
+        "game replay",
+        "quality",
+        "physics character motor",
+        "model routing v3/v4"
+      ],
+      "note": "existing integration PRs reused; zero-file comparisons remain lineage-only"
     }
   },
   "integrated_domains": [
