@@ -308,16 +308,30 @@ class OpenAIProviderAdapter(ProviderAdapter):
         self.max_retries = max(0, int(max_retries))
         self._client = client
         self._sdk_import_error: Exception | None = None
+        self._provider_architecture_receipt: ProviderArchitectureReceipt | None = None
+
+    def _ensure_architecture(self) -> ProviderArchitectureReceipt:
+        receipt = self._provider_architecture_receipt
+        if receipt is not None:
+            return receipt
+        try:
+            receipt = load_provider_architecture(self.provider_id)
+        except ProviderArchitectureError as exc:
+            raise ProviderUnavailableError(
+                f"AI provider architecture acknowledgement failed: {self.provider_id}"
+            ) from exc
+        self._provider_architecture_receipt = receipt
+        return receipt
 
     @property
     def available(self) -> bool:
-        if self._client is not None:
-            return True
-        if not self.api_key:
+        if self._client is None and not self.api_key:
             return False
         try:
+            self._ensure_architecture()
             _validate_provider_base_url(self.base_url)
-            self._load_client_class()
+            if self._client is None:
+                self._load_client_class()
         except ProviderUnavailableError:
             return False
         return True
@@ -333,6 +347,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
         return AsyncOpenAI
 
     def _get_client(self) -> Any:
+        self._ensure_architecture()
         if self._client is not None:
             return self._client
         if not self.api_key:
