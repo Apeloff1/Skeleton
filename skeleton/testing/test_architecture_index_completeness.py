@@ -230,3 +230,84 @@ def test_exotic_plan_and_research_canon_are_canonical() -> None:
     assert "Mutable neural state protocol" in manual
     assert "Exotic falsification battery" in manual
     assert "There is no AC → production shortcut." in manual
+
+
+def test_frontier_research_saturation_is_machine_visible() -> None:
+    tracks = architecture_index.CONSTRUCTION_TRACKS
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260921-FRONTIER-RESEARCH-SATURATION"
+    ]
+    invariants = architecture_index.RESEARCH_PASS_INVARIANTS
+    source_audit = architecture_index.RESEARCH_SOURCE_AUDIT_INVARIANTS
+    automation = architecture_index.RESEARCH_AUTOMATION_INVARIANTS
+    monitorability = architecture_index.MONITORABILITY_RESEARCH_INVARIANTS
+
+    assert tracks["AD"] == "research_saturation_replication_frontier_synthesis"
+    assert checkpoint["tracks"] == ("AD",)
+    assert checkpoint["research_conclusion_range"] == ("FR001", "FR114")
+    assert checkpoint["research_question_range"] == ("RQ001", "RQ010")
+    assert checkpoint["production_authority_granted"] is False
+    assert checkpoint["research_refresh_required"] is True
+
+    assert len(architecture_index.RESEARCH_CONCLUSION_IDS) == 114
+    assert len(architecture_index.RESEARCH_QUESTION_IDS) == 10
+    assert len(architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS) == 36
+    assert len(architecture_index.FRONTIER_DELTA_IDS) == 10
+
+    assert invariants["research_source_is_evidence_not_authority"] is True
+    assert invariants["contradictory_evidence_is_retained"] is True
+    assert invariants["negative_results_are_first_class"] is True
+    assert invariants["paper_status_is_preserved"] is True
+    assert invariants["scale_transfer_is_measured_not_assumed"] is True
+    assert invariants["research_agent_cannot_self_validate"] is True
+
+    assert source_audit["accepted_and_submitted_are_not_equivalent"] is True
+    assert source_audit["withdrawn_work_remains_available_as_scoped_evidence"] is True
+    assert source_audit["first_party_evidence_is_not_independent_consensus"] is True
+    assert source_audit["status_upgrade_is_new_evidence_event"] is True
+
+    assert automation["research_agent_cannot_mark_own_result_reproduced"] is True
+    assert automation["research_agent_cannot_read_blind_promotion_answers"] is True
+    assert automation["scorer_variance_cannot_be_exploited_as_success"] is True
+    assert automation["research_agent_result_requires_independent_recompute_or_review"] is True
+
+    assert monitorability["monitorability_is_versioned_measured_property"] is True
+    assert monitorability["monitorability_is_not_assumed_monotonic_with_capability"] is True
+    assert monitorability["learned_detector_ood_generalization_is_not_assumed"] is True
+
+
+def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    atlas = (
+        root / "docs" / "architecture" / "frontier-research-atlas-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+    index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
+
+    assert architecture_index.CANONICAL_DOCUMENTS["frontier_research_atlas"] == (
+        "docs/architecture/frontier-research-atlas-2026.md"
+    )
+    assert "Track AD — Research saturation, replication, and frontier synthesis" in plan
+    assert "**AD** — research saturation, replication, and frontier synthesis" in index
+    assert "Source-status verification audit" in atlas
+    assert "September 2026 frontier delta" in atlas
+
+    for finding_id in architecture_index.RESEARCH_CONCLUSION_IDS:
+        assert finding_id in atlas
+    for question_id in architecture_index.RESEARCH_QUESTION_IDS:
+        assert question_id in atlas
+    for source_id in architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS:
+        assert source_id in atlas
+    for delta_id in architecture_index.FRONTIER_DELTA_IDS:
+        assert delta_id in atlas
+
+    assert "RExBench" in atlas and "WITHDRAWN" in atlas
+    assert "ToolTweak" in atlas and "SUBMISSION" in atlas
+    assert "SWE-Bench Pro" in atlas and "SUBMISSION" in atlas
+    assert "Aletheia" in atlas and "ACL ARR 2026 March SUBMISSION" in atlas
+    assert "MemGAS" in atlas and "ICLR 2026 Poster" in atlas
+    assert "Data Mixture Optimization" in atlas and "NeurIPS 2025 Poster" in atlas
+    assert "To Infinity and Beyond" in atlas and "ICLR 2026 Oral" in atlas
+    assert "research agent cannot mark its own result reproduced" in atlas.lower()
