@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * ╔═══════════════════════════════════════════════════════════════╗
  * ║  GAME FACTORY v17.0 — Full Game Creation + Compile Mode       ║
@@ -22,8 +23,8 @@ const API_BASE = (() => {
   if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
     return (window as any).location.origin.replace(/\/+$/, '');
   }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  return (Constants.CANONICAL_API_BASE as string)
+    || CANONICAL_API_BASE || '';
 })();
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');

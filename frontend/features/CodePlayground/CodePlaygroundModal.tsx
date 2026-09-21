@@ -1,9 +1,10 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, SafeAreaView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const LANGS = [
   { id: 'python', name: 'Python 3', icon: 'logo-python' as const, color: '#3B82F6', template: 'def solution():\n    # Write your code here\n    print("Hello, World!")\n\nsolution()' },

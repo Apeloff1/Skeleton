@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 // ═══════════════════════════════════════════════════════════════════════
 // GALAXY STUDIO FACTORY v6.0 — 100-Phase / 10-Batch 15-Minute Build + APK
 // Interval polling • Batch-level generation • No 520 errors
@@ -47,8 +48,8 @@ const BACKEND = (() => {
   if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
     return (window as any).location.origin.replace(/\/+$/, '');
   }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  return (Constants.CANONICAL_API_BASE as string)
+    || CANONICAL_API_BASE || '';
 })();
 
 interface Props { visible: boolean; onClose: () => void; }

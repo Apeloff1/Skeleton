@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 // ============================================================================
 // CODEDOCK QUANTUM COMPILER SUITE - Main Modal Component
 // Version: 6.0.0 | Agentic • Heterogeneous • Energy-Aware
@@ -231,7 +232,7 @@ export function CompilerModal({
     
     try {
       // Get the backend URL from environment
-      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+      const backendUrl = CANONICAL_API_BASE || '';
       
       // Prepare request payload
       const requestPayload = {

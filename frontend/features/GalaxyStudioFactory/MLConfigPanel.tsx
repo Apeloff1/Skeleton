@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * MLConfigPanel
  * -------------------------------------------------------------------
@@ -23,7 +24,7 @@ import { T } from './GalaxyStudioFactoryModal.styles';
 // ─── Local styles (inline since this is a self-contained sub-screen) ──
 
 // Backend base URL — mirrors the modal's BACKEND constant pattern
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 // 2026-05-15 — Schema cache: AsyncStorage key + TTL (24h). Schema changes are rare,
 // so we serve cached values immediately and revalidate in the background.

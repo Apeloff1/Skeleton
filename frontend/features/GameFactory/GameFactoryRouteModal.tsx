@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -41,8 +42,8 @@ const API_BASE = (() => {
   ) {
     return (window as any).location.origin.replace(/\/+$/, '');
   }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL
+  return (Constants.CANONICAL_API_BASE as string)
+    || CANONICAL_API_BASE
     || '';
 })();
 
