@@ -161,3 +161,58 @@ def test_hostile_gap_audit_and_track_ab_are_canonical_plan_inputs() -> None:
     assert "G200" in audit
     assert "open P0" in audit
     assert "pairwise" in audit
+
+
+def test_exotic_architecture_lab_is_indexed_and_quarantined() -> None:
+    tracks = architecture_index.CONSTRUCTION_TRACKS
+    tiers = architecture_index.EXOTIC_ARCHITECTURE_TIERS
+    invariants = architecture_index.EXOTIC_ARCHITECTURE_INVARIANTS
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260921-EXOTIC-ARCHITECTURE-LAB"
+    ]
+
+    assert tracks["AC"] == "exotic_architecture_laboratory"
+    assert tiers["E1"] == tuple(f"AC{number}" for number in range(1, 14))
+    assert "AC14" in tiers["E2"]
+    assert "AC39" in tiers["E2"]
+    assert "AC27" in tiers["E3"]
+    assert "AC41" in tiers["E3"]
+
+    assert checkpoint["tracks"] == ("AC",)
+    assert checkpoint["production_authority_granted"] is False
+    assert checkpoint["promotion_requires_track_ab_p0_closure"] is True
+
+    assert invariants["exotic_candidate_has_falsifiable_hypothesis"] is True
+    assert invariants["exotic_candidate_declares_kill_criteria"] is True
+    assert invariants["mutable_neural_state_is_not_trusted_durable_memory"] is True
+    assert invariants["inference_time_mutation_has_owner_scope_ttl_and_reset"] is True
+    assert invariants["tentative_generation_is_not_committed_output"] is True
+    assert invariants["exotic_candidate_cannot_execute_tools_from_uncommitted_state"] is True
+    assert invariants["compound_exotics_require_component_ablation"] is True
+    assert invariants["microbenchmark_only_result_cannot_promote"] is True
+    assert invariants["architecture_search_cannot_self_promote"] is True
+    assert invariants["track_ab_p0_invariants_remain_binding"] is True
+    assert invariants["promotion_to_production_requires_track_aa_path"] is True
+
+
+def test_exotic_plan_and_research_canon_are_canonical() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+    index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
+    catalog = (
+        root / "docs" / "architecture" / "research-source-catalog.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Track AC — Exotic architecture laboratory" in plan
+    assert "AC44. Exotic promotion ladder" in plan
+    assert "**AC** — exotic architecture laboratory" in index
+    assert "Exotic architecture canon" in catalog
+    assert "Titans: Learning to Memorize at Test Time" in catalog
+    assert "Byte Latent Transformer" in catalog
+    assert "Discrete Diffusion" in catalog
+    assert "Recurrent Depth" in catalog
+    assert "Universal YOCO" in catalog
+    assert "BitNet" in catalog
+    assert "Track AC anti-canon" in catalog
