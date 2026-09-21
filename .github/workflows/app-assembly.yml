@@ -19,6 +19,7 @@ on:
       - "skeleton/testing/test_ai_accountability_cli.py"
       - "skeleton/testing/test_capability_interfaces.py"
       - "skeleton/testing/test_state_topology.py"
+      - "skeleton/testing/test_state_recovery_drill.py"
       - "skeleton/testing/test_provider_contract.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
@@ -85,6 +86,7 @@ on:
       - "scripts/ai_accountability.py"
       - "scripts/check_capability_interfaces.py"
       - "scripts/check_state_topology.py"
+      - "scripts/state_recovery_drill.py"
       - "scripts/check_provider_bootstrap.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
@@ -107,6 +109,7 @@ on:
       - ".github/copilot-instructions.md"
       - ".cursor/rules/architecture.mdc"
       - ".github/workflows/app-assembly.yml"
+      - ".github/workflows/state-recovery-drill.yml"
 
 permissions:
   contents: read
@@ -221,7 +224,7 @@ jobs:
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
-          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/check_capability_interfaces.py
+          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
@@ -242,6 +245,7 @@ jobs:
           skeleton/testing/test_ai_accountability_cli.py
           skeleton/testing/test_capability_interfaces.py
           skeleton/testing/test_state_topology.py
+          skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_provider_contract.py
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_data_lifecycle.py
