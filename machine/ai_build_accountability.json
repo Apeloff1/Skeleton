@@ -16923,11 +16923,11 @@
       "id": "ACC-WP-W00",
       "type": "work_package",
       "title": "WP-W00 Architecture Authority",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T17:30:56Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -16954,8 +16954,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T17:30:56Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:30:56Z",
+          "git_sha": "ba97a57cfad129fe83d672f6f8a39970aa18cda8",
+          "statement": "Begin WP-W00 Architecture Authority construction and accountability enforcement.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/ba97a57cfad129fe83d672f6f8a39970aa18cda8",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W00/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
@@ -18283,11 +18301,11 @@
       "id": "ACC-AIQ-S0-GOV-01",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry.",
-      "status": "pending",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T17:30:59Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -18314,8 +18332,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T17:30:59Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:30:59Z",
+          "git_sha": "40d7e1bd45158b8f4dfe39be4188bfc4de5f4ae4",
+          "statement": "Begin AIQ-S0-GOV-01 governance lifecycle registry implementation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/40d7e1bd45158b8f4dfe39be4188bfc4de5f4ae4",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-AIQ-S0-GOV-01/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "pending"
     },
