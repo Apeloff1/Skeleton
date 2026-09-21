@@ -6,10 +6,22 @@ from .canonical import (
     EvidenceRef,
     Identity,
 )
+from .operation import (
+    OperationContractError,
+    OperationEnvelope,
+    OperationState,
+    OperationTransitionError,
+    TERMINAL_OPERATION_STATES,
+)
 
 __all__ = [
     "CanonicalContractError",
     "CanonicalEnvelope",
     "EvidenceRef",
     "Identity",
+    "OperationContractError",
+    "OperationEnvelope",
+    "OperationState",
+    "OperationTransitionError",
+    "TERMINAL_OPERATION_STATES",
 ]
