@@ -32,7 +32,7 @@ import json
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -47,7 +47,6 @@ async def list_code_reviews(limit: int = 30):
     return {"reviews": rows, "count": len(rows)}
 
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 mongo_client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 ai_toolkit_db = mongo_client.codedock_ai_toolkit
 
@@ -148,18 +147,18 @@ QUALITY_METRICS = {
 # ============================================================================
 
 async def call_ai(prompt: str, system_prompt: str = None) -> str:
-    """Call AI with given prompt"""
+    """Call the declared provider through the canonical engine runtime."""
     try:
-        chat = LlmChat(api_key=EMERGENT_LLM_KEY)
-        
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
-        else:
-            full_prompt = prompt
-        
-        response = await chat.send_async([UserMessage(content=full_prompt)])
+        adapter = ProviderRegistry.from_env().require_active()
+        response = await adapter.generate(
+            ProviderRequest(
+                instructions=system_prompt or "You are a precise software engineering assistant.",
+                prompt=prompt,
+                purpose="software-engineering-assistance",
+            )
+        )
         return response.text
-    except Exception:
+    except ProviderError:
         return "llm_request_failed"
 
 
