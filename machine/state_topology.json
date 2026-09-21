@@ -222,7 +222,7 @@
       "backup_restore": "not required for canonical recovery",
       "migration": "skip canonical app migration; rebuild/recompute",
       "derived_from": [
-        "jobs/orchestration inputs"
+        "canonical-operation-state"
       ],
       "rebuildable": true,
       "evidence": [
@@ -352,7 +352,7 @@
       "backup_restore": "required if selected as production stream authority; otherwise conformance/reference only",
       "migration": "schema migration + protocol conformance required",
       "derived_from": [
-        "canonical operation state transitions"
+        "canonical-operation-state"
       ],
       "rebuildable": false,
       "evidence": [
@@ -471,6 +471,14 @@
       "mode": "manual-snapshot",
       "rule": "snapshot is an explicit operator aid and never silently promoted to production authority",
       "failure": "ignore/repair snapshot; authoritative state remains elsewhere"
+    },
+    {
+      "id": "operation-to-swarm-scratch",
+      "from": "canonical-operation-state",
+      "to": "backend-swarm-scratch",
+      "mode": "scratch-materialization",
+      "rule": "swarm scratch is materialized from admitted/running operation inputs and worker decomposition; it never becomes canonical operation or product state",
+      "failure": "discard or recompute scratch from the canonical operation/work request; never promote scratch after an ambiguous worker failure"
     }
   ],
   "recovery_order": [
