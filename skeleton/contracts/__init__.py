@@ -6,6 +6,17 @@ from .canonical import (
     EvidenceRef,
     Identity,
 )
+from .context import (
+    CONTEXT_SCHEMA_VERSION,
+    ContextBudget,
+    ContextContractError,
+    ContextEnvelope,
+    ContextKind,
+    ContextSegment,
+    ContextTrust,
+    context_digest_payload,
+    estimate_tokens,
+)
 from .conversation import (
     CONVERSATION_SCHEMA_VERSION,
     ConversationAuthorType,
@@ -27,6 +38,15 @@ __all__ = [
     "CanonicalEnvelope",
     "EvidenceRef",
     "Identity",
+    "CONTEXT_SCHEMA_VERSION",
+    "ContextBudget",
+    "ContextContractError",
+    "ContextEnvelope",
+    "ContextKind",
+    "ContextSegment",
+    "ContextTrust",
+    "context_digest_payload",
+    "estimate_tokens",
     "CONVERSATION_SCHEMA_VERSION",
     "ConversationAuthorType",
     "ConversationContractError",
