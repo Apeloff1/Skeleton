@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
 from core.operation_stream_transport import (
     OperationAccessDenied,
@@ -54,6 +55,13 @@ _IDLE_TIMEOUT_SECONDS = _positive_float_env(
     300.0,
     minimum=5.0,
 )
+_CONSUMER_PATTERN = r"^[A-Za-z0-9._:-]{1,128}$"
+_CONSUMER_LEASE_SECONDS = 300
+
+
+class OperationAckRequest(BaseModel):
+    consumer_id: str = Field(min_length=1, max_length=128, pattern=_CONSUMER_PATTERN)
+    sequence: int = Field(ge=0)
 
 
 @lru_cache(maxsize=1)
@@ -136,6 +144,12 @@ def cancel_operation(
 @router.get("/{operation_id}/events/replay")
 def operation_event_replay(
     operation_id: str,
+    consumer_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=_CONSUMER_PATTERN,
+    ),
     after_sequence: int = Query(default=0, ge=0),
     limit: int = Query(default=250, ge=1, le=1000),
     user=Depends(require_role("viewer")),
@@ -149,16 +163,46 @@ def operation_event_replay(
             tenant_id=tenant_id,
             after_sequence=after_sequence,
             limit=limit,
+            consumer_id=consumer_id,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
         )
     except Exception as exc:
         raise _map_transport_error(exc) from None
     return {"ok": True, **batch.as_dict()}
 
 
+@router.post("/{operation_id}/events/ack")
+def acknowledge_operation_events(
+    operation_id: str,
+    body: OperationAckRequest,
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    """Advance one client cursor only after the client applied the events."""
+
+    tenant_id = _principal_tenant(user)
+    try:
+        checkpoint = _transport().acknowledge(
+            operation_id,
+            tenant_id=tenant_id,
+            consumer_id=body.consumer_id,
+            sequence=body.sequence,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, "consumer": checkpoint.as_dict()}
+
+
 @router.get("/{operation_id}/events")
 async def operation_events(
     request: Request,
     operation_id: str,
+    consumer_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=_CONSUMER_PATTERN,
+    ),
     after_sequence: int | None = Query(default=None, ge=0),
     user=Depends(require_role("viewer")),
 ) -> StreamingResponse:
@@ -173,6 +217,8 @@ async def operation_events(
             operation_id,
             tenant_id=tenant_id,
             after_sequence=cursor,
+            consumer_id=consumer_id,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
         )
     except Exception as exc:
         raise _map_transport_error(exc) from None
@@ -212,6 +258,8 @@ async def operation_events(
                     operation_id,
                     tenant_id=tenant_id,
                     after_sequence=cursor,
+                    consumer_id=consumer_id,
+                    consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
                 )
             except StreamReplayGapError:
                 # Once response headers are committed an HTTP 409 is no longer
@@ -244,6 +292,7 @@ async def operation_events(
 __all__ = [
     "router",
     "operation_event_replay",
+    "acknowledge_operation_events",
     "_last_event_sequence",
     "_principal_tenant",
 ]
