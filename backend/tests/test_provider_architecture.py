@@ -60,8 +60,8 @@ def test_real_openai_provider_reads_active_repository_contract() -> None:
     receipt = load_provider_architecture("openai")
 
     assert receipt.provider_id == "openai"
-    assert receipt.architecture_tag == "arch-map/v3.6"
-    assert receipt.construction_version == "3.6.0"
+    assert receipt.architecture_tag == "arch-map/v3.7"
+    assert receipt.construction_version == "3.7.0"
     assert len(receipt.contract_digest) == 64
     assert "docs/AI_APP_CONSTRUCTION_MANUAL.md" in receipt.required_documents
 
