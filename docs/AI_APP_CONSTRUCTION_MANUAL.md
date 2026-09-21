@@ -583,68 +583,94 @@ The shared loader verifies:
 
 The receipt is local metadata. It does not contain credentials and does not require sending the manual to the external model.
 
-## 8. Current-state execution roadmap
+## 8. Current functional-AI execution roadmap
 
-The generic construction phases describe how to build the system from zero. The
-current repository is already partially assembled, so active work follows this
-gap-closure roadmap:
+The current repository is beyond generic plane mapping. Functional-AI closure now follows the machine-enforced `functional_ai_dependency_graph` in `machine/ai_app_construction.json`.
 
-```text
-Wave 1  policy + provider + budget foundation
-        ├─ provider-surface convergence
-        ├─ governance registry
-        └─ cost/capacity admission
-             |
-             v
-Wave 2  realtime + provider resilience
-        ├─ resumable event protocol
-        └─ provider redundancy / explicit single-provider SLO
-             |
-             v
-Wave 3  golden journey integration
-        └─ prompt + retrieval + tools + artifacts + outage + reconnect E2E
-             |
-             v
-Wave 4  controlled learning + release control
-        ├─ feedback/eval/promotion pipeline
-        └─ canary SLO promotion + automatic rollback
-             |
-             v
-Wave 5  SOTA closure
-        └─ zero P0 gaps + all gates + chaos/eval/release evidence
-```
+Dependencies are **closure prerequisites**, not a ban on starting independent implementation earlier behind stable contracts.
 
-Wave 1 tracks can proceed in parallel. Wave 2 starts only after data-transfer
-policy and admission budgets are enforceable. The golden E2E suite comes after
-realtime/provider failure semantics are stable; otherwise it would encode
-temporary behavior. Learning and automated release promotion come last because
-they must consume trustworthy evaluation and operational evidence.
+### Stage 0 — authority-policy-foundations
 
-The machine-readable source for this sequence is
-`execution_roadmap` in `machine/ai_app_construction.json`. Every open gap must
-appear exactly once before SOTA closure.
+- `gap-state-authority-convergence`
+- `gap-governance-registry`
+- `gap-cost-admission`
+- `gap-provider-surface-convergence`
 
-## 9. Current SOTA gap register
+**Exit:** state, privacy/policy, budget and credential ownership are deterministic before higher autonomy
 
-The construction contract intentionally distinguishes a structurally complete
-application map from a fully closed SOTA implementation. Open gaps are first-
-class construction work, not hidden TODOs.
+### Stage 1 — durable-user-and-action-foundations
 
-| Priority | Plane | Gap | Closure evidence |
-| --- | --- | --- | --- |
-| P0 | model-provider | Provider transport/credentials are structurally centralized; current-head CI still must prove repository-wide discovery and SDK isolation before closure. | shared receipt, text/image/speech convergence, undeclared-provider denial, provider-surface inventory, SDK isolation |
-| P0 | streaming-realtime | One canonical resumable event protocol is not yet proven end-to-end. | protocol contract, disconnect/reconnect, duplicate/out-of-order, frontend recovery |
-| P0 | governance | Data classification and provider-transfer policy are not yet one enforced registry. | transfer denial, deletion propagation, export completeness, retention expiry |
-| P0 | cost-capacity | Provider/token/storage/concurrency budgets are not yet one admission contract. | budget denial, budget-aware routing, saturation, cost telemetry |
-| P0 | product-experience | Canonical AI golden journeys need one cross-plane browser/API E2E suite. | prompt, retrieval, tool, artifact, outage, reconnect/cancel journeys |
-| P1 | feedback-learning | Feedback-to-production promotion is not yet one controlled pipeline. | experiment isolation, eval-before-promotion, rollback, consent |
-| P1 | model-provider | OpenAI is canonical today; SOTA redundancy needs a second declared provider or an explicit single-provider SLO decision. | failover test or approved SLO, routing telemetry |
-| P1 | deployment-release | Canary promotion/rollback should consume the same SLO evidence produced by observability. | promotion test, automatic rollback drill, release evidence |
+- `gap-conversation-state-authority`
+- `gap-memory-durable-authority`
+- `gap-tool-runtime-convergence`
 
-The exact construction steps for each gap live in
-`machine/ai_app_construction.json`. P0 gaps block claiming full SOTA
-completion. They do not block safe incremental construction when the gap remains
-explicit and the change preserves the canonical contracts.
+**Exit:** canonical user continuity and governed action primitives are durable
+
+### Stage 2 — model-input-output-contracts
+
+- `gap-context-compiler-convergence`
+- `gap-provider-interaction-protocol`
+
+**Exit:** the runtime can compile one canonical model turn and receive normalized structured/tool output
+
+### Stage 3 — evidence-verification
+
+- `gap-verification-evidence-contract`
+
+**Exit:** finalization can distinguish verified/qualified/abstain/repair/block from observable evidence
+
+### Stage 4 — cognitive-transaction
+
+- `gap-cognitive-execution-loop`
+
+**Exit:** one durable bounded AI transaction composes model/context/tool/memory/verification correctly
+
+### Stage 5 — process-boundary-cutover
+
+- `gap-engine-application-execution-boundary`
+
+**Exit:** backend product state and engine execution are separated by authenticated idempotent contracts
+
+### Stage 6 — realtime-product-delivery
+
+- `gap-streaming-protocol`
+
+**Exit:** the client can disconnect/reconnect/cancel and converge on canonical terminal state
+
+### Stage 7 — assembled-proof
+
+- `gap-e2e-golden-journeys`
+
+**Exit:** cross-plane golden journeys and injected failures prove the complete AI product
+
+A P0 gap may not be marked closed until every declared dependency is closed, its associated blueprint is marked `implemented` or `complete`, focused closure evidence exists, and the closure-evidence ledger is updated. Breaking a lower-stage contract invalidates dependent evidence and requires revalidation.
+
+The file-level implementation source is `machine/ai_implementation_handoff.json`; closure evidence is tracked separately in `machine/ai_closure_evidence.json`.
+
+## 9. Current P0 functional-AI gap register
+
+All P0 gaps below are mandatory for the fully functional AI claim. The table is a human projection of the machine contract; machine JSON remains authoritative.
+
+| Stage | Plane | P0 gap | Closure gate |
+| ---: | --- | --- | --- |
+| 1 | `application-api` | `gap-conversation-state-authority` | the server can reconstruct and authorize every model-visible prior message from canonical state without trusting client-supplied transcript history |
+| 1 | `tool-runtime` | `gap-tool-runtime-convergence` | every model-callable tool is declared, minimally projected, policy-admitted, idempotency-aware and receipt-backed, with no executable shadow registry or nested provider credential path |
+| 2 | `prompt-context` | `gap-context-compiler-convergence` | no canonical AI execution constructs provider prompt/history directly outside the ContextCompiler + provider projection boundary |
+| 3 | `reasoning-verification` | `gap-verification-evidence-contract` | every final result that claims verification carries an immutable observable VerificationReceipt whose required claims/actions are supported by declared evidence/checks |
+| 2 | `model-provider` | `gap-provider-interaction-protocol` | the cognitive runtime can perform a model turn with structured result or tool proposals entirely through provider-neutral contracts |
+| 5 | `engine-api` | `gap-engine-application-execution-boundary` | production AI requests entering backend execute provider/model/tool cognition only in the Skeleton engine process with authenticated idempotent cross-service contracts and no local provider fallback |
+| 4 | `orchestration` | `gap-cognitive-execution-loop` | one operation can deterministically retrieve, reason, call governed tools, wait/resume, verify, persist and stream a terminal answer without bypassing any canonical plane |
+| 6 | `streaming-realtime` | `gap-streaming-protocol` | frontend can lose transport and resume without duplicating side effects or losing terminal state |
+| 0 | `governance` | `gap-governance-registry` | every provider transfer and durable write has a data-class/governance decision |
+| 1 | `memory` | `gap-memory-durable-authority` | long-term memory is durable, governed, tenant-scoped and recoverable; no vector/MAG/CAG/process store is the sole source of canonical user memory |
+| 0 | `data-persistence` | `gap-state-authority-convergence` | every logical state domain has one declared authority; authoritative state restores without depending on derived stores; operation state and stream event durability are reconciled |
+| 0 | `cost-capacity` | `gap-cost-admission` | all expensive operations carry an admission receipt |
+| 7 | `product-experience` | `gap-e2e-golden-journeys` | canonical journeys pass against assembled topology |
+| 0 | `model-provider` | `gap-provider-surface-convergence` | no credential-bearing model edge exists outside a declared receipt-governed surface |
+
+There are currently **14 P0 functional-AI gaps** in the closure set. Every one must appear exactly once in the dependency DAG, work-package schedule, detailed blueprint set, implementation handoff, and closure-evidence ledger.
+
+P1 work such as provider redundancy, feedback/promotion, and release-SLO automation remains important but does not replace missing P0 closure evidence.
 
 ## 10. Assembly checklist
 
