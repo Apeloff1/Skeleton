@@ -14,10 +14,13 @@ from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
 from ipaddress import IPv4Address, IPv6Address, ip_address
 import hashlib
+import json
 import math
 import os
 import socket
 import time
+import urllib.error
+import urllib.request
 from typing import Any, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
 
@@ -43,6 +46,8 @@ from skeleton.vault.data_governance import (
 
 _ALLOWED_HISTORY_ROLES = frozenset({"user", "assistant"})
 _DEFAULT_HISTORY_CHAR_BUDGET = 80_000
+_MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024
+_DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 _BLOCKED_PROVIDER_HOSTNAMES = frozenset(
     {
         "localhost",
@@ -520,6 +525,233 @@ class OpenAIProviderAdapter(ProviderAdapter):
         )
 
 
+class OpenAISyncProviderAdapter:
+    """Dependency-free synchronous OpenAI Responses API adapter.
+
+    Jeeves and other synchronous engine call sites use this adapter instead of
+    owning credentials or raw provider HTTP behavior. It deliberately shares
+    the same architecture acknowledgement, governance, admission, URL policy,
+    request validation, and normalized response contract as the async adapter.
+    """
+
+    provider_id = "openai"
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
+        timeout_seconds: float = 45.0,
+        max_retries: int = 2,
+    ) -> None:
+        self.api_key = (
+            api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
+        ).strip()
+        self.model = (model or os.getenv("AI_MODEL") or "gpt-5.5").strip()
+        self.base_url = (
+            base_url if base_url is not None else os.getenv("OPENAI_BASE_URL", "")
+        ).strip()
+        self.timeout_seconds = max(1.0, float(timeout_seconds))
+        self.max_retries = max(0, int(max_retries))
+        self._provider_architecture_receipt: ProviderArchitectureReceipt | None = None
+
+    def _ensure_architecture(self) -> ProviderArchitectureReceipt:
+        receipt = self._provider_architecture_receipt
+        if receipt is not None:
+            return receipt
+        try:
+            receipt = load_provider_architecture(self.provider_id)
+        except ProviderArchitectureError as exc:
+            raise ProviderUnavailableError(
+                f"AI provider architecture acknowledgement failed: {self.provider_id}"
+            ) from exc
+        self._provider_architecture_receipt = receipt
+        return receipt
+
+    def _responses_url(self) -> str:
+        configured = self.base_url or _DEFAULT_OPENAI_BASE_URL
+        validated = _validate_provider_base_url(configured)
+        normalized = validated.rstrip("/")
+        if normalized.endswith("/responses"):
+            return normalized
+        return normalized + "/responses"
+
+    @property
+    def available(self) -> bool:
+        if not self.api_key:
+            return False
+        try:
+            self._ensure_architecture()
+            self._responses_url()
+        except ProviderUnavailableError:
+            return False
+        return True
+
+    def status(self) -> dict[str, Any]:
+        return {"id": self.provider_id, "model": self.model, "available": self.available}
+
+    @staticmethod
+    def _extract_response_text(payload: Any) -> str:
+        if not isinstance(payload, Mapping):
+            raise ProviderInvocationError("model provider returned malformed JSON")
+
+        direct = payload.get("output_text")
+        if isinstance(direct, str) and direct.strip():
+            return direct.strip()
+
+        output = payload.get("output")
+        if not isinstance(output, list):
+            raise ProviderInvocationError("model provider returned malformed response")
+
+        fragments: list[str] = []
+        for item in output:
+            if not isinstance(item, Mapping):
+                continue
+            content = item.get("content")
+            if not isinstance(content, list):
+                continue
+            for part in content:
+                if not isinstance(part, Mapping):
+                    continue
+                if part.get("type") not in {"output_text", "text"}:
+                    continue
+                text = part.get("text")
+                if isinstance(text, str) and text.strip():
+                    fragments.append(text.strip())
+
+        joined = "\n".join(fragments).strip()
+        if not joined:
+            raise ProviderInvocationError("model provider returned an empty response")
+        return joined
+
+    @staticmethod
+    def _decode_response(response: Any) -> Mapping[str, Any]:
+        raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+        if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+            raise ProviderInvocationError("model provider response exceeded size limit")
+        try:
+            payload = json.loads(raw)
+        except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
+            raise ProviderInvocationError(
+                "model provider returned malformed JSON"
+            ) from exc
+        if not isinstance(payload, Mapping):
+            raise ProviderInvocationError("model provider returned malformed JSON")
+        return payload
+
+    def generate_sync(self, request: ProviderRequest) -> ProviderResponse:
+        model = _validate_request(request, default_model=self.model)
+        self._ensure_architecture()
+
+        try:
+            governance = require_provider_transfer(
+                ProviderTransferRequest(
+                    provider_id=self.provider_id,
+                    data_class=request.data_class,
+                    purpose=request.purpose,
+                    tenant_id=request.tenant_id,
+                    source="skeleton/provider_runtime.py",
+                )
+            )
+        except DataGovernanceDenied as exc:
+            raise ProviderPolicyError(
+                "model provider transfer denied by governance policy"
+            ) from exc
+
+        requested_output = (
+            request.max_output_tokens
+            if request.max_output_tokens is not None
+            else min(4_096, request.resource_budget.max_output_tokens)
+        )
+        try:
+            admission = require_admission(
+                AdmissionRequest(
+                    operation_id=_provider_operation_id(request),
+                    tenant_id=(request.tenant_id or "unbound"),
+                    capability="model-inference",
+                    budget=request.resource_budget,
+                    estimate=UsageEstimate(
+                        input_tokens=_estimated_input_tokens(request),
+                        output_tokens=requested_output,
+                        cost_usd=float(request.estimated_cost_usd),
+                        wall_seconds=self.timeout_seconds,
+                        provider_attempts=self.max_retries + 1,
+                    ),
+                    pressure=RuntimePressure(),
+                )
+            )
+        except AdmissionError as exc:
+            raise ProviderPolicyError(
+                "model provider request denied by resource admission"
+            ) from exc
+
+        if not self.api_key:
+            raise ProviderUnavailableError("OPENAI_API_KEY is not configured")
+
+        messages: list[dict[str, str]] = [
+            message.as_openai_input() for message in request.history
+        ]
+        messages.append({"role": "user", "content": request.prompt})
+        body: dict[str, Any] = {
+            "model": model,
+            "instructions": request.instructions,
+            "input": messages,
+        }
+        if request.max_output_tokens is not None:
+            body["max_output_tokens"] = request.max_output_tokens
+
+        outbound = urllib.request.Request(
+            self._responses_url(),
+            data=json.dumps(body, separators=(",", ":")).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "Skeleton-Provider-Runtime/3.2",
+            },
+            method="POST",
+        )
+
+        started = time.perf_counter()
+        last_error: BaseException | None = None
+        for _attempt in range(self.max_retries + 1):
+            try:
+                with urllib.request.urlopen(
+                    outbound,
+                    timeout=self.timeout_seconds,
+                ) as response:
+                    payload = self._decode_response(response)
+                text = self._extract_response_text(payload)
+                request_id = payload.get("id")
+                latency_ms = (time.perf_counter() - started) * 1000
+                return ProviderResponse(
+                    text=text,
+                    provider=self.provider_id,
+                    model=model,
+                    request_id=(
+                        str(request_id)
+                        if isinstance(request_id, (str, int))
+                        else None
+                    ),
+                    latency_ms=round(latency_ms, 2),
+                    governance_decision_id=governance.decision_id,
+                    admission_decision_id=admission.decision_id,
+                    data_class=governance.data_class,
+                )
+            except ProviderError:
+                raise
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                OSError,
+                ValueError,
+            ) as exc:
+                last_error = exc
+                continue
+
+        raise ProviderInvocationError("model provider request failed") from last_error
+
+
 class ProviderRegistry:
     """Configuration-driven provider selector with mandatory architecture read."""
 
@@ -632,6 +864,7 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
 __all__ = [
     "AIMessage",
     "OpenAIProviderAdapter",
+    "OpenAISyncProviderAdapter",
     "ProviderAdapter",
     "ProviderError",
     "ProviderInvocationError",
