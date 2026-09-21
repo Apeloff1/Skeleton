@@ -254,24 +254,24 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
 
     assert tracks["AD"] == "research_saturation_replication_frontier_synthesis"
     assert checkpoint["tracks"] == ("AD",)
-    assert checkpoint["research_conclusion_range"] == ("FR001", "FR114")
-    assert checkpoint["research_question_range"] == ("RQ001", "RQ067")
-    assert checkpoint["source_verification_range"] == ("SV001", "SV066")
-    assert checkpoint["frontier_delta_range"] == ("FD001", "FD026")
+    assert checkpoint["research_conclusion_range"] == ("FR001", "FR144")
+    assert checkpoint["research_question_range"] == ("RQ001", "RQ082")
+    assert checkpoint["source_verification_range"] == ("SV001", "SV072")
+    assert checkpoint["frontier_delta_range"] == ("FD001", "FD031")
     assert checkpoint["contradiction_range"] == ("CX001", "CX024")
-    assert checkpoint["research_debt_range"] == ("RDE001", "RDE036")
-    assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP050")
+    assert checkpoint["research_debt_range"] == ("RDE001", "RDE046")
+    assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP062")
     assert checkpoint["production_authority_granted"] is False
     assert checkpoint["research_refresh_required"] is True
 
-    assert len(architecture_index.RESEARCH_CONCLUSION_IDS) == 114
-    assert len(architecture_index.RESEARCH_QUESTION_IDS) == 67
-    assert len(architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS) == 66
-    assert len(architecture_index.FRONTIER_DELTA_IDS) == 26
+    assert len(architecture_index.RESEARCH_CONCLUSION_IDS) == 144
+    assert len(architecture_index.RESEARCH_QUESTION_IDS) == 82
+    assert len(architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS) == 72
+    assert len(architecture_index.FRONTIER_DELTA_IDS) == 31
     assert len(architecture_index.RESEARCH_CONTRADICTION_IDS) == 24
-    assert len(architecture_index.RESEARCH_DEBT_IDS) == 36
-    assert len(architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS) == 50
-    assert len(architecture_index.FRONTIER_RESEARCH_DOMAINS) == 19
+    assert len(architecture_index.RESEARCH_DEBT_IDS) == 46
+    assert len(architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS) == 62
+    assert len(architecture_index.FRONTIER_RESEARCH_DOMAINS) == 24
 
     assert invariants["research_source_is_evidence_not_authority"] is True
     assert invariants["contradictory_evidence_is_retained"] is True
@@ -406,7 +406,12 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "AD72. Experiment decision-value review" in plan
     assert "AD81. Domain-resolved question bank" in plan
     assert "AD82. Expanded local protocol coverage" in plan
-    assert "FD001–FD026" in plan
+    assert "AD84. Compression/distillation/pruning research" in plan
+    assert "AD85. Privacy-preserving learning/inference" in plan
+    assert "AD86. Software-engineering/code-agent science" in plan
+    assert "AD87. Human–AI/operator science" in plan
+    assert "AD88. Causal/counterfactual research" in plan
+    assert "FD001–FD031" in plan
 
 
 def test_research_saturation_accountability_distinguishes_planning_from_reproduction() -> None:
@@ -417,7 +422,7 @@ def test_research_saturation_accountability_distinguishes_planning_from_reproduc
     ]
 
     assert checkpoint["tracks"] == ("AD",)
-    assert checkpoint["domain_count"] == 19
+    assert checkpoint["domain_count"] == 24
     assert checkpoint["planning_status"] == "planning_covered"
     assert checkpoint["local_reproduction_status"] == "reproduction_pending"
     assert checkpoint["production_authority_granted"] is False
