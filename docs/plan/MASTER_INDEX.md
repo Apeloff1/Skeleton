@@ -28,6 +28,10 @@ Critical/high edge queue: [`EDGE_CASE_PRIORITY_QUEUE.md`](EDGE_CASE_PRIORITY_QUE
 
 Machine priority queue: [`machine/ai_edge_case_priority_queue.json`](../../machine/ai_edge_case_priority_queue.json)
 
+Mandatory build accountability: [`BUILD_ACCOUNTABILITY_LEDGER.md`](BUILD_ACCOUNTABILITY_LEDGER.md)
+
+Machine accountability ledger: [`machine/ai_build_accountability.json`](../../machine/ai_build_accountability.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
