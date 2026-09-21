@@ -63,6 +63,10 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_tenant_quota_sqlite.py \
   skeleton/testing/test_admission_runtime.py
 
+printf '\n== Authoritative-first recovery contract ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_state_recovery_drill.py
+
 printf '\n== Durable operation authority and outbox ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_operation_contract.py \
