@@ -5861,7 +5861,8 @@
       "interactive_steering_contract",
       "ai_safety_policy_blueprint",
       "ai_response_rendering_contract",
-      "implementation_handoff"
+      "implementation_handoff",
+      "closure_evidence_ledger"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -8575,5 +8576,11 @@
     "status": "active",
     "handoff_version": "1.0.0",
     "path": "machine/ai_implementation_handoff.json"
+  },
+  "closure_evidence_ledger": {
+    "schema_version": 1,
+    "status": "active",
+    "ledger_version": "1.0.0",
+    "path": "machine/ai_closure_evidence.json"
   }
 }
