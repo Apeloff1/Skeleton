@@ -194,7 +194,7 @@ def test_structural_blueprint_partitions_every_construction_plane() -> None:
         for plane_id in domain["planes"]
     ]
 
-    assert blueprint["structure_tag"] == "structure-map/v1.0"
+    assert blueprint["structure_tag"] == "structure-map/v1.1"
     assert len(placed_ids) == len(set(placed_ids))
     assert set(placed_ids) == plane_ids
     assert len(recovery_ids) == len(set(recovery_ids))
@@ -266,6 +266,7 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "composition_roots": 6,
         "state_authorities": 13,
         "recovery_domains": 8,
+        "dependency_exceptions": 3,
     }
 
 def test_repository_manifest_links_architecture_and_structure_tags() -> None:
@@ -283,4 +284,3 @@ def test_repository_manifest_links_architecture_and_structure_tags() -> None:
     assert layer["tag"] == architecture["architecture_tag"]
     assert layer["structure_tag"] == architecture["structural_blueprint"]["structure_tag"]
     assert layer["ref"] == assembly["architecture_branch"]
-
