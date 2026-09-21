@@ -13,7 +13,10 @@ from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
 from ipaddress import IPv4Address, IPv6Address, ip_address
+import base64
 import hashlib
+import inspect
+import io
 import json
 import math
 import os
@@ -47,6 +50,7 @@ from skeleton.vault.data_governance import (
 _ALLOWED_HISTORY_ROLES = frozenset({"user", "assistant"})
 _DEFAULT_HISTORY_CHAR_BUDGET = 80_000
 _MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024
+_MAX_PROVIDER_MEDIA_BYTES = 32 * 1024 * 1024
 _DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 _BLOCKED_PROVIDER_HOSTNAMES = frozenset(
     {
@@ -189,6 +193,69 @@ class ProviderResponse:
     data_class: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class ProviderImageRequest:
+    """Provider-neutral image generation request."""
+
+    prompt: str
+    size: str = "1024x1024"
+    quality: str = "standard"
+    count: int = 1
+    model: str = "gpt-image-1"
+    data_class: str = "internal"
+    purpose: str = "image-generation"
+    tenant_id: str | None = None
+    operation_id: str | None = None
+    estimated_cost_usd: float = 0.0
+    resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderImageResponse:
+    """Normalized image result with base64 payloads kept inside the media boundary."""
+
+    images: tuple[dict[str, Any], ...]
+    provider: str
+    model: str
+    request_id: str | None = None
+    latency_ms: float | None = None
+    governance_decision_id: str | None = None
+    admission_decision_id: str | None = None
+    data_class: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderSpeechRequest:
+    """Provider-neutral speech synthesis request."""
+
+    text: str
+    voice: str = "nova"
+    speed: float = 1.0
+    model: str = "tts-1-hd"
+    response_format: str = "mp3"
+    data_class: str = "internal"
+    purpose: str = "speech-synthesis"
+    tenant_id: str | None = None
+    operation_id: str | None = None
+    estimated_cost_usd: float = 0.0
+    resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderSpeechResponse:
+    """Normalized binary speech result."""
+
+    audio: bytes
+    provider: str
+    model: str
+    response_format: str
+    request_id: str | None = None
+    latency_ms: float | None = None
+    governance_decision_id: str | None = None
+    admission_decision_id: str | None = None
+    data_class: str | None = None
+
+
 class ProviderAdapter(ABC):
     """Minimal contract implemented by concrete model providers."""
 
@@ -206,6 +273,49 @@ class ProviderAdapter(ABC):
 
     def status(self) -> dict[str, Any]:
         return {"id": self.provider_id, "model": self.model, "available": self.available}
+
+    async def generate_image(self, request: ProviderImageRequest) -> ProviderImageResponse:
+        raise ProviderUnavailableError(
+            f"provider does not implement image generation: {self.provider_id}"
+        )
+
+    async def create_image_variation(
+        self,
+        image: bytes,
+        *,
+        count: int = 1,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        del image, count, size, data_class, tenant_id, operation_id
+        raise ProviderUnavailableError(
+            f"provider does not implement image variation: {self.provider_id}"
+        )
+
+    async def edit_image(
+        self,
+        image: bytes,
+        *,
+        prompt: str,
+        mask: bytes | None = None,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        del image, prompt, mask, size, data_class, tenant_id, operation_id
+        raise ProviderUnavailableError(
+            f"provider does not implement image editing: {self.provider_id}"
+        )
+
+    async def synthesize_speech(
+        self, request: ProviderSpeechRequest
+    ) -> ProviderSpeechResponse:
+        raise ProviderUnavailableError(
+            f"provider does not implement speech synthesis: {self.provider_id}"
+        )
 
 
 def _normalize_history_item(item: Mapping[str, Any] | Any) -> AIMessage | None:
@@ -364,6 +474,119 @@ def _provider_operation_id(request: ProviderRequest) -> str:
     return "provider-" + digest.hexdigest()[:24]
 
 
+def _media_operation_id(
+    provider_id: str,
+    purpose: str,
+    content: bytes | str,
+    operation_id: str | None,
+) -> str:
+    if operation_id is not None and operation_id.strip():
+        return operation_id.strip()
+    digest = hashlib.sha256()
+    digest.update(provider_id.encode("utf-8"))
+    digest.update(b"\x1f")
+    digest.update(purpose.encode("utf-8"))
+    digest.update(b"\x1f")
+    digest.update(content if isinstance(content, bytes) else content.encode("utf-8"))
+    return "provider-media-" + digest.hexdigest()[:24]
+
+
+def _require_media_policy(
+    *,
+    provider_id: str,
+    purpose: str,
+    data_class: str,
+    tenant_id: str | None,
+    operation_id: str | None,
+    content: bytes | str,
+    estimated_cost_usd: float,
+    resource_budget: ResourceBudget,
+    timeout_seconds: float,
+    provider_attempts: int,
+    output_tokens: int = 1,
+) -> tuple[Any, Any]:
+    if not isinstance(data_class, str) or not data_class.strip():
+        raise ProviderPolicyError("provider media data classification is invalid")
+    if not isinstance(purpose, str) or not purpose.strip():
+        raise ProviderPolicyError("provider media purpose is invalid")
+    if not isinstance(resource_budget, ResourceBudget):
+        raise ProviderPolicyError("provider media resource budget is invalid")
+    try:
+        estimated_cost = float(estimated_cost_usd)
+    except (TypeError, ValueError) as exc:
+        raise ProviderPolicyError("provider media estimated cost is invalid") from exc
+    if not math.isfinite(estimated_cost) or estimated_cost < 0:
+        raise ProviderPolicyError("provider media estimated cost is invalid")
+
+    try:
+        governance = require_provider_transfer(
+            ProviderTransferRequest(
+                provider_id=provider_id,
+                data_class=data_class,
+                purpose=purpose,
+                tenant_id=tenant_id,
+                source="skeleton/provider_runtime.py",
+            )
+        )
+    except DataGovernanceDenied as exc:
+        raise ProviderPolicyError(
+            "provider media transfer denied by governance policy"
+        ) from exc
+
+    size_hint = len(content) if isinstance(content, bytes) else len(content.encode("utf-8"))
+    try:
+        admission = require_admission(
+            AdmissionRequest(
+                operation_id=_media_operation_id(
+                    provider_id, purpose, content, operation_id
+                ),
+                tenant_id=(tenant_id or "unbound"),
+                capability=purpose,
+                budget=resource_budget,
+                estimate=UsageEstimate(
+                    input_tokens=max(1, math.ceil(size_hint / 4)),
+                    output_tokens=max(1, output_tokens),
+                    cost_usd=estimated_cost,
+                    wall_seconds=timeout_seconds,
+                    provider_attempts=max(1, provider_attempts),
+                ),
+                pressure=RuntimePressure(),
+            )
+        )
+    except AdmissionError as exc:
+        raise ProviderPolicyError(
+            "provider media request denied by resource admission"
+        ) from exc
+    return governance, admission
+
+
+def _extract_b64_images(response: Any, *, fallback_prompt: str) -> tuple[dict[str, Any], ...]:
+    data = getattr(response, "data", None)
+    if not isinstance(data, SequenceABC) or isinstance(data, (str, bytes, bytearray)):
+        raise ProviderInvocationError("image provider returned malformed response")
+    images: list[dict[str, Any]] = []
+    total = 0
+    for item in data:
+        encoded = getattr(item, "b64_json", None)
+        if not isinstance(encoded, str) or not encoded.strip():
+            continue
+        total += len(encoded)
+        if total > (_MAX_PROVIDER_MEDIA_BYTES * 2):
+            raise ProviderInvocationError("image provider response exceeded size limit")
+        images.append(
+            {
+                "data": encoded,
+                "format": "base64_png",
+                "revised_prompt": str(
+                    getattr(item, "revised_prompt", None) or fallback_prompt
+                ),
+            }
+        )
+    if not images:
+        raise ProviderInvocationError("image provider returned no usable image")
+    return tuple(images)
+
+
 class OpenAIProviderAdapter(ProviderAdapter):
     """OpenAI Responses API adapter with lazy SDK construction."""
 
@@ -519,6 +742,246 @@ class OpenAIProviderAdapter(ProviderAdapter):
             model=model,
             request_id=str(request_id) if request_id else None,
             latency_ms=round(latency_ms, 2),
+            governance_decision_id=governance.decision_id,
+            admission_decision_id=admission.decision_id,
+            data_class=governance.data_class,
+        )
+
+
+    async def generate_image(
+        self, request: ProviderImageRequest
+    ) -> ProviderImageResponse:
+        if not isinstance(request.prompt, str) or not request.prompt.strip():
+            raise ProviderInvocationError("image provider prompt must be non-empty")
+        if request.count < 1 or request.count > 4:
+            raise ProviderInvocationError("image provider count must be between one and four")
+        if request.size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
+            raise ProviderInvocationError("image provider size is unsupported")
+        if request.quality not in {"standard", "hd", "low", "medium", "high", "auto"}:
+            raise ProviderInvocationError("image provider quality is unsupported")
+
+        governance, admission = _require_media_policy(
+            provider_id=self.provider_id,
+            purpose=request.purpose,
+            data_class=request.data_class,
+            tenant_id=request.tenant_id,
+            operation_id=request.operation_id,
+            content=request.prompt,
+            estimated_cost_usd=request.estimated_cost_usd,
+            resource_budget=request.resource_budget,
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+            output_tokens=request.count,
+        )
+        client = self._get_client()
+        started = time.perf_counter()
+        try:
+            response = await client.images.generate(
+                model=request.model,
+                prompt=request.prompt,
+                size=request.size,
+                quality=request.quality,
+                n=request.count,
+                response_format="b64_json",
+            )
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderInvocationError("image provider request failed") from exc
+
+        images = _extract_b64_images(response, fallback_prompt=request.prompt)
+        request_id = getattr(response, "id", None)
+        return ProviderImageResponse(
+            images=images,
+            provider=self.provider_id,
+            model=request.model,
+            request_id=str(request_id) if request_id else None,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            governance_decision_id=governance.decision_id,
+            admission_decision_id=admission.decision_id,
+            data_class=governance.data_class,
+        )
+
+    async def create_image_variation(
+        self,
+        image: bytes,
+        *,
+        count: int = 1,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        if not isinstance(image, bytes) or not image:
+            raise ProviderInvocationError("image variation source must be non-empty bytes")
+        if len(image) > _MAX_PROVIDER_MEDIA_BYTES:
+            raise ProviderInvocationError("image variation source exceeded size limit")
+        if count < 1 or count > 4:
+            raise ProviderInvocationError("image variation count must be between one and four")
+
+        governance, admission = _require_media_policy(
+            provider_id=self.provider_id,
+            purpose="image-variation",
+            data_class=data_class,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+            content=image,
+            estimated_cost_usd=0.0,
+            resource_budget=ResourceBudget(),
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+            output_tokens=count,
+        )
+        client = self._get_client()
+        source = io.BytesIO(image)
+        source.name = "image.png"
+        started = time.perf_counter()
+        try:
+            response = await client.images.create_variation(
+                image=source,
+                n=count,
+                size=size,
+                response_format="b64_json",
+            )
+        except Exception as exc:
+            raise ProviderInvocationError("image variation request failed") from exc
+        images = _extract_b64_images(response, fallback_prompt="variation")
+        request_id = getattr(response, "id", None)
+        return ProviderImageResponse(
+            images=images,
+            provider=self.provider_id,
+            model="image-variation",
+            request_id=str(request_id) if request_id else None,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            governance_decision_id=governance.decision_id,
+            admission_decision_id=admission.decision_id,
+            data_class=governance.data_class,
+        )
+
+    async def edit_image(
+        self,
+        image: bytes,
+        *,
+        prompt: str,
+        mask: bytes | None = None,
+        size: str = "1024x1024",
+        data_class: str = "internal",
+        tenant_id: str | None = None,
+        operation_id: str | None = None,
+    ) -> ProviderImageResponse:
+        if not isinstance(image, bytes) or not image:
+            raise ProviderInvocationError("image edit source must be non-empty bytes")
+        if len(image) > _MAX_PROVIDER_MEDIA_BYTES:
+            raise ProviderInvocationError("image edit source exceeded size limit")
+        if mask is not None and len(mask) > _MAX_PROVIDER_MEDIA_BYTES:
+            raise ProviderInvocationError("image edit mask exceeded size limit")
+        if not isinstance(prompt, str) or not prompt.strip():
+            raise ProviderInvocationError("image edit prompt must be non-empty")
+
+        governance, admission = _require_media_policy(
+            provider_id=self.provider_id,
+            purpose="image-edit",
+            data_class=data_class,
+            tenant_id=tenant_id,
+            operation_id=operation_id,
+            content=image + prompt.encode("utf-8"),
+            estimated_cost_usd=0.0,
+            resource_budget=ResourceBudget(),
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+        )
+        client = self._get_client()
+        source = io.BytesIO(image)
+        source.name = "image.png"
+        kwargs: dict[str, Any] = {
+            "image": source,
+            "prompt": prompt,
+            "n": 1,
+            "size": size,
+            "response_format": "b64_json",
+        }
+        if mask is not None:
+            mask_file = io.BytesIO(mask)
+            mask_file.name = "mask.png"
+            kwargs["mask"] = mask_file
+        started = time.perf_counter()
+        try:
+            response = await client.images.edit(**kwargs)
+        except Exception as exc:
+            raise ProviderInvocationError("image edit request failed") from exc
+        images = _extract_b64_images(response, fallback_prompt=prompt)
+        request_id = getattr(response, "id", None)
+        return ProviderImageResponse(
+            images=images,
+            provider=self.provider_id,
+            model="image-edit",
+            request_id=str(request_id) if request_id else None,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
+            governance_decision_id=governance.decision_id,
+            admission_decision_id=admission.decision_id,
+            data_class=governance.data_class,
+        )
+
+    async def synthesize_speech(
+        self, request: ProviderSpeechRequest
+    ) -> ProviderSpeechResponse:
+        if not isinstance(request.text, str) or not request.text.strip():
+            raise ProviderInvocationError("speech provider text must be non-empty")
+        if len(request.text) > 16_384:
+            raise ProviderInvocationError("speech provider text exceeded size limit")
+        if not 0.25 <= float(request.speed) <= 4.0:
+            raise ProviderInvocationError("speech provider speed is unsupported")
+        if request.response_format not in {"mp3", "wav", "opus", "aac", "flac", "pcm"}:
+            raise ProviderInvocationError("speech provider format is unsupported")
+
+        governance, admission = _require_media_policy(
+            provider_id=self.provider_id,
+            purpose=request.purpose,
+            data_class=request.data_class,
+            tenant_id=request.tenant_id,
+            operation_id=request.operation_id,
+            content=request.text,
+            estimated_cost_usd=request.estimated_cost_usd,
+            resource_budget=request.resource_budget,
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+        )
+        client = self._get_client()
+        started = time.perf_counter()
+        try:
+            response = await client.audio.speech.create(
+                model=request.model,
+                voice=request.voice,
+                input=request.text,
+                speed=request.speed,
+                response_format=request.response_format,
+            )
+            raw = getattr(response, "content", None)
+            if raw is None:
+                reader = getattr(response, "read", None)
+                if reader is None:
+                    raise ProviderInvocationError("speech provider returned malformed response")
+                raw = reader()
+                if inspect.isawaitable(raw):
+                    raw = await raw
+        except ProviderError:
+            raise
+        except Exception as exc:
+            raise ProviderInvocationError("speech provider request failed") from exc
+
+        if not isinstance(raw, (bytes, bytearray)) or not raw:
+            raise ProviderInvocationError("speech provider returned empty audio")
+        audio = bytes(raw)
+        if len(audio) > _MAX_PROVIDER_MEDIA_BYTES:
+            raise ProviderInvocationError("speech provider response exceeded size limit")
+        request_id = getattr(response, "request_id", None) or getattr(response, "id", None)
+        return ProviderSpeechResponse(
+            audio=audio,
+            provider=self.provider_id,
+            model=request.model,
+            response_format=request.response_format,
+            request_id=str(request_id) if request_id else None,
+            latency_ms=round((time.perf_counter() - started) * 1000, 2),
             governance_decision_id=governance.decision_id,
             admission_decision_id=admission.decision_id,
             data_class=governance.data_class,
@@ -867,11 +1330,15 @@ __all__ = [
     "OpenAISyncProviderAdapter",
     "ProviderAdapter",
     "ProviderError",
+    "ProviderImageRequest",
+    "ProviderImageResponse",
     "ProviderInvocationError",
     "ProviderPolicyError",
     "ProviderRegistry",
     "ProviderRequest",
     "ProviderResponse",
+    "ProviderSpeechRequest",
+    "ProviderSpeechResponse",
     "ProviderUnavailableError",
     "normalize_history",
 ]
