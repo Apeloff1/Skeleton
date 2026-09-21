@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.4.0",
-  "architecture_tag": "arch-map/v3.4",
+  "architecture_version": "3.5.0",
+  "architecture_tag": "arch-map/v3.5",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -533,7 +533,10 @@
     "replay gaps fail closed instead of pretending recovery succeeded",
     "durable operation streams preserve exact-next monotonic sequence transactionally",
     "stream compaction advances an explicit watermark and old cursors fail with replay-gap",
-    "durable stream terminal state fences all later writes"
+    "durable stream terminal state fences all later writes",
+    "runtime dependency edges and acceptance-target edges are distinct relationship classes",
+    "model-routing is engine-owned; application routing surfaces are composition or compatibility layers",
+    "release validation of frontend/backend contracts does not create upward engine dependencies"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -614,7 +617,8 @@
       "cross_zone_plane_dependency_must_follow_zone_dag": true,
       "transitional_root_may_not_own_plane": true,
       "composition_roots_may_wire_but_not_redefine_capability_ownership": true,
-      "state_class_has_single_authority": true
+      "state_class_has_single_authority": true,
+      "acceptance_targets_do_not_create_zone_dependencies": true
     },
     "plane_placements": [
       {
@@ -651,8 +655,8 @@
       },
       {
         "plane": "model-routing",
-        "zone": "application",
-        "owner": "backend/core/model_router.py",
+        "zone": "engine",
+        "owner": "skeleton/frontier/model_routing.py",
         "unit_type": "module",
         "boundary_class": "policy-boundary",
         "exposure": "internal"
@@ -867,9 +871,15 @@
       },
       {
         "id": "model-routing-policy",
+        "path": "skeleton/frontier/model_routing.py",
+        "zone": "engine",
+        "responsibility": "Own canonical provider capability/budget routing below the application boundary; no provider credentials."
+      },
+      {
+        "id": "backend-model-routing-compatibility",
         "path": "backend/core/model_router.py",
         "zone": "application",
-        "responsibility": "Select among declared provider capabilities using bounded evidence and budgets without performing provider network I/O."
+        "responsibility": "Application compatibility and telemetry-policy surface during routing convergence; it may consume engine routing contracts but cannot own canonical model-routing state."
       }
     ],
     "state_authorities": [
@@ -1077,5 +1087,10 @@
         "removal_condition": "Replace the construction prerequisite with an explicit product release-evidence interface when the release evidence contract is promoted."
       }
     ]
+  },
+  "relationship_semantics": {
+    "runtime_dependency": "Implementation dependency that participates in the zone DAG and topological construction order.",
+    "acceptance_target": "Evidence/contract target observed by a validator or release plane without an implementation dependency.",
+    "composition": "Assembly-time wiring between already-owned capabilities; never transfers ownership."
   }
 }
