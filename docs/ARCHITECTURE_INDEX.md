@@ -68,6 +68,7 @@ A round that is not indexed is considered structurally incomplete.
 | Optimizer/training internals | `docs/BUILD_PLAN.md` Track Z | research source catalog | quality/token, stability, memory, communication, checkpoint/replay |
 | Massive upgrade program | `docs/BUILD_PLAN.md` Track AA | research/evidence evolution contract | ablation, full-stack benchmark, failure injection, migration + rollback |
 | Adversarial foundations | `docs/BUILD_PLAN.md` Track AB | `docs/architecture/masterplan-gap-audit.md` | P0 closure, fault injection, recovery, signed evidence |
+| Exotic architecture laboratory | `docs/BUILD_PLAN.md` Track AC | `docs/architecture/research-source-catalog.md` | reproduction, falsification, kill criteria, sandbox, staged graduation |
 | Deployment | deploy/resilience packages | build plan | canary + rollback + observability |
 | Machine organization | `.machine/`, `machine/` | architecture index | deterministic inventory + drift checks |
 
@@ -142,7 +143,7 @@ No source may skip from discovery directly to production.
 
 ## 8. Build-plan frontier
 
-The current construction frontier is organized into Tracks Q–AB in [BUILD_PLAN.md](BUILD_PLAN.md):
+The current construction frontier is organized into Tracks Q–AC in [BUILD_PLAN.md](BUILD_PLAN.md):
 
 - **Q** — research evidence substrate;
 - **R** — model/training substrate;
@@ -155,7 +156,8 @@ The current construction frontier is organized into Tracks Q–AB in [BUILD_PLAN
 - **Y** — experiment, promotion, rollback, and continuous scientific refresh;
 - **Z** — deep internals and optimizer control plane;
 - **AA** — rare massive upgrades and full-stack step changes;
-- **AB** — adversarial foundations and systemic hardening.
+- **AB** — adversarial foundations and systemic hardening;
+- **AC** — exotic architecture laboratory.
 
 The tracks are deliberately cross-linked. A model improvement is not finished until its serving, security, evaluation, provenance, and rollback consequences are accounted for.
 
@@ -295,3 +297,43 @@ Planning checkpoint:
 PLAN-20260921-HOSTILE-GAP-AUDIT  
 scope=G001..G200 + Track AB  
 production_readiness_blocked_by_applicable_open_P0=true
+
+
+## 13. Exotic architecture authority
+
+Track AC is a quarantined laboratory for architecture-changing ideas that challenge assumptions such as fixed tokenization, fixed depth, autoregressive decoding, dense activation, static inference-time model state, conventional precision, and modality-specific generation.
+
+Evidence-backed frontier families include:
+
+- Titans/MIRAS-style test-time neural memory;
+- tokenizer-free dynamic byte-latent modeling;
+- discrete diffusion and AR/diffusion hybrids;
+- recurrent latent-depth reasoning;
+- Universal YOCO-style efficient recursion;
+- equilibrium/fixed-point language modules;
+- Mixture-of-Depths conditional depth;
+- differential/noise-canceling attention;
+- native ternary/1.58-bit model families;
+- fully sparse activation and Sparse-BitNet compounds;
+- cross-layer shared sparse routing;
+- latent multimodal language modeling;
+- reversible blocks.
+
+Track AC also keeps deliberately speculative lanes for fast weights, generated adapters, expert lifecycle changes, neural execution graphs, neuro-symbolic substrates, world models, graph-native computation, continuous-time/event-driven models, neuromorphic/analog hardware, error-correcting neural compute, explicit belief states, energy-based generation and bounded architecture search.
+
+The authority rules are stricter than the research scope:
+
+1. exotic architecture candidates cannot directly become production defaults;
+2. each candidate declares a falsifiable hypothesis and kill criteria;
+3. mutable inference-time neural state has owner/scope/TTL/reset semantics and is not trusted durable memory;
+4. tentative diffusion/revision/speculative output is not committed output;
+5. compound candidates require component-level ablation;
+6. Track AB P0 invariants remain binding;
+7. a candidate with real full-stack advantage graduates through Track AA rather than bypassing it.
+
+Planning checkpoint:
+
+PLAN-20260921-EXOTIC-ARCHITECTURE-LAB  
+scope=Track AC1..AC44  
+production_authority_granted=false  
+promotion_requires_track_ab_p0_closure=true
