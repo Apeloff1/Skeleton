@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "queue_version": "1.0.0",
+  "queue_version": "1.1.0",
   "status": "active",
   "architecture_tag": "arch-map/v3.7",
   "construction_version": "3.7.0",
@@ -45,7 +45,19 @@
         "WP-W03",
         "WP-W04"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 43,
+        "critical": 0,
+        "high": 11,
+        "medium": 21,
+        "reference": 11
+      }
     },
     {
       "task_id": "AIQ-S0-STATE-02",
@@ -74,7 +86,19 @@
         "WP-W03",
         "WP-W04"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 43,
+        "critical": 0,
+        "high": 11,
+        "medium": 21,
+        "reference": 11
+      }
     },
     {
       "task_id": "AIQ-S0-STATE-03",
@@ -102,7 +126,19 @@
         "WP-W03",
         "WP-W04"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 43,
+        "critical": 0,
+        "high": 11,
+        "medium": 21,
+        "reference": 11
+      }
     },
     {
       "task_id": "AIQ-S0-GOV-01",
@@ -133,7 +169,19 @@
         "WP-W08",
         "WP-W09"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 78,
+        "critical": 8,
+        "high": 12,
+        "medium": 34,
+        "reference": 24
+      }
     },
     {
       "task_id": "AIQ-S0-GOV-02",
@@ -165,7 +213,19 @@
         "WP-W08",
         "WP-W09"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 78,
+        "critical": 8,
+        "high": 12,
+        "medium": 34,
+        "reference": 24
+      }
     },
     {
       "task_id": "AIQ-S0-GOV-03",
@@ -196,7 +256,19 @@
         "WP-W08",
         "WP-W09"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 78,
+        "critical": 8,
+        "high": 12,
+        "medium": 34,
+        "reference": 24
+      }
     },
     {
       "task_id": "AIQ-S0-COST-01",
@@ -222,7 +294,19 @@
         "WP-W06",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 51,
+        "critical": 2,
+        "high": 6,
+        "medium": 30,
+        "reference": 13
+      }
     },
     {
       "task_id": "AIQ-S0-COST-02",
@@ -251,7 +335,19 @@
         "WP-W06",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 51,
+        "critical": 2,
+        "high": 6,
+        "medium": 30,
+        "reference": 13
+      }
     },
     {
       "task_id": "AIQ-S0-COST-03",
@@ -279,7 +375,19 @@
         "WP-W06",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 51,
+        "critical": 2,
+        "high": 6,
+        "medium": 30,
+        "reference": 13
+      }
     },
     {
       "task_id": "AIQ-S0-PROV-01",
@@ -305,7 +413,19 @@
         "WP-W05",
         "WP-W06"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 28,
+        "critical": 1,
+        "high": 2,
+        "medium": 17,
+        "reference": 8
+      }
     },
     {
       "task_id": "AIQ-S0-PROV-02",
@@ -336,7 +456,19 @@
         "WP-W05",
         "WP-W06"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 28,
+        "critical": 1,
+        "high": 2,
+        "medium": 17,
+        "reference": 8
+      }
     },
     {
       "task_id": "AIQ-S0-PROV-03",
@@ -363,7 +495,19 @@
         "WP-W05",
         "WP-W06"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 28,
+        "critical": 1,
+        "high": 2,
+        "medium": 17,
+        "reference": 8
+      }
     },
     {
       "task_id": "AIQ-S1-CONV-01",
@@ -397,7 +541,19 @@
         "WP-W10",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 9,
+        "high": 16,
+        "medium": 49,
+        "reference": 25
+      }
     },
     {
       "task_id": "AIQ-S1-CONV-02",
@@ -430,7 +586,19 @@
         "WP-W10",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 9,
+        "high": 16,
+        "medium": 49,
+        "reference": 25
+      }
     },
     {
       "task_id": "AIQ-S1-CONV-03",
@@ -463,7 +631,19 @@
         "WP-W10",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 9,
+        "high": 16,
+        "medium": 49,
+        "reference": 25
+      }
     },
     {
       "task_id": "AIQ-S1-MEM-01",
@@ -494,7 +674,19 @@
         "WP-W09",
         "WP-W10"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 52,
+        "critical": 11,
+        "high": 3,
+        "medium": 22,
+        "reference": 16
+      }
     },
     {
       "task_id": "AIQ-S1-MEM-02",
@@ -527,7 +719,19 @@
         "WP-W09",
         "WP-W10"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 52,
+        "critical": 11,
+        "high": 3,
+        "medium": 22,
+        "reference": 16
+      }
     },
     {
       "task_id": "AIQ-S1-MEM-03",
@@ -561,7 +765,19 @@
         "WP-W09",
         "WP-W10"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 52,
+        "critical": 11,
+        "high": 3,
+        "medium": 22,
+        "reference": 16
+      }
     },
     {
       "task_id": "AIQ-S1-TOOL-01",
@@ -592,7 +808,19 @@
         "WP-W13",
         "WP-W14"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 29,
+        "high": 7,
+        "medium": 42,
+        "reference": 21
+      }
     },
     {
       "task_id": "AIQ-S1-TOOL-02",
@@ -626,7 +854,19 @@
         "WP-W13",
         "WP-W14"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 29,
+        "high": 7,
+        "medium": 42,
+        "reference": 21
+      }
     },
     {
       "task_id": "AIQ-S1-TOOL-03",
@@ -660,7 +900,19 @@
         "WP-W13",
         "WP-W14"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 29,
+        "high": 7,
+        "medium": 42,
+        "reference": 21
+      }
     },
     {
       "task_id": "AIQ-S2-CTX-01",
@@ -692,7 +944,19 @@
       "work_package_refs": [
         "WP-W10"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 16,
+        "critical": 8,
+        "high": 0,
+        "medium": 4,
+        "reference": 4
+      }
     },
     {
       "task_id": "AIQ-S2-CTX-02",
@@ -726,7 +990,19 @@
       "work_package_refs": [
         "WP-W10"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 16,
+        "critical": 8,
+        "high": 0,
+        "medium": 4,
+        "reference": 4
+      }
     },
     {
       "task_id": "AIQ-S2-CTX-03",
@@ -760,7 +1036,19 @@
       "work_package_refs": [
         "WP-W10"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 16,
+        "critical": 8,
+        "high": 0,
+        "medium": 4,
+        "reference": 4
+      }
     },
     {
       "task_id": "AIQ-S2-PROTO-01",
@@ -791,7 +1079,19 @@
         "WP-W01",
         "WP-W05"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 44,
+        "critical": 5,
+        "high": 5,
+        "medium": 26,
+        "reference": 8
+      }
     },
     {
       "task_id": "AIQ-S2-PROTO-02",
@@ -825,7 +1125,19 @@
         "WP-W01",
         "WP-W05"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 44,
+        "critical": 5,
+        "high": 5,
+        "medium": 26,
+        "reference": 8
+      }
     },
     {
       "task_id": "AIQ-S2-PROTO-03",
@@ -857,7 +1169,19 @@
         "WP-W01",
         "WP-W05"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 44,
+        "critical": 5,
+        "high": 5,
+        "medium": 26,
+        "reference": 8
+      }
     },
     {
       "task_id": "AIQ-S3-VER-01",
@@ -888,7 +1212,19 @@
         "WP-W11",
         "WP-W17"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 65,
+        "critical": 3,
+        "high": 7,
+        "medium": 37,
+        "reference": 18
+      }
     },
     {
       "task_id": "AIQ-S3-VER-02",
@@ -923,7 +1259,19 @@
         "WP-W11",
         "WP-W17"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 65,
+        "critical": 3,
+        "high": 7,
+        "medium": 37,
+        "reference": 18
+      }
     },
     {
       "task_id": "AIQ-S3-VER-03",
@@ -957,7 +1305,19 @@
         "WP-W11",
         "WP-W17"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 65,
+        "critical": 3,
+        "high": 7,
+        "medium": 37,
+        "reference": 18
+      }
     },
     {
       "task_id": "AIQ-S4-EXEC-01",
@@ -992,7 +1352,19 @@
       "work_package_refs": [
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 42,
+        "critical": 1,
+        "high": 5,
+        "medium": 26,
+        "reference": 10
+      }
     },
     {
       "task_id": "AIQ-S4-EXEC-02",
@@ -1030,7 +1402,19 @@
       "work_package_refs": [
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 42,
+        "critical": 1,
+        "high": 5,
+        "medium": 26,
+        "reference": 10
+      }
     },
     {
       "task_id": "AIQ-S4-EXEC-03",
@@ -1068,7 +1452,19 @@
       "work_package_refs": [
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 42,
+        "critical": 1,
+        "high": 5,
+        "medium": 26,
+        "reference": 10
+      }
     },
     {
       "task_id": "AIQ-S5-ENG-01",
@@ -1100,7 +1496,19 @@
         "WP-W11",
         "WP-W22"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 93,
+        "critical": 5,
+        "high": 7,
+        "medium": 60,
+        "reference": 21
+      }
     },
     {
       "task_id": "AIQ-S5-ENG-02",
@@ -1135,7 +1543,19 @@
         "WP-W11",
         "WP-W22"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 93,
+        "critical": 5,
+        "high": 7,
+        "medium": 60,
+        "reference": 21
+      }
     },
     {
       "task_id": "AIQ-S5-ENG-03",
@@ -1171,7 +1591,19 @@
         "WP-W11",
         "WP-W22"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 93,
+        "critical": 5,
+        "high": 7,
+        "medium": 60,
+        "reference": 21
+      }
     },
     {
       "task_id": "AIQ-S6-STREAM-01",
@@ -1200,7 +1632,19 @@
         "WP-W11",
         "WP-W22"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 82,
+        "critical": 3,
+        "high": 7,
+        "medium": 54,
+        "reference": 18
+      }
     },
     {
       "task_id": "AIQ-S6-STREAM-02",
@@ -1234,7 +1678,19 @@
         "WP-W11",
         "WP-W22"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 82,
+        "critical": 3,
+        "high": 7,
+        "medium": 54,
+        "reference": 18
+      }
     },
     {
       "task_id": "AIQ-S6-STREAM-03",
@@ -1268,7 +1724,19 @@
         "WP-W11",
         "WP-W22"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 82,
+        "critical": 3,
+        "high": 7,
+        "medium": 54,
+        "reference": 18
+      }
     },
     {
       "task_id": "AIQ-S7-E2E-01",
@@ -1319,7 +1787,19 @@
         "WP-W10",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 173,
+        "critical": 18,
+        "high": 20,
+        "medium": 91,
+        "reference": 44
+      }
     },
     {
       "task_id": "AIQ-S7-E2E-02",
@@ -1371,7 +1851,19 @@
         "WP-W10",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 173,
+        "critical": 18,
+        "high": 20,
+        "medium": 91,
+        "reference": 44
+      }
     },
     {
       "task_id": "AIQ-S7-E2E-03",
@@ -1424,7 +1916,19 @@
         "WP-W10",
         "WP-W11"
       ],
-      "acceptance_overlay": "p0_edge_case_matrix"
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 173,
+        "critical": 18,
+        "high": 20,
+        "medium": 91,
+        "reference": 44
+      }
     }
   ],
   "queue_invariants": [
@@ -1440,6 +1944,12 @@
       "human": "docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md",
       "inheritance_rule": "Each task inherits relevant edge/historical obligations from work_package_refs. Non-applicable items require explicit disposition; planned tests are not completion evidence.",
       "hardening_rule": "A task may implement before all inherited cases close, but its owning capability cannot be hardened/production while high-impact inherited cases lack evidence or accepted-risk disposition."
+    },
+    "full_program_edge_case_matrix": {
+      "contract": "machine/ai_full_edge_case_matrix.json",
+      "human": "docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md",
+      "inheritance_rule": "Each task inherits the union of catalogue cases mapped to its work_package_refs. Critical/high cases require executable evidence or explicit accepted-risk disposition before hardened/production status.",
+      "source_catalog": "machine/ai_edge_case_catalog.json"
     }
   }
 }
