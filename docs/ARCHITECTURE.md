@@ -248,13 +248,14 @@ single learned judge is treated as truth.
 Canonical navigation for this layer:
 
 - [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md) — master human index and authority order;
-- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–AC construction sequence;
+- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–AD construction sequence;
 - [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md) — scientific evidence, experiment, and promotion contract;
 - [architecture/research-source-catalog.md](architecture/research-source-catalog.md) — historical/frontier research canon and anti-canon;
 - [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
 - [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion;
 - [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns;
-- [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md) — quarantined architecture-changing experiments, falsification batteries, state-containment and graduation rules.
+- [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md) — quarantined architecture-changing experiments, falsification batteries, state-containment and graduation rules;
+- [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md) — current frontier findings, contradictions, source-status audit, research questions, reproduction queue, and September 2026 research delta.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
@@ -284,3 +285,20 @@ This plane does not weaken authority boundaries:
 - compound architectures require component ablation;
 - Track AB P0 invariants remain binding;
 - a candidate must graduate through the Track AA full-stack promotion path before production consideration.
+
+
+### Research saturation and source-status discipline
+
+Track AD turns research intake into an explicit scientific workload.
+
+The architecture distinguishes accepted peer-reviewed work, preprints, conference/ARR submissions, withdrawn work, official first-party deployment/research evidence, and unresolved source status.
+
+Research status is part of evidence identity. A source becoming accepted later is a new evidence event; it does not rewrite what was known when an earlier architecture decision was made.
+
+Research conclusions are scoped to the tested population, model, data, hardware, inference protocol, and evaluator. The system retains contradictory and negative evidence and discounts consensus when sources share models, data, benchmarks, code, evaluators, or authors.
+
+For reasoning and agent research, the evaluated object is the complete inference/workflow system, not only base model weights. For research agents, experiment manifests, code execution, hidden evaluation access, generated training data, and result validation remain independently governed. A research agent cannot certify its own result as reproduced or promotion-ready.
+
+Monitorability is a measured, versioned property that can drift with model scale, post-training, reasoning method, and monitor capability. It is therefore re-evaluated rather than assumed to improve monotonically with capability.
+
+The canonical research snapshot is docs/architecture/frontier-research-atlas-2026.md. Its FR, RQ, SV, and FD identifiers are research/evidence references, not runtime authorities.
