@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * vaultActions — client helpers for the unified vault read / download / restore /
  * fetch-into-system flows. Download uses Linking (native) / anchor (web) so no
@@ -7,7 +8,7 @@ import { Platform, Linking } from 'react-native';
 import api from './apiClient';
 import { authHeaders } from '../auth/gameforgeAuth';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE;
 const S = '/api/gameforge/studio';
 
 export function vaultDownloadUrl(fileId: string): string {
