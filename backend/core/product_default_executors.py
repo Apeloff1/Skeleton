@@ -6,10 +6,13 @@ executors are deterministic and attested; effectful executors must be replay-saf
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Callable
 
+from core.academy_product import continue_learning, practice, progress as academy_progress
 from core.curiosity_engine import CuriosityEngine
 from core.deployment_planner import compile_deployment_plan
+from core.gameforge_artifact_builder import build_source_artifact, build_web_artifact
 from core.execution_receipts import ExecutionReceiptStore, ReceiptIntegrityError
 from core.knowledge_augmented_jeeves import KnowledgeAugmentedJeeves
 from core.product_executor_registry import ProductExecutorRegistry
@@ -22,15 +25,21 @@ Provider = Callable[[], dict[str, Any] | list[dict[str, Any]]]
 
 _CONTRACTS = {
     "native.studio.project.create": (1, "state", True),
+    "native.studio.build.submit": (1, "state", True),
     "native.studio.pipeline.inspect": (1, "query", True),
     "native.worldforge.world.create": (1, "state", True),
     "native.worldforge.world.systems.compose": (1, "state", True),
+    "native.worldforge.asset.forge": (1, "state", True),
     "native.playables.playable.launch": (1, "state", True),
     "native.playables.runtime.sessions": (1, "query", True),
     "native.playables.progress.inspect": (1, "query", True),
     "native.jeeves.reason": (1, "state", True),
     "native.jeeves.plan": (1, "state", True),
     "native.jeeves.agents.review": (1, "state", True),
+    "native.academy.continue": (1, "query", True),
+    "native.academy.practice": (1, "query", True),
+    "native.academy.progress": (1, "query", True),
+    "native.operations.ops.agents": (1, "query", True),
     "native.operations.ops.runtime": (1, "query", True),
     "native.operations.ops.deployments": (1, "query", True),
     "native.governance.policy": (1, "query", True),
@@ -93,6 +102,45 @@ class NativeProductExecutors:
             "genre": str(payload.get("genre") or "unspecified")[:80], "brief": str(payload.get("brief") or payload.get("prompt") or "")[:20_000],
             "template": str(payload.get("template") or "blank")[:120], "owner": operation.principal, "state": "created"})
 
+    def submit_build(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.studio.build.submit"
+        if self._already_complete(operation, executor): return True
+
+        game_name_raw = payload.get("game_name")
+        if game_name_raw is None:
+            game_name_raw = payload.get("name") or payload.get("title")
+        if not isinstance(game_name_raw, str) or not game_name_raw.strip():
+            raise ValueError("game_name is required")
+        game_name = game_name_raw.strip()
+        if len(game_name) > 200:
+            raise ValueError("game_name must be at most 200 characters")
+
+        kind_raw = payload.get("kind", "web")
+        if not isinstance(kind_raw, str):
+            raise ValueError("kind must be a string")
+        kind = kind_raw.strip().lower()
+        if kind not in {"web", "source"}:
+            raise ValueError("kind must be 'web' or 'source'")
+
+        supplied = payload.get("files")
+        files = None
+        if supplied is not None:
+            if not isinstance(supplied, list) or not all(isinstance(item, dict) for item in supplied):
+                raise ValueError("files must be an array of objects when supplied")
+            files = [dict(item) for item in supplied]
+
+        builder = build_web_artifact if kind == "web" else build_source_artifact
+        built_at = datetime.fromisoformat(operation.admitted_at).timestamp()
+        artifact = builder(
+            game_name,
+            files=files,
+            build_token=operation.id,
+            built_at=built_at,
+        )
+        public = dict(artifact)
+        public.pop("path", None)
+        return self._write(operation, executor, {"build": public})
+
     def pipeline_inspect(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.studio.pipeline.inspect"
         if self._already_complete(operation, executor): return True
@@ -116,6 +164,52 @@ class NativeProductExecutors:
         world = dict(supplied) if isinstance(supplied, dict) else self._generate_world(payload)
         blueprint = compose_world_systems(world)
         return self._write(operation, executor, {"blueprint": blueprint_dict(blueprint), "world_signature": blueprint.world_signature})
+
+    def forge_assets(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.worldforge.asset.forge"
+        if self._already_complete(operation, executor): return True
+        from core import asset_forge, vault_gdd
+
+        build_id = str(payload.get("build_id") or "").strip()
+        if not build_id or len(build_id) > 200:
+            raise ValueError("build_id is required and must be at most 200 characters")
+
+        supplied = payload.get("items")
+        if supplied is None:
+            items = list(vault_gdd.read_gamefiles(build_id).get("items") or ())
+        else:
+            if not isinstance(supplied, list) or not all(isinstance(item, dict) for item in supplied):
+                raise ValueError("items must be an array of objects when supplied")
+            items = [dict(item) for item in supplied]
+        if not items:
+            raise ValueError("asset forge requires existing or supplied gamefile items")
+
+        seed_raw = payload.get("seed", 0)
+        if isinstance(seed_raw, bool):
+            raise ValueError("seed must be an integer")
+        try:
+            seed = int(seed_raw)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("seed must be an integer") from exc
+
+        persist = payload.get("persist", True)
+        if not isinstance(persist, bool):
+            raise ValueError("persist must be a boolean")
+        era_raw = payload.get("era")
+        if era_raw is not None and not isinstance(era_raw, str):
+            raise ValueError("era must be a string when supplied")
+        era = era_raw.strip()[:100] if isinstance(era_raw, str) else None
+
+        summary = asset_forge.forge_build_assets(
+            build_id,
+            items,
+            seed,
+            persist,
+            era=era or None,
+        )
+        summary = dict(summary)
+        summary.pop("assets", None)
+        return self._write(operation, executor, {"asset_forge": summary})
 
     def launch_playable(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.playables.playable.launch"
@@ -159,6 +253,62 @@ class NativeProductExecutors:
         if self._already_complete(operation, executor): return True
         return self._write(operation, executor, {"review": self._require_jeeves().review(self._jeeves_payload(operation, payload))})
 
+    async def academy_continue(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.academy.continue"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"academy": await continue_learning(payload)})
+
+    async def academy_practice(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.academy.practice"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"academy": await practice(payload)})
+
+    async def academy_progress(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.academy.progress"
+        if self._already_complete(operation, executor): return True
+        return self._write(operation, executor, {"academy": await academy_progress(payload)})
+
+    def ops_agents(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
+        executor = "native.operations.ops.agents"
+        if self._already_complete(operation, executor): return True
+        from core.swarm_agents import SWARM_DOMAINS
+
+        category_raw = payload.get("category")
+        query_raw = payload.get("query") or payload.get("q")
+        if category_raw is not None and not isinstance(category_raw, str):
+            raise ValueError("category must be a string when supplied")
+        if query_raw is not None and not isinstance(query_raw, str):
+            raise ValueError("query must be a string when supplied")
+        category = category_raw.strip().lower() if isinstance(category_raw, str) else ""
+        query = query_raw.strip().lower() if isinstance(query_raw, str) else ""
+
+        limit_raw = payload.get("limit", 50)
+        if isinstance(limit_raw, bool):
+            raise ValueError("limit must be an integer")
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("limit must be an integer") from exc
+        if limit < 1 or limit > 200:
+            raise ValueError("limit must be between 1 and 200")
+
+        agents = list(SWARM_DOMAINS)
+        if category:
+            agents = [item for item in agents if str(item.get("category", "")).lower() == category]
+        if query:
+            agents = [
+                item for item in agents
+                if query in str(item.get("id", "")).lower()
+                or query in str(item.get("domain", "")).lower()
+                or query in str(item.get("agent", "")).lower()
+                or any(query in str(keyword).lower() for keyword in item.get("expertise", ()))
+            ]
+        return self._write(
+            operation,
+            executor,
+            {"agents": {"total": len(agents), "returned": min(len(agents), limit), "items": agents[:limit]}},
+        )
+
     def ops_runtime(self, operation: AdmittedOperation, payload: dict[str, Any]) -> bool:
         executor = "native.operations.ops.runtime"
         if self._already_complete(operation, executor): return True
@@ -188,9 +338,11 @@ class NativeProductExecutors:
 
     def register_into(self, registry: ProductExecutorRegistry) -> ProductExecutorRegistry:
         registry.register("studio", "project.create", self.create_project, name="native.studio.project.create", version=1, effect_class="state", replay_safe=True)
+        registry.register("studio", "build.submit", self.submit_build, name="native.studio.build.submit", version=1, effect_class="state", replay_safe=True)
         if self.operations_provider is not None: registry.register("studio", "pipeline.inspect", self.pipeline_inspect, name="native.studio.pipeline.inspect", version=1, effect_class="query", replay_safe=True)
         registry.register("world-forge", "world.create", self.create_world, name="native.worldforge.world.create", version=1, effect_class="state", replay_safe=True)
         registry.register("world-forge", "world.systems.compose", self.compose_world_systems, name="native.worldforge.world.systems.compose", version=1, effect_class="state", replay_safe=True)
+        registry.register("world-forge", "asset.forge", self.forge_assets, name="native.worldforge.asset.forge", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "playable.launch", self.launch_playable, name="native.playables.playable.launch", version=1, effect_class="state", replay_safe=True)
         registry.register("playables", "runtime.sessions", self.runtime_sessions, name="native.playables.runtime.sessions", version=1, effect_class="query", replay_safe=True)
         registry.register("playables", "progress.inspect", self.progress_inspect, name="native.playables.progress.inspect", version=1, effect_class="query", replay_safe=True)
@@ -198,6 +350,10 @@ class NativeProductExecutors:
             registry.register("jeeves", "jeeves.reason", self.jeeves_reason, name="native.jeeves.reason", version=1, effect_class="state", replay_safe=True)
             registry.register("jeeves", "jeeves.plan", self.jeeves_plan, name="native.jeeves.plan", version=1, effect_class="state", replay_safe=True)
             registry.register("jeeves", "agents.review", self.agents_review, name="native.jeeves.agents.review", version=1, effect_class="state", replay_safe=True)
+        registry.register("academy", "academy.continue", self.academy_continue, name="native.academy.continue", version=1, effect_class="query", replay_safe=True)
+        registry.register("academy", "academy.practice", self.academy_practice, name="native.academy.practice", version=1, effect_class="query", replay_safe=True)
+        registry.register("academy", "academy.progress", self.academy_progress, name="native.academy.progress", version=1, effect_class="query", replay_safe=True)
+        registry.register("operations", "ops.agents", self.ops_agents, name="native.operations.ops.agents", version=1, effect_class="query", replay_safe=True)
         if self.operations_provider is not None: registry.register("operations", "ops.runtime", self.ops_runtime, name="native.operations.ops.runtime", version=1, effect_class="query", replay_safe=True)
         registry.register("operations", "ops.deployments", self.ops_deployments, name="native.operations.ops.deployments", version=1, effect_class="query", replay_safe=True)
         if self.policy_provider is not None: registry.register("governance", "governance.policy", self.governance_policy, name="native.governance.policy", version=1, effect_class="query", replay_safe=True)

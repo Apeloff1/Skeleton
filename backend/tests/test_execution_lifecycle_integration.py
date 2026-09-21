@@ -3,6 +3,28 @@ import asyncio
 from core.product_control_plane import ProductControlPlane
 from core.product_executor_registry import ProductExecutorRegistry
 
+def _plane_without_build_executor(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    source = plane.executors
+    filtered = ProductExecutorRegistry()
+    for item in source.snapshot():
+        pair = (item["capability_id"], item["action"])
+        if pair == ("studio", "build.submit"):
+            continue
+        binding = source.require(*pair)
+        filtered.register(
+            pair[0],
+            pair[1],
+            binding.executor,
+            name=binding.name,
+            version=binding.version,
+            effect_class=binding.effect_class,
+            replay_safe=binding.replay_safe,
+        )
+    plane.executors = filtered
+    return plane
+
+
 
 def test_native_execution_moves_evidence_from_pending_to_confirmed_and_survives_restart(tmp_path):
     plane = ProductControlPlane(tmp_path)
@@ -44,7 +66,7 @@ def test_native_execution_moves_evidence_from_pending_to_confirmed_and_survives_
 
 
 def test_unbound_operation_remains_durable_pending_evidence(tmp_path):
-    plane = ProductControlPlane(tmp_path)
+    plane = _plane_without_build_executor(tmp_path)
     admitted = plane.admit(
         capability_id="studio",
         domain="studio",
@@ -68,7 +90,7 @@ def test_unbound_operation_remains_durable_pending_evidence(tmp_path):
     assert lifecycle["admitted_audit_present"] is True
     assert lifecycle["anomalies"] == ()
 
-    restored = ProductControlPlane(tmp_path)
+    restored = _plane_without_build_executor(tmp_path)
     assert restored.operation_lifecycle(admitted.id)["state"] == "pending_unbound"
 
 

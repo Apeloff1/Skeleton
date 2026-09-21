@@ -5,19 +5,28 @@ on:
     branches: [main]
     paths:
       - "backend/core/charter_policy.py"
+      - "backend/core/academy_product.py"
+      - "backend/core/gameforge_artifact_builder.py"
       - "backend/core/product_kernel.py"
       - "backend/core/product_control_plane.py"
+      - "backend/core/product_control_runtime.py"
       - "backend/core/product_executor_registry.py"
       - "backend/core/product_default_executors.py"
       - "backend/core/execution_receipts.py"
       - "backend/core/product_operations.py"
+      - "backend/routes/product_runtime.py"
+      - "backend/routes/ops.py"
+      - "backend/core/routes_registry.py"
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
       - "backend/tests/test_product_executor_registry.py"
       - "backend/tests/test_execution_receipts.py"
       - "backend/tests/test_native_product_executors.py"
+      - "backend/tests/test_product_control_plane.py"
+      - "backend/tests/test_gameforge_artifact_builder.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/src/product/productControlClient.ts"
+      - "frontend/src/product/appHealthClient.ts"
       - "frontend/app/product.tsx"
       - "frontend/app/capability.tsx"
       - "frontend/app/operation.tsx"
@@ -29,19 +38,28 @@ on:
     types: [opened, synchronize, reopened, closed]
     paths:
       - "backend/core/charter_policy.py"
+      - "backend/core/academy_product.py"
+      - "backend/core/gameforge_artifact_builder.py"
       - "backend/core/product_kernel.py"
       - "backend/core/product_control_plane.py"
+      - "backend/core/product_control_runtime.py"
       - "backend/core/product_executor_registry.py"
       - "backend/core/product_default_executors.py"
       - "backend/core/execution_receipts.py"
       - "backend/core/product_operations.py"
+      - "backend/routes/product_runtime.py"
+      - "backend/routes/ops.py"
+      - "backend/core/routes_registry.py"
       - "backend/tests/test_charter_policy.py"
       - "backend/tests/test_product_kernel.py"
       - "backend/tests/test_product_executor_registry.py"
       - "backend/tests/test_execution_receipts.py"
       - "backend/tests/test_native_product_executors.py"
+      - "backend/tests/test_product_control_plane.py"
+      - "backend/tests/test_gameforge_artifact_builder.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/src/product/productControlClient.ts"
+      - "frontend/src/product/appHealthClient.ts"
       - "frontend/app/product.tsx"
       - "frontend/app/capability.tsx"
       - "frontend/app/operation.tsx"
@@ -71,7 +89,12 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
-      - run: python -m pip install "pytest>=8,<9"
+      - name: Install focused product-kernel test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+          "pytest-asyncio>=0.23,<2"
+          "cryptography==50.0.1"
       - name: Verify framework-free product kernel contracts
         run: >-
           python -m pytest -q --noconftest
@@ -80,6 +103,8 @@ jobs:
           tests/test_product_executor_registry.py
           tests/test_execution_receipts.py
           tests/test_native_product_executors.py
+          tests/test_product_control_plane.py
+          tests/test_gameforge_artifact_builder.py
 
   frontend-product-contract:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'

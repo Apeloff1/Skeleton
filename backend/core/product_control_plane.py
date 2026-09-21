@@ -214,14 +214,14 @@ class ProductControlPlane:
         return [asdict(x) for x in derive_ledger(pending_operations=self.pending(), receipts=self.receipt_history(limit=500), audit_entries=self.audit_history(limit=500))]
 
     async def execute_registered(self, seq: int, registry: ProductExecutorRegistry | None = None) -> bool:
-        active = registry or self.executors; operation = next((x for x in self.operations.pending_operations() if x.outbox_seq == seq), None)
+        active = self.executors if registry is None else registry; operation = next((x for x in self.operations.pending_operations() if x.outbox_seq == seq), None)
         if operation is None: return False
         try: executor = active.executor_for(operation)
         except ExecutorNotRegistered: return False
         return (await self.operations.execute_one(seq, executor)).confirmed
 
     async def dispatch_pending(self, registry: ProductExecutorRegistry | None = None, *, limit: int | None = None) -> dict[str, Any]:
-        active = registry or self.executors; pending = self.operations.pending_operations()
+        active = self.executors if registry is None else registry; pending = self.operations.pending_operations()
         if limit is not None:
             if limit < 0: raise ValueError("limit cannot be negative")
             pending = pending[:limit]
