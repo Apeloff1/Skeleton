@@ -1629,6 +1629,136 @@ def _validate_implementation_handoff(
     return result
 
 
+
+def _validate_closure_evidence_ledger(
+    contract: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    """Validate evidence-based P0 gap closure accounting."""
+
+    link = contract.get("closure_evidence_ledger")
+    result = {"entries": 0, "closed": 0, "ready_for_closure": 0}
+    if not isinstance(link, dict):
+        errors.append("closure_evidence_ledger must be an object")
+        return result
+    if link.get("schema_version") != 1:
+        errors.append("closure_evidence_ledger.schema_version must be 1")
+    if link.get("status") != "active":
+        errors.append("closure_evidence_ledger.status must be active")
+
+    try:
+        relative = _path(link.get("path"))
+    except ValueError as exc:
+        errors.append(f"closure_evidence_ledger.path: {exc}")
+        return result
+    try:
+        ledger = _load(repo_root / relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return result
+
+    if ledger.get("schema_version") != 1:
+        errors.append("AI closure evidence ledger schema_version must be 1")
+    if ledger.get("status") != "active":
+        errors.append("AI closure evidence ledger status must be active")
+    if ledger.get("ledger_version") != link.get("ledger_version"):
+        errors.append("closure_evidence_ledger.ledger_version must match ledger file")
+    if ledger.get("architecture_tag") != contract.get("architecture_tag"):
+        errors.append("AI closure evidence ledger architecture_tag drift")
+    if ledger.get("construction_version") != contract.get("construction_version"):
+        errors.append("AI closure evidence ledger construction_version drift")
+
+    closure = contract.get("functional_ai_closure")
+    required_p0 = set(closure.get("required_p0_gaps", [])) if isinstance(closure, dict) else set()
+    gap_by_id = {
+        item.get("id"): item
+        for item in contract.get("gap_register", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    graph = contract.get("functional_ai_dependency_graph")
+    graph_nodes = {
+        item.get("gap"): item
+        for item in graph.get("nodes", [])
+        if isinstance(item, dict) and isinstance(item.get("gap"), str)
+    } if isinstance(graph, dict) else {}
+
+    entries = ledger.get("entries")
+    if not isinstance(entries, list) or not entries:
+        errors.append("AI closure evidence ledger entries must be non-empty")
+        return result
+
+    by_gap: dict[str, dict[str, Any]] = {}
+    allowed_decisions = {"open", "ready_for_closure", "closed", "reopened"}
+    for index, item in enumerate(entries):
+        label = f"ai_closure_evidence.entries[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        gap_id = item.get("gap")
+        if not isinstance(gap_id, str) or not gap_id.strip():
+            errors.append(f"{label}.gap must be non-empty")
+            continue
+        if gap_id in by_gap:
+            errors.append(f"duplicate AI closure evidence gap: {gap_id}")
+            continue
+        by_gap[gap_id] = item
+
+        gap = gap_by_id.get(gap_id)
+        if not isinstance(gap, dict):
+            errors.append(f"{label} references unknown gap {gap_id!r}")
+            continue
+        if item.get("gap_status") != gap.get("status"):
+            errors.append(f"{label}.gap_status drift for {gap_id}")
+
+        node = graph_nodes.get(gap_id)
+        if isinstance(node, dict):
+            if item.get("stage") != node.get("stage"):
+                errors.append(f"{label}.stage drift for {gap_id}")
+
+        decision = item.get("closure_decision")
+        if decision not in allowed_decisions:
+            errors.append(f"{label}.closure_decision must be one of {sorted(allowed_decisions)}")
+        if decision == "closed":
+            result["closed"] += 1
+            if gap.get("status") != "closed":
+                errors.append(f"{label} cannot be closed while canonical gap is open")
+        if decision == "ready_for_closure":
+            result["ready_for_closure"] += 1
+
+        required = item.get("closure_evidence_required")
+        if not isinstance(required, list) or not required:
+            errors.append(f"{label}.closure_evidence_required must be non-empty")
+        elif required != gap.get("closure_evidence"):
+            errors.append(f"{label}.closure_evidence_required drift for {gap_id}")
+
+        _nonempty_strings(
+            item.get("close_when"),
+            label=f"{label}.close_when",
+            errors=errors,
+        )
+        _nonempty_strings(
+            item.get("reopen_when"),
+            label=f"{label}.reopen_when",
+            errors=errors,
+        )
+
+    missing = sorted(required_p0 - set(by_gap))
+    extra = sorted(set(by_gap) - required_p0)
+    if missing:
+        errors.append("AI closure evidence ledger missing P0 gaps: " + ", ".join(missing))
+    if extra:
+        errors.append("AI closure evidence ledger has non-P0 gaps: " + ", ".join(extra))
+
+    result["entries"] = len(by_gap)
+    _nonempty_strings(
+        ledger.get("rules"),
+        label="AI closure evidence ledger rules",
+        errors=errors,
+    )
+    return result
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -2088,6 +2218,9 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     implementation_handoff = _validate_implementation_handoff(
         contract, repo_root, errors
     )
+    closure_evidence = _validate_closure_evidence_ledger(
+        contract, repo_root, errors
+    )
     functional_ai = _validate_functional_ai_closure(
         contract, planes, repo_root, errors
     )
@@ -2130,6 +2263,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "construction_ledger": ledger,
         "runtime_schemas": runtime_schemas,
         "implementation_handoff": implementation_handoff,
+        "closure_evidence": closure_evidence,
         "functional_ai": functional_ai,
         "operation_stream": operation_stream,
         "provider_documents": must_read,
