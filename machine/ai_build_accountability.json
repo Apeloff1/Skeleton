@@ -18625,22 +18625,32 @@
       "id": "ACC-AIQ-S0-GOV-03",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T17:52:22Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-21T17:58:49Z",
+        "git_sha": "322605e99752cd2398e4cfb18583a93a5bdb55a4",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/34fc2c2f59427bc43b0b303bcbebb3f3d3bca25b",
+          "https://github.com/Apeloff1/Skeleton/commit/ba24c06cdeaf685fc4a740ae37fb9de31f4f6081",
+          "https://github.com/Apeloff1/Skeleton/commit/9c7f0a8923c0c8a914eeaf99625175658fa1206d",
+          "https://github.com/Apeloff1/Skeleton/commit/d0e241fdd87563cc0e7d4c96847879a7e8114e98",
+          "https://github.com/Apeloff1/Skeleton/commit/426e87cd841e71b9db82d8af58c840cdb5cd2a78",
+          "https://github.com/Apeloff1/Skeleton/commit/f339e176b24722bb2cd0419e2c9a45379c4a8450",
+          "https://github.com/Apeloff1/Skeleton/commit/a5e376f5e1008e8526682d9942ffe87cb313ee5a",
+          "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4",
+          "machine/accountability_events/ACC-AIQ-S0-GOV-03/implementation.json"
+        ],
+        "statement": "Implemented correlation-aware, payload-free governance lifecycle audit integration using WORM audit and tracing, with adversarial regression coverage.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4"
       },
       "verification_signoff": {
         "signed": false,
@@ -18656,7 +18666,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:52:22Z",
+      "last_event_at_utc": "2026-09-21T17:58:49Z",
       "history": [
         {
           "sequence": 1,
@@ -18674,9 +18684,44 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-AIQ-S0-GOV-03/start.json"
           ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:58:49Z",
+          "git_sha": "322605e99752cd2398e4cfb18583a93a5bdb55a4",
+          "statement": "Implemented correlation-aware, payload-free governance lifecycle audit integration using WORM audit and tracing, with adversarial regression coverage.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/34fc2c2f59427bc43b0b303bcbebb3f3d3bca25b",
+            "https://github.com/Apeloff1/Skeleton/commit/ba24c06cdeaf685fc4a740ae37fb9de31f4f6081",
+            "https://github.com/Apeloff1/Skeleton/commit/9c7f0a8923c0c8a914eeaf99625175658fa1206d",
+            "https://github.com/Apeloff1/Skeleton/commit/d0e241fdd87563cc0e7d4c96847879a7e8114e98",
+            "https://github.com/Apeloff1/Skeleton/commit/426e87cd841e71b9db82d8af58c840cdb5cd2a78",
+            "https://github.com/Apeloff1/Skeleton/commit/f339e176b24722bb2cd0419e2c9a45379c4a8450",
+            "https://github.com/Apeloff1/Skeleton/commit/a5e376f5e1008e8526682d9942ffe87cb313ee5a",
+            "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4",
+            "machine/accountability_events/ACC-AIQ-S0-GOV-03/implementation.json"
+          ]
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/34fc2c2f59427bc43b0b303bcbebb3f3d3bca25b",
+        "https://github.com/Apeloff1/Skeleton/commit/ba24c06cdeaf685fc4a740ae37fb9de31f4f6081",
+        "https://github.com/Apeloff1/Skeleton/commit/9c7f0a8923c0c8a914eeaf99625175658fa1206d",
+        "https://github.com/Apeloff1/Skeleton/commit/d0e241fdd87563cc0e7d4c96847879a7e8114e98",
+        "https://github.com/Apeloff1/Skeleton/commit/426e87cd841e71b9db82d8af58c840cdb5cd2a78",
+        "https://github.com/Apeloff1/Skeleton/commit/f339e176b24722bb2cd0419e2c9a45379c4a8450",
+        "https://github.com/Apeloff1/Skeleton/commit/a5e376f5e1008e8526682d9942ffe87cb313ee5a",
+        "https://github.com/Apeloff1/Skeleton/commit/322605e99752cd2398e4cfb18583a93a5bdb55a4",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-03/implementation.json"
+      ],
       "baseline_status": "pending"
     },
     {
