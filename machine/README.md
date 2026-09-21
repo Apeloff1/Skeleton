@@ -120,6 +120,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Archive lineage:** PR-runner and workflow-secret-output snapshots remain historical source material after revalidation; neither is treated as a merge target.
 
+- **Backup lineage:** five recovery snapshots revalidated; all diverge materially from assembly and remain historical recovery/source material, not merge targets.
+
 ## Target layout
 
 ```text
