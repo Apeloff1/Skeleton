@@ -633,6 +633,22 @@ Evidence:
 `backend/tests/test_rag_state_authority.py`, and
 `machine/state_topology.json`.
 
+### State-authority checkpoint — durable operation runtime
+
+The production Skeleton intelligence surface is bound through `DurableOperationRuntime`, not directly to the in-memory orchestrator.
+
+- `SQLiteOperationStore` is the canonical OperationEnvelope authority;
+- each accepted create/transition commits state and a deterministic outbox event in the same transaction;
+- `SQLiteOperationEventStore` is a resumable durable projection, not operation truth;
+- startup drains pending outbox rows before serving normal work;
+- foreground state transitions trigger immediate best-effort dispatch;
+- a bounded background dispatcher retries unpublished rows during idle process time;
+- crash-after-stream-append-before-outbox-ACK is reconciled by deterministic event identity;
+- shutdown stops the dispatcher, flushes pending rows, then closes durable stores.
+
+A stream outage therefore cannot roll back an accepted operation transition, and an idle process no longer requires a new request or restart to retry pending publication. STATE-02 remains verification-pending until the focused operation store/runtime/server-binding tests pass under independent CI.
+
+
 ### Cost-admission checkpoint — durable tenant quotas
 
 The durable-quota slice of `gap-cost-admission` now has a reference backend at
