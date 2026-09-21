@@ -3097,7 +3097,11 @@ Reproduce or operationalize the highest-impact FD findings:
 13. adversarial tool-metadata selection study;
 14. semantic-faithfulness vs formal-validity verifier split;
 15. research-agent stage-by-stage capability decomposition;
-16. typed prospective-intention-store vs retrospective-memory comparison.
+16. typed prospective-intention-store vs retrospective-memory comparison;
+17. formal-prover agent-loop convergence and semantic-fidelity split;
+18. trajectory-level uncertainty/calibration study;
+19. continual-adapter interference-geometry study;
+20. multimodal perception-aware post-training study.
 
 ### AD49. Research claim expiry and revalidation — ⬜
 
@@ -3625,7 +3629,7 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 27. 🧪 Establish Track AC ExoticCandidate harnesses and reproduce Tier E1 candidates independently.
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
 29. 🔨 Establish Track AD research saturation: normalize priority sources, verify source/venue status, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
-30. 🧪 Execute the AD high-information experiment queue plus FD001–FD021 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
+30. 🧪 Execute the AD high-information experiment queue plus FD001–FD026 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
 31. ⬜ Instantiate RXP001–RXP035 experiment manifests and execute the first-wave protocols in evidence-value order.
 32. ⬜ Close or explicitly scope material RDE research debt and resolve/document CX contradictions before default promotion.
 33. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
