@@ -72,6 +72,8 @@ class ServerState:
         self.memory_trinity: Optional[Any] = None
         self.resilience: Optional[Any] = None
         self.intelligence: Optional[Any] = None
+        self.intelligence_core: Optional[Any] = None
+        self.operation_runtime: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
@@ -193,12 +195,47 @@ class ServerState:
         overall = not has_error and not swarm_critical and not recovery_mismatch and not tenant_mismatch
         return {"overall": overall, "checks": checks}
 
+    def bind_operation_runtime(self) -> Any:
+        """Bind the live intelligence surface to durable operation state."""
+        if self.intelligence_core is None:
+            if self.genesis is None:
+                raise RuntimeError("genesis must be wired before operation runtime")
+            self.intelligence_core = self.genesis.handles.get("orchestrator")
+        if self.intelligence_core is None:
+            raise RuntimeError("intelligence orchestrator is unavailable")
+        if self.operation_runtime is not None and not getattr(
+            self.operation_runtime, "_closed", False
+        ):
+            self.intelligence = self.operation_runtime
+            return self.operation_runtime
+
+        from skeleton.config.settings import get_settings
+        from skeleton.persistence.operation_runtime import DurableOperationRuntime
+
+        runtime = DurableOperationRuntime.from_settings(
+            self.intelligence_core,
+            get_settings().operation,
+        )
+        runtime.dispatch_outbox()
+        self.operation_runtime = runtime
+        self.intelligence = runtime
+        return runtime
+
+    def close_operation_runtime(self) -> None:
+        runtime = self.operation_runtime
+        if runtime is not None:
+            runtime.close()
+        self.operation_runtime = None
+        self.intelligence = self.intelligence_core
+
     def wire_from_genesis(self, genesis: Any) -> None:
         self.genesis = genesis
         self.forge = genesis.handles.get("forge")
         self.mesh = genesis.handles.get("mesh")
         self.memory_trinity = genesis.handles.get("trinity")
-        self.intelligence = genesis.handles.get("orchestrator")
+        self.intelligence_core = genesis.handles.get("orchestrator")
+        self.intelligence = self.intelligence_core
+        self.bind_operation_runtime()
         self.resilience = genesis.handles.get("fortress")
 
         from skeleton.pipelines import AnimationPipeline, GameForge, GameLogicPipeline, NPCPipeline
@@ -319,6 +356,11 @@ def create_app() -> Any:
         if state.genesis is None:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
+
+    @app.on_event("shutdown")
+    async def shutdown():
+        state = get_state()
+        state.close_operation_runtime()
 
     @app.get("/")
     async def root():
