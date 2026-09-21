@@ -367,8 +367,8 @@ The 2026-09-21 atlas currently defines:
 
 - **FR001–FR114** — scoped research conclusions;
 - **RQ001–RQ010** — unresolved frontier questions;
-- **SV001–SV050** — verified source/status records;
-- **FD001–FD016** — post-freeze frontier-delta findings;
+- **SV001–SV055** — verified source/status records;
+- **FD001–FD021** — post-freeze frontier-delta findings;
 - **CX001–CX024** — explicit research contradictions/tensions;
 - **RDE001–RDE036** — local research-debt items;
 - **RXP001–RXP035** — predeclared high-information local experiment protocols;
@@ -428,8 +428,8 @@ PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 track=AD
 research_conclusions=FR001..FR114
 research_questions=RQ001..RQ010
-source_verifications=SV001..SV050
-frontier_delta=FD001..FD016
+source_verifications=SV001..SV055
+frontier_delta=FD001..FD021
 contradictions=CX001..CX024
 research_debt=RDE001..RDE036
 experiment_protocols=RXP001..RXP035
