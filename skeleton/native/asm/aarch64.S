@@ -181,21 +181,54 @@ skeleton_asm_dot_matrix_f32:
 
 .Lmatrix_row:
     eor v0.16b, v0.16b, v0.16b
+    eor v4.16b, v4.16b, v4.16b
+    eor v5.16b, v5.16b, v5.16b
+    eor v6.16b, v6.16b, v6.16b
     mov x9, x0
-    lsr x10, x4, #2
-    cbz x10, .Lmatrix_tail
 
-.Lmatrix_vec:
+    lsr x10, x4, #4
+    cbz x10, .Lmatrix_vec4_setup
+
+.Lmatrix_vec16:
+    ld1 {v1.4s}, [x9], #16
+    ld1 {v2.4s}, [x7], #16
+    fmla v0.4s, v1.4s, v2.4s
+
+    ld1 {v1.4s}, [x9], #16
+    ld1 {v2.4s}, [x7], #16
+    fmla v4.4s, v1.4s, v2.4s
+
+    ld1 {v1.4s}, [x9], #16
+    ld1 {v2.4s}, [x7], #16
+    fmla v5.4s, v1.4s, v2.4s
+
+    ld1 {v1.4s}, [x9], #16
+    ld1 {v2.4s}, [x7], #16
+    fmla v6.4s, v1.4s, v2.4s
+
+    subs x10, x10, #1
+    b.ne .Lmatrix_vec16
+
+    fadd v0.4s, v0.4s, v4.4s
+    fadd v5.4s, v5.4s, v6.4s
+    fadd v0.4s, v0.4s, v5.4s
+
+.Lmatrix_vec4_setup:
+    lsr x10, x4, #2
+    and x10, x10, #3
+    cbz x10, .Lmatrix_reduce
+
+.Lmatrix_vec4:
     ld1 {v1.4s}, [x9], #16
     ld1 {v2.4s}, [x7], #16
     fmla v0.4s, v1.4s, v2.4s
     subs x10, x10, #1
-    b.ne .Lmatrix_vec
+    b.ne .Lmatrix_vec4
 
+.Lmatrix_reduce:
     faddp v0.4s, v0.4s, v0.4s
     faddp s0, v0.2s
 
-.Lmatrix_tail:
     and x10, x4, #3
     cbz x10, .Lmatrix_store
 
