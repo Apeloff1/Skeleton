@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v3.0`
+**Architecture tag:** `arch-map/v3.1`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -224,6 +224,7 @@ arch-map/v2.7  legacy backend AI service/provider convergence
 arch-map/v2.8  truthful LLM/game routing through declared provider execution
 arch-map/v2.9  shared provider receipt families + provider surface inventory
 arch-map/v3.0  executable lifecycle/trust/data/work-package construction ledger
+arch-map/v3.1  Wave 1 governance + resource admission enforced before provider I/O
 ```
 
 ## 10. Operator commands
