@@ -225,6 +225,17 @@ def audit_topology_alignment() -> None:
             )
 
 
+def audit_backend_public_identity() -> None:
+    health = read("backend/routes/health.py")
+    server = read("backend/server.py")
+
+    check('"name": "Skeleton Application API"' in health, "backend root identity drift")
+    check('"legacy_name": "CodeDock Quantum Nexus"' in health, "legacy backend identity compatibility marker missing")
+    check('SYSTEM_VERSION = "11.0.0"' in health, "backend health component version drift")
+    check('title="Skeleton Application API"' in server, "backend OpenAPI title drift")
+    check('logging.getLogger("Skeleton.Backend")' in server, "backend logger identity drift")
+
+
 def audit_no_competing_root_launchers() -> None:
     for relative in ("app.py", "main.py", "server.py"):
         check(
@@ -738,6 +749,7 @@ def audit_product_route_registry() -> None:
 def main() -> int:
     audit_manifest()
     audit_topology_alignment()
+    audit_backend_public_identity()
     audit_no_competing_root_launchers()
     audit_endpoint_boundary()
     audit_compose_modes()
