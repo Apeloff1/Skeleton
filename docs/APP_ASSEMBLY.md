@@ -57,6 +57,46 @@ host dependencies fail closed with a remediation message. Setup writes only to
 the ignored local `.env` file; installer receipts contain key names and phase
 status, never generated secret values.
 
+### Windows Setup.exe
+
+The Windows distribution wraps the same setup/runtime plane in two executable
+layers:
+
+1. `Skeleton-Setup-<version>-windows-x64.exe` is the normal Windows installer
+   wizard produced by Inno Setup. It installs per-user under
+   `%LOCALAPPDATA%\\Programs\\Skeleton`, registers uninstall metadata, creates
+   Start Menu shortcuts, and can add an optional desktop shortcut.
+2. `Skeleton.exe` is the installed setup/runtime control surface. It is frozen
+   with PyInstaller and carries its own Python runtime, so the user does not
+   need a system Python or pip installation.
+
+The launcher provides system check, install/repair, start, open-app, and stop
+controls. Runtime setup remains fail-closed and reuses the canonical
+`skeleton.app` preloader and installer implementation.
+
+Docker Desktop with the Docker Compose plugin remains an explicit prerequisite
+for running the assembled services. The installer does not silently elevate or
+install Docker on the user's behalf.
+
+Build the Windows installer on Windows with:
+
+```powershell
+pwsh ./scripts/windows/build_installer.ps1
+```
+
+The output directory contains the Setup executable plus a SHA-256 sidecar:
+
+```text
+dist/windows/Skeleton-Setup-16.0.0-windows-x64.exe
+dist/windows/Skeleton-Setup-16.0.0-windows-x64.exe.sha256
+```
+
+The `Windows Installer` GitHub Actions workflow performs the same build on a
+Windows runner and publishes those files as a workflow artifact. Uninstall
+stops the Compose services first and removes the generated local `.env`
+secret file.
+
+
 ## Canonical commands
 
 ```bash
@@ -86,7 +126,9 @@ python -m skeleton app config
 python -m skeleton app down
 ```
 
-After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.\n\nThe CLI never uses a shell to construct Docker commands. Service names are
+After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.
+
+The CLI never uses a shell to construct Docker commands. Service names are
 validated against the manifest before they are passed to Compose.
 
 ## Runtime modes
