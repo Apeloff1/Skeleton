@@ -17,8 +17,12 @@ Rules:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import json
+import os
+from pathlib import Path
+import tempfile
 from typing import Any
 
 from skeleton.contracts.operation import OperationState
@@ -116,6 +120,43 @@ def encode_sse_heartbeat() -> str:
     """Return a comment heartbeat that does not advance the replay cursor."""
 
     return ": heartbeat\n\n"
+
+
+def operation_runtime_paths(
+    source: Mapping[str, str] | None = None,
+) -> tuple[Path, Path]:
+    """Resolve one shared local durable runtime directory without hidden CWD state."""
+
+    environ = os.environ if source is None else source
+    root_raw = environ.get("CODEDOCK_OPERATION_RUNTIME_DIR", "").strip()
+    root = (
+        Path(root_raw).expanduser()
+        if root_raw
+        else Path(tempfile.gettempdir()) / "codedock-operation-runtime"
+    )
+    state_raw = environ.get("CODEDOCK_OPERATION_STATE_DB", "").strip()
+    stream_raw = environ.get("CODEDOCK_OPERATION_STREAM_DB", "").strip()
+    state_path = Path(state_raw).expanduser() if state_raw else root / "operations.sqlite3"
+    stream_path = Path(stream_raw).expanduser() if stream_raw else root / "events.sqlite3"
+    if state_path == stream_path:
+        raise OperationTransportError(
+            "operation state and stream databases must use separate files"
+        )
+    return state_path, stream_path
+
+
+def transport_from_env(
+    source: Mapping[str, str] | None = None,
+) -> "OperationStreamTransport":
+    """Create a durable local transport using the canonical environment paths."""
+
+    state_path, stream_path = operation_runtime_paths(source)
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    stream_path.parent.mkdir(parents=True, exist_ok=True)
+    return OperationStreamTransport(
+        SQLiteOperationStore(state_path),
+        SQLiteOperationEventStore(stream_path),
+    )
 
 
 class OperationStreamTransport:
@@ -269,4 +310,6 @@ __all__ = [
     "StreamReplayGapError",
     "encode_sse_event",
     "encode_sse_heartbeat",
+    "operation_runtime_paths",
+    "transport_from_env",
 ]
