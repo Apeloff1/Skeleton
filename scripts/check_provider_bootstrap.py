@@ -160,6 +160,47 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         if not isinstance(relative, str) or not (repo_root / relative).is_file():
             errors.append(f"runtime provider {label} is missing: {relative!r}")
 
+    if isinstance(loader_path, str) and (repo_root / loader_path).is_file():
+        loader = (repo_root / loader_path).read_text(encoding="utf-8")
+        for token in (
+            "ProviderArchitectureReceipt",
+            "provider_family",
+            "runtime_model_providers",
+            "automation_model_providers",
+            "must_read",
+        ):
+            if token not in loader:
+                errors.append(
+                    f"shared provider loader does not enforce contract token {token!r}"
+                )
+
+    compatibility_loaders = runtime.get("compatibility_loaders", [])
+    if not isinstance(compatibility_loaders, list) or not compatibility_loaders:
+        errors.append("provider compatibility loaders are missing")
+    else:
+        for relative in compatibility_loaders:
+            if not isinstance(relative, str):
+                errors.append("provider compatibility loader path is invalid")
+                continue
+            path = repo_root / relative
+            if not path.is_file():
+                errors.append(f"provider compatibility loader missing: {relative}")
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+            if "from skeleton.provider_contract import" not in text:
+                errors.append(
+                    f"provider compatibility loader is not a shared-contract re-export: {relative}"
+                )
+
+    families = runtime.get("provider_families")
+    if not isinstance(families, list) or set(families) != {
+        "runtime_model",
+        "automation_model",
+    }:
+        errors.append(
+            "provider families must declare exactly runtime_model and automation_model"
+        )
+
     if isinstance(boundary_path, str) and (repo_root / boundary_path).is_file():
         boundary = (repo_root / boundary_path).read_text(encoding="utf-8")
         required_tokens = (
@@ -187,21 +228,27 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     f"backend runtime image does not materialize provider contract: {token}"
                 )
 
-    declared = contract.get("runtime_model_providers")
-    if not isinstance(declared, list) or not declared:
-        errors.append("runtime model provider declarations are missing")
-    else:
+    for family_key, family_label in (
+        ("runtime_model_providers", "runtime"),
+        ("automation_model_providers", "automation"),
+    ):
+        declared = contract.get(family_key)
+        if not isinstance(declared, list) or not declared:
+            errors.append(f"{family_label} model provider declarations are missing")
+            continue
         seen: set[str] = set()
         for item in declared:
             if not isinstance(item, dict):
-                errors.append("runtime provider declaration must be an object")
+                errors.append(f"{family_label} provider declaration must be an object")
                 continue
             provider_id = item.get("id")
             if not isinstance(provider_id, str) or not provider_id:
-                errors.append("runtime provider id is invalid")
+                errors.append(f"{family_label} provider id is invalid")
                 continue
             if provider_id in seen:
-                errors.append(f"duplicate runtime provider declaration: {provider_id}")
+                errors.append(
+                    f"duplicate {family_label} provider declaration: {provider_id}"
+                )
             seen.add(provider_id)
             for key in (
                 "architecture_read_required",
@@ -209,7 +256,44 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 "activation_receipt_required",
             ):
                 if item.get(key) is not True:
-                    errors.append(f"runtime provider {provider_id}.{key} must be true")
+                    errors.append(
+                        f"{family_label} provider {provider_id}.{key} must be true"
+                    )
+
+    surfaces = contract.get("provider_surfaces")
+    if not isinstance(surfaces, list) or not surfaces:
+        errors.append("provider surface inventory is missing")
+    else:
+        surface_ids: set[str] = set()
+        for item in surfaces:
+            if not isinstance(item, dict):
+                errors.append("provider surface entry must be an object")
+                continue
+            surface_id = item.get("id")
+            owner = item.get("owner")
+            if not isinstance(surface_id, str) or not surface_id:
+                errors.append("provider surface id is invalid")
+                continue
+            if surface_id in surface_ids:
+                errors.append(f"duplicate provider surface id: {surface_id}")
+            surface_ids.add(surface_id)
+            if not isinstance(owner, str) or not owner:
+                errors.append(f"provider surface {surface_id} owner is invalid")
+                continue
+            path = repo_root / owner
+            if not path.is_file():
+                errors.append(f"provider surface owner missing: {owner}")
+                continue
+            if item.get("credential_bearing") is True:
+                if item.get("receipt_required") is not True:
+                    errors.append(
+                        f"credential-bearing provider surface lacks receipt: {surface_id}"
+                    )
+                source = path.read_text(encoding="utf-8", errors="replace")
+                if "load_provider_architecture" not in source:
+                    errors.append(
+                        f"credential-bearing provider surface does not load architecture: {owner}"
+                    )
 
     backend = repo_root / "backend"
     if backend.is_dir():
@@ -240,7 +324,10 @@ def main() -> int:
         for error in errors:
             print(f"  - {error}", file=sys.stderr)
         return 1
-    print("provider-bootstrap: OK (mandatory docs, runtime receipt, SDK isolation)")
+    print(
+        "provider-bootstrap: OK "
+        "(mandatory docs, shared receipts, provider families, surface inventory, SDK isolation)"
+    )
     return 0
 
 
