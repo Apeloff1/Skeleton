@@ -77,6 +77,7 @@ on:
       - "machine/ai_edge_case_catalog.json"
       - "machine/ai_p0_edge_case_matrix.json"
       - "machine/ai_full_edge_case_matrix.json"
+      - "machine/ai_edge_case_priority_queue.json"
       - "machine/capability_interfaces.json"
       - "machine/state_topology.json"
       - "docs/ARCHITECTURE_MAP.md"
