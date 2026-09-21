@@ -332,6 +332,23 @@ class RAGStateRepository:
         coll.insert_one(copy.deepcopy(candidate))
         return copy.deepcopy(candidate)
 
+    def projection_inventory(self) -> dict[str, list[dict[str, Any]]]:
+        """Return canonical rows eligible to rebuild semantic projections."""
+        return {
+            "learning_sessions": [
+                self._without_native_id(row) or {}
+                for row in self._collection(self.LEARNING).find({})
+            ],
+            "cocoding_context": [
+                self._without_native_id(row) or {}
+                for row in self._collection(self.COCODING).find({})
+            ],
+            "feedback": [
+                self._without_native_id(row) or {}
+                for row in self._collection(self.FEEDBACK).find({})
+            ],
+        }
+
     def stats(self) -> dict[str, int]:
         return {
             "learning_sessions": int(
