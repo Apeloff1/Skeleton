@@ -2465,6 +2465,17 @@ Status vocabulary:
 | SV053 | *Machine Unlearning under Retain–Forget Entanglement* | ICLR 2026 Poster | accepted evidence that unlearning difficulty depends on representational entanglement between retain and forget knowledge |
 | SV054 | *Do LLMs Build Spatial World Models? Evidence from Grid-World Maze Tasks* | ICLR 2026 Workshop World Models | scoped negative evidence against inferring robust internal spatial world models from surface planning success |
 | SV055 | *Inverse IFEval: Can LLMs Unlearn Stubborn Training Conventions to Follow Real Instructions?* | ICLR 2026 Poster | supports explicit evaluation of instruction-following under conflicts with learned/post-training conventions |
+| SV056 | LEAP, arXiv:2606.03303 | PREPRINT | strong agentic formal-mathematics evidence using decomposition, Lean interaction, and compiler-verified proofs; benchmark scope remains explicit |
+| SV057 | OpenProver, arXiv:2607.09217 | PREPRINT / open-source system | supports planner-worker-verifier formal proving with interactive Lean and reproducible automatic verification |
+| SV058 | OProver, arXiv:2605.17283 | PREPRINT | supports iterative proving, retrieval, compiler feedback, verified-proof memory, and repair trajectories in training |
+| SV059 | Numina-Lean-Agent, arXiv:2601.14027 | PREPRINT / open system | supports general coding-agent + Lean-tool decomposition without a separately trained formal prover |
+| SV060 | *Uncertainty Quantification for LLM Agents: A Taxonomy, an Evaluation Protocol, and an Empirical Study*, arXiv:2609.07395 | PREPRINT, submitted 2026-09-07 | evidence that step-level calibration does not imply trajectory-level calibration and late-horizon overconfidence can be hidden by aggregate scores |
+| SV061 | ELLA, arXiv:2601.02232 | PREPRINT | continual-adapter challenger using selective subspace de-correlation without replay or architectural expansion |
+| SV062 | *Continual Fine-Tuning of Large Language Models via Program Memory*, arXiv:2605.13162 | PREPRINT | supports structured adapter-memory slots as a plasticity/stability mechanism for continual LoRA |
+| SV063 | Cat-PO | ICLR 2026 Conference | accepted evidence that multimodal preference optimization benefits from token-level visual-relevance signals to reduce hallucination |
+| SV064 | *Perception-Aware Policy Optimization for Multimodal Reasoning* | ICLR 2026 Conference | accepted evidence that perception errors are a major bottleneck in multimodal RL and that perception-aware policy gradients can help |
+| SV065 | *Spotlight on Token Perception for Multimodal Reinforcement Learning* | ICLR 2026 Conference | accepted evidence that visual dependency is sparse across generated tokens/trajectories and can shape RL updates |
+| SV066 | *Joint Multimodal Preference Optimization for Fine-Grained Visual-Textual Alignment* | Findings of EACL 2026 | accepted evidence for joint textual/visual preference objectives and fine-grained visual contrast supervision |
 
 ## 25A.1 Status discipline
 
@@ -2821,6 +2832,81 @@ Inverse IFEval targets cases where explicit user instructions conflict with conv
 - hierarchy-preserving adversarial instructions.
 
 This is an adaptability test, not permission to weaken system/developer instruction hierarchy.
+
+
+## FD022 — Formal theorem proving is converging on an agentic verifier loop
+
+LEAP, OpenProver, OProver, Numina-Lean-Agent, Hilbert, Goedel-Prover-V2, and PAT-Agent differ in training and orchestration, but converge on a recurring structure:
+
+```text
+informal strategy
+ -> decomposition/retrieval
+ -> formal candidate
+ -> deterministic compiler/prover feedback
+ -> repair
+ -> machine-checked acceptance
+```
+
+**Skeleton consequence:** formal reasoning should be architected as a typed tool loop rather than as free-form text generation with a learned judge.
+
+The unresolved bottleneck is semantic fidelity between user intent and the formal statement.
+
+## FD023 — Agent uncertainty is trajectory-structured
+
+Recent agent-uncertainty work reports that step-level calibration does not imply trajectory-level calibration and that aggregate confidence can hide increasing overconfidence late in long trajectories.
+
+**Skeleton consequence:** uncertainty evidence must be attached to:
+- observation/retrieval;
+- planning step;
+- tool selection;
+- tool result interpretation;
+- memory use;
+- action proposal;
+- final outcome;
+- whole trajectory.
+
+One scalar confidence score is insufficient for long-horizon agents.
+
+## FD024 — Continual adaptation needs explicit interference geometry
+
+ELLA and program-memory continual LoRA work attack catastrophic forgetting by structuring where updates are allowed to live rather than treating the adapter space as homogeneous.
+
+**Skeleton consequence:** medium-velocity adaptation experiments should record:
+- update subspace;
+- interference with prior adapters/tasks;
+- reusable/shared regions;
+- reserved capacity;
+- adapter retrieval policy;
+- consolidation;
+- rollback.
+
+This is a research lane, not evidence that one continual-adapter mechanism is the default.
+
+## FD025 — Multimodal post-training must optimize perception, not only textual preference
+
+Accepted ICLR 2026 multimodal preference/RL work repeatedly identifies visual grounding or perception as a distinct optimization bottleneck.
+
+**Skeleton consequence:** multimodal RL/preference training must separate:
+- visual dependency/perception;
+- textual reasoning;
+- final-answer preference;
+- hallucination/grounding;
+- cross-modal consistency.
+
+A reward improvement that comes from stronger language priors while visual dependence falls is not accepted as a clean multimodal gain.
+
+## FD026 — Per-token and per-trajectory modality dependence can guide multimodal learning
+
+Cat-PO, perception-aware policy optimization, and token-perception work suggest that not every generated token depends equally on visual evidence.
+
+**Skeleton consequence:** exploratory multimodal training can test:
+- token-level modality attribution;
+- trajectory-level modality dependence;
+- reward/update reweighting;
+- visual-token coverage;
+- failure cases where attribution is wrong.
+
+**Guardrail:** attribution estimates are training signals, not factual ground-truth labels.
 
 
 
