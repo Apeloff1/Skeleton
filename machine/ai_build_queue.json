@@ -26,14 +26,21 @@
       "stage": 0,
       "parallel_lane": "state-authority",
       "objective": "Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [],
       "can_start_before_closure_dependencies_close": true,
       "target_paths": [
         "backend/services/rag_service.py",
         "backend/services/database.py",
-        "machine/state_topology.json"
+        "machine/state_topology.json",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py",
+        "machine/ai_app_construction.json",
+        "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+        ".github/workflows/app-assembly.yml",
+        "scripts/quality-gates.sh"
       ],
       "acceptance": [
         "authoritative-versus-derived repository tests",
@@ -62,7 +69,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false
     },
     {
