@@ -44,6 +44,14 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_build_accountability.py \
   skeleton/testing/test_ai_accountability_cli.py
 
+printf '\n== Governance lifecycle accountability ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_data_governance.py \
+  skeleton/testing/test_data_lifecycle.py \
+  skeleton/testing/test_governance_registry.py \
+  skeleton/testing/test_lifecycle_adapters.py \
+  skeleton/testing/test_governance_audit.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
