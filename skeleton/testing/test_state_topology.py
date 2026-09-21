@@ -124,3 +124,39 @@ def test_snapshot_files_are_recovery_aids_not_production_authority() -> None:
     assert snapshot["authority"] == "recovery-aid"
     assert snapshot["source_of_truth"] is False
     assert "debug/manual" in snapshot["backup_restore"].lower()
+
+def test_all_state_derivations_resolve_to_real_declared_domains() -> None:
+    topology = _topology()
+    domains = {
+        domain["id"]
+        for domain in topology["state_domains"]
+    }
+
+    for domain in topology["state_domains"]:
+        if domain["id"] == "backend-seeded-content":
+            continue
+        for source in domain["derived_from"]:
+            assert source in domains, (domain["id"], source)
+
+
+def test_swarm_scratch_and_event_stream_derive_from_canonical_operation_state() -> None:
+    topology = _topology()
+    domains = {
+        domain["id"]: domain
+        for domain in topology["state_domains"]
+    }
+
+    assert domains["backend-swarm-scratch"]["derived_from"] == [
+        "canonical-operation-state"
+    ]
+    assert domains["operation-event-stream"]["derived_from"] == [
+        "canonical-operation-state"
+    ]
+
+    flow = next(
+        item
+        for item in topology["state_flows"]
+        if item["id"] == "operation-to-swarm-scratch"
+    )
+    assert flow["from"] == "canonical-operation-state"
+    assert flow["to"] == "backend-swarm-scratch"
