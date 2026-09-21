@@ -26,7 +26,7 @@
       "stage": 0,
       "parallel_lane": "state-authority",
       "objective": "Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [],
       "closure_dependencies": [],
       "can_start_before_closure_dependencies_close": true,
