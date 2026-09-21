@@ -42,6 +42,22 @@ python -m skeleton test
 
 The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
 
+### Windows installer
+
+Windows users can install the assembled application through a normal per-user
+Setup wizard. The CI artifact is named `Skeleton-Setup-<version>-windows-x64.exe`.
+It installs `Skeleton.exe`, Start Menu shortcuts, optional desktop shortcut,
+repair controls, and an uninstaller.
+
+To build the installer on Windows:
+
+```powershell
+pwsh ./scripts/windows/build_installer.ps1
+```
+
+The installed launcher contains its own Python runtime. Docker Desktop with the
+Docker Compose plugin remains required to build and run the application services.
+
 ## Architecture
 
 7-phase boot protocol:
