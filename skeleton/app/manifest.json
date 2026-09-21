@@ -173,7 +173,8 @@
     "skeleton/testing/test_operation_contract.py",
     "skeleton/testing/test_operation_stream.py",
     "skeleton/frontier/operation_stream_store.py",
-    "skeleton/testing/test_operation_stream_store.py"
+    "skeleton/testing/test_operation_stream_store.py",
+    "skeleton/frontier/model_routing.py"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -187,6 +188,8 @@
     "provider_runtime_boundary": "skeleton/provider_runtime.py",
     "operation_contract": "skeleton/contracts/operation.py",
     "stream_contract": "skeleton/frontier/operation_stream.py",
-    "stream_store": "skeleton/frontier/operation_stream_store.py"
+    "stream_store": "skeleton/frontier/operation_stream_store.py",
+    "model_routing_owner": "skeleton/frontier/model_routing.py",
+    "relationship_semantics": "depends_on=runtime dependency; validates=acceptance target"
   }
 }
