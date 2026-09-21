@@ -283,6 +283,29 @@ class SQLiteOperationEventStore:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 head = self._ensure_head(operation_id)
+                if event_id is not None:
+                    duplicate = self._connection.execute(
+                        """
+                        SELECT operation_id, sequence, event_id, event_type, timestamp, payload_json
+                        FROM operation_stream_event
+                        WHERE namespace = ? AND operation_id = ? AND event_id = ?
+                        """,
+                        (self.namespace, operation_id, event_id),
+                    ).fetchone()
+                    if duplicate is not None:
+                        prior = self._event_from_row(duplicate)
+                        candidate_payload = dict(payload)
+                        if (
+                            prior.type == event_type
+                            and prior.timestamp == (timestamp or prior.timestamp)
+                            and dict(prior.payload) == candidate_payload
+                        ):
+                            self._connection.execute("COMMIT")
+                            return prior
+                        raise StreamDuplicateConflictError(
+                            "event_id already exists with different event content"
+                        )
+
                 if int(head["terminal"]):
                     raise StreamTerminalError("operation stream is already terminal")
                 count_row = self._connection.execute(
