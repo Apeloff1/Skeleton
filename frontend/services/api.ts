@@ -5,13 +5,13 @@
  * and type-safe responses
  */
 
-import Constants from 'expo-constants';
+import { API_BASE } from '../utils/apiBase';
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const API_BASE_URL = Constants.expoConfig?.extra?.EXPO_BACKEND_URL || '';
+const API_BASE_URL = API_BASE;
 const DEFAULT_TIMEOUT = 30000;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
