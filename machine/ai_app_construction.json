@@ -5546,7 +5546,11 @@
       "functional_ai_acceptance_matrix",
       "ai_security_threat_model",
       "degraded_mode_matrix",
-      "legacy_ai_cutover_map"
+      "legacy_ai_cutover_map",
+      "ai_runtime_bootstrap_blueprint",
+      "ai_configuration_contract",
+      "ai_error_contract",
+      "contract_versioning_policy"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -7317,6 +7321,241 @@
       "block new imports/callers to legacy surfaces once replacement exists",
       "remove credentials/privileged I/O before marking a facade compatibility-only",
       "delete legacy path only after call graph/source scan and regression tests show zero required callers"
+    ]
+  },
+  "ai_runtime_bootstrap_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "objective": "Define deterministic process startup, readiness, dependency gating, shutdown and restart behavior for the assembled AI application.",
+    "skeleton_engine_startup": [
+      "load static configuration and validate environment schema",
+      "load architecture/construction/provider receipts",
+      "initialize secret references without logging values",
+      "connect authoritative durable stores and verify schema/index compatibility",
+      "run/verify required migrations under deployment policy",
+      "initialize governance registry and lifecycle workers",
+      "initialize durable quota/admission coordination",
+      "initialize operation/execution/approval/idempotency/usage/verification/result repositories",
+      "initialize canonical memory repository and projection workers",
+      "initialize provider declarations/transports without sending model traffic",
+      "initialize governed tool registry/adapters",
+      "initialize context compiler and retrieval adapters",
+      "initialize verification runtime",
+      "initialize cognitive execution runtime and recovery reconciler",
+      "recover/reconcile incomplete operations before declaring full write readiness",
+      "start engine API and operation-event delivery",
+      "publish readiness capability matrix"
+    ],
+    "backend_startup": [
+      "load product configuration and service identity",
+      "connect authoritative application/conversation state",
+      "verify conversation/product migrations",
+      "initialize engine client and delegated-authority signer/binder",
+      "probe engine live/readiness endpoints",
+      "initialize operation-event projection transport",
+      "publish product AI readiness from backend+engine dependency state"
+    ],
+    "readiness_classes": {
+      "live": "process event loop/server is alive; says nothing about AI capability",
+      "ready_read": "safe canonical reads/status/history are available",
+      "ready_ai_text": "text execution dependencies are usable",
+      "ready_ai_tools": "governed tool execution dependencies are usable",
+      "ready_memory": "durable memory read/write path is usable",
+      "ready_realtime": "event replay/projection path is usable",
+      "ready_full": "all mandatory P0 runtime dependencies required by enabled capabilities are usable"
+    },
+    "readiness_rules": [
+      "readiness is capability-scoped rather than a single optimistic boolean",
+      "provider credential presence is not provider readiness",
+      "derived vector outage may degrade retrieval without failing liveness",
+      "authoritative store/migration mismatch blocks affected write readiness",
+      "governance unavailable blocks governed transfer readiness",
+      "quota/admission unavailable blocks expensive execution readiness unless explicit conservative mode is configured",
+      "backend never reports AI ready solely because its own HTTP server is healthy"
+    ],
+    "recovery_workers": [
+      "transactional outbox dispatcher",
+      "execution/checkpoint reconciliation",
+      "ambiguous tool-side-effect reconciliation",
+      "expired approval cleanup",
+      "memory/index projection reconciliation",
+      "retention/deletion propagation",
+      "stale quota lease reconciliation"
+    ],
+    "shutdown": [
+      "stop accepting new expensive operations",
+      "mark process draining",
+      "allow bounded in-flight checkpoint/receipt commit",
+      "cancel interruptible provider/tool work when policy requires",
+      "do not fabricate failure for non-interruptible side effects",
+      "flush durable outbox/usage/telemetry within shutdown budget",
+      "release renewable leases only after durable state is consistent"
+    ],
+    "startup_failure_policy": [
+      "configuration/contract corruption -> fail process start",
+      "authoritative store unreachable -> fail affected canonical write readiness; production engine may fail start when no safe service remains",
+      "optional vector/index unavailable -> start degraded with explicit capability state",
+      "provider unavailable -> engine may start for history/local/read operations but AI execution readiness is false/degraded",
+      "tool adapter unavailable -> disable only declared tool capability unless mandatory for configured product"
+    ]
+  },
+  "ai_configuration_contract": {
+    "schema_version": 1,
+    "contract_version": "1.0.0",
+    "status": "active",
+    "principles": [
+      "configuration schema is explicit and validated before runtime activation",
+      "secret values are referenced/injected, never copied into machine contracts or logs",
+      "environment-specific values do not change ownership contracts",
+      "missing optional capability config disables that capability explicitly"
+    ],
+    "ownership": {
+      "skeleton_engine": [
+        "runtime model provider credentials after engine cutover",
+        "provider base URL/model defaults",
+        "engine Mongo/durable store connection",
+        "tool egress/sandbox policy",
+        "execution/runtime limits",
+        "engine service authentication verification"
+      ],
+      "backend": [
+        "product JWT/session configuration",
+        "backend Mongo/application store connection",
+        "engine service endpoint",
+        "backend service identity/delegation credential",
+        "product rate limits"
+      ],
+      "frontend": [
+        "public backend URL",
+        "public explicitly-declared engine health/native-feature URL",
+        "non-secret product flags"
+      ]
+    },
+    "secret_classes": [
+      "provider credential",
+      "database credential",
+      "service-to-service signing/auth credential",
+      "JWT/session secret",
+      "artifact/encryption signing secret"
+    ],
+    "invariants": [
+      "EXPO_PUBLIC variables are never secrets",
+      "backend-to-engine service credential is distinct from end-user token",
+      "provider credentials are unavailable to frontend and, after cutover, unavailable to backend",
+      "tool subprocess/network environment is allowlisted; it does not inherit the full parent secret environment",
+      "configuration diagnostics report presence/source class, never secret value"
+    ],
+    "rotation": [
+      "support overlap/versioned service credentials where zero-downtime rotation is required",
+      "provider credential rotation does not change provider identity contract",
+      "rotation invalidates/reloads clients safely without exposing secret material to operation state"
+    ]
+  },
+  "ai_error_contract": {
+    "schema_version": 1,
+    "contract_version": "1.0.0",
+    "status": "active",
+    "objective": "Stable cross-plane error semantics for API, engine, product UX, retry policy and telemetry.",
+    "fields": [
+      "error_code",
+      "category",
+      "retryable",
+      "http_status",
+      "operation_id",
+      "trace_id",
+      "user_safe_message",
+      "detail_ref",
+      "retry_after",
+      "caused_by"
+    ],
+    "categories": [
+      "validation",
+      "authentication",
+      "authorization",
+      "governance",
+      "admission",
+      "conflict",
+      "dependency_unavailable",
+      "provider",
+      "tool",
+      "verification",
+      "deadline",
+      "cancelled",
+      "corruption",
+      "internal"
+    ],
+    "stable_codes": [
+      "invalid_request",
+      "unauthenticated",
+      "authority_denied",
+      "tenant_mismatch",
+      "governance_denied",
+      "budget_denied",
+      "quota_exhausted",
+      "idempotency_conflict",
+      "checkpoint_conflict",
+      "engine_unavailable",
+      "provider_unavailable",
+      "provider_invalid_response",
+      "structured_output_invalid",
+      "tool_unknown",
+      "tool_arguments_invalid",
+      "tool_authority_denied",
+      "approval_required",
+      "approval_expired",
+      "tool_failed",
+      "tool_result_invalid",
+      "verification_failed",
+      "insufficient_evidence",
+      "replay_gap",
+      "deadline_exceeded",
+      "cancelled",
+      "state_corruption",
+      "internal_invariant_violation"
+    ],
+    "rules": [
+      "raw provider/tool/database exceptions never cross public API",
+      "retryable is set by error semantics, not guessed by UI",
+      "authorization/governance/policy denials are non-retryable without changed authority/input/policy",
+      "idempotency conflict returns existing identity/reference when safe",
+      "dependency unavailable may include bounded retry_after",
+      "user-safe message never includes credentials, raw restricted content or internal stack trace",
+      "detail_ref may point operators to protected trace/receipt evidence"
+    ],
+    "product_mapping": [
+      "approval_required -> explicit approval UI",
+      "replay_gap -> resync UI path",
+      "provider/engine unavailable -> degraded/retry state",
+      "budget/quota denied -> bounded limit state",
+      "cancelled -> terminal cancelled state",
+      "verification insufficient -> qualified/abstain UX rather than generic server error"
+    ]
+  },
+  "contract_versioning_policy": {
+    "schema_version": 1,
+    "policy_version": "1.0.0",
+    "status": "active",
+    "contracts": [
+      "operation",
+      "conversation",
+      "context",
+      "provider interaction",
+      "tool",
+      "memory",
+      "verification",
+      "engine execution",
+      "operation stream",
+      "AIExecutionResult"
+    ],
+    "rules": [
+      "wire/persisted envelopes carry schema version when evolution requires it",
+      "additive optional fields are preferred during compatibility windows",
+      "breaking field meaning/type requires a new contract version and migration/adapter",
+      "stored records remain readable for the declared rollback/upgrade window",
+      "backend/engine deploy order must support one-version skew during rolling deployment where applicable",
+      "event consumers ignore declared forward-compatible optional fields but reject unknown incompatible schema versions",
+      "tests include old-reader/new-writer and new-reader/old-writer cases for cross-service/persisted contracts"
     ]
   }
 }
