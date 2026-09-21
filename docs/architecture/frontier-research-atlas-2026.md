@@ -2133,6 +2133,11 @@ Status vocabulary:
 | SV048 | ThinkBooster, arXiv:2606.06915 | PREPRINT with released framework | supports modular quality-cost evaluation of multiple test-time-compute strategies and scorers |
 | SV049 | Pythagoras-Prover, arXiv:2606.12594 | PREPRINT with open models/code claimed by paper | supports compute-efficient formal proving, verified curricula, and diffusion-style proof generation experiments |
 | SV050 | *Recent Advances in Large Language Model Benchmarks against Data Contamination: From Static to Dynamic Evaluation*, arXiv:2502.17521 | SURVEY/PREPRINT | strengthens requirement that dynamic benchmarks themselves need standardized quality criteria |
+| SV051 | *Full-Stack FP4: Stable LLM Pretraining with Quantized Projections, Optimizers, and Attention*, arXiv:2607.04422 | PREPRINT | materially raises FP4 plausibility by treating projection, optimizer, and attention failure modes jointly; evidence remains 3B/64B-token scale in the reported study |
+| SV052 | CODE2BENCH / *Dynamic Benchmark Construction for Evaluating Large Language Models on Real-World Codes*, arXiv:2508.07180 | PREPRINT | supports recent-code ingestion + property-based testing as one contamination-resistant benchmark construction pattern |
+| SV053 | *Machine Unlearning under Retain–Forget Entanglement* | ICLR 2026 Poster | accepted evidence that unlearning difficulty depends on representational entanglement between retain and forget knowledge |
+| SV054 | *Do LLMs Build Spatial World Models? Evidence from Grid-World Maze Tasks* | ICLR 2026 Workshop World Models | scoped negative evidence against inferring robust internal spatial world models from surface planning success |
+| SV055 | *Inverse IFEval: Can LLMs Unlearn Stubborn Training Conventions to Follow Real Instructions?* | ICLR 2026 Poster | supports explicit evaluation of instruction-following under conflicts with learned/post-training conventions |
 
 ## 25A.1 Status discipline
 
@@ -2417,6 +2422,78 @@ Required metrics:
 - model size dependence.
 
 **Maturity warning:** one recent preprint is not enough to constitutionalize the design. Treat as a high-information challenger.
+
+
+## FD017 — Full-stack FP4 evidence has moved from isolated kernels toward integrated training
+
+Full-Stack FP4 explicitly studies numerical failures across projections, optimizer state/arithmetic, and attention rather than quantizing only linear layers.
+
+**Skeleton consequence:** FP4 research must be module-aware. "FP4 training" is not a scalar setting.
+
+Required reporting:
+- projection precision;
+- attention precision;
+- backward precision;
+- optimizer moment representation;
+- accumulation;
+- protected BF16 escape paths;
+- late-run stability.
+
+**Scope warning:** reported validation remains far below the scale needed to constitutionalize FP4 as a default frontier-training path.
+
+## FD018 — Dynamic evaluation needs benchmark-generator validation
+
+CODE2BENCH and contamination-survey work support dynamic/recent benchmark construction, but changing the benchmark introduces its own generator and validation failure modes.
+
+**Skeleton consequence:** dynamic benchmark pipelines require:
+- source cutoff/date;
+- task-generation provenance;
+- property/test coverage;
+- difficulty drift tracking;
+- fixed anchor set;
+- evaluator stability;
+- duplicate/leakage scans.
+
+Dynamic does not automatically mean uncontaminated or valid.
+
+## FD019 — Planning performance is not enough to claim an internal world model
+
+Controlled 2026 maze evidence reports strong representation/prompt dependence and failures consistent with task-specific strategies rather than a robust invariant spatial model.
+
+**Skeleton consequence:** world-model claims require transfer under:
+- representation change;
+- action-name obfuscation;
+- observation remapping;
+- topology/layout change;
+- counterfactual transition tests.
+
+A model that succeeds only under one textual encoding does not earn a "world model" architecture label.
+
+## FD020 — Unlearning depends on retain–forget entanglement
+
+Accepted ICLR 2026 work on retain–forget entanglement strengthens the view that forgetting quality cannot be understood from target-answer suppression alone.
+
+**Skeleton consequence:** weight-unlearning research must characterize:
+- forget effectiveness;
+- retain utility;
+- representation entanglement;
+- relearning attacks;
+- unrelated fine-tuning recovery;
+- quantization/recompression effects;
+- jailbreak/input attacks.
+
+## FD021 — Instruction following must test conflicts with learned conventions
+
+Inverse IFEval targets cases where explicit user instructions conflict with conventions learned during SFT/post-training.
+
+**Skeleton consequence:** instruction-following evaluation should include:
+- anti-template instructions;
+- unusual but valid formatting;
+- reversal of learned answer conventions;
+- bilingual/cross-domain conflicts;
+- hierarchy-preserving adversarial instructions.
+
+This is an adaptability test, not permission to weaken system/developer instruction hierarchy.
 
 
 
