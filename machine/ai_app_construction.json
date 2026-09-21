@@ -2524,9 +2524,8 @@
         "skeleton/memory",
         "skeleton/retrieval",
         "skeleton/frontier/operation_stream.py",
-        "skeleton/contracts/ai_execution.py",
-        "skeleton/intelligence/execution_runtime.py",
-        "skeleton/persistence/execution_repository.py"
+        "skeleton/contracts",
+        "skeleton/persistence"
       ],
       "objective": "One canonical durable AI execution transaction from admitted user intent through model/tool turns to a verified, persisted and streamable result.",
       "steps": [
@@ -2573,7 +2572,15 @@
           "implement frontend/backend transport integration",
           "prove fault and golden-journey evidence"
         ]
-      }
+      },
+      "planned_outputs": [
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/testing/test_ai_execution_contract.py",
+        "skeleton/testing/test_ai_execution_runtime.py",
+        "skeleton/testing/test_ai_execution_recovery.py"
+      ]
     },
     {
       "id": "WP-P0-STREAM",
