@@ -2107,7 +2107,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, tenant quota reservation, shared live pressure, provider/media lease enforcement and actual provider/media reconciliation now share one contract; remaining work is durable quota persistence, broader non-provider admission, and estimate-vs-actual telemetry across all expensive planes.",
+      "gap": "Request admission, durable tenant quota reservation, shared live pressure, provider/media lease enforcement and actual provider/media reconciliation share one contract; remaining work is broader non-provider admission, cross-process pressure, and estimate-vs-actual telemetry across all expensive planes.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2121,7 +2121,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "shared AdmissionRuntime now composes request budgets, tenant quota reservations, concurrency/queue pressure, provider/media leases, failure release and actual token/artifact-byte reconciliation; durable quota persistence, broad tool/storage integration and unified telemetry remain"
+      "status_detail": "shared AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, concurrency/queue pressure, provider/media leases, failure release and actual token/artifact-byte reconciliation; broad tool/storage integration, distributed pressure and unified telemetry remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -3256,7 +3256,9 @@
         "skeleton/intelligence/quota.py",
         "skeleton/testing/test_cost_admission.py",
         "skeleton/testing/test_admission_runtime.py",
-        "skeleton/testing/test_tenant_quota.py"
+        "skeleton/testing/test_tenant_quota.py",
+        "skeleton/intelligence/quota_sqlite.py",
+        "skeleton/testing/test_tenant_quota_sqlite.py"
       ],
       "objective": "Reject or reroute unaffordable work before expensive allocation.",
       "steps": [
@@ -3271,7 +3273,8 @@
         "budget-aware route",
         "quota exhaustion",
         "saturation shedding",
-        "usage telemetry"
+        "usage telemetry",
+        "durable quota restart and multi-worker race"
       ],
       "exit": "all expensive operations carry an admission receipt",
       "progress": {
@@ -3289,10 +3292,12 @@
           "provider text usage reconciliation from returned token usage",
           "image/speech artifact-byte reconciliation",
           "media provider admission through the shared runtime",
-          "quota exhaustion and shared saturation regression coverage"
+          "quota exhaustion and shared saturation regression coverage",
+          "durable SQLite tenant quota/window persistence with transactional reservations",
+          "restart-stable committed usage and active reservation recovery",
+          "multi-worker reservation race serialization with retry-stable operation identity"
         ],
         "remaining": [
-          "durable tenant quota/window persistence and restart recovery",
           "estimate-vs-actual cost telemetry in the canonical observability plane",
           "actual tool and storage usage accounting",
           "admission at every expensive non-provider action",
@@ -6982,7 +6987,7 @@
   "cost_admission_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress-p0",
     "gap": "gap-cost-admission",
     "canonical_owner": "skeleton/intelligence",
     "objective": "Every expensive AI boundary is admitted against one monotonic request/tenant budget before allocation, with actual usage reconciled durably across processes.",
@@ -7026,6 +7031,11 @@
         "consumed actual usage is monotonic",
         "restart cannot erase quota already consumed",
         "lease expiry/reconciliation cannot double-credit usage"
+      ],
+      "reference_backend": "skeleton/intelligence/quota_sqlite.py",
+      "persistence": "SQLite WAL with BEGIN IMMEDIATE serialized reservations for same-volume multi-worker deployments",
+      "evidence": [
+        "skeleton/testing/test_tenant_quota_sqlite.py"
       ]
     },
     "routing_binding": [
