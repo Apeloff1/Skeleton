@@ -1277,6 +1277,9 @@ Remaining closure:
 
 ### WP-P0-GOVERNANCE
 
+**Status: in progress.** Baseline provider-transfer classification and pre-I/O
+enforcement are implemented; broader lifecycle governance remains open.
+
 Owners are materialized in `skeleton/kernel/governance.py`,
 `skeleton/shells/ai/governance.py`, `backend/routes/governance.py`,
 `backend/core/model_router.py`, context, and memory surfaces.
@@ -1294,6 +1297,10 @@ Construction sequence:
 8. add denial-first tests.
 
 ### WP-P0-COST-ADMISSION
+
+**Status: in progress.** Deterministic admission contracts, provider pre-I/O
+gating, and model-routing budget projection are implemented. Durable tenant
+quotas, live pressure, and actual-usage accounting remain open.
 
 Construction sequence:
 
@@ -1353,6 +1360,100 @@ requires an experiment/evaluation receipt and rollback baseline.
 Canary promotion consumes the same error/latency/provider-quality signals that
 operators observe. Rollback is automated for objective breach with an auditable
 override path.
+
+## 27A. Wave 1 implementation ledger
+
+### Governance slice implemented
+
+The provider edge now performs a baseline governance decision before constructing
+or invoking the external provider client.
+
+Implemented code:
+
+- `skeleton/vault/data_governance.py` defines `DataClass`,
+  `ProviderTransferRequest`, `ProviderTransferDecision`, and fail-closed
+  evaluation;
+- `backend/core/ai_provider.py` requires a transfer decision before provider
+  I/O;
+- restricted data is denied by the generic external-provider path;
+- confidential data requires a tenant identity;
+- transfer purpose is allowlisted;
+- successful calls return a non-secret `gov-*` decision ID and the effective
+  data class;
+- the decision receipt never contains prompt or payload content.
+
+This does **not** close the governance P0 gap. Still required:
+
+- classification propagation through memory, retrieval, artifacts and durable
+  state;
+- a single provider privacy-ceiling bridge across every route;
+- deletion propagation;
+- export inventory;
+- retention expiry enforcement;
+- durable governance/audit evidence at all required boundaries.
+
+### Cost/admission slice implemented
+
+`skeleton/intelligence/admission.py` now defines the shared pre-allocation
+budget vocabulary:
+
+- `ResourceBudget`;
+- `UsageEstimate`;
+- `RuntimePressure`;
+- `AdmissionRequest`;
+- `AdmissionDecision`;
+- admit/defer/reject semantics.
+
+The deterministic gate currently covers:
+
+- input token ceiling;
+- output token ceiling;
+- estimated provider cost;
+- wall-time estimate;
+- provider attempt count;
+- tool-call estimate;
+- artifact-byte estimate;
+- concurrency saturation;
+- queue saturation;
+- operation deadline.
+
+Provider execution now receives an admission receipt before the SDK client is
+used. `RouteRequest.from_resource_budget(...)` projects the same cost,
+output-token, and wall-time ceiling into model routing, preventing downstream
+routing code from silently widening the caller's resource envelope.
+
+Successful provider responses therefore carry two independent non-secret
+control receipts:
+
+```text
+governance_decision_id = gov-...
+admission_decision_id  = adm-...
+```
+
+This does **not** close the cost/capacity P0 gap. Still required:
+
+- durable/per-tenant quota accounting;
+- live concurrency and queue pressure feed;
+- actual token/cost/tool/storage usage accounting;
+- estimate-versus-actual feedback;
+- admission integration at expensive tool/artifact/non-provider operations.
+
+### Required ordering at the provider edge
+
+The enforced order is:
+
+```text
+validate ProviderRequest
+  -> governance decision
+  -> resource admission
+  -> architecture/provider receipt
+  -> provider client
+  -> external I/O
+  -> normalized ProviderResponse
+```
+
+No denied request should increment the provider-call counter. Regression tests
+explicitly assert that property.
 
 ## 28. Work-package execution protocol
 
