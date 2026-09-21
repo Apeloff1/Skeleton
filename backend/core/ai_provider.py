@@ -12,6 +12,8 @@ from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
 from ipaddress import IPv4Address, IPv6Address, ip_address
+import hashlib
+import math
 import os
 import socket
 import time
@@ -22,6 +24,14 @@ from core.provider_architecture import (
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
     load_provider_architecture,
+)
+from skeleton.intelligence.admission import (
+    AdmissionError,
+    AdmissionRequest,
+    ResourceBudget,
+    RuntimePressure,
+    UsageEstimate,
+    require_admission,
 )
 from skeleton.vault.data_governance import (
     DataGovernanceDenied,
@@ -54,7 +64,7 @@ class ProviderInvocationError(ProviderError):
 
 
 class ProviderPolicyError(ProviderError):
-    """Raised when governance denies a provider-bound data transfer."""
+    """Raised when governance or admission denies provider-bound work."""
 
 
 def _literal_ip_address(host: str) -> IPv4Address | IPv6Address | None:
@@ -154,6 +164,9 @@ class ProviderRequest:
     data_class: str = "internal"
     purpose: str = "model-inference"
     tenant_id: str | None = None
+    operation_id: str | None = None
+    estimated_cost_usd: float = 0.0
+    resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +179,7 @@ class ProviderResponse:
     request_id: str | None = None
     latency_ms: float | None = None
     governance_decision_id: str | None = None
+    admission_decision_id: str | None = None
     data_class: str | None = None
 
 
@@ -306,7 +320,42 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         not isinstance(request.tenant_id, str) or not request.tenant_id.strip()
     ):
         raise ProviderPolicyError("model provider tenant identity is invalid")
+    if request.operation_id is not None and (
+        not isinstance(request.operation_id, str) or not request.operation_id.strip()
+    ):
+        raise ProviderPolicyError("model provider operation identity is invalid")
+    if isinstance(request.estimated_cost_usd, bool):
+        raise ProviderPolicyError("model provider estimated cost is invalid")
+    try:
+        estimated_cost = float(request.estimated_cost_usd)
+    except (TypeError, ValueError) as exc:
+        raise ProviderPolicyError("model provider estimated cost is invalid") from exc
+    if not math.isfinite(estimated_cost) or estimated_cost < 0:
+        raise ProviderPolicyError("model provider estimated cost is invalid")
+    if not isinstance(request.resource_budget, ResourceBudget):
+        raise ProviderPolicyError("model provider resource budget is invalid")
     return model
+
+
+def _estimated_input_tokens(request: ProviderRequest) -> int:
+    characters = len(request.instructions) + len(request.prompt)
+    characters += sum(len(message.content) for message in request.history)
+    return max(1, math.ceil(characters / 4))
+
+
+def _provider_operation_id(request: ProviderRequest) -> str:
+    if request.operation_id is not None:
+        return request.operation_id.strip()
+    digest = hashlib.sha256()
+    digest.update(request.instructions.encode("utf-8"))
+    digest.update(b"\x1f")
+    digest.update(request.prompt.encode("utf-8"))
+    for message in request.history:
+        digest.update(b"\x1e")
+        digest.update(message.role.encode("utf-8"))
+        digest.update(b"\x1f")
+        digest.update(message.content.encode("utf-8"))
+    return "provider-" + digest.hexdigest()[:24]
 
 
 class OpenAIProviderAdapter(ProviderAdapter):
@@ -404,6 +453,34 @@ class OpenAIProviderAdapter(ProviderAdapter):
             raise ProviderPolicyError(
                 "model provider transfer denied by governance policy"
             ) from exc
+
+        requested_output = (
+            request.max_output_tokens
+            if request.max_output_tokens is not None
+            else min(4_096, request.resource_budget.max_output_tokens)
+        )
+        try:
+            admission = require_admission(
+                AdmissionRequest(
+                    operation_id=_provider_operation_id(request),
+                    tenant_id=(request.tenant_id or "unbound"),
+                    capability="model-inference",
+                    budget=request.resource_budget,
+                    estimate=UsageEstimate(
+                        input_tokens=_estimated_input_tokens(request),
+                        output_tokens=requested_output,
+                        cost_usd=float(request.estimated_cost_usd),
+                        wall_seconds=self.timeout_seconds,
+                        provider_attempts=self.max_retries + 1,
+                    ),
+                    pressure=RuntimePressure(),
+                )
+            )
+        except AdmissionError as exc:
+            raise ProviderPolicyError(
+                "model provider request denied by resource admission"
+            ) from exc
+
         client = self._get_client()
         messages: list[dict[str, str]] = [message.as_openai_input() for message in request.history]
         messages.append({"role": "user", "content": request.prompt})
@@ -437,6 +514,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             request_id=str(request_id) if request_id else None,
             latency_ms=round(latency_ms, 2),
             governance_decision_id=governance.decision_id,
+            admission_decision_id=admission.decision_id,
             data_class=governance.data_class,
         )
 
