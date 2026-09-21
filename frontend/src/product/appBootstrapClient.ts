@@ -7,6 +7,7 @@ export type BootstrapService = {
   canonical: boolean;
   profile: string;
   health_path: string;
+  ingress_prefix: string;
   depends_on: string[];
   default: boolean;
   full: boolean;
