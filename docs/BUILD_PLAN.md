@@ -13,6 +13,8 @@ Exotic architecture manual: [architecture/exotic-architecture-lab.md](architectu
 Frontier research atlas: [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md)
 Research experiment protocols: [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md)
 Research saturation accountability: [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md)
+Historical research lineage: [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md)
+Research source topology: [architecture/research-source-topology.md](architecture/research-source-topology.md)
 
 ## 0. Construction constitution
 
@@ -3439,6 +3441,98 @@ Before expensive experiments, state which architecture decision changes under:
 - inconclusive result.
 
 Experiments with no plausible decision-changing outcome are deprioritized.
+
+### AD73. Historical cross-discipline lineage gate — ⬜
+
+Maintain HL001–HL110 across information theory, optimization, RL/control, IR, databases, distributed systems, security, formal methods, compilers, testing, reliability, human factors, and scientific methodology.
+
+**Gate:** before inventing a new AI-specific primitive, check whether a stronger mature systems/science abstraction already exists.
+
+### AD74. Research source-family topology — ⬜
+
+Maintain RS001–RS055 across preprints, peer-reviewed venues, bibliographic graphs, standards, source repositories, artifacts, patents, advisories, incident reports, formal-proof libraries, and archival sources.
+
+**Gate:** no single archive/search engine becomes the sole discovery or status authority.
+
+### AD75. Work-identity resolution — ⬜
+
+Unify one scientific work across:
+
+- preprint versions;
+- OpenReview/submission records;
+- accepted publication;
+- DOI/publisher;
+- code releases;
+- model/data artifacts;
+- corrections/retractions;
+- replications.
+
+**Gate:** the same work appearing at multiple URLs does not count as independent evidence.
+
+### AD76. Source-adapter conformance — ⬜
+
+Each ResearchSourceAdapter declares:
+
+- supported identifier types;
+- metadata/version/status retrieval;
+- artifact links;
+- correction/retraction behavior;
+- rate/auth requirements;
+- parser version;
+- failure semantics.
+
+Adapters retrieve evidence; they do not assign truth or architecture authority.
+
+### AD77. Negative-evidence discovery lane — ⬜
+
+Research search must intentionally query for:
+
+- reproduction/replication;
+- negative result;
+- failure;
+- critique;
+- limitation;
+- counterexample;
+- attack;
+- collapse;
+- instability;
+- withdrawal/retraction/errata.
+
+**Gate:** a discovery pipeline that searches only for improvements is considered biased/incomplete.
+
+### AD78. Non-paper operational evidence lane — ⬜
+
+Ingest scoped evidence from:
+
+- incident postmortems;
+- standards/RFCs;
+- security advisories;
+- hardware manuals;
+- benchmark issue trackers;
+- bug reports;
+- code commits;
+- formal proofs;
+- regulatory texts when applicable.
+
+Operational evidence retains its source class and does not masquerade as peer-reviewed science.
+
+### AD79. Research-source security — ⬜
+
+Fetched repositories, PDFs, archives, notebooks, models, and webpages are untrusted input.
+
+Research ingestion inherits:
+- parser limits;
+- decompression limits;
+- malware/secret scans;
+- dependency isolation;
+- sandbox execution;
+- no ambient credentials.
+
+### AD80. Source disappearance and archival resilience — ⬜
+
+Maintain durable identifiers, version metadata, checksums/references where permitted, and archived provenance so evidence lineage survives disappearing or rewritten URLs.
+
+**Gate:** a mutable live URL alone is insufficient long-term provenance.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
