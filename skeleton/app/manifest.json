@@ -67,7 +67,8 @@
         "backend",
         "skeleton"
       ],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": "/"
     },
     {
       "name": "backend",
@@ -81,7 +82,8 @@
       "depends_on": [
         "mongo"
       ],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": "/api"
     },
     {
       "name": "skeleton",
@@ -95,7 +97,8 @@
       "depends_on": [
         "mongo"
       ],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": "/api/v1"
     },
     {
       "name": "mongo",
@@ -104,7 +107,8 @@
       "kind": "database",
       "container_port": 27017,
       "depends_on": [],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": ""
     },
     {
       "name": "chroma",
@@ -115,7 +119,8 @@
       "container_port": 8000,
       "depends_on": [],
       "canonical": false,
-      "profile": "full"
+      "profile": "full",
+      "ingress_prefix": ""
     }
   ],
   "required_paths": [
