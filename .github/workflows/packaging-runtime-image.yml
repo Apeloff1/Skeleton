@@ -54,9 +54,10 @@ jobs:
           python -m pip wheel --no-deps --wheel-dir "$RUNNER_TEMP/wheel" .
           python - <<'PY'
           import glob
+          import os
           import zipfile
 
-          wheels = glob.glob("$RUNNER_TEMP/wheel/*.whl")
+          wheels = glob.glob(os.path.join(os.environ["RUNNER_TEMP"], "wheel", "*.whl"))
           assert len(wheels) == 1, wheels
           with zipfile.ZipFile(wheels[0]) as archive:
               names = set(archive.namelist())
