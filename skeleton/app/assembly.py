@@ -68,6 +68,7 @@ class AssemblyManifest:
     name: str
     version: str
     compose_file: str
+    hot_compose_file: str
     modes: dict[str, dict[str, str]]
     default_services: tuple[str, ...]
     full_services: tuple[str, ...]
@@ -180,6 +181,7 @@ def load_manifest() -> AssemblyManifest:
         name=str(app.get("name", "Skeleton")),
         version=str(app.get("version", "")),
         compose_file=str(app.get("compose_file", "docker-compose.yml")),
+        hot_compose_file=str(app.get("hot_compose_file", "docker-compose.hot.yml")),
         modes=modes,
         default_services=default_services,
         full_services=full_services,
@@ -326,12 +328,15 @@ def compose_command(
     build: bool = True,
     follow: bool = False,
     service: str = "",
+    hot: bool = False,
 ) -> tuple[str, ...]:
     """Build a shell-free Docker Compose command for the unified app."""
 
     manifest = manifest or load_manifest()
     action = action.strip().lower()
     base = ["docker", "compose", "-f", manifest.compose_file]
+    if hot:
+        base.extend(["-f", manifest.hot_compose_file])
 
     if action == "up":
         if full:
@@ -369,6 +374,7 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
         "name": manifest.name,
         "version": manifest.version,
         "compose_file": manifest.compose_file,
+        "hot_compose_file": manifest.hot_compose_file,
         "modes": {name: dict(values) for name, values in manifest.modes.items()},
         "default_services": list(manifest.default_services),
         "full_services": list(manifest.full_services),
