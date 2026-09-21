@@ -1,0 +1,226 @@
+"""Authenticated HTTP/SSE adapter for canonical durable AI operations."""
+
+from __future__ import annotations
+
+import asyncio
+from functools import lru_cache
+import os
+import time
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
+
+from core.operation_stream_transport import (
+    OperationAccessDenied,
+    OperationStreamTransport,
+    OperationTransportConflict,
+    StreamReplayGapError,
+    encode_sse_event,
+    encode_sse_heartbeat,
+    transport_from_env,
+)
+from routes.gameforge_auth import require_role
+
+
+router = APIRouter(prefix="/operations", tags=["AI Operations"])
+
+
+def _positive_float_env(name: str, default: float, *, minimum: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    if value < minimum:
+        return default
+    return value
+
+
+_POLL_SECONDS = _positive_float_env(
+    "CODEDOCK_OPERATION_STREAM_POLL_SECONDS",
+    0.25,
+    minimum=0.05,
+)
+_HEARTBEAT_SECONDS = _positive_float_env(
+    "CODEDOCK_OPERATION_STREAM_HEARTBEAT_SECONDS",
+    15.0,
+    minimum=1.0,
+)
+_IDLE_TIMEOUT_SECONDS = _positive_float_env(
+    "CODEDOCK_OPERATION_STREAM_IDLE_TIMEOUT_SECONDS",
+    300.0,
+    minimum=5.0,
+)
+
+
+@lru_cache(maxsize=1)
+def _transport() -> OperationStreamTransport:
+    return transport_from_env()
+
+
+def _principal_tenant(user: Any) -> str:
+    if not isinstance(user, dict):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    tenant = user.get("tenant_id") or user.get("email")
+    if not isinstance(tenant, str) or not tenant.strip():
+        raise HTTPException(status_code=403, detail="Tenant identity is required")
+    return tenant.strip()
+
+
+def _last_event_sequence(
+    request: Request,
+    explicit: int | None,
+) -> int:
+    if explicit is not None:
+        return explicit
+    raw = request.headers.get("last-event-id")
+    if raw is None or not raw.strip():
+        return 0
+    value = raw.strip()
+    if not value.isascii() or not value.isdigit():
+        raise HTTPException(status_code=400, detail="Last-Event-ID must be an integer")
+    sequence = int(value, 10)
+    if sequence < 0:
+        raise HTTPException(status_code=400, detail="Last-Event-ID must be non-negative")
+    return sequence
+
+
+def _map_transport_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, OperationAccessDenied):
+        return HTTPException(status_code=404, detail="Operation not found")
+    if isinstance(exc, StreamReplayGapError):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "error": "replay_gap",
+                "resync_required": True,
+            },
+        )
+    if isinstance(exc, OperationTransportConflict):
+        return HTTPException(
+            status_code=409,
+            detail="Operation changed concurrently; retry",
+        )
+    return HTTPException(status_code=503, detail="Operation transport unavailable")
+
+
+@router.get("/{operation_id}")
+def operation_status(
+    operation_id: str,
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    tenant_id = _principal_tenant(user)
+    try:
+        operation = _transport().status(operation_id, tenant_id=tenant_id)
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, "operation": operation.as_dict()}
+
+
+@router.post("/{operation_id}/cancel")
+def cancel_operation(
+    operation_id: str,
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    tenant_id = _principal_tenant(user)
+    try:
+        result = _transport().cancel(operation_id, tenant_id=tenant_id)
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, **result.as_dict()}
+
+
+@router.get("/{operation_id}/events")
+async def operation_events(
+    request: Request,
+    operation_id: str,
+    after_sequence: int | None = Query(default=None, ge=0),
+    user=Depends(require_role("viewer")),
+) -> StreamingResponse:
+    """Replay and follow one tenant-owned canonical operation with SSE."""
+
+    tenant_id = _principal_tenant(user)
+    cursor = _last_event_sequence(request, after_sequence)
+    transport = _transport()
+
+    try:
+        initial = transport.replay(
+            operation_id,
+            tenant_id=tenant_id,
+            after_sequence=cursor,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+
+    async def stream():
+        nonlocal cursor, initial
+        last_activity = time.monotonic()
+        last_heartbeat = last_activity
+        batch = initial
+
+        while True:
+            if await request.is_disconnected():
+                return
+
+            if batch.events:
+                for event in batch.events:
+                    yield encode_sse_event(event)
+                    cursor = event.sequence
+                    last_activity = time.monotonic()
+                    last_heartbeat = last_activity
+
+            if batch.terminal:
+                return
+
+            now = time.monotonic()
+            if now - last_activity >= _IDLE_TIMEOUT_SECONDS:
+                yield ": idle-timeout\n\n"
+                return
+
+            if now - last_heartbeat >= _HEARTBEAT_SECONDS:
+                yield encode_sse_heartbeat()
+                last_heartbeat = now
+
+            await asyncio.sleep(_POLL_SECONDS)
+            try:
+                batch = transport.replay(
+                    operation_id,
+                    tenant_id=tenant_id,
+                    after_sequence=cursor,
+                )
+            except StreamReplayGapError:
+                # Once response headers are committed an HTTP 409 is no longer
+                # possible. Emit a transport-level resync signal and close.
+                yield (
+                    "event: stream.resync_required\n"
+                    'data: {"error":"replay_gap","resync_required":true}\n\n'
+                )
+                return
+            except OperationAccessDenied:
+                return
+            except Exception:
+                yield (
+                    "event: stream.unavailable\n"
+                    'data: {"error":"transport_unavailable"}\n\n'
+                )
+                return
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+__all__ = [
+    "router",
+    "_last_event_sequence",
+    "_principal_tenant",
+]
