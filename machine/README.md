@@ -126,6 +126,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Reconcile wave:** revalidated 27 branches. Meaningful deltas are already staged in integration PRs; zero-file deltas remain lineage only.
 
+- **Fix wave:** revalidated 15 current-main fix branches; meaningful deltas are already represented in integration staging, with no duplicate PRs created. One zero-file branch remains lineage only.
+
 ## Target layout
 
 ```text
