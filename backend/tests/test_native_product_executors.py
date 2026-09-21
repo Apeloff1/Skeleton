@@ -82,8 +82,8 @@ def test_playable_launch_executes_real_runtime_session(tmp_path):
 def test_build_submit_executes_artifact_adapter_and_hides_internal_path(tmp_path, monkeypatch):
     seen = {}
 
-    def fake_build(game_name, *, files=None, build_token=None):
-        seen.update(game_name=game_name, files=files, build_token=build_token)
+    def fake_build(game_name, *, files=None, build_token=None, built_at=None):
+        seen.update(game_name=game_name, files=files, build_token=build_token, built_at=built_at)
         return {
             "ok": True,
             "build_id": "demo-web-token",
@@ -115,6 +115,7 @@ def test_build_submit_executes_artifact_adapter_and_hides_internal_path(tmp_path
     assert "path" not in result
     assert seen["game_name"] == "demo"
     assert seen["build_token"] == admitted.id
+    assert seen["built_at"] > 0
 
 
 def test_executor_retry_uses_existing_receipt_without_duplicate_session(tmp_path):
