@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MACHINE = ROOT / "machine" / "ai_master_plan.json"
 INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
+DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 
 EXPECTED_FIRST = 0
 EXPECTED_LAST = 420
@@ -88,7 +89,7 @@ def validate(data: dict) -> list[str]:
                     f"volume {volume.get('id', '?')} status {status} requires non-empty {required_field}"
                 )
 
-    for path in (INDEX, PLAN):
+    for path in (INDEX, PLAN, DEPTH_000_040):
         if not path.is_file():
             errors.append(f"missing document: {path.relative_to(ROOT)}")
 
@@ -99,9 +100,37 @@ def validate(data: dict) -> list[str]:
         if "Breadth status: **FROZEN" not in text:
             errors.append("master index must declare breadth freeze")
 
+    depth_passes = data.get("depth_passes")
+    if not isinstance(depth_passes, list):
+        errors.append("depth_passes must be a list")
+    else:
+        dp = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-000-040"), None)
+        if not isinstance(dp, dict):
+            errors.append("missing DP-000-040 depth pass")
+        else:
+            if dp.get("volume_range") != [0, 40]:
+                errors.append("DP-000-040 volume_range must equal [0, 40]")
+            fields = dp.get("required_nonempty_fields")
+            if not isinstance(fields, list) or not fields:
+                errors.append("DP-000-040 required_nonempty_fields must be non-empty")
+            else:
+                for volume in volumes[:41]:
+                    if volume.get("depth_pass") != "DP-000-040":
+                        errors.append(f"{volume.get('key', '?')}: missing DP-000-040 marker")
+                    for field in fields:
+                        value = volume.get(field)
+                        if not isinstance(value, list) or not value:
+                            errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
+
+    if DEPTH_000_040.is_file():
+        depth_text = DEPTH_000_040.read_text(encoding="utf-8")
+        for marker in ("DP-000-040", "VOL-000", "VOL-040", "Remaining work after DP-000-040"):
+            if marker not in depth_text:
+                errors.append(f"volume depth doc missing marker: {marker}")
+
     if PLAN.is_file():
         text = PLAN.read_text(encoding="utf-8")
-        for marker in ("## 21. P0 build program", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 25. Scope freeze"):
+        for marker in ("## 21. P0 build program", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 24.3 Volume depth passes", "## 25. Scope freeze"):
             if marker not in text:
                 errors.append(f"master plan missing required section: {marker}")
 
