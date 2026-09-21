@@ -76,7 +76,7 @@ def test_security_digest_exposes_actionable_locations_and_root_cause_groups() ->
     assert ".most_recent_instance.location.path" in text
     assert ".most_recent_instance.location.start_line" in text
     assert ".dependency.manifest_path" in text
-    assert 'group: ("code:" + (.rule.id // "unknown-rule"))' in text
+    assert 'group: ("code:" + clip((.rule.id // "unknown-rule"); 100))' in text
     assert 'group: ("dependabot:" + (.dependency.package.name // "unknown-package"))' in text
     assert "group_by(.group)" in text
 
