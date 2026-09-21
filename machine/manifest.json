@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.9",
+  "schema_version": "5.0",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -508,6 +508,13 @@
         "tmp/java-accelerator-operations-rebase-20260920"
       ],
       "note": "zero-file delta versus assembly; retained as lineage only"
+    },
+    "archive_wave": {
+      "revalidated": [
+        "archive/pr-runner-v2-pre-reconcile-20260920",
+        "archive/workflow-secret-output-pre-rebase-20260920"
+      ],
+      "note": "archive snapshots diverge substantially; retained as historical source material, not merged"
     }
   },
   "integrated_domains": [
