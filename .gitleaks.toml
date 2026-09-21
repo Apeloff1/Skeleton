@@ -21,5 +21,4 @@ entropy = 4.2
 
 [[allowlists]]
 description = "Deterministic GameForge replay token used only in artifact tests"
-regexTarget = "line"
-regexes = ['''build_token="operation-123"''']
+stopwords = ["operation-123"]
