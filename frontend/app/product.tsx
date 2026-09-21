@@ -137,7 +137,17 @@ export default function ProductShellRoute() {
             <Metric label="Pillars" value={String(normalizedQuery ? visiblePillars.length : PILLARS.length)} />
             <Metric
               label="Runtime"
-              value={healthLoading && !health ? 'Checking' : health?.ok ? 'Healthy' : health ? 'Degraded' : 'Unknown'}
+              value={
+                healthLoading && !health
+                  ? 'Checking'
+                  : health?.ok
+                    ? 'Healthy'
+                    : health?.contractSource && health.contractSource !== 'runtime'
+                      ? 'Partial'
+                      : health
+                        ? 'Degraded'
+                        : 'Unknown'
+              }
             />
             <Metric
               label="Actions"
