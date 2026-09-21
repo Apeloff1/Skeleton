@@ -26,7 +26,6 @@ import time
 import json
 import hashlib
 import asyncio
-import uuid
 from collections import OrderedDict
 from datetime import datetime, timezone
 
