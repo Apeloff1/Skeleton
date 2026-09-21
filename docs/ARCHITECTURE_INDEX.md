@@ -20,9 +20,10 @@ When documents overlap, resolve them in this order:
 8. **Research experiment protocols** — [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md).
 9. **Research saturation accountability** — [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md).
 10. **Historical research lineage** — [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md).
-11. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-12. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-13. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+11. **Research source topology** — [architecture/research-source-topology.md](architecture/research-source-topology.md).
+12. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+13. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+14. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
@@ -375,6 +376,7 @@ The 2026-09-21 atlas currently defines:
 - **RDE001–RDE036** — local research-debt items;
 - **RXP001–RXP035** — predeclared high-information local experiment protocols;
 - **HL001–HL110** — historical cross-disciplinary research lineage anchors;
+- **RS001–RS055** — research source families and archive/artifact topology;
 - a staged experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability.
 
 Research conclusions are not production defaults. A conclusion can recommend a contract, baseline, experiment, watch state or negative guardrail. Architecture changes still require the normal experiment/ADR/shadow/canary path.
