@@ -102,6 +102,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Security/reliability contracts:** repair intake, repo contracts/bots, archive/import safety, and secret-scan sources revalidated; existing integration PRs reused. Three older branch comparisons need another pass.
 
+- **Security resolution wave:** deserialization, token parsing, content-type, scraper DNS/SSRF, CORS, vault atomicity, and scan-evidence branches revalidated; zero-file SAST traversal branch remains lineage-only.
+
 ## Target layout
 
 ```text
