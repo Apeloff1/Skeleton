@@ -104,6 +104,8 @@ def inspect_host(
     runner: Runner = subprocess.run,
     min_free_bytes: int = 2 * 1024**3,
     recommended_free_bytes: int = 8 * 1024**3,
+    require_python: bool = True,
+    require_pip: bool = True,
 ) -> PreloadReport:
     """Return a deterministic, read-only host readiness report."""
 
@@ -115,8 +117,9 @@ def inspect_host(
         PreloadCheck(
             code="host:python",
             ok=python_ok,
+            required=require_python,
             detail=f"Python {platform.python_version()} ({sys.executable})",
-            remediation="Install Python 3.11 or newer." if not python_ok else "",
+            remediation="Install Python 3.11 or newer." if require_python and not python_ok else "",
         )
     )
 
@@ -134,13 +137,20 @@ def inspect_host(
         )
     )
 
+    pip_check = _command_check(
+        [sys.executable, "-m", "pip", "--version"],
+        code="host:pip",
+        label="pip",
+        remediation="Install pip for the active Python interpreter.",
+        runner=runner,
+    )
     checks.append(
-        _command_check(
-            [sys.executable, "-m", "pip", "--version"],
-            code="host:pip",
-            label="pip",
-            remediation="Install pip for the active Python interpreter.",
-            runner=runner,
+        PreloadCheck(
+            code=pip_check.code,
+            ok=pip_check.ok,
+            detail=pip_check.detail,
+            required=require_pip,
+            remediation=pip_check.remediation if require_pip else "",
         )
     )
 
