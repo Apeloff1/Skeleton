@@ -264,9 +264,16 @@
         "ProviderImageResponse",
         "ProviderSpeechRequest",
         "ProviderSpeechResponse",
-        "governed media operations share provider credentials and policy receipts with text generation"
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
       ],
-      "target_failure_contract": "provider unavailable, no credential leakage",
+      "target_failure_contract": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration",
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
@@ -285,9 +292,15 @@
         "Jeeves compatibility source contains no credential or raw provider transport",
         "image generation/edit/variation boundary tests",
         "speech synthesis boundary tests",
-        "application media routes contain no provider credentials or vendor SDK imports"
+        "application media routes contain no provider credentials or vendor SDK imports",
+        "structured output tests",
+        "tool-call normalization tests",
+        "offered-tool enforcement",
+        "usage/finish-reason tests",
+        "provider cancel/deadline tests",
+        "stream-delta protocol tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:application-api->orchestration",
@@ -1614,14 +1627,20 @@
         "Jeeves compatibility source contains no credential or raw provider transport",
         "image generation/edit/variation boundary tests",
         "speech synthesis boundary tests",
-        "application media routes contain no provider credentials or vendor SDK imports"
+        "application media routes contain no provider credentials or vendor SDK imports",
+        "structured output tests",
+        "tool-call normalization tests",
+        "offered-tool enforcement",
+        "usage/finish-reason tests",
+        "provider cancel/deadline tests",
+        "stream-delta protocol tests"
       ],
       "target_acceptance": [
         "invalid config fails startup",
         "secret redaction tests",
         "snapshot reproducibility"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:model-provider->foundation",
@@ -1650,14 +1669,20 @@
         "Jeeves compatibility source contains no credential or raw provider transport",
         "image generation/edit/variation boundary tests",
         "speech synthesis boundary tests",
-        "application media routes contain no provider credentials or vendor SDK imports"
+        "application media routes contain no provider credentials or vendor SDK imports",
+        "structured output tests",
+        "tool-call normalization tests",
+        "offered-tool enforcement",
+        "usage/finish-reason tests",
+        "provider cancel/deadline tests",
+        "stream-delta protocol tests"
       ],
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
         "no heavy imports in skeleton/__init__.py"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:model-routing->model-provider",
@@ -1685,9 +1710,16 @@
         "ProviderImageResponse",
         "ProviderSpeechRequest",
         "ProviderSpeechResponse",
-        "governed media operations share provider credentials and policy receipts with text generation"
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
       ],
-      "target_failure_contract": "provider unavailable, no credential leakage",
+      "target_failure_contract": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration",
       "source_acceptance": [
         "no-route tests",
         "privacy ceiling tests",
@@ -1703,9 +1735,15 @@
         "Jeeves compatibility source contains no credential or raw provider transport",
         "image generation/edit/variation boundary tests",
         "speech synthesis boundary tests",
-        "application media routes contain no provider credentials or vendor SDK imports"
+        "application media routes contain no provider credentials or vendor SDK imports",
+        "structured output tests",
+        "tool-call normalization tests",
+        "offered-tool enforcement",
+        "usage/finish-reason tests",
+        "provider cancel/deadline tests",
+        "stream-delta protocol tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:model-routing->observability",
@@ -2740,9 +2778,16 @@
         "ProviderImageResponse",
         "ProviderSpeechRequest",
         "ProviderSpeechResponse",
-        "governed media operations share provider credentials and policy receipts with text generation"
+        "governed media operations share provider credentials and policy receipts with text generation",
+        "ProviderToolDefinition",
+        "ProviderToolCall",
+        "ProviderStructuredOutputSpec",
+        "ProviderUsage",
+        "ProviderFinishReason",
+        "ProviderStreamDelta",
+        "provider cancellation/deadline propagation"
       ],
-      "target_failure_contract": "provider unavailable, no credential leakage",
+      "target_failure_contract": "provider unavailable/invalid/policy-denied with normalized receipt; malformed structured/tool output never reaches orchestration",
       "source_acceptance": [
         "recall/precision eval",
         "citation correctness",
@@ -2758,9 +2803,15 @@
         "Jeeves compatibility source contains no credential or raw provider transport",
         "image generation/edit/variation boundary tests",
         "speech synthesis boundary tests",
-        "application media routes contain no provider credentials or vendor SDK imports"
+        "application media routes contain no provider credentials or vendor SDK imports",
+        "structured output tests",
+        "tool-call normalization tests",
+        "offered-tool enforcement",
+        "usage/finish-reason tests",
+        "provider cancel/deadline tests",
+        "stream-delta protocol tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:security-safety->configuration-secrets",
