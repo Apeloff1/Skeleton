@@ -124,6 +124,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Stabilization wave:** audited 38 shell stabilization branches; most are zero-file lineage. New PR #1876 stages shell orchestration (84 files). Three large 300-file waves remain held for reconciliation.
 
+- **Reconcile wave:** revalidated 27 branches. Meaningful deltas are already staged in integration PRs; zero-file deltas remain lineage only.
+
 ## Target layout
 
 ```text
