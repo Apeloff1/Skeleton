@@ -114,8 +114,10 @@ services:
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}
       - NODE_ENV=${NODE_ENV:-development}
     depends_on:
-      - backend
-      - skeleton
+      backend:
+        condition: service_healthy
+      skeleton:
+        condition: service_healthy
     networks:
       - tutolage
 
