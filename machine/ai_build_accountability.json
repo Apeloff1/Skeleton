@@ -18141,11 +18141,11 @@
       "id": "ACC-WP-W30",
       "type": "work_package",
       "title": "WP-W30 Production Hardening",
-      "status": "planned",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T17:40:43Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -18172,8 +18172,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T17:40:43Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:40:43Z",
+          "git_sha": "a11c073c50add9416bdcf94adb6380a64a9254b5",
+          "statement": "Begin WP-W30 Production Hardening to remove packaging/release blockers discovered during signed construction.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/a11c073c50add9416bdcf94adb6380a64a9254b5",
+          "from_status": "planned",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-WP-W30/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "planned"
     },
