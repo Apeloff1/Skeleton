@@ -108,6 +108,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Reconciliation wave:** revalidated repo-bot, security-evidence, physics, network/X-harness, and Jeeves semantic/science sources; game-replay, quality, character-motor, and model-routing zero-file deltas remain lineage-only.
 
+- **Feature wave:** staged ASM vector microkernel as new PR #1875 and revalidated automation, builder, supervisor, squad, Java, and retrieval sources; existing integration PRs reused, zero-file deltas retained as lineage.
+
 ## Target layout
 
 ```text
