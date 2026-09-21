@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from skeleton.intelligence.admission import ResourceBudget
+
 from core.ai_provider import (
     AIMessage,
     OpenAIProviderAdapter,
@@ -175,6 +177,8 @@ async def test_confidential_tenant_transfer_emits_governance_receipt(
     assert result.data_class == "confidential"
     assert result.governance_decision_id
     assert result.governance_decision_id.startswith("gov-")
+    assert result.admission_decision_id
+    assert result.admission_decision_id.startswith("adm-")
     assert adapter._client.responses.calls == 1
 
 
@@ -192,3 +196,82 @@ async def test_unknown_provider_transfer_purpose_fails_closed(
         )
 
     assert adapter._client.responses.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_input_token_budget_denies_before_provider_io(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    with pytest.raises(ProviderPolicyError, match="resource admission"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="x" * 100,
+                resource_budget=ResourceBudget(max_input_tokens=5),
+            )
+        )
+
+    assert adapter._client.responses.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_cost_budget_denies_before_provider_io(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    with pytest.raises(ProviderPolicyError, match="resource admission"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="hello",
+                estimated_cost_usd=2.0,
+                resource_budget=ResourceBudget(max_cost_usd=1.0),
+            )
+        )
+
+    assert adapter._client.responses.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_provider_retry_budget_is_admitted_before_io() -> None:
+    client = _FakeClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="configured-model",
+        max_retries=2,
+        client=client,
+    )
+
+    result = await adapter.generate(
+        ProviderRequest(
+            instructions="rules",
+            prompt="hello",
+            operation_id="op-budgeted",
+            tenant_id="tenant-1",
+            resource_budget=ResourceBudget(max_provider_attempts=3),
+        )
+    )
+
+    assert result.admission_decision_id
+    assert client.responses.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_retry_budget_rejects_excess_configured_attempts() -> None:
+    client = _FakeClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="configured-model",
+        max_retries=3,
+        client=client,
+    )
+
+    with pytest.raises(ProviderPolicyError, match="resource admission"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="hello",
+                resource_budget=ResourceBudget(max_provider_attempts=3),
+            )
+        )
+
+    assert client.responses.calls == 0
