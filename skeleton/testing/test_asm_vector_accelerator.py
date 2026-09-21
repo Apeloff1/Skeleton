@@ -302,6 +302,38 @@ def test_dot_matrix_rejects_huge_zero_dimension_output_before_allocation(
     assert accelerator.status().calls == 0
 
 
+def test_runtime_status_reports_workload_telemetry(tmp_path: Path) -> None:
+    status = _supported_preflight(tmp_path)
+    if not status.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    accelerator = AsmVectorAccelerator(
+        AsmVectorAccelerator.build(output_dir=tmp_path)
+    )
+    accelerator.dot_f32([1.0, 2.0, 3.0], [3.0, 2.0, 1.0])
+    accelerator.l2_sq_f32([1.0, 2.0, 3.0], [3.0, 2.0, 1.0])
+    accelerator.dot_batch_f32(
+        [1.0, 2.0, 3.0],
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+    )
+    accelerator.dot_queries_matrix_f32(
+        [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        [1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        query_count=2,
+        rows=2,
+        dimensions=3,
+    )
+
+    runtime = accelerator.status()
+    assert runtime.calls == 4
+    assert runtime.failures == 0
+    assert runtime.scalar_calls == 2
+    assert runtime.batch_calls == 1
+    assert runtime.matrix_calls == 1
+    assert runtime.elements_processed == 24
+    assert runtime.results_emitted == 8
+
+
 def test_batch_dot_scores_rows_and_tail_dimensions(tmp_path: Path) -> None:
     status = _supported_preflight(tmp_path)
     if not status.build_ready:
