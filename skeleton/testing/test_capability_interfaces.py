@@ -21,8 +21,8 @@ def test_capability_interface_registry_is_complete_and_valid() -> None:
 
     assert errors == []
     assert summary["ok"] is True
-    assert summary["architecture_tag"] == "arch-map/v3.6"
-    assert summary["construction_version"] == "3.6.0"
+    assert summary["architecture_tag"] == "arch-map/v3.7"
+    assert summary["construction_version"] == "3.7.0"
     assert summary["entries"] == summary["expected_edges"]
     assert summary["entries"] >= 80
     assert summary["relations"]["runtime_dependency"] > 0
