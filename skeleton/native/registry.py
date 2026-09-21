@@ -39,6 +39,11 @@ class NativeAcceleratorRuntimeStatus:
     matrix_backend: str | None = None
     calls: int = 0
     failures: int = 0
+    scalar_calls: int = 0
+    batch_calls: int = 0
+    matrix_calls: int = 0
+    elements_processed: int = 0
+    results_emitted: int = 0
     last_error: str | None = None
 
     @property
@@ -213,6 +218,13 @@ class NativeAcceleratorRegistry:
                 ),
                 calls=int(getattr(raw, "calls", 0)),
                 failures=int(getattr(raw, "failures", 0)),
+                scalar_calls=int(getattr(raw, "scalar_calls", 0)),
+                batch_calls=int(getattr(raw, "batch_calls", 0)),
+                matrix_calls=int(getattr(raw, "matrix_calls", 0)),
+                elements_processed=int(
+                    getattr(raw, "elements_processed", 0)
+                ),
+                results_emitted=int(getattr(raw, "results_emitted", 0)),
                 last_error=last_error,
             )
 
@@ -267,6 +279,11 @@ class NativeAcceleratorRegistry:
                         "matrix_backend": status.matrix_backend,
                         "calls": status.calls,
                         "failures": status.failures,
+                        "scalar_calls": status.scalar_calls,
+                        "batch_calls": status.batch_calls,
+                        "matrix_calls": status.matrix_calls,
+                        "elements_processed": status.elements_processed,
+                        "results_emitted": status.results_emitted,
                     },
                 )
             except Exception as exc:
