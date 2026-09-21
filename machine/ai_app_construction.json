@@ -1392,6 +1392,38 @@
   "target_maturity": "production-sota",
   "gap_register": [
     {
+      "id": "gap-cognitive-execution-loop",
+      "plane": "orchestration",
+      "priority": "P0",
+      "status": "open",
+      "gap": "The repository has provider, routing, context, verification, tool, operation and stream primitives, but there is not yet one canonical durable AI execution loop that owns a complete model-turn/tool-turn cycle from admitted operation to verified final result. Without this contract, features can call the model or tools independently while bypassing shared budgets, checkpoints, approval, replay and final evidence binding.",
+      "construction": [
+        "define AIExecutionRequest and AIExecutionResult as orchestration-owned envelopes bound to OperationEnvelope",
+        "define AgentTurn with stable turn_id, parent_turn_id, operation_id, context digest, route decision, provider receipt, tool receipts, verification receipt and usage delta",
+        "define provider-neutral tool definitions and tool-call proposals without allowing provider-native SDK objects beyond the provider boundary",
+        "support structured model output with schema validation and fail-closed parse/repair limits",
+        "execute a bounded loop: assemble context -> route -> provider turn -> normalize proposed actions -> policy/authority/admission -> tool execution -> append tool results -> next provider turn -> verification -> finalization",
+        "checkpoint before and after every provider/tool side-effect boundary so crash recovery never silently duplicates an external action",
+        "support waiting_for_user for approval or missing information and resume from the same durable checkpoint",
+        "enforce max model turns, max tool calls, max parallel tools, token/cost budget, wall-clock deadline and cancellation at every iteration",
+        "persist final result, memory writes, artifacts, usage and all receipts under the operation identity before terminal completion",
+        "emit operation stream events from committed state transitions rather than treating the client stream as authority"
+      ],
+      "closure_evidence": [
+        "prompt-only execution reaches completed with one bound result receipt",
+        "single-tool and multi-tool loop tests",
+        "structured-output schema success/failure/repair tests",
+        "tool-call argument validation and authority denial tests",
+        "loop budget exhaustion terminates deterministically without further provider/tool I/O",
+        "crash after provider turn and crash after tool side effect resume without duplicate external action",
+        "waiting_for_user approval suspend/resume test",
+        "cancellation race test at model and tool boundaries",
+        "provider fallback preserves operation/turn lineage",
+        "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
+        "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
+      ]
+    },
+    {
       "id": "gap-streaming-protocol",
       "plane": "streaming-realtime",
       "priority": "P0",
@@ -1619,17 +1651,21 @@
     },
     {
       "wave": 2,
-      "id": "realtime-and-provider-resilience",
+      "id": "cognitive-runtime-and-realtime-resilience",
       "mode": "parallel",
       "gaps": [
+        "gap-cognitive-execution-loop",
         "gap-streaming-protocol",
         "gap-provider-redundancy"
       ],
       "depends_on": [
         "policy-and-budget-foundation"
       ],
-      "goal": "Make long-running AI work resumable and provider failure survivable under explicit privacy/cost policy.",
+      "goal": "Make admitted AI work execute through one bounded, resumable model/tool cognitive loop while long-running delivery and provider failure remain recoverable.",
       "exit": [
+        "canonical cognitive execution loop proven",
+        "provider/tool turns preserve operation and checkpoint lineage",
+        "bounded stop/cancel/human-wait semantics proven",
         "resumable ordered event protocol proven",
         "provider outage behavior proven",
         "routing/fallback telemetry available"
@@ -1643,7 +1679,7 @@
         "gap-e2e-golden-journeys"
       ],
       "depends_on": [
-        "realtime-and-provider-resilience"
+        "cognitive-runtime-and-realtime-resilience"
       ],
       "goal": "Prove the complete human-to-provider/tool/memory/artifact lifecycle in one cross-plane suite.",
       "exit": [
@@ -2176,6 +2212,71 @@
         "routing_privacy"
       ],
       "owner_plane": "governance"
+    },
+    "ai_execution": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "objective",
+        "context_policy",
+        "tool_policy",
+        "resource_budget",
+        "stop_policy",
+        "checkpoint_ref",
+        "created_at"
+      ],
+      "owner_plane": "orchestration"
+    },
+    "agent_turn": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "parent_turn_id",
+        "turn_index",
+        "phase",
+        "context_digest",
+        "route_decision_id",
+        "provider_request_id",
+        "provider_response_id",
+        "tool_receipt_ids",
+        "verification_receipt_id",
+        "usage_delta",
+        "checkpoint_ref",
+        "status"
+      ],
+      "owner_plane": "orchestration"
+    },
+    "tool_call_proposal": {
+      "required_fields": [
+        "operation_id",
+        "turn_id",
+        "call_id",
+        "tool_id",
+        "arguments",
+        "arguments_hash",
+        "authority_required",
+        "approval_required"
+      ],
+      "owner_plane": "tool-runtime"
+    },
+    "ai_execution_result": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "status",
+        "final_output",
+        "verification",
+        "route_receipts",
+        "provider_receipts",
+        "tool_receipts",
+        "memory_refs",
+        "artifact_refs",
+        "usage",
+        "stream_terminal_event",
+        "completed_at"
+      ],
+      "owner_plane": "orchestration"
     }
   },
   "release_evidence_bundle": [
@@ -2365,6 +2466,46 @@
         "cache/index/snapshot loss recovery"
       ],
       "exit": "every logical state domain has one declared authority; authoritative state restores without depending on derived stores; operation state and stream event durability are reconciled"
+    },
+    {
+      "id": "WP-P0-COGNITIVE-LOOP",
+      "gap": "gap-cognitive-execution-loop",
+      "wave": 2,
+      "owners": [
+        "skeleton/intelligence",
+        "skeleton/contracts/operation.py",
+        "skeleton/provider_runtime.py",
+        "skeleton/frontier/model_routing.py",
+        "skeleton/context",
+        "skeleton/skills",
+        "skeleton/memory",
+        "skeleton/retrieval",
+        "skeleton/frontier/operation_stream.py"
+      ],
+      "objective": "One canonical durable AI execution transaction from admitted user intent through model/tool turns to a verified, persisted and streamable result.",
+      "steps": [
+        "freeze AIExecutionRequest/AgentTurn/AIExecutionResult envelopes",
+        "normalize provider tool calls and structured outputs at the provider boundary",
+        "implement bounded model-turn/tool-turn loop in orchestration",
+        "checkpoint each external side-effect boundary",
+        "wire tool authority, schema validation, approval and idempotency into every proposed action",
+        "wire retrieval/memory reads before turns and governed memory/result writes after verification",
+        "support waiting_for_user, cancellation, deadline and resume",
+        "bind actual usage into admission/cost accounting",
+        "commit terminal result before terminal stream event"
+      ],
+      "tests": [
+        "prompt-only loop",
+        "tool loop",
+        "multi-tool bounded fan-out",
+        "structured-output validation",
+        "approval wait/resume",
+        "crash/replay without duplicate side effect",
+        "budget/deadline/cancel termination",
+        "provider failover lineage",
+        "full evidence-binding assertion"
+      ],
+      "exit": "one operation can deterministically retrieve, reason, call governed tools, wait/resume, verify, persist and stream a terminal answer without bypassing any canonical plane"
     },
     {
       "id": "WP-P0-STREAM",
@@ -2686,5 +2827,63 @@
     "validator": "scripts/check_state_topology.py",
     "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "policy": "one canonical authority per logical state domain; derived/scratch/recovery stores never silently become source of truth"
+  },
+  "execution_loop_contract": {
+    "owner": "orchestration",
+    "canonical_owner_path": "skeleton/intelligence",
+    "operation_contract": "skeleton/contracts/operation.py",
+    "mode": "bounded-durable-resumable",
+    "phases": [
+      "load-operation",
+      "assemble-context",
+      "route-model",
+      "execute-model-turn",
+      "normalize-model-output",
+      "verify-or-classify-actions",
+      "authorize-and-admit-tools",
+      "execute-tools",
+      "append-tool-results",
+      "checkpoint",
+      "repeat-or-finalize",
+      "verify-final-result",
+      "persist-result-memory-artifacts-usage",
+      "commit-terminal-operation-state",
+      "emit-terminal-stream-event"
+    ],
+    "loop_limits": [
+      "max_model_turns",
+      "max_tool_calls",
+      "max_parallel_tools",
+      "max_input_tokens",
+      "max_output_tokens",
+      "max_total_tokens",
+      "max_provider_cost",
+      "max_tool_cost",
+      "max_wall_seconds",
+      "operation_deadline"
+    ],
+    "stop_conditions": [
+      "verified-final-result",
+      "explicit-model-final",
+      "human-input-required",
+      "policy-denied",
+      "budget-exhausted",
+      "deadline-exceeded",
+      "cancelled",
+      "non-retriable-provider-failure",
+      "non-retriable-tool-failure",
+      "loop-limit-reached"
+    ],
+    "invariants": [
+      "no provider or tool call occurs outside an admitted OperationEnvelope",
+      "every model/tool turn is attributable to exactly one operation and execution",
+      "provider-native tool-call objects are normalized before leaving the provider boundary",
+      "tool arguments are schema-validated before authority evaluation and execution",
+      "destructive or approval-required actions can suspend in waiting_for_user without losing checkpoint identity",
+      "a side effect is never retried without idempotency or an explicit compensation policy",
+      "committed operation state is authoritative; transport streams are projections",
+      "terminal completion occurs only after final result and required receipts are durably bound",
+      "loop limits are monotonic and cannot be reset by a model response"
+    ]
   }
 }
