@@ -129,3 +129,85 @@ Exact implementation types may evolve, but their authority boundaries may not di
 ## Production-readiness rule
 
 A subsystem may be experimentally useful while P0 audit gaps remain open, but it may not be described as production-grade unless all applicable P0 findings in the hostile audit are closed with tests, fault injection, observability, recovery evidence and signoff.
+
+
+## Research authority boundary
+
+Research is a distinct control plane.
+
+Canonical research objects include:
+
+```text
+ResearchEvidence
+ResearchClaim
+ResearchQuestion
+ResearchContradiction
+ResearchDebt
+ReproductionRecord
+ExperimentManifest
+SourceStatusAttestation
+ArchitectureDecisionRecord
+```
+
+Research objects can:
+
+- propose candidates;
+- update confidence;
+- create experiments;
+- record negative evidence;
+- open or retire scoped research debt;
+- recommend an ADR;
+- trigger review.
+
+Research objects cannot directly:
+
+- change deployed model weights;
+- modify tool authority;
+- alter runtime capability policy;
+- overwrite durable user memory;
+- expose blind promotion answers;
+- mark their own experiment as independently reproduced;
+- promote themselves.
+
+### Source-status invariant
+
+Accepted/peer-reviewed, preprint, submission, withdrawn, official-organization evidence, and unresolved status are distinct evidence states.
+
+A title, citation count, recency, organization name, or fluent summary cannot upgrade source status.
+
+### Research-agent invariant
+
+An AI research worker is a principal operating under normal sandbox, capability, provenance, resource, evaluation, and audit rules.
+
+It may author code, experiments, analyses, hypotheses, and reports inside its authorized workspace. It may not certify its own result as independent replication or production-ready evidence.
+
+### Research-debt invariant
+
+A production or architecture claim that depends materially on unretired research debt must disclose that debt.
+
+A literature claim alone cannot retire local research debt.
+
+### Monitorability invariant
+
+Monitorability is a measured property of a specific:
+
+```text
+model + training recipe + reasoning protocol + monitor + observation channel + threat/task population
+```
+
+It is not assumed to improve monotonically with model capability and does not replace deterministic authorization.
+
+### Experimental-rigor invariant
+
+Consequential research comparisons retain:
+
+- tuning/search budget;
+- failed/diverged runs;
+- baseline parity;
+- variance/uncertainty;
+- multiple-comparison pressure;
+- lifecycle cost;
+- untested scope;
+- exact inference protocol.
+
+Research evidence that omits a material field is downgraded in scope rather than silently completed by assumption.
