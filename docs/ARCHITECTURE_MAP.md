@@ -1,8 +1,8 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v1.4`  
-**Machine contract:** `machine/architecture.json`  
-**Runtime contract:** `skeleton/app/manifest.json`  
+**Architecture tag:** `arch-map/v1.4`
+**Machine contract:** `machine/architecture.json`
+**Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
 
 This map is the canonical bridge between repository structure and the assembled
