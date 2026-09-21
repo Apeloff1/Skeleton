@@ -1,5 +1,6 @@
 import asyncio
 
+from core.canonical_product_policy import CANONICAL_PRODUCT_POLICY
 from core.product_control_plane import ProductControlPlane
 
 
@@ -22,6 +23,20 @@ def test_default_executor_registry_binds_native_actions(tmp_path):
     assert ("governance", "governance.audit") in bindings
     assert ("governance", "governance.safety") in bindings
     assert ("studio", "build.submit") in bindings
+
+
+def test_default_executor_registry_covers_entire_canonical_policy(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    bound = {(item["capability_id"], item["action"]) for item in plane.executors.snapshot()}
+    canonical = {
+        (domain.domain, action)
+        for domain in CANONICAL_PRODUCT_POLICY
+        for action in domain.actions
+    }
+
+    assert bound == canonical
+    assert plane.executor_coverage()["coverage_pct"] == 100.0
+    assert plane.readiness_report()["ready_pct"] == 100.0
 
 
 def test_studio_project_executes_and_writes_provenance_receipt(tmp_path):
