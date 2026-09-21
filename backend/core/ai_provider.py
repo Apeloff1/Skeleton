@@ -23,6 +23,11 @@ from core.provider_architecture import (
     ProviderArchitectureReceipt,
     load_provider_architecture,
 )
+from skeleton.vault.data_governance import (
+    DataGovernanceDenied,
+    ProviderTransferRequest,
+    require_provider_transfer,
+)
 
 
 _ALLOWED_HISTORY_ROLES = frozenset({"user", "assistant"})
@@ -46,6 +51,10 @@ class ProviderUnavailableError(ProviderError):
 
 class ProviderInvocationError(ProviderError):
     """Raised when a configured provider fails to return usable output."""
+
+
+class ProviderPolicyError(ProviderError):
+    """Raised when governance denies a provider-bound data transfer."""
 
 
 def _literal_ip_address(host: str) -> IPv4Address | IPv6Address | None:
@@ -142,6 +151,9 @@ class ProviderRequest:
     history: tuple[AIMessage, ...] = field(default_factory=tuple)
     max_output_tokens: int | None = None
     model: str | None = None
+    data_class: str = "internal"
+    purpose: str = "model-inference"
+    tenant_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +165,8 @@ class ProviderResponse:
     model: str
     request_id: str | None = None
     latency_ms: float | None = None
+    governance_decision_id: str | None = None
+    data_class: str | None = None
 
 
 class ProviderAdapter(ABC):
@@ -283,6 +297,15 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
 
     if not model:
         raise ProviderInvocationError("model provider model must be non-empty text")
+
+    if not isinstance(request.data_class, str) or not request.data_class.strip():
+        raise ProviderPolicyError("model provider data classification is invalid")
+    if not isinstance(request.purpose, str) or not request.purpose.strip():
+        raise ProviderPolicyError("model provider transfer purpose is invalid")
+    if request.tenant_id is not None and (
+        not isinstance(request.tenant_id, str) or not request.tenant_id.strip()
+    ):
+        raise ProviderPolicyError("model provider tenant identity is invalid")
     return model
 
 
@@ -367,6 +390,20 @@ class OpenAIProviderAdapter(ProviderAdapter):
 
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         model = _validate_request(request, default_model=self.model)
+        try:
+            governance = require_provider_transfer(
+                ProviderTransferRequest(
+                    provider_id=self.provider_id,
+                    data_class=request.data_class,
+                    purpose=request.purpose,
+                    tenant_id=request.tenant_id,
+                    source="backend/core/ai_provider.py",
+                )
+            )
+        except DataGovernanceDenied as exc:
+            raise ProviderPolicyError(
+                "model provider transfer denied by governance policy"
+            ) from exc
         client = self._get_client()
         messages: list[dict[str, str]] = [message.as_openai_input() for message in request.history]
         messages.append({"role": "user", "content": request.prompt})
@@ -399,6 +436,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             model=model,
             request_id=str(request_id) if request_id else None,
             latency_ms=round(latency_ms, 2),
+            governance_decision_id=governance.decision_id,
+            data_class=governance.data_class,
         )
 
 
