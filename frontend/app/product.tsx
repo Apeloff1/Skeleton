@@ -151,7 +151,9 @@ export default function ProductShellRoute() {
             <View style={styles.healthCopy}>
               <Text style={styles.healthTitle}>Application runtime</Text>
               <Text style={styles.healthSubtitle}>
-                Canonical backend and Skeleton engine health from the same endpoints used by startup verification.
+                {health?.application
+                  ? `${health.application.name} v${health.application.version} · ${health.contractSource} contract · canonical backend and engine probes`
+                  : 'Canonical backend and Skeleton engine health from the assembly contract.'}
               </Text>
             </View>
             <TouchableOpacity
