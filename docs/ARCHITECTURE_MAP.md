@@ -301,7 +301,7 @@ A production store may replace SQLite, but it must pass the same semantics.
 Persistence technology is replaceable; stream ordering and recovery behavior are
 not.
 
-## 14. Structural blueprint — `structure-map/v1.0`
+## 14. Structural blueprint — `structure-map/v1.1`
 
 The architecture now has an explicit physical-placement layer. The purpose is to
 prevent a common failure mode in a large AI repository: a capability is logically
@@ -441,6 +441,28 @@ The validator now rejects all of the following:
 - a composition root outside its declared zone;
 - drift between architecture, repository, and runtime structure tags.
 
-The repository and runtime manifests carry `structure-map/v1.0` so a build
+The repository and runtime manifests carry `structure-map/v1.1` so a build
 cannot silently validate an architecture map while running a differently
 structured application.
+
+### 14.7 Bounded reverse-edge exceptions
+
+The structural validator does **not** widen the zone DAG to accommodate legacy
+ownership. Reverse edges must be declared individually in
+`structural_blueprint.dependency_exceptions`.
+
+Three bounded exceptions currently exist:
+
+- engine orchestration, reasoning verification, resilience, and cost admission
+  consume the provider-neutral routing policy while that policy is still
+  physically owned by `backend/core/model_router.py`; the declared migration
+  target is an engine-owned routing module;
+- deployment/release consumes application API readiness evidence;
+- deployment/release consumes product build/E2E evidence.
+
+An exception must match a real construction dependency, state its exact
+from/to zones, identify its semantic kind, explain why it exists, and carry a
+removal condition. An exception cannot add a zone to `may_depend_on`, cannot
+create a second owner, and becomes a validation error when it is no longer
+needed.
+
