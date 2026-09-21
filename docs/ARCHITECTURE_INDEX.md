@@ -65,6 +65,8 @@ A round that is not indexed is considered structurally incomplete.
 | Research evolution | `research-evidence-evolution.md` | adaptive absorption fabric | reproduction + benchmark + canary |
 | Evaluation | `eval/`, tests, build plan | research manual | deterministic + adversarial + benchmark |
 | Serving/inference | runtime/provider adapters | build plan | latency, throughput, memory, failure recovery |
+| Optimizer/training internals | `docs/BUILD_PLAN.md` Track Z | research source catalog | quality/token, stability, memory, communication, checkpoint/replay |
+| Massive upgrade program | `docs/BUILD_PLAN.md` Track AA | research/evidence evolution contract | ablation, full-stack benchmark, failure injection, migration + rollback |
 | Deployment | deploy/resilience packages | build plan | canary + rollback + observability |
 | Machine organization | `.machine/`, `machine/` | architecture index | deterministic inventory + drift checks |
 
@@ -139,7 +141,7 @@ No source may skip from discovery directly to production.
 
 ## 8. Build-plan frontier
 
-The current construction frontier is organized into Tracks Q–Y in [BUILD_PLAN.md](BUILD_PLAN.md):
+The current construction frontier is organized into Tracks Q–AA in [BUILD_PLAN.md](BUILD_PLAN.md):
 
 - **Q** — research evidence substrate;
 - **R** — model/training substrate;
@@ -149,7 +151,9 @@ The current construction frontier is organized into Tracks Q–Y in [BUILD_PLAN.
 - **V** — inference and serving systems;
 - **W** — controlled learning and post-training;
 - **X** — evaluation, verification, and formal correctness;
-- **Y** — experiment, promotion, rollback, and continuous scientific refresh.
+- **Y** — experiment, promotion, rollback, and continuous scientific refresh;
+- **Z** — deep internals and optimizer control plane;
+- **AA** — rare massive upgrades and full-stack step changes.
 
 The tracks are deliberately cross-linked. A model improvement is not finished until its serving, security, evaluation, provenance, and rollback consequences are accounted for.
 
@@ -196,3 +200,54 @@ A SOTA claim in Skeleton must answer all of the following before promotion:
 12. When will the evidence be refreshed?
 
 If these answers are missing, the item remains research or backlog, not architecture truth.
+
+
+## 11. Deep internals and massive-upgrade authority
+
+Tracks Z and AA extend the masterplan below the model API and across the full systems stack.
+
+Track Z makes weight-update mechanics explicit architecture:
+
+- stable optimizer baselines remain available permanently;
+- optimizer state, precision, sharding, checkpointing, and migration are first-class contracts;
+- parameter semantic classes may use different optimizers through one versioned \`ParameterOptimizationMap\`;
+- structure-aware, curvature-aware, low-rank, sign, schedule-free, orthogonalized, and parameter-free optimizers are challenger families, not defaults by novelty;
+- step telemetry and an optimization flight recorder preserve evidence around divergence and rare catastrophic updates;
+- bounded counterfactual optimizer replay can compare alternate updates without mutating the authoritative training trajectory;
+- numerical/stability circuit breakers preserve evidence before recovery;
+- optimizer promotion requires equal-token and equal-wall-clock comparisons, scale transfer, checkpoint/resume, failure injection, downstream evaluation, and signed ADR evidence.
+
+Track AA is the quarantine for unusually large architectural step changes:
+
+- hardware-native sparse attention;
+- hybrid attention/state-space/recurrent blocks;
+- fine-grained/shared-expert MoE and expert parallelism;
+- latent/compressed KV architectures;
+- 100K→1M+ useful-context programs;
+- FP8-first and experimental FP4 training;
+- topology-aware 6D+ distributed training;
+- communication/computation overlap and kernel autotuning;
+- elastic training and asynchronous verified checkpointing;
+- dynamic-depth inference;
+- speculative/multi-token generation;
+- disaggregated prefill/decode;
+- multi-tier KV fabrics;
+- cross-model distillation;
+- architecture surgery/transplant;
+- bounded optimizer/architecture co-search;
+- quarantined learned optimizers.
+
+A Track AA candidate is not promotable from a microbenchmark alone. It must carry model-quality, training, serving, memory, communication, reliability, migration, security, and rollback evidence.
+
+### Mandatory accountability
+
+Every Z/AA work item carries a stable ID, checkbox/status, created/updated timestamps, dependencies, evidence references, and mandatory signed acceptance for validated/promoted states. The signature binds the evidence/artifact digest. Rejected and superseded items remain in history as negative evidence.
+
+Planning checkpoint:
+
+\`\`\`text
+PLAN-20260921-INTERNALS-OPTIMIZERS-MASSIVE-UPGRADES
+created_at=2026-09-21T21:33:00+02:00
+scope=Track Z + Track AA
+implementation_claims_require_signed_evidence=true
+\`\`\`
