@@ -10,8 +10,13 @@ def test_default_executor_registry_binds_native_actions(tmp_path):
     assert ("studio", "pipeline.inspect") in bindings
     assert ("world-forge", "world.create") in bindings
     assert ("world-forge", "world.systems.compose") in bindings
+    assert ("world-forge", "asset.forge") in bindings
     assert ("playables", "playable.launch") in bindings
     assert ("playables", "runtime.sessions") in bindings
+    assert ("academy", "academy.continue") in bindings
+    assert ("academy", "academy.practice") in bindings
+    assert ("academy", "academy.progress") in bindings
+    assert ("operations", "ops.agents") in bindings
     assert ("operations", "ops.runtime") in bindings
     assert ("governance", "governance.policy") in bindings
     assert ("governance", "governance.audit") in bindings
@@ -109,3 +114,55 @@ def test_receipt_store_keeps_result_payload_out_of_receipt_file(tmp_path):
     text = receipt_path.read_text(encoding="utf-8")
     assert "x" * 1_000 not in text
     assert plane.receipts.stats()["results"]["manifests"] == 1
+
+
+def test_asset_forge_executes_with_supplied_gamefiles(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    admitted = plane.admit(
+        capability_id="world-forge",
+        domain="world-forge",
+        action="asset.forge",
+        principal="artist",
+        actor_weight=0,
+        payload={
+            "build_id": "asset-build-1",
+            "persist": False,
+            "items": [
+                {
+                    "item_id": "itm_tree",
+                    "stage": "assets",
+                    "skin": {
+                        "palette": ["#336633", "#88AA55"],
+                        "applied_choices": {"dimension": "2d"},
+                    },
+                }
+            ],
+        },
+        idempotency_key="asset-forge-1",
+    )
+
+    assert asyncio.run(plane.execute_registered(admitted.outbox_seq)) is True
+    result = plane.receipt_result(admitted.id)["asset_forge"]
+    assert result["build_id"] == "asset-build-1"
+    assert result["items"] == 1
+    assert result["total_assets"] > 0
+    assert "assets" not in result
+
+
+def test_ops_agents_executes_against_canonical_swarm_inventory(tmp_path):
+    plane = ProductControlPlane(tmp_path)
+    admitted = plane.admit(
+        capability_id="operations",
+        domain="operations",
+        action="ops.agents",
+        principal="operator",
+        actor_weight=0,
+        payload={"category": "rendering", "limit": 3},
+        idempotency_key="ops-agents-1",
+    )
+
+    assert asyncio.run(plane.execute_registered(admitted.outbox_seq)) is True
+    result = plane.receipt_result(admitted.id)["agents"]
+    assert result["returned"] == 3
+    assert result["total"] >= 3
+    assert all(item["category"] == "rendering" for item in result["items"])
