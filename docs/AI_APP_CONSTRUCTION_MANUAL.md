@@ -3196,3 +3196,74 @@ After application-to-engine cutover, runtime provider credentials are injected o
 Stage 0 establishes state authority, governance, cost admission and provider-surface ownership. Stage 1 adds durable conversation/memory plus governed tools. Stage 2 fixes canonical context compilation and provider interaction. Stage 3 binds evidence verification. Stage 4 assembles the cognitive transaction. Stage 5 cuts product/application execution over to the authenticated engine boundary. Stage 6 proves realtime delivery/recovery. Stage 7 proves the assembled product through golden journeys.
 
 A gap cannot be marked closed before all declared dependencies are closed. Breaking a lower-stage contract invalidates dependent evidence and requires revalidation. Every declared P0 gap must appear exactly once in the closure ledger, dependency DAG, work-package schedule and required-blueprint set.
+
+## Fully Functional AI Closure: Runtime Bootstrap and Readiness
+
+Liveness and AI readiness are separate. A process can be alive while provider execution, tools, memory, realtime, or canonical writes are degraded.
+
+The Skeleton engine boot order is: configuration validation -> architecture/provider receipts -> secrets -> authoritative stores/migrations -> governance -> durable quota/admission -> AI execution repositories -> canonical memory -> provider declarations -> governed tools -> context/retrieval -> verification -> cognitive runtime/recovery -> event delivery -> capability readiness.
+
+Recovery and reconciliation of incomplete durable work happens before full write readiness. Required workers include transactional-outbox dispatch, execution/checkpoint reconciliation, ambiguous tool-side-effect reconciliation, expired approval cleanup, memory/index projection repair, retention/deletion propagation, and stale quota-lease reconciliation.
+
+Backend boots product/conversation state, service identity, the engine client and event projection. It reports AI capability from the combined backend + engine state; backend HTTP health alone never means AI is ready.
+
+Readiness is capability-scoped: live, canonical-read, text AI, tool AI, memory, realtime, and full. Optional vector/index outages may degrade retrieval while liveness remains healthy. Governance or authoritative-state failure blocks affected protected work.
+
+Shutdown enters draining state, stops new expensive work, gives in-flight work a bounded checkpoint/receipt commit window, preserves non-interruptible side-effect history, flushes durable state/outbox/usage as allowed, and releases leases only after canonical state is consistent.
+
+## Fully Functional AI Closure: Configuration and Errors
+
+Configuration ownership follows process ownership. After the engine cutover, runtime model credentials, provider endpoints/defaults, tool egress policy and execution limits belong to the Skeleton engine. Backend owns product auth/session config, application storage, engine endpoint and service-delegation identity. Frontend receives only public URLs and non-secret flags.
+
+Public/browser-prefixed environment values are never secrets. Tools receive an allowlisted environment and never inherit the complete parent secret environment.
+
+Cross-plane errors use stable codes and fields for category, retryability, HTTP projection, operation/trace identity, safe message, protected detail reference and retry delay. Raw provider, tool or database exceptions never become public API responses. Policy/governance/authorization failures are not retried as if transient. Replay gaps route to resynchronization; insufficient verification routes to qualified/abstain behavior; approval-required routes to explicit approval UX.
+
+Persisted and cross-service contracts are versioned. Rolling deployment must tolerate the declared one-version skew where applicable, with additive evolution preferred and explicit migrations/adapters for breaking semantics.
+
+## Fully Functional AI Closure: AI Threat Model
+
+Core assets are provider/service credentials, tenant conversation/memory, tool write authority, artifacts, canonical operation/results, and governance/approval receipts.
+
+The architecture treats prompt injection, confused-deputy tool use, cross-tenant leakage, credential exfiltration, SSRF/egress abuse, arbitrary code execution, replay/duplicate side effects, stream-state confusion, approval spoofing and untrusted semantic verifiers as explicit threat classes.
+
+Hard laws:
+
+- model output is never authorization;
+- retrieved, tool and artifact text is never trusted control data;
+- client-provided state is never durable authority;
+- network location alone is never authentication;
+- credentials never enter model-visible context;
+- security/governance denials cannot become success through a model retry;
+- code/build execution occurs only through sandboxed adapters, not the long-lived backend/engine process;
+- similarity search cannot bypass tenant/ACL filtering.
+
+The machine threat model maps each threat to the concrete contracts that prevent or contain it.
+
+## Fully Functional AI Closure: Retrieval and Artifacts
+
+Retrieval returns evidence records, not raw prompt strings. Authorization and source scope filtering happen before model-visible fusion/ranking. Every selected result carries canonical source/fragment identity, content digest, source version, tenant/data class, provenance and citation metadata. Vector indexes remain derived where declared and orphan hits are rejected.
+
+Time-sensitive capabilities can impose freshness ceilings. Stale evidence is marked explicitly. A citation is valid only when it resolves to authorized recorded evidence; a model-generated URL string is not a citation receipt.
+
+Artifacts follow one lifecycle: bounded authenticated ingress -> digest/type detection -> governance -> scan/quarantine -> durable ready record -> bounded extraction/provenance -> context/tool eligibility. The original artifact remains authoritative while extracted text/thumbnails/indexes are projections.
+
+Context receives authorized artifact references/excerpts, never unrestricted filesystem paths. Large files are sliced or summarized under explicit byte/token budgets. Generated artifacts are committed and linked to the producing operation/tool/provider receipt before being presented as durable output.
+
+## Fully Functional AI Closure: Routing, Degradation, and Fairness
+
+Model routing filters candidates before scoring: declared capability -> privacy/governance -> required tool/structured/media protocol -> remaining budget -> deadline/readiness -> policy. Fallback cannot widen privacy, cost or deadline ceilings and cannot silently drop required tool/structured/media semantics.
+
+Degraded behavior is explicit. Provider loss does not produce a fake AI answer. Engine loss leaves product/conversation reads available where safe but never activates a shadow backend provider. Memory loss degrades continuity without crossing tenant boundaries. Vector loss may use authorized canonical/lexical fallback. Tool loss cannot be reported as completed action. Governance loss blocks governed transfer. Quota uncertainty is conservative, never unlimited. Stream loss does not imply operation failure.
+
+Scheduling distinguishes interactive, approval-resume, background, maintenance and recovery classes. Tenant and operation concurrency limits prevent noisy neighbors. Capacity needed to reconcile/finalize already-committed external effects is protected from ordinary overload shedding; priority never bypasses governance, authority or budget.
+
+## Fully Functional AI Closure: Observability and Release Evidence
+
+A single user-visible operation is traceable across product request, conversation append, engine submit, cognitive execution, context, route, provider, tool, verification, memory writeback, finalization and stream projection.
+
+Ordinary logs use IDs, digests and allowlisted metadata instead of raw prompts/tool arguments. Credentials are never logged. Critical security/governance/approval/terminal/failure receipts are not lost through ordinary telemetry sampling.
+
+Evaluation has layered evidence: deterministic contract tests, scenario tests with fake providers/tools, full golden journeys on assembled services, tightly budgeted live-provider staging smoke where configured, and canary/release gates. Baselines are capability- and version-specific and include runtime/model/routing-policy identity.
+
+Release evidence includes architecture/construction validation, P0 focused tests, golden journeys, security/provider-surface scans, migration/restore proof, eval regression reports, and build/artifact provenance. Rollback may revert deployment, routing/model policy or feature enablement, but never by discarding canonical user or operation state.
