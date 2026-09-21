@@ -491,7 +491,7 @@ Completion requires implementation sign-off plus independent verification sign-o
 ## Atomic AI Build Queue
 
 - [ ] `ACC-AIQ-S0-STATE-01` — AIQ-S0-STATE-01 Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-STATE-02` — AIQ-S0-STATE-02 Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-STATE-02` — AIQ-S0-STATE-02 Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher. — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-STATE-03` — AIQ-S0-STATE-03 Prove authoritative restore first and derived index/cache rebuild second. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-01` — AIQ-S0-GOV-01 Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-02` — AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
