@@ -123,7 +123,7 @@ async def call_gpt4o(
         return response.text
     except ProviderError as exc:
         log.warning("AI pipeline text provider failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="AI text provider unavailable") from None
+        raise HTTPException(status_code=503, detail="AI text generation failed") from None
 
 
 async def generate_image_openai(prompt: str, size: str = "1024x1024") -> Dict[str, Any]:
