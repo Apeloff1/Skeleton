@@ -1,5 +1,5 @@
 import { API_BASE, SKELETON_API_BASE } from '../../utils/apiBase';
-import { bootstrapService, getAppBootstrap } from './appBootstrapClient';
+import { bootstrapService, getAppBootstrap, getAppRuntimeStatus } from './appBootstrapClient';
 import type { AppBootstrap } from './appBootstrapClient';
 
 export type AppServiceHealth = {
@@ -15,7 +15,7 @@ export type AppHealthSnapshot = {
   checkedAt: number;
   services: readonly AppServiceHealth[];
   application: AppBootstrap['application'] | null;
-  contractSource: 'bootstrap' | 'fallback';
+  contractSource: 'runtime' | 'bootstrap-fallback' | 'static-fallback';
 };
 
 const FALLBACK_HEALTH_PATHS = Object.freeze({
@@ -95,6 +95,29 @@ export async function probeAppHealth(
     bootstrap = null;
   }
 
+  if (bootstrap) {
+    try {
+      const runtime = await getAppRuntimeStatus(timeoutMs, signal);
+      if (runtime) {
+        return {
+          ok: runtime.ok,
+          checkedAt: Date.now(),
+          services: runtime.services.map((service) => ({
+            name: service.name,
+            ok: service.ok,
+            status: service.status,
+            latencyMs: service.latency_ms,
+            detail: service.detail,
+          })),
+          application: runtime.application,
+          contractSource: 'runtime',
+        };
+      }
+    } catch {
+      // Fall through to direct probes using bootstrap-owned health paths.
+    }
+  }
+
   const backendPath = bootstrapService(bootstrap, 'backend')?.health_path || FALLBACK_HEALTH_PATHS.backend;
   const skeletonPath = bootstrapService(bootstrap, 'skeleton')?.health_path || FALLBACK_HEALTH_PATHS.skeleton;
 
@@ -108,6 +131,6 @@ export async function probeAppHealth(
     checkedAt: Date.now(),
     services,
     application: bootstrap?.application ?? null,
-    contractSource: bootstrap ? 'bootstrap' : 'fallback',
+    contractSource: bootstrap ? 'bootstrap-fallback' : 'static-fallback',
   };
 }
