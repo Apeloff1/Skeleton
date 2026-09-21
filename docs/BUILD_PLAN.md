@@ -3291,7 +3291,7 @@ A retired debt can reopen after:
 
 ### AD61. Research experiment protocol registry — ⬜
 
-Maintain RXP001–RXP035 as canonical experiment designs.
+Maintain RXP001–RXP050 as canonical experiment designs.
 
 Every RXP protocol declares:
 
@@ -3555,6 +3555,29 @@ Every question records:
 
 **Gate:** an implementation choice does not close a research question by convenience.
 
+### AD82. Expanded local protocol coverage — ⬜
+
+Maintain RXP001–RXP050.
+
+The extended protocols add:
+- continual-adapter interference geometry;
+- trajectory-level uncertainty/calibration;
+- multimodal perception-aware post-training;
+- formal-prover component ablation;
+- work-identity/status conflict resolution;
+- evidence-independence graphs;
+- contamination-risk quantification;
+- benchmark retirement/saturation;
+- dynamic benchmark longitudinal stability;
+- provider semantic-drift canaries;
+- cross-hardware portability;
+- world-model invariance;
+- instruction-convention conflict;
+- retain–forget entanglement;
+- source-adapter conformance.
+
+**Gate:** every high-priority unresolved question has either a direct RXP protocol or an explicitly documented reason it cannot yet be tested locally.
+
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
 ---
@@ -3630,7 +3653,7 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
 29. 🔨 Establish Track AD research saturation: normalize priority sources, verify source/venue status, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
 30. 🧪 Execute the AD high-information experiment queue plus FD001–FD026 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
-31. ⬜ Instantiate RXP001–RXP035 experiment manifests and execute the first-wave protocols in evidence-value order.
+31. ⬜ Instantiate RXP001–RXP050 experiment manifests and execute the first-wave protocols in evidence-value order.
 32. ⬜ Close or explicitly scope material RDE research debt and resolve/document CX contradictions before default promotion.
 33. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
