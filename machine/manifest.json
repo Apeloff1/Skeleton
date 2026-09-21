@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.2",
+  "schema_version": "5.3",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -538,6 +538,39 @@
         "stabilize/shell-ai-recovery-integrity-20260920-clean"
       ],
       "note": "large 300-file shell waves remain held for file-level reconciliation"
+    },
+    "reconcile_wave": {
+      "revalidated": "27 reconcile branches",
+      "lineage_only": [
+        "additive planes",
+        "assets",
+        "build incremental",
+        "eval",
+        "game replay",
+        "generated sandbox",
+        "model routing v3/v4",
+        "physics character motor",
+        "quality"
+      ],
+      "staged_existing": [
+        "closed bot ledger",
+        "hardened repo bots",
+        "inventory gates",
+        "Jeeves adaptive scientific core",
+        "compiler pipeline assurance",
+        "cortex cost learning",
+        "lens science",
+        "machine semantics",
+        "probability frontier",
+        "relational semantics",
+        "semantic plane",
+        "network replication",
+        "physics simulation stack",
+        "repository bots",
+        "security scan evidence",
+        "X-harness"
+      ],
+      "note": "Meaningful reconcile branches are already represented by integration PRs; zero-file deltas remain lineage only."
     }
   },
   "integrated_domains": [
