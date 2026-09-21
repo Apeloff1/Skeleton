@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v3.2`
+**Architecture tag:** `arch-map/v3.3`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -226,6 +226,7 @@ arch-map/v2.9  shared provider receipt families + provider surface inventory
 arch-map/v3.0  executable lifecycle/trust/data/work-package construction ledger
 arch-map/v3.1  Wave 1 governance + resource admission enforced before provider I/O
 arch-map/v3.2  unified governed text/image/speech provider runtime + media credential convergence
+arch-map/v3.3  canonical operation lifecycle + resumable stream contract
 ```
 
 ## 10. Operator commands
@@ -268,3 +269,21 @@ instructions from creating competing build rules.
 Open P0 construction gaps are explicit and block claiming SOTA completion, but
 they do not block incremental architecture work when the gap itself, its
 construction plan, and its closure evidence are recorded.
+
+
+## 12. Operation and realtime contract
+
+Long-running AI work now has one engine-level identity and lifecycle contract in
+`skeleton/contracts/operation.py`. Operation identity is distinct from tracing:
+an idempotency identity binds tenant, actor, capability and idempotency key while
+`trace_id` remains observability correlation.
+
+The transport-neutral resumable event contract lives in
+`skeleton/frontier/operation_stream.py`. Transport adapters may use SSE,
+WebSocket or polling, but they must preserve operation-scoped event IDs,
+monotonic sequence, bounded strict-JSON payloads, replay cursors, duplicate
+conflict detection, terminal finality and fail-closed backpressure.
+
+The current reference `OperationEventLog` is a conformance oracle, not the
+production durable store. Production storage may change only the persistence
+mechanism, not protocol semantics.
