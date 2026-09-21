@@ -131,9 +131,17 @@ def test_registered_test_requires_module_marker(tmp_path: Path) -> None:
 def test_repository_manifest_is_explicit_and_versioned() -> None:
     payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
     assert payload["version"] == 1
-    assert set(payload["tests"]) == {
+
+    tests = payload["tests"]
+    assert {
         "test_galaxy_build_pipeline_regression.py",
         "test_galaxy_manifest_constants.py",
         "test_governance.py",
         "test_iteration_5_codegen_refactor.py",
-    }
+    } <= set(tests)
+
+    assert tests
+    for name, metadata in tests.items():
+        assert name.startswith("test_") and name.endswith(".py")
+        assert len(metadata["reason"].strip()) >= 20
+        assert metadata["target"].strip()
