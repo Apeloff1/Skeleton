@@ -57,6 +57,11 @@ No edge runs directly from paper/source to production.
 | continual adaptation | RQ059–RQ061 | RDE018, RDE030 + adaptation debt | RXP030, RXP036 | adapters, memory, slow/medium/fast adaptation lanes | rollback, poisoning, deletion, promotion boundaries |
 | hardware/precision/efficiency | RQ062–RQ064 | RDE008–RDE009, RDE024 | RXP005, RXP019, RXP032, RXP033, RXP046 | Track Z/AA hardware profiles | kernel/operator support, portability, recovery |
 | research automation | RQ065–RQ067 | RDE033–RDE036 | RXP026, RXP027, RXP035, RXP040, RXP050 | research-agent plane, source adapters, evidence graph | blind-eval isolation, sandbox, anti-cheating, signoff |
+| model compression/distillation/pruning | RQ068–RQ070 | RDE037–RDE038 | RXP051–RXP053 | artifact family derivation, compression pipeline, deployment variants | artifact identity, regression, kernel portability |
+| privacy-preserving learning/inference | RQ071–RQ073 | RDE039–RDE040 | RXP054–RXP056 | privacy budget plane, federated/split adaptation | tenant/data isolation, key trust, attack validation |
+| software-engineering/code agents | RQ074–RQ076 | RDE041–RDE042 | RXP057–RXP059 | coding-agent runtime, repository tools, validation pipeline | sandbox, dependency trust, rollback, CI integrity |
+| human–AI/operator science | RQ077–RQ079 | RDE043–RDE044 | RXP060 | UI/approval/monitoring plane | identity, approvals, reversibility, alert governance |
+| causal/counterfactual modeling | RQ080–RQ082 | RDE045–RDE046 | RXP047, RXP061, RXP062 | world-model, causal evaluator, robustness suite | provenance, semantic fidelity, intervention assumptions |
 
 ---
 
@@ -341,10 +346,10 @@ High novelty does not imply high priority.
 ```text
 checkpoint_id: PLAN-20260922-RESEARCH-DEPENDENCY-MAP
 created_at: 2026-09-22T00:06:00+02:00
-domains: 19
-research_questions: RQ001..RQ067
-research_debt: RDE001..RDE036
-experiment_protocols: RXP001..RXP050
+domains: 24
+research_questions: RQ001..RQ082
+research_debt: RDE001..RDE046
+experiment_protocols: RXP001..RXP062
 historical_lineage: HL001..HL110
 source_families: RS001..RS055
 production_authority_granted: false
