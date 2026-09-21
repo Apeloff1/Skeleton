@@ -640,21 +640,21 @@ class AsmVectorAccelerator:
         return converted, buffer
 
 
-_default_accelerator: AsmVectorAccelerator | None = None
-_default_lock = Lock()
-
-
 def get_default_asm_accelerator(
     *,
     build_if_missing: bool = False,
 ) -> AsmVectorAccelerator:
-    global _default_accelerator
-    with _default_lock:
-        if _default_accelerator is None:
-            _default_accelerator = AsmVectorAccelerator(
-                build_if_missing=build_if_missing
-            )
-        return _default_accelerator
+    """Return the process-wide vector kernel managed by the native registry."""
+    from skeleton.native.registry import get_default_native_registry
+
+    registry = get_default_native_registry()
+    if registry.initialized("vector"):
+        return registry.get("vector")
+    if build_if_missing:
+        preflight = registry.preflight("vector")
+        if not preflight.library_available:
+            return registry.build_and_get("vector")
+    return registry.get("vector")
 
 
 __all__ = [
