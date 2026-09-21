@@ -23,6 +23,23 @@ export * from './operationStreamReducer';
 
 const CURSOR_PREFIX = 'codedock:operation-cursor:';
 
+function newConsumerId(): string {
+  try {
+    const randomUUID = (globalThis as any)?.crypto?.randomUUID;
+    if (typeof randomUUID === 'function') {
+      return `client-${randomUUID.call((globalThis as any).crypto)}`;
+    }
+  } catch {}
+  return `client-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+}
+
+/**
+ * One consumer lease identity per running app session. It is not a credential
+ * and is intentionally not persisted: a restarted client gets a new lease,
+ * while the durable replay cursor remains operation-scoped.
+ */
+export const OPERATION_CONSUMER_ID = newConsumerId();
+
 export interface FollowOperationOptions {
   signal?: AbortSignal;
   pollMs?: number;
@@ -81,6 +98,35 @@ export async function clearOperationCursor(operationId: string): Promise<void> {
   } catch {}
 }
 
+async function acknowledgeOperationCursor(
+  state: OperationClientState,
+  signal?: AbortSignal,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await api.post<any>(
+    `/api/operations/${encodeURIComponent(state.operationId)}/events/ack`,
+    {
+      consumer_id: OPERATION_CONSUMER_ID,
+      sequence: state.lastSequence,
+    },
+    {
+      signal,
+      headers: authHeaders(),
+      idempotencyKey:
+        `operation-ack:${state.operationId}:${OPERATION_CONSUMER_ID}:${state.lastSequence}`,
+      retries: 2,
+      timeoutMs: 15_000,
+    },
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error || `HTTP ${result.status}`,
+    };
+  }
+  return { ok: true };
+}
+
+
 export async function replayOperation(
   state: OperationClientState,
   signal?: AbortSignal,
@@ -91,7 +137,8 @@ export async function replayOperation(
 
   const path =
     `/api/operations/${encodeURIComponent(state.operationId)}/events/replay`
-    + `?after_sequence=${state.lastSequence}&limit=250`;
+    + `?consumer_id=${encodeURIComponent(OPERATION_CONSUMER_ID)}`
+    + `&after_sequence=${state.lastSequence}&limit=250`;
   const result = await api.get<OperationReplayPayload>(path, {
     signal,
     headers: authHeaders(),
@@ -114,7 +161,9 @@ export async function replayOperation(
   }
 
   const next = reduceOperationReplay(state, result.data);
-  if (!next.resyncRequired && next.lastSequence !== state.lastSequence) {
+  if (next.resyncRequired) return next;
+
+  if (next.lastSequence !== state.lastSequence) {
     try {
       await saveOperationCursor(next.operationId, next.lastSequence);
     } catch {
@@ -124,6 +173,18 @@ export async function replayOperation(
         error: 'cursor_persistence_failed',
       };
     }
+  }
+
+  const acknowledgement = await acknowledgeOperationCursor(next, signal);
+  if (!acknowledgement.ok) {
+    if (signal?.aborted || acknowledgement.error === 'aborted') {
+      return { ...next, connection: 'idle', error: 'aborted' };
+    }
+    return {
+      ...next,
+      connection: 'error',
+      error: `cursor_ack_failed:${acknowledgement.error || 'unknown'}`,
+    };
   }
   return next;
 }
