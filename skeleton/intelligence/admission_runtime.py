@@ -33,6 +33,7 @@ from skeleton.intelligence.quota import (
     QuotaError,
     QuotaExceeded,
     QuotaReservation,
+    QuotaUsageEvent,
     TenantQuotaLedger,
 )
 
@@ -225,6 +226,131 @@ class AdmissionRuntime:
                 request_fingerprint=fingerprint,
             )
             return lease
+
+    def record_usage_event(
+        self,
+        operation_id: str,
+        event_id: str,
+        category: str,
+        delta: UsageEstimate,
+        *,
+        now_wall: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Charge one idempotent actual-usage event against an active lease."""
+
+        if not isinstance(delta, UsageEstimate):
+            raise TypeError("delta must be a UsageEstimate")
+        operation = str(operation_id).strip()
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        wall = _wall_time(now_wall, field="now_wall")
+
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            reservation = active.lease.quota_reservation
+            if reservation is None or self.quota_ledger is None:
+                raise AdmissionRuntimeError(
+                    "operation has no durable quota reservation"
+                )
+            recorder = getattr(self.quota_ledger, "record_usage_event", None)
+            if not callable(recorder):
+                raise AdmissionRuntimeError(
+                    "quota ledger does not support incremental usage metering"
+                )
+
+            decision = active.lease.decision
+            max_tool_calls = int(
+                decision.estimated.tool_calls
+                + int(decision.remaining["tool_calls"])
+            )
+            max_artifact_bytes = int(
+                decision.estimated.artifact_bytes
+                + int(decision.remaining["artifact_bytes"])
+            )
+            try:
+                return recorder(
+                    reservation.reservation_id,
+                    event_id,
+                    category,
+                    delta,
+                    max_tool_calls=max_tool_calls,
+                    max_artifact_bytes=max_artifact_bytes,
+                    now=wall,
+                )
+            except QuotaExceeded as exc:
+                raise AdmissionError(str(exc)) from exc
+            except QuotaConflict as exc:
+                raise AdmissionRuntimeConflict(str(exc)) from exc
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "incremental_usage_meter_unavailable"
+                ) from exc
+
+    def meter_tool_call(
+        self,
+        operation_id: str,
+        event_id: str,
+        *,
+        calls: int = 1,
+        now_wall: float | None = None,
+    ) -> QuotaUsageEvent:
+        if isinstance(calls, bool) or not isinstance(calls, int) or calls <= 0:
+            raise ValueError("calls must be a positive integer")
+        return self.record_usage_event(
+            operation_id,
+            event_id,
+            "tool",
+            UsageEstimate(tool_calls=calls),
+            now_wall=now_wall,
+        )
+
+    def meter_artifact_bytes(
+        self,
+        operation_id: str,
+        event_id: str,
+        byte_count: int,
+        *,
+        now_wall: float | None = None,
+    ) -> QuotaUsageEvent:
+        if (
+            isinstance(byte_count, bool)
+            or not isinstance(byte_count, int)
+            or byte_count < 0
+        ):
+            raise ValueError("byte_count must be a non-negative integer")
+        return self.record_usage_event(
+            operation_id,
+            event_id,
+            "artifact",
+            UsageEstimate(artifact_bytes=byte_count),
+            now_wall=now_wall,
+        )
+
+    def meter_storage_bytes(
+        self,
+        operation_id: str,
+        event_id: str,
+        byte_count: int,
+        *,
+        now_wall: float | None = None,
+    ) -> QuotaUsageEvent:
+        if (
+            isinstance(byte_count, bool)
+            or not isinstance(byte_count, int)
+            or byte_count < 0
+        ):
+            raise ValueError("byte_count must be a non-negative integer")
+        return self.record_usage_event(
+            operation_id,
+            event_id,
+            "storage",
+            UsageEstimate(artifact_bytes=byte_count),
+            now_wall=now_wall,
+        )
 
     def complete(
         self,
