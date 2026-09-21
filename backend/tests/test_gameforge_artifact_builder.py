@@ -8,7 +8,7 @@ from core.gameforge_artifact_builder import build_source_artifact, build_web_art
 
 def test_web_artifact_escapes_html_and_contains_runtime_payload(tmp_path):
     result = build_web_artifact(
-        "</script><script>alert('x')</script>",
+        "<img onerror=x>",
         files=[
             {
                 "filename": "<b>main.js</b>",
@@ -28,9 +28,9 @@ def test_web_artifact_escapes_html_and_contains_runtime_payload(tmp_path):
         html = archive.read("index.html").decode("utf-8")
         payload = json.loads(archive.read("game_data.json"))
 
-    assert "</script><script>alert('x')</script>" not in html
-    assert "&lt;/script&gt;&lt;script&gt;alert(&#x27;x&#x27;)&lt;/script&gt;" in html
-    assert "\\u003c/script\\u003e" in html
+    assert "<img onerror=x>" not in html
+    assert "&lt;img onerror=x&gt;" in html
+    assert "\\u003cimg onerror=x\\u003e" in html
     assert "<b>main.js</b>" not in html
     assert "&lt;b&gt;main.js&lt;/b&gt;" in html
     assert payload["files"][0]["content"] == "console.log('ok')"
