@@ -71,19 +71,48 @@ def test_legacy_backend_health_exposes_canonical_identity_compatibly():
 
 
 def test_manifest_ingress_prefixes_are_validated():
-    from dataclasses import replace
+    import json
+    from copy import deepcopy
+    from importlib import resources
 
     import pytest
 
-    from skeleton.app.assembly import load_manifest
+    from skeleton.app.assembly import parse_manifest
 
-    manifest = load_manifest()
-    backend = manifest.service("backend")
-    assert backend.ingress_prefix == "/api"
-    assert manifest.service("skeleton").ingress_prefix == "/api/v1"
+    payload = json.loads(resources.files("skeleton.app").joinpath("manifest.json").read_text())
+    parsed = parse_manifest(payload)
+    assert parsed.service("backend").ingress_prefix == "/api"
+    assert parsed.service("skeleton").ingress_prefix == "/api/v1"
 
-    invalid = replace(backend, ingress_prefix="api")
-    services = tuple(invalid if item.name == "backend" else item for item in manifest.services)
-    # AssemblyManifest itself is immutable data; loader validation owns syntax.
-    # Preserve this assertion as a shape guard for downstream consumers.
-    assert services[manifest.service_names.index("backend")].ingress_prefix == "api"
+    invalid = deepcopy(payload)
+    next(item for item in invalid["services"] if item["name"] == "backend")["ingress_prefix"] = "api"
+    with pytest.raises(ValueError, match="must start"):
+        parse_manifest(invalid)
+
+    escaped = deepcopy(payload)
+    next(item for item in escaped["services"] if item["name"] == "backend")["health_path"] = "/other/health"
+    with pytest.raises(ValueError, match="health_path must live under"):
+        parse_manifest(escaped)
+
+    duplicate = deepcopy(payload)
+    next(item for item in duplicate["services"] if item["name"] == "skeleton")["ingress_prefix"] = "/api"
+    with pytest.raises(ValueError, match="shared"):
+        parse_manifest(duplicate)
+
+
+def test_aggregate_runtime_status_includes_engine_and_state():
+    from pathlib import Path
+
+    from skeleton.app.assembly import find_repo_root
+
+    root = find_repo_root(Path(__file__))
+    route = (root / "backend/routes/app_runtime.py").read_text(encoding="utf-8")
+    client = (root / "frontend/src/product/appBootstrapClient.ts").read_text(encoding="utf-8")
+    shell = (root / "frontend/app/product.tsx").read_text(encoding="utf-8")
+
+    assert "async def _probe_mongo" in route
+    assert 'core_db.command("ping")' in route
+    assert "asyncio.gather(" in route
+    assert '"name": "mongo"' in route
+    assert "'backend' | 'skeleton' | 'mongo'" in client
+    assert "Mongo state" in shell
