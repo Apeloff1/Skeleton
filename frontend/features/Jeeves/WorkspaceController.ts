@@ -253,7 +253,13 @@ export class WorkspaceController {
     // Older failed turns can only be copied into a new draft, so their bytes are no longer needed.
     this.attachments.clear();
     if (attachment) this.attachments.set(message.id, attachment);
-    const body = buildChatBody(conversation, content, attachment);
+    const body = buildChatBody(
+      conversation,
+      content,
+      attachment,
+      Date.now(),
+      message.id,
+    );
     this.change(updateConversation(this.snapshot.workspace, conversation.id, c => ({
       ...c, title: c.messages.length === 0 && c.title === 'New conversation' ? content.slice(0, 70) : c.title,
       draft: '', updatedAt: Date.now(), messages: [...c.messages, message],
@@ -279,7 +285,13 @@ export class WorkspaceController {
       this.notify('Attachments are not saved on this device. Reattach the file and send your restored draft.');
       return;
     }
-    const body = buildChatBody({ ...conversation, messages: conversation.messages.slice(0, index) }, message.text, attachment);
+    const body = buildChatBody(
+      { ...conversation, messages: conversation.messages.slice(0, index) },
+      message.text,
+      attachment,
+      Date.now(),
+      message.id,
+    );
     this.setMessage(conversation.id, messageId, { status: 'pending', error: undefined });
     await this.execute(conversation.id, messageId, body);
   }
