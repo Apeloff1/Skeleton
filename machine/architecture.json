@@ -322,7 +322,9 @@
       "minimum_checks": [
         "frontend-typecheck",
         "frontend-export",
-        "architecture-map"
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
       ]
     },
     {
@@ -333,7 +335,9 @@
       "minimum_checks": [
         "backend-quality",
         "app-assembly",
-        "architecture-map"
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
       ]
     },
     {
@@ -344,7 +348,9 @@
       "minimum_checks": [
         "backend-quality",
         "app-assembly",
-        "architecture-map"
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
       ]
     },
     {
@@ -355,7 +361,9 @@
       ],
       "minimum_checks": [
         "native-or-java-contract",
-        "architecture-map"
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
       ]
     },
     {
@@ -366,7 +374,9 @@
       ],
       "minimum_checks": [
         "repository-hygiene",
-        "architecture-map"
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
       ]
     },
     {
@@ -378,7 +388,9 @@
       "minimum_checks": [
         "workflow-input-security",
         "repository-hygiene",
-        "architecture-map"
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
       ]
     }
   ],
@@ -401,6 +413,8 @@
     ],
     "critical_path": [
       "architecture-map",
+      "construction-contract",
+      "provider-bootstrap",
       "app-assembly",
       "focused-domain-tests",
       "merge-readiness"
