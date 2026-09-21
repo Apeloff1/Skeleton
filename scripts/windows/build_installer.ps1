@@ -9,12 +9,14 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $PyProjectPath = Join-Path $RepoRoot "pyproject.toml"
 $BuildRoot = Join-Path $RepoRoot ".build\windows-installer"
-$PayloadDir = Join-Path $BuildRoot "payload"
-$LauncherDist = Join-Path $BuildRoot "launcher-dist"
-$LauncherWork = Join-Path $BuildRoot "launcher-work"
-$LauncherSpec = Join-Path $BuildRoot "launcher-spec"
 $OutputDir = Join-Path $RepoRoot "dist\windows"
-$ArchivePath = Join-Path $BuildRoot "source.zip"
+$ShortDrive = "W:"
+$ShortRoot = "$ShortDrive\"
+$PayloadDir = Join-Path $ShortRoot "payload"
+$LauncherDist = Join-Path $ShortRoot "launcher-dist"
+$LauncherWork = Join-Path $ShortRoot "launcher-work"
+$LauncherSpec = Join-Path $ShortRoot "launcher-spec"
+$ArchivePath = Join-Path $ShortRoot "source.zip"
 $EntryPoint = Join-Path $RepoRoot "packaging\windows\launcher_entry.py"
 $InstallerScript = Join-Path $RepoRoot "packaging\windows\SkeletonSetup.iss"
 
@@ -38,9 +40,18 @@ foreach ($Path in @($BuildRoot, $OutputDir)) {
         Remove-Item -LiteralPath $Path -Recurse -Force
     }
 }
-New-Item -ItemType Directory -Force -Path $BuildRoot, $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec, $OutputDir | Out-Null
+New-Item -ItemType Directory -Force -Path $BuildRoot, $OutputDir | Out-Null
 
-Write-Host "==> Staging curated application payload from $SourceRef"
+if (Test-Path $ShortDrive) {
+    throw "Temporary build drive $ShortDrive is already in use"
+}
+& subst $ShortDrive $BuildRoot
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $ShortDrive)) {
+    throw "Unable to create short Windows build drive $ShortDrive"
+}
+New-Item -ItemType Directory -Force -Path $PayloadDir, $LauncherDist, $LauncherWork, $LauncherSpec | Out-Null
+
+Write-Host "==> Staging curated application payload from $SourceRef via $ShortDrive"
 $RuntimePaths = @(
     ".dockerignore",
     ".env.example",
@@ -146,3 +157,5 @@ Write-Host ""
 Write-Host "Windows installer built successfully:"
 Write-Host "  $($Installer.FullName)"
 Write-Host "  SHA256 $($Hash.Hash)"
+
+& subst $ShortDrive /D
