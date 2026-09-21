@@ -18172,7 +18172,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:40:43Z",
+      "last_event_at_utc": "2026-09-21T17:41:33Z",
       "history": [
         {
           "sequence": 1,
@@ -18190,9 +18190,32 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-WP-W30/start.json"
           ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "evidence_added",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:41:33Z",
+          "git_sha": "fb5770c5daedd4676179689767d343e0a801602b",
+          "statement": "Fixed Docker/wheel package discovery and added regression coverage.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
+          "from_status": "in_progress",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/225c280b119c9f7ec474c2c97cd25931f75d326d",
+            "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
+            "machine/accountability_events/ACC-WP-W30/packaging-discovery-fix.json"
+          ]
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/225c280b119c9f7ec474c2c97cd25931f75d326d",
+        "https://github.com/Apeloff1/Skeleton/commit/fb5770c5daedd4676179689767d343e0a801602b",
+        "machine/accountability_events/ACC-WP-W30/packaging-discovery-fix.json"
+      ],
       "baseline_status": "planned"
     },
     {
