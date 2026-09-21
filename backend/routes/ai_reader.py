@@ -78,7 +78,7 @@ async def speak_text(
         return out
     except Exception as exc:
         log.warning("TTS generation failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="TTS provider unavailable") from None
+        raise HTTPException(status_code=503, detail="TTS generation failed") from None
 
 
 @router.post("/read-chapter")
@@ -130,7 +130,7 @@ async def read_book_chapter(
         }
     except Exception as exc:
         log.warning("TTS generation failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="TTS provider unavailable") from None
+        raise HTTPException(status_code=503, detail="TTS generation failed") from None
 
 
 @router.post("/read-knowledge")
@@ -170,4 +170,4 @@ async def read_knowledge_entry(
         }
     except Exception as exc:
         log.warning("TTS generation failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="TTS provider unavailable") from None
+        raise HTTPException(status_code=503, detail="TTS generation failed") from None
