@@ -39,6 +39,10 @@ def validate() -> list[str]:
         errors.append("master build sequence must preserve breadth freeze at VOL-420")
     if seq.get("completion_semantics", {}).get("mode") != "derived_from_existing_accountability":
         errors.append("wave completion must derive from existing accountability")
+    packet = seq.get("build_packet_standard", {})
+    required_packet_fields = packet.get("required_fields")
+    if not isinstance(required_packet_fields, list) or len(required_packet_fields) < 12:
+        errors.append("build_packet_standard must define the full implementation packet")
 
     waves = seq.get("waves")
     if not isinstance(waves, list):
@@ -80,12 +84,17 @@ def validate() -> list[str]:
 
         for field in (
             "objective", "entry_criteria", "deliverables",
-            "required_evidence_modes", "exit_criteria", "stop_conditions"
+            "required_evidence_modes", "exit_criteria", "stop_conditions",
+            "definition_of_ready", "definition_of_done", "handoff_outputs",
+            "review_questions", "gating_vertical_slices"
         ):
             value = wave.get(field)
             if field == "objective":
                 if not isinstance(value, str) or not value.strip():
                     errors.append(f"{wid}: objective must be non-empty")
+            elif field == "gating_vertical_slices":
+                if not isinstance(value, list):
+                    errors.append(f"{wid}: gating_vertical_slices must be a list")
             elif not isinstance(value, list) or not value:
                 errors.append(f"{wid}: {field} must be non-empty")
 
@@ -114,6 +123,14 @@ def validate() -> list[str]:
         visited.add(node)
     for node in ids:
         visit(node)
+
+    vertical_slice_refs = {
+        ref for wave in waves for ref in wave.get("gating_vertical_slices", [])
+        if isinstance(ref, str)
+    }
+    expected_vertical_slices = set(master.get("vertical_slices", []))
+    if not expected_vertical_slices.issubset(vertical_slice_refs):
+        errors.append("master build waves must gate every canonical vertical slice")
 
     queue_stages = {task.get("stage") for task in queue.get("tasks", []) if isinstance(task.get("stage"), int)}
     if queue_stages != EXPECTED_AIQ_STAGES:
@@ -144,6 +161,9 @@ def validate() -> list[str]:
         "MBW-07 — Installer, Distributed Runtime & Production Hardening",
         "Universal stop conditions",
         "Promotion evidence bundle",
+        "Build packet standard",
+        "Definition-of-Ready / Definition-of-Done",
+        "Handoff law",
     ):
         if marker not in human:
             errors.append(f"human build sequence missing marker: {marker}")
