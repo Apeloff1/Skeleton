@@ -515,6 +515,27 @@ def validate_state_topology(repo_root: Path = ROOT) -> tuple[list[str], dict[str
         "in-process-retrieval-memory",
         "manual-memory-snapshots",
     }
+    closure = construction.get("functional_ai_closure")
+    if isinstance(closure, dict):
+        closure_domains = closure.get("required_state_domains")
+        if not isinstance(closure_domains, list) or not closure_domains:
+            errors.append(
+                "functional_ai_closure.required_state_domains must be a non-empty list"
+            )
+        else:
+            for index, domain_id in enumerate(closure_domains):
+                if not isinstance(domain_id, str) or not domain_id.strip():
+                    errors.append(
+                        "functional_ai_closure.required_state_domains"
+                        f"[{index}] must be a non-empty string"
+                    )
+                    continue
+                required_domains.add(domain_id)
+    else:
+        errors.append(
+            "construction contract must define functional_ai_closure for state topology"
+        )
+
     missing_domains = sorted(required_domains - set(domains))
     if missing_domains:
         errors.append(
