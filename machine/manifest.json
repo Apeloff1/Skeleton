@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.9",
+  "schema_version": "6.0",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -603,6 +603,16 @@
         "chore/housekeeping-general-runner-20260918"
       ],
       "note": "One distinct 4-file housekeeping/backlog delta staged; zero-file housekeeping branch remains lineage only."
+    },
+    "validation_docs_perf_wave": {
+      "new_prs": [
+        "#1878",
+        "#1879",
+        "#1880",
+        "#1881",
+        "#1882"
+      ],
+      "note": "Staged 5 distinct test/docs/performance deltas; all were file-level changes versus assembly."
     }
   },
   "integrated_domains": [
