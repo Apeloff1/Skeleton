@@ -371,7 +371,7 @@
       "stage": 0,
       "parallel_lane": "cost-admission",
       "objective": "Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S0-COST-01"
       ],
