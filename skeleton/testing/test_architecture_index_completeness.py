@@ -28,6 +28,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["adaptive_absorption_fabric"].endswith(
         "adaptive-absorption-fabric.md"
     )
+    assert documents["exotic_architecture_lab"] == "docs/architecture/exotic-architecture-lab.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -59,6 +60,9 @@ def test_master_plan_indexes_optimizer_and_massive_upgrade_tracks() -> None:
     index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
     catalog = (
         root / "docs" / "architecture" / "research-source-catalog.md"
+    ).read_text(encoding="utf-8")
+    manual = (
+        root / "docs" / "architecture" / "exotic-architecture-lab.md"
     ).read_text(encoding="utf-8")
 
     assert "Track Z — Deep internals and optimizer control plane" in plan
@@ -216,3 +220,8 @@ def test_exotic_plan_and_research_canon_are_canonical() -> None:
     assert "Universal YOCO" in catalog
     assert "BitNet" in catalog
     assert "Track AC anti-canon" in catalog
+    assert "Architecture coordinate system" in manual
+    assert "ExoticCandidate manifest" in manual
+    assert "Mutable neural state protocol" in manual
+    assert "Exotic falsification battery" in manual
+    assert "There is no AC → production shortcut." in manual
