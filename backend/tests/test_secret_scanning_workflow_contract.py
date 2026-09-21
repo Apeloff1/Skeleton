@@ -68,8 +68,8 @@ def test_feature_pushes_coalesce_but_default_branch_evidence_does_not() -> None:
 
     assert "group: secret-scanning-${{ github.event.pull_request.number || github.ref }}" in text
     assert "github.event_name == 'pull_request'" in text
-    assert "github.event_name == 'push'" in text
-    assert "github.ref_name != github.event.repository.default_branch" in text
+    assert "branches: [main]" in text
+    assert "github.event_name == 'push'" not in text.split("cancel-in-progress:", 1)[1].split("\n", 1)[0]
 
 
 def test_default_branch_push_range_binds_exact_before_and_current_commit() -> None:
