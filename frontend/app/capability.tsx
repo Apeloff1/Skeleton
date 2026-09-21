@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,6 +10,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { capabilityById } from '../src/product/productCatalog';
+import { getProductControlStatus } from '../src/product/productControlClient';
+import type { ActionReadiness } from '../src/product/productControlClient';
 
 const PILLAR_COPY = {
   create: 'CREATE',
@@ -23,6 +25,29 @@ export default function CapabilityRoute() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const capability = useMemo(() => (id ? capabilityById(id) : undefined), [id]);
+  const [readiness, setReadiness] = useState<readonly ActionReadiness[] | null>(null);
+
+  useEffect(() => {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    getProductControlStatus('', controller?.signal)
+      .then((result) => {
+        if (!controller?.signal.aborted && result.ok && result.data) {
+          setReadiness(result.data.readiness.actions);
+        }
+      })
+      .catch(() => {
+        // Readiness is operator telemetry, not a navigation prerequisite.
+      });
+    return () => {
+      try { controller?.abort(); } catch {}
+    };
+  }, []);
+
+  const capabilityReadiness = useMemo(
+    () => readiness?.filter((item) => item.capability_id === capability?.id) ?? null,
+    [capability?.id, readiness],
+  );
+  const nativeReadyCount = capabilityReadiness?.filter((item) => item.state === 'native_ready').length ?? null;
 
   if (!capability) {
     return (
@@ -58,12 +83,36 @@ export default function CapabilityRoute() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Actions</Text>
-          <Text style={styles.sectionMeta}>{capability.actions.length} canonical</Text>
+          <Text style={styles.sectionMeta}>
+            {capability.actions.length} canonical
+            {nativeReadyCount !== null ? ` · ${nativeReadyCount} native ready` : ''}
+          </Text>
         </View>
 
-        {capability.actions.map((action) => (
+        {capability.actions.map((action) => {
+          const actionReadiness = capabilityReadiness?.find((item) => item.action === action.operation);
+          const readinessLabel = actionReadiness?.state === 'native_ready'
+            ? 'NATIVE READY'
+            : actionReadiness
+              ? actionReadiness.state.replace(/_/g, ' ').toUpperCase()
+              : 'READINESS UNKNOWN';
+          return (
           <View key={action.id} style={styles.actionCard}>
-            <Text style={styles.actionTitle}>{action.title}</Text>
+            <View style={styles.actionTop}>
+              <Text style={styles.actionTitle}>{action.title}</Text>
+              <Text
+                style={[
+                  styles.readinessBadge,
+                  actionReadiness?.state === 'native_ready'
+                    ? styles.readinessReady
+                    : actionReadiness
+                      ? styles.readinessBlocked
+                      : styles.readinessUnknown,
+                ]}
+              >
+                {readinessLabel}
+              </Text>
+            </View>
             <Text style={styles.actionDescription}>{action.description}</Text>
             <View style={styles.operationPill}>
               <Text style={styles.operationText}>{action.operation}</Text>
@@ -97,7 +146,8 @@ export default function CapabilityRoute() {
               ) : null}
             </View>
           </View>
-        ))}
+          );
+        })}
 
         <View style={styles.footerCard}>
           <Text style={styles.footerTitle}>Compatibility escape hatch</Text>
@@ -128,7 +178,12 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#F1F5F9', fontSize: 19, fontWeight: '900' },
   sectionMeta: { color: '#69758A', fontSize: 11, fontWeight: '700' },
   actionCard: { borderWidth: 1, borderColor: '#202737', borderRadius: 18, backgroundColor: '#0F141F', padding: 16 },
-  actionTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '800' },
+  actionTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  actionTitle: { color: '#F8FAFC', fontSize: 16, fontWeight: '800', flex: 1 },
+  readinessBadge: { fontSize: 8, fontWeight: '900', letterSpacing: 0.6, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5, overflow: 'hidden' },
+  readinessReady: { color: '#87E3A9', backgroundColor: '#12271D' },
+  readinessBlocked: { color: '#F2A0AE', backgroundColor: '#2B151A' },
+  readinessUnknown: { color: '#8E9AAF', backgroundColor: '#181E2A' },
   actionDescription: { color: '#95A1B4', fontSize: 12, lineHeight: 18, marginTop: 5 },
   operationPill: { alignSelf: 'flex-start', marginTop: 12, borderRadius: 9, backgroundColor: '#151B2B', paddingHorizontal: 9, paddingVertical: 6 },
   operationText: { color: '#8F9DFF', fontFamily: 'monospace', fontSize: 10 },
