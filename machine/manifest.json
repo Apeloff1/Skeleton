@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.0",
+  "schema_version": "4.1",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -370,6 +370,16 @@
         1874
       ],
       "note": "existing integration PRs reused where present; overlapping control-plane changes remain staged"
+    },
+    "security_reliability_contract_wave": {
+      "revalidated": 12,
+      "status": "staged",
+      "note": "repair intake, repo attention/bots/contracts, archive/import safety, and secret-scan contracts/evidence revalidated; existing integration PRs reused",
+      "unresolved_compare": [
+        "fix/deserialization-safety-hardening",
+        "fix/http-token-regex-hardening",
+        "fix/content-type-security-boundary"
+      ]
     }
   },
   "integrated_domains": [
