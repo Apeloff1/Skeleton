@@ -218,7 +218,7 @@ def test_structural_plane_owners_match_construction_and_zone_roots() -> None:
         )
 
 
-def test_structural_cross_zone_dependencies_follow_zone_dag_or_exact_exception() -> None:
+def test_structural_cross_zone_dependencies_follow_zone_dag_without_exceptions() -> None:
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
     construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
     blueprint = architecture["structural_blueprint"]
@@ -227,32 +227,29 @@ def test_structural_cross_zone_dependencies_follow_zone_dag_or_exact_exception()
         placement["plane"]: placement
         for placement in blueprint["plane_placements"]
     }
-    excepted_edges = {
-        (source_plane, exception["dependency_plane"])
-        for exception in blueprint["dependency_exceptions"]
-        for source_plane in exception["source_planes"]
-    }
 
-    observed_exceptions: set[tuple[str, str]] = set()
+    assert blueprint["dependency_exceptions"] == []
+
     for plane in construction["planes"]:
         source_zone = placements[plane["id"]]["zone"]
         for dependency in plane["depends_on"]:
             target_zone = placements[dependency]["zone"]
-            if source_zone == target_zone:
-                continue
-            if target_zone in zones[source_zone]["may_depend_on"]:
-                continue
-            edge = (plane["id"], dependency)
-            assert edge in excepted_edges
-            observed_exceptions.add(edge)
-
-    assert observed_exceptions == excepted_edges
+            assert (
+                source_zone == target_zone
+                or target_zone in zones[source_zone]["may_depend_on"]
+            ), (plane["id"], dependency)
 
 
-def test_structural_validator_rejects_missing_reverse_dependency_exception() -> None:
+def test_structural_validator_rejects_new_reverse_dependency_without_exception() -> None:
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
     broken = deepcopy(architecture)
-    broken["structural_blueprint"]["dependency_exceptions"] = []
+    placement = next(
+        item
+        for item in broken["structural_blueprint"]["plane_placements"]
+        if item["plane"] == "model-routing"
+    )
+    placement["zone"] = "application"
+    placement["owner"] = "backend/core/model_router.py"
     zones = {zone["id"]: zone for zone in broken["zones"]}
     errors: list[str] = []
 
@@ -262,6 +259,28 @@ def test_structural_validator_rejects_missing_reverse_dependency_exception() -> 
         "orchestration(engine) -> model-routing(application)" in error
         for error in errors
     )
+
+
+def test_acceptance_edges_match_construction_validates_without_affecting_dag() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    construction = _load(REPO_ROOT / "machine/ai_app_construction.json")
+    blueprint = architecture["structural_blueprint"]
+
+    architecture_edges = {
+        (item["source_plane"], item["target_plane"])
+        for item in blueprint["acceptance_edges"]
+    }
+    construction_edges = {
+        (plane["id"], target)
+        for plane in construction["planes"]
+        for target in plane.get("validates", [])
+    }
+
+    assert architecture_edges == construction_edges
+    assert (
+        "deployment-release",
+        "product-experience",
+    ) in architecture_edges
 
 
 def test_structural_validator_rejects_owner_outside_declared_zone() -> None:
@@ -292,10 +311,11 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
     assert summary["structure"] == {
         "levels": 5,
         "plane_placements": 27,
-        "composition_roots": 6,
+        "composition_roots": 7,
         "state_authorities": 13,
         "recovery_domains": 8,
-        "dependency_exceptions": 3,
+        "dependency_exceptions": 0,
+        "acceptance_edges": 3,
     }
 
 
