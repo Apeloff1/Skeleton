@@ -2079,7 +2079,7 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State technology and authority are not fully separated: backend RAG still stores authoritative-looking user progress/feedback/session records inside local Chroma; a durable reference OperationEnvelope repository with transactional outbox now exists, but production runtime binding and full authoritative-first recovery remain unproven.",
+      "gap": "State technology and authority are not fully separated: Jeeves RAG product state has been migrated to Mongo-first repositories with Chroma rebuildable projections, while production operation-repository binding, authoritative-first recovery, backup/restore rehearsal, and full derived-store loss recovery remain unproven.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2100,7 +2100,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "durable-operation-reference-and-transactional-outbox-added"
+      "verification_state": "rag-product-state-mongo-authority-added-operation-recovery-still-open"
     },
     {
       "id": "gap-cost-admission",
@@ -3386,10 +3386,14 @@
           "terminal operation state persistence",
           "transactional operation-state plus event-intent outbox",
           "retry-stable outbox event identity compatible with canonical stream",
-          "operation state reopen/corruption/outbox integration regressions"
+          "operation state reopen/corruption/outbox integration regressions",
+          "canonical Jeeves RAG learning-session, user-progress, co-coding and feedback state migrated to Mongo-first repositories",
+          "local Chroma user-owned state reduced to rebuildable semantic projections",
+          "legacy Chroma product-state import path with idempotent canonical identifiers",
+          "Chroma total-loss projection rebuild from canonical Mongo state",
+          "stale co-coding projection ownership fenced by canonical Mongo lookup"
         ],
         "remaining": [
-          "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
           "bind production orchestration paths to durable operation repository",
           "run durable outbox dispatcher as part of runtime lifecycle",
           "define production backup and retention policy for operation state",
@@ -6783,7 +6787,7 @@
   "state_authority_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress-p0",
     "gap": "gap-state-authority-convergence",
     "registry": "machine/state_topology.json",
     "objective": "Every logical state domain has exactly one durable authority, explicit derived projections, transactional/reconciliation semantics, migration ownership, restore order and failure behavior.",
@@ -6833,7 +6837,8 @@
       "expand -> migrate/backfill -> dual-read only when explicitly bounded -> cutover -> contract",
       "migration preserves canonical ids, tenant ownership, lifecycle status and provenance",
       "downgrade/rollback policy is defined before destructive schema removal",
-      "projection rebuild is never used as substitute for authoritative migration"
+      "projection rebuild is never used as substitute for authoritative migration",
+      "Jeeves RAG product-state cutover commits Mongo authority before best-effort Chroma projection and supports idempotent legacy import"
     ],
     "recovery_order": [
       "configuration/secrets and service identity",
@@ -6848,7 +6853,8 @@
       "authoritative store unavailable -> reject/defer writes; never fall back to derived store as authority",
       "derived index unavailable -> degrade retrieval/search while canonical records remain usable",
       "outbox dispatcher unavailable -> state commit may remain durable with pending delivery; reconciliation resumes later",
-      "corrupt version/lineage -> fail closed and surface operator repair requirement"
+      "corrupt version/lineage -> fail closed and surface operator repair requirement",
+      "Jeeves Chroma projection loss -> continue canonical Mongo reads/writes and rebuild projection from Mongo"
     ],
     "closure_evidence": [
       "state topology validation",
