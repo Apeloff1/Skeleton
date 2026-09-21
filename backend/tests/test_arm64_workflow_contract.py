@@ -13,5 +13,8 @@ def test_arm64_pr_close_is_zero_work_cancellation_tombstone() -> None:
     assert "types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]" in text
     assert 'group: arm64-${{ github.event.pull_request.number || github.ref }}' in text
     assert "cancel-in-progress: true" in text
-    assert "if: github.event_name != 'pull_request' || github.event.action != 'closed'" in text
+    assert "github.event_name != 'pull_request' ||" in text
+    assert "!github.event.pull_request.draft" in text
+    assert "github.event.action != 'converted_to_draft'" in text
+    assert "github.event.action != 'closed'" in text
     assert "runs-on: ubuntu-24.04-arm" in text
