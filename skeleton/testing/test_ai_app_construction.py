@@ -226,3 +226,22 @@ def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
     assert "durable stream storage adapter" not in package["progress"]["remaining"]
     assert "backend SSE or WebSocket transport" in package["progress"]["remaining"]
     assert "frontend reconnect/resume cursor" in package["progress"]["remaining"]
+
+
+def test_dependency_and_acceptance_relationships_are_separate() -> None:
+    contract = _contract()
+    planes = {plane["id"]: plane for plane in contract["planes"]}
+
+    assert contract["relationship_semantics"]["runtime_dependency"]["field"] == "depends_on"
+    assert contract["relationship_semantics"]["acceptance_target"]["field"] == "validates"
+    assert planes["model-routing"]["owner"] == "skeleton/frontier/model_routing.py"
+    assert "model-routing" in planes["orchestration"]["depends_on"]
+
+    release = planes["deployment-release"]
+    assert "application-api" not in release["depends_on"]
+    assert "product-experience" not in release["depends_on"]
+    assert set(release["validates"]) == {
+        "application-api",
+        "engine-api",
+        "product-experience",
+    }
