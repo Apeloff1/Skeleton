@@ -59,6 +59,12 @@ export type AppRuntimeService = {
   status: number | null;
   latency_ms: number;
   detail: string;
+  application?: {
+    name?: string;
+    version?: string;
+    component?: string;
+    ingress_prefix?: string;
+  };
 };
 
 export type AppRuntimeProduct = {
