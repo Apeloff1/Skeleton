@@ -33,6 +33,11 @@ python scripts/check_ai_p0_edge_case_matrix.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_p0_edge_case_matrix.py
 
+printf '\n== Full edge-case construction matrix ==\n'
+python scripts/check_ai_full_edge_case_matrix.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_full_edge_case_matrix.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
