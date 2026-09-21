@@ -40,10 +40,30 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: git config --global core.longpaths true
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/windows-installer.yml
+            /.dockerignore
+            /.env.example
+            /Dockerfile
+            /README.md
+            /docker-compose.yml
+            /docker-compose.hot.yml
+            /pyproject.toml
+            /requirements.txt
+            /backend/
+            /frontend/
+            /skeleton/
+            /scripts/
+            /packaging/
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
