@@ -146,6 +146,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     manifest = load_manifest()
 
     if command == "up":
+        if bool(args.production) and bool(args.hot):
+            print("--production and --hot are mutually exclusive")
+            return 2
         checks = preflight(root, runtime=True, manifest=manifest)
         if not checks_ok(checks):
             for check in checks:
@@ -153,9 +156,6 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print(f"[FAIL] {check.message}")
             print("application start aborted: runtime preflight failed")
             return 1
-        if bool(args.production) and bool(args.hot):
-            print("--production and --hot are mutually exclusive")
-            return 2
         mode = "production" if bool(args.production) else "development"
         exit_code = _run_compose(
             compose_command(
