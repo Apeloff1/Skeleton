@@ -181,7 +181,8 @@
     "scripts/check_state_topology.py",
     "skeleton/testing/test_state_topology.py",
     "machine/ai_runtime_schemas.json",
-    "machine/ai_implementation_handoff.json"
+    "machine/ai_implementation_handoff.json",
+    "machine/ai_closure_evidence.json"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -203,6 +204,7 @@
     "state_topology": "machine/state_topology.json",
     "state_topology_validator": "scripts/check_state_topology.py",
     "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
-    "implementation_handoff": "machine/ai_implementation_handoff.json"
+    "implementation_handoff": "machine/ai_implementation_handoff.json",
+    "closure_evidence_ledger": "machine/ai_closure_evidence.json"
   }
 }
