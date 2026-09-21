@@ -2079,7 +2079,7 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State technology and authority are not fully separated: Jeeves RAG product state has been migrated to Mongo-first repositories with Chroma rebuildable projections, while production operation-repository binding, authoritative-first recovery, backup/restore rehearsal, and full derived-store loss recovery remain unproven.",
+      "gap": "State authority convergence is partially implemented: Jeeves RAG product state is Mongo-authoritative and production Skeleton reasoning is bound to durable OperationEnvelope SQLite state with transactional outbox plus durable stream projection. Formal backup/restore rehearsal, full derived-store loss recovery, and broader cognitive execution/result/approval/usage ledger bindings remain open.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2100,7 +2100,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "rag-product-state-mongo-authority-added-operation-recovery-still-open"
+      "verification_state": "rag-and-production-operation-authority-bound-restore-and-cognitive-ledgers-open"
     },
     {
       "id": "gap-cost-admission",
@@ -3396,11 +3396,13 @@
           "local Chroma user-owned state reduced to rebuildable semantic projections",
           "legacy Chroma product-state import path with idempotent canonical identifiers",
           "Chroma total-loss projection rebuild from canonical Mongo state",
-          "stale co-coding projection ownership fenced by canonical Mongo lookup"
+          "stale co-coding projection ownership fenced by canonical Mongo lookup",
+          "production Skeleton intelligence/reason path bound to DurableOperationRuntime and canonical OperationEnvelope state",
+          "transactional outbox dispatcher runs after state commits, on startup reconciliation, and on bounded shutdown drain",
+          "production operation-state and operation-stream SQLite mounted on skeleton_data",
+          "operation state/event crash-window reconciliation and restart recovery regressions"
         ],
         "remaining": [
-          "bind production orchestration paths to durable operation repository",
-          "run durable outbox dispatcher as part of runtime lifecycle",
           "define production backup and retention policy for operation state",
           "prove Mongo authoritative restore before all derived index rebuilds",
           "run derived-store loss and rebuild drill"
@@ -6835,7 +6837,15 @@
     "operation_atomicity": {
       "preferred": "single durable transaction for operation/checkpoint/result and outbox intent where co-located",
       "fallback": "transactional outbox with stable event id + deterministic reconciliation",
-      "invariant": "completed operation cannot exist without its required canonical final result; terminal event cannot be the sole record of completion"
+      "invariant": "completed operation cannot exist without its required canonical final result; terminal event cannot be the sole record of completion",
+      "production_binding": {
+        "state": "skeleton/persistence/operation_runtime.py + SQLiteOperationStore",
+        "stream": "SQLiteOperationEventStore",
+        "service": "skeleton",
+        "persistent_volume": "skeleton_data",
+        "lifecycle": "startup reconciliation + post-commit dispatch + bounded shutdown drain",
+        "failure_rule": "operation state remains authoritative when stream delivery fails; unpublished outbox intent is retried idempotently"
+      }
     },
     "migration_policy": [
       "every authoritative collection/table has schema/index owner and version",
@@ -6867,7 +6877,10 @@
       "transaction/outbox fault injection",
       "Mongo backup restore drill",
       "derived-store total loss and rebuild",
-      "no authoritative record exists solely in process memory/Chroma/browser state"
+      "no authoritative record exists solely in process memory/Chroma/browser state",
+      "production reasoning OperationEnvelope binding",
+      "transactional outbox crash-after-append-before-ack reconciliation",
+      "operation runtime restart drain test"
     ]
   },
   "governance_runtime_blueprint": {
