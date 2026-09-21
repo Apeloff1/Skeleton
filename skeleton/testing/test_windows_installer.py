@@ -129,6 +129,35 @@ def test_windows_build_is_pinned_and_hashes_installer():
     assert "ISCC.exe" in source
 
 
+
+def test_windows_runtime_payload_respects_portable_path_budget():
+    runtime_roots = (
+        Path("backend"),
+        Path("frontend"),
+        Path("skeleton"),
+        Path("scripts"),
+        Path("packaging"),
+    )
+    violations: list[tuple[int, str]] = []
+
+    for root in runtime_roots:
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+            relative = path.as_posix()
+            if (
+                relative.startswith("backend/gameforge/jeeves/jeeves_mastermap_")
+                and relative.endswith(".json")
+            ):
+                continue
+            if len(relative) > 190:
+                violations.append((len(relative), relative))
+
+    assert violations == [], (
+        "Windows runtime payload exceeds the 190-character relative path budget: "
+        + ", ".join(f"{length}:{path}" for length, path in sorted(violations, reverse=True))
+    )
+
 def test_windows_workflow_builds_and_uploads_setup_exe():
     source = Path(".github/workflows/windows-installer.yml").read_text(encoding="utf-8")
 
