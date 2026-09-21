@@ -40,3 +40,21 @@ def test_build_queue_inherits_full_program_risk_counts() -> None:
         assert stats["catalog_total"] > 0
         assert stats["critical"] >= 0
         assert stats["high"] >= 0
+
+
+def test_priority_queue_exactly_matches_critical_and_high_catalog() -> None:
+    catalog = json.loads(checker.CATALOG.read_text(encoding="utf-8"))
+    priority = json.loads(checker.PRIORITY.read_text(encoding="utf-8"))
+    expected = {
+        e["id"] for e in catalog["entries"]
+        if e["criticality"] in {"critical", "high"}
+    }
+    actual = {item["id"] for item in priority["items"]}
+    assert actual == expected
+    assert priority["counts"]["total"] == len(expected)
+    assert priority["counts"]["P0"] == sum(
+        e["criticality"] == "critical" for e in catalog["entries"]
+    )
+    assert priority["counts"]["P1"] == sum(
+        e["criticality"] == "high" for e in catalog["entries"]
+    )
