@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.5",
+  "schema_version": "4.6",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -458,6 +458,26 @@
         "build incremental graph"
       ],
       "note": "existing integration PRs reused; large/overlapping waves remain staged rather than blindly merged"
+    },
+    "jeeves_frontier_wave": {
+      "revalidated": [
+        "Jeeves decision",
+        "Jeeves planning",
+        "evidence augmentation",
+        "frontier core/falsification/reasoning",
+        "machine repository control",
+        "merge blocker recovery",
+        "MW/pack A/pack C/pack J",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift managers",
+        "tools cockpit doctor"
+      ],
+      "held": [
+        "feat/jeeves-topology-learning",
+        "feat/pr-runner-hygiene-pack-e-20260920"
+      ],
+      "note": "topology learning remains a 129-commit reconciliation input; PR runner hygiene remains a 111-file wave"
     }
   },
   "integrated_domains": [
