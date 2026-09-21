@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.3",
+  "schema_version": "5.4",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -571,6 +571,28 @@
         "X-harness"
       ],
       "note": "Meaningful reconcile branches are already represented by integration PRs; zero-file deltas remain lineage only."
+    },
+    "fix_wave": {
+      "revalidated": [
+        "actions live-run reaper",
+        "actions queue pressure",
+        "ARM64 manifest",
+        "automation reconcile",
+        "automerge workflow run",
+        "autonomous PR URL evidence",
+        "autonomous supervisor current-main",
+        "backlog reasoner",
+        "branch archive",
+        "branch control",
+        "branch flow",
+        "build vault",
+        "builder repair receipts",
+        "canonical scan evidence"
+      ],
+      "lineage_only": [
+        "branch-clean-fail-closed current-main"
+      ],
+      "note": "revalidated fix branches are already represented in integration staging; no duplicate integration PRs created."
     }
   },
   "integrated_domains": [
