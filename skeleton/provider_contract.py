@@ -96,9 +96,26 @@ def _candidate_roots(explicit: str | Path | None) -> list[Path]:
 
 
 def locate_contract_root(explicit: str | Path | None = None) -> Path:
-    """Find the materialized construction root without consulting the network."""
+    """Find the materialized construction root without consulting the network.
 
-    for root in _candidate_roots(explicit):
+    An explicit root is authoritative: if it is incomplete, activation fails
+    closed instead of silently falling back to another checkout.
+    """
+
+    if explicit is not None:
+        root = Path(explicit).resolve()
+        if (
+            (root / "machine/manifest.json").is_file()
+            and (root / "machine/architecture.json").is_file()
+            and (root / "machine/ai_app_construction.json").is_file()
+            and (root / "docs/AI_APP_CONSTRUCTION_MANUAL.md").is_file()
+        ):
+            return root
+        raise ProviderArchitectureError(
+            "mandatory AI architecture contracts are not materialized at explicit root"
+        )
+
+    for root in _candidate_roots(None):
         if (
             (root / "machine/manifest.json").is_file()
             and (root / "machine/architecture.json").is_file()
