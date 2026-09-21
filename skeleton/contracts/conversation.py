@@ -151,9 +151,10 @@ class ConversationThread:
         _nonnegative_int(self.message_sequence, "message_sequence")
         _uuid(self.active_branch_id, "active_branch_id")
         try:
-            ConversationThreadState(self.state)
+            state = ConversationThreadState(self.state)
         except ValueError as exc:
             raise ConversationContractError("thread state is invalid") from exc
+        object.__setattr__(self, "state", state)
         _text(self.title, "title", max_length=200)
         object.__setattr__(self, "data_class", _data_class(self.data_class))
         if self.schema_version != CONVERSATION_SCHEMA_VERSION:
@@ -212,6 +213,7 @@ class ConversationMessage:
             author = ConversationAuthorType(self.author_type)
         except ValueError as exc:
             raise ConversationContractError("author_type is invalid") from exc
+        object.__setattr__(self, "author_type", author)
         _aware_utc(self.created_at, "created_at")
         _text(self.idempotency_key, "idempotency_key", max_length=1024)
 
