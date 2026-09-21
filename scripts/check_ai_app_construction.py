@@ -1391,6 +1391,180 @@ def _validate_acceptance_gates(
     return ids
 
 
+
+def _validate_functional_ai_closure(
+    contract: dict[str, Any],
+    planes: dict[str, dict[str, Any]],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, Any]:
+    """Fail closed on the mandatory fully-functional AI closure ledger."""
+
+    closure = contract.get("functional_ai_closure")
+    result = {
+        "blueprints": 0,
+        "required_envelopes": 0,
+        "required_state_domains": 0,
+    }
+    if not isinstance(closure, dict):
+        errors.append("functional_ai_closure must be an object")
+        return result
+    if closure.get("status") != "active":
+        errors.append("functional_ai_closure.status must be active")
+    if not isinstance(closure.get("version"), str) or not closure["version"].strip():
+        errors.append("functional_ai_closure.version must be non-empty")
+
+    raw_gaps = contract.get("gap_register")
+    gap_by_id = {
+        item.get("id"): item
+        for item in raw_gaps
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    } if isinstance(raw_gaps, list) else {}
+    raw_packages = contract.get("construction_work_packages")
+    package_by_id = {
+        item.get("id"): item
+        for item in raw_packages
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    } if isinstance(raw_packages, list) else {}
+
+    required_blueprints = closure.get("required_blueprints")
+    if not isinstance(required_blueprints, list) or not required_blueprints:
+        errors.append("functional_ai_closure.required_blueprints must be non-empty")
+    else:
+        seen_keys: set[str] = set()
+        seen_gaps: set[str] = set()
+        seen_packages: set[str] = set()
+        for index, item in enumerate(required_blueprints):
+            label = f"functional_ai_closure.required_blueprints[{index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            key = item.get("key")
+            gap_id = item.get("gap")
+            plane_id = item.get("plane")
+            package_id = item.get("work_package")
+            for field, value in (
+                ("key", key),
+                ("gap", gap_id),
+                ("plane", plane_id),
+                ("work_package", package_id),
+            ):
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"{label}.{field} must be non-empty")
+            if not all(isinstance(v, str) and v.strip() for v in (key, gap_id, plane_id, package_id)):
+                continue
+
+            if key in seen_keys:
+                errors.append(f"duplicate functional AI blueprint key: {key}")
+            seen_keys.add(key)
+            if gap_id in seen_gaps:
+                errors.append(f"functional AI gap scheduled by multiple blueprints: {gap_id}")
+            seen_gaps.add(gap_id)
+            if package_id in seen_packages:
+                errors.append(f"functional AI work package reused: {package_id}")
+            seen_packages.add(package_id)
+
+            blueprint = contract.get(key)
+            if not isinstance(blueprint, dict):
+                errors.append(f"functional AI blueprint missing/object required: {key}")
+            else:
+                if blueprint.get("schema_version") != 1:
+                    errors.append(f"functional AI blueprint {key}.schema_version must be 1")
+                if not isinstance(blueprint.get("status"), str) or not blueprint["status"].strip():
+                    errors.append(f"functional AI blueprint {key}.status must be non-empty")
+                if blueprint.get("gap") != gap_id:
+                    errors.append(
+                        f"functional AI blueprint {key}.gap must be {gap_id!r}"
+                    )
+
+            gap = gap_by_id.get(gap_id)
+            if not isinstance(gap, dict):
+                errors.append(f"functional AI blueprint {key} references missing gap {gap_id!r}")
+            else:
+                if gap.get("status") != "open":
+                    errors.append(
+                        f"functional AI gap {gap_id} must remain open until closure evidence updates the ledger"
+                    )
+                if gap.get("priority") != "P0":
+                    errors.append(f"functional AI gap {gap_id} must be P0")
+                if gap.get("plane") != plane_id:
+                    errors.append(
+                        f"functional AI gap {gap_id}.plane must be {plane_id!r}"
+                    )
+
+            plane = planes.get(plane_id)
+            if plane is None:
+                errors.append(
+                    f"functional AI blueprint {key} references unknown plane {plane_id!r}"
+                )
+            elif gap is not None and gap.get("status") == "open" and plane.get("state") != "partial":
+                errors.append(
+                    f"functional AI plane {plane_id} must remain partial while {gap_id} is open"
+                )
+
+            package = package_by_id.get(package_id)
+            if not isinstance(package, dict):
+                errors.append(
+                    f"functional AI blueprint {key} references missing work package {package_id!r}"
+                )
+            elif package.get("gap") != gap_id:
+                errors.append(
+                    f"functional AI work package {package_id}.gap must be {gap_id!r}"
+                )
+        result["blueprints"] = len(seen_keys)
+
+    required_envelopes = _nonempty_strings(
+        closure.get("required_envelopes"),
+        label="functional_ai_closure.required_envelopes",
+        errors=errors,
+    )
+    envelopes = contract.get("canonical_envelopes")
+    if not isinstance(envelopes, dict):
+        errors.append("functional AI closure requires canonical_envelopes object")
+    else:
+        for envelope_id in required_envelopes:
+            if envelope_id not in envelopes:
+                errors.append(
+                    f"functional AI required canonical envelope missing: {envelope_id}"
+                )
+    result["required_envelopes"] = len(required_envelopes)
+
+    required_domains = _nonempty_strings(
+        closure.get("required_state_domains"),
+        label="functional_ai_closure.required_state_domains",
+        errors=errors,
+    )
+    try:
+        topology = _load(repo_root / Path("machine/state_topology.json"))
+    except ValueError as exc:
+        errors.append(str(exc))
+    else:
+        domains = topology.get("state_domains")
+        domain_ids = {
+            item.get("id")
+            for item in domains
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        } if isinstance(domains, list) else set()
+        for domain_id in required_domains:
+            if domain_id not in domain_ids:
+                errors.append(
+                    f"functional AI required state domain missing: {domain_id}"
+                )
+    result["required_state_domains"] = len(required_domains)
+
+    closure_order = _nonempty_strings(
+        closure.get("closure_order"),
+        label="functional_ai_closure.closure_order",
+        errors=errors,
+    )
+    if not closure_order:
+        errors.append("functional_ai_closure.closure_order must not be empty")
+    if not isinstance(closure.get("invariant"), str) or not closure["invariant"].strip():
+        errors.append("functional_ai_closure.invariant must be non-empty")
+
+    return result
+
+
 def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, Any]]:
     errors: list[str] = []
     try:
@@ -1411,6 +1585,9 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     )
     provider_surfaces = _validate_provider_surfaces(contract, repo_root, errors)
     ledger = _validate_construction_ledger(contract, planes, repo_root, errors)
+    functional_ai = _validate_functional_ai_closure(
+        contract, planes, repo_root, errors
+    )
     operation_stream = _validate_operation_stream_contracts(
         contract, repo_root, errors
     )
@@ -1448,6 +1625,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "automation_providers": automation_providers,
         "provider_surfaces": provider_surfaces,
         "construction_ledger": ledger,
+        "functional_ai": functional_ai,
         "operation_stream": operation_stream,
         "provider_documents": must_read,
         "acceptance_gates": gates,
