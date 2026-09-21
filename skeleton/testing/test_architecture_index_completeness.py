@@ -49,3 +49,23 @@ def test_evidence_states_include_negative_and_mixed_results() -> None:
 
     assert {"foundational", "replicated", "frontier", "emerging"} <= states
     assert {"mixed", "negative", "superseded"} <= states
+
+
+def test_master_plan_indexes_optimizer_and_massive_upgrade_tracks() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+    index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
+    catalog = (
+        root / "docs" / "architecture" / "research-source-catalog.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Track Z — Deep internals and optimizer control plane" in plan
+    assert "Track AA — Rare massive upgrades and full-stack step changes" in plan
+    assert "**Z** — deep internals and optimizer control plane" in index
+    assert "**AA** — rare massive upgrades and full-stack step changes" in index
+    assert "Optimizer internals canon and challenger set" in catalog
+    assert "Massive-upgrade source seeds" in catalog
+    assert "signoff_required_for_implementation_claims: true" in plan
+    assert "production_authority_granted: false" in plan
