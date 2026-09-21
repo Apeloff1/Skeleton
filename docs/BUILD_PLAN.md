@@ -11,6 +11,7 @@ Scientific promotion contract: [architecture/research-evidence-evolution.md](arc
 Historical/frontier research catalog: [architecture/research-source-catalog.md](architecture/research-source-catalog.md)
 Exotic architecture manual: [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md)
 Frontier research atlas: [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md)
+Research experiment protocols: [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md)
 
 ## 0. Construction constitution
 
@@ -3281,6 +3282,90 @@ A retired debt can reopen after:
 
 **Gate:** "paper says so" cannot retire local debt.
 
+### AD61. Research experiment protocol registry — ⬜
+
+Maintain RXP001–RXP035 as canonical experiment designs.
+
+Every RXP protocol declares:
+
+- question/hypothesis;
+- null hypothesis where meaningful;
+- variables;
+- controls;
+- held-constant dimensions;
+- tuning budget;
+- primary/secondary metrics;
+- stop/failure rules;
+- artifacts;
+- decision vocabulary;
+- research-debt targets.
+
+### AD62. Experiment pre-registration envelope — ⬜
+
+Before expensive or promotion-relevant runs, freeze:
+
+- primary metric;
+- baseline;
+- key hyperparameter range;
+- success/failure threshold;
+- stop rule;
+- evaluation set;
+- analysis plan.
+
+Post-hoc changes are allowed only if disclosed and marked exploratory.
+
+### AD63. Experiment result state machine — ⬜
+
+Allowed terminal/summary states:
+
+```text
+SUPPORTED_IN_SCOPE
+PARTIALLY_SUPPORTED
+NULL_RESULT
+FALSIFIED_IN_SCOPE
+INCONCLUSIVE_VARIANCE
+INCONCLUSIVE_RESOURCE_LIMIT
+INVALID_METHOD
+INVALID_BASELINE
+INVALID_EVALUATION
+REPRODUCTION_FAILED
+```
+
+**Gate:** non-positive results are not automatically relabeled "needs more scale."
+
+### AD64. Experiment artifact integrity — ⬜
+
+Before results enter the claim graph, require:
+
+- immutable code commit;
+- config digest;
+- dataset manifest;
+- model artifact identity;
+- evaluator version;
+- hardware/software manifest;
+- retained failures;
+- baseline-parity review;
+- raw evidence reference.
+
+### AD65. Research experiment sequencing — ⬜
+
+Execute high-information cheap falsification before expensive scale-up.
+
+Default first wave:
+
+1. dense baseline/scaling;
+2. retrieval/context ladder;
+3. test-time scaling matrix;
+4. memory belief-revision/prospective-memory protocols;
+5. tool metadata adversary;
+6. serving crossover;
+7. optimizer geometry;
+8. synthetic-data factorial;
+9. monitorability drift;
+10. research-agent anti-cheating.
+
+Expensive Track AC/AA candidates wait until applicable foundation/eval/manifest gates exist.
+
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
 ---
@@ -3356,8 +3441,9 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
 29. 🔨 Establish Track AD research saturation: normalize priority sources, verify source/venue status, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
 30. 🧪 Execute the AD high-information experiment queue plus FD001–FD016 source-verified frontier-delta experiments before expensive full-scale architecture commitments.
-31. ⬜ Close or explicitly scope material RDE research debt and resolve/document CX contradictions before default promotion.
-32. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
+31. ⬜ Instantiate RXP001–RXP035 experiment manifests and execute the first-wave protocols in evidence-value order.
+32. ⬜ Close or explicitly scope material RDE research debt and resolve/document CX contradictions before default promotion.
+33. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
 Parallel research is allowed where isolation is real. Production-readiness gates are not bypassed to gain speed.
 
