@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from skeleton.app.assembly import load_manifest
 from skeleton.app.bootstrap import public_bootstrap_payload
 from core.databases import core_db
+from core.product_control_runtime import public_readiness
 
 _MANIFEST = load_manifest()
 router = APIRouter(prefix=_MANIFEST.public_contract["prefix"], tags=["application"])
@@ -114,6 +115,32 @@ async def _runtime_status(timeout_ms: int) -> dict[str, object]:
         engine,
         mongo,
     ]
+    product_readiness: dict[str, object]
+    try:
+        report = public_readiness()
+        product_readiness = {
+            "available": True,
+            "canonical_actions": int(report.get("canonical_actions", 0)),
+            "ready_actions": int(report.get("ready_actions", 0)),
+            "ready_pct": float(report.get("ready_pct", 0.0)),
+            "governed_unbound": int(report.get("governed_unbound", 0)),
+            "unsafe_actions": int(report.get("unsafe_actions", 0)),
+            "policy_gaps": int(report.get("policy_gaps", 0)),
+            "attestation_sha256": str(report.get("attestation_sha256", "")),
+        }
+    except Exception as exc:
+        product_readiness = {
+            "available": False,
+            "canonical_actions": 0,
+            "ready_actions": 0,
+            "ready_pct": 0.0,
+            "governed_unbound": 0,
+            "unsafe_actions": 0,
+            "policy_gaps": 0,
+            "attestation_sha256": "",
+            "detail": type(exc).__name__,
+        }
+
     return {
         "ok": all(bool(item["ok"]) for item in services),
         "checked_at": datetime.now(timezone.utc).isoformat(),
@@ -121,6 +148,7 @@ async def _runtime_status(timeout_ms: int) -> dict[str, object]:
         "contract": bootstrap["contract"],
         "scope": "public-runtime",
         "services": services,
+        "product": product_readiness,
     }
 
 
