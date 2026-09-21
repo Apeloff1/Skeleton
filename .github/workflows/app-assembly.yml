@@ -35,8 +35,11 @@ on:
       - "skeleton/context/sources/**"
       - "skeleton/testing/test_context_compiler.py"
       - "skeleton/persistence/operation_store.py"
+      - "skeleton/persistence/operation_runtime.py"
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/testing/test_operation_store.py"
+      - "skeleton/testing/test_operation_runtime.py"
+      - "skeleton/testing/test_operation_server_binding.py"
       - "skeleton/testing/test_conversation_repository.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
@@ -204,6 +207,7 @@ jobs:
           skeleton/contracts/conversation.py skeleton/contracts/context.py
           skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py
+          skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
           backend/core/operation_stream_transport.py backend/routes/operation_stream.py
           backend/core/conversations.py backend/routes/conversations.py
@@ -250,6 +254,8 @@ jobs:
           skeleton/testing/test_tenant_quota_sqlite.py
           skeleton/testing/test_operation_contract.py
           skeleton/testing/test_operation_store.py
+          skeleton/testing/test_operation_runtime.py
+          skeleton/testing/test_operation_server_binding.py
           skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_operation_stream.py
