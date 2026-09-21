@@ -15,7 +15,7 @@ def _canonical_application() -> dict[str, object]:
     return dict(public_bootstrap_payload()["application"])
 
 # Version Info
-SYSTEM_VERSION = "10.0.0"
+SYSTEM_VERSION = "11.0.0"
 SYSTEM_CODENAME = "CS Bible Edition"
 SYSTEM_BUILD = "2026.02.22-PRODUCTION"
 
@@ -44,12 +44,14 @@ SYSTEM_FEATURES = [
 async def root():
     """Root endpoint with version info"""
     return {
-        "name": "CodeDock Quantum Nexus",
+        "name": "Skeleton Application API",
+        "legacy_name": "CodeDock Quantum Nexus",
         "version": SYSTEM_VERSION,
         "codename": SYSTEM_CODENAME,
         "build": SYSTEM_BUILD,
         "features": SYSTEM_FEATURES,
         "status": "operational",
+        "component": "backend",
         "architecture": "modular",
         "canonical_application": _canonical_application()
     }
