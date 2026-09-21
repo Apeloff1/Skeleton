@@ -14,6 +14,7 @@ on:
       - "skeleton/testing/test_ai_master_plan.py"
       - "skeleton/testing/test_ai_edge_case_catalog.py"
       - "skeleton/testing/test_ai_p0_edge_case_matrix.py"
+      - "skeleton/testing/test_ai_full_edge_case_matrix.py"
       - "skeleton/testing/test_capability_interfaces.py"
       - "skeleton/testing/test_state_topology.py"
       - "skeleton/testing/test_provider_contract.py"
@@ -64,6 +65,7 @@ on:
       - "scripts/check_ai_master_plan.py"
       - "scripts/check_ai_edge_case_catalog.py"
       - "scripts/check_ai_p0_edge_case_matrix.py"
+      - "scripts/check_ai_full_edge_case_matrix.py"
       - "scripts/check_capability_interfaces.py"
       - "scripts/check_state_topology.py"
       - "scripts/check_provider_bootstrap.py"
@@ -74,6 +76,7 @@ on:
       - "machine/ai_master_plan.json"
       - "machine/ai_edge_case_catalog.json"
       - "machine/ai_p0_edge_case_matrix.json"
+      - "machine/ai_full_edge_case_matrix.json"
       - "machine/capability_interfaces.json"
       - "machine/state_topology.json"
       - "docs/ARCHITECTURE_MAP.md"
@@ -128,6 +131,9 @@ jobs:
 
       - name: Validate P0 edge-case construction matrix
         run: python scripts/check_ai_p0_edge_case_matrix.py
+
+      - name: Validate full edge-case construction matrix
+        run: python scripts/check_ai_full_edge_case_matrix.py
 
       - name: Validate capability interface registry
         run: python scripts/check_capability_interfaces.py
@@ -191,7 +197,7 @@ jobs:
           backend/core/ai_provider.py backend/core/provider_architecture.py
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
-          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_capability_interfaces.py
+          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_capability_interfaces.py
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
@@ -207,6 +213,7 @@ jobs:
           skeleton/testing/test_ai_master_plan.py
           skeleton/testing/test_ai_edge_case_catalog.py
           skeleton/testing/test_ai_p0_edge_case_matrix.py
+          skeleton/testing/test_ai_full_edge_case_matrix.py
           skeleton/testing/test_capability_interfaces.py
           skeleton/testing/test_state_topology.py
           skeleton/testing/test_provider_contract.py
