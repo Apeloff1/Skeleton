@@ -1800,7 +1800,8 @@
         "apply deterministic priority/relevance/recency selection and compaction",
         "preserve source ids and citation/tool/artifact provenance through trimming/summarization",
         "separate immutable policy/instructions from untrusted evidence content",
-        "make direct feature-level ProviderRequest prompt/history assembly compatibility-only"
+        "make direct feature-level ProviderRequest prompt/history assembly compatibility-only",
+        "migrate legacy hard-coded system/control prompts onto versioned instruction-policy identities consumed by the ContextCompiler"
       ],
       "closure_evidence": [
         "deterministic context snapshot/digest tests",
@@ -1812,7 +1813,8 @@
         "oversized tool/artifact result externalization tests",
         "summary/compaction provenance tests",
         "citation/source ids survive context projection",
-        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes"
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
+        "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "verification_state": "universal-context-contract-and-compiler-added",
       "progress": {
@@ -3514,7 +3516,8 @@
         "implement remaining memory/artifact/tool/skill source adapters",
         "bind context snapshot/digest to AgentTurn and ProviderRequest",
         "add provenance-preserving compaction",
-        "migrate direct feature prompt/history assembly to compatibility delegation"
+        "migrate direct feature prompt/history assembly to compatibility delegation",
+        "migrate duplicate route/service system prompts to the versioned instruction-policy registry"
       ],
       "tests": [
         "deterministic packing",
@@ -3525,7 +3528,8 @@
         "oversized evidence",
         "compaction provenance",
         "context digest stability",
-        "legacy route delegation"
+        "legacy route delegation",
+        "instruction policy source ownership/parity"
       ],
       "exit": "no canonical AI execution constructs provider prompt/history directly outside the ContextCompiler + provider projection boundary",
       "planned_outputs": [
@@ -3533,7 +3537,9 @@
         "skeleton/context/compiler.py",
         "skeleton/context/policy.py",
         "skeleton/context/sources/",
-        "skeleton/testing/test_context_compiler.py"
+        "skeleton/testing/test_context_compiler.py",
+        "skeleton/context/instruction_policy.py",
+        "skeleton/testing/test_instruction_policy.py"
       ],
       "progress": {
         "state": "in_progress",
@@ -8748,6 +8754,40 @@
       "rollback uses prior immutable version",
       "experiment assignment stability",
       "untrusted content cannot register/activate policy"
+    ],
+    "legacy_source_inventory": [
+      {
+        "source": "backend/routes/ai.py",
+        "symbol": "AI_MODES[*].system_prompt",
+        "current_role": "route-owned code-assistance system prompts for explain/debug/optimize/complete/refactor/document/test_gen/security_audit/convert/review",
+        "target": "one canonical versioned instruction policy per code-assistance mode; route resolves policy by capability/mode"
+      },
+      {
+        "source": "backend/services/ai_assistant_svc.py",
+        "symbol": "AIAssistantService.assist prompts map",
+        "current_role": "second code-assistance prompt table overlapping backend/routes/ai.py modes",
+        "target": "compatibility service consumes the same canonical policies as routes; no independent prompt definitions"
+      },
+      {
+        "source": "backend/routes/image_generation.py",
+        "symbol": "enhance_prompt instructions + enhancement_prompt template",
+        "current_role": "route-owned image-prompt enhancement instruction",
+        "target": "versioned image-prompt-enhancement policy resolved through canonical instruction registry"
+      }
+    ],
+    "convergence_rules": [
+      "one active platform/product/capability-mode instruction policy per effective scope unless an explicit experiment assignment selects a variant",
+      "duplicate compatibility surfaces consume the same policy identity/version rather than maintaining equivalent strings",
+      "policy content may live in canonical code/config storage, but identity/version/digest and activation state are centrally recorded",
+      "hard-coded feature prompts are migration sources, not permanent policy owners",
+      "source scans may allow user prompt templates/data formatting, but control/system instruction literals must resolve to declared policy identity"
+    ],
+    "closure_evidence": [
+      "legacy code-assistance route/service prompt parity tests",
+      "instruction policy source scan finds no undeclared active control prompt owners in canonical AI paths",
+      "context snapshot records policy ids/versions/digests",
+      "policy rollback reproduces prior context digest/behavior configuration",
+      "image prompt enhancement uses declared policy identity"
     ]
   },
   "capability_registry": {
