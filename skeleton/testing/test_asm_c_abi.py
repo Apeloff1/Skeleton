@@ -164,3 +164,58 @@ def test_c_header_links_and_executes_public_abi(tmp_path: Path) -> None:
         f"{executed.stderr or executed.stdout}"
     )
     assert "skeleton-asm-c-abi: OK" in executed.stdout
+
+
+def test_shared_library_exports_public_symbols_and_nonexec_stack(
+    tmp_path: Path,
+) -> None:
+    preflight = AsmVectorAccelerator.preflight(cache_dir=tmp_path)
+    if not preflight.build_ready:
+        pytest.skip("host cannot build the Assembly accelerator")
+
+    readelf = shutil.which("readelf")
+    nm = shutil.which("nm")
+    if readelf is None or nm is None:
+        pytest.skip("binutils readelf/nm unavailable")
+
+    library = AsmVectorAccelerator.build(output_dir=tmp_path)
+
+    symbols = subprocess.run(
+        [nm, "-D", "--defined-only", str(library)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert symbols.returncode == 0, symbols.stderr or symbols.stdout
+    expected = {
+        "skeleton_asm_abi_version",
+        "skeleton_asm_capabilities",
+        "skeleton_asm_dot_f32",
+        "skeleton_asm_l2_sq_f32",
+        "skeleton_asm_dot_batch_f32",
+        "skeleton_asm_dot_matrix_f32",
+    }
+    for symbol in expected:
+        assert symbol in symbols.stdout
+
+    if preflight.architecture == "x86_64":
+        assert "skeleton_asm_dot_matrix_f32_avx" in symbols.stdout
+
+    program_headers = subprocess.run(
+        [readelf, "-W", "-l", str(library)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert program_headers.returncode == 0, (
+        program_headers.stderr or program_headers.stdout
+    )
+    stack_lines = [
+        line
+        for line in program_headers.stdout.splitlines()
+        if "GNU_STACK" in line
+    ]
+    assert len(stack_lines) == 1
+    assert "RWE" not in stack_lines[0]
