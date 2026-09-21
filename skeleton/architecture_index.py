@@ -90,6 +90,7 @@ CANONICAL_DOCUMENTS = {
     "research_saturation_checklist": "docs/architecture/research-saturation-checklist-2026.md",
     "research_historical_lineage": "docs/architecture/research-historical-lineage.md",
     "research_source_topology": "docs/architecture/research-source-topology.md",
+    "research_dependency_map": "docs/architecture/research-dependency-map-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -188,6 +189,18 @@ PLAN_CHECKPOINTS = {
         "experiment_protocol_range": ("RXP001", "RXP050"),
         "production_authority_granted": False,
         "research_refresh_required": True,
+    },
+    "PLAN-20260922-RESEARCH-DEPENDENCY-MAP": {
+        "created_at": "2026-09-22T00:06:00+02:00",
+        "tracks": ("AD",),
+        "domain_count": 19,
+        "research_question_range": ("RQ001", "RQ067"),
+        "research_debt_range": ("RDE001", "RDE036"),
+        "experiment_protocol_range": ("RXP001", "RXP050"),
+        "historical_lineage_range": ("HL001", "HL110"),
+        "source_family_range": ("RS001", "RS055"),
+        "blocking_edges_must_be_explicit": True,
+        "production_authority_granted": False,
     },
     "PLAN-20260921-RESEARCH-SOURCE-TOPOLOGY": {
         "created_at": "2026-09-21",
