@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.2.0",
+  "topology_version": "1.3.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -480,7 +480,7 @@
       "migration": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
+      "gap": "gap-tool-runtime-convergence",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/skills/manifest.py"
@@ -505,7 +505,7 @@
       "migration": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-cognitive-execution-loop",
+      "gap": "gap-tool-runtime-convergence",
       "evidence": [
         "machine/ai_app_construction.json",
         "skeleton/contracts/operation.py"
