@@ -33,6 +33,7 @@ def public_bootstrap_payload(
                 "canonical": service.canonical,
                 "profile": service.profile,
                 "health_path": service.health_path,
+                "ingress_prefix": service.ingress_prefix,
                 "depends_on": list(service.depends_on),
                 "default": service.name in default_names,
                 "full": service.name in full_names,
