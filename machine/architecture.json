@@ -566,5 +566,469 @@
       "contract": "skeleton/frontier/operation_stream.py",
       "security": "operation scoped; bounded JSON payload; no secret-bearing raw logs; replay cursor validated"
     }
-  ]
+  ],
+  "structural_blueprint": {
+    "schema_version": 1,
+    "structure_tag": "structure-map/v1.0",
+    "purpose": "Bind repository roots, runtime zones, capability planes, physical ownership, state authority, composition roots, and recovery domains into one validator-enforced structural model.",
+    "levels": [
+      {
+        "id": "L0",
+        "name": "repository-root",
+        "unit": "canonical root",
+        "rule": "A top-level live owner must be declared in canonical_roots before it can own runtime behavior."
+      },
+      {
+        "id": "L1",
+        "name": "runtime-zone",
+        "unit": "ownership zone",
+        "rule": "Zones define legal dependency direction and forbidden ownership."
+      },
+      {
+        "id": "L2",
+        "name": "capability-plane",
+        "unit": "AI construction plane",
+        "rule": "Every construction plane is placed exactly once in one runtime zone."
+      },
+      {
+        "id": "L3",
+        "name": "ownership-unit",
+        "unit": "package or module",
+        "rule": "Each plane has one materialized canonical owner inside its assigned zone."
+      },
+      {
+        "id": "L4",
+        "name": "contract-surface",
+        "unit": "interface, envelope, or state authority",
+        "rule": "Cross-boundary behavior is explicit, versionable, testable, and receipt-bearing where authority changes."
+      }
+    ],
+    "dependency_rules": {
+      "plane_owner_must_materialize": true,
+      "plane_owner_must_be_inside_assigned_zone": true,
+      "construction_plane_must_be_placed_exactly_once": true,
+      "cross_zone_plane_dependency_must_follow_zone_dag": true,
+      "transitional_root_may_not_own_plane": true,
+      "composition_roots_may_wire_but_not_redefine_capability_ownership": true,
+      "state_class_has_single_authority": true
+    },
+    "plane_placements": [
+      {
+        "plane": "foundation",
+        "zone": "engine",
+        "owner": "skeleton/kernel",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "identity",
+        "zone": "engine",
+        "owner": "skeleton/api",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "configuration-secrets",
+        "zone": "engine",
+        "owner": "skeleton/config",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "model-provider",
+        "zone": "engine",
+        "owner": "skeleton/provider_runtime.py",
+        "unit_type": "module",
+        "boundary_class": "provider-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "model-routing",
+        "zone": "application",
+        "owner": "backend/core/model_router.py",
+        "unit_type": "module",
+        "boundary_class": "policy-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "prompt-context",
+        "zone": "engine",
+        "owner": "skeleton/context",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "orchestration",
+        "zone": "engine",
+        "owner": "skeleton/intelligence",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "reasoning-verification",
+        "zone": "engine",
+        "owner": "skeleton/intelligence",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "tool-runtime",
+        "zone": "engine",
+        "owner": "skeleton/skills",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "memory",
+        "zone": "engine",
+        "owner": "skeleton/memory",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "retrieval",
+        "zone": "engine",
+        "owner": "skeleton/retrieval",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "data-persistence",
+        "zone": "engine",
+        "owner": "skeleton/persistence",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "jobs-durability",
+        "zone": "engine",
+        "owner": "skeleton/agents",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "artifact-files",
+        "zone": "engine",
+        "owner": "skeleton/artifact_plane",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "application-api",
+        "zone": "application",
+        "owner": "backend",
+        "unit_type": "package",
+        "boundary_class": "service-boundary",
+        "exposure": "externally-reachable"
+      },
+      {
+        "plane": "engine-api",
+        "zone": "engine",
+        "owner": "skeleton/api",
+        "unit_type": "package",
+        "boundary_class": "service-boundary",
+        "exposure": "externally-reachable"
+      },
+      {
+        "plane": "product-experience",
+        "zone": "product",
+        "owner": "frontend",
+        "unit_type": "package",
+        "boundary_class": "product-shell",
+        "exposure": "externally-reachable"
+      },
+      {
+        "plane": "streaming-realtime",
+        "zone": "application",
+        "owner": "backend",
+        "unit_type": "package",
+        "boundary_class": "transport-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "security-safety",
+        "zone": "engine",
+        "owner": "skeleton/security",
+        "unit_type": "package",
+        "boundary_class": "security-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "governance",
+        "zone": "engine",
+        "owner": "skeleton/vault",
+        "unit_type": "package",
+        "boundary_class": "governance-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "resilience",
+        "zone": "engine",
+        "owner": "skeleton/reliability",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "observability",
+        "zone": "engine",
+        "owner": "skeleton/observability",
+        "unit_type": "package",
+        "boundary_class": "telemetry-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "evaluation",
+        "zone": "engine",
+        "owner": "skeleton/eval",
+        "unit_type": "package",
+        "boundary_class": "evidence-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "feedback-learning",
+        "zone": "engine",
+        "owner": "skeleton/learning",
+        "unit_type": "package",
+        "boundary_class": "promotion-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "cost-capacity",
+        "zone": "engine",
+        "owner": "skeleton/intelligence",
+        "unit_type": "package",
+        "boundary_class": "admission-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "operator-control",
+        "zone": "application",
+        "owner": "backend/core/product_control_runtime.py",
+        "unit_type": "module",
+        "boundary_class": "control-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "deployment-release",
+        "zone": "engine",
+        "owner": "skeleton/deploy",
+        "unit_type": "package",
+        "boundary_class": "release-boundary",
+        "exposure": "internal"
+      }
+    ],
+    "composition_roots": [
+      {
+        "id": "whole-app-assembly",
+        "path": "skeleton/app/assembly.py",
+        "zone": "engine",
+        "responsibility": "Compose declared runtime services and operator topology; never absorb domain business logic."
+      },
+      {
+        "id": "engine-cli",
+        "path": "skeleton/__main__.py",
+        "zone": "engine",
+        "responsibility": "Dispatch operator commands into owned engine/application surfaces without creating alternate runtimes."
+      },
+      {
+        "id": "application-api-bootstrap",
+        "path": "backend/server.py",
+        "zone": "application",
+        "responsibility": "Mount application routes, middleware, and shared application dependencies; feature logic remains in owned modules."
+      },
+      {
+        "id": "product-shell-bootstrap",
+        "path": "frontend/app/_layout.tsx",
+        "zone": "product",
+        "responsibility": "Mount product providers, guards, and navigation shell; service ownership remains behind canonical API clients."
+      },
+      {
+        "id": "provider-runtime-composition",
+        "path": "skeleton/provider_runtime.py",
+        "zone": "engine",
+        "responsibility": "Construct credential-bearing runtime provider adapters after governance, admission, and architecture receipt checks."
+      },
+      {
+        "id": "model-routing-policy",
+        "path": "backend/core/model_router.py",
+        "zone": "application",
+        "responsibility": "Select among declared provider capabilities using bounded evidence and budgets without performing provider network I/O."
+      }
+    ],
+    "state_authorities": [
+      {
+        "state": "identity-and-principal",
+        "plane": "identity",
+        "owner": "skeleton/api"
+      },
+      {
+        "state": "runtime-configuration-and-secrets",
+        "plane": "configuration-secrets",
+        "owner": "skeleton/config"
+      },
+      {
+        "state": "provider-activation",
+        "plane": "model-provider",
+        "owner": "skeleton/provider_runtime.py"
+      },
+      {
+        "state": "conversation-and-working-memory",
+        "plane": "memory",
+        "owner": "skeleton/memory"
+      },
+      {
+        "state": "retrieval-index-and-ranking-state",
+        "plane": "retrieval",
+        "owner": "skeleton/retrieval"
+      },
+      {
+        "state": "durable-application-records",
+        "plane": "data-persistence",
+        "owner": "skeleton/persistence"
+      },
+      {
+        "state": "job-checkpoints-and-resume",
+        "plane": "jobs-durability",
+        "owner": "skeleton/agents"
+      },
+      {
+        "state": "artifact-bytes-and-metadata",
+        "plane": "artifact-files",
+        "owner": "skeleton/artifact_plane"
+      },
+      {
+        "state": "governance-policy-and-retention",
+        "plane": "governance",
+        "owner": "skeleton/vault"
+      },
+      {
+        "state": "evaluation-evidence",
+        "plane": "evaluation",
+        "owner": "skeleton/eval"
+      },
+      {
+        "state": "feedback-experiments-and-promotion",
+        "plane": "feedback-learning",
+        "owner": "skeleton/learning"
+      },
+      {
+        "state": "quota-budget-and-admission",
+        "plane": "cost-capacity",
+        "owner": "skeleton/intelligence"
+      },
+      {
+        "state": "release-and-rollback-evidence",
+        "plane": "deployment-release",
+        "owner": "skeleton/deploy"
+      }
+    ],
+    "recovery_domains": [
+      {
+        "id": "bootstrap-authority",
+        "planes": [
+          "foundation",
+          "identity",
+          "configuration-secrets"
+        ],
+        "restart_scope": "engine bootstrap/configuration",
+        "degraded_mode": "fail closed for authority-bearing work; health may remain diagnostic-only"
+      },
+      {
+        "id": "provider-execution",
+        "planes": [
+          "model-provider",
+          "model-routing",
+          "cost-capacity"
+        ],
+        "restart_scope": "provider/routing workers",
+        "degraded_mode": "deny or route only to already-declared healthy capacity; never bypass receipts or budgets"
+      },
+      {
+        "id": "knowledge-state",
+        "planes": [
+          "memory",
+          "retrieval",
+          "data-persistence",
+          "prompt-context"
+        ],
+        "restart_scope": "knowledge and persistence adapters",
+        "degraded_mode": "bounded stateless mode only where the request contract permits it; never cross tenant boundaries"
+      },
+      {
+        "id": "cognition-action",
+        "planes": [
+          "orchestration",
+          "reasoning-verification",
+          "jobs-durability",
+          "tool-runtime",
+          "artifact-files"
+        ],
+        "restart_scope": "operation/job execution",
+        "degraded_mode": "checkpoint, cancel, or return partial evidence; never silently repeat side effects"
+      },
+      {
+        "id": "service-transport",
+        "planes": [
+          "application-api",
+          "engine-api",
+          "streaming-realtime",
+          "operator-control"
+        ],
+        "restart_scope": "API/transport process",
+        "degraded_mode": "health and explicit unavailable responses; resumable operations preserve identity and terminal state"
+      },
+      {
+        "id": "product-shell",
+        "planes": [
+          "product-experience"
+        ],
+        "restart_scope": "frontend process/session",
+        "degraded_mode": "preserve local UI state and surface backend/engine degradation without fabricating completion"
+      },
+      {
+        "id": "security-governance",
+        "planes": [
+          "security-safety",
+          "governance"
+        ],
+        "restart_scope": "policy/security boundary",
+        "degraded_mode": "fail closed for protected actions and external transfers"
+      },
+      {
+        "id": "quality-release",
+        "planes": [
+          "observability",
+          "resilience",
+          "evaluation",
+          "feedback-learning",
+          "deployment-release"
+        ],
+        "restart_scope": "evidence/promotion control",
+        "degraded_mode": "freeze promotion and learning mutation while preserving current known-good release"
+      }
+    ],
+    "invariants": [
+      "every construction plane is placed exactly once",
+      "plane owner equals the construction contract owner",
+      "plane owner is physically contained by its assigned zone",
+      "cross-zone plane dependencies follow the zone dependency DAG",
+      "no transitional root owns a construction plane",
+      "every declared composition root exists and belongs to its declared zone",
+      "every state class has exactly one authority plane and matching owner",
+      "every construction plane belongs to exactly one recovery domain"
+    ]
+  }
 }
