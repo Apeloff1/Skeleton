@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/product", tags=["product"])
 
 
 @router.get("/readiness")
-async def product_readiness() -> dict:
+def product_readiness() -> dict:
     """Expose canonical action readiness without admin control-plane state."""
 
     return public_readiness()
