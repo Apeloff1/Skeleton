@@ -91,7 +91,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
           python scripts/check_architecture_boundaries.py
-          PYTHONPATH=. python -m pytest -q --noconftest ../tests/test_architecture_boundaries.py
+          PYTHONPATH=. python -m pytest -q --noconftest tests/test_architecture_boundaries.py
 
       - name: Provider runtime boundary gate
         working-directory: .
@@ -99,7 +99,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
           python scripts/check_provider_runtime_boundary.py
-          PYTHONPATH=. python -m pytest -q --noconftest ../tests/test_provider_runtime_boundary.py
+          PYTHONPATH=. python -m pytest -q --noconftest tests/test_provider_runtime_boundary.py
 
       - name: Production layer boundary gate
         run: python scripts/check_architecture_boundaries.py
