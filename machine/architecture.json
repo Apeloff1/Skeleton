@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.3.0",
-  "architecture_tag": "arch-map/v3.3",
+  "architecture_version": "3.4.0",
+  "architecture_tag": "arch-map/v3.4",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -15,7 +15,8 @@
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
     "provider_contract": "skeleton/provider_contract.py",
     "operation_contract": "skeleton/contracts/operation.py",
-    "stream_contract": "skeleton/frontier/operation_stream.py"
+    "stream_contract": "skeleton/frontier/operation_stream.py",
+    "stream_store": "skeleton/frontier/operation_stream_store.py"
   },
   "objectives": [
     "one product shell",
@@ -529,7 +530,10 @@
     "operation terminal states are final",
     "operation stream sequence is monotonic per operation",
     "stream overflow backpressures instead of silently dropping retained events",
-    "replay gaps fail closed instead of pretending recovery succeeded"
+    "replay gaps fail closed instead of pretending recovery succeeded",
+    "durable operation streams preserve exact-next monotonic sequence transactionally",
+    "stream compaction advances an explicit watermark and old cursors fail with replay-gap",
+    "durable stream terminal state fences all later writes"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
