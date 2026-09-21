@@ -91,6 +91,7 @@ CANONICAL_DOCUMENTS = {
     "research_historical_lineage": "docs/architecture/research-historical-lineage.md",
     "research_source_topology": "docs/architecture/research-source-topology.md",
     "research_dependency_map": "docs/architecture/research-dependency-map-2026.md",
+    "research_execution_program": "docs/architecture/research-execution-program-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -189,6 +190,17 @@ PLAN_CHECKPOINTS = {
         "experiment_protocol_range": ("RXP001", "RXP062"),
         "production_authority_granted": False,
         "research_refresh_required": True,
+    },
+    "PLAN-20260922-RESEARCH-EXECUTION-PROGRAM": {
+        "created_at": "2026-09-22",
+        "tracks": ("AD",),
+        "wave_range": ("WAVE0", "WAVE13"),
+        "protocol_range": ("RXP001", "RXP062"),
+        "domain_count": 24,
+        "cheap_falsification_before_scale": True,
+        "baseline_before_challenger": True,
+        "measurement_before_promotion": True,
+        "production_authority_granted": False,
     },
     "PLAN-20260922-RESEARCH-DEPENDENCY-MAP": {
         "created_at": "2026-09-22T00:06:00+02:00",
