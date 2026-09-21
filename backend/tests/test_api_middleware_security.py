@@ -86,7 +86,7 @@ def test_request_id_accepts_only_bounded_header_safe_values() -> None:
 
     assert api_middleware._request_id(accepted) == "trace-01.prod:abc_123"
     assert api_middleware._request_id(rejected) != "unsafe value with spaces"
-    assert len(api_middleware._request_id(oversized)) == 16
+    assert len(api_middleware._request_id(oversized)) == 32
 
 
 def test_api_route_boundary_rejects_lookalike_prefixes() -> None:
