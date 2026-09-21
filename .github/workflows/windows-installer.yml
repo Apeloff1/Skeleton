@@ -122,9 +122,17 @@ jobs:
           ) -Wait -PassThru
           if ($install.ExitCode -ne 0) {
             if (Test-Path -LiteralPath $setupLog) {
-              Write-Host "---- Inno Setup smoke log tail ----"
-              Get-Content -LiteralPath $setupLog -Tail 160
-              Write-Host "---- end Inno Setup smoke log ----"
+              Write-Host "---- Inno Setup failure context ----"
+              $patterns = "error|exception|abort|failed|denied|access|cannot|unable|not found|rollback"
+              $matches = Select-String -LiteralPath $setupLog -Pattern $patterns -CaseSensitive:$false -Context 8,16
+              if ($matches) {
+                $matches | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+              } else {
+                Write-Host "No explicit error token found; printing log head and tail."
+                Get-Content -LiteralPath $setupLog -TotalCount 100
+                Get-Content -LiteralPath $setupLog -Tail 100
+              }
+              Write-Host "---- end Inno Setup failure context ----"
             }
             throw "silent installer exited $($install.ExitCode)"
           }
@@ -163,5 +171,6 @@ jobs:
           path: |
             dist/windows/Skeleton-Setup-*-windows-x64.exe
             dist/windows/Skeleton-Setup-*-windows-x64.exe.sha256
+            ${{ runner.temp }}/SkeletonSetup-smoke.log
           if-no-files-found: error
           retention-days: 14
