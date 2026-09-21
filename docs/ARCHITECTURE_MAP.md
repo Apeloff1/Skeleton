@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v1.4`
+**Architecture tag:** `arch-map/v2.0`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -74,7 +74,7 @@ backends and never own business policy.
 
 ## 3. Contract layering
 
-There are three layers, each with one job:
+There are four canonical contract layers, each with one job:
 
 1. **`skeleton/app/manifest.json` — runtime contract.** Services, runtime modes,
    health paths, required environment, and Compose topology.
@@ -84,8 +84,13 @@ There are three layers, each with one job:
 3. **`machine/architecture.json` — architecture contract.** Canonical roots,
    ownership zones, dependency graph, interfaces, change routing, optimization
    lanes, and migration policy.
+4. **`machine/ai_app_construction.json` — AI construction contract.** Required
+   capability planes, build phases, provider bootstraps, acceptance gates, gap
+   register, and closure evidence. Its human manual is
+   `docs/AI_APP_CONSTRUCTION_MANUAL.md`.
 
-`scripts/check_architecture_map.py` links the layers. It rejects drift when the
+`scripts/check_architecture_map.py`, `scripts/check_ai_app_construction.py`, and
+`scripts/check_provider_bootstrap.py` link the layers. It rejects drift when the
 architecture service graph no longer exactly matches the runtime manifest.
 
 ## 4. Dependency direction
@@ -208,15 +213,22 @@ arch-map/v1.1  fail-closed architecture validator
 arch-map/v1.2  regression tests for topology invariants
 arch-map/v1.3  runtime/repository linkage + fail-fast CI + transitional-root policy
 arch-map/v1.4  acyclic ownership zones + source-inventory alignment
+arch-map/v2.0  complete AI application construction/manual contract
+arch-map/v2.1  mandatory runtime provider architecture acknowledgement
+arch-map/v2.2  construction/provider fail-closed validators
+arch-map/v2.3  explicit SOTA gap register + closure evidence
+arch-map/v2.4  fail-fast CI construction/provider gates
 ```
 
 ## 10. Operator commands
 
 ```bash
-# Validate only the architecture contract
+# Validate architecture and complete AI construction contracts
 python scripts/check_architecture_map.py
+python scripts/check_ai_app_construction.py
+python scripts/check_provider_bootstrap.py
 
-# Machine-readable result
+# Machine-readable architecture result
 python scripts/check_architecture_map.py --json
 
 # Validate the complete assembled application
@@ -228,3 +240,23 @@ python -m skeleton app status --json
 
 Architecture changes should keep all four commands deterministic and
 non-interactive.
+
+
+## 11. Mandatory AI construction manual
+
+All AI capability construction and provider integration is governed by
+`machine/ai_app_construction.json` and
+`docs/AI_APP_CONSTRUCTION_MANUAL.md`.
+
+Runtime model providers are not trusted merely because credentials exist.
+`backend/core/provider_architecture.py` must load the active contracts and
+issue a non-secret architecture receipt before `ProviderRegistry` can return an
+active adapter. Undeclared providers fail closed.
+
+Development-agent instruction files are pointers to the same contract, never
+independent copies of the architecture. This prevents provider-specific
+instructions from creating competing build rules.
+
+Open P0 construction gaps are explicit and block claiming SOTA completion, but
+they do not block incremental architecture work when the gap itself, its
+construction plan, and its closure evidence are recorded.
