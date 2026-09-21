@@ -5499,7 +5499,7 @@
       "cross-plane golden journeys",
       "zero open P0 gaps"
     ],
-    "invariant": "No fully-functional-AI completion claim is valid while a listed P0 gap is open or its blueprint/envelope/state/work-package contract is missing.",
+    "invariant": "No fully-functional-AI completion claim is valid while a declared P0 gap is absent from the closure ledger/dependency DAG, remains open, or lacks its required blueprint/envelope/state/work-package/evidence contract.",
     "required_p0_gaps": [
       "gap-cognitive-execution-loop",
       "gap-context-compiler-convergence",
@@ -5515,7 +5515,8 @@
       "gap-streaming-protocol",
       "gap-tool-runtime-convergence",
       "gap-verification-evidence-contract"
-    ]
+    ],
+    "dependency_graph": "functional_ai_dependency_graph"
   },
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
@@ -6166,6 +6167,240 @@
         "current": "process-local vector store",
         "target": "derived retrieval projection/reference implementation"
       }
+    ]
+  },
+  "functional_ai_dependency_graph": {
+    "schema_version": 1,
+    "graph_version": "1.0.0",
+    "status": "active",
+    "purpose": "Executable build-order DAG for the P0 fully-functional-AI closure set. Dependencies mean closure/promotion prerequisites, not necessarily that implementation work cannot begin earlier.",
+    "nodes": [
+      {
+        "gap": "gap-state-authority-convergence",
+        "stage": 0,
+        "depends_on": [],
+        "gate": "one authority per logical state domain; operation state durable/reconciled"
+      },
+      {
+        "gap": "gap-governance-registry",
+        "stage": 0,
+        "depends_on": [],
+        "gate": "data classification/provider transfer/lifecycle decisions are enforceable"
+      },
+      {
+        "gap": "gap-cost-admission",
+        "stage": 0,
+        "depends_on": [],
+        "gate": "expensive work receives deterministic budget/admission decisions"
+      },
+      {
+        "gap": "gap-provider-surface-convergence",
+        "stage": 0,
+        "depends_on": [],
+        "gate": "one credential-bearing runtime provider owner with no shadow transport"
+      },
+      {
+        "gap": "gap-conversation-state-authority",
+        "stage": 1,
+        "depends_on": [
+          "gap-state-authority-convergence",
+          "gap-governance-registry"
+        ],
+        "gate": "server-authoritative durable threads/messages with branch/idempotency/lifecycle"
+      },
+      {
+        "gap": "gap-memory-durable-authority",
+        "stage": 1,
+        "depends_on": [
+          "gap-state-authority-convergence",
+          "gap-governance-registry"
+        ],
+        "gate": "durable namespaced canonical memory; vector/process stores derived"
+      },
+      {
+        "gap": "gap-tool-runtime-convergence",
+        "stage": 1,
+        "depends_on": [
+          "gap-governance-registry",
+          "gap-cost-admission",
+          "gap-provider-surface-convergence"
+        ],
+        "gate": "typed governed idempotent tool runtime; no nested credential path"
+      },
+      {
+        "gap": "gap-context-compiler-convergence",
+        "stage": 2,
+        "depends_on": [
+          "gap-conversation-state-authority",
+          "gap-memory-durable-authority",
+          "gap-tool-runtime-convergence",
+          "gap-governance-registry"
+        ],
+        "gate": "one deterministic trust/provenance/budget-aware ContextEnvelope compiler"
+      },
+      {
+        "gap": "gap-provider-interaction-protocol",
+        "stage": 2,
+        "depends_on": [
+          "gap-provider-surface-convergence",
+          "gap-tool-runtime-convergence",
+          "gap-governance-registry",
+          "gap-cost-admission"
+        ],
+        "gate": "provider-neutral structured/tool/usage/cancel protocol available"
+      },
+      {
+        "gap": "gap-verification-evidence-contract",
+        "stage": 3,
+        "depends_on": [
+          "gap-context-compiler-convergence",
+          "gap-tool-runtime-convergence",
+          "gap-provider-interaction-protocol"
+        ],
+        "gate": "observable evidence/postcondition verification receipts drive finalization"
+      },
+      {
+        "gap": "gap-cognitive-execution-loop",
+        "stage": 4,
+        "depends_on": [
+          "gap-state-authority-convergence",
+          "gap-governance-registry",
+          "gap-cost-admission",
+          "gap-conversation-state-authority",
+          "gap-memory-durable-authority",
+          "gap-tool-runtime-convergence",
+          "gap-context-compiler-convergence",
+          "gap-provider-interaction-protocol",
+          "gap-verification-evidence-contract"
+        ],
+        "gate": "bounded durable model/tool loop can wait/resume/cancel/recover/finalize exactly once"
+      },
+      {
+        "gap": "gap-engine-application-execution-boundary",
+        "stage": 5,
+        "depends_on": [
+          "gap-cognitive-execution-loop",
+          "gap-state-authority-convergence",
+          "gap-provider-surface-convergence"
+        ],
+        "gate": "backend delegates authenticated/idempotent execution to engine; process ownership can cut over"
+      },
+      {
+        "gap": "gap-streaming-protocol",
+        "stage": 6,
+        "depends_on": [
+          "gap-cognitive-execution-loop",
+          "gap-engine-application-execution-boundary",
+          "gap-state-authority-convergence"
+        ],
+        "gate": "ordered resumable product delivery with canonical terminal reconciliation"
+      },
+      {
+        "gap": "gap-e2e-golden-journeys",
+        "stage": 7,
+        "depends_on": [
+          "gap-state-authority-convergence",
+          "gap-governance-registry",
+          "gap-cost-admission",
+          "gap-provider-surface-convergence",
+          "gap-conversation-state-authority",
+          "gap-memory-durable-authority",
+          "gap-tool-runtime-convergence",
+          "gap-context-compiler-convergence",
+          "gap-provider-interaction-protocol",
+          "gap-verification-evidence-contract",
+          "gap-cognitive-execution-loop",
+          "gap-engine-application-execution-boundary",
+          "gap-streaming-protocol"
+        ],
+        "gate": "all mandatory cross-plane journeys and fault paths pass on assembled topology"
+      }
+    ],
+    "stages": [
+      {
+        "stage": 0,
+        "id": "authority-policy-foundations",
+        "parallel": true,
+        "closes": [
+          "gap-state-authority-convergence",
+          "gap-governance-registry",
+          "gap-cost-admission",
+          "gap-provider-surface-convergence"
+        ],
+        "exit": "state, privacy/policy, budget and credential ownership are deterministic before higher autonomy"
+      },
+      {
+        "stage": 1,
+        "id": "durable-user-and-action-foundations",
+        "parallel": true,
+        "closes": [
+          "gap-conversation-state-authority",
+          "gap-memory-durable-authority",
+          "gap-tool-runtime-convergence"
+        ],
+        "exit": "canonical user continuity and governed action primitives are durable"
+      },
+      {
+        "stage": 2,
+        "id": "model-input-output-contracts",
+        "parallel": true,
+        "closes": [
+          "gap-context-compiler-convergence",
+          "gap-provider-interaction-protocol"
+        ],
+        "exit": "the runtime can compile one canonical model turn and receive normalized structured/tool output"
+      },
+      {
+        "stage": 3,
+        "id": "evidence-verification",
+        "parallel": false,
+        "closes": [
+          "gap-verification-evidence-contract"
+        ],
+        "exit": "finalization can distinguish verified/qualified/abstain/repair/block from observable evidence"
+      },
+      {
+        "stage": 4,
+        "id": "cognitive-transaction",
+        "parallel": false,
+        "closes": [
+          "gap-cognitive-execution-loop"
+        ],
+        "exit": "one durable bounded AI transaction composes model/context/tool/memory/verification correctly"
+      },
+      {
+        "stage": 5,
+        "id": "process-boundary-cutover",
+        "parallel": false,
+        "closes": [
+          "gap-engine-application-execution-boundary"
+        ],
+        "exit": "backend product state and engine execution are separated by authenticated idempotent contracts"
+      },
+      {
+        "stage": 6,
+        "id": "realtime-product-delivery",
+        "parallel": false,
+        "closes": [
+          "gap-streaming-protocol"
+        ],
+        "exit": "the client can disconnect/reconnect/cancel and converge on canonical terminal state"
+      },
+      {
+        "stage": 7,
+        "id": "assembled-proof",
+        "parallel": false,
+        "closes": [
+          "gap-e2e-golden-journeys"
+        ],
+        "exit": "cross-plane golden journeys and injected failures prove the complete AI product"
+      }
+    ],
+    "scheduling_rules": [
+      "implementation may start early behind stable planned contracts, but a gap cannot be marked closed before all depends_on gaps are closed",
+      "parallel=true means closure work within the stage has no declared mutual prerequisite; shared lower-stage contracts still apply",
+      "breaking lower-stage contract changes invalidate dependent-stage evidence and require revalidation",
+      "stage 7 is evidence-only closure: it must not hide missing lower-stage implementation by mocking the product topology itself"
     ]
   }
 }
