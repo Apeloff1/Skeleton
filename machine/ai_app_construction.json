@@ -760,7 +760,7 @@
     {
       "id": "engine-api",
       "owner": "skeleton/api",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Engine-native API for health, orchestration, retrieval, agents and governed engine operations.",
       "depends_on": [
         "identity",
@@ -778,19 +778,35 @@
         "/api/v1 versioning",
         "health/live",
         "health/ready",
-        "engine operation contracts"
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay"
       ],
       "construction": [
         "keep engine ownership separate from product routes",
         "version contracts",
-        "bound requests"
+        "bound requests",
+        "expose the cognitive runtime only through versioned authenticated engine execution contracts",
+        "validate backend service identity and delegated principal/tenant authority",
+        "support idempotent submit/query/cancel and resumable operation events",
+        "keep provider credentials and model transport in the engine process after cutover"
       ],
       "acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
-      "failure_mode": "engine-specific typed failure"
+      "failure_mode": "typed unavailable/denied/conflict response with no local backend provider fallback"
     },
     {
       "id": "product-experience",
@@ -1647,6 +1663,37 @@
       ]
     },
     {
+      "id": "gap-engine-application-execution-boundary",
+      "plane": "engine-api",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Runtime code ownership and process ownership are not yet aligned. The Skeleton root owns provider/orchestration contracts, but backend currently ships Skeleton code and receives model credentials, while the standalone Skeleton service lacks the canonical product execution API needed for backend delegation. Fully functional deployment requires one authenticated backend->engine execution boundary so product state stays in backend and AI execution/provider credentials stay in the engine process.",
+      "construction": [
+        "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
+        "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
+        "define backend service identity plus delegated end-user/tenant authority envelope validated by engine",
+        "propagate operation id, idempotency key, trace id, deadline, tenant, actor, capability and resource budget across the boundary",
+        "make execution admission asynchronous: quick accepted acknowledgement, durable operation/result status, resumable events and idempotent cancellation",
+        "define retry semantics for submit/query/cancel without duplicate execution",
+        "project engine operation events/results back through application transport without making backend stream state authoritative",
+        "after endpoint parity, remove runtime-model credentials from backend process and inject them only into the Skeleton engine service",
+        "retire/invert backend/core/ai_provider.py from local runtime facade to compatibility client or remove after callers migrate",
+        "add readiness so backend AI capability is degraded when engine execution endpoint is unavailable"
+      ],
+      "closure_evidence": [
+        "backend->engine authenticated submit test",
+        "delegated tenant/user/scope validation test",
+        "submit retry returns same operation/execution rather than duplicate work",
+        "deadline/trace/budget propagation test",
+        "query/result binding test",
+        "idempotent cancel and late-result fencing test",
+        "engine outage produces explicit backend degraded behavior",
+        "backend contains no runtime model credential after cutover",
+        "provider execution occurs only in Skeleton service in production topology",
+        "cross-service golden journey preserves operation/turn/receipt lineage"
+      ]
+    },
+    {
       "id": "gap-cognitive-execution-loop",
       "plane": "orchestration",
       "priority": "P0",
@@ -1929,6 +1976,7 @@
       "id": "cognitive-runtime-and-realtime-resilience",
       "mode": "parallel",
       "gaps": [
+        "gap-engine-application-execution-boundary",
         "gap-cognitive-execution-loop",
         "gap-streaming-protocol",
         "gap-provider-redundancy"
@@ -1936,8 +1984,10 @@
       "depends_on": [
         "policy-and-budget-foundation"
       ],
-      "goal": "Make admitted AI work execute through one bounded, resumable model/tool cognitive loop while long-running delivery and provider failure remain recoverable.",
+      "goal": "Make the application delegate to one authenticated engine-owned cognitive runtime, with admitted AI work executing through a bounded resumable model/tool loop while realtime delivery and provider failure remain recoverable.",
       "exit": [
+        "backend product AI ingress delegates to authenticated engine execution boundary",
+        "runtime provider process ownership has an executable cutover path",
         "canonical cognitive execution loop proven",
         "provider/tool turns preserve operation and checkpoint lineage",
         "bounded stop/cancel/human-wait semantics proven",
@@ -2692,6 +2742,68 @@
         "completed_at"
       ],
       "owner_plane": "reasoning-verification"
+    },
+    "delegated_authority": {
+      "required_fields": [
+        "service_principal",
+        "actor_id",
+        "tenant_id",
+        "scopes",
+        "capability",
+        "issued_at",
+        "expires_at",
+        "request_binding",
+        "authority_digest"
+      ],
+      "owner_plane": "engine-api"
+    },
+    "engine_execution_command": {
+      "required_fields": [
+        "operation",
+        "execution_request",
+        "delegated_authority",
+        "context_seed_refs",
+        "resource_budget",
+        "stream_preferences"
+      ],
+      "owner_plane": "engine-api"
+    },
+    "engine_execution_ack": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "state",
+        "accepted_at",
+        "idempotency_digest",
+        "status_ref",
+        "events_ref",
+        "trace_id"
+      ],
+      "owner_plane": "engine-api"
+    },
+    "engine_execution_status": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "operation_state",
+        "execution_state",
+        "latest_checkpoint_version",
+        "result_ref",
+        "failure_code",
+        "updated_at"
+      ],
+      "owner_plane": "engine-api"
+    },
+    "engine_cancel_command": {
+      "required_fields": [
+        "operation_id",
+        "actor_id",
+        "tenant_id",
+        "reason",
+        "requested_at",
+        "idempotency_key"
+      ],
+      "owner_plane": "engine-api"
     }
   },
   "release_evidence_bundle": [
@@ -3116,6 +3228,47 @@
         "skeleton/testing/test_provider_structured_output.py",
         "skeleton/testing/test_provider_tool_calls.py",
         "skeleton/testing/test_provider_stream_deltas.py"
+      ]
+    },
+    {
+      "id": "WP-P0-ENGINE-BOUNDARY",
+      "gap": "gap-engine-application-execution-boundary",
+      "wave": 2,
+      "owners": [
+        "skeleton/api",
+        "backend",
+        "skeleton/provider_runtime.py",
+        "skeleton/app/manifest.json",
+        "docker-compose.yml"
+      ],
+      "objective": "Align runtime process ownership with architecture ownership: backend owns product/conversation ingress and delegates canonical AI execution to the Skeleton engine process.",
+      "steps": [
+        "freeze engine command/ack/status/cancel/delegated-authority envelopes",
+        "implement authenticated engine execution submit/status/cancel/events endpoints",
+        "implement backend engine client with idempotent retry/query behavior",
+        "route canonical conversation assistant execution through engine client",
+        "add readiness/degraded behavior for engine loss",
+        "prove cross-service lineage and cancellation",
+        "cut provider credential ownership from backend to engine only after parity",
+        "retire local backend provider execution path"
+      ],
+      "tests": [
+        "service/delegated auth",
+        "submit idempotency",
+        "trace/deadline/budget propagation",
+        "result/status",
+        "cancel fencing",
+        "engine outage",
+        "cross-service stream/replay",
+        "process credential isolation"
+      ],
+      "exit": "production AI requests entering backend execute provider/model/tool cognition only in the Skeleton engine process with authenticated idempotent cross-service contracts and no local provider fallback",
+      "planned_outputs": [
+        "skeleton/api execution routes",
+        "backend/core/engine_client.py",
+        "backend route delegation",
+        "service identity configuration",
+        "runtime manifest/compose dependency and credential cutover"
       ]
     },
     {
@@ -5160,6 +5313,12 @@
         "work_package": "WP-P0-VERIFICATION"
       },
       {
+        "key": "engine_application_boundary_blueprint",
+        "gap": "gap-engine-application-execution-boundary",
+        "plane": "engine-api",
+        "work_package": "WP-P0-ENGINE-BOUNDARY"
+      },
+      {
         "key": "cognitive_runtime_blueprint",
         "gap": "gap-cognitive-execution-loop",
         "plane": "orchestration",
@@ -5182,7 +5341,12 @@
       "verification_request",
       "verification_receipt",
       "ai_execution_result",
-      "stream_event"
+      "stream_event",
+      "delegated_authority",
+      "engine_execution_command",
+      "engine_execution_ack",
+      "engine_execution_status",
+      "engine_cancel_command"
     ],
     "required_state_domains": [
       "conversation-thread-state",
@@ -5197,10 +5361,185 @@
     "closure_order": [
       "conversation + state authority",
       "tool runtime + provider interaction + context compiler + verification",
-      "cognitive execution loop",
+      "cognitive execution loop + authenticated application/engine boundary",
+      "runtime provider credential/process cutover",
       "realtime transport/recovery",
       "cross-plane golden journeys"
     ],
     "invariant": "No fully-functional-AI completion claim is valid while a listed P0 gap is open or its blueprint/envelope/state/work-package contract is missing."
+  },
+  "engine_application_boundary_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-engine-application-execution-boundary",
+    "current_state": {
+      "backend_process": [
+        "ships backend plus Skeleton compatibility code",
+        "receives runtime provider credentials in compose",
+        "can execute skeleton/provider_runtime.py through compatibility facades"
+      ],
+      "skeleton_process": [
+        "owns canonical engine API root",
+        "owns provider/orchestration source contracts",
+        "does not yet own the complete product cognitive execution ingress",
+        "does not currently receive the product runtime provider credential in compose"
+      ],
+      "conflict": "source ownership says engine; deployed credential/execution ownership can occur in backend"
+    },
+    "target_process_ownership": {
+      "backend": {
+        "owns": [
+          "user/product authentication ingress",
+          "conversation/thread/message authority",
+          "product workflows",
+          "application rate limits",
+          "product-facing realtime projection"
+        ],
+        "must_not_own": [
+          "runtime model provider credentials",
+          "provider SDK/network transport",
+          "cognitive model-tool loop",
+          "engine turn/checkpoint authority"
+        ]
+      },
+      "skeleton": {
+        "owns": [
+          "AIExecution runtime",
+          "provider credentials/transports",
+          "model routing",
+          "context compiler",
+          "governed tool runtime",
+          "verification runtime",
+          "execution/turn/checkpoint/result authority",
+          "engine operation event production"
+        ]
+      }
+    },
+    "internal_transport": {
+      "target": "HTTP/JSON initially; transport may evolve without changing envelopes",
+      "network": "private runtime network; production does not rely on network privacy alone for authorization",
+      "service_identity": "backend authenticates as a declared service principal",
+      "delegated_authority": "backend forwards a signed/bound principal+tenant+scope context for the user action; engine validates service identity and delegated fields before protected execution",
+      "versioning": "/api/v1 internal engine contracts; incompatible changes require compatibility window/migration",
+      "timeout": "submit/cancel/query use bounded request timeout; long execution is asynchronous"
+    },
+    "canonical_commands": {
+      "submit": {
+        "method": "POST",
+        "target": "/api/v1/executions",
+        "request": "engine_execution_command",
+        "response": "engine_execution_ack",
+        "semantics": "create-or-return-existing by operation/idempotency identity; never hold HTTP request for full model/tool execution"
+      },
+      "status": {
+        "method": "GET",
+        "target": "/api/v1/executions/{operation_id}",
+        "response": "engine_execution_status",
+        "semantics": "authoritative execution/result state projection"
+      },
+      "cancel": {
+        "method": "POST",
+        "target": "/api/v1/executions/{operation_id}/cancel",
+        "request": "engine_cancel_command",
+        "semantics": "idempotent cancellation request bound to delegated authority"
+      },
+      "events": {
+        "method": "GET",
+        "target": "/api/v1/executions/{operation_id}/events",
+        "response": "canonical operation stream projection",
+        "semantics": "cursor-based replay; backend may proxy/project but not invent engine state"
+      }
+    },
+    "delegated_authority": {
+      "required_fields": [
+        "service_principal",
+        "actor_id",
+        "tenant_id",
+        "scopes",
+        "capability",
+        "issued_at",
+        "expires_at",
+        "request_binding",
+        "authority_digest"
+      ],
+      "rules": [
+        "service principal and user principal are distinct identities",
+        "engine independently checks capability/scope/tenant against requested operation",
+        "short validity window; replay binding to operation/idempotency/request identity",
+        "backend cannot delegate scopes it does not possess under service policy",
+        "raw user JWT need not become the engine service credential"
+      ]
+    },
+    "execution_command": {
+      "required_fields": [
+        "operation",
+        "execution_request",
+        "delegated_authority",
+        "context_seed_refs",
+        "resource_budget",
+        "stream_preferences"
+      ],
+      "invariant": "command contains references/identity needed to load canonical state, not an untrusted full client transcript"
+    },
+    "acknowledgement": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "state",
+        "accepted_at",
+        "idempotency_digest",
+        "status_ref",
+        "events_ref",
+        "trace_id"
+      ]
+    },
+    "status_projection": {
+      "required_fields": [
+        "operation_id",
+        "execution_id",
+        "operation_state",
+        "execution_state",
+        "latest_checkpoint_version",
+        "result_ref",
+        "failure_code",
+        "updated_at"
+      ],
+      "rule": "projection cannot report completed without canonical AIExecutionResult"
+    },
+    "retry_matrix": [
+      {
+        "command": "submit",
+        "policy": "safe only through stable operation/idempotency identity; duplicate returns existing acknowledgement"
+      },
+      {
+        "command": "status",
+        "policy": "read-only retry with backoff"
+      },
+      {
+        "command": "events",
+        "policy": "resume by cursor; replay-gap is explicit"
+      },
+      {
+        "command": "cancel",
+        "policy": "idempotent; terminal operation remains terminal"
+      }
+    ],
+    "failure_mapping": [
+      "engine_unavailable -> backend AI capability degraded/503 or queued only if durable queue contract exists",
+      "delegation_denied -> 403 without local provider fallback",
+      "idempotency_conflict -> 409 with existing operation reference when safe",
+      "budget/policy denial -> stable application problem detail",
+      "engine timeout on submit -> backend queries by operation/idempotency identity before retry"
+    ],
+    "credential_cutover": {
+      "phase_0": "compatibility: backend may still execute canonical provider runtime in-process",
+      "phase_1": "engine execution endpoints and service auth available",
+      "phase_2": "backend AI routes delegate; shadow local provider calls blocked by tests",
+      "phase_3": "runtime provider credentials removed from backend deployment and available only to Skeleton engine",
+      "phase_4": "backend/core/ai_provider.py becomes remote compatibility client or is retired",
+      "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
+    },
+    "frontend_rule": "product conversation/assistant actions enter through backend because backend owns product/conversation authority; direct frontend->engine remains limited to explicitly declared engine surfaces such as health or future separately authorized engine-native features"
   }
 }
