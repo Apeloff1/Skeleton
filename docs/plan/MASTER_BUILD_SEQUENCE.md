@@ -126,3 +126,43 @@ signed promotion
 ```
 
 This gives builders enough structure to move quickly without confusing architectural ambition, task completion, and production evidence.
+
+
+## Build packet standard
+
+Every implementation packet created from this masterplan must carry the same minimum anatomy. This prevents “context in someone’s head” from becoming a hidden dependency.
+
+- objective and explicit non-goals;
+- volume/requirement and W/AIQ references;
+- canonical contracts, state owners and exact implementation paths;
+- authority, security, privacy and data-classification notes;
+- migration/compatibility behavior;
+- failure, recovery and rollback behavior;
+- test/evaluation plan, including mapped edge obligations;
+- observability, cost and performance signals;
+- evidence references;
+- implementation and independent-verification sign-offs.
+
+A packet may be split for parallel execution, but none of these fields may disappear simply because work was delegated.
+
+## Definition-of-Ready / Definition-of-Done
+
+**Ready** means dependencies are materially usable, contract/state ownership is known, relevant edge obligations are visible, and the builder can name the tests/evidence that will prove the change. “There is a file to edit” is not readiness.
+
+**Done** means the implementation satisfies its contracts, failure behavior is exercised, migration/recovery/rollback is defined where durable state changes, observability exists, evidence is attached, and the signed accountability transition is valid. “Code merged” is not done by itself.
+
+Each MBW wave now carries machine-readable `definition_of_ready`, `definition_of_done`, `handoff_outputs`, `review_questions`, and `gating_vertical_slices`.
+
+## Handoff law
+
+A wave hands downstream **contracts and proven capabilities**, not assumptions. Every handoff must make explicit:
+
+- what is authoritative;
+- what is derived/cache/projection state;
+- which failure states are expected and recoverable;
+- what callers may rely on;
+- what remains experimental or unverified;
+- which critical/high risks are still open;
+- which evidence refs demonstrate the advertised behavior.
+
+Downstream work may prototype against an incomplete upstream wave only when the dependency contract is stable enough and the incomplete behavior is represented as an explicit gap. Prototype success never upgrades the upstream wave’s completion state.
