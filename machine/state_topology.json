@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.4.0",
+  "topology_version": "1.5.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -321,7 +321,8 @@
       "derived_from": [
         "engine-mongo-state",
         "backend-core-app-state",
-        "backend-seeded-content"
+        "backend-seeded-content",
+        "canonical-ai-memory-records"
       ],
       "rebuildable": true,
       "evidence": [
@@ -402,7 +403,8 @@
       "derived_from": [
         "backend-core-app-state",
         "backend-seeded-content",
-        "engine-mongo-state"
+        "engine-mongo-state",
+        "canonical-ai-memory-records"
       ],
       "rebuildable": true,
       "evidence": [
@@ -636,6 +638,33 @@
         "skeleton/intelligence/verification.py",
         "skeleton/intelligence/verifier.py"
       ]
+    },
+    {
+      "id": "canonical-ai-memory-records",
+      "owner_plane": "memory",
+      "physical_store": "mongo",
+      "logical_location": "SKL_MONGO_DATABASE.memory_records via canonical memory repository",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "planned-canonical",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "single canonical memory record/version plus lifecycle metadata; repository transaction where multi-record lifecycle updates require it",
+      "consistency": "durable writes require Mongo acknowledgement; tenant/user/namespace/version/provenance remain canonical independently of vector/cache projections",
+      "retention": "governance-controlled by retention_class and expiry; deletion/export are first-class lifecycle operations",
+      "backup_restore": "required; restore canonical memory before rebuilding vector, MAG/CAG compatibility, or process-local projections",
+      "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe key, version and status",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-memory-durable-authority",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/frontier/memory.py",
+        "skeleton/frontier/retrieval_context.py",
+        "skeleton/memory/frontier_adapter.py"
+      ]
     }
   ],
   "state_flows": [
@@ -782,12 +811,29 @@
       "mode": "finalization-evidence",
       "rule": "AIExecutionResult references the exact terminal verification receipt selected for the final candidate",
       "failure": "final result cannot claim verified status without the required receipt/check coverage"
+    },
+    {
+      "id": "canonical-memory-to-vector",
+      "from": "canonical-ai-memory-records",
+      "to": "optional-vector-index",
+      "mode": "derived-semantic-index",
+      "rule": "only active authorized canonical memory records are projected with memory_id, tenant/user namespace and provenance metadata; vector similarity never grants authority",
+      "failure": "degrade semantic recall and rebuild projection from canonical memory; never mutate canonical memory to match a lost/stale index"
+    },
+    {
+      "id": "canonical-memory-to-process-cache",
+      "from": "canonical-ai-memory-records",
+      "to": "in-process-retrieval-memory",
+      "mode": "cache-projection",
+      "rule": "process-local MAG/CAG/vector/reference state may warm from canonical memory records but remains discardable",
+      "failure": "restart cold and rebuild; canonical memory remains durable"
     }
   ],
   "recovery_order": [
     "restore/authenticate Mongo physical service",
     "restore backend-core-app-state and any materialized engine authoritative state",
     "restore conversation thread/message authority and verify branch/message ordering before accepting AI chat traffic",
+    "restore canonical AI memory records before rebuilding memory/vector/process-local projections",
     "verify schema/index/migration compatibility",
     "restore or reconstruct canonical operation state",
     "restore cognitive execution, turn and checkpoint authority before resuming AI work",
@@ -820,6 +866,9 @@
     "assistant conversation messages reference canonical operation/execution results rather than treating provider text as standalone durable truth",
     "conversation edit/regenerate preserves immutable branch lineage and never silently rewrites historical tool/action receipts",
     "verification receipts persist observable claims, evidence references, checks and outcomes but never require hidden chain-of-thought",
-    "a final AI result that claims verification references an immutable verification receipt with policy-required check coverage"
+    "a final AI result that claims verification references an immutable verification receipt with policy-required check coverage",
+    "canonical user/tenant AI memory is durable document state; vector, MAG, CAG and process-memory representations are never its sole authority",
+    "memory restore precedes semantic/vector/cache projection rebuild",
+    "vector similarity never widens tenant/user/namespace memory authority"
   ]
 }
