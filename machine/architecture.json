@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.1.0",
-  "architecture_tag": "arch-map/v3.1",
+  "architecture_version": "3.2.0",
+  "architecture_tag": "arch-map/v3.2",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -29,7 +29,9 @@
     "one shared architecture receipt contract across product runtime and repository automation AI providers",
     "machine-readable request lifecycle, data classes, trust zones, environment profiles, envelopes, work packages, and completion criteria",
     "fail-closed data governance and resource admission before external provider I/O",
-    "shared ResourceBudget semantics between admission and model routing"
+    "shared ResourceBudget semantics between admission and model routing",
+    "one engine-owned provider runtime for text, image, speech, and synchronous compatibility execution",
+    "application routes contain no provider credentials or direct vendor SDK imports"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -516,7 +518,9 @@
     "runtime and automation provider families share skeleton/provider_contract.py receipt semantics",
     "every open construction gap has exactly one work package and roadmap wave",
     "external provider I/O follows validation -> governance -> admission -> architecture receipt -> client execution",
-    "model routing cannot widen ResourceBudget cost, output-token, or wall-time ceilings"
+    "model routing cannot widen ResourceBudget cost, output-token, or wall-time ceilings",
+    "runtime-model credentials are owned only by skeleton/provider_runtime.py",
+    "undeclared media providers fail closed instead of borrowing another provider credential"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -524,7 +528,7 @@
     "validator": "scripts/check_ai_app_construction.py",
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
     "provider_runtime_loader": "skeleton/provider_contract.py",
-    "provider_runtime_boundary": "backend/core/ai_provider.py",
+    "provider_runtime_boundary": "skeleton/provider_runtime.py",
     "policy": "contract-before-implementation; undeclared providers, planes, services, roots, and interfaces fail closed",
     "provider_runtime_compatibility_loader": "backend/core/provider_architecture.py"
   },
