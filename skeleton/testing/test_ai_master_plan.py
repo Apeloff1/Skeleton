@@ -35,3 +35,19 @@ def test_promoted_volume_without_required_depth_fails_validation() -> None:
     mutated["volumes"][0]["requirements"] = []
     errors = checker.validate(mutated)
     assert any("status implemented requires non-empty requirements" in e for e in errors)
+
+
+def test_foundational_depth_pass_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-000-040")
+    assert depth["volume_range"] == [0, 40]
+    for volume in data["volumes"][:41]:
+        assert volume["depth_pass"] == "DP-000-040"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_foundational_depth_doc_exists_and_spans_000_040() -> None:
+    text = checker.DEPTH_000_040.read_text(encoding="utf-8")
+    assert "VOL-000" in text
+    assert "VOL-040" in text
