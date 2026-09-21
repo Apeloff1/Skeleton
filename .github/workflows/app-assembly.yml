@@ -11,6 +11,8 @@ on:
       - "skeleton/testing/test_app_assembly.py"
       - "skeleton/testing/test_architecture_map.py"
       - "skeleton/testing/test_ai_app_construction.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "skeleton/provider_contract.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "frontend/**"
@@ -28,6 +30,7 @@ on:
       - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
       - "AGENTS.md"
       - "CLAUDE.md"
+      - "GEMINI.md"
       - ".github/copilot-instructions.md"
       - ".cursor/rules/architecture.mdc"
       - ".github/workflows/app-assembly.yml"
@@ -103,8 +106,11 @@ jobs:
       - name: Compile assembly surface
         run: >-
           python -m compileall -q
-          skeleton/app skeleton/__main__.py
+          skeleton/app skeleton/__main__.py skeleton/provider_contract.py
+          skeleton/automation/free_model.py skeleton/jeeves/providers.py
           backend/core/ai_provider.py backend/core/provider_architecture.py
+          backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
+          backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
@@ -117,8 +123,11 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_architecture_map.py
           skeleton/testing/test_ai_app_construction.py
+          skeleton/testing/test_provider_contract.py
           skeleton/testing/test_app_assembly.py
           backend/tests/test_provider_architecture.py
+          backend/tests/test_ai_provider_adapter.py
+          backend/tests/test_ai_service_provider_convergence.py
 
       - name: Validate structural assembly
         env:
