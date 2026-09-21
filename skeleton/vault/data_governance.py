@@ -73,6 +73,10 @@ _ALLOWED_PROVIDER_PURPOSES = frozenset(
         "retrieval-synthesis",
         "verification",
         "evaluation",
+        "image-generation",
+        "image-variation",
+        "image-edit",
+        "speech-synthesis",
     }
 )
 
