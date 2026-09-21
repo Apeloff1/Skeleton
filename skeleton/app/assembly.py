@@ -118,10 +118,9 @@ def _manifest_bytes() -> bytes:
     return resources.files("skeleton.app").joinpath("manifest.json").read_bytes()
 
 
-def load_manifest() -> AssemblyManifest:
-    """Load and validate the packaged application assembly manifest."""
+def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
+    """Validate a decoded application manifest payload."""
 
-    payload = json.loads(_manifest_bytes().decode("utf-8"))
     if payload.get("schema_version") != 1:
         raise ValueError("unsupported application assembly manifest schema")
 
@@ -212,6 +211,15 @@ def load_manifest() -> AssemblyManifest:
         services=services,
     )
 
+
+
+def load_manifest() -> AssemblyManifest:
+    """Load and validate the packaged application assembly manifest."""
+
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("application assembly manifest root must be an object")
+    return parse_manifest(payload)
 
 def find_repo_root(start: Path | None = None) -> Path:
     """Find the checkout root without depending on the current working directory."""
