@@ -4,7 +4,7 @@ Usage:
     python -m skeleton <command> [options]
 
 Commands:
-    app         Unified application assembly (status/check/up/down/ps/logs)
+    app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     run         Start the skeleton runtime / GameForge vision run
     forge       Blueprint compilation and materialization
     test        Run test suites
