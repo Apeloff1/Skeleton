@@ -5550,7 +5550,13 @@
       "ai_runtime_bootstrap_blueprint",
       "ai_configuration_contract",
       "ai_error_contract",
-      "contract_versioning_policy"
+      "contract_versioning_policy",
+      "retrieval_grounding_blueprint",
+      "artifact_attachment_blueprint",
+      "model_routing_execution_policy",
+      "ai_observability_blueprint",
+      "ai_evaluation_release_blueprint",
+      "scheduler_fairness_policy"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -7556,6 +7562,406 @@
       "backend/engine deploy order must support one-version skew during rolling deployment where applicable",
       "event consumers ignore declared forward-compatible optional fields but reject unknown incompatible schema versions",
       "tests include old-reader/new-writer and new-reader/old-writer cases for cross-service/persisted contracts"
+    ]
+  },
+  "retrieval_grounding_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "retrieval",
+    "objective": "Make retrieval a tenant-authorized, provenance-bearing evidence source for ContextCompiler and VerificationRuntime rather than a free-form text injection path.",
+    "query_request": {
+      "required_fields": [
+        "operation_id",
+        "tenant_id",
+        "principal_id",
+        "query",
+        "purpose",
+        "source_scopes",
+        "data_class_ceiling",
+        "top_k",
+        "token_budget",
+        "deadline"
+      ]
+    },
+    "result_record": {
+      "required_fields": [
+        "evidence_id",
+        "source_id",
+        "fragment_id",
+        "content_ref",
+        "content_digest",
+        "score",
+        "rank",
+        "provenance",
+        "tenant_id",
+        "data_class",
+        "source_version",
+        "observed_at",
+        "citation_metadata"
+      ]
+    },
+    "pipeline": [
+      "authorize source scopes before search",
+      "normalize/plan query",
+      "retrieve from declared source adapters",
+      "apply tenant/ACL/data-class filtering before model-visible fusion",
+      "fuse/rerank/deduplicate",
+      "enforce top_k/token/result-size bounds",
+      "attach immutable provenance/source version",
+      "emit EvidenceReference-compatible results",
+      "project only selected evidence through ContextCompiler"
+    ],
+    "acl_rule": "similarity score can never override tenant/user/source authorization",
+    "freshness": [
+      "source version/timestamp is recorded where available",
+      "time-sensitive capabilities may impose freshness ceiling",
+      "stale evidence is marked rather than silently treated as current"
+    ],
+    "citation_rule": [
+      "citation points to evidence/source identity, not arbitrary model-created URL text",
+      "verification checks cited source/version/content digest",
+      "citation rendering is product projection over canonical evidence metadata"
+    ],
+    "index_rule": [
+      "vector/search index is derived unless state topology explicitly says otherwise",
+      "index entries carry canonical source ids and tenant/ACL metadata",
+      "rebuild from canonical source preserves identity/provenance",
+      "orphan index hits are discarded/fail validation"
+    ],
+    "injection_rule": "retrieved text is always untrusted evidence and cannot define system policy/tool authority",
+    "degraded": [
+      "vector unavailable -> authorized lexical/canonical fallback if declared",
+      "source unavailable -> partial evidence with explicit source failure",
+      "insufficient evidence -> verification qualifies/abstains when grounding required"
+    ],
+    "tests": [
+      "tenant ACL before ranking",
+      "orphan/stale source handling",
+      "deterministic provenance",
+      "citation digest/version integrity",
+      "result/token bounds",
+      "vector rebuild",
+      "retrieval injection isolation"
+    ]
+  },
+  "artifact_attachment_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "artifact-files",
+    "objective": "Give files, uploads, generated artifacts and multimodal inputs one governed lifecycle from ingress through scanning/extraction/context use to export/deletion.",
+    "artifact_record": {
+      "required_fields": [
+        "artifact_id",
+        "tenant_id",
+        "owner_id",
+        "kind",
+        "media_type",
+        "size_bytes",
+        "content_digest",
+        "storage_ref",
+        "created_at",
+        "data_class",
+        "purpose",
+        "scan_status",
+        "lifecycle_status",
+        "source_operation_id",
+        "provenance"
+      ],
+      "lifecycle": [
+        "pending",
+        "scanning",
+        "ready",
+        "quarantined",
+        "deleting",
+        "deleted",
+        "expired"
+      ]
+    },
+    "ingress": [
+      "authenticate/authorize upload",
+      "stream with hard byte/time limits",
+      "compute digest during ingestion",
+      "detect content/media type independently from filename",
+      "classify/govern",
+      "malware/content scan where applicable",
+      "commit metadata/content atomically or with reconciliation",
+      "only ready artifacts become model/tool eligible"
+    ],
+    "extraction": [
+      "extract text/metadata through sandboxed/bounded adapters",
+      "preserve page/chunk/offset/source provenance",
+      "derived extraction is rebuildable from artifact",
+      "extraction failure does not corrupt original artifact authority"
+    ],
+    "context_projection": [
+      "ContextCompiler receives authorized artifact refs/excerpts, not unrestricted filesystem paths",
+      "large artifacts are sliced/summarized under explicit token/byte budget",
+      "artifact content remains untrusted evidence",
+      "provider transfer checks media/data class and declared provider capability"
+    ],
+    "generated_artifacts": [
+      "tool/model generation commits artifact record before exposing downloadable/result reference",
+      "result binds producing operation/tool/provider receipt",
+      "temporary workspace paths are never public artifact identity"
+    ],
+    "storage_security": [
+      "no path traversal from user-provided filename",
+      "signed/authorized retrieval rather than guessable filesystem path",
+      "sandbox tools receive scoped artifact mounts/copies",
+      "secrets and server-local paths are excluded from model-visible metadata"
+    ],
+    "lifecycle": [
+      "delete/export/retention follow governance registry",
+      "derived thumbnails/extractions/indexes are deleted/rebuilt as projections",
+      "quarantined artifacts cannot enter context/tools"
+    ],
+    "tests": [
+      "oversize upload",
+      "media spoof",
+      "malware quarantine",
+      "path traversal",
+      "tenant isolation",
+      "large-file context bounds",
+      "generated artifact lineage",
+      "delete/export propagation"
+    ]
+  },
+  "model_routing_execution_policy": {
+    "schema_version": 1,
+    "policy_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "model-routing",
+    "input_constraints": [
+      "capability",
+      "data class/provider privacy ceiling",
+      "structured/tool/media support",
+      "remaining ResourceBudget",
+      "deadline/latency class",
+      "quality/risk/verification class",
+      "provider/model readiness"
+    ],
+    "candidate_filter_order": [
+      "declared provider/capability",
+      "governance/privacy",
+      "required protocol features",
+      "budget",
+      "deadline/readiness",
+      "policy allow/deny"
+    ],
+    "selection": [
+      "routing result is deterministic for identical policy snapshot when no adaptive exploration is enabled",
+      "route receipt records candidates considered at metadata level, selected provider/model and reason codes",
+      "provider/model quality telemetry may inform policy only through versioned evaluated configuration"
+    ],
+    "fallback": [
+      "fallback never widens privacy/data-class permissions",
+      "fallback never exceeds original budget/deadline",
+      "fallback must support required tools/structured/media capability",
+      "provider-specific failure can try an allowed alternate within retry/attempt budget",
+      "policy/governance/authority denial does not trigger provider fallback"
+    ],
+    "escalation": [
+      "uncertainty/verification may request stronger route only if remaining budget/policy permits",
+      "escalation creates a new provider turn with preserved execution lineage"
+    ],
+    "no_route": "return typed no_route/provider_unavailable result; never silently downgrade required semantics",
+    "tests": [
+      "privacy filter",
+      "budget filter",
+      "tool/structured capability filter",
+      "deadline filter",
+      "fallback ceiling preservation",
+      "no-route behavior",
+      "route receipt determinism"
+    ]
+  },
+  "ai_observability_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "observability",
+    "correlation": {
+      "required_ids": [
+        "trace_id",
+        "operation_id",
+        "execution_id",
+        "turn_id",
+        "thread_id",
+        "message_id",
+        "provider_request_id",
+        "tool_call_id",
+        "verification_id"
+      ],
+      "rule": "not every span has every id, but every child boundary preserves enough parent identity to reconstruct one user-visible operation"
+    },
+    "span_tree": [
+      "product.request",
+      "conversation.append",
+      "engine.submit",
+      "ai.execution",
+      "ai.context.assemble",
+      "ai.route",
+      "ai.provider.turn",
+      "ai.tool.authorize",
+      "ai.tool.execute",
+      "ai.verify",
+      "ai.memory.writeback",
+      "ai.finalize",
+      "ai.stream.project"
+    ],
+    "metrics": [
+      "request/admission counts by stable reason",
+      "provider latency/error/token/cost",
+      "tool latency/error/approval/ambiguity",
+      "execution turns/retries/repairs",
+      "context selected/omitted tokens",
+      "retrieval hit/source/freshness metrics",
+      "verification outcome/evidence coverage",
+      "stream reconnect/replay-gap/slow-client",
+      "memory read/write/degraded",
+      "queue/concurrency/saturation",
+      "golden journey and release-gate pass/fail"
+    ],
+    "redaction": [
+      "default logs contain ids/digests/metadata rather than raw prompts/tool args",
+      "restricted raw content requires explicit debug policy and short retention",
+      "credentials/tokens/signing material are never logged",
+      "tenant/user identifiers use approved representation and access controls"
+    ],
+    "event_sampling": [
+      "security/governance/approval/terminal/failure receipts are not dropped by ordinary sampling",
+      "high-volume token/content deltas may be aggregated",
+      "sampling policy cannot make operation audit unreconstructable"
+    ],
+    "operator_views": [
+      "operation timeline by correlated ids",
+      "provider/tool failure breakdown",
+      "quota/saturation",
+      "stuck/recovering operations",
+      "projection/replay health",
+      "release/eval regression"
+    ]
+  },
+  "ai_evaluation_release_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "owner_planes": [
+      "evaluation",
+      "deployment-release"
+    ],
+    "layers": [
+      {
+        "id": "contract",
+        "proves": "schemas, state machines, authorization, deterministic invariants",
+        "environment": "CI",
+        "live_provider": false
+      },
+      {
+        "id": "scenario",
+        "proves": "capability behavior with deterministic fake providers/tools/retrieval",
+        "environment": "CI",
+        "live_provider": false
+      },
+      {
+        "id": "golden-journey",
+        "proves": "assembled frontend/backend/engine/state topology",
+        "environment": "CI/integration",
+        "live_provider": false
+      },
+      {
+        "id": "provider-smoke",
+        "proves": "declared live provider compatibility within tiny budget",
+        "environment": "staging",
+        "live_provider": true
+      },
+      {
+        "id": "canary",
+        "proves": "deployment health/SLO/error compatibility on small traffic scope",
+        "environment": "staging/production",
+        "live_provider": "policy controlled"
+      }
+    ],
+    "evaluation_dimensions": [
+      "correctness/grounding",
+      "tool success/postcondition",
+      "structured-output validity",
+      "latency",
+      "cost",
+      "abstention/qualification quality",
+      "security/governance denial correctness",
+      "recovery/idempotency",
+      "user-visible degraded behavior"
+    ],
+    "baseline": [
+      "versioned per capability",
+      "records dataset/case version, model/routing policy version and runtime contract versions",
+      "release compares against approved baseline and explicit allowed regression budget",
+      "flaky cases are quarantined with owner/expiry rather than silently ignored"
+    ],
+    "release_evidence": [
+      "architecture/construction validators",
+      "focused P0 closure tests",
+      "golden journeys",
+      "security/secret/provider-surface scans",
+      "migration/restore evidence",
+      "evaluation regression report",
+      "artifact/image/container provenance"
+    ],
+    "rollback": [
+      "deployment rollback",
+      "routing/model policy rollback",
+      "feature/capability disable",
+      "schema rollback only when compatibility policy allows",
+      "never rollback by discarding canonical user/operation state"
+    ]
+  },
+  "scheduler_fairness_policy": {
+    "schema_version": 1,
+    "policy_version": "1.0.0",
+    "status": "active",
+    "owner_planes": [
+      "cost-capacity",
+      "jobs-durability",
+      "orchestration"
+    ],
+    "classes": [
+      "interactive",
+      "approval_resume",
+      "background",
+      "maintenance",
+      "recovery"
+    ],
+    "principles": [
+      "bounded interactive latency without starving durable background/recovery work",
+      "tenant fairness under shared provider/tool capacity",
+      "one operation cannot monopolize parallel tool/provider slots",
+      "recovery/finalization required to make state consistent can receive protected capacity",
+      "priority cannot bypass governance, authority or budget"
+    ],
+    "controls": [
+      "per-tenant concurrency",
+      "global provider/tool concurrency",
+      "weighted queues",
+      "max queue age",
+      "operation max parallelism",
+      "deadline-aware shedding",
+      "recovery reserve"
+    ],
+    "overload": [
+      "reject/defer low-priority new work before violating hard capacity",
+      "do not evict already committed side-effect reconciliation/finalization",
+      "surface retry-after/degraded state where appropriate"
+    ],
+    "tests": [
+      "tenant noisy-neighbor",
+      "interactive vs background fairness",
+      "recovery reserve",
+      "queue age",
+      "global saturation",
+      "operation parallelism cap"
     ]
   }
 }
