@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import hashlib
+import math
 import threading
 import time
 from typing import Any
@@ -42,6 +43,13 @@ class AdmissionRuntimeError(RuntimeError):
 
 class AdmissionRuntimeConflict(AdmissionRuntimeError):
     """Operation admission state conflicts with an active lease."""
+
+
+def _wall_time(value: float | None, *, field: str) -> float:
+    number = time.time() if value is None else float(value)
+    if not math.isfinite(number) or number < 0:
+        raise ValueError(f"{field} must be finite and non-negative")
+    return number
 
 
 def _request_fingerprint(request: AdmissionRequest) -> str:
@@ -170,7 +178,7 @@ class AdmissionRuntime:
     ) -> AdmissionLease:
         if not isinstance(request, AdmissionRequest):
             raise TypeError("request must be an AdmissionRequest")
-        wall = time.time() if now_wall is None else float(now_wall)
+        wall = _wall_time(now_wall, field="now_wall")
         fingerprint = _request_fingerprint(request)
 
         with self._lock:
@@ -230,7 +238,7 @@ class AdmissionRuntime:
         operation = str(operation_id).strip()
         if not operation:
             raise AdmissionRuntimeError("operation_id is required")
-        wall = time.time() if now_wall is None else float(now_wall)
+        wall = _wall_time(now_wall, field="now_wall")
 
         with self._lock:
             active = self._active.get(operation)
