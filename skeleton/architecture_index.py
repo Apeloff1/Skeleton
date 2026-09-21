@@ -180,20 +180,20 @@ PLAN_CHECKPOINTS = {
     "PLAN-20260921-FRONTIER-RESEARCH-SATURATION": {
         "created_at": "2026-09-21",
         "tracks": ("AD",),
-        "research_conclusion_range": ("FR001", "FR114"),
-        "research_question_range": ("RQ001", "RQ067"),
-        "source_verification_range": ("SV001", "SV066"),
-        "frontier_delta_range": ("FD001", "FD026"),
+        "research_conclusion_range": ("FR001", "FR144"),
+        "research_question_range": ("RQ001", "RQ082"),
+        "source_verification_range": ("SV001", "SV072"),
+        "frontier_delta_range": ("FD001", "FD031"),
         "contradiction_range": ("CX001", "CX024"),
-        "research_debt_range": ("RDE001", "RDE036"),
-        "experiment_protocol_range": ("RXP001", "RXP050"),
+        "research_debt_range": ("RDE001", "RDE046"),
+        "experiment_protocol_range": ("RXP001", "RXP062"),
         "production_authority_granted": False,
         "research_refresh_required": True,
     },
     "PLAN-20260922-RESEARCH-DEPENDENCY-MAP": {
         "created_at": "2026-09-22T00:06:00+02:00",
         "tracks": ("AD",),
-        "domain_count": 19,
+        "domain_count": 24,
         "research_question_range": ("RQ001", "RQ067"),
         "research_debt_range": ("RDE001", "RDE036"),
         "experiment_protocol_range": ("RXP001", "RXP050"),
@@ -356,6 +356,11 @@ FRONTIER_RESEARCH_DOMAINS = (
     "continual_adaptation",
     "hardware_precision_efficiency",
     "research_automation",
+    "model_compression_distillation_pruning",
+    "privacy_preserving_learning_inference",
+    "software_engineering_code_agents",
+    "human_ai_operator_science",
+    "causal_counterfactual_modeling",
 )
 
 RESEARCH_PASS_INVARIANTS = {
@@ -379,13 +384,13 @@ RESEARCH_PASS_INVARIANTS = {
     "research_cannot_directly_mutate_production": True,
 }
 
-RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
-RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 68))
-RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 67))
-FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 27))
+RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 145))
+RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 83))
+RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 73))
+FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 32))
 RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
-RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 37))
-RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 51))
+RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 47))
+RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 63))
 HISTORICAL_RESEARCH_LINEAGE_IDS = tuple(f"HL{number:03d}" for number in range(1, 111))
 RESEARCH_SOURCE_FAMILY_IDS = tuple(f"RS{number:03d}" for number in range(1, 56))
 
