@@ -569,3 +569,75 @@ Every SOTA statement therefore needs:
 - refresh policy.
 
 This definition prevents benchmark fashion from becoming architecture debt.
+
+
+## 21. Exotic architecture evidence contract
+
+Track AC candidates receive additional evidence fields because conventional model evidence is insufficient for architectures with mutable inference state, non-autoregressive decoding, dynamic depth, implicit convergence, generated weights, or unusual hardware.
+
+Required fields:
+
+```text
+exotic_candidate_id
+challenged_assumption
+architecture_family
+evidence_tier
+persistent_state
+ephemeral_state
+inference_time_mutation
+mutation_scope
+reset_semantics
+convergence_or_stop_rule
+tentative_output_semantics
+commit_rule
+representation_dependency
+hardware_specialization
+strongest_conventional_baseline
+falsification_test
+kill_criteria
+compound_components[]
+component_ablation_status
+track_ab_compatibility
+track_aa_graduation_status
+```
+
+### Exotic evidence defaults
+
+- a new exotic idea begins as `emerging` or `mixed`, not `frontier` by declaration;
+- a microbenchmark cannot raise evidence maturity by itself;
+- theoretical asymptotic improvement without measured hardware benefit is scoped as theory/system-potential evidence;
+- mutable inference-time state requires replay/reset evidence before any persistent use;
+- non-autoregressive or revise-anywhere generation must prove commit semantics before tool/action integration;
+- recursive/equilibrium methods must record non-convergence and tail-iteration behavior, not only average quality;
+- compound candidates must report component ablations;
+- architecture-search outputs inherit the evidence maturity of their evaluation procedure and cannot validate themselves.
+
+### Graduation rule
+
+```text
+Track AC research
+ -> reproduced candidate
+ -> falsification survived
+ -> full-stack systems evidence
+ -> Track AB compatibility
+ -> Track AA candidate
+ -> normal shadow/canary/promotion state machine
+```
+
+There is no direct AC → production edge.
+
+## 22. Research refresh for exotic candidates
+
+Exotic evidence receives additional refresh triggers:
+
+- new independent scale reproduction;
+- failure to transfer to a larger scale;
+- new kernel/hardware support;
+- revised convergence analysis;
+- new cross-session/state leakage finding;
+- tokenizer/representation incompatibility;
+- new conventional baseline that removes the claimed advantage;
+- composition failure with another promoted subsystem;
+- architecture simplification showing the exotic component was unnecessary.
+
+A simpler architecture that matches an exotic candidate's measured benefit is preferred unless the exotic candidate retains another material full-stack advantage.
