@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.6",
+  "schema_version": "5.7",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -504,7 +504,7 @@
         "archive/pr-runner-v2-pre-reconcile-20260920",
         "archive/workflow-secret-output-pre-rebase-20260920"
       ],
-      "note": "archive snapshots diverge substantially; retained as historical source material, not merged"
+      "note": "Historical archive snapshots retain unique file deltas but diverge substantially from assembly; retained as recovery/source material and not merge targets."
     },
     "backup_wave": {
       "revalidated": [
