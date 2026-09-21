@@ -8,6 +8,7 @@ that ordinary unit tests cannot see when subsystems are edited independently.
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import sys
@@ -230,6 +231,129 @@ def audit_launcher_convergence() -> None:
     check("Enter Product" in welcome, "welcome product label drift")
 
 
+def _backend_product_policy() -> dict[str, tuple[str, ...]]:
+    tree = ast.parse(read("backend/core/canonical_product_policy.py"))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY" for target in node.targets):
+            continue
+        if not isinstance(node.value, ast.Tuple):
+            break
+        policy: dict[str, tuple[str, ...]] = {}
+        for item in node.value.elts:
+            check(
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Name)
+                and item.func.id == "CanonicalDomainPolicy"
+                and len(item.args) == 2,
+                "canonical product policy contains unsupported syntax",
+            )
+            if not (
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Name)
+                and item.func.id == "CanonicalDomainPolicy"
+                and len(item.args) == 2
+            ):
+                continue
+            domain_node, actions_node = item.args
+            if not (
+                isinstance(domain_node, ast.Constant)
+                and isinstance(domain_node.value, str)
+                and isinstance(actions_node, ast.Tuple)
+            ):
+                FAILURES.append("canonical product policy must use literal domain/action tuples")
+                continue
+            actions: list[str] = []
+            for action_node in actions_node.elts:
+                if not isinstance(action_node, ast.Constant) or not isinstance(action_node.value, str):
+                    FAILURES.append(f"canonical product policy action for {domain_node.value} is not a literal string")
+                    continue
+                actions.append(action_node.value)
+            policy[domain_node.value] = tuple(actions)
+        return policy
+    FAILURES.append("CANONICAL_PRODUCT_POLICY assignment not found")
+    return {}
+
+
+def _backend_product_kernel() -> dict[str, tuple[str, ...]]:
+    tree = ast.parse(read("backend/core/product_kernel.py"))
+    for node in tree.body:
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        if not isinstance(node.target, ast.Name) or node.target.id != "CAPABILITIES":
+            continue
+        if not isinstance(node.value, ast.Tuple):
+            break
+        kernel: dict[str, tuple[str, ...]] = {}
+        for item in node.value.elts:
+            if not (
+                isinstance(item, ast.Call)
+                and isinstance(item.func, ast.Name)
+                and item.func.id == "Capability"
+                and len(item.args) >= 4
+                and isinstance(item.args[0], ast.Constant)
+                and isinstance(item.args[0].value, str)
+                and isinstance(item.args[3], ast.Tuple)
+            ):
+                FAILURES.append("product kernel capability contains unsupported syntax")
+                continue
+            prefixes: list[str] = []
+            for prefix_node in item.args[3].elts:
+                if isinstance(prefix_node, ast.Constant) and isinstance(prefix_node.value, str):
+                    prefixes.append(prefix_node.value)
+                else:
+                    FAILURES.append(f"product kernel prefix for {item.args[0].value} is not a literal string")
+            kernel[item.args[0].value] = tuple(prefixes)
+        return kernel
+    FAILURES.append("product kernel CAPABILITIES assignment not found")
+    return {}
+
+
+def _frontend_product_catalog() -> tuple[dict[str, tuple[str, ...]], dict[str, str]]:
+    source = read("frontend/src/product/productCatalog.ts")
+    block_re = re.compile(
+        r"(?ms)^  \\{\\n    id: '([^']+)'.*?^    backendSurface: '([^']+)',.*?^    actions: \\[(.*?)^    \\],\\n^  \\},"
+    )
+    policy: dict[str, tuple[str, ...]] = {}
+    surfaces: dict[str, str] = {}
+    for match in block_re.finditer(source):
+        capability_id, surface, action_block = match.groups()
+        actions = tuple(re.findall(r"operation: '([^']+)'", action_block))
+        policy[capability_id] = actions
+        surfaces[capability_id] = surface
+    check(bool(policy), "frontend canonical product catalog could not be parsed")
+    return policy, surfaces
+
+
+def audit_product_catalog_alignment() -> None:
+    backend_policy = _backend_product_policy()
+    kernel = _backend_product_kernel()
+    frontend_policy, frontend_surfaces = _frontend_product_catalog()
+
+    check(
+        set(frontend_policy) == set(backend_policy),
+        f"frontend/backend product capability drift: frontend={sorted(frontend_policy)} backend={sorted(backend_policy)}",
+    )
+    check(
+        set(kernel) == set(backend_policy),
+        f"kernel/policy capability drift: kernel={sorted(kernel)} policy={sorted(backend_policy)}",
+    )
+
+    for capability_id, backend_actions in backend_policy.items():
+        frontend_actions = frontend_policy.get(capability_id, ())
+        check(
+            frontend_actions == backend_actions,
+            f"product action drift for {capability_id}: frontend={frontend_actions} backend={backend_actions}",
+        )
+        surface = frontend_surfaces.get(capability_id)
+        prefixes = kernel.get(capability_id, ())
+        check(
+            surface in prefixes,
+            f"frontend backendSurface for {capability_id} is not owned by product kernel: {surface!r} not in {prefixes}",
+        )
+
+
 def audit_product_health_contract() -> None:
     client = read("frontend/src/product/appHealthClient.ts")
     shell = read("frontend/app/product.tsx")
@@ -316,6 +440,7 @@ def main() -> int:
     audit_compose_modes()
     audit_production_ingress()
     audit_launcher_convergence()
+    audit_product_catalog_alignment()
     audit_product_health_contract()
     audit_product_control_contract()
     audit_product_route_registry()
