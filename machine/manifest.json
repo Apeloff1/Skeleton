@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.5",
+  "schema_version": "5.6",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -583,6 +583,13 @@
         "branch-clean-fail-closed current-main"
       ],
       "note": "revalidated fix branches are already represented in integration staging; no duplicate integration PRs created."
+    },
+    "merge_wave": {
+      "held": [
+        "merge/repo-machine-gates-20260920",
+        "merge/1669-safe-20260920"
+      ],
+      "note": "Both merge snapshots diverge materially from assembly (115 and 150 files respectively) and are retained for controlled reconciliation; no blind merge performed."
     }
   },
   "integrated_domains": [
