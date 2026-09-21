@@ -307,6 +307,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             "COPY --chown=appuser:appuser machine/manifest.json ./machine/manifest.json",
             "COPY --chown=appuser:appuser machine/architecture.json ./machine/architecture.json",
             "COPY --chown=appuser:appuser machine/ai_app_construction.json ./machine/ai_app_construction.json",
+            "COPY --chown=appuser:appuser machine/capability_interfaces.json ./machine/capability_interfaces.json",
             "COPY --chown=appuser:appuser docs/AI_APP_CONSTRUCTION_MANUAL.md ./docs/AI_APP_CONSTRUCTION_MANUAL.md",
         ):
             if token not in docker:
