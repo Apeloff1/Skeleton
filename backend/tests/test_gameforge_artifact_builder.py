@@ -64,12 +64,14 @@ def test_deterministic_build_token_reuses_same_artifact_identity(tmp_path):
         files=[{"filename": "main.py", "content": "print(1)"}],
         artifacts_root=tmp_path,
         build_token="operation-123",
+        built_at=1_700_000_000,
     )
     second = build_source_artifact(
         "demo",
         files=[{"filename": "main.py", "content": "print(1)"}],
         artifacts_root=tmp_path,
         build_token="operation-123",
+        built_at=1_700_000_000,
     )
 
     assert second["build_id"] == first["build_id"]
