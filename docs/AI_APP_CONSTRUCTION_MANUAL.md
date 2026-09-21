@@ -1477,4 +1477,3 @@ The mandatory provider rule is enforced at three different layers:
 This is deliberately redundant. The goal is not to trust that a provider
 "probably saw" the architecture; the goal is to make architecture
 acknowledgement a condition of activation or repository work.
-
