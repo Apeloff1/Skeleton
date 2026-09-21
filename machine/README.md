@@ -136,6 +136,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Temporary branches:** `tmp/java-accelerator-operations-rebase-20260920` is zero-file lineage versus assembly; no integration action required.
 
+- **Chore wave:** PR #1877 stages a distinct 4-file small backlog drain; the 0-file housekeeping runner remains lineage only.
+
 ## Target layout
 
 ```text
