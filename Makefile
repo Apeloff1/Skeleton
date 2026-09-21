@@ -1,4 +1,4 @@
-.PHONY: install dev app app-preload app-setup app-install app-check app-status app-down test smoke verify quality ci lint clean
+.PHONY: install dev app app-preload app-setup app-install windows-installer app-check app-status app-down test smoke verify quality ci lint clean
 
 install:
 	pip install -r requirements.txt
@@ -17,6 +17,9 @@ app-setup:
 
 app-install:
 	python -m skeleton app install
+
+windows-installer:
+	pwsh ./scripts/windows/build_installer.ps1
 
 app-check:
 	python -m skeleton app check
