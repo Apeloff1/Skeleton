@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from skeleton.intelligence.admission import ResourceBudget
+from skeleton.intelligence.admission import (
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.vault.data_lifecycle import GovernedDataRecord
 from skeleton.vault.governance_registry import GovernanceRegistry
 
@@ -346,3 +352,133 @@ async def test_registry_context_tenant_mismatch_fails_before_provider_io(
         )
 
     assert adapter._client.responses.calls == 0
+
+
+class _FailingResponses:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def create(self, **_kwargs):
+        self.calls += 1
+        raise TimeoutError("upstream timeout detail")
+
+
+@pytest.mark.asyncio
+async def test_provider_uses_shared_runtime_pressure_before_io() -> None:
+    runtime = AdmissionRuntime()
+    runtime.admit(
+        AdmissionRequest(
+            operation_id="other-operation",
+            tenant_id="tenant-a",
+            capability="background-work",
+            budget=ResourceBudget(max_concurrency=32),
+            estimate=UsageEstimate(),
+        ),
+        now_wall=10.0,
+    )
+    client = _FakeClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="configured-model",
+        client=client,
+        admission_runtime=runtime,
+    )
+
+    with pytest.raises(ProviderPolicyError, match="resource admission"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="hello",
+                operation_id="provider-operation",
+                tenant_id="tenant-a",
+                resource_budget=ResourceBudget(max_concurrency=1),
+            )
+        )
+
+    assert client.responses.calls == 0
+    runtime.release("other-operation")
+
+
+@pytest.mark.asyncio
+async def test_provider_failure_releases_shared_admission_lease() -> None:
+    runtime = AdmissionRuntime()
+    failing = _FailingResponses()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="configured-model",
+        client=SimpleNamespace(responses=failing),
+        admission_runtime=runtime,
+    )
+
+    with pytest.raises(ProviderInvocationError, match="request failed"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="hello",
+                operation_id="provider-operation",
+                tenant_id="tenant-a",
+                resource_budget=ResourceBudget(max_concurrency=1),
+            )
+        )
+
+    assert failing.calls == 1
+    assert runtime.pressure.active_operations == 0
+
+
+@pytest.mark.asyncio
+async def test_provider_reconciles_returned_token_usage_into_tenant_quota() -> None:
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="window-1",
+            max_operations=10,
+            max_input_tokens=1_000,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_concurrent_operations=2,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+
+    class _UsageResponses:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def create(self, **_kwargs):
+            self.calls += 1
+            return SimpleNamespace(
+                output_text="ok",
+                id="resp_usage",
+                usage=SimpleNamespace(
+                    input_tokens=7,
+                    output_tokens=3,
+                ),
+            )
+
+    responses = _UsageResponses()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="configured-model",
+        client=SimpleNamespace(responses=responses),
+        admission_runtime=runtime,
+    )
+
+    result = await adapter.generate(
+        ProviderRequest(
+            instructions="rules",
+            prompt="hello",
+            operation_id="provider-operation",
+            tenant_id="tenant-a",
+            estimated_cost_usd=0.25,
+        )
+    )
+
+    assert result.text == "ok"
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["committed"]["operations"] == 1
+    assert snapshot["committed"]["input_tokens"] == 7
+    assert snapshot["committed"]["output_tokens"] == 3
+    assert snapshot["committed"]["cost_usd"] == 0.25
+    assert runtime.pressure.active_operations == 0
