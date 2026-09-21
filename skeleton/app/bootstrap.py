@@ -47,6 +47,11 @@ def public_bootstrap_payload(
             "version": manifest.version,
             "assembly_schema_version": manifest.schema_version,
         },
+        "contract": {
+            "bootstrap": manifest.contract_path("bootstrap"),
+            "status": manifest.contract_path("status"),
+            "ready": manifest.contract_path("ready"),
+        },
         "profiles": {
             "default": {
                 "services": list(default_plan.services),
