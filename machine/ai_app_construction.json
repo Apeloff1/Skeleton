@@ -11,7 +11,7 @@
   "provider_bootstrap": {
     "mandatory": true,
     "mode": "fail_closed",
-    "rule": "Every AI development agent and every runtime model provider activation must load the active architecture and construction contracts before changing or serving the system.",
+    "rule": "Every AI development agent and every credential-bearing AI provider family must load the active architecture and construction contracts before changing or serving the system.",
     "must_read": [
       "machine/manifest.json",
       "machine/architecture.json",
@@ -57,7 +57,7 @@
     ],
     "runtime_enforcement": {
       "loader": "skeleton/provider_contract.py",
-      "activation_boundary": "backend/core/ai_provider.py",
+      "activation_boundary": "skeleton/provider_runtime.py",
       "docker_materialization": "backend/Dockerfile",
       "receipt_required": true,
       "undeclared_provider_policy": "deny",
@@ -67,6 +67,10 @@
       "provider_families": [
         "runtime_model",
         "automation_model"
+      ],
+      "compatibility_boundaries": [
+        "backend/core/ai_provider.py",
+        "skeleton/jeeves/providers.py"
       ]
     }
   },
@@ -183,16 +187,19 @@
     },
     {
       "id": "model-provider",
-      "owner": "backend/core/ai_provider.py",
+      "owner": "skeleton/provider_runtime.py",
       "state": "present",
-      "responsibility": "Provider-neutral model request/response boundary and concrete runtime provider adapters.",
+      "responsibility": "Engine-owned provider-neutral model request/response boundary, concrete runtime transports, policy receipts, and application compatibility facades.",
       "depends_on": [
         "foundation",
         "configuration-secrets"
       ],
       "evidence": [
+        "skeleton/provider_runtime.py",
+        "skeleton/provider_contract.py",
         "backend/core/ai_provider.py",
         "backend/core/ai_provider_compat.py",
+        "skeleton/jeeves/providers.py",
         "backend/emergentintegrations/llm/chat.py"
       ],
       "required_interfaces": [
@@ -201,7 +208,10 @@
         "ProviderAdapter",
         "provider architecture receipt",
         "governance decision receipt",
-        "admission decision receipt"
+        "admission decision receipt",
+        "single credential-bearing runtime owner",
+        "sync/async transport parity",
+        "compatibility surfaces contain no provider credentials"
       ],
       "construction": [
         "provider reads mandatory construction contract",
@@ -210,13 +220,17 @@
         "normalize errors",
         "never expose credentials",
         "evaluate data governance before provider client access",
-        "evaluate resource admission before provider client access"
+        "evaluate resource admission before provider client access",
+        "own provider credentials and transport in skeleton/provider_runtime.py only",
+        "keep backend and Jeeves provider modules as non-credential compatibility facades"
       ],
       "acceptance": [
         "provider contract gate",
         "SDK isolation tests",
         "unsafe base URL rejection",
-        "empty/invalid output rejection"
+        "empty/invalid output rejection",
+        "provider surface discovery proves one runtime credential owner",
+        "Jeeves compatibility source contains no credential or raw provider transport"
       ],
       "failure_mode": "provider unavailable, no credential leakage"
     },
@@ -265,7 +279,7 @@
       "evidence": [
         "skeleton/context",
         "skeleton/contexts",
-        "backend/core/ai_provider.py"
+        "skeleton/provider_runtime.py"
       ],
       "required_interfaces": [
         "context envelope",
@@ -1295,7 +1309,7 @@
     {
       "id": "openai",
       "state": "active",
-      "adapter": "backend/core/ai_provider.py:OpenAIProviderAdapter",
+      "adapter": "skeleton/provider_runtime.py:OpenAIProviderAdapter",
       "protocol": "OpenAI Responses API",
       "architecture_read_required": true,
       "construction_manual_read_required": true,
@@ -1313,7 +1327,10 @@
         "text-generation"
       ],
       "undeclared_capability_policy": "deny",
-      "network_policy": "https-only; no URL credentials; block localhost, metadata endpoints and non-global literal IPs"
+      "network_policy": "https-only; no URL credentials; block localhost, metadata endpoints and non-global literal IPs",
+      "sync_adapter": "skeleton/provider_runtime.py:OpenAISyncProviderAdapter",
+      "compatibility_facade": "backend/core/ai_provider.py",
+      "execution_owner": "skeleton/provider_runtime.py"
     }
   ],
   "gap_policy": {
@@ -1472,19 +1489,20 @@
       "plane": "model-provider",
       "priority": "P0",
       "status": "open",
-      "gap": "Credential-bearing model execution still exists in the transitional synchronous Jeeves provider surface in addition to the canonical backend runtime.",
+      "gap": "Runtime provider execution has been promoted into skeleton/provider_runtime.py; closure now depends on proving backend/Jeeves are non-credential facades and repository discovery finds no hidden runtime-model transport.",
       "construction": [
-        "require the shared architecture receipt on every Jeeves network provider before availability or I/O",
-        "deny undeclared Jeeves providers even when legacy credentials are configured",
-        "migrate Jeeves network execution behind one shared provider adapter/transport contract",
-        "retain LocalEchoProvider as an offline deterministic fallback rather than a network provider",
-        "remove legacy provider credentials after all Jeeves call sites use the canonical transport"
+        "promote async runtime provider implementation to skeleton/provider_runtime.py",
+        "add dependency-free synchronous adapter under the same governance/admission/receipt boundary",
+        "collapse backend/core/ai_provider.py to a compatibility facade",
+        "collapse Jeeves network providers to canonical runtime wrappers and explicit undeclared-provider denial",
+        "run provider-surface discovery across backend and engine source"
       ],
       "closure_evidence": [
-        "Jeeves OpenAI receipt enforcement test",
-        "undeclared Anthropic denial test",
-        "provider-surface inventory gate",
-        "no credential-bearing model provider outside declared provider surfaces"
+        "canonical async provider regression suite",
+        "canonical synchronous provider transport regression suite",
+        "Jeeves source has no model credentials or raw provider network I/O",
+        "provider-surface inventory gate reports only declared credential-bearing owners",
+        "SDK isolation scans backend and skeleton source"
       ]
     }
   ],
@@ -1619,31 +1637,40 @@
   ],
   "provider_surfaces": [
     {
-      "id": "backend-runtime",
+      "id": "engine-runtime",
       "family": "runtime_model",
-      "role": "canonical product runtime model execution",
-      "owner": "backend/core/ai_provider.py",
+      "role": "canonical product and engine runtime model execution; sole runtime-model credential and transport owner",
+      "owner": "skeleton/provider_runtime.py",
       "credential_bearing": true,
       "receipt_required": true,
       "status": "canonical"
     },
     {
+      "id": "backend-runtime-compat",
+      "family": "runtime_model",
+      "role": "historical backend provider import facade delegating to engine runtime",
+      "owner": "backend/core/ai_provider.py",
+      "credential_bearing": false,
+      "receipt_required": true,
+      "status": "compatibility"
+    },
+    {
       "id": "backend-legacy-compat",
       "family": "runtime_model",
-      "role": "legacy backend call compatibility only",
+      "role": "legacy chat-builder/message compatibility delegating to canonical runtime",
       "owner": "backend/core/ai_provider_compat.py",
       "credential_bearing": false,
       "receipt_required": true,
       "status": "compatibility"
     },
     {
-      "id": "jeeves-legacy-runtime",
+      "id": "jeeves-runtime-compat",
       "family": "runtime_model",
-      "role": "legacy synchronous Jeeves model compatibility pending convergence",
+      "role": "legacy synchronous Jeeves provider protocol wrapping canonical synchronous runtime adapter",
       "owner": "skeleton/jeeves/providers.py",
-      "credential_bearing": true,
+      "credential_bearing": false,
       "receipt_required": true,
-      "status": "transitional"
+      "status": "compatibility"
     },
     {
       "id": "repository-automation",
@@ -1666,7 +1693,7 @@
     {
       "id": "jeeves-provider-router",
       "family": "none",
-      "role": "provider-neutral retry/cache/circuit orchestration; concrete network providers remain separately governed",
+      "role": "provider-neutral retry/cache/circuit orchestration; concrete network execution is delegated to canonical provider runtime",
       "owner": "skeleton/jeeves/agent/provider.py",
       "credential_bearing": false,
       "receipt_required": false,
