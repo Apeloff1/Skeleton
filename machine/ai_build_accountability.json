@@ -18311,8 +18311,8 @@
         "signer_id": "chatgpt:gpt-5.6-sol",
         "signer_type": "agent",
         "role": "implementation-agent",
-        "signed_at_utc": "2026-09-21T17:35:47Z",
-        "git_sha": "740954febacd5a52a645e19edc9d8401f8c39037",
+        "signed_at_utc": "2026-09-21T17:37:44Z",
+        "git_sha": "2317eebe1e982f953b8956dc47d3ceb781fe91a1",
         "evidence_refs": [
           "https://github.com/Apeloff1/Skeleton/commit/5a87dbff0347ebb01a48ef6e23d3c2ddb903bd6d",
           "https://github.com/Apeloff1/Skeleton/commit/9a2f0dc136828f04a5a079f4892642beec3c1c6c",
@@ -18320,11 +18320,15 @@
           "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json",
           "https://github.com/Apeloff1/Skeleton/commit/30415b23a06c577d81005f427221b337763d93ea",
           "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037",
-          "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json"
+          "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json",
+          "https://github.com/Apeloff1/Skeleton/commit/4ee378fc3473814d0580c95185652f5a18caddf3",
+          "https://github.com/Apeloff1/Skeleton/commit/6253a0436444039b8485f47aa50062116eec3922",
+          "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+          "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-003.json"
         ],
-        "statement": "Superseding implementation attestation: canonical governance write registration is implemented and hardened against scalar-string iterable ambiguity.",
+        "statement": "Superseding implementation attestation: canonical governance write registration is retry-safe, idempotent for identical replay, conflict-safe for metadata reuse, and regression-covered.",
         "signature_method": "github_identity",
-        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037"
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1"
       },
       "verification_signoff": {
         "signed": false,
@@ -18340,7 +18344,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T17:35:47Z",
+      "last_event_at_utc": "2026-09-21T17:37:44Z",
       "history": [
         {
           "sequence": 1,
@@ -18398,6 +18402,27 @@
             "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json"
           ],
           "supersedes_git_sha": "74243c2ac41b40040dce059d9fdb9416dce03ada"
+        },
+        {
+          "sequence": 4,
+          "event_type": "implementation_superseded",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:37:44Z",
+          "git_sha": "2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+          "statement": "Supersede prior implementation attestation after retry-safe registration hardening.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/4ee378fc3473814d0580c95185652f5a18caddf3",
+            "https://github.com/Apeloff1/Skeleton/commit/6253a0436444039b8485f47aa50062116eec3922",
+            "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+            "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-003.json"
+          ],
+          "supersedes_git_sha": "740954febacd5a52a645e19edc9d8401f8c39037"
         }
       ],
       "evidence": [
@@ -18407,7 +18432,11 @@
         "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation.json",
         "https://github.com/Apeloff1/Skeleton/commit/30415b23a06c577d81005f427221b337763d93ea",
         "https://github.com/Apeloff1/Skeleton/commit/740954febacd5a52a645e19edc9d8401f8c39037",
-        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json"
+        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-002.json",
+        "https://github.com/Apeloff1/Skeleton/commit/4ee378fc3473814d0580c95185652f5a18caddf3",
+        "https://github.com/Apeloff1/Skeleton/commit/6253a0436444039b8485f47aa50062116eec3922",
+        "https://github.com/Apeloff1/Skeleton/commit/2317eebe1e982f953b8956dc47d3ceb781fe91a1",
+        "machine/accountability_events/ACC-AIQ-S0-GOV-01/implementation-003.json"
       ],
       "baseline_status": "pending"
     },
