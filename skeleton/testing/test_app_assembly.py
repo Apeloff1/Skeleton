@@ -243,3 +243,16 @@ def test_wait_for_application_rejects_invalid_budget():
         wait_for_application(timeout=0)
     with pytest.raises(ValueError, match="delay"):
         wait_for_application(delay=-1)
+
+
+def test_all_launcher_paths_converge_on_product_shell():
+    root = find_repo_root(Path(__file__))
+    launch = (root / "frontend/components/LaunchCascade.tsx").read_text(encoding="utf-8")
+    welcome = (root / "frontend/app/welcome.tsx").read_text(encoding="utf-8")
+    safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
+
+    assert "router.replace('/product')" in launch
+    assert "router.replace('/product')" in welcome
+    assert "router.replace('/product')" in safe_mode
+    assert "Enter Product" in launch
+    assert "Enter Product" in welcome
