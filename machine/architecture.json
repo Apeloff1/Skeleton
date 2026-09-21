@@ -21,7 +21,8 @@
     "capability_interface_validator": "scripts/check_capability_interfaces.py",
     "state_topology": "machine/state_topology.json",
     "state_topology_validator": "scripts/check_state_topology.py",
-    "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json"
+    "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+    "ai_implementation_handoff": "machine/ai_implementation_handoff.json"
   },
   "objectives": [
     "one product shell",
@@ -554,7 +555,8 @@
     "derived and scratch state cannot become sole canonical authority",
     "mixed-authority and unbound-authority state is transitional and attached to an open P0 gap",
     "authoritative state recovery precedes derived projection rebuild",
-    "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest"
+    "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest",
+    "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG."
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
