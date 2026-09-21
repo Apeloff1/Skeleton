@@ -38,12 +38,13 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.11.16"
+  NODE_VERSION: "24.20.0"
 
 jobs:
   assembly-contract:
     name: Assembly Contract
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -57,6 +58,30 @@ jobs:
 
       - name: Install focused test runtime
         run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "${{ env.NODE_VERSION }}"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without third-party lifecycle scripts
+        working-directory: frontend
+        run: yarn install --frozen-lockfile --ignore-scripts
+
+      - name: Apply reviewed local node_modules patches
+        working-directory: frontend
+        run: node ./scripts/patch-node-modules.js
+
+      - name: Validate assembled frontend
+        working-directory: frontend
+        env:
+          EXPO_PUBLIC_BACKEND_URL: http://localhost:8001
+          EXPO_PUBLIC_SKELETON_URL: http://localhost:8010
+        run: |
+          yarn typecheck
+          yarn export:web
 
       - name: Compile assembly surface
         run: python -m compileall -q skeleton/app skeleton/__main__.py
