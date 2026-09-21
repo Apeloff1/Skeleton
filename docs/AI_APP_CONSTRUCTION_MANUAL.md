@@ -19,7 +19,8 @@ Before an AI coding agent, human contributor, runtime provider adapter, automati
 1. `machine/manifest.json`
 2. `machine/architecture.json`
 3. `machine/ai_app_construction.json`
-4. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+4. `machine/capability_interfaces.json`
+5. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
 
 Do not infer architecture from branch names, historical files, or provider-specific conventions when these contracts answer the question. An undeclared runtime provider, runtime service, top-level runtime root, capability plane, or ownership boundary is rejected until the contracts are updated and validated.
 
@@ -550,7 +551,7 @@ The correct response to a gap is to add the smallest canonical contract/implemen
 
 ## 7. Mandatory provider bootstrap
 
-Development AI providers must read the four bootstrap documents before repository work. Provider-specific instruction files point to the same source of truth:
+Development AI providers must read the five bootstrap documents before repository work. Provider-specific instruction files point to the same source of truth:
 
 - `AGENTS.md`
 - `CLAUDE.md`
@@ -1466,7 +1467,7 @@ explicitly assert that property.
 
 When a builder takes a work package:
 
-1. read the four mandatory bootstrap documents;
+1. read the five mandatory bootstrap documents;
 2. locate its gap and work package in the machine contract;
 3. inspect every declared owner/evidence path;
 4. confirm the gap still exists on the current base;
@@ -1574,7 +1575,7 @@ operationally complete."
 The mandatory provider rule is enforced at three different layers:
 
 1. **Development-provider layer.** Provider-specific repository instruction
-   files point every coding agent to the same four bootstrap documents.
+   files point every coding agent to the same five bootstrap documents.
 2. **Runtime/automation activation layer.** Credential-bearing AI provider
    clients call `skeleton/provider_contract.py` and receive a digest-bound
    receipt before external I/O.
