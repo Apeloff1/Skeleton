@@ -37,7 +37,10 @@
         "request bounds",
         "idempotency",
         "problem details",
-        "health/readiness"
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
       ],
       "target_failure_contract": "typed 4xx/5xx without secret leakage",
       "source_acceptance": [
@@ -50,7 +53,11 @@
       "target_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "status": "present"
     },
@@ -145,7 +152,11 @@
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "target_acceptance": [
         "large/invalid upload tests",
@@ -177,7 +188,11 @@
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
@@ -209,7 +224,11 @@
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -251,7 +270,11 @@
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "target_acceptance": [
         "provider contract gate",
@@ -296,7 +319,11 @@
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "target_acceptance": [
         "resume tests",
@@ -335,7 +362,11 @@
       "source_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "target_acceptance": [
         "recall/precision eval",
@@ -1745,7 +1776,10 @@
         "request bounds",
         "idempotency",
         "problem details",
-        "health/readiness"
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
       ],
       "target_failure_contract": "typed 4xx/5xx without secret leakage",
       "source_acceptance": [
@@ -1757,7 +1791,11 @@
       "target_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "status": "present"
     },
@@ -2069,7 +2107,10 @@
         "request bounds",
         "idempotency",
         "problem details",
-        "health/readiness"
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
       ],
       "target_failure_contract": "typed 4xx/5xx without secret leakage",
       "source_acceptance": [
@@ -2082,7 +2123,11 @@
       "target_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "status": "present"
     },
@@ -2769,7 +2814,10 @@
         "request bounds",
         "idempotency",
         "problem details",
-        "health/readiness"
+        "health/readiness",
+        "ConversationThread",
+        "ConversationMessage",
+        "conversation append/read/branch/delete/export"
       ],
       "target_failure_contract": "typed 4xx/5xx without secret leakage",
       "source_acceptance": [
@@ -2780,7 +2828,11 @@
       "target_acceptance": [
         "OpenAPI/schema tests",
         "route ownership tests",
-        "auth/idempotency tests"
+        "auth/idempotency tests",
+        "conversation authority tests",
+        "thread isolation tests",
+        "message ordering/idempotency tests",
+        "edit/regenerate lineage tests"
       ],
       "status": "partial"
     },
