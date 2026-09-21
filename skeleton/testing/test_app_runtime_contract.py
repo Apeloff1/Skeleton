@@ -104,7 +104,7 @@ def test_runtime_routes_are_manifest_owned():
     manifest = runtime._MANIFEST
     paths = {route.path for route in runtime.router.routes}
 
-    assert manifest.public_contract["bootstrap"] in paths
-    assert manifest.public_contract["status"] in paths
-    assert manifest.public_contract["ready"] in paths
+    assert manifest.contract_path("bootstrap") in paths
+    assert manifest.contract_path("status") in paths
+    assert manifest.contract_path("ready") in paths
     assert runtime.router.prefix == manifest.public_contract["prefix"]
