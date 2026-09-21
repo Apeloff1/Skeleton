@@ -5396,10 +5396,40 @@
     "purpose": "Mandatory closure ledger for the fully functional AI path. Every listed blueprint is required until its associated P0 gap closes with executable evidence.",
     "required_blueprints": [
       {
+        "key": "cost_admission_blueprint",
+        "gap": "gap-cost-admission",
+        "plane": "cost-capacity",
+        "work_package": "WP-P0-COST-ADMISSION"
+      },
+      {
+        "key": "governance_runtime_blueprint",
+        "gap": "gap-governance-registry",
+        "plane": "governance",
+        "work_package": "WP-P0-GOVERNANCE"
+      },
+      {
+        "key": "provider_surface_convergence_blueprint",
+        "gap": "gap-provider-surface-convergence",
+        "plane": "model-provider",
+        "work_package": "WP-P0-PROVIDER-SURFACES"
+      },
+      {
+        "key": "state_authority_blueprint",
+        "gap": "gap-state-authority-convergence",
+        "plane": "data-persistence",
+        "work_package": "WP-P0-STATE-AUTHORITY"
+      },
+      {
         "key": "conversation_runtime_contract",
         "gap": "gap-conversation-state-authority",
         "plane": "application-api",
         "work_package": "WP-P0-CONVERSATION-STATE"
+      },
+      {
+        "key": "memory_runtime_blueprint",
+        "gap": "gap-memory-durable-authority",
+        "plane": "memory",
+        "work_package": "WP-P0-MEMORY-AUTHORITY"
       },
       {
         "key": "tool_runtime_blueprint",
@@ -5426,16 +5456,16 @@
         "work_package": "WP-P0-VERIFICATION"
       },
       {
-        "key": "engine_application_boundary_blueprint",
-        "gap": "gap-engine-application-execution-boundary",
-        "plane": "engine-api",
-        "work_package": "WP-P0-ENGINE-BOUNDARY"
-      },
-      {
         "key": "cognitive_runtime_blueprint",
         "gap": "gap-cognitive-execution-loop",
         "plane": "orchestration",
         "work_package": "WP-P0-COGNITIVE-LOOP"
+      },
+      {
+        "key": "engine_application_boundary_blueprint",
+        "gap": "gap-engine-application-execution-boundary",
+        "plane": "engine-api",
+        "work_package": "WP-P0-ENGINE-BOUNDARY"
       },
       {
         "key": "realtime_delivery_blueprint",
@@ -5448,12 +5478,6 @@
         "gap": "gap-e2e-golden-journeys",
         "plane": "product-experience",
         "work_package": "WP-P0-GOLDEN-JOURNEYS"
-      },
-      {
-        "key": "memory_runtime_blueprint",
-        "gap": "gap-memory-durable-authority",
-        "plane": "memory",
-        "work_package": "WP-P0-MEMORY-AUTHORITY"
       }
     ],
     "required_envelopes": [
@@ -6401,6 +6425,351 @@
       "parallel=true means closure work within the stage has no declared mutual prerequisite; shared lower-stage contracts still apply",
       "breaking lower-stage contract changes invalidate dependent-stage evidence and require revalidation",
       "stage 7 is evidence-only closure: it must not hide missing lower-stage implementation by mocking the product topology itself"
+    ]
+  },
+  "state_authority_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-state-authority-convergence",
+    "registry": "machine/state_topology.json",
+    "objective": "Every logical state domain has exactly one durable authority, explicit derived projections, transactional/reconciliation semantics, migration ownership, restore order and failure behavior.",
+    "authority_rules": [
+      "storage technology does not imply authority",
+      "one logical record cannot have two competing authoritative stores",
+      "derived/vector/cache/snapshot state is rebuildable from declared authority",
+      "process memory may accelerate but never be sole authority for restart-sensitive AI state",
+      "authority changes require migration/version fencing and rollback plan",
+      "terminal operation/result/receipt state survives process restart"
+    ],
+    "authoritative_repository_contract": {
+      "required_capabilities": [
+        "create/read/update with optimistic version",
+        "idempotent create by canonical identity",
+        "compare-and-set transition",
+        "transaction or transactional-outbox boundary",
+        "typed conflict/not-found/corruption errors",
+        "health/readiness",
+        "backup/restore metadata",
+        "schema/index migration version"
+      ],
+      "consistency": "explicit per-domain; operation/execution/tool/approval/result ledgers require monotonic version/fencing semantics"
+    },
+    "mongo_domains": [
+      "conversation threads/messages",
+      "canonical memory records",
+      "product/user state",
+      "governance lifecycle metadata",
+      "production AI execution ledgers unless a separately declared durable engine store replaces it"
+    ],
+    "derived_domains": [
+      "Chroma/vector embeddings",
+      "retrieval indexes",
+      "process caches",
+      "compiled conversation/context summaries",
+      "frontend caches",
+      "manual snapshots"
+    ],
+    "operation_atomicity": {
+      "preferred": "single durable transaction for operation/checkpoint/result and outbox intent where co-located",
+      "fallback": "transactional outbox with stable event id + deterministic reconciliation",
+      "invariant": "completed operation cannot exist without its required canonical final result; terminal event cannot be the sole record of completion"
+    },
+    "migration_policy": [
+      "every authoritative collection/table has schema/index owner and version",
+      "expand -> migrate/backfill -> dual-read only when explicitly bounded -> cutover -> contract",
+      "migration preserves canonical ids, tenant ownership, lifecycle status and provenance",
+      "downgrade/rollback policy is defined before destructive schema removal",
+      "projection rebuild is never used as substitute for authoritative migration"
+    ],
+    "recovery_order": [
+      "configuration/secrets and service identity",
+      "Mongo/authoritative durable stores",
+      "operation/execution/tool/approval/verification/result ledgers",
+      "conversation and canonical memory",
+      "transactional outbox/event stream",
+      "derived retrieval/vector/search indexes",
+      "process caches and frontend projections"
+    ],
+    "failure_behavior": [
+      "authoritative store unavailable -> reject/defer writes; never fall back to derived store as authority",
+      "derived index unavailable -> degrade retrieval/search while canonical records remain usable",
+      "outbox dispatcher unavailable -> state commit may remain durable with pending delivery; reconciliation resumes later",
+      "corrupt version/lineage -> fail closed and surface operator repair requirement"
+    ],
+    "closure_evidence": [
+      "state topology validation",
+      "restart/recovery tests per authoritative AI domain",
+      "transaction/outbox fault injection",
+      "Mongo backup restore drill",
+      "derived-store total loss and rebuild",
+      "no authoritative record exists solely in process memory/Chroma/browser state"
+    ]
+  },
+  "governance_runtime_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-governance-registry",
+    "canonical_owner": "skeleton/vault",
+    "objective": "One registry and decision engine governs classification, purpose, tenant/subject ownership, provider/tool transfer, retention, deletion, export and audit across every AI data movement.",
+    "registry_record": {
+      "required_fields": [
+        "resource_id",
+        "resource_type",
+        "tenant_id",
+        "subject_ids",
+        "data_class",
+        "purposes",
+        "provenance",
+        "retention_class",
+        "created_at",
+        "expires_at",
+        "deletion_state",
+        "exportable",
+        "provider_transfer_policy",
+        "version"
+      ]
+    },
+    "decisions": [
+      "read",
+      "write",
+      "provider_transfer",
+      "tool_transfer",
+      "artifact_materialization",
+      "memory_commit",
+      "retrieval_index",
+      "export",
+      "delete",
+      "retain"
+    ],
+    "decision_receipt": {
+      "required_fields": [
+        "decision_id",
+        "operation_id",
+        "tenant_id",
+        "principal_id",
+        "action",
+        "resource_refs",
+        "data_class",
+        "purpose",
+        "destination_class",
+        "allowed",
+        "reason_codes",
+        "policy_version",
+        "decided_at"
+      ],
+      "invariant": "every external transfer or canonical durable write that handles governed content is attributable to one decision receipt"
+    },
+    "provider_transfer": [
+      "compute most restrictive data class across selected context segments",
+      "validate declared purpose and provider privacy ceiling",
+      "deny restricted/unknown classification by default",
+      "minimize payload before transfer",
+      "record provider/model destination class without credentials",
+      "bind decision id into ProviderRequest/Response"
+    ],
+    "lifecycle": {
+      "deletion": [
+        "authorize request",
+        "enumerate canonical records",
+        "mark deleting/tombstone where required",
+        "delete canonical content according to policy",
+        "propagate projection/index/cache deletion",
+        "record residual audit metadata permitted by policy",
+        "verify completion"
+      ],
+      "export": [
+        "authorize subject/tenant",
+        "inventory canonical exportable records",
+        "include provenance/lifecycle metadata",
+        "exclude secrets/internal-only derived metadata",
+        "produce immutable export receipt"
+      ],
+      "retention": [
+        "deterministic expiry calculation",
+        "scheduled expiry scan",
+        "same deletion propagation contract as explicit delete when applicable"
+      ]
+    },
+    "cross_plane_bindings": [
+      "conversation messages",
+      "canonical memory",
+      "retrieval sources/results",
+      "artifact metadata/content",
+      "context segments",
+      "provider requests",
+      "tool arguments/results",
+      "verification evidence"
+    ],
+    "fail_closed": [
+      "unknown tenant for confidential data",
+      "unknown data class at external transfer",
+      "purpose mismatch",
+      "provider privacy ceiling exceeded",
+      "cross-tenant resource mix",
+      "expired/deleting resource selected for new context"
+    ],
+    "closure_evidence": [
+      "provider/tool transfer denial",
+      "cross-tenant denial",
+      "conversation/memory/artifact registration",
+      "delete propagation through canonical and derived state",
+      "export completeness",
+      "retention expiry",
+      "audit receipt linkage"
+    ]
+  },
+  "cost_admission_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-cost-admission",
+    "canonical_owner": "skeleton/intelligence",
+    "objective": "Every expensive AI boundary is admitted against one monotonic request/tenant budget before allocation, with actual usage reconciled durably across processes.",
+    "budget_dimensions": [
+      "input_tokens",
+      "output_tokens",
+      "total_tokens",
+      "provider_cost",
+      "tool_cost",
+      "artifact_bytes",
+      "storage_bytes",
+      "wall_seconds",
+      "provider_concurrency",
+      "tool_concurrency",
+      "queue_slots",
+      "retry_count",
+      "repair_count"
+    ],
+    "admission_pipeline": [
+      "normalize requested capability/resource estimate",
+      "load tenant/user/service quota window",
+      "load live concurrency/queue pressure",
+      "subtract already-consumed execution usage",
+      "apply priority/reservation policy",
+      "select admit/defer/reroute/reject",
+      "reserve lease/quota atomically",
+      "emit AdmissionDecision receipt",
+      "reconcile actual usage after each expensive boundary",
+      "release unused reservation at terminal state"
+    ],
+    "durable_quota": {
+      "requirement": "multi-worker production quota/window reservations cannot be process-local",
+      "keys": [
+        "tenant_id",
+        "quota_policy_id",
+        "window_id",
+        "resource_dimension"
+      ],
+      "invariants": [
+        "reservation is idempotent by operation/execution identity",
+        "consumed actual usage is monotonic",
+        "restart cannot erase quota already consumed",
+        "lease expiry/reconciliation cannot double-credit usage"
+      ]
+    },
+    "routing_binding": [
+      "model routing receives hard remaining provider/token/deadline ceiling",
+      "tool scheduler receives remaining tool/concurrency/cost ceiling",
+      "context compiler receives context/output/tool-result token budget",
+      "artifact plane receives byte/storage ceiling"
+    ],
+    "actual_usage_sources": [
+      "normalized ProviderUsage",
+      "ToolExecutionReceipt usage",
+      "artifact sizes",
+      "storage write metrics",
+      "wall-clock span durations"
+    ],
+    "unknown_usage": "unknown is explicit; conservative policy may reserve/degrade/block but never treats unknown as zero",
+    "pressure": {
+      "local": "in-process fast counters are cache only",
+      "distributed": "production multi-worker pressure must use shared durable/atomic coordinator or conservative partitioned limits",
+      "overload": "defer/shedding policy preserves high-priority bounded work and never bypasses tenant budget"
+    },
+    "observability": [
+      "estimate vs actual delta",
+      "denial/defer/reroute reason",
+      "quota window",
+      "provider/tool cost",
+      "retry/repair amplification",
+      "saturation/queue pressure"
+    ],
+    "closure_evidence": [
+      "durable quota restart test",
+      "multi-worker reservation race test",
+      "budget-aware route/tool/context tests",
+      "actual usage reconciliation",
+      "unknown-usage behavior",
+      "saturation shedding",
+      "no expensive provider/tool/storage path without admission receipt"
+    ]
+  },
+  "provider_surface_convergence_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-provider-surface-convergence",
+    "canonical_owner": "skeleton/provider_runtime.py",
+    "objective": "There is exactly one runtime model-provider transport/credential owner; every other provider-facing module is a declaration, adapter or compatibility facade without independent credentials or raw provider network execution.",
+    "allowed_surface_classes": [
+      "canonical_runtime",
+      "provider_declaration",
+      "noncredential_compatibility_facade",
+      "automation_provider_explicitly_separate_and_receipt-gated"
+    ],
+    "canonical_runtime_owns": [
+      "runtime provider credentials",
+      "base URL validation",
+      "SDK/client construction",
+      "HTTP/provider transport",
+      "retry/timeout",
+      "text/image/speech provider execution",
+      "structured/tool protocol translation",
+      "usage/finish normalization",
+      "provider-specific errors"
+    ],
+    "forbidden_runtime_surfaces": [
+      "backend route/service reading OPENAI/GEMINI/GROK/provider keys directly",
+      "Jeeves/tool modules creating provider SDK clients",
+      "media routes executing provider HTTP directly",
+      "generic nested llm_chat tool with its own credential",
+      "undeclared provider selected solely because an environment variable exists"
+    ],
+    "discovery_gate": {
+      "scan_roots": [
+        "backend",
+        "skeleton"
+      ],
+      "signals": [
+        "provider key environment names",
+        "vendor SDK imports",
+        "known provider base URLs",
+        "generic HTTP calls near provider credentials/models",
+        "client constructor patterns"
+      ],
+      "allowlist": "machine contract declared provider surfaces only",
+      "result": "fail CI on unexplained credential-bearing/network provider surface"
+    },
+    "compatibility_migration": [
+      "preserve public application signatures",
+      "replace local implementation with canonical provider runtime/client delegation",
+      "remove credential reads/imports from facade",
+      "add source isolation regression",
+      "remove facade only after callers migrate"
+    ],
+    "media_rule": "text/image/edit/variation/speech all share the same governance/admission/receipt/credential boundary; media cannot be a route-owned exception",
+    "automation_rule": "repository automation provider is a distinct declared surface and must not become product runtime provider ownership",
+    "deployment_rule": "after engine-boundary cutover, product runtime provider credentials are injected only into the Skeleton engine service",
+    "closure_evidence": [
+      "provider surface inventory clean",
+      "SDK/import isolation",
+      "credential grep/AST scan",
+      "text/image/speech regression",
+      "Jeeves/tool shadow provider denial",
+      "undeclared provider denial",
+      "backend credential removal after engine cutover"
     ]
   }
 }
