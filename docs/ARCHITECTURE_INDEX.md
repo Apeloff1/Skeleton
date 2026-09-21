@@ -451,7 +451,7 @@ Planning coverage and local reproduction are separate states. The current checkp
 
 ```text
 PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY
-domain_count=19
+domain_count=24
 planning_status=PLANNING_COVERED
 local_reproduction_status=REPRODUCTION_PENDING
 production_authority_granted=false
