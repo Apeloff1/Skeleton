@@ -1759,6 +1759,166 @@ def _validate_closure_evidence_ledger(
     return result
 
 
+
+def _validate_capability_registry(
+    contract: dict[str, Any],
+    planes: dict[str, dict[str, Any]],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    """Validate concrete AI capability declarations against planes/providers/journeys."""
+
+    link = contract.get("capability_registry")
+    result = {"capabilities": 0, "enabled": 0}
+    if not isinstance(link, dict):
+        errors.append("capability_registry must be an object")
+        return result
+    if link.get("schema_version") != 1:
+        errors.append("capability_registry.schema_version must be 1")
+    if link.get("status") != "active":
+        errors.append("capability_registry.status must be active")
+
+    try:
+        relative = _path(link.get("path"))
+    except ValueError as exc:
+        errors.append(f"capability_registry.path: {exc}")
+        return result
+    try:
+        registry = _load(repo_root / relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return result
+
+    if registry.get("schema_version") != 1:
+        errors.append("AI capability registry schema_version must be 1")
+    if registry.get("status") != "active":
+        errors.append("AI capability registry status must be active")
+    if registry.get("registry_version") != link.get("registry_version"):
+        errors.append("capability_registry.registry_version must match registry file")
+    if registry.get("architecture_tag") != contract.get("architecture_tag"):
+        errors.append("AI capability registry architecture_tag drift")
+
+    provider_caps = {
+        capability
+        for provider in contract.get("runtime_model_providers", [])
+        if isinstance(provider, dict) and provider.get("state") == "active"
+        for capability in provider.get("capabilities", [])
+        if isinstance(capability, str)
+    }
+    journey_ids = {
+        item.get("id")
+        for item in contract.get("golden_journey_blueprint", {}).get("journeys", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    data_classes = {
+        item.get("id")
+        for item in contract.get("data_classes", [])
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    allowed_verification = {"none", "structural", "evidence", "action", "high_impact"}
+    allowed_risk = {"low", "medium", "high", "critical"}
+
+    capabilities = registry.get("capabilities")
+    if not isinstance(capabilities, list) or not capabilities:
+        errors.append("AI capability registry capabilities must be non-empty")
+        return result
+
+    seen: set[str] = set()
+    for index, item in enumerate(capabilities):
+        label = f"ai_capabilities.capabilities[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        capability_id = item.get("capability_id")
+        if not isinstance(capability_id, str) or not capability_id.strip():
+            errors.append(f"{label}.capability_id must be non-empty")
+            continue
+        if capability_id in seen:
+            errors.append(f"duplicate AI capability id: {capability_id}")
+            continue
+        seen.add(capability_id)
+
+        if item.get("enabled") is True:
+            result["enabled"] += 1
+        elif item.get("enabled") is not False:
+            errors.append(f"{label}.enabled must be boolean")
+
+        owner = item.get("owner_plane")
+        if owner not in planes:
+            errors.append(f"{label}.owner_plane references unknown plane {owner!r}")
+
+        required_planes = _nonempty_strings(
+            item.get("required_planes"),
+            label=f"{label}.required_planes",
+            errors=errors,
+        )
+        for plane_id in required_planes:
+            if plane_id not in planes:
+                errors.append(f"{label} requires unknown plane {plane_id!r}")
+
+        required_provider = _nonempty_strings(
+            item.get("required_provider_capabilities"),
+            label=f"{label}.required_provider_capabilities",
+            errors=errors,
+            allow_empty=True,
+        )
+        unsupported = sorted(set(required_provider) - provider_caps)
+        if unsupported:
+            errors.append(
+                f"{label} requires unsupported runtime provider capabilities: "
+                + ", ".join(unsupported)
+            )
+
+        if item.get("risk_class") not in allowed_risk:
+            errors.append(f"{label}.risk_class is invalid")
+        if item.get("verification_level") not in allowed_verification:
+            errors.append(f"{label}.verification_level is invalid")
+        if item.get("data_class_ceiling") not in data_classes:
+            errors.append(f"{label}.data_class_ceiling is invalid")
+
+        ref = item.get("instruction_policy_ref")
+        if not isinstance(ref, str) or not ref.startswith("policy://"):
+            errors.append(f"{label}.instruction_policy_ref must use policy://")
+
+        journeys = _nonempty_strings(
+            item.get("golden_journeys"),
+            label=f"{label}.golden_journeys",
+            errors=errors,
+        )
+        unknown_journeys = sorted(set(journeys) - journey_ids)
+        if unknown_journeys:
+            errors.append(
+                f"{label} references unknown golden journeys: "
+                + ", ".join(unknown_journeys)
+            )
+
+        for key in (
+            "tool_policy",
+            "memory_policy",
+            "retrieval_policy",
+            "budget_profile",
+            "degraded_behavior",
+        ):
+            if not isinstance(item.get(key), dict):
+                errors.append(f"{label}.{key} must be an object")
+        _nonempty_strings(
+            item.get("readiness_requirements"),
+            label=f"{label}.readiness_requirements",
+            errors=errors,
+        )
+        for key in ("version", "implementation_state"):
+            if not isinstance(item.get(key), str) or not item[key].strip():
+                errors.append(f"{label}.{key} must be non-empty")
+
+    result["capabilities"] = len(seen)
+    _nonempty_strings(
+        registry.get("invariants"),
+        label="AI capability registry invariants",
+        errors=errors,
+    )
+    return result
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -2221,6 +2381,9 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     closure_evidence = _validate_closure_evidence_ledger(
         contract, repo_root, errors
     )
+    capabilities = _validate_capability_registry(
+        contract, planes, repo_root, errors
+    )
     functional_ai = _validate_functional_ai_closure(
         contract, planes, repo_root, errors
     )
@@ -2264,6 +2427,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "runtime_schemas": runtime_schemas,
         "implementation_handoff": implementation_handoff,
         "closure_evidence": closure_evidence,
+        "capabilities": capabilities,
         "functional_ai": functional_ai,
         "operation_stream": operation_stream,
         "provider_documents": must_read,
