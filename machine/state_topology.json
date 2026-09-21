@@ -51,15 +51,17 @@
         "backend_data"
       ],
       "durability": "persistent-volume",
-      "production_role": "application-local persistent support data; currently includes local Chroma",
+      "production_role": "application-local support data; local Chroma is rebuildable retrieval projection only",
       "network": "not directly network-addressable",
       "authentication": "process boundary",
-      "backup": "required only for any state not yet migrated to an authoritative document store; target is derived-only",
-      "restore": "rebuild derived indexes from authoritative sources after state-authority convergence",
-      "migration": "remove authoritative product state from local Chroma before treating volume as rebuildable",
+      "backup": "optional for local Chroma projection; authoritative product state is backed up through Mongo",
+      "restore": "rebuild local Chroma projections from canonical Mongo/content sources",
+      "migration": "canonical Jeeves RAG product state migrated to Mongo; legacy Chroma state imports through RAGService.migrate_legacy_chroma_state",
       "evidence": [
         "docker-compose.yml",
-        "backend/services/rag_service.py"
+        "backend/services/rag_service.py",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py"
       ]
     },
     {
@@ -197,7 +199,8 @@
       "rebuildable": false,
       "evidence": [
         "backend/core/databases.py",
-        "backend/services/database.py"
+        "backend/services/database.py",
+        "backend/services/rag_state_repository.py"
       ]
     },
     {
@@ -278,27 +281,29 @@
       "owner_plane": "retrieval",
       "physical_store": "backend-data-volume",
       "logical_location": "CHROMA_PERSIST_DIR=/app/data/chroma",
-      "authority": "mixed-transitional",
+      "authority": "derived",
       "source_of_truth": false,
-      "status": "transitional",
+      "status": "present",
       "data_classes": [
         "internal",
         "confidential"
       ],
       "transaction_scope": "Chroma collection operation",
-      "consistency": "retrieval projections may be rebuilt; authoritative user progress/feedback must migrate to canonical document state",
-      "retention": "mixed legacy; convergence required",
-      "backup_restore": "temporarily preserve until authoritative records are migrated; target rebuildable-only",
-      "migration": "move user_progress, feedback, session ownership and other canonical product records to Mongo; retain Chroma embeddings/projections only",
+      "consistency": "eventually consistent rebuildable projection; canonical learning sessions, user progress, co-coding state and feedback commit to Mongo first",
+      "retention": "projection lifetime; canonical retention is governed in Mongo",
+      "backup_restore": "rebuild from canonical Mongo/content sources; no product-state authority depends on Chroma",
+      "migration": "legacy user_progress, feedback, learning-session and co-coding records import idempotently to Mongo; new writes are Mongo-first",
       "derived_from": [
         "backend-core-app-state",
         "backend-seeded-content"
       ],
-      "rebuildable": false,
-      "gap": "gap-state-authority-convergence",
+      "rebuildable": true,
       "evidence": [
         "backend/services/rag_service.py",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py"
       ]
     },
     {
@@ -688,8 +693,8 @@
       "from": "backend-core-app-state",
       "to": "backend-rag-local-chroma",
       "mode": "projection",
-      "rule": "after convergence, Chroma receives indexable/minimized projection only; canonical writes commit to Mongo first",
-      "failure": "projection failure degrades retrieval but does not roll back already-committed canonical state"
+      "rule": "Chroma receives indexable/minimized projection only after canonical Mongo commit; retrieval hits are validated against canonical ownership where required",
+      "failure": "projection failure or staleness degrades retrieval only; it cannot roll back or resurrect canonical product state"
     },
     {
       "id": "content-to-rag-projection",
@@ -884,6 +889,7 @@
     "a final AI result that claims verification references an immutable verification receipt with policy-required check coverage",
     "canonical user/tenant AI memory is durable document state; vector, MAG, CAG and process-memory representations are never its sole authority",
     "memory restore precedes semantic/vector/cache projection rebuild",
-    "vector similarity never widens tenant/user/namespace memory authority"
+    "vector similarity never widens tenant/user/namespace memory authority",
+    "Jeeves learning sessions, user progress, co-coding ownership/state and feedback are Mongo-authoritative; Chroma is projection-only"
   ]
 }
