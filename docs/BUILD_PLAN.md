@@ -1550,7 +1550,7 @@ Every durable store declares transaction, isolation, durability, replication, co
 **Gate:** callers cannot assume guarantees stronger than the storage adapter declares.
 
 ### AB10. Distributed time, leases, fencing and event ordering — ⬜
-Introduce monotonic local deadlines, lease epochs, fencing tokens, sequence/correlation/causation IDs and explicit dedupe windows.
+Introduce monotonic local deadlines and lease epochs; use fencing counters plus explicit sequence, correlation, causation, and deduplication metadata.
 **Gate:** a stale/expired writer cannot commit after losing authority.
 
 ### AB11. Secret lifecycle / taint propagation — ⬜
@@ -2349,8 +2349,8 @@ Required kill switches:
 
 # Exotic architecture tiers
 
-**Tier E1 — evidence-backed frontier:** AC1–AC13.  
-**Tier E2 — radical but engineering-plausible:** AC14–AC26, AC31–AC39.  
+**Tier E1 — evidence-backed frontier:** AC1–AC13.
+**Tier E2 — radical but engineering-plausible:** AC14–AC26, AC31–AC39.
 **Tier E3 — moonshot / hardware / architecture search:** AC27–AC30, AC40–AC41.
 
 Tier is evidence maturity, not prestige. Candidates may move both directions.
