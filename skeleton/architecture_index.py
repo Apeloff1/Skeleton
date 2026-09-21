@@ -86,6 +86,7 @@ CANONICAL_DOCUMENTS = {
     "masterplan_gap_audit": "docs/architecture/masterplan-gap-audit.md",
     "exotic_architecture_lab": "docs/architecture/exotic-architecture-lab.md",
     "frontier_research_atlas": "docs/architecture/frontier-research-atlas-2026.md",
+    "frontier_research_experiment_protocols": "docs/architecture/frontier-research-experiment-protocols-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -181,6 +182,7 @@ PLAN_CHECKPOINTS = {
         "frontier_delta_range": ("FD001", "FD016"),
         "contradiction_range": ("CX001", "CX024"),
         "research_debt_range": ("RDE001", "RDE036"),
+        "experiment_protocol_range": ("RXP001", "RXP035"),
         "production_authority_granted": False,
         "research_refresh_required": True,
     }
@@ -344,6 +346,7 @@ RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1
 FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 17))
 RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
 RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 37))
+RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 36))
 
 RESEARCH_SOURCE_STATUS_STATES = (
     "accepted_peer_reviewed",
@@ -439,6 +442,7 @@ def full_summary() -> Dict[str, Any]:
         "frontier_delta_ids": list(FRONTIER_DELTA_IDS),
         "research_contradiction_ids": list(RESEARCH_CONTRADICTION_IDS),
         "research_debt_ids": list(RESEARCH_DEBT_IDS),
+        "research_experiment_protocol_ids": list(RESEARCH_EXPERIMENT_PROTOCOL_IDS),
         "research_source_status_states": list(RESEARCH_SOURCE_STATUS_STATES),
         "research_source_audit_invariants": dict(RESEARCH_SOURCE_AUDIT_INVARIANTS),
         "research_automation_invariants": dict(RESEARCH_AUTOMATION_INVARIANTS),
