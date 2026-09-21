@@ -28,6 +28,9 @@ def _parser() -> argparse.ArgumentParser:
 
     status = sub.add_parser("status", help="show the canonical application topology")
     status.add_argument("--json", action="store_true", dest="as_json")
+    status.add_argument("--live", action="store_true", help="also probe public runtime health")
+    status.add_argument("--full", action="store_true", help="include optional full-profile health")
+    status.add_argument("--timeout", type=float, default=3.0, help="per-service live probe timeout")
 
     check = sub.add_parser("check", help="validate the application assembly")
     check.add_argument(
@@ -76,12 +79,35 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _print_status(as_json: bool) -> int:
+def _print_status(
+    as_json: bool,
+    *,
+    live: bool = False,
+    full: bool = False,
+    timeout: float = 3.0,
+) -> int:
     manifest = load_manifest()
     payload = manifest_payload(manifest)
+    live_results = ()
+    live_ok: bool | None = None
+
+    if live:
+        if timeout <= 0:
+            print("status timeout must be greater than zero")
+            return 2
+        from skeleton.app.health import probe_application, probes_ok
+
+        live_results = probe_application(manifest=manifest, full=full, timeout=timeout)
+        live_ok = probes_ok(live_results)
+        payload["runtime_health"] = {
+            "ok": live_ok,
+            "full": full,
+            "results": [result.to_dict() for result in live_results],
+        }
+
     if as_json:
         print(json.dumps(payload, indent=2, sort_keys=True))
-        return 0
+        return 0 if live_ok is not False else 1
 
     print(f"{manifest.name} application assembly v{manifest.version}")
     print(f"compose: {manifest.compose_file}")
@@ -90,7 +116,18 @@ def _print_status(as_json: bool) -> int:
         url = f" {service.public_url}" if service.public_url else ""
         profile = f" [{service.profile}]" if service.profile else ""
         print(f"{marker} {service.name:<10} {service.role:<18} {service.kind}{profile}{url}")
-    return 0
+
+    if live:
+        print("")
+        for result in live_results:
+            status = result.status if result.status is not None else "-"
+            print(
+                f"[{'PASS' if result.ok else 'FAIL'}] "
+                f"{result.service:<10} status={status} {result.url} {result.detail}"
+            )
+        print("runtime: healthy" if live_ok else "runtime: unhealthy")
+
+    return 0 if live_ok is not False else 1
 
 
 def _print_checks(runtime: bool, as_json: bool) -> int:
@@ -138,7 +175,12 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
     command = args.command or "status"
 
     if command == "status":
-        return _print_status(bool(getattr(args, "as_json", False)))
+        return _print_status(
+            bool(getattr(args, "as_json", False)),
+            live=bool(getattr(args, "live", False)),
+            full=bool(getattr(args, "full", False)),
+            timeout=float(getattr(args, "timeout", 3.0)),
+        )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
 
