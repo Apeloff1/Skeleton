@@ -1,4 +1,4 @@
-import api from '../utils/apiClient';
+import api, { type ApiResult } from '../utils/apiClient';
 
 export type ConversationThreadState = 'active' | 'archived' | 'deleting' | 'deleted';
 export type ConversationAuthorType = 'user' | 'assistant' | 'tool' | 'system-derived';
@@ -41,11 +41,9 @@ export type ConversationMessage = {
   data_class: 'public' | 'internal' | 'confidential' | 'restricted';
 };
 
-type ApiResult<T> = { ok: boolean; status: number; data?: T; error?: unknown };
-
 async function requireData<T>(promise: Promise<ApiResult<T>>, message: string): Promise<T> {
   const result = await promise;
-  if (!result.ok || !result.data) throw new Error(message);
+  if (!result.ok || result.data === null) throw new Error(message);
   return result.data;
 }
 
