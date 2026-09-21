@@ -1010,6 +1010,7 @@ class SecretaryRoutingTests(unittest.TestCase):
             supervisor_fingerprint=FP,
             execution=EXECUTION,
             build_authorization=None,
+            attempt=1,
         )
 
 

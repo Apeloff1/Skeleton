@@ -37,6 +37,7 @@ from .advanced_bots import (
     AdvancedBot,
     allowed,
 )
+from .execution_failsafe import retry_token
 from .free_model import FreeModelClient, ModelError, redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
@@ -117,12 +118,38 @@ def admit_worker(name: str) -> WorkerCustody:
                 "",
             ).strip()
         )
+        attempt_text = os.environ.get(
+            "SECRETARY_ATTEMPT",
+            "",
+        ).strip()
+        supplied_retry_token = os.environ.get(
+            "SECRETARY_RETRY_TOKEN",
+            "",
+        ).strip()
+        if (
+            not attempt_text.isdigit()
+            or str(int(attempt_text)) != attempt_text
+        ):
+            raise WorkerAdmissionError(
+                "worker retry attempt is invalid"
+            )
+        attempt = int(attempt_text)
+        expected_retry_token = retry_token(
+            worker=name,
+            attempt=attempt,
+            execution_fingerprint=execution.fingerprint,
+            snapshot_fingerprint=snapshot,
+        )
+        if supplied_retry_token != expected_retry_token:
+            raise WorkerAdmissionError(
+                "worker retry token custody mismatch"
+            )
         return WorkerCustody(
             worker=name,
             snapshot_fingerprint=snapshot,
             execution=execution,
         )
-    except SupervisorRuntimeError as exc:
+    except (SupervisorRuntimeError, ValueError) as exc:
         raise WorkerAdmissionError(
             "invalid worker custody"
         ) from exc
@@ -1126,12 +1153,45 @@ def main() -> int:
             env=publish_env,
             timeout=60,
         )
+        pr_raw = subprocess.check_output(
+            [
+                "gh",
+                "pr",
+                "view",
+                branch,
+                "--repo",
+                execution.repository,
+                "--json",
+                "number,url",
+            ],
+            text=True,
+            env=publish_env,
+            timeout=30,
+        )
+        pr_metadata = json.loads(
+            pr_raw,
+            object_pairs_hook=_unique_json_object,
+        )
+        pull_request = pr_metadata.get("number")
+        pull_request_url = pr_metadata.get("url")
+        if (
+            isinstance(pull_request, bool)
+            or not isinstance(pull_request, int)
+            or pull_request <= 0
+            or not isinstance(pull_request_url, str)
+            or not pull_request_url.startswith("https://github.com/")
+        ):
+            raise WorkerAdmissionError(
+                "created pull request evidence is invalid"
+            )
 
         _print_status(
             {
                 "status": "pull-request-created",
                 "bot": spec.name,
                 "branch": branch,
+                "pull_request": pull_request,
+                "pull_request_url": pull_request_url,
                 "changed_lines": changed_lines,
                 "proposal_digest": digest,
                 "base_sha": execution.base_sha,

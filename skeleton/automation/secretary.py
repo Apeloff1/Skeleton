@@ -40,6 +40,12 @@ from .bot_manager import (
     save_state,
     select_specialists_due,
 )
+from .execution_failsafe import (
+    attach_retry_history,
+    retry_allowed,
+    retry_delay_seconds,
+    retry_token,
+)
 from .free_model import redact_secrets
 from .supervisor_runtime import (
     ExecutionIdentity,
@@ -434,17 +440,14 @@ def route(
         if spec.name == "feature-builder":
             if build_authorization is None:
                 continue
-            # Repository state grants build authority; plan text only selects
-            # whether the authorized builder is relevant to this dispatch.
-            # Ordinary CI/root-cause work must not wake a feature builder merely
-            # because some unrelated approved build task exists.
+            # Exact repository-state authorization is the authority boundary.
+            # Plan text is untrusted supplemental data and may raise relevance,
+            # but it must never suppress an already authorized build assignment.
             matches = sum(
                 1
                 for word in KEYWORDS.get(spec.name, ())
                 if word in text
             )
-            if not matches:
-                continue
             score = 100 + matches
         else:
             score = sum(
@@ -515,6 +518,7 @@ def _dispatch_one(
     execution: ExecutionIdentity,
     build_authorization: BuildAuthorization | None = None,
     builder_manifest: BuilderManifest | None = None,
+    attempt: int = 1,
 ) -> dict[str, Any]:
     """Run one worker in a detached worktree rooted at the admitted base."""
     repo_root = Path.cwd().resolve()
@@ -531,6 +535,7 @@ def _dispatch_one(
         dir=runner_temp,
     ) as temporary:
         worktree = Path(temporary) / "worktree"
+        worker_started = False
         try:
             subprocess.run(
                 [
@@ -554,6 +559,13 @@ def _dispatch_one(
                     "SECRETARY_PLAN": plan,
                     "SECRETARY_WORKER": name,
                     "SECRETARY_DELEGATION": "1",
+                    "SECRETARY_ATTEMPT": str(attempt),
+                    "SECRETARY_RETRY_TOKEN": retry_token(
+                        worker=name,
+                        attempt=attempt,
+                        execution_fingerprint=execution.fingerprint,
+                        snapshot_fingerprint=supervisor_fingerprint,
+                    ),
                     "SUPERVISOR_SNAPSHOT_FINGERPRINT": (
                         supervisor_fingerprint
                     ),
@@ -610,6 +622,7 @@ def _dispatch_one(
                     builder_manifest.manifest_digest
                 )
 
+            worker_started = True
             process = subprocess.run(
                 [
                     "python",
@@ -655,22 +668,43 @@ def _dispatch_one(
                         raise SupervisorRuntimeError(
                             "feature-builder evidence failed Builder Plane custody"
                         ) from exc
-            return {
+            result = {
                 "bot": name,
                 "returncode": process.returncode,
                 "isolated": True,
+                "attempt": attempt,
                 "evidence": evidence,
             }
-        except (
-            OSError,
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            SupervisorRuntimeError,
-        ):
+            if process.returncode != 0:
+                result["failure_kind"] = "worker-failure"
+            return result
+        except subprocess.TimeoutExpired:
             return {
                 "bot": name,
                 "returncode": 1,
                 "isolated": True,
+                "attempt": attempt,
+                "failure_kind": (
+                    "worker-timeout"
+                    if worker_started
+                    else "setup-failure"
+                ),
+            }
+        except (OSError, subprocess.CalledProcessError):
+            return {
+                "bot": name,
+                "returncode": 1,
+                "isolated": True,
+                "attempt": attempt,
+                "failure_kind": "setup-failure",
+            }
+        except SupervisorRuntimeError:
+            return {
+                "bot": name,
+                "returncode": 1,
+                "isolated": True,
+                "attempt": attempt,
+                "failure_kind": "custody-failure",
             }
         finally:
             _remove_worktree(
@@ -748,11 +782,48 @@ def dispatch(
         }
         if name == "feature-builder":
             kwargs["builder_manifest"] = builder_manifest
-        results.append(
-            _dispatch_one(
+
+        attempts: list[dict[str, Any]] = []
+        first = _dispatch_one(
+            plan,
+            name,
+            attempt=1,
+            **kwargs,
+        )
+        attempts.append(first)
+        final = first
+
+        if retry_allowed(first):
+            second_token = retry_token(
+                worker=name,
+                attempt=2,
+                execution_fingerprint=execution.fingerprint,
+                snapshot_fingerprint=supervisor_fingerprint,
+            )
+            time.sleep(
+                retry_delay_seconds(
+                    2,
+                    second_token,
+                )
+            )
+            # A retry is a fresh privilege decision, not continuation of the
+            # failed attempt. Re-establish immutable repository authority first.
+            require_exact_head(execution.base_sha)
+            require_remote_base_unchanged(execution)
+            final = _dispatch_one(
                 plan,
                 name,
+                attempt=2,
                 **kwargs,
+            )
+            attempts.append(final)
+
+        results.append(
+            attach_retry_history(
+                final,
+                attempts,
+                execution_fingerprint=execution.fingerprint,
+                snapshot_fingerprint=supervisor_fingerprint,
             )
         )
     return results
