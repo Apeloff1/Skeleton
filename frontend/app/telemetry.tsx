@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /telemetry — Live dashboard for the security + modal-log system.
  *
@@ -18,7 +19,7 @@ import theme from '../theme/tokens';
 import { useModalLogger } from '../utils/modalLogger';
 import { useBackendHealth } from '../utils/selfHeal';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const { breathing, palette, radii } = theme;
 
 type Tab = 'live' | 'sessions' | 'security' | 'modals';

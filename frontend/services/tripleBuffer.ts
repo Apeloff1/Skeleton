@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * ╔═══════════════════════════════════════════════════════════════╗
  * ║  QUAD BUFFER API PIPELINE v17.0                              ║
@@ -19,15 +20,12 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
 
 // ============================================================================
 // CONFIG
 // ============================================================================
 
-const API_BASE = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL
-  || process.env.EXPO_PUBLIC_BACKEND_URL
-  || '';
+const API_BASE = CANONICAL_API_BASE;
 
 const CACHE_PREFIX = 'tb_cache_';
 const CACHE_TTL_MS = 5 * 60 * 1000;        // 5 min fresh cache

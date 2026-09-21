@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /creator — Creator Dashboard (DELUXE).
  * A premium command center: glass hero with Battle-Pass tier over a cinematic
@@ -17,7 +18,7 @@ import { useHaptics } from '../src/hooks/useHaptics';
 import { getVisitorId } from '../src/utils/liveops';
 import { C, S, R } from '../src/theme/deluxe';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const HERO_BG = 'https://images.unsplash.com/photo-1637825891028-564f672aa42c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMGdyYWRpZW50JTIwZGFyayUyMHB1cnBsZSUyMG5lb24lMjB0ZXh0dXJlfGVufDB8fHx8MTc4MTg4NTA4MHww&ixlib=rb-4.1.0&q=85';
 
 type Listing = {

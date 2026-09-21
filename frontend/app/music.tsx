@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /music — AI Music Pipeline
  * POST /api/music/generate → score / SFX / adaptive
@@ -11,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const GENRES = ['orchestral', 'electronic', 'ambient', 'rock', 'jazz', 'lofi', 'chiptune', 'cinematic'];
 const MOODS = ['epic', 'mysterious', 'energetic', 'calm', 'sad', 'tense', 'triumphant', 'eerie'];
 const DURATIONS = [30, 60, 90, 180];

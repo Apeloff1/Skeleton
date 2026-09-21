@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /multiplayer — 🛰️ Netcode Studio (Cosmic Backlog V.4).
  * Generate a complete multiplayer scaffold (server + client + protocol + lobby)
@@ -14,7 +15,7 @@ import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { toast } from '../components/Toast';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Model = { id: string; label: string; desc: string; best_for: string[]; tradeoffs: string; recommended_tick: number };
 type File = { path: string; lang: string; content: string };

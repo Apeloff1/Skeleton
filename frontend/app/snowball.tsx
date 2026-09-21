@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /snowball — ☃️ Snowball Build (manual, stage-by-stage).
  *
@@ -220,7 +221,7 @@ export default function Snowball() {
   }, [snow, running, runStage]);
 
   const exportGdd = React.useCallback(() => {
-    const base = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+    const base = CANONICAL_API_BASE || '';
     Linking.openURL(`${base}/api/snowball/${gameId}/gdd.md`);
   }, [gameId]);
 

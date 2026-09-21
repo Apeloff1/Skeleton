@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Gamification Dashboard — XP, Levels, Skill Tree, Rank Progression
  */
@@ -6,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, ActivityIn
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const RANK_COLORS: Record<string, string> = {
   Novice: '#94A3B8', Initiate: '#8B5CF6', Apprentice: '#3B82F6',

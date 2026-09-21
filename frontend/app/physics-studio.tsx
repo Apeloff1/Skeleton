@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /physics-studio — 🧲 Physics System.
  * Forge a complete physics system (world/gravity, materials, bodies, colliders,
@@ -13,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Body = { entity?: string; body_type?: string; material?: string; collider?: string; notes?: string };
 type Mat = { id?: string; friction?: number; restitution?: number; density?: number; notes?: string };

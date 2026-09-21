@@ -4,6 +4,7 @@ Usage:
     python -m skeleton <command> [options]
 
 Commands:
+    app         Unified application assembly (status/check/up/down/ps/logs/smoke)
     run         Start the skeleton runtime / GameForge vision run
     forge       Blueprint compilation and materialization
     test        Run test suites
@@ -496,6 +497,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     cmd = args[0]
     rest = args[1:]
+    if cmd == "app":
+        from skeleton.app.cli import run_app_cli
+        return run_app_cli(rest)
     if cmd == "run": return _cmd_gameforge_run(rest)
     if cmd == "forge":
         from skeleton.forge.universal import Forge

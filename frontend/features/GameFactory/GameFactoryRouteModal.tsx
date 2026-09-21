@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -10,7 +11,6 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
 import { GameFactoryModal } from './GameFactoryModal';
@@ -33,18 +33,7 @@ interface CreatedProjectSummary {
   title: string;
 }
 
-const API_BASE = (() => {
-  if (
-    typeof window !== 'undefined'
-    && (window as any).location?.origin
-    && !(window as any).location.origin.startsWith('file:')
-  ) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL
-    || '';
-})();
+const API_BASE = CANONICAL_API_BASE;
 
 function parseCreatedProjectPayload(payload: unknown): CreatedProjectSummary | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;

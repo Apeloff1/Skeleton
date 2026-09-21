@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 // ============================================================================
 // CODEDOCK v9.0.0 - ULTIMATE HUB MODAL
 // Language Packs, Expansions, Algorithms, Compilation Bible
@@ -81,7 +82,7 @@ export const HubModal: React.FC<HubModalProps> = ({ visible, onClose, colors }) 
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [detailView, setDetailView] = useState<'list' | 'detail'>('list');
 
-  const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  const backendUrl = CANONICAL_API_BASE || '';
 
   const fetchData = useCallback(async () => {
     setLoading(true);

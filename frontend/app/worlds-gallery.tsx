@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /worlds-gallery — a showcase of every world forged from a game and saved (WG).
  * Each card shows a rendered thumbnail (globe / cartographic / cosmic), its name,
@@ -11,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type World = {
   world_id: string; name: string; scale: string; palette: string; climate: string;

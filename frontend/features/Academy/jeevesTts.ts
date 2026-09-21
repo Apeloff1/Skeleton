@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Jeeves-flavoured TTS wrapper.
  * ------------------------------------------------------------------
@@ -24,7 +25,7 @@ import { ttsSpeak, ttsStop } from './tts';
 import { useSettings } from '../../state/settingsStore';
 import { speakCinematic, stopCinematic } from '../../src/utils/cinematicVoice';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 // Per-context expressive tone for the cinematic HD voice. Falls back to the
 // user's chosen Jeeves tone (default "butler") when a context isn't mapped.

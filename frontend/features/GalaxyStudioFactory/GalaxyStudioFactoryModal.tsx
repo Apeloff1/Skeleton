@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 // ═══════════════════════════════════════════════════════════════════════
 // GALAXY STUDIO FACTORY v6.0 — 100-Phase / 10-Batch 15-Minute Build + APK
 // Interval polling • Batch-level generation • No 520 errors
@@ -10,7 +11,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EXTRA_PARAM_CATEGORIES, DEFAULT_EXTRA_PARAMS, TOTAL_EXTRA_PARAMS } from './extraParams';
 import { GAME_TEMPLATES, randomizeConfig, GameTemplate } from './presets';
@@ -42,14 +42,7 @@ import { jeevesSpeak } from '../Academy/jeevesTts';
 import { shareResult } from '../../utils/shareResult';
 
 import { FALLBACK_GENRES } from './fallbackGenres';
-const BACKEND = (() => {
-  // Web: prefer same-origin so the app works on any deploy URL.
-  if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
-    return (window as any).location.origin.replace(/\/+$/, '');
-  }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL || '';
-})();
+const BACKEND = CANONICAL_API_BASE;
 
 interface Props { visible: boolean; onClose: () => void; }
 type Step = 'pick' | 'building' | 'done';

@@ -225,7 +225,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          container_id="$(docker run -d -p 127.0.0.1:18080:8080 "${{ matrix.image }}")"
+          container_id="$(docker run -d \
+            --add-host skeleton:127.0.0.1 \
+            --add-host backend:127.0.0.1 \
+            -p 127.0.0.1:18080:8080 \
+            "${{ matrix.image }}")"
           trap 'docker rm -f "$container_id" >/dev/null 2>&1 || true' EXIT
 
           ready=0

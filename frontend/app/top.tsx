@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /top — Public, shareable Top Games leaderboard (Creator Marketplace).
  *
@@ -17,7 +18,7 @@ import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 import theme from '../theme/tokens';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const { colors: C, spacing: S, radii: R } = { colors: theme.colors, spacing: theme.spacing, radii: theme.radii };
 
 const PODIUM = [

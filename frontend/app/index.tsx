@@ -9,10 +9,10 @@
  *   3. Otherwise mount <LaunchCascade /> INLINE. Layer 0 is the new
  *      BootLauncher (progress bar + readiness checks + decorative
  *      non-blocking Starfall). Returning users auto-advance when all
- *      checks pass; first-timers tap "Enter the Hub".
+ *      checks pass; first-timers tap "Enter Product".
  *
  * Layers 1–3 remain as crash-loop fallbacks. The user is always one tap
- * away from /hub or /safe-mode.
+ * away from /product or /safe-mode.
  */
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';

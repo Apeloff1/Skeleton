@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * 🎙️ CINEMATIC VOICE — plays Jeeves & narration through the immersive
  * tts-1-hd backend (storyteller cadence + augmented tone control) so the
@@ -11,7 +12,7 @@
 import { Platform } from 'react-native';
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE;
 
 let current: AudioPlayer | null = null;
 let webUrl: string | null = null;

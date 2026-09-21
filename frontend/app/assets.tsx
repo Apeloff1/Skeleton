@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /assets — Asset Pipeline
  * POST /api/assets/generate/sprite → sprite prompt + dalle/sd/midjourney pack
@@ -11,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const CATEGORIES = ['characters', 'environment', 'ui', 'items', 'effects'];
 const TYPES_BY_CAT: Record<string, string[]> = {
   characters: ['player', 'enemy', 'npc', 'boss', 'companion', 'creature'],

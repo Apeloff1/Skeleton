@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Jeeves EQ Modal v11.8 - Emotional Intelligence Dashboard
  * 
@@ -17,10 +18,9 @@ import {
   Modal, ActivityIndicator, Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Constants from 'expo-constants';
 
 import { apiFetch } from '../../utils/apiController';
-const API_URL = Constants.expoConfig?.extra?.EXPO_BACKEND_URL || '';
+const API_URL = CANONICAL_API_BASE;
 
 interface JeevesEQModalProps {
   visible: boolean;

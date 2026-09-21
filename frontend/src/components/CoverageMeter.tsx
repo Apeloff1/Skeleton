@@ -1,8 +1,9 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { apiFetch } from '../../utils/apiController';
 
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE;
 const C = { card: '#141b2e', border: '#2a3550', text: '#eef2fb', muted: '#8a96b2', accent: '#a78bfa', good: '#43d39e', track: '#22304e' };
 
 const STAGE_ICON: Record<string, string> = { refine: '🔧', polish: '✨', qc: '🛡️' };

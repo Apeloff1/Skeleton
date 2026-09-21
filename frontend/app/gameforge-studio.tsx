@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /gameforge-studio — CNS Studio console (tabbed).
  *   Overview · Build · Map · Jeeves
@@ -27,7 +28,7 @@ const PLAN = '/api/gameforge/planning';
 const TOOLS = '/api/gameforge/tools';
 const WF = '/api/gameforge/workflow';
 const AUTH = '/api/auth';
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 const authOpts = (timeoutMs = 20000) =>
   (getAuthToken() ? { timeoutMs, headers: authHeaders() } : { timeoutMs });

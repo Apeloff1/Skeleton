@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * withScreenGuard — per-screen ErrorBoundary wrapper with self-healing retry.
  *
@@ -23,7 +24,7 @@ import { getSessionId, recordEvent } from '../utils/modalLogger';
 import { navToSafeMode } from '../utils/bootTracer';
 import { crashTelemetryFields, isDevErrorDetails, redactSecrets, safeErrorMessage } from '../utils/safeError';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 /** Track persistent failures across remounts so a "sticky" crash doesn't
  *  retry infinitely. After 2 self-heal attempts in the same session for

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /studio — 🌌 Galaxy Studio (Unified).
  * The single, clean entry point that runs the whole pipeline IN ORDER on one screen:
@@ -17,7 +18,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../src/utils/apiClient';
 import BuildJourney from '../src/components/BuildJourney';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Step = {
   key: string; label: string; icon: string; done?: boolean; locked?: boolean;

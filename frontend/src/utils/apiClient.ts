@@ -15,8 +15,9 @@
  *     "what the user did last".
  */
 import { trail } from './breadcrumbs';
+import { API_BASE } from '../../utils/apiBase';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = API_BASE;
 
 export interface ApiResult<T = any> {
   ok: boolean;

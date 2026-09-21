@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /build-hub — Build · Code · AI Powerhouse Hub.
  *
@@ -17,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Skeleton from '../components/UI/Skeleton';
 import RetryBanner from '../components/UI/RetryBanner';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Category = 'Code & Run' | 'AI Pipelines' | 'Assets & Media' | 'Education';
 

@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from './apiBase';
 /**
  * modalLogger — per-modal telemetry tracker.
  *
@@ -15,7 +16,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BACKEND  = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND  = CANONICAL_API_BASE;
 const FLUSH_MS = 5000;
 const QUEUE_KEY = '@telemetry/queue';
 

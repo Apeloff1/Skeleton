@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * CodeDock Synergy Service v12.0
  * 
@@ -5,7 +6,7 @@
  * Connects learning progress, emotional state, and AI interactions.
  */
 
-const API_BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_BASE = CANONICAL_API_BASE;
 
 export interface UserContext {
   user_id: string;

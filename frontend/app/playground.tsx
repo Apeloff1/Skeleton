@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /playground — Full Code Playground IDE.
  *
@@ -17,7 +18,7 @@ import { jeevesSpeak } from '../features/Academy/jeevesTts';
 import { useAutosave } from '../utils/useAutosave';
 import { withScreenGuard } from '../components/withScreenGuard';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const USER_ID = 'default_user';
 
 type Lang = { id: string; name?: string; runtime?: string };

@@ -13,8 +13,9 @@
  *   if (res.ok) use(res.data); else showError(res.error);
  */
 import { traceStep } from './bootTracer';
+import { API_BASE } from './apiBase';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = API_BASE;
 
 // ── Offline state (wired by OfflineBanner / useNetworkStatus) ───────
 // When set to true, in-flight retries bail early instead of running

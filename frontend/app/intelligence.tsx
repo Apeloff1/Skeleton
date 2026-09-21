@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /intelligence — Code Intelligence
  * Auto-document, generate-tests, predict-bugs, analyze-architecture, etc.
@@ -13,7 +14,7 @@ import { useRouteHistory } from '../utils/routeHistory';
 import { shareResult, copyToClipboard } from '../utils/shareResult';
 import { jeevesSpeak } from '../features/Academy/jeevesTts';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 const LANGS = ['python','javascript','typescript','rust','go','java','cpp','c'];
 
 type Action = {

@@ -1,46 +1,107 @@
 /**
- * apiBase — pick the right backend origin per platform.
+ * Canonical runtime endpoint resolution for the assembled application.
  *
- *  • Web: when the app is loaded from a real origin (preview, deployed,
- *    custom domain), prefer SAME-ORIGIN so `/api/*` is routed by the
- *    platform ingress to the backend (port 8001). This makes the app
- *    work on every URL — no env edit required when deploying.
+ * Resolution order is intentionally identical for every frontend client:
+ *   1. explicit EXPO_PUBLIC_* / legacy Expo extra override,
+ *   2. browser same-origin fallback (for reverse-proxied deployments),
+ *   3. local development port.
  *
- *  • Native (Expo Go / installed APK): use EXPO_PUBLIC_BACKEND_URL from
- *    the bundled .env. There is no "current origin" on native.
- *
- *  • Fallback: localhost:8001 for local dev where neither is set.
+ * Explicit values win on web as well as native. This is important for the
+ * Docker/Expo development topology where the browser runs on :3000 while the
+ * application API and Skeleton engine live on :8001 and :8010.
  */
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-function resolveApiBase(): string {
-  // 1) Web — use the page's own origin so requests hit the same host
-  //    the bundle was loaded from. The platform ingress maps /api/* to
-  //    the backend service.
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const loc: any = (window as any).location;
-    if (loc && typeof loc.origin === 'string' && loc.origin && !loc.origin.startsWith('file:')) {
-      return loc.origin.replace(/\/+$/, '');
-    }
-  }
-  // 2) Native or fallback — use the env-baked URL
-  const envFromConst =
-    (Constants?.expoConfig as any)?.extra?.EXPO_PUBLIC_BACKEND_URL ||
-    (Constants as any)?.manifest?.extra?.EXPO_PUBLIC_BACKEND_URL ||
-    '';
-  const envFromProcess = (process.env.EXPO_PUBLIC_BACKEND_URL || '').trim();
-  const env = (envFromConst || envFromProcess || '').replace(/\/+$/, '');
-  if (env) return env;
-  // 3) Last-ditch local dev fallback
-  return 'http://localhost:8001';
+type EndpointKey =
+  | 'EXPO_PUBLIC_BACKEND_URL'
+  | 'EXPO_BACKEND_URL'
+  | 'EXPO_PUBLIC_SKELETON_URL'
+  | 'EXPO_SKELETON_URL'
+  | 'EXPO_PUBLIC_BACKEND_FALLBACK_URL';
+
+function clean(value: unknown): string {
+  return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
 }
 
-export const API_BASE = resolveApiBase();
+function extraValue(key: EndpointKey): string {
+  const expoConfig = (Constants?.expoConfig as any)?.extra;
+  const manifest = (Constants as any)?.manifest?.extra;
+  return clean(expoConfig?.[key] || manifest?.[key] || '');
+}
 
-/** Convenience: build a full URL from a path that may or may not start with /. */
+function processValue(key: EndpointKey): string {
+  switch (key) {
+    case 'EXPO_PUBLIC_BACKEND_URL':
+      return clean(process.env.EXPO_PUBLIC_BACKEND_URL);
+    case 'EXPO_BACKEND_URL':
+      return clean(process.env.EXPO_BACKEND_URL);
+    case 'EXPO_PUBLIC_SKELETON_URL':
+      return clean(process.env.EXPO_PUBLIC_SKELETON_URL);
+    case 'EXPO_SKELETON_URL':
+      return clean(process.env.EXPO_SKELETON_URL);
+    case 'EXPO_PUBLIC_BACKEND_FALLBACK_URL':
+      return clean(process.env.EXPO_PUBLIC_BACKEND_FALLBACK_URL);
+  }
+}
+
+function explicitEndpoint(keys: EndpointKey[]): string {
+  for (const key of keys) {
+    const fromProcess = processValue(key);
+    if (fromProcess) return fromProcess;
+    const fromExtra = extraValue(key);
+    if (fromExtra) return fromExtra;
+  }
+  return '';
+}
+
+function browserOrigin(): string {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return '';
+  const origin = clean((window as any)?.location?.origin);
+  if (!origin || origin.startsWith('file:')) return '';
+  return origin;
+}
+
+function resolveEndpoint(keys: EndpointKey[], localFallback: string): string {
+  const explicit = explicitEndpoint(keys);
+  if (explicit) return explicit;
+
+  const sameOrigin = browserOrigin();
+  if (sameOrigin) return sameOrigin;
+
+  return localFallback;
+}
+
+export const API_BASE = resolveEndpoint(
+  ['EXPO_PUBLIC_BACKEND_URL', 'EXPO_BACKEND_URL'],
+  'http://localhost:8001',
+);
+
+export const SKELETON_API_BASE = resolveEndpoint(
+  ['EXPO_PUBLIC_SKELETON_URL', 'EXPO_SKELETON_URL'],
+  'http://localhost:8010',
+);
+
+export const API_FALLBACK_BASE = explicitEndpoint([
+  'EXPO_PUBLIC_BACKEND_FALLBACK_URL',
+]);
+
+export const RUNTIME_ENDPOINTS = Object.freeze({
+  backend: API_BASE,
+  backendFallback: API_FALLBACK_BASE,
+  skeleton: SKELETON_API_BASE,
+});
+
+/** Build a backend URL from a relative path or preserve an absolute URL. */
 export function api(path: string): string {
   if (!path) return API_BASE;
   if (/^https?:\/\//i.test(path)) return path;
   return API_BASE + (path.startsWith('/') ? path : '/' + path);
+}
+
+/** Build a Skeleton-engine URL from a relative path or preserve an absolute URL. */
+export function skeletonApi(path: string): string {
+  if (!path) return SKELETON_API_BASE;
+  if (/^https?:\/\//i.test(path)) return path;
+  return SKELETON_API_BASE + (path.startsWith('/') ? path : '/' + path);
 }

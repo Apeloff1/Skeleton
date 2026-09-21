@@ -2,14 +2,27 @@
 
 AI game engine and agent orchestration framework.
 
-Jeeves chat now includes saved conversations, project context, search, retry,
-and transcript export. See the [Jeeves workspace baseline](docs/JEEVES_WORKSPACE_BASELINE.md)
-for its architecture, limits, migration behavior and focused test commands.
-
 ## Quick Start
 
 ```bash
-# Boot the full system
+# Inspect canonical topology, then optionally probe live runtime health
+python -m skeleton app status
+python -m skeleton app status --live
+
+# Validate the repository-wide application assembly
+python -m skeleton app check
+
+# Build and start frontend + backend + Skeleton API + Mongo
+python -m skeleton app up
+
+# Verify the assembled public surfaces
+python -m skeleton app smoke
+
+# Optional operating modes
+python -m skeleton app up --hot
+python -m skeleton app up --production
+
+# Boot only the in-process Skeleton engine runtime
 python -m skeleton run
 
 # Developer CLI
@@ -20,6 +33,8 @@ python -m skeleton dev health
 # Run tests
 python -m skeleton test
 ```
+
+The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
 
 ## Architecture
 
@@ -37,6 +52,18 @@ python -m skeleton test
 - Track E root-test archive: `tests/legacy_root/`
 - SEVEN_BY series archive: [`docs/archive/seven_by/`](docs/archive/seven_by/)
 - Policy: [`docs/ARTIFACT_PLANE.md`](docs/ARTIFACT_PLANE.md)
+
+## Builder plane
+
+Autonomous feature work uses a deterministic Builder Plane between Secretary
+admission and the bounded feature worker. Maintainer-approved issue authority
+is compiled into a digest-sealed build manifest with exact snapshot/execution
+custody, an ordered build DAG, proposal budgets, acceptance criteria, and
+publication evidence. The plane is data-only: it does not add token
+permissions, executable model output, or merge authority.
+
+See [`docs/BUILDER_PLANE.md`](docs/BUILDER_PLANE.md) for the complete
+authority, lifecycle, failure, and CI contract.
 
 ## Subsystems
 
