@@ -1651,6 +1651,11 @@ Close G071–G130, including TOCTOU approval races, SSRF/DNS rebinding, path/sym
 
 **Gate:** no residual gap may remain an unowned implicit assumption; every item is closed, downgraded with bounded evidence, or explicitly scheduled with a production-readiness restriction.
 
+### AB39. Systemic lifecycle and recovery closure — ⬜
+Close G131–G200: deterministic invariant/policy precedence, bootstrap/recovery dependency cycles, dependency-reduced safe mode, break-glass survivability, staging/production parity, chaos-harness validation, rate/quota cascades, region/data-residency boundaries, encryption/service identity, webhook authenticity, prompt/policy exfiltration, graph/retrieval fanout abuse, license revocation lineage, adapter/quantization/model-router compatibility, long-running workflow version envelopes, restore/replay reconciliation, durable fencing across restore, and backend-specific activation atomicity.
+
+**Gate:** recovery can be executed from a documented minimal dependency set; internal services authenticate identity; restored work reconciles external-effect receipts before dispatch; policy conflicts resolve deterministically.
+
 **Exit gate for AB:** every P0 audit finding has a canonical contract, owner, machine invariant, tests, fault injection, observability, recovery semantics and signed evidence. No subsystem with an applicable open P0 may claim production-grade status.
 
 ---
@@ -1704,7 +1709,7 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 6. ⬜ AB5–AB10: evaluation firewall, principals/tenancy, sandbox, supply chain, storage semantics, leases/fencing/ordering.
 7. ⬜ AB11–AB20: secret lifecycle, DR, control-plane reserve, config snapshots, side-effect reconciliation, deletion, poisoning, safe loading, tamper-evident audit, safe mode.
 8. ⬜ AB21–AB36: resource/backpressure, observability integrity, compatibility, structured decoding, uncertainty, cache/event semantics, multi-agent containment, provenance, numeric IR, capacity/cost, parser bounds, cancellation, semantic drift/ABI, historical restore, trust-root bootstrap.
-9. ⬜ AB37: combined single-, pairwise- and selected three-axis fault campaigns.
+9. ⬜ AB37–AB39: combined fault campaigns plus residual race/boundary and systemic lifecycle/recovery closure.
 10. ⬜ Implement ResearchEvidence and experiment-manifest schemas.
 11. ⬜ Add source/version/provenance adapters.
 12. ⬜ Build the claim/evidence graph and evidence maturity engine.
