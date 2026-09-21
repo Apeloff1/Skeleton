@@ -20,6 +20,10 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
         documents["research_evidence_evolution"]
         == "docs/architecture/research-evidence-evolution.md"
     )
+    assert (
+        documents["research_source_catalog"]
+        == "docs/architecture/research-source-catalog.md"
+    )
     assert documents["sota_absorb_engine"].endswith("sota-absorb-engine.md")
     assert documents["adaptive_absorption_fabric"].endswith(
         "adaptive-absorption-fabric.md"
