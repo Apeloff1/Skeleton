@@ -14,7 +14,7 @@ and acknowledges them only after the underlying data has actually been removed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import math
@@ -380,6 +380,27 @@ class DataLifecycleRegistry:
                         )
                     if entry.state is not LifecycleState.DELETED:
                         entries.append(entry)
+
+            active_plan_ids = {
+                entry.active_plan_id
+                for entry in entries
+                if entry.state is LifecycleState.DELETE_PENDING
+                and entry.active_plan_id is not None
+            }
+            if active_plan_ids:
+                if len(active_plan_ids) != 1:
+                    raise LifecycleConflict(
+                        "selected records belong to multiple active deletion plans"
+                    )
+                active_plan_id = next(iter(active_plan_ids))
+                if any(
+                    entry.state is LifecycleState.ACTIVE
+                    for entry in entries
+                ):
+                    raise LifecycleConflict(
+                        "cannot merge active records into an existing deletion plan"
+                    )
+                return self._plans[active_plan_id]
 
             return self._plan(
                 entries,
