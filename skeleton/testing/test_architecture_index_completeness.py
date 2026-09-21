@@ -29,6 +29,8 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
         "adaptive-absorption-fabric.md"
     )
     assert documents["exotic_architecture_lab"] == "docs/architecture/exotic-architecture-lab.md"
+    assert documents["frontier_research_atlas"] == "docs/architecture/frontier-research-atlas-2026.md"
+    assert documents["frontier_research_experiment_protocols"] == "docs/architecture/frontier-research-experiment-protocols-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -252,6 +254,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert checkpoint["frontier_delta_range"] == ("FD001", "FD016")
     assert checkpoint["contradiction_range"] == ("CX001", "CX024")
     assert checkpoint["research_debt_range"] == ("RDE001", "RDE036")
+    assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP035")
     assert checkpoint["production_authority_granted"] is False
     assert checkpoint["research_refresh_required"] is True
 
@@ -261,6 +264,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert len(architecture_index.FRONTIER_DELTA_IDS) == 16
     assert len(architecture_index.RESEARCH_CONTRADICTION_IDS) == 24
     assert len(architecture_index.RESEARCH_DEBT_IDS) == 36
+    assert len(architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS) == 35
 
     assert invariants["research_source_is_evidence_not_authority"] is True
     assert invariants["contradictory_evidence_is_retained"] is True
@@ -302,6 +306,12 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     atlas = (
         root / "docs" / "architecture" / "frontier-research-atlas-2026.md"
     ).read_text(encoding="utf-8")
+    protocols = (
+        root
+        / "docs"
+        / "architecture"
+        / "frontier-research-experiment-protocols-2026.md"
+    ).read_text(encoding="utf-8")
     plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
     index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
 
@@ -317,6 +327,9 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "Research debt ledger" in atlas
     assert "Statistical and experimental rigor contract" in atlas
     assert "Research freshness tiers" in atlas
+    assert "Experiment sequencing policy" in protocols
+    assert "Experiment-result decision vocabulary" in protocols
+    assert "Experiment integrity gate" in protocols
 
     for finding_id in architecture_index.RESEARCH_CONCLUSION_IDS:
         assert finding_id in atlas
@@ -330,6 +343,8 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
         assert contradiction_id in atlas
     for debt_id in architecture_index.RESEARCH_DEBT_IDS:
         assert debt_id in atlas
+    for protocol_id in architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS:
+        assert protocol_id in protocols
 
     assert "RExBench" in atlas and "WITHDRAWN" in atlas
     assert "ToolTweak" in atlas and "SUBMISSION" in atlas
@@ -340,4 +355,5 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "To Infinity and Beyond" in atlas and "ICLR 2026 Oral" in atlas
     assert "research agent cannot mark its own result reproduced" in atlas.lower()
     assert "AD60. Debt retirement and reopening" in plan
+    assert "AD65. Research experiment sequencing" in plan
     assert "FD001–FD016" in plan
