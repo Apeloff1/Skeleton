@@ -48,6 +48,11 @@ from skeleton.vault.data_governance import (
     evaluate_provider_transfer,
     require_provider_transfer,
 )
+from skeleton.vault.governance_registry import (
+    GovernanceContext,
+    GovernanceRegistry,
+    RegisteredProviderTransferDecision,
+)
 
 __all__ = [
     "AccessPolicy",
@@ -79,4 +84,7 @@ __all__ = [
     "LifecycleConflict",
     "LifecycleError",
     "LifecycleState",
+    "GovernanceContext",
+    "GovernanceRegistry",
+    "RegisteredProviderTransferDecision",
 ]
