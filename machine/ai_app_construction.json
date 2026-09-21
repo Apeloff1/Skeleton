@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.5.0",
-  "architecture_tag": "arch-map/v3.5",
+  "construction_version": "3.6.0",
+  "architecture_tag": "arch-map/v3.6",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
@@ -1287,6 +1287,12 @@
       "required": true
     },
     {
+      "id": "capability-interfaces",
+      "kind": "static",
+      "command": "python scripts/check_capability_interfaces.py",
+      "required": true
+    },
+    {
       "id": "app-assembly",
       "kind": "integration",
       "command": "python scripts/check_app_assembly.py",
@@ -2454,7 +2460,9 @@
       "plane dependency graph acyclic",
       "all provider families and credential-bearing surfaces declared",
       "all open gaps scheduled exactly once",
-      "all canonical envelopes and lifecycle stages have owners"
+      "all canonical envelopes and lifecycle stages have owners",
+      "every construction relationship has an interface registry entry",
+      "interface registry owners/zones/contracts match canonical planes"
     ],
     "sota_complete": [
       "zero open P0 gaps",
@@ -2578,5 +2586,12 @@
       "meaning": "A plane whose externally observable contract/evidence is checked, but whose implementation is not imported as a runtime dependency.",
       "validation": "target must be a declared plane; does not alter runtime dependency order"
     }
+  },
+  "capability_interface_registry": {
+    "contract": "machine/capability_interfaces.json",
+    "validator": "scripts/check_capability_interfaces.py",
+    "coverage": "all depends_on and validates edges exactly once",
+    "ownership": "target plane retains authority",
+    "merge_policy": "fail closed on missing, extra, stale, or mismatched interface entries"
   }
 }
