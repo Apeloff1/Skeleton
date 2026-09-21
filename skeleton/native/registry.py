@@ -70,6 +70,7 @@ class NativeAcceleratorRuntimeStatus:
 PreflightProvider = Callable[[], AsmAcceleratorPreflight]
 AcceleratorFactory = Callable[[], Any]
 Builder = Callable[..., Path]
+LibraryLoader = Callable[[Path], Any]
 
 
 class NativeAcceleratorRegistry:
@@ -81,12 +82,14 @@ class NativeAcceleratorRegistry:
         factory: AcceleratorFactory | None = None,
         preflight_provider: PreflightProvider | None = None,
         builder: Builder | None = None,
+        library_loader: LibraryLoader | None = None,
     ) -> None:
         self._factory = factory or AsmVectorAccelerator
         self._preflight_provider = (
             preflight_provider or AsmVectorAccelerator.preflight
         )
         self._builder = builder or AsmVectorAccelerator.build
+        self._library_loader = library_loader or AsmVectorAccelerator
         self._instance: Any | None = None
         self._last_error: str | None = None
         self._lock = threading.RLock()
@@ -137,7 +140,7 @@ class NativeAcceleratorRegistry:
                     output_dir=output_dir,
                     compiler=compiler,
                 )
-                instance = AsmVectorAccelerator(library)
+                instance = self._library_loader(library)
             except Exception as exc:
                 self._last_error = type(exc).__name__
                 raise
