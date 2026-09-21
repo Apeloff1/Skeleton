@@ -97,7 +97,7 @@ export async function probeAppHealth(
 
   if (bootstrap) {
     try {
-      const runtime = await getAppRuntimeStatus(timeoutMs, signal);
+      const runtime = await getAppRuntimeStatus(timeoutMs, signal, bootstrap);
       if (runtime) {
         return {
           ok: runtime.ok,
