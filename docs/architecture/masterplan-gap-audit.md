@@ -1,7 +1,7 @@
 # Masterplan Adversarial Gap Audit
 
-Status: canonical hostile-design review  
-Updated: 2026-09-21  
+Status: canonical hostile-design review
+Updated: 2026-09-21
 Scope: Skeleton architecture, Tracks Q–AA, training, inference, memory, tools, agents, data, deployment and recovery
 
 ## 0. Audit posture
@@ -1211,8 +1211,8 @@ This audit intentionally remains open-ended. Every incident, near miss, benchmar
 
 ## 8. Audit checkpoint
 
-PLAN-20260921-HOSTILE-GAP-AUDIT  
-scope=G001..G200 + Track AB  
-open_P0_blocks_production_readiness=true  
-fault_model=single-axis + pairwise + selected-three-axis  
+PLAN-20260921-HOSTILE-GAP-AUDIT
+scope=G001..G200 + Track AB
+open_P0_blocks_production_readiness=true
+fault_model=single-axis + pairwise + selected-three-axis
 signoff_required_for_closure=true
