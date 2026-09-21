@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Architecture tag:** `arch-map/v3.5`
+**Architecture tag:** `arch-map/v3.6`
 **Machine contract:** `machine/architecture.json`
 **Runtime contract:** `skeleton/app/manifest.json`
 **Validator:** `python scripts/check_architecture_map.py`
@@ -230,6 +230,7 @@ arch-map/v3.3  canonical operation lifecycle + resumable stream contract
 arch-map/v3.4  durable operation stream store + replay watermark semantics
 arch-map/v3.5  clean dependency DAG + explicit acceptance edges + engine-owned model routing
 arch-map/v3.5  structural ownership/recovery map + bounded reverse-edge semantics
+arch-map/v3.6  exception-free model-routing ownership convergence + explicit acceptance edges
 ```
 
 ## 10. Operator commands
