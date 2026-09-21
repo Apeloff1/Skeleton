@@ -94,7 +94,7 @@ def artifact_build(
 def database():
     from core.databases import get_sync_db
 
-    return get_syncdatabase()
+    return get_sync_db()
 
 
 def gamefiles(game_name: str) -> list[dict[str, Any]]:
