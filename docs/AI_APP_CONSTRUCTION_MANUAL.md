@@ -623,8 +623,9 @@ as Mongo-first authority:
   canonical Mongo state.
 
 This does **not** close the full state-authority P0 gap. Production operation
-repository binding, durable outbox runtime dispatch, authoritative Mongo
-backup/restore rehearsal, and full derived-store recovery remain required.
+authority/outbox dispatch and restore-first recovery are now separate implemented
+checkpoints below; production backup/retention policy for operation SQLite and
+future authoritative cognitive ledgers remain open.
 
 Evidence:
 `backend/services/rag_service.py`,
@@ -647,6 +648,31 @@ The production Skeleton intelligence surface is bound through `DurableOperationR
 - shutdown stops the dispatcher, flushes pending rows, then closes durable stores.
 
 A stream outage therefore cannot roll back an accepted operation transition, and an idle process no longer requires a new request or restart to retry pending publication. STATE-02 remains verification-pending until the focused operation store/runtime/server-binding tests pass under independent CI.
+
+
+
+### State-authority checkpoint — restore-first recovery
+
+STATE-03 makes recovery ordering executable instead of advisory.
+
+The dedicated `State Recovery Drill` workflow starts an isolated Mongo 7
+service, seeds representative canonical RAG product records, captures a logical
+backup including user index metadata, restores into a separate scratch
+database, and verifies collection sets, record counts, canonical document
+digests and index digests.
+
+Only after `verify_authority` passes may the drill enter
+`rebuild_derived`. The recovery journal enforces this sequence and fails
+closed on an ordering violation. Derived reconstruction is then checked for
+determinism. The RAG authority regression suite separately proves total Chroma
+projection loss can be rebuilt from Mongo.
+
+Deployment volumes are labeled by declared state role, and
+`machine/state_topology.json` is the canonical recovery order. The operator
+procedure is documented in `docs/runbooks/STATE_RECOVERY.md`.
+
+This closes the STATE-03 implementation slice without claiming that every
+future authoritative cognitive ledger already has a production backup policy.
 
 
 ### Cost-admission checkpoint — durable tenant quotas
