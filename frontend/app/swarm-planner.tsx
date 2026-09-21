@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 // ─────────────────────────────────────────────────────────────────────────
 //  Hierarchical Swarm Planner — visualises the director→leads→platoons→
 //  workers task DAG with provable 100% coverage, dependency waves and a
@@ -13,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { apiFetch } from '../utils/apiController';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = CANONICAL_API_BASE || '';
 
 const T = {
   bg: '#0A0A0A', card: '#141414', cardAlt: '#15203A',

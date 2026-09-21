@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /tournaments — Seasonal Tournaments (single-elimination brackets over games).
  *
@@ -14,7 +15,7 @@ import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Slot = { playable_id: string; title?: string; seed?: number; has_cover?: boolean };
 type Match = { match_id: string; a: Slot; b: Slot; votes: { a: number; b: number }; winner: string | null };

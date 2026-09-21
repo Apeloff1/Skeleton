@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../utils/apiBase';
 /**
  * /worldforge — Cosmic-Scale Procedural World Engine (2026).
  *
@@ -18,7 +19,7 @@ import { useRouter } from 'expo-router';
 import api from '../src/utils/apiClient';
 import { useHaptics } from '../src/hooks/useHaptics';
 
-const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BACKEND = CANONICAL_API_BASE || '';
 
 type Tile = { b: string; c: string };
 type Dist = { biome: string; label: string; emoji: string; color: string; pct: number };
