@@ -2,6 +2,8 @@ import math
 
 import pytest
 
+from skeleton.intelligence.admission import ResourceBudget
+
 from core.model_router import (
     ModelEndpoint,
     ModelRouter,
@@ -203,3 +205,63 @@ def test_decision_serialization_exposes_explicit_fallbacks_and_rejections():
     assert payload["fallbacks"] == ["fallback"]
     assert payload["candidates"][0]["endpoint_id"] == "primary"
     assert payload["rejected"]["disabled"] == ["disabled"]
+
+
+def test_route_request_projects_resource_budget_into_hard_constraints():
+    budget = ResourceBudget(
+        max_output_tokens=2048,
+        max_cost_usd=0.25,
+        max_wall_seconds=3.5,
+    )
+
+    request = RouteRequest.from_resource_budget(
+        "analysis",
+        budget,
+        context_tokens=1200,
+        expected_output_tokens=4096,
+        privacy="sensitive",
+    )
+
+    assert request.context_tokens == 1200
+    assert request.expected_output_tokens == 2048
+    assert request.cost_budget == 0.25
+    assert request.latency_budget_ms == 3500.0
+    assert request.privacy is PrivacyLevel.SENSITIVE
+
+
+def test_resource_budget_constraints_cannot_be_overridden_by_caller():
+    budget = ResourceBudget(max_cost_usd=1.0)
+
+    with pytest.raises(ValueError, match="resource budget owns"):
+        RouteRequest.from_resource_budget(
+            "analysis",
+            budget,
+            cost_budget=999.0,
+        )
+
+
+def test_resource_budget_can_make_expensive_route_ineligible():
+    budget = ResourceBudget(
+        max_output_tokens=1000,
+        max_cost_usd=0.0001,
+        max_wall_seconds=1.0,
+    )
+    router = ModelRouter()
+    router.register(
+        _endpoint(
+            "expensive",
+            input_cost=100.0,
+            output_cost=100.0,
+            latency=100,
+        )
+    )
+
+    request = RouteRequest.from_resource_budget(
+        "analysis",
+        budget,
+        context_tokens=1000,
+        expected_output_tokens=1000,
+    )
+
+    with pytest.raises(NoRoute, match="cost"):
+        router.route(request)
