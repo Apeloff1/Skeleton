@@ -80,6 +80,7 @@ CANONICAL_DOCUMENTS = {
     "frontier_contract": "docs/FRONTIER_ARCHITECTURE.md",
     "build_plan": "docs/BUILD_PLAN.md",
     "research_evidence_evolution": "docs/architecture/research-evidence-evolution.md",
+    "research_source_catalog": "docs/architecture/research-source-catalog.md",
     "sota_absorb_engine": "docs/architecture/sota-absorb-engine.md",
     "adaptive_absorption_fabric": "docs/architecture/adaptive-absorption-fabric.md",
 }
