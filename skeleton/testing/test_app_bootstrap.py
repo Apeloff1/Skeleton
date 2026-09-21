@@ -8,7 +8,7 @@ def test_public_bootstrap_is_dependency_closed_and_sanitized():
 
     assert payload["schema_version"] == 1
     assert payload["application"]["name"] == "Skeleton"
-    assert payload["application"]["version"] == "16"
+    assert payload["application"]["version"] == "16.0.0"
 
     services = {item["name"]: item for item in payload["services"]}
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(services)
