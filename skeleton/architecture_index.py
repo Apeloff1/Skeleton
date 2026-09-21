@@ -350,11 +350,53 @@ RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(
 
 RESEARCH_SOURCE_STATUS_STATES = (
     "accepted_peer_reviewed",
+    "accepted_poster",
+    "accepted_oral",
+    "workshop",
     "preprint",
     "submission",
+    "arr_submission",
     "withdrawn",
+    "rejected",
     "official_org_evidence",
+    "corrected",
+    "retracted",
     "status_unresolved",
+)
+
+REPRODUCTION_CLASSES = (
+    "sanity",
+    "paper_scale",
+    "transfer",
+    "systems",
+    "adversarial",
+    "negative",
+    "independent",
+)
+
+RESEARCH_DEBT_STATES = (
+    "open",
+    "experiment_designed",
+    "running",
+    "evidence_collected",
+    "challenged",
+    "retired",
+    "partially_retired",
+    "invalidated",
+    "deferred",
+)
+
+RESEARCH_RESULT_STATES = (
+    "supported_in_scope",
+    "partially_supported",
+    "null_result",
+    "falsified_in_scope",
+    "inconclusive_variance",
+    "inconclusive_resource_limit",
+    "invalid_method",
+    "invalid_baseline",
+    "invalid_evaluation",
+    "reproduction_failed",
 )
 
 RESEARCH_SOURCE_AUDIT_INVARIANTS = {
@@ -365,6 +407,7 @@ RESEARCH_SOURCE_AUDIT_INVARIANTS = {
     "withdrawn_work_remains_available_as_scoped_evidence": True,
     "first_party_evidence_is_not_independent_consensus": True,
     "status_upgrade_is_new_evidence_event": True,
+    "correction_or_retraction_is_new_evidence_event": True,
     "source_claim_scope_is_preserved": True,
     "research_status_cannot_be_inferred_from_title_or_recency": True,
 }
@@ -444,6 +487,9 @@ def full_summary() -> Dict[str, Any]:
         "research_debt_ids": list(RESEARCH_DEBT_IDS),
         "research_experiment_protocol_ids": list(RESEARCH_EXPERIMENT_PROTOCOL_IDS),
         "research_source_status_states": list(RESEARCH_SOURCE_STATUS_STATES),
+        "reproduction_classes": list(REPRODUCTION_CLASSES),
+        "research_debt_states": list(RESEARCH_DEBT_STATES),
+        "research_result_states": list(RESEARCH_RESULT_STATES),
         "research_source_audit_invariants": dict(RESEARCH_SOURCE_AUDIT_INVARIANTS),
         "research_automation_invariants": dict(RESEARCH_AUTOMATION_INVARIANTS),
         "monitorability_research_invariants": dict(MONITORABILITY_RESEARCH_INVARIANTS),
