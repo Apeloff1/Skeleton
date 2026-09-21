@@ -11,6 +11,9 @@ python -m skeleton app check
 # Build and start frontend + backend + Skeleton API + Mongo
 python -m skeleton app up
 
+# Verify the assembled public surfaces
+python -m skeleton app smoke
+
 # Boot only the in-process Skeleton engine runtime
 python -m skeleton run
 
