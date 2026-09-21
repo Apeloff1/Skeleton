@@ -3367,6 +3367,79 @@ Default first wave:
 
 Expensive Track AC/AA candidates wait until applicable foundation/eval/manifest gates exist.
 
+### AD66. Practical-significance and equivalence regions — ⬜
+
+Every consequential comparison predefines or reports:
+- absolute effect size;
+- relative effect;
+- uncertainty;
+- operationally meaningful threshold;
+- equivalence region where systems are effectively tied.
+
+**Gate:** noise-level leaderboard differences cannot drive architecture promotion.
+
+### AD67. Systems measurement discipline — ⬜
+
+Performance studies declare:
+- warmup/JIT state;
+- cold vs warm cache;
+- synchronization/timing source;
+- batch/concurrency;
+- background load;
+- power/thermal state where material;
+- p50/p95/p99;
+- timeout/failure rate.
+
+### AD68. Missingness and failed-run custody — ⬜
+
+Persist and classify:
+- OOM;
+- timeout;
+- parser error;
+- evaluator failure;
+- telemetry loss;
+- invalid sample;
+- diverged training;
+- interrupted run.
+
+Missing outcomes never silently disappear from denominator/accounting.
+
+### AD69. Benchmark custody and access ledger — ⬜
+
+Blind/private evaluation records:
+- authorized readers;
+- answer accesses;
+- query count;
+- export/download;
+- derived labels;
+- benchmark version;
+- contamination incidents.
+
+### AD70. Analysis provenance — ⬜
+
+Every promoted figure/table/summary is reproducible from:
+- result bundle;
+- analysis code;
+- filters/query;
+- metric version;
+- plotting/report version.
+
+### AD71. Independent implementation replication — ⬜
+
+For architecture-changing results, seek at least one reproduction that does not reuse all candidate implementation assumptions.
+
+**Gate:** implementation-specific speedups or hidden defaults cannot masquerade as algorithmic evidence.
+
+### AD72. Experiment decision-value review — ⬜
+
+Before expensive experiments, state which architecture decision changes under:
+- positive result;
+- null result;
+- negative result;
+- inconclusive result.
+
+Experiments with no plausible decision-changing outcome are deprioritized.
+
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
 ---
