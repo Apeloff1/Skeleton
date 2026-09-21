@@ -19237,11 +19237,11 @@
       "id": "ACC-AIQ-S0-COST-02",
       "type": "queue_task",
       "title": "AIQ-S0-COST-02 Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
-      "status": "pending",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T19:18:48Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -19268,8 +19268,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T19:18:48Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T19:18:48Z",
+          "git_sha": "cf774f306661f48d30bc27d3f8ecbad055304773",
+          "statement": "Begin AIQ-S0-COST-02 durable monotonic tool/artifact/storage usage metering and reconciliation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/cf774f306661f48d30bc27d3f8ecbad055304773",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-AIQ-S0-COST-02/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "pending"
     },
