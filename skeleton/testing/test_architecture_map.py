@@ -266,4 +266,3 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "state_authorities": 13,
         "recovery_domains": 8,
     }
-
