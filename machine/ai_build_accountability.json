@@ -18600,9 +18600,9 @@
       "id": "ACC-AIQ-S0-STATE-03",
       "type": "queue_task",
       "title": "AIQ-S0-STATE-03 Prove authoritative restore first and derived index/cache rebuild second.",
-      "status": "verified",
-      "checkbox": false,
-      "checkbox_mark": "[ ]",
+      "status": "done",
+      "checkbox": true,
+      "checkbox_mark": "[x]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T18:59:34Z",
       "implementation_signoff": {
@@ -18653,8 +18653,8 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147"
       },
       "independence_exception": null,
-      "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T19:14:11Z",
+      "completed_at_utc": "2026-09-21T19:16:49Z",
+      "last_event_at_utc": "2026-09-21T19:16:49Z",
       "history": [
         {
           "sequence": 1,
@@ -18742,6 +18742,25 @@
             "state-recovery-drill:derived_digest=1be92375ecda43900c76a802ff81cfeeb6dd718c55bbfab36d4312c4b19f445d",
             "machine/accountability_events/ACC-AIQ-S0-STATE-03/verification.json"
           ]
+        },
+        {
+          "sequence": 5,
+          "event_type": "completed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "accountability-finalizer",
+          "at_utc": "2026-09-21T19:16:49Z",
+          "git_sha": "8d5b5ba69120e52510af07e35782e916102d0336",
+          "statement": "Finalize STATE-03 after implementation and independent live recovery verification signatures are present.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/8d5b5ba69120e52510af07e35782e916102d0336",
+          "from_status": "verified",
+          "to_status": "done",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/8d5b5ba69120e52510af07e35782e916102d0336",
+            "machine/accountability_events/ACC-AIQ-S0-STATE-03/completion.json",
+            "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147"
+          ]
         }
       ],
       "evidence": [
@@ -18765,7 +18784,9 @@
         "github-actions-job:106478069613",
         "state-recovery-drill:backup_restore_digest=5d341ec0e455b74fb295621098be33e0f2991014d91076b4e5eccfbdd15c4ab1",
         "state-recovery-drill:derived_digest=1be92375ecda43900c76a802ff81cfeeb6dd718c55bbfab36d4312c4b19f445d",
-        "machine/accountability_events/ACC-AIQ-S0-STATE-03/verification.json"
+        "machine/accountability_events/ACC-AIQ-S0-STATE-03/verification.json",
+        "https://github.com/Apeloff1/Skeleton/commit/8d5b5ba69120e52510af07e35782e916102d0336",
+        "machine/accountability_events/ACC-AIQ-S0-STATE-03/completion.json"
       ],
       "baseline_status": "pending"
     },
