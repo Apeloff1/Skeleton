@@ -1095,6 +1095,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             }
             if request.max_output_tokens is not None:
                 kwargs["max_output_tokens"] = request.max_output_tokens
+            if request.tool_schemas:
+                kwargs["tools"] = [dict(schema) for schema in request.tool_schemas]
 
             try:
                 response = await client.responses.create(**kwargs)
@@ -1134,6 +1136,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             governance_decision_id=governance.decision_id,
             admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
+            context_id=request.context_id,
+            context_digest=request.context_digest,
         )
 
 
@@ -1620,6 +1624,8 @@ class OpenAISyncProviderAdapter:
         }
         if request.max_output_tokens is not None:
             body["max_output_tokens"] = request.max_output_tokens
+        if request.tool_schemas:
+            body["tools"] = [dict(schema) for schema in request.tool_schemas]
 
         outbound = urllib.request.Request(
             self._responses_url(),
@@ -1676,6 +1682,8 @@ class OpenAISyncProviderAdapter:
                         governance_decision_id=governance.decision_id,
                         admission_decision_id=lease.decision.decision_id,
                         data_class=governance.data_class,
+                        context_id=request.context_id,
+                        context_digest=request.context_digest,
                     )
                 except ProviderError:
                     raise
