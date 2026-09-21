@@ -451,6 +451,19 @@ RESEARCH_EXPERIMENT_RIGOR_INVARIANTS = {
     "single_seed_is_not_zero_uncertainty": True,
 }
 
+RESEARCH_DOMAIN_COVERAGE_REQUIREMENTS = {
+    "foundational_anchor": True,
+    "current_frontier_source": True,
+    "negative_or_counterevidence": True,
+    "verified_source_status": True,
+    "mandatory_baseline": True,
+    "local_experiment_protocol": True,
+    "research_debt_assessment": True,
+    "scale_and_hardware_scope": True,
+    "unresolved_contradictions": True,
+    "refresh_trigger": True,
+}
+
 
 
 
@@ -495,6 +508,7 @@ def full_summary() -> Dict[str, Any]:
         "monitorability_research_invariants": dict(MONITORABILITY_RESEARCH_INVARIANTS),
         "research_debt_invariants": dict(RESEARCH_DEBT_INVARIANTS),
         "research_experiment_rigor_invariants": dict(RESEARCH_EXPERIMENT_RIGOR_INVARIANTS),
+        "research_domain_coverage_requirements": dict(RESEARCH_DOMAIN_COVERAGE_REQUIREMENTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
