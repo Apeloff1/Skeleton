@@ -51,3 +51,23 @@ def test_wave_completion_has_no_manual_checkbox() -> None:
 
 def test_master_build_sequence_main_success_path() -> None:
     assert checker.main() == 0
+
+
+def test_all_vertical_slices_are_gated() -> None:
+    seq = json.loads(checker.SEQUENCE.read_text(encoding="utf-8"))
+    master = json.loads(checker.MASTER.read_text(encoding="utf-8"))
+    refs = {
+        ref
+        for wave in seq["waves"]
+        for ref in wave["gating_vertical_slices"]
+    }
+    assert set(master["vertical_slices"]) <= refs
+
+
+def test_every_wave_has_ready_done_handoff_and_review_questions() -> None:
+    seq = json.loads(checker.SEQUENCE.read_text(encoding="utf-8"))
+    for wave in seq["waves"]:
+        assert wave["definition_of_ready"]
+        assert wave["definition_of_done"]
+        assert wave["handoff_outputs"]
+        assert wave["review_questions"]
