@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.8",
+  "schema_version": "3.9",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -332,6 +332,27 @@
       "count": 18,
       "status": "staged",
       "note": "all existing integration PRs reused; no duplicates created"
+    },
+    "throughput_science_wave": {
+      "staged": [
+        "throughput deterministic mechanics",
+        "throughput forge",
+        "throughput middleware",
+        "Ubuntu 9k delivery",
+        "inventory gates",
+        "Jeeves adaptive science",
+        "Jeeves cortex cost learning"
+      ],
+      "lineage_only": [
+        "model-routing-current-main-v3"
+      ],
+      "revalidated_existing": [
+        "network replication",
+        "X harness",
+        "Jeeves machine semantics",
+        "Jeeves semantic plane"
+      ],
+      "note": "existing integration PRs reused; zero-file model-routing remains lineage"
     }
   },
   "integrated_domains": [
