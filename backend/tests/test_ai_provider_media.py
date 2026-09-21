@@ -5,9 +5,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from skeleton.vault.data_lifecycle import GovernedDataRecord
+from skeleton.vault.governance_registry import GovernanceRegistry
+
 from core.ai_provider import (
     OpenAIProviderAdapter,
     ProviderImageRequest,
+    ProviderPolicyError,
     ProviderSpeechRequest,
 )
 
@@ -204,3 +208,81 @@ def test_application_surfaces_do_not_own_provider_credentials_or_sdks(relative: 
     )
     hits = [token for token in forbidden if token in source]
     assert hits == [], f"{relative} bypasses canonical provider runtime: {hits}"
+
+
+def _media_governance_context(
+    *,
+    record_id: str,
+    purpose: str,
+    data_class: str = "restricted",
+):
+    registry = GovernanceRegistry()
+    registry.register(
+        GovernedDataRecord(
+            record_id=record_id,
+            tenant_id="tenant-media",
+            owner_plane="artifact-files",
+            source_ref=f"artifact:{record_id}",
+            data_class=data_class,
+            purposes=(purpose,),
+            deletion_targets=("artifact",),
+            created_at=1.0,
+        )
+    )
+    return registry.context_for(
+        (record_id,),
+        tenant_id="tenant-media",
+        purpose=purpose,
+    )
+
+
+@pytest.mark.asyncio
+async def test_image_generation_honors_registry_classification_before_io() -> None:
+    client = _FakeClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="text-model",
+        client=client,
+    )
+    context = _media_governance_context(
+        record_id="restricted-image",
+        purpose="image-generation",
+    )
+
+    with pytest.raises(ProviderPolicyError, match="governance policy"):
+        await adapter.generate_image(
+            ProviderImageRequest(
+                prompt="do not transmit",
+                data_class="public",
+                purpose="image-generation",
+                governance_context=context,
+            )
+        )
+
+    assert client.images.generate_kwargs is None
+
+
+@pytest.mark.asyncio
+async def test_speech_honors_registry_classification_before_io() -> None:
+    client = _FakeClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="text-model",
+        client=client,
+    )
+    context = _media_governance_context(
+        record_id="restricted-speech",
+        purpose="speech-synthesis",
+    )
+
+    with pytest.raises(ProviderPolicyError, match="governance policy"):
+        await adapter.synthesize_speech(
+            ProviderSpeechRequest(
+                text="do not transmit",
+                data_class="public",
+                purpose="speech-synthesis",
+                governance_context=context,
+            )
+        )
+
+    assert client.speech.kwargs is None
