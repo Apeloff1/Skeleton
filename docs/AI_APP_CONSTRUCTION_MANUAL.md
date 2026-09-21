@@ -2376,3 +2376,197 @@ ready
 
 Every transition should emit an operation/event receipt so setup failures are
 diagnosable and resumable rather than opaque.
+
+## 36. Capability interface construction ledger
+
+The complete plane graph is materialized in `machine/capability_interfaces.json`.
+This registry is mandatory construction input, not optional documentation.
+
+At v3.6 the registry contains 86 relationships. Each one is generated from one
+of two source relations:
+
+- `depends_on` becomes `runtime_dependency`;
+- `validates` becomes `acceptance_target`.
+
+The registry exists because a graph edge alone is insufficient for safe
+construction. A builder needs to know the contract surface being consumed, its
+physical owner, its zone, expected failure behavior, and the evidence required
+to prove the connection.
+
+### 36.1 Interface entry anatomy
+
+A registry entry contains:
+
+```text
+id
+relation
+source_plane
+target_plane
+source_owner
+target_owner
+source_zone
+target_zone
+boundary
+binding
+ownership_rule
+target_contract_surface
+target_failure_contract
+source_acceptance
+target_acceptance
+status
+```
+
+The `id` is deterministic:
+
+```text
+runtime_dependency:<source>-><target>
+acceptance_target:<source>-><target>
+```
+
+This means an edge cannot be renamed casually. A source/target or relationship
+change is an architecture change.
+
+### 36.2 Relationship classes
+
+#### Runtime dependency
+
+A runtime dependency means the source plane needs the target capability as part
+of construction or execution. It participates in the construction DAG, must
+resolve to a declared target plane, must follow the zone DAG when cross-zone,
+and consumes the target's declared contract and failure semantics.
+
+#### Acceptance target
+
+An acceptance target means the source validates evidence about the target but
+does not import the target implementation. Its boundary is `evidence-only`, its
+binding is `evidence-contract`, it never alters runtime topological order, and it
+cannot transfer state authority.
+
+This is how `deployment-release` validates application API, engine API, and
+product experience without introducing upward engine dependencies.
+
+### 36.3 Boundary classes
+
+`intra-zone` is the cheapest relationship. It still needs a contract.
+
+`cross-zone` is an architectural boundary. Prefer stable typed envelopes,
+serialization-safe values, narrow interfaces, explicit timeout/cancellation
+behavior, explicit authority/data classification, observable identity, and no
+shared mutable global state.
+
+`evidence-only` carries readiness, test, evaluation, build, or release evidence.
+It must never become a disguised implementation call.
+
+### 36.4 Maturity propagation
+
+Interface maturity is derived from its endpoints. Current v3.6 state is 71
+`present` relationships and 15 `partial` relationships. If either connected
+plane remains partial, the interface remains partial until that plane's gap
+closes.
+
+### 36.5 Consumer construction procedure
+
+When adding a dependency from plane A to plane B:
+
+1. confirm B is the canonical owner;
+2. inspect B's `required_interfaces`;
+3. select or define the exact consumed contract;
+4. add B to A's `depends_on`;
+5. confirm the zone DAG permits the edge;
+6. create/update the exact capability-interface entry;
+7. define target failure behavior visible to A;
+8. decide timeout, cancellation, retry and idempotency semantics;
+9. bind authority/data classification across trust boundaries;
+10. add target contract tests;
+11. add consumer contract tests;
+12. add failure/degraded-path tests;
+13. run architecture, construction and interface validators;
+14. run assembly integration.
+
+If the zone edge is illegal, reconsider ownership, introduce a lower stable
+interface, or determine whether the relationship is acceptance-only.
+
+### 36.6 Provider-readable edge discipline
+
+AI development providers must not infer relationship semantics from imports
+alone. Before changing dependencies they read `machine/architecture.json`,
+`machine/ai_app_construction.json`, `machine/capability_interfaces.json`, and
+this manual.
+
+If code appears to contradict the registry, investigate and repair drift rather
+than silently adding another path.
+
+### 36.7 Interface versioning
+
+Classify observable contract changes as compatible additive, compatible
+behavioral, migration-required, or breaking. For migration-required/breaking
+changes record old/new contracts, affected interface IDs, affected consumers,
+migration order, compatibility window, rollback behavior, and removal criteria.
+
+Never rely on a monorepo to substitute for interface compatibility.
+
+### 36.8 Failure-contract propagation
+
+The target plane's `failure_mode` is part of the interface contract. A consumer
+must not transform provider unavailable into fabricated content, governance
+denial into an illegal fallback, storage unavailable into durable success, tool
+denial into an ungoverned second path, no-route into an undeclared provider, or
+verification failure into an unqualified high-impact result.
+
+### 36.9 Interface evidence bundle
+
+For a changed interface collect the interface ID, source/target owner and zone,
+before/after contract, compatibility classification, target tests, consumer
+tests, failure tests, authority/privacy tests, performance/resource evidence
+where relevant, and all architecture/construction/interface/assembly gates.
+
+### 36.10 Interface closure rule
+
+A relationship is construction-complete only when the edge is declared, the
+target owner materializes, the target contract and failure semantics are
+explicit, the zone relationship is legal, consumer/failure integration is
+tested, required authority/privacy behavior is tested, registry parity passes,
+and assembly remains valid.
+
+A working import is not sufficient.
+
+## 37. Architectural build order after v3.6
+
+Use a monotonic build order:
+
+- Layer A: foundation, identity, configuration, governance, security.
+- Layer B: cost admission, provider receipt/runtime, model routing, provider telemetry.
+- Layer C: persistence, memory, retrieval, context, artifact lifecycle.
+- Layer D: orchestration, verification, durable jobs, tools, operation state.
+- Layer E: engine API, application API, realtime protocol/store, cancellation/resume.
+- Layer F: frontend/product control/readiness/operator receipts.
+- Layer G: observability, evaluation, resilience, feedback/promotion, release/rollback.
+
+Upper layers may consume lower capabilities. Lower layers do not reach upward
+for policy or UI behavior.
+
+## 38. Construction commands for architecture work
+
+Run the cheap architecture path first:
+
+```bash
+python scripts/check_architecture_map.py
+python scripts/check_ai_app_construction.py
+python scripts/check_capability_interfaces.py
+python scripts/check_provider_bootstrap.py
+python scripts/check_app_assembly.py
+```
+
+Then run focused architecture tests:
+
+```bash
+python -m pytest -q \
+  skeleton/testing/test_architecture_map.py \
+  skeleton/testing/test_ai_app_construction.py \
+  skeleton/testing/test_capability_interfaces.py \
+  skeleton/testing/test_provider_contract.py \
+  skeleton/testing/test_app_assembly.py
+```
+
+Only after these pass should dependency-heavy frontend, broad backend, Compose,
+packaging, security, or release checks diagnose higher-level failures.
