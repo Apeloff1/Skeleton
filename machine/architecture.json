@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "2.6.0",
-  "architecture_tag": "arch-map/v2.6",
+  "architecture_version": "3.0.0",
+  "architecture_tag": "arch-map/v3.0",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -12,7 +12,8 @@
     "construction_contract": "machine/ai_app_construction.json",
     "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "construction_validator": "scripts/check_ai_app_construction.py",
-    "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py"
+    "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
+    "provider_contract": "skeleton/provider_contract.py"
   },
   "objectives": [
     "one product shell",
@@ -24,7 +25,9 @@
     "no new top-level runtime island without architecture review",
     "complete AI application capability map with construction and acceptance contracts",
     "mandatory fail-closed architecture acknowledgement for runtime model providers",
-    "provider-specific development-agent bootstraps point to one canonical manual"
+    "provider-specific development-agent bootstraps point to one canonical manual",
+    "one shared architecture receipt contract across product runtime and repository automation AI providers",
+    "machine-readable request lifecycle, data classes, trust zones, environment profiles, envelopes, work packages, and completion criteria"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -35,7 +38,9 @@
     "large reconciliation waves integrate by domain and file semantics rather than blind history merge",
     "AI providers are edge adapters; provider SDKs never define application architecture",
     "runtime model providers must load the active construction contract before activation",
-    "every capability plane has one owner, explicit dependencies, failure behavior, and acceptance evidence"
+    "every capability plane has one owner, explicit dependencies, failure behavior, and acceptance evidence",
+    "credential-bearing AI provider surfaces are explicitly inventoried and receipt-gated",
+    "provider-neutral libraries may model provider behavior but cannot own undeclared credentials or network activation"
   ],
   "canonical_roots": [
     {
@@ -504,16 +509,20 @@
     "architecture changes must preserve a single machine-readable map",
     "runtime model providers cannot activate without a valid architecture/construction receipt",
     "provider-specific development instruction files reference the same canonical construction documents",
-    "the AI construction contract enumerates every required capability plane and promotion gate"
+    "the AI construction contract enumerates every required capability plane and promotion gate",
+    "all credential-bearing AI provider surfaces are declared in the construction contract",
+    "runtime and automation provider families share skeleton/provider_contract.py receipt semantics",
+    "every open construction gap has exactly one work package and roadmap wave"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
     "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "validator": "scripts/check_ai_app_construction.py",
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
-    "provider_runtime_loader": "backend/core/provider_architecture.py",
+    "provider_runtime_loader": "skeleton/provider_contract.py",
     "provider_runtime_boundary": "backend/core/ai_provider.py",
-    "policy": "contract-before-implementation; undeclared providers, planes, services, roots, and interfaces fail closed"
+    "policy": "contract-before-implementation; undeclared providers, planes, services, roots, and interfaces fail closed",
+    "provider_runtime_compatibility_loader": "backend/core/provider_architecture.py"
   },
   "external_interfaces": [
     {
@@ -523,6 +532,14 @@
       "transport": "provider SDK/API",
       "contract": "ProviderRequest -> mandatory architecture receipt -> ProviderAdapter -> ProviderResponse",
       "security": "credentials stay inside adapter; HTTPS/custom endpoint policy; bounded timeout/retry"
+    },
+    {
+      "id": "automation-model-provider",
+      "from": "skeleton/automation/free_model.py",
+      "to": "declared automation model provider",
+      "transport": "HTTPS chat-completions compatible API",
+      "contract": "sanitized repository context -> mandatory automation_model receipt -> bounded model call -> sanitized text",
+      "security": "HTTPS-only public endpoint; secrets redacted; bounded response; credentials remain in automation client"
     }
   ]
 }
