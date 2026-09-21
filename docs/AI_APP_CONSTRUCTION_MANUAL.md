@@ -3020,3 +3020,64 @@ Canonical product conversation/assistant actions enter through backend because b
 ### Closure
 
 The engine-api plane remains `partial` until service/delegated auth, submit idempotency, trace/deadline/budget propagation, status/result, cancellation fencing, engine-outage behavior, cross-service replay and process credential-isolation tests pass.
+
+## Fully Functional AI Closure: Realtime Delivery
+
+Realtime delivery is a projection of durable operation state, not an alternate source of truth.
+
+### Transport
+
+SSE is the default product transport. WebSocket may be added later without changing the event contract. Mutating commands such as cancel or approval remain authenticated HTTP operations; the stream is server-to-client state delivery.
+
+Backend authorizes the product subscriber and projects Skeleton engine operation events while preserving operation/event identity and sequence. The frontend reduces events idempotently.
+
+### Cursor and replay
+
+Cursor identity is operation + sequence + event ID. The cursor advances only after the reducer accepts the event. Exact duplicates are idempotent; a duplicate ID with different content is corruption. Sequence gaps trigger replay and are never skipped silently.
+
+When compaction makes a cursor too old, the server returns an explicit resync requirement. The client fetches canonical conversation/operation/result state and resumes from the current cursor.
+
+### Content streaming
+
+Provider token deltas are not treated as durable product truth. They are coalesced into bounded `assistant_content` operation events. On terminal completion the product reconciles provisional display content against the canonical assistant message and `AIExecutionResult`.
+
+### Backpressure and multi-client
+
+Each subscriber has a bounded transport queue. A slow client can be disconnected with its last accepted cursor; it cannot block unrelated operations or cause silent loss. Each client keeps an independent cursor. Compaction is governed by bounded retention/terminal policy, not by waiting forever for every old client.
+
+### Heartbeat and cancellation
+
+Default heartbeat is 15 seconds, configurable from 10–60 seconds. Heartbeats prove transport liveness only. Disconnect does not imply cancellation unless an explicit request policy says so. Cancel/complete races are resolved by terminal operation fencing.
+
+### Event classes
+
+Canonical product events include operation/execution state, assistant content, tool proposal/authorization/start/completion, approval required, usage update, verification update, artifact ready, degraded state and terminal.
+
+### Closure
+
+Realtime P0 closure requires ordered delivery, duplicate/corruption/gap handling, reconnect replay, compacted-cursor resync, heartbeat timeout, slow-client behavior, multi-client cursors, cancel/complete race, terminal finality and tenant authorization tests.
+
+
+## Fully Functional AI Closure: Golden Journeys
+
+Component tests do not prove a functional AI product. The golden-journey suite exercises the assembled topology from frontend through backend, authenticated engine execution, provider/tool/memory/retrieval/artifact planes, durable state and realtime delivery back to the product.
+
+### Mandatory journeys
+
+The suite covers prompt-only response, canonical multi-turn conversation, retrieval-grounded answer, read-only tool loop, write tool with human approval, artifact flow, cancellation, reconnect/replay, provider outage, engine outage and governance delete/export. Media generation/speech journeys run whenever those provider capabilities are declared enabled.
+
+### Test modes
+
+CI uses deterministic fake provider/tool adapters and requires no live provider secret. Integration runs the assembled services with Mongo and deterministic harnesses. Staging may perform tightly budgeted live-provider smoke tests. Production uses only bounded post-deploy synthetic smoke checks.
+
+### Global assertions
+
+Every journey asserts one consistent tenant/user identity, one operation/execution lineage, one canonical final result, assistant-message/result binding, trace continuity, admission/usage evidence, governance/authority receipts, no duplicate side effects during retry/reconnect, no completed client state before durable final result, and no credential leakage.
+
+### Fault injection
+
+Fault journeys inject provider timeout, crash after provider response, crash around tool reservation/side effect/receipt, stream disconnect, slow client, transient Mongo failure, engine restart, backend restart and expired approval. Recovery must follow the same canonical operation and side-effect evidence rather than creating a replacement history.
+
+### Closure
+
+The product-experience P0 gap closes only when all mandatory and applicable conditional journeys pass against the assembled topology, while deterministic CI remains green without live provider credentials.
