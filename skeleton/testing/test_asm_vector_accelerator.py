@@ -463,6 +463,26 @@ def test_assembly_sources_export_the_same_abi() -> None:
         assert ".note.GNU-stack" in source
 
 
+def test_public_c_header_matches_runtime_abi() -> None:
+    header = Path("skeleton/native/asm/skeleton_asm.h").read_text(encoding="utf-8")
+
+    assert "SKELETON_ASM_ABI_VERSION UINT32_C(4)" in header
+    assert "SKELETON_ASM_CAP_X86_SSE2 UINT64_C(1)" in header
+    assert "SKELETON_ASM_CAP_X86_AVX  UINT64_C(2)" in header
+    assert "SKELETON_ASM_CAP_AARCH64_NEON UINT64_C(4)" in header
+
+    for symbol in (
+        "skeleton_asm_abi_version",
+        "skeleton_asm_capabilities",
+        "skeleton_asm_dot_f32",
+        "skeleton_asm_l2_sq_f32",
+        "skeleton_asm_dot_batch_f32",
+        "skeleton_asm_dot_matrix_f32",
+        "skeleton_asm_dot_matrix_f32_avx",
+    ):
+        assert symbol in header
+
+
 def test_x86_source_contains_runtime_guarded_avx_matrix_kernel() -> None:
     source = Path("skeleton/native/asm/x86_64.S").read_text(encoding="utf-8")
     assert "skeleton_asm_dot_matrix_f32_avx" in source
