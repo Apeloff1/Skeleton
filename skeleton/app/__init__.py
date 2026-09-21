@@ -12,6 +12,7 @@ from skeleton.app.assembly import (
     compose_command,
     find_repo_root,
     load_manifest,
+    parse_manifest,
     preflight,
 )
 from skeleton.app.bootstrap import public_bootstrap_payload
@@ -25,6 +26,7 @@ __all__ = [
     "compose_command",
     "find_repo_root",
     "load_manifest",
+    "parse_manifest",
     "preflight",
     "ProbeResult",
     "probe_application",
