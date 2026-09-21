@@ -24,6 +24,9 @@ def test_manifest_is_self_consistent():
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(manifest.service_names)
     assert set(manifest.default_services).issubset(manifest.service_names)
     assert set(manifest.full_services).issubset(manifest.service_names)
+    assert manifest.architecture["tag"] == "arch-map/v2.0"
+    assert manifest.construction["contract"] == "machine/ai_app_construction.json"
+    assert manifest.construction["provider_activation_boundary"] == "backend/core/ai_provider.py"
 
     for service in manifest.services:
         assert set(service.depends_on).issubset(manifest.service_names)
@@ -37,6 +40,9 @@ def test_manifest_payload_is_json_serializable():
     assert '"frontend"' in encoded
     assert '"backend"' in encoded
     assert '"skeleton"' in encoded
+    assert '"architecture"' in encoded
+    assert '"construction"' in encoded
+    assert '"machine/ai_app_construction.json"' in encoded
 
 
 def test_structural_preflight_passes_for_repository_checkout():
