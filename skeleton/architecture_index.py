@@ -155,7 +155,7 @@ PLAN_CHECKPOINTS = {
     "PLAN-20260921-HOSTILE-GAP-AUDIT": {
         "created_at": "2026-09-21",
         "tracks": ("AB",),
-        "gap_range": ("G001", "G070"),
+        "gap_range": ("G001", "G130"),
         "production_readiness_blocked_by_applicable_open_p0": True,
         "production_authority_granted": False,
     }
@@ -200,6 +200,7 @@ P0_HARDENING_GAPS = (
     "G018_safe_artifact_loading",
     "G019_tamper_evident_audit",
     "G020_safe_mode_break_glass",
+    "G084_trust_root_key_compromise_recovery",
 )
 
 ADVERSARIAL_HARDENING_INVARIANTS = {
@@ -224,6 +225,11 @@ ADVERSARIAL_HARDENING_INVARIANTS = {
     "untrusted_artifact_load_is_resource_bounded": True,
     "authority_mutations_are_tamper_evident": True,
     "safe_mode_is_required": True,
+    "root_trust_key_compromise_has_reroot_recovery": True,
+    "authorization_is_revalidated_at_commit": True,
+    "signed_objects_use_canonical_serialization": True,
+    "distributed_checkpoint_completion_is_manifest_atomic": True,
+    "partial_or_speculative_output_is_not_committed_output": True,
 }
 
 
