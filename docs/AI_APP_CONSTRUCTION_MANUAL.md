@@ -551,13 +551,30 @@ The correct response to a gap is to add the smallest canonical contract/implemen
 
 ## 7. Mandatory provider bootstrap
 
-Development AI providers must read the five bootstrap documents before repository work. Provider-specific instruction files point to the same source of truth:
+Development AI providers must read the full mandatory bootstrap set before repository work. Provider-specific instruction files point to the same source of truth:
+
+Provider-specific instruction entrypoints remain:
 
 - `AGENTS.md`
 - `CLAUDE.md`
 - `.github/copilot-instructions.md`
 - `.cursor/rules/architecture.mdc`
 - `GEMINI.md`
+
+Each entrypoint must instruct the provider to read these canonical artifacts:
+
+1. `machine/manifest.json`
+2. `machine/architecture.json`
+3. `machine/ai_app_construction.json`
+4. `machine/capability_interfaces.json`
+5. `machine/state_topology.json`
+6. `machine/ai_runtime_schemas.json`
+7. `machine/ai_capabilities.json`
+8. `machine/ai_implementation_handoff.json`
+9. `machine/ai_closure_evidence.json`
+10. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+
+Both backend compatibility and standalone Skeleton engine images materialize the same set. `skeleton/provider_contract.py` reads and hashes every required document into the provider activation receipt, so a missing or stale runtime artifact fails closed before provider I/O.
 
 Grok and other coding agents without a dedicated repository instruction format use
 `AGENTS.md` as the generic bootstrap entrypoint.
@@ -2657,6 +2674,7 @@ Run the cheap architecture path first:
 python scripts/check_architecture_map.py
 python scripts/check_ai_app_construction.py
 python scripts/check_capability_interfaces.py
+python scripts/check_state_topology.py
 python scripts/check_provider_bootstrap.py
 python scripts/check_app_assembly.py
 ```
@@ -3331,3 +3349,16 @@ The generator is not the safety authority. A model refusal is not a substitute f
 Assistant text, Markdown and HTML are untrusted display content. Product rendering uses a safe renderer, safe link-protocol policy, inert code blocks, authorized artifact links and canonical citation metadata. Tool/action status comes from durable receipts rather than prose.
 
 Qualified, abstained, blocked and degraded results remain visually distinguishable from verified completion. Provisional streamed text is reconciled to the canonical assistant message/result on terminal commit. Rendering and approval controls meet accessibility requirements.
+
+
+## Fully Functional AI Closure: Concrete Capability and Handoff Control
+
+`machine/ai_capabilities.json` is the concrete assembled-product capability registry. It declares user-visible capability IDs, version, risk, input/output modalities, required planes, provider capabilities, tool/memory/retrieval policy, verification floor, data-class ceiling, budget profile, instruction-policy reference, readiness requirements, degraded behavior and golden-journey coverage.
+
+An enabled capability is not automatically ready. Readiness is resolved from its declared dependencies. Provider credential presence alone is never enough.
+
+`machine/ai_implementation_handoff.json` translates every P0 closure gap into exact contract/runtime/persistence/integration/test targets plus migration/cutover rules. Planned paths may not exist yet; the handoff is a build target, not evidence that implementation is complete.
+
+`machine/ai_closure_evidence.json` separately tracks closure proof. Implementation progress and closure decision are intentionally different concepts. A P0 closes only after dependency closure, executable evidence, blueprint promotion, focused tests, and canonical gap-state update. A regression in a lower-stage contract can reopen dependent evidence.
+
+These three files are mandatory provider-bootstrap material and are linked from the architecture and runtime manifests.
