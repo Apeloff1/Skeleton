@@ -24,11 +24,11 @@ def test_manifest_is_self_consistent():
     assert {"frontend", "backend", "skeleton", "mongo"}.issubset(manifest.service_names)
     assert set(manifest.default_services).issubset(manifest.service_names)
     assert set(manifest.full_services).issubset(manifest.service_names)
-    assert manifest.architecture["tag"] == "arch-map/v3.4"
+    assert manifest.architecture["tag"] == "arch-map/v3.5"
     assert manifest.construction["contract"] == "machine/ai_app_construction.json"
     assert manifest.construction["provider_activation_boundary"] == "backend/core/ai_provider.py"
     assert manifest.construction["provider_architecture_loader"] == "skeleton/provider_contract.py"
-    assert manifest.construction["construction_version"] == "3.4.0"
+    assert manifest.construction["construction_version"] == "3.5.0"
     assert manifest.construction["operation_contract"] == "skeleton/contracts/operation.py"
     assert manifest.construction["stream_contract"] == "skeleton/frontier/operation_stream.py"
     assert manifest.construction["stream_store"] == "skeleton/frontier/operation_stream_store.py"
