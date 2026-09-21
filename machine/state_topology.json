@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.1.0",
+  "topology_version": "1.2.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -559,6 +559,57 @@
         "machine/ai_app_construction.json",
         "skeleton/contracts/operation.py"
       ]
+    },
+    {
+      "id": "conversation-thread-state",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.conversation_threads",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "planned-canonical",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "thread identity/owner/status/version update",
+      "consistency": "thread owner/tenant binding and version are authoritative; client caches cannot advance thread state",
+      "retention": "governance controlled by thread retention class",
+      "backup_restore": "required with backend core application state",
+      "migration": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-conversation-state-authority",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "backend/services/database.py"
+      ]
+    },
+    {
+      "id": "conversation-message-state",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.conversation_messages",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "planned-canonical",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "idempotent exact message append and immutable lineage update",
+      "consistency": "message identity is immutable; branch sequence is monotonic; edit/regenerate creates lineage rather than overwriting canonical history",
+      "retention": "inherits/strengthens thread governance policy; referenced artifacts/memory have independent retention",
+      "backup_restore": "required with backend core application state",
+      "migration": "preserve message_id, thread/tenant/author identity, sequence, branch/supersedes lineage, operation/result refs and content/provenance refs",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-conversation-state-authority",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "backend/services/database.py",
+        "backend/routes/ai.py"
+      ]
     }
   ],
   "state_flows": [
@@ -665,11 +716,36 @@
       "mode": "terminal-finalization",
       "rule": "verified final output and evidence references are committed before the enclosing operation transitions to completed",
       "failure": "incomplete finalization remains recoverable and cannot emit a completed terminal event"
+    },
+    {
+      "id": "thread-to-message-authority",
+      "from": "conversation-thread-state",
+      "to": "conversation-message-state",
+      "mode": "ordered-child-ledger",
+      "rule": "message append authorizes against thread tenant/owner/status and uses thread version or exact-next sequence fencing",
+      "failure": "unauthorized, archived/deleting, stale-version or duplicate-conflict appends fail without mutating canonical history"
+    },
+    {
+      "id": "conversation-to-cognitive-execution",
+      "from": "conversation-message-state",
+      "to": "cognitive-execution-ledger",
+      "mode": "causal-operation-input",
+      "rule": "a committed user message may create one or more explicitly identified execution branches; every assistant result binds back to the causal user message and thread",
+      "failure": "execution without a valid authorized causal message cannot be committed as a canonical conversation assistant response"
+    },
+    {
+      "id": "final-result-to-conversation",
+      "from": "final-ai-result-ledger",
+      "to": "conversation-message-state",
+      "mode": "assistant-message-projection",
+      "rule": "a verified/qualified AIExecutionResult becomes an assistant message by immutable result reference plus allowed rendered content; message commit never fabricates a result identity",
+      "failure": "if assistant-message projection fails, the execution result remains authoritative and projection is retried idempotently"
     }
   ],
   "recovery_order": [
     "restore/authenticate Mongo physical service",
     "restore backend-core-app-state and any materialized engine authoritative state",
+    "restore conversation thread/message authority and verify branch/message ordering before accepting AI chat traffic",
     "verify schema/index/migration compatibility",
     "restore or reconstruct canonical operation state",
     "restore cognitive execution, turn and checkpoint authority before resuming AI work",
@@ -697,6 +773,9 @@
     "a completed operation requires an authoritative final AI result record when the operation used the cognitive runtime",
     "approval decisions are bound to exact tool argument digests and cannot be replayed across edited calls",
     "tool side-effect recovery consults the idempotency ledger before any retry",
-    "usage consumption is monotonic across retries, repairs and resumed turns"
+    "usage consumption is monotonic across retries, repairs and resumed turns",
+    "conversation thread/message authority is server-side durable state; client-submitted history never becomes authoritative by being sent to a model",
+    "assistant conversation messages reference canonical operation/execution results rather than treating provider text as standalone durable truth",
+    "conversation edit/regenerate preserves immutable branch lineage and never silently rewrites historical tool/action receipts"
   ]
 }
