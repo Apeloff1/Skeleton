@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.8",
+  "schema_version": "5.9",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -596,6 +596,13 @@
         "tmp/java-accelerator-operations-rebase-20260920"
       ],
       "note": "Temporary rebase branch is zero-file delta versus assembly; retained as lineage only."
+    },
+    "chore_wave": {
+      "new_pr": "#1877 small backlog drain",
+      "lineage_only": [
+        "chore/housekeeping-general-runner-20260918"
+      ],
+      "note": "One distinct 4-file housekeeping/backlog delta staged; zero-file housekeeping branch remains lineage only."
     }
   },
   "integrated_domains": [
