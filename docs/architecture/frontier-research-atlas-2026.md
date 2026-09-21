@@ -2803,6 +2803,12 @@ Status vocabulary:
 | SV064 | *Perception-Aware Policy Optimization for Multimodal Reasoning* | ICLR 2026 Conference | accepted evidence that perception errors are a major bottleneck in multimodal RL and that perception-aware policy gradients can help |
 | SV065 | *Spotlight on Token Perception for Multimodal Reinforcement Learning* | ICLR 2026 Conference | accepted evidence that visual dependency is sparse across generated tokens/trajectories and can shape RL updates |
 | SV066 | *Joint Multimodal Preference Optimization for Fine-Grained Visual-Textual Alignment* | Findings of EACL 2026 | accepted evidence for joint textual/visual preference objectives and fine-grained visual contrast supervision |
+| SV067 | *Compact Language Models via Pruning and Knowledge Distillation*, arXiv:2407.14679 | PREPRINT / open weights and example code reported | strong practical evidence for deriving smaller family members via structured pruning + distillation with far fewer retraining tokens than scratch baselines |
+| SV068 | CounterBench, arXiv:2502.11008 | PREPRINT / public dataset | evidence that formal counterfactual reasoning remains difficult for many LLMs and is sensitive to explicit reasoning structure |
+| SV069 | *Privacy-Preserving Split Learning for Federated LLM Fine-Tuning*, arXiv:2609.09794 | PREPRINT, submitted 2026-09-09 | recent evidence that autoregressive intermediate activations in split LLM tuning can leak inputs and require explicit privacy protection |
+| SV070 | DP-FedLoRA, arXiv:2509.09097 | PREPRINT | supports differentially private federated LoRA as a privacy/communication challenger with formal privacy accounting |
+| SV071 | SWE-Bench 5G, arXiv:2604.26278 | PREPRINT | domain-specific software-agent evidence: diagnosis can be high while validated bug resolution remains much lower |
+| SV072 | Amershi et al., *Guidelines for Human-AI Interaction* | CHI 2019 | foundational peer-reviewed HCI guidance on expectation setting, feedback, correction, control, failure and trust calibration |
 
 ## 25A.1 Status discipline
 
@@ -3236,6 +3242,74 @@ Cat-PO, perception-aware policy optimization, and token-perception work suggest 
 **Guardrail:** attribution estimates are training signals, not factual ground-truth labels.
 
 
+## FD027 — Compression should be evaluated as family derivation, not only one-model shrinkage
+
+Minitron-style pruning/distillation evidence suggests a large parent checkpoint can potentially seed several smaller deployment variants more cheaply than independently training every size.
+
+**Skeleton consequence:** architecture economics should compare:
+- one parent + derived family;
+- independent scratch-trained family;
+- quantized-only variants;
+- distilled/pruned variants.
+
+Count the cost of the parent, search, retraining, validation, and deployment kernels.
+
+## FD028 — Privacy boundaries include activations and updates, not only raw examples
+
+Recent split/federated LLM work reinforces that intermediate activations and adaptation updates can leak sensitive training information.
+
+**Skeleton consequence:** the privacy dataflow map includes:
+- raw samples;
+- tokenized input;
+- activations;
+- gradients;
+- optimizer state;
+- adapters;
+- aggregated updates;
+- telemetry;
+- final model.
+
+"Raw data stayed local" cannot close a privacy review.
+
+## FD029 — Coding-agent evaluation needs stage decomposition
+
+SWE-Bench 5G reports diagnosis rates far above end-to-end resolve rates.
+
+**Skeleton consequence:** software-engineering agents are scored separately on:
+- environment setup;
+- localization;
+- diagnosis;
+- specification retrieval;
+- patch design;
+- implementation;
+- test execution;
+- regression analysis;
+- validated resolution.
+
+## FD030 — Human oversight quality depends on interface design
+
+Mature HCI guidance makes a recurring point relevant to autonomous agents: oversight is not a binary "human in loop" flag.
+
+**Skeleton consequence:** consequential workflows must evaluate:
+- whether operators understand what will happen;
+- whether they can inspect evidence;
+- whether they can correct/undo;
+- whether confidence is actionable;
+- whether repeated warnings create alarm fatigue;
+- whether automation bias reduces independent checking.
+
+## FD031 — Counterfactual reasoning deserves its own capability axis
+
+CounterBench-style formal tasks show that general language competence does not imply reliable counterfactual inference.
+
+**Skeleton consequence:** causal/counterfactual reasoning is evaluated separately from:
+- commonsense causality;
+- correlation;
+- planning success;
+- explanation fluency;
+- general reasoning benchmark scores.
+
+
 
 
 ---
@@ -3482,7 +3556,7 @@ Contradictions are stored because averaging conflicting papers into a vague cons
 
 ---
 
-# 25E. Research debt ledger — RDE001..RDE036
+# 25E. Research debt ledger — RDE001..RDE046
 
 Research debt is an architecture assumption with insufficient local evidence. Debt can be acceptable temporarily, but it must be visible.
 
@@ -3716,6 +3790,67 @@ Dynamic benchmark generation can itself introduce bias, instability and evaluato
 The plan has manual refresh rules but no proven automatic stale-evidence detector.
 
 **Retire with:** source/version/status watcher plus deterministic change receipts.
+
+
+## RDE037 — Compression behavioral parity
+
+A compressed/distilled/pruned model has not locally demonstrated parity on long-tail, safety, calibration, structured output, and tool behavior.
+
+**Retire with:** parent/student paired evaluation plus deployment artifact regression.
+
+## RDE038 — Distillation teacher-error inheritance
+
+Skeleton has not measured how strongly student errors correlate with teacher blind spots.
+
+**Retire with:** RXP052 across independent ground-truth tasks and multiple teachers.
+
+## RDE039 — Privacy-budget lifecycle semantics
+
+Privacy accounting across repeated fine-tuning, analytics, releases, and continual adaptation is not yet integrated.
+
+**Retire with:** durable privacy-budget object plus composition/replay tests.
+
+## RDE040 — Federated/split-learning leakage
+
+The actual leakage from gradients, adapters, activations, and aggregate updates has not been characterized for Skeleton workloads.
+
+**Retire with:** RXP054–RXP056 with attack-based privacy validation.
+
+## RDE041 — Code-agent environment determinism
+
+Agent patch results can be confounded by mutable dependencies, flaky tests, cached builds, and network state.
+
+**Retire with:** hermetic coding-agent environment and nondeterminism measurement.
+
+## RDE042 — Code patch validation sufficiency
+
+Passing available tests does not establish compatibility/security/performance correctness.
+
+**Retire with:** layered validation protocol including hidden regression, static/security checks, and diff review.
+
+## RDE043 — Human uncertainty-interface calibration
+
+Skeleton has not demonstrated that its uncertainty display improves user decisions rather than merely presenting confidence.
+
+**Retire with:** controlled HCI experiment measuring selective trust and decision utility.
+
+## RDE044 — Operator automation-bias and alert-fatigue resilience
+
+Long-running operator behavior under repeated AI suggestions/alerts remains unmeasured.
+
+**Retire with:** repeated-exposure incident simulation including false positives and hidden true incidents.
+
+## RDE045 — Formal counterfactual competence
+
+The reasoning plane has not demonstrated reliable intervention/counterfactual reasoning under explicit causal rules.
+
+**Retire with:** RXP061 against symbolic/causal baselines.
+
+## RDE046 — Causal/world-model invariance
+
+Planning success has not established representation-invariant transition knowledge.
+
+**Retire with:** RXP047 + RXP062 representation/action/counterfactual transfer tests.
 
 ---
 
