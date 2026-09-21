@@ -972,8 +972,6 @@ def _validate_construction_ledger(
     known_gaps = {
         item.get("id")
         for item in gaps
-        if isinstance(gaps, list)
-        for item in gaps
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     } if isinstance(gaps, list) else set()
     open_gaps = {
