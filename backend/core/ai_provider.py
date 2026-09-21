@@ -14,11 +14,15 @@ AIMessage = _runtime.AIMessage
 OpenAIProviderAdapter = _runtime.OpenAIProviderAdapter
 ProviderAdapter = _runtime.ProviderAdapter
 ProviderError = _runtime.ProviderError
+ProviderImageRequest = _runtime.ProviderImageRequest
+ProviderImageResponse = _runtime.ProviderImageResponse
 ProviderInvocationError = _runtime.ProviderInvocationError
 ProviderPolicyError = _runtime.ProviderPolicyError
 ProviderRegistry = _runtime.ProviderRegistry
 ProviderRequest = _runtime.ProviderRequest
 ProviderResponse = _runtime.ProviderResponse
+ProviderSpeechRequest = _runtime.ProviderSpeechRequest
+ProviderSpeechResponse = _runtime.ProviderSpeechResponse
 ProviderUnavailableError = _runtime.ProviderUnavailableError
 normalize_history = _runtime.normalize_history
 
