@@ -228,6 +228,7 @@ arch-map/v3.1  Wave 1 governance + resource admission enforced before provider I
 arch-map/v3.2  unified governed text/image/speech provider runtime + media credential convergence
 arch-map/v3.3  canonical operation lifecycle + resumable stream contract
 arch-map/v3.4  durable operation stream store + replay watermark semantics
+arch-map/v3.5  structural ownership/recovery map + bounded reverse-edge semantics
 ```
 
 ## 10. Operator commands
