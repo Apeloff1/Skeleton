@@ -2119,6 +2119,16 @@ Status vocabulary:
 | SV034 | Anthropic, *Fine-Tuned Lie Detectors Failed to Generalize* (2026-08-21) | OFFICIAL-ORG-EVIDENCE / negative | permanent guardrail against trusting narrow lie-detector fine-tuning under OOD shift |
 | SV035 | OpenAI, *Research acceleration: The view inside OpenAI* (2026-09-06) | OFFICIAL-ORG-EVIDENCE | supports substantial research-workflow acceleration under human direction; does not establish autonomous general science |
 | SV036 | OpenAI, *Our framework for reporting model misalignment* (2026-09-16) | OFFICIAL-ORG-EVIDENCE / reporting framework | motivates incident-to-eval feedback and standardized disclosure categories |
+| SV037 | NetKV, arXiv:2606.03910 | PREPRINT | supports network-aware decode selection; current evidence is simulator/trace scoped |
+| SV038 | MemoryDocDataSet, arXiv:2606.04442 | PREPRINT | supports joint conversational-memory + long-document evaluation; synthetic benchmark scope must remain explicit |
+| SV039 | PM-Bench, arXiv:2607.12385 | COLM 2026 conference paper per arXiv record | establishes prospective memory as a distinct agent evaluation family |
+| SV040 | TriggerBench, arXiv:2606.23459 | PREPRINT | strengthens prospective-memory precision/recall, false-alarm and attentional-load evaluation |
+| SV041 | FIRE-Bench, arXiv:2602.02905 | PREPRINT / released benchmark | research-agent rediscovery benchmark; distinguishes planning/analysis failures from implementation failures |
+| SV042 | Goedel-Prover-V2, arXiv:2508.03613 | PREPRINT with released code/models | strong formal theorem-proving evidence; benchmark and test-time-compute scope remains explicit |
+| SV043 | Hilbert, arXiv:2509.22819 | PREPRINT with released code | supports informal reasoner + prover + formal verifier + theorem retrieval decomposition |
+| SV044 | EVICPRESS, arXiv:2512.14946 | PREPRINT | supports joint KV compression/eviction rather than independent cache policies |
+| SV045 | *On Training Large Language Models for Long-Horizon Tasks: An Empirical Study of Horizon Length* | ICML 2026 regular | strong controlled evidence that horizon length itself destabilizes training and action abstraction/subgoals help |
+| SV046 | LoRA-Pre | ICLR 2026 conference paper | strengthens low-rank optimizer-state challenger evidence; still requires matched local optimizer baselines |
 
 ## 25A.1 Status discipline
 
@@ -2287,6 +2297,92 @@ The 2026 TTS reproducibility work formalizes a point already visible across reas
 The large controlled synthetic-data study and accepted Synthetic Bootstrapped Pretraining work point in compatible but non-identical directions: synthetic transformations can improve data-constrained training, while synthetic type, natural-data anchoring, model scale, and budget materially change the outcome.
 
 **Skeleton consequence:** synthetic-data research must be factorial and lineage-aware; there is no global "synthetic percentage" default.
+
+
+## FD011 — Prospective memory needs explicit intention lifecycle
+
+PM-Bench and TriggerBench independently separate prospective memory from ordinary retrospective retrieval. Both show that remembering a fact is much easier than remembering to act on a future cue without false alarms.
+
+**Skeleton consequence:** deferred intentions use a typed state machine:
+
+```text
+proposed
+ -> accepted
+ -> armed
+ -> due
+ -> revalidated
+ -> executed | skipped | cancelled | superseded | expired
+```
+
+Required fields include trigger type, trigger evidence, earliest/latest execution, dependency state, cancellation/supersession, principal/authority, and fresh execution-time policy.
+
+## FD012 — Action horizon is itself a training variable
+
+The ICML 2026 controlled horizon-length study holds decision logic roughly fixed while increasing action-sequence length and reports worsening training stability from exploration and credit-assignment difficulty. Higher-level actions and subgoals reduce effective horizon and improve transfer to longer tasks.
+
+**Skeleton consequence:** long-horizon agent work must report:
+- primitive action count;
+- effective/subgoal horizon;
+- decision branching;
+- recovery points;
+- credit assignment;
+- action abstraction level.
+
+Do not treat "long horizon" as only context length.
+
+## FD013 — Tool metadata is part of the adversarial input surface
+
+ToolTweak demonstrates, at submission-level evidence maturity, that manipulating tool names/descriptions can bias selection among functionally comparable tools.
+
+**Skeleton consequence:** tool discovery/ranking needs:
+- normalized/canonical capability descriptors;
+- provider identity separate from description text;
+- selection audits;
+- equivalence groups;
+- adversarial description mutation tests.
+
+Tool ranking still cannot grant tool authority.
+
+## FD014 — Formal verification gains come from decomposition, but semantic formalization remains the weak link
+
+PAT-Agent, Goedel-Prover-V2, and Hilbert converge on a common pattern:
+
+```text
+informal reasoning/planning
+ -> formal candidate
+ -> deterministic checker/prover
+ -> counterexample/error feedback
+ -> repair/decomposition
+```
+
+The checker can establish validity of the formal object but cannot prove that the formal object faithfully represents the user's natural-language intent.
+
+**Skeleton consequence:** formal verification evidence has two separate fields:
+- semantic-faithfulness evidence;
+- formal-validity evidence.
+
+They must never be collapsed.
+
+## FD015 — "AI researcher" is not one capability
+
+FIRE-Bench emphasizes rediscovery of verifiable scientific insights, while RExBench tests implementation of research extensions and reports much lower success; first-party 2026 research-workflow evidence adds supervised real-world productivity rather than benchmark-only autonomy.
+
+**Skeleton consequence:** research-agent evaluation is decomposed into:
+- retrieval;
+- literature synthesis;
+- hypothesis;
+- design;
+- implementation;
+- execution;
+- debugging;
+- statistical analysis;
+- rediscovery;
+- extension;
+- replication;
+- report;
+- self-audit.
+
+A system may be excellent at one stage and poor at another.
 
 
 # 26. Research anti-patterns
