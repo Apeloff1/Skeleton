@@ -125,7 +125,7 @@
       "stage": 0,
       "parallel_lane": "state-authority",
       "objective": "Prove authoritative restore first and derived index/cache rebuild second.",
-      "status": "verified",
+      "status": "done",
       "task_dependencies": [
         "AIQ-S0-STATE-02"
       ],
@@ -168,8 +168,8 @@
       },
       "accountability_id": "ACC-AIQ-S0-STATE-03",
       "accountability_required": true,
-      "completion_checkbox": false,
-      "completion_checkbox_mark": "[ ]",
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
       "implementation_signed": true,
       "verification_signed": true
     },
