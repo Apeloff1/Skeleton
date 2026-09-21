@@ -1688,12 +1688,12 @@
       "plane": "streaming-realtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical operation, event, replay, backpressure, and durable SQLite persistence semantics exist; backend transport, cancellation/heartbeat integration, frontend resume/reducer behavior, and end-to-end recovery evidence remain.",
+      "gap": "Canonical operation/event persistence plus a tenant-bound authenticated backend SSE adapter now implement replay cursors, heartbeat/idle behavior, cancellation projection and retry-safe outbox dispatch; frontend resume/reducer behavior, multi-client acknowledgement and end-to-end recovery evidence remain.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
         "use skeleton/frontier/operation_stream.py as the stream conformance contract",
-        "add backend SSE or WebSocket adapter without changing envelope semantics",
-        "bridge cancellation into the canonical operation state machine",
+        "maintain backend SSE adapter without changing envelope semantics",
+        "keep cancellation bound to the canonical operation state machine and transactional outbox",
         "add frontend reducer, reconnect cursor, duplicate/out-of-order handling",
         "prove heartbeat, idle timeout, backpressure, reconnect and terminal semantics end-to-end"
       ],
@@ -3202,7 +3202,10 @@
         "skeleton/frontier/runtime_events.py",
         "skeleton/testing/test_operation_contract.py",
         "skeleton/testing/test_operation_stream.py",
-        "backend",
+        "backend/core/operation_stream_transport.py",
+        "backend/routes/operation_stream.py",
+        "backend/tests/test_operation_stream_transport.py",
+        "backend/tests/test_operation_stream_route.py",
         "frontend"
       ],
       "objective": "One ordered resumable protocol for long-running AI operations.",
@@ -3241,16 +3244,22 @@
           "durable terminal fencing",
           "durable replay compaction watermark",
           "persisted corruption rejection",
-          "durable capacity backpressure"
+          "durable capacity backpressure",
+          "retry-idempotent explicit event-id append for transactional outbox recovery",
+          "tenant-bound backend operation transport service",
+          "authenticated SSE route with Last-Event-ID resume",
+          "heartbeat and idle timeout integration",
+          "cancellation bridge into durable OperationEnvelope state",
+          "transactional outbox drain before replay",
+          "explicit post-header replay-gap resync event",
+          "focused tenant-isolation/cancel/replay/terminal SSE tests"
         ],
         "remaining": [
-          "backend SSE or WebSocket transport",
-          "heartbeat and idle timeout integration",
-          "cancellation bridge from transport to operation state",
           "frontend reducer with sequence and event-id dedupe",
           "frontend reconnect/resume cursor",
-          "multi-client acknowledgement strategy",
-          "end-to-end slow-client and reconnect tests"
+          "multi-client acknowledgement/compaction strategy",
+          "distributed stream ownership for multi-worker deployment",
+          "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
         ]
       }
     },
