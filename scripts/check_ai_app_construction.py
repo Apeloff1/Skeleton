@@ -1403,6 +1403,7 @@ def _validate_functional_ai_closure(
     closure = contract.get("functional_ai_closure")
     result = {
         "blueprints": 0,
+        "required_p0_gaps": 0,
         "required_envelopes": 0,
         "required_state_domains": 0,
     }
@@ -1426,6 +1427,29 @@ def _validate_functional_ai_closure(
         for item in raw_packages
         if isinstance(item, dict) and isinstance(item.get("id"), str)
     } if isinstance(raw_packages, list) else {}
+
+    required_p0_gaps = _nonempty_strings(
+        closure.get("required_p0_gaps"),
+        label="functional_ai_closure.required_p0_gaps",
+        errors=errors,
+    )
+    declared_p0_gaps = {
+        gap_id
+        for gap_id, item in gap_by_id.items()
+        if isinstance(item, dict) and item.get("priority") == "P0"
+    }
+    required_p0_set = set(required_p0_gaps)
+    missing_p0 = sorted(declared_p0_gaps - required_p0_set)
+    extra_p0 = sorted(required_p0_set - declared_p0_gaps)
+    if missing_p0:
+        errors.append(
+            "functional AI closure missing declared P0 gaps: " + ", ".join(missing_p0)
+        )
+    if extra_p0:
+        errors.append(
+            "functional AI closure references non-P0/unknown gaps: " + ", ".join(extra_p0)
+        )
+    result["required_p0_gaps"] = len(required_p0_set)
 
     required_blueprints = closure.get("required_blueprints")
     if not isinstance(required_blueprints, list) or not required_blueprints:
@@ -1481,10 +1505,6 @@ def _validate_functional_ai_closure(
             if not isinstance(gap, dict):
                 errors.append(f"functional AI blueprint {key} references missing gap {gap_id!r}")
             else:
-                if gap.get("status") != "open":
-                    errors.append(
-                        f"functional AI gap {gap_id} must remain open until closure evidence updates the ledger"
-                    )
                 if gap.get("priority") != "P0":
                     errors.append(f"functional AI gap {gap_id} must be P0")
                 if gap.get("plane") != plane_id:
@@ -1497,10 +1517,16 @@ def _validate_functional_ai_closure(
                 errors.append(
                     f"functional AI blueprint {key} references unknown plane {plane_id!r}"
                 )
-            elif gap is not None and gap.get("status") == "open" and plane.get("state") != "partial":
+            elif isinstance(gap, dict) and gap.get("status") == "open" and plane.get("state") != "partial":
                 errors.append(
                     f"functional AI plane {plane_id} must remain partial while {gap_id} is open"
                 )
+            elif isinstance(gap, dict) and gap.get("status") == "closed":
+                blueprint_status = blueprint.get("status") if isinstance(blueprint, dict) else None
+                if blueprint_status not in {"implemented", "complete"}:
+                    errors.append(
+                        f"closed functional AI gap {gap_id} requires blueprint {key}.status implemented/complete"
+                    )
 
             package = package_by_id.get(package_id)
             if not isinstance(package, dict):
