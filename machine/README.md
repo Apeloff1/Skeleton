@@ -128,6 +128,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Fix wave:** revalidated 15 current-main fix branches; meaningful deltas are already represented in integration staging, with no duplicate PRs created. One zero-file branch remains lineage only.
 
+- **Feature wave:** revalidated 46 feature branches. Existing integration PRs cover meaningful staged deltas; zero-file branches remain lineage. Large shell, PR-runner, Jeeves topology, and physics families remain held for reconciliation.
+
 ## Target layout
 
 ```text
