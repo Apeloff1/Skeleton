@@ -1697,7 +1697,7 @@ This section is mandatory for implementation work. Logical capability design is
 not sufficient; every change must land in the physical structure declared by
 `machine/architecture.json -> structural_blueprint`.
 
-The structural checkpoint is `structure-map/v1.1`.
+The structural checkpoint is `structure-map/v1.2`.
 
 ### 35.1 Construction decision sequence
 
@@ -1997,3 +1997,236 @@ application request
 
 The reverse direction is prohibited. Engine orchestration, resilience,
 verification, and cost admission do not import application routing code.
+
+## 36. Execution topology and runtime assembly
+
+The structural contract now separates four questions that must not be conflated:
+
+1. **Who owns the capability?** — `plane_placements.owner`.
+2. **Which architectural zone contains it?** — `plane_placements.zone`.
+3. **Where does it execute?** — `plane_execution.host`.
+4. **How must it behave operationally?** — `plane_execution.profile`.
+
+This distinction prevents two opposite failure modes: exploding every package
+into a service, and collapsing every capability into one process with no
+independent lifecycle semantics.
+
+### 36.1 Execution hosts
+
+#### skeleton-service
+
+- Kind: `runtime-service`
+- Runtime node: `skeleton`
+- Allowed zones: `engine`
+- Lifecycle: `compose-managed`
+- Responsibility: Host engine-owned request, policy, state-adapter, worker, and evidence planes without changing their ownership.
+
+#### backend-service
+
+- Kind: `runtime-service`
+- Runtime node: `backend`
+- Allowed zones: `application`
+- Lifecycle: `compose-managed`
+- Responsibility: Host application API, product control, and realtime transport adapters.
+
+#### frontend-client
+
+- Kind: `client-runtime`
+- Runtime node: `frontend`
+- Allowed zones: `product`
+- Lifecycle: `session-managed`
+- Responsibility: Host the human product shell and session-local presentation state.
+
+#### operator-ci
+
+- Kind: `control-execution`
+- Runtime node: none; run-scoped control execution
+- Allowed zones: `engine`
+- Lifecycle: `run-scoped`
+- Responsibility: Execute release/build/promotion control from CLI or CI without becoming a long-running product service.
+
+
+A host is a deployment/runtime container, not a domain owner. Moving a plane
+between hosts is therefore a deployment change unless its physical owner or
+zone also changes.
+
+### 36.2 Execution profiles
+
+#### library
+
+- Lifecycle: `consumer-scoped`
+- State mode: `none-or-ephemeral`
+- Scale unit: `consumer-process`
+- Shutdown: `consumer-managed`
+- Failure policy: `propagate-to-owning-plane`
+- Side-effect policy: `none-unless-declared`
+
+#### request-service
+
+- Lifecycle: `long-lived`
+- State mode: `externalized`
+- Scale unit: `service-replica`
+- Shutdown: `drain-inflight-then-stop`
+- Failure policy: `fail-health-and-reject-new-work`
+- Side-effect policy: `idempotency-required-for-mutations`
+
+#### provider-edge
+
+- Lifecycle: `request-scoped-io`
+- State mode: `external-provider`
+- Scale unit: `consumer-process`
+- Shutdown: `cancel-bounded-io`
+- Failure policy: `fail-closed-or-explicit-router-degrade`
+- Side-effect policy: `receipt-before-external-io`
+
+#### durable-state
+
+- Lifecycle: `long-lived`
+- State mode: `authoritative-durable`
+- Scale unit: `partition-or-replica`
+- Shutdown: `flush-and-fence-writes`
+- Failure policy: `reject-ambiguous-writes`
+- Side-effect policy: `single-authority-writer`
+
+#### durable-worker
+
+- Lifecycle: `long-lived-worker`
+- State mode: `checkpointed`
+- Scale unit: `worker-replica`
+- Shutdown: `checkpoint-or-terminalize`
+- Failure policy: `retry-idempotently-or-terminalize`
+- Side-effect policy: `operation-idempotency-and-receipts`
+
+#### policy-control
+
+- Lifecycle: `consumer-scoped`
+- State mode: `policy-or-ledger`
+- Scale unit: `consumer-process`
+- Shutdown: `no-special-drain`
+- Failure policy: `fail-closed-for-authority-bearing-decisions`
+- Side-effect policy: `decision-receipt-before-effect`
+
+#### realtime-transport
+
+- Lifecycle: `long-lived`
+- State mode: `durable-cursor-plus-bounded-buffer`
+- Scale unit: `transport-replica`
+- Shutdown: `preserve-resume-state-and-stop-accepting`
+- Failure policy: `reconnect-resume-or-explicit-resync`
+- Side-effect policy: `transport-never-owns-operation-truth`
+
+#### product-client
+
+- Lifecycle: `user-session`
+- State mode: `ephemeral-session`
+- Scale unit: `client-session`
+- Shutdown: `persist-bounded-resume-state`
+- Failure policy: `surface-degraded-mode-and-reconnect`
+- Side-effect policy: `mutations-through-canonical-service-contracts`
+
+#### evidence-control
+
+- Lifecycle: `continuous-or-run-scoped`
+- State mode: `append-only-evidence`
+- Scale unit: `observer-or-worker`
+- Shutdown: `flush-evidence`
+- Failure policy: `do-not-fabricate-evidence; freeze-dependent-promotion`
+- Side-effect policy: `observation-cannot-mutate-runtime-policy-directly`
+
+#### release-control
+
+- Lifecycle: `release-run`
+- State mode: `release-evidence-and-rollback-pointer`
+- Scale unit: `operator-or-ci-run`
+- Shutdown: `atomic-complete-or-fail`
+- Failure policy: `no-promotion-on-incomplete-evidence`
+- Side-effect policy: `promotion-and-rollback-require-auditable-receipts`
+
+
+### 36.3 Plane execution registry
+
+| Plane | Execution host | Profile | Zone |
+| --- | --- | --- | --- |
+| `foundation` | `skeleton-service` | `library` | `engine` |
+| `identity` | `skeleton-service` | `policy-control` | `engine` |
+| `configuration-secrets` | `skeleton-service` | `policy-control` | `engine` |
+| `model-provider` | `skeleton-service` | `provider-edge` | `engine` |
+| `model-routing` | `skeleton-service` | `policy-control` | `engine` |
+| `prompt-context` | `skeleton-service` | `library` | `engine` |
+| `orchestration` | `skeleton-service` | `durable-worker` | `engine` |
+| `reasoning-verification` | `skeleton-service` | `library` | `engine` |
+| `tool-runtime` | `skeleton-service` | `provider-edge` | `engine` |
+| `memory` | `skeleton-service` | `durable-state` | `engine` |
+| `retrieval` | `skeleton-service` | `durable-state` | `engine` |
+| `data-persistence` | `skeleton-service` | `durable-state` | `engine` |
+| `jobs-durability` | `skeleton-service` | `durable-worker` | `engine` |
+| `artifact-files` | `skeleton-service` | `durable-state` | `engine` |
+| `application-api` | `backend-service` | `request-service` | `application` |
+| `engine-api` | `skeleton-service` | `request-service` | `engine` |
+| `product-experience` | `frontend-client` | `product-client` | `product` |
+| `streaming-realtime` | `backend-service` | `realtime-transport` | `application` |
+| `security-safety` | `skeleton-service` | `policy-control` | `engine` |
+| `governance` | `skeleton-service` | `policy-control` | `engine` |
+| `resilience` | `skeleton-service` | `policy-control` | `engine` |
+| `observability` | `skeleton-service` | `evidence-control` | `engine` |
+| `evaluation` | `skeleton-service` | `evidence-control` | `engine` |
+| `feedback-learning` | `skeleton-service` | `evidence-control` | `engine` |
+| `cost-capacity` | `skeleton-service` | `policy-control` | `engine` |
+| `operator-control` | `backend-service` | `policy-control` | `application` |
+| `deployment-release` | `operator-ci` | `release-control` | `engine` |
+
+### 36.4 Runtime construction rules
+
+When implementing a plane, its execution profile supplies the default operational
+rules:
+
+- **library** code does not invent durable state or hidden side effects;
+- **request-service** work drains in-flight requests and externalizes durable
+  state before horizontal scale;
+- **provider-edge** work must obtain governance/admission/architecture receipts
+  before external I/O;
+- **durable-state** work rejects ambiguous writes and preserves one writer of
+  record;
+- **durable-worker** work checkpoints or reaches a terminal state before
+  shutdown and retries only through idempotent operation identity;
+- **policy-control** work fails closed when an authority-bearing decision cannot
+  be made;
+- **realtime-transport** preserves resume semantics and never becomes the owner
+  of operation truth;
+- **product-client** state is session-local and all mutations cross canonical
+  service contracts;
+- **evidence-control** may observe broadly but cannot directly mutate runtime
+  policy; missing evidence freezes dependent promotion;
+- **release-control** never promotes on incomplete evidence and always retains a
+  rollback pointer.
+
+### 36.5 Scaling rule
+
+Scale the execution host only after checking the profiles it contains. Horizontal
+replication of a host is legal only when each hosted plane either externalizes
+authoritative state, partitions it explicitly, or has a single-authority
+coordination mechanism.
+
+Do not infer that an engine package needs another daemon merely because it has a
+distinct capability plane. Add a long-running runtime node only when process
+isolation, independent scaling, security boundary, or failure containment
+justifies the operational cost and the runtime manifest is updated in the same
+change.
+
+### 36.6 Shutdown rule
+
+Shutdown proceeds from admission to transport to execution to state:
+
+```text
+stop accepting new work
+  -> freeze authority-changing control operations
+  -> drain request services / stop new stream subscriptions
+  -> checkpoint or terminalize durable operations
+  -> cancel bounded external I/O
+  -> flush evidence and durable state
+  -> release runtime resources
+```
+
+A plane-specific shutdown implementation may be stricter, but it may not skip
+the guarantees encoded by its execution profile.
+
