@@ -198,3 +198,17 @@ def test_receipts_are_tenant_scoped() -> None:
 
     assert len(receipts) == 1
     assert receipts[0].record_id == "a"
+
+
+def test_retry_of_pending_plan_returns_only_outstanding_targets() -> None:
+    registry = DataLifecycleRegistry()
+    registry.register(_record("a", targets=("memory", "artifact")))
+    plan = registry.request_deletion("tenant-a", record_ids=["a"], now=20.0)
+    registry.acknowledge_deletion(plan.plan_id, "a", "memory", now=21.0)
+
+    retry = registry.request_deletion("tenant-a", record_ids=["a"], now=30.0)
+
+    assert retry.plan_id == plan.plan_id
+    assert [(action.record_id, action.target) for action in retry.actions] == [
+        ("a", "artifact"),
+    ]
