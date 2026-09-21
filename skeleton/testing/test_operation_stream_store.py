@@ -184,3 +184,172 @@ def test_sqlite_stream_explicit_event_id_conflict_fails_closed(
                 event_id=event_id,
                 timestamp=timestamp,
             )
+
+
+def test_consumer_acknowledgements_gate_safe_compaction(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        for index in range(1, 5):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": index},
+                timestamp=base + timedelta(seconds=index),
+            )
+
+        store.register_consumer(
+            operation_id,
+            "client-a",
+            lease_seconds=300,
+            now=base,
+        )
+        store.register_consumer(
+            operation_id,
+            "client-b",
+            lease_seconds=300,
+            now=base,
+        )
+        store.acknowledge_consumer(
+            operation_id,
+            "client-a",
+            3,
+            lease_seconds=300,
+            now=base + timedelta(seconds=1),
+        )
+        store.acknowledge_consumer(
+            operation_id,
+            "client-b",
+            2,
+            lease_seconds=300,
+            now=base + timedelta(seconds=1),
+        )
+
+        assert store.safe_compaction_sequence(
+            operation_id,
+            now=base + timedelta(seconds=2),
+        ) == 2
+        assert store.compact_acknowledged(
+            operation_id,
+            now=base + timedelta(seconds=2),
+        ) == 2
+        assert store.head(operation_id)["compacted_through"] == 2
+
+
+def test_expired_consumer_stops_blocking_active_consumer_watermark(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        for index in range(1, 6):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": index},
+                timestamp=base + timedelta(seconds=index),
+            )
+
+        store.register_consumer(
+            operation_id,
+            "slow-client",
+            lease_seconds=1,
+            now=base,
+        )
+        store.acknowledge_consumer(
+            operation_id,
+            "slow-client",
+            1,
+            lease_seconds=1,
+            now=base,
+        )
+        store.register_consumer(
+            operation_id,
+            "active-client",
+            lease_seconds=300,
+            now=base,
+        )
+        store.acknowledge_consumer(
+            operation_id,
+            "active-client",
+            4,
+            lease_seconds=300,
+            now=base,
+        )
+
+        assert store.safe_compaction_sequence(
+            operation_id,
+            now=base + timedelta(seconds=2),
+        ) == 4
+        consumers = store.active_consumers(
+            operation_id,
+            now=base + timedelta(seconds=2),
+        )
+        assert [item.consumer_id for item in consumers] == ["active-client"]
+
+
+def test_consumer_ack_is_monotonic_and_cannot_exceed_stream_head(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        for index in range(1, 4):
+            store.append(
+                operation_id,
+                "operation.progress",
+                {"step": index},
+                timestamp=base + timedelta(seconds=index),
+            )
+        store.register_consumer(operation_id, "client-a", now=base)
+
+        first = store.acknowledge_consumer(
+            operation_id,
+            "client-a",
+            2,
+            now=base + timedelta(seconds=1),
+        )
+        regressed = store.acknowledge_consumer(
+            operation_id,
+            "client-a",
+            1,
+            now=base + timedelta(seconds=2),
+        )
+
+        assert first.acknowledged_through == 2
+        assert regressed.acknowledged_through == 2
+
+        with pytest.raises(StreamContractError, match="beyond latest"):
+            store.acknowledge_consumer(
+                operation_id,
+                "client-a",
+                4,
+                now=base + timedelta(seconds=3),
+            )
+
+
+def test_consumer_must_register_before_acknowledging(tmp_path: Path) -> None:
+    operation_id = str(uuid4())
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        store.append(operation_id, "operation.created", {"state": "created"})
+
+        with pytest.raises(StreamContractError, match="register"):
+            store.acknowledge_consumer(operation_id, "unknown-client", 1)
+
+
+def test_no_active_consumers_never_advances_compaction_implicitly(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        store.append(operation_id, "operation.created", {"state": "created"})
+        assert store.safe_compaction_sequence(operation_id) == 0
+        assert store.compact_acknowledged(operation_id) == 0
+        assert store.head(operation_id)["compacted_through"] == 0
