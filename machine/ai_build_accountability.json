@@ -18610,8 +18610,8 @@
         "signer_id": "chatgpt:gpt-5.6-sol",
         "signer_type": "agent",
         "role": "implementation-agent",
-        "signed_at_utc": "2026-09-21T19:07:34Z",
-        "git_sha": "433aa55e8d15d0d7475a39669c56504e36d33108",
+        "signed_at_utc": "2026-09-21T19:11:45Z",
+        "git_sha": "4ba7b22e23e77b88716df27a06733d7d9c4a9606",
         "evidence_refs": [
           "https://github.com/Apeloff1/Skeleton/commit/b158b194941d37f74591e7f19c628fac6cb1d354",
           "https://github.com/Apeloff1/Skeleton/commit/694ffafa325756f14e757bb782ca4e9f0c2e938e",
@@ -18625,11 +18625,14 @@
           "https://github.com/Apeloff1/Skeleton/commit/2713905ada01fc2d197c137d69127adedfb31456",
           "https://github.com/Apeloff1/Skeleton/commit/6d43873855a7fce6d1d95e0778cf4929924ae0c8",
           "https://github.com/Apeloff1/Skeleton/commit/433aa55e8d15d0d7475a39669c56504e36d33108",
-          "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation.json"
+          "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation.json",
+          "https://github.com/Apeloff1/Skeleton/commit/739889a96d525ba64cd2c744aae0877ecc36df31",
+          "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606",
+          "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation-002.json"
         ],
-        "statement": "Implemented authoritative-first state recovery with live scratch Mongo backup/restore, integrity verification, derived rebuild fencing, deterministic rebuild, CI drill and operator runbook.",
+        "statement": "Superseding implementation attestation: authoritative-first recovery remains implemented; dedicated recovery CI now includes the pinned Skeleton runtime and the runbook is repository-hygiene clean.",
         "signature_method": "github_identity",
-        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/433aa55e8d15d0d7475a39669c56504e36d33108"
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606"
       },
       "verification_signoff": {
         "signed": false,
@@ -18645,7 +18648,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T19:07:34Z",
+      "last_event_at_utc": "2026-09-21T19:11:45Z",
       "history": [
         {
           "sequence": 1,
@@ -18692,6 +18695,26 @@
             "https://github.com/Apeloff1/Skeleton/commit/433aa55e8d15d0d7475a39669c56504e36d33108",
             "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation.json"
           ]
+        },
+        {
+          "sequence": 3,
+          "event_type": "implementation_superseded",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T19:11:45Z",
+          "git_sha": "4ba7b22e23e77b88716df27a06733d7d9c4a9606",
+          "statement": "Supersede prior STATE-03 implementation attestation after CI dependency and hygiene fixes.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606",
+          "from_status": "evidence_pending",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/739889a96d525ba64cd2c744aae0877ecc36df31",
+            "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606",
+            "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation-002.json"
+          ],
+          "supersedes_git_sha": "433aa55e8d15d0d7475a39669c56504e36d33108"
         }
       ],
       "evidence": [
@@ -18707,7 +18730,10 @@
         "https://github.com/Apeloff1/Skeleton/commit/2713905ada01fc2d197c137d69127adedfb31456",
         "https://github.com/Apeloff1/Skeleton/commit/6d43873855a7fce6d1d95e0778cf4929924ae0c8",
         "https://github.com/Apeloff1/Skeleton/commit/433aa55e8d15d0d7475a39669c56504e36d33108",
-        "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation.json"
+        "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation.json",
+        "https://github.com/Apeloff1/Skeleton/commit/739889a96d525ba64cd2c744aae0877ecc36df31",
+        "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606",
+        "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation-002.json"
       ],
       "baseline_status": "pending"
     },
