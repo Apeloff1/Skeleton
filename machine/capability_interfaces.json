@@ -2030,9 +2030,16 @@
         "context envelope",
         "instruction hierarchy",
         "token/character budget",
-        "source provenance"
+        "source provenance",
+        "ContextEnvelope",
+        "ContextSegment",
+        "ContextBudget",
+        "ContextSnapshot",
+        "ContextCompiler",
+        "context source adapter",
+        "provider projection"
       ],
-      "target_failure_contract": "drop unsafe/unbounded context",
+      "target_failure_contract": "drop/deny unauthorized or unbounded segments; produce explicit insufficient-context result rather than silently bypassing policy",
       "source_acceptance": [
         "resume tests",
         "cancellation tests",
@@ -2047,9 +2054,14 @@
       "target_acceptance": [
         "prompt injection regression suite",
         "budget tests",
-        "source attribution tests"
+        "source attribution tests",
+        "context compiler determinism",
+        "trust-tier/injection tests",
+        "source authorization tests",
+        "budget/headroom tests",
+        "provenance-preserving compaction tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:orchestration->tool-runtime",
@@ -2266,14 +2278,19 @@
       "source_acceptance": [
         "prompt injection regression suite",
         "budget tests",
-        "source attribution tests"
+        "source attribution tests",
+        "context compiler determinism",
+        "trust-tier/injection tests",
+        "source authorization tests",
+        "budget/headroom tests",
+        "provenance-preserving compaction tests"
       ],
       "target_acceptance": [
         "primitive unit suite",
         "serialization compatibility",
         "no heavy imports in skeleton/__init__.py"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:prompt-context->identity",
@@ -2297,14 +2314,19 @@
       "source_acceptance": [
         "prompt injection regression suite",
         "budget tests",
-        "source attribution tests"
+        "source attribution tests",
+        "context compiler determinism",
+        "trust-tier/injection tests",
+        "source authorization tests",
+        "budget/headroom tests",
+        "provenance-preserving compaction tests"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
         "tenant isolation tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:prompt-context->retrieval",
@@ -2330,7 +2352,12 @@
       "source_acceptance": [
         "prompt injection regression suite",
         "budget tests",
-        "source attribution tests"
+        "source attribution tests",
+        "context compiler determinism",
+        "trust-tier/injection tests",
+        "source authorization tests",
+        "budget/headroom tests",
+        "provenance-preserving compaction tests"
       ],
       "target_acceptance": [
         "recall/precision eval",
@@ -2338,7 +2365,7 @@
         "ACL leakage tests",
         "freshness invalidation"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:reasoning-verification->model-routing",
