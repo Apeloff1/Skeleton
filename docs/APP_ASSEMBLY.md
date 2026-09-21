@@ -138,6 +138,12 @@ checks must not invent a shorter `/health` path on the Skeleton service.
 
 ## Production web ingress
 
+Ingress ownership is declared in the application manifest: the frontend owns
+`/`, the application backend owns `/api`, and the Skeleton engine owns
+`/api/v1`. Health paths must remain inside their owning prefix. The assembly
+audit derives Nginx location/upstream expectations from this metadata and also
+requires more-specific prefixes to appear before broader prefixes.
+
 The production Nginx image is the browser-facing ingress for the assembled app.
 When no explicit public endpoint override is baked into the Expo export,
 `apiBase.ts` uses the browser origin. Nginx then routes:
