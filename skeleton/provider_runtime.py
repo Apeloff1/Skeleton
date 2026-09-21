@@ -45,6 +45,7 @@ from skeleton.vault.data_governance import (
     ProviderTransferRequest,
     require_provider_transfer,
 )
+from skeleton.vault.governance_registry import GovernanceContext
 
 
 _ALLOWED_HISTORY_ROLES = frozenset({"user", "assistant"})
@@ -194,6 +195,7 @@ class ProviderRequest:
     operation_id: str | None = None
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
+    governance_context: GovernanceContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,6 +227,7 @@ class ProviderImageRequest:
     operation_id: str | None = None
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
+    governance_context: GovernanceContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,6 +259,7 @@ class ProviderSpeechRequest:
     operation_id: str | None = None
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
+    governance_context: GovernanceContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -413,6 +417,37 @@ def normalize_history(
     return tuple(kept)
 
 
+def _effective_governance_fields(
+    *,
+    data_class: str,
+    purpose: str,
+    tenant_id: str | None,
+    governance_context: GovernanceContext | None,
+) -> tuple[str, str, str | None]:
+    """Resolve effective governance fields without trusting a weaker caller label."""
+
+    if governance_context is None:
+        return data_class, purpose, tenant_id
+    if not isinstance(governance_context, GovernanceContext):
+        raise ProviderPolicyError("provider governance context is invalid")
+
+    normalized_purpose = purpose.strip().lower() if isinstance(purpose, str) else ""
+    if normalized_purpose != governance_context.purpose:
+        raise ProviderPolicyError(
+            "provider purpose does not match governance context"
+        )
+    if tenant_id is not None and tenant_id.strip() != governance_context.tenant_id:
+        raise ProviderPolicyError(
+            "provider tenant does not match governance context"
+        )
+
+    return (
+        governance_context.data_class.label,
+        governance_context.purpose,
+        governance_context.tenant_id,
+    )
+
+
 def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
     """Validate provider-neutral request fields before any provider I/O."""
 
@@ -445,14 +480,21 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
     if not model:
         raise ProviderInvocationError("model provider model must be non-empty text")
 
-    if not isinstance(request.data_class, str) or not request.data_class.strip():
-        raise ProviderPolicyError("model provider data classification is invalid")
     if not isinstance(request.purpose, str) or not request.purpose.strip():
         raise ProviderPolicyError("model provider transfer purpose is invalid")
-    if request.tenant_id is not None and (
-        not isinstance(request.tenant_id, str) or not request.tenant_id.strip()
-    ):
-        raise ProviderPolicyError("model provider tenant identity is invalid")
+    if request.governance_context is None:
+        if not isinstance(request.data_class, str) or not request.data_class.strip():
+            raise ProviderPolicyError("model provider data classification is invalid")
+        if request.tenant_id is not None and (
+            not isinstance(request.tenant_id, str) or not request.tenant_id.strip()
+        ):
+            raise ProviderPolicyError("model provider tenant identity is invalid")
+    _effective_governance_fields(
+        data_class=request.data_class,
+        purpose=request.purpose,
+        tenant_id=request.tenant_id,
+        governance_context=request.governance_context,
+    )
     if request.operation_id is not None and (
         not isinstance(request.operation_id, str) or not request.operation_id.strip()
     ):
@@ -518,14 +560,23 @@ def _require_media_policy(
     content: bytes | str,
     estimated_cost_usd: float,
     resource_budget: ResourceBudget,
+    governance_context: GovernanceContext | None = None,
     timeout_seconds: float,
     provider_attempts: int,
     output_tokens: int = 1,
 ) -> tuple[Any, Any]:
-    if not isinstance(data_class, str) or not data_class.strip():
-        raise ProviderPolicyError("provider media data classification is invalid")
     if not isinstance(purpose, str) or not purpose.strip():
         raise ProviderPolicyError("provider media purpose is invalid")
+    if governance_context is None and (
+        not isinstance(data_class, str) or not data_class.strip()
+    ):
+        raise ProviderPolicyError("provider media data classification is invalid")
+    data_class, purpose, tenant_id = _effective_governance_fields(
+        data_class=data_class,
+        purpose=purpose,
+        tenant_id=tenant_id,
+        governance_context=governance_context,
+    )
     if not isinstance(resource_budget, ResourceBudget):
         raise ProviderPolicyError("provider media resource budget is invalid")
     try:
