@@ -23,12 +23,11 @@ def _tokens(value: str) -> tuple[str, ...]:
     for token in raw:
         lowered = token.casefold()
         tokens.add(lowered)
-        for separator in ("/", ".", "_", "-", ":"):
-            if separator in lowered:
-                tokens.update(
-                    part for part in lowered.split(separator)
-                    if len(part) >= 2
-                )
+        tokens.update(
+            part
+            for part in re.split(r"[/._:-]+", lowered)
+            if len(part) >= 2
+        )
     return tuple(sorted(tokens))
 
 

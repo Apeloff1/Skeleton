@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+import errno
 import hashlib
 import io
 import os
@@ -32,6 +33,15 @@ from typing import BinaryIO, Iterable, Iterator, Mapping
 from skeleton.shells.workspace_txn.pathing import (
     WorkspacePathError,
     normalize_relative_path,
+)
+
+
+# Capture platform capability once, before tests or callers wrap os functions.
+# os.supports_dir_fd stores function objects; re-checking membership after a
+# monkeypatch can incorrectly make a supported platform look unsupported.
+_DIR_FD_CAPABILITIES_AVAILABLE = all(
+    function in os.supports_dir_fd
+    for function in (os.open, os.stat, os.mkdir)
 )
 
 
@@ -282,11 +292,7 @@ class RootedFilesystem:
         outside the capability root.
         """
         mode = _bounded_mode(mode)
-        if (
-            os.open not in os.supports_dir_fd
-            or os.stat not in os.supports_dir_fd
-            or os.mkdir not in os.supports_dir_fd
-        ):
+        if not _DIR_FD_CAPABILITIES_AVAILABLE:
             raise FilesystemBoundaryError(
                 "descriptor-relative filesystem operations are unavailable"
             )
@@ -326,6 +332,19 @@ class RootedFilesystem:
                             "created parent cannot be opened safely"
                         ) from exc
                 except OSError as exc:
+                    if exc.errno in {errno.ELOOP, errno.ENOTDIR}:
+                        try:
+                            entry = os.stat(
+                                part,
+                                dir_fd=current_fd,
+                                follow_symlinks=False,
+                            )
+                        except OSError:
+                            entry = None
+                        if entry is not None and stat.S_ISLNK(entry.st_mode):
+                            raise FilesystemPathError(
+                                "parent path component is a symlink"
+                            ) from exc
                     raise FilesystemPathError(
                         "parent directory cannot be opened safely"
                     ) from exc
@@ -412,7 +431,9 @@ class RootedFilesystem:
                 )
             except OSError as exc:
                 raise FilesystemPathError("file cannot be inspected") from exc
-            if not _regular_file(before) or stat.S_ISLNK(before.st_mode):
+            if stat.S_ISLNK(before.st_mode):
+                raise FilesystemPathError("read target must not be a symlink")
+            if not _regular_file(before):
                 raise FilesystemPathError("read target must be a regular file")
             if before.st_size > limit:
                 raise FilesystemQuotaError("file exceeds read byte bound")
