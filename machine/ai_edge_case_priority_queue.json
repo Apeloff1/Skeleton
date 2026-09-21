@@ -53,7 +53,8 @@
       "accountability_id": "ACC-HIST-SYS-019",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 2,
@@ -84,7 +85,8 @@
       "accountability_id": "ACC-OBSCURE-018",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 3,
@@ -114,7 +116,8 @@
       "accountability_id": "ACC-EDGE-CONTRACT-010",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 4,
@@ -143,7 +146,8 @@
       "accountability_id": "ACC-EDGE-CONTRACT-009",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 5,
@@ -173,7 +177,8 @@
       "accountability_id": "ACC-EDGE-DATA-010",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 6,
@@ -202,7 +207,8 @@
       "accountability_id": "ACC-EDGE-SEC-008",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 7,
@@ -232,7 +238,8 @@
       "accountability_id": "ACC-EDGE-SEC-009",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 8,
@@ -260,7 +267,8 @@
       "accountability_id": "ACC-EDGE-AI-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 9,
@@ -288,7 +296,8 @@
       "accountability_id": "ACC-EDGE-AI-002",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 10,
@@ -316,7 +325,8 @@
       "accountability_id": "ACC-EDGE-AI-013",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 11,
@@ -344,7 +354,8 @@
       "accountability_id": "ACC-EDGE-AI-030",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 12,
@@ -372,7 +383,8 @@
       "accountability_id": "ACC-EDGE-CONTRACT-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 13,
@@ -400,7 +412,8 @@
       "accountability_id": "ACC-EDGE-CONTRACT-020",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 14,
@@ -428,7 +441,8 @@
       "accountability_id": "ACC-EDGE-SEC-005",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 15,
@@ -457,7 +471,8 @@
       "accountability_id": "ACC-EDGE-SEC-006",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 16,
@@ -486,7 +501,8 @@
       "accountability_id": "ACC-EDGE-SEC-007",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 17,
@@ -516,7 +532,8 @@
       "accountability_id": "ACC-OBSCURE-024",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 18,
@@ -543,7 +560,8 @@
       "accountability_id": "ACC-EDGE-AI-021",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 19,
@@ -567,7 +585,8 @@
       "accountability_id": "ACC-EDGE-DATA-009",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 20,
@@ -592,7 +611,8 @@
       "accountability_id": "ACC-EDGE-SEC-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 21,
@@ -617,7 +637,8 @@
       "accountability_id": "ACC-EDGE-SEC-011",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 22,
@@ -642,7 +663,8 @@
       "accountability_id": "ACC-EDGE-SEC-015",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 23,
@@ -667,7 +689,8 @@
       "accountability_id": "ACC-EDGE-SEC-016",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 24,
@@ -693,7 +716,8 @@
       "accountability_id": "ACC-EDGE-SEC-018",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 25,
@@ -721,7 +745,8 @@
       "accountability_id": "ACC-HIST-SYS-020",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 26,
@@ -750,7 +775,8 @@
       "accountability_id": "ACC-OBSCURE-025",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 27,
@@ -776,7 +802,8 @@
       "accountability_id": "ACC-EDGE-AI-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 28,
@@ -801,7 +828,8 @@
       "accountability_id": "ACC-EDGE-SEC-002",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 29,
@@ -828,7 +856,8 @@
       "accountability_id": "ACC-EDGE-SEC-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 30,
@@ -855,7 +884,8 @@
       "accountability_id": "ACC-EDGE-SEC-004",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 31,
@@ -879,7 +909,8 @@
       "accountability_id": "ACC-EDGE-SEC-012",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 32,
@@ -903,7 +934,8 @@
       "accountability_id": "ACC-EDGE-SEC-013",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 33,
@@ -927,7 +959,8 @@
       "accountability_id": "ACC-EDGE-SEC-014",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 34,
@@ -952,7 +985,8 @@
       "accountability_id": "ACC-EDGE-SEC-017",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 35,
@@ -978,7 +1012,8 @@
       "accountability_id": "ACC-EDGE-SEC-019",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 36,
@@ -1005,7 +1040,8 @@
       "accountability_id": "ACC-HIST-SYS-021",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 37,
@@ -1038,7 +1074,8 @@
       "accountability_id": "ACC-HIST-AI-002",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 38,
@@ -1069,7 +1106,8 @@
       "accountability_id": "ACC-EDGE-DIST-020",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 39,
@@ -1100,7 +1138,8 @@
       "accountability_id": "ACC-EDGE-DIST-021",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 40,
@@ -1129,7 +1168,8 @@
       "accountability_id": "ACC-HIST-SYS-003",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 41,
@@ -1158,7 +1198,8 @@
       "accountability_id": "ACC-EDGE-DATA-002",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 42,
@@ -1187,7 +1228,8 @@
       "accountability_id": "ACC-EDGE-DATA-007",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 43,
@@ -1216,7 +1258,8 @@
       "accountability_id": "ACC-EDGE-DIST-010",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 44,
@@ -1243,7 +1286,8 @@
       "accountability_id": "ACC-EDGE-DIST-027",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 45,
@@ -1272,7 +1316,8 @@
       "accountability_id": "ACC-OBSCURE-005",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 46,
@@ -1302,7 +1347,8 @@
       "accountability_id": "ACC-OBSCURE-010",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 47,
@@ -1332,7 +1378,8 @@
       "accountability_id": "ACC-OBSCURE-029",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 48,
@@ -1361,7 +1408,8 @@
       "accountability_id": "ACC-EDGE-DATA-005",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 49,
@@ -1389,7 +1437,8 @@
       "accountability_id": "ACC-HIST-SYS-025",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 50,
@@ -1418,7 +1467,8 @@
       "accountability_id": "ACC-OBSCURE-014",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 51,
@@ -1443,7 +1493,8 @@
       "accountability_id": "ACC-OBSCURE-021",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 52,
@@ -1469,7 +1520,8 @@
       "accountability_id": "ACC-EDGE-CONTRACT-013",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 53,
@@ -1494,7 +1546,8 @@
       "accountability_id": "ACC-EDGE-DATA-001",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 54,
@@ -1521,7 +1574,8 @@
       "accountability_id": "ACC-EDGE-DATA-006",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 55,
@@ -1546,7 +1600,8 @@
       "accountability_id": "ACC-EDGE-DIST-007",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 56,
@@ -1569,7 +1624,8 @@
       "accountability_id": "ACC-EDGE-DIST-024",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     },
     {
       "rank": 57,
@@ -1594,7 +1650,8 @@
       "accountability_id": "ACC-OBSCURE-007",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "accountability_status": "planned"
     }
   ]
 }
