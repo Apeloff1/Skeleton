@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "construction_version": "3.4.0",
-  "architecture_tag": "arch-map/v3.4",
+  "construction_version": "3.5.0",
+  "architecture_tag": "arch-map/v3.5",
   "status": "active",
   "title": "Skeleton SOTA AI Application Construction Contract",
   "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
@@ -247,7 +247,7 @@
     },
     {
       "id": "model-routing",
-      "owner": "backend/core/model_router.py",
+      "owner": "skeleton/frontier/model_routing.py",
       "state": "present",
       "responsibility": "Capability/privacy/cost/latency/quality-aware model selection with deterministic fallback ordering.",
       "depends_on": [
@@ -255,6 +255,7 @@
         "observability"
       ],
       "evidence": [
+        "skeleton/frontier/model_routing.py",
         "backend/core/model_router.py"
       ],
       "required_interfaces": [
@@ -264,6 +265,8 @@
         "endpoint telemetry"
       ],
       "construction": [
+        "keep canonical capability/privacy/cost/latency routing in the engine zone",
+        "treat backend/core/model_router.py as application compatibility/policy surface until converged",
         "register only declared providers",
         "score against budgets",
         "separate hard rejection from preference scoring",
@@ -1067,9 +1070,7 @@
         "resilience",
         "observability",
         "security-safety",
-        "application-api",
-        "engine-api",
-        "product-experience"
+        "engine-api"
       ],
       "evidence": [
         "skeleton/deploy",
@@ -1087,6 +1088,7 @@
         "rollback"
       ],
       "construction": [
+        "consume product/application readiness through acceptance evidence rather than upward code dependencies",
         "immutable images",
         "SBOM/provenance",
         "migrate before traffic",
@@ -1100,7 +1102,12 @@
         "migration rehearsal",
         "rollback drill"
       ],
-      "failure_mode": "do not promote or rollback"
+      "failure_mode": "do not promote or rollback",
+      "validates": [
+        "application-api",
+        "engine-api",
+        "product-experience"
+      ]
     }
   ],
   "construction_phases": [
@@ -2178,6 +2185,7 @@
       "gap": "gap-governance-registry",
       "wave": 1,
       "owners": [
+        "skeleton/frontier/model_routing.py",
         "skeleton/kernel/governance.py",
         "skeleton/shells/ai/governance.py",
         "backend/routes/governance.py",
@@ -2226,6 +2234,7 @@
       "gap": "gap-cost-admission",
       "wave": 1,
       "owners": [
+        "skeleton/frontier/model_routing.py",
         "skeleton/intelligence/capacity_planner.py",
         "backend/core/model_router.py",
         "skeleton/agents/swarm_quota.py",
@@ -2336,6 +2345,7 @@
       "gap": "gap-provider-redundancy",
       "wave": 2,
       "owners": [
+        "skeleton/frontier/model_routing.py",
         "backend/core/ai_provider.py",
         "backend/core/model_router.py"
       ],
@@ -2439,6 +2449,7 @@
   ],
   "completion_criteria": {
     "structural_complete": [
+      "runtime dependency edges and acceptance-target edges are classified separately",
       "all required planes declared and owned",
       "plane dependency graph acyclic",
       "all provider families and credential-bearing surfaces declared",
@@ -2555,5 +2566,17 @@
       "strict JSON corruption rejection",
       "per-operation bounded retention with backpressure"
     ]
+  },
+  "relationship_semantics": {
+    "runtime_dependency": {
+      "field": "depends_on",
+      "meaning": "Required runtime/build dependency. Must follow the architecture zone DAG and remain acyclic.",
+      "validation": "topological order + cross-zone DAG enforcement"
+    },
+    "acceptance_target": {
+      "field": "validates",
+      "meaning": "A plane whose externally observable contract/evidence is checked, but whose implementation is not imported as a runtime dependency.",
+      "validation": "target must be a declared plane; does not alter runtime dependency order"
+    }
   }
 }
