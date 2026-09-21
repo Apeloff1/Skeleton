@@ -70,7 +70,7 @@ def test_legacy_backend_health_exposes_canonical_identity_compatibly():
     root = find_repo_root(Path(__file__))
     health = (root / "backend/routes/health.py").read_text(encoding="utf-8")
 
-    assert 'SYSTEM_VERSION = "10.0.0"' in health
+    assert 'SYSTEM_VERSION = "11.0.0"' in health
     assert '"canonical_application": _canonical_application()' in health
     assert "public_bootstrap_payload" in health
 
@@ -121,3 +121,18 @@ def test_aggregate_runtime_status_includes_engine_and_state():
     assert '"name": "mongo"' in route
     assert "'backend' | 'skeleton' | 'mongo'" in client
     assert "Mongo state" in shell
+
+
+def test_backend_public_identity_converges_on_skeleton():
+    from pathlib import Path
+
+    from skeleton.app.assembly import find_repo_root
+
+    root = find_repo_root(Path(__file__))
+    health = (root / "backend/routes/health.py").read_text(encoding="utf-8")
+    server = (root / "backend/server.py").read_text(encoding="utf-8")
+
+    assert '"name": "Skeleton Application API"' in health
+    assert '"legacy_name": "CodeDock Quantum Nexus"' in health
+    assert 'title="Skeleton Application API"' in server
+    assert 'logging.getLogger("Skeleton.Backend")' in server
