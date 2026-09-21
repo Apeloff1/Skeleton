@@ -634,7 +634,9 @@
       "source_acceptance": [
         "migration forward/backward tests",
         "backup restore drill",
-        "consistency tests"
+        "consistency tests",
+        "state topology validator",
+        "authoritative-state restore and derived-index rebuild drill"
       ],
       "target_acceptance": [
         "invalid config fails startup",
@@ -664,7 +666,9 @@
       "source_acceptance": [
         "migration forward/backward tests",
         "backup restore drill",
-        "consistency tests"
+        "consistency tests",
+        "state topology validator",
+        "authoritative-state restore and derived-index rebuild drill"
       ],
       "target_acceptance": [
         "primitive unit suite",
