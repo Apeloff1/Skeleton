@@ -107,11 +107,23 @@ def test_architecture_sources_link_all_contract_layers() -> None:
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
 
     assert architecture["sources"] == {
-        "runtime_contract": "skeleton/app/manifest.json",
-        "repository_contract": "machine/manifest.json",
-        "human_map": "docs/ARCHITECTURE_MAP.md",
-        "validator": "scripts/check_architecture_map.py",
-    }
+            "runtime_contract": "skeleton/app/manifest.json",
+            "repository_contract": "machine/manifest.json",
+            "human_map": "docs/ARCHITECTURE_MAP.md",
+            "validator": "scripts/check_architecture_map.py",
+            "construction_contract": "machine/ai_app_construction.json",
+            "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+            "construction_validator": "scripts/check_ai_app_construction.py",
+            "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
+            "provider_contract": "skeleton/provider_contract.py",
+            "operation_contract": "skeleton/contracts/operation.py",
+            "stream_contract": "skeleton/frontier/operation_stream.py",
+            "stream_store": "skeleton/frontier/operation_stream_store.py",
+            "capability_interface_registry": "machine/capability_interfaces.json",
+            "capability_interface_validator": "scripts/check_capability_interfaces.py",
+            "state_topology": "machine/state_topology.json",
+            "state_topology_validator": "scripts/check_state_topology.py"
+        }
 
 
 def test_no_new_runtime_root_can_be_implicit() -> None:
