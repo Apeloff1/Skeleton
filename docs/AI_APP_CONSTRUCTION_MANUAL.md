@@ -2571,3 +2571,57 @@ python -m pytest -q \
 
 Only after these pass should dependency-heavy frontend, broad backend, Compose,
 packaging, security, or release checks diagnose higher-level failures.
+
+
+## Fully Functional AI Closure: Canonical Cognitive Execution Loop
+
+The architecture is not considered functionally complete merely because model providers, routing, memory, retrieval, tools, streaming, and evaluation exist independently. A complete AI application requires one orchestration-owned, durable cognitive execution transaction that binds those planes together under a single `OperationEnvelope`.
+
+### Canonical loop
+
+Every admitted interactive or agentic AI operation must follow this bounded loop:
+
+1. Load the durable operation and current checkpoint.
+2. Assemble governed context from instructions, conversation state, memory, retrieval evidence, artifacts, and approved user data.
+3. Route the model using capability, privacy, quality, latency, and budget constraints.
+4. Execute one provider-neutral model turn.
+5. Normalize provider-native structured output and tool-call proposals at the provider boundary.
+6. Validate proposed tool arguments against the canonical tool schema.
+7. Apply security, governance, identity/authority, approval, and cost/capacity admission before any tool side effect.
+8. Execute permitted tools with idempotency and bounded parallelism.
+9. Persist tool receipts/results and append them to the next-turn context.
+10. Checkpoint the operation before the next external boundary.
+11. Repeat only while the stop policy and remaining resource budget permit.
+12. Verify the candidate final result against available evidence and policy.
+13. Persist the final result, memory writes, artifacts, actual usage, and all linked receipts.
+14. Commit the terminal operation state.
+15. Emit the terminal stream event from committed state.
+
+### Required execution envelopes
+
+The machine contract defines four mandatory envelopes:
+
+- `ai_execution`: objective, operation binding, policies, budgets, and checkpoint identity.
+- `agent_turn`: stable turn lineage plus context digest, route/provider/tool/verification evidence, usage delta, checkpoint, and status.
+- `tool_call_proposal`: normalized call identity, schema-bound arguments, required authority, and approval requirement.
+- `ai_execution_result`: one terminal evidence bundle tying the final output to routing, provider, tools, verification, memory/artifacts, actual usage, and terminal stream state.
+
+Provider SDK objects must never become these contracts. Provider-specific tool-call or structured-output payloads are normalized inside `skeleton/provider_runtime.py` before the orchestration or tool planes consume them.
+
+### Hard loop bounds
+
+Every cognitive execution carries monotonic limits for model turns, tool calls, parallel tools, input/output/total tokens, provider cost, tool cost, wall-clock duration, and the operation deadline. A model response cannot reset or enlarge these limits. Exhaustion produces a deterministic terminal or degraded state and prevents further provider/tool allocation.
+
+### Human approval and suspend/resume
+
+The existing `waiting_for_user` operation state is the canonical suspension point for approval-required actions or genuinely missing information. Suspension must persist the exact execution and turn checkpoint. Resume continues the same operation identity; it must not create a fresh operation merely to avoid checkpoint recovery.
+
+### Crash and replay semantics
+
+A checkpoint is required before and after provider or tool boundaries. Any external side effect must have either an idempotency key or an explicit compensation policy before retry is legal. After restart, the runtime reconstructs the latest committed turn and never assumes that a client stream is the source of truth. Durable operation state is authoritative; streaming is a projection.
+
+### Functional-completion evidence
+
+The P0 cognitive-loop gap closes only when executable tests prove all of the following: prompt-only completion; single- and multi-tool execution; structured-output validation and bounded repair; tool authority denial; deterministic loop-budget exhaustion; crash/replay without duplicate side effects; approval wait/resume; cancellation races; provider fallback with preserved turn lineage; and a final result receipt that binds trace, route, provider, tool, verification, usage, memory/artifact, and stream evidence.
+
+The cross-plane golden journey must then prove that one real request can retrieve evidence, reason, call a governed tool, suspend/resume when required, verify its answer, persist resulting state, and stream the same terminal result to the product without bypassing a canonical plane.
