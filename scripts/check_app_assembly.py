@@ -318,6 +318,15 @@ def audit_compose_modes() -> None:
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
     )
+    frontend_block = base.split("  frontend:", 1)[1].split("\n  mongo:", 1)[0] if "  frontend:" in base and "\n  mongo:" in base else ""
+    check(
+        "backend:\n        condition: service_healthy" in frontend_block,
+        "frontend must wait for healthy backend",
+    )
+    check(
+        "skeleton:\n        condition: service_healthy" in frontend_block,
+        "frontend must wait for healthy Skeleton engine",
+    )
 
 
 def audit_production_ingress() -> None:
@@ -580,6 +589,9 @@ def audit_public_app_bootstrap_contract() -> None:
     check('@router.get("/status")' in route, "aggregate app runtime status route missing")
     check("public_bootstrap_payload()" in route, "app bootstrap route bypasses canonical payload builder")
     check("asyncio.to_thread(_probe_engine" in route, "aggregate app status does not isolate engine probe")
+    check("async def _probe_mongo" in route, "aggregate app status state probe missing")
+    check('core_db.command("ping")' in route, "aggregate app status does not verify durable state")
+    check("asyncio.gather(" in route, "aggregate app status probes are not concurrent")
     check("SKELETON_INTERNAL_URL" in route, "aggregate app status internal engine endpoint missing")
     check('("routes.app_runtime",' in registry, "public app runtime router is not registered")
 
