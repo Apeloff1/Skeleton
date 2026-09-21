@@ -313,7 +313,11 @@ def test_health_probe_reports_prebuilt_and_loaded_states(tmp_path: Path) -> None
     assert after.ok is True
     assert "loaded" in after.detail
     assert after.metadata["abi_version"] == 4
+    assert after.metadata["capabilities"] == ("sse2",)
     assert after.metadata["matrix_backend"] == "sse2"
+    assert after.metadata["library_available"] is True
+    assert after.metadata["load_ready"] is True
+    assert after.metadata["build_ready"] is True
 
 
 def test_health_probe_redacts_preflight_failures(tmp_path: Path) -> None:
