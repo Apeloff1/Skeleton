@@ -3275,7 +3275,8 @@ async def health():
     return {
         "status": "healthy",
         "uptime_seconds": time.time() - app_start_time,
-        "ai_available": bool(ai_service.api_key),
+        "ai_available": ai_service.available,
+        "ai_provider": ai_service.provider_status(),
         "features_enabled": [f.value for f, cfg in FEATURE_FLAGS.items() if cfg["enabled"]]
     }
 
@@ -3352,9 +3353,14 @@ async def health_ready():
 
     # 2) AI key
     try:
-        checks["ai_key"] = {"ok": bool(ai_service.api_key)}
-        if not ai_service.api_key:
-            checks["ai_key"]["note"] = "AI features will fall back to deterministic generators"
+        checks["ai_provider"] = {
+            "ok": ai_service.available,
+            "status": ai_service.provider_status(),
+        }
+        if not ai_service.available:
+            checks["ai_provider"]["note"] = (
+                "AI provider is unavailable or has not acknowledged the active construction contract"
+            )
     except Exception as e:
         logger.warning("health probe failed (ai_key): %s", type(e).__name__)
         checks["ai_key"] = {"ok": False, "error": "probe_failed"}
@@ -3676,7 +3682,11 @@ async def get_ai_modes():
             (AIAssistantMode.ARCHITECTURE, "Architecture suggestions"),
         ]
     ]
-    return {"modes": modes, "ai_available": bool(ai_service.api_key)}
+    return {
+        "modes": modes,
+        "ai_available": ai_service.available,
+        "provider": ai_service.provider_status(),
+    }
 
 @api_router.post("/ai/assist", response_model=AIAssistResponse)
 async def ai_assist(request: AIAssistRequest):
