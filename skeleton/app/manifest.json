@@ -136,6 +136,10 @@
     "backend/core/canonical_product_policy.py",
     "backend/core/product_control_runtime.py",
     "backend/routes/product_runtime.py",
-    "scripts/check_app_assembly.py"
+    "scripts/check_app_assembly.py",
+    "skeleton/app/preloader.py",
+    "skeleton/app/setup_runtime.py",
+    "skeleton/app/installer.py",
+    "scripts/install_app.py"
   ]
 }
