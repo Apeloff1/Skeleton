@@ -103,11 +103,11 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: development
+      target: ${FRONTEND_BUILD_TARGET:-development}
     container_name: tutolage-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "${FRONTEND_PORT:-3000}:${FRONTEND_CONTAINER_PORT:-3000}"
       - "8081:8081"      # Metro bundler
       - "19000:19000"    # Expo
       - "19001:19001"    # Expo DevTools
