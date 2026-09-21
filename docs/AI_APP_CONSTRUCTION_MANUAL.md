@@ -1697,7 +1697,7 @@ This section is mandatory for implementation work. Logical capability design is
 not sufficient; every change must land in the physical structure declared by
 `machine/architecture.json -> structural_blueprint`.
 
-The structural checkpoint is `structure-map/v1.0`.
+The structural checkpoint is `structure-map/v1.1`.
 
 ### 35.1 Construction decision sequence
 
@@ -1940,3 +1940,22 @@ A structural change is complete only when:
 - `python scripts/check_architecture_map.py` passes;
 - focused behavioral tests for the changed plane pass;
 - no transitional root has become a new runtime authority.
+
+### 35.9 Reverse dependency exception procedure
+
+A reverse dependency is architecture debt, not permission to widen the zone
+graph. When a construction prerequisite cannot yet follow the runtime zone DAG:
+
+1. keep the zone DAG unchanged;
+2. declare the exact source plane(s) and dependency plane;
+3. classify the exception as `ownership-migration` or
+   `control-observation`;
+4. document why the dependency is not equivalent to runtime ownership;
+5. for ownership migration, declare the intended destination owner;
+6. provide a concrete removal condition;
+7. add regression coverage proving the exception is both necessary and exact;
+8. remove the exception as soon as the edge becomes legal or disappears.
+
+Never use a wildcard exception, root-wide exception, or an exception that
+creates an implicit cyclic zone dependency.
+
