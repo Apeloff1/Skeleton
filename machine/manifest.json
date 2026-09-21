@@ -1,5 +1,5 @@
 {
-  "schema_version": "5.0",
+  "schema_version": "5.1",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -515,6 +515,16 @@
         "archive/workflow-secret-output-pre-rebase-20260920"
       ],
       "note": "archive snapshots diverge substantially; retained as historical source material, not merged"
+    },
+    "backup_wave": {
+      "revalidated": [
+        "autonomous supervisor pre-reconcile",
+        "autonomous supervisor pre-secret-clean",
+        "security code-scan pre-sync",
+        "supervisor 1544 pre-stack",
+        "supervisor custody pre-reconcile"
+      ],
+      "note": "backup snapshots diverge substantially; retained as historical recovery/source material, not merge targets"
     }
   },
   "integrated_domains": [
