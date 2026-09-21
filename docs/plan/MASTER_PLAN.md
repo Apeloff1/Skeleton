@@ -348,6 +348,14 @@ WP-W29 Distributed runtime
 WP-W30 Production hardening
 ```
 
+## 21.1 W00-W11 edge-case acceptance overlay
+
+The P0 build program is cross-checked against `docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md` and `machine/ai_p0_edge_case_matrix.json`.
+
+The matrix currently maps **173 unique historical/edge/obscure catalogue entries** into W00–W11, including exact repository paths, invariants, test targets and acceptance conditions. Planned tests are explicitly labeled `planned:` and do not count as evidence until materialized and passing.
+
+A W00–W11 package may reach implementation before every mapped edge case is closed, but it may not reach hardened/production status until relevant high-impact cases are either evidence-passing or recorded as explicit accepted risks with ownership.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
