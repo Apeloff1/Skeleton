@@ -1,10 +1,22 @@
-.PHONY: install dev test smoke verify quality ci lint clean
+.PHONY: install dev app app-check app-status app-down test smoke verify quality ci lint clean
 
 install:
 	pip install -r requirements.txt
 
 dev:
 	pip install -r requirements-dev.txt
+
+app:
+	python -m skeleton app up
+
+app-check:
+	python -m skeleton app check
+
+app-status:
+	python -m skeleton app status
+
+app-down:
+	python -m skeleton app down
 
 test:
 	python -m pytest skeleton/testing -v --tb=short || python -m unittest discover skeleton/testing -v
