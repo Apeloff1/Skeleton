@@ -506,7 +506,7 @@
     {
       "id": "data-persistence",
       "owner": "skeleton/persistence",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Durable application/model state, transactions, migrations, backups and vector storage.",
       "depends_on": [
         "foundation",
@@ -529,12 +529,16 @@
         "transaction boundaries",
         "indexes",
         "backup cadence",
-        "restore proof"
+        "restore proof",
+        "state authority registry and source-of-truth separation",
+        "durable operation repository plus event consistency contract"
       ],
       "acceptance": [
         "migration forward/backward tests",
         "backup restore drill",
-        "consistency tests"
+        "consistency tests",
+        "state topology validator",
+        "authoritative-state restore and derived-index rebuild drill"
       ],
       "failure_mode": "read-only/degraded mode where safe"
     },
@@ -1294,6 +1298,12 @@
       "required": true
     },
     {
+      "id": "state-topology",
+      "kind": "static",
+      "command": "python scripts/check_state_topology.py",
+      "required": true
+    },
+    {
       "id": "app-assembly",
       "kind": "integration",
       "command": "python scripts/check_app_assembly.py",
@@ -1445,6 +1455,34 @@
       ]
     },
     {
+      "id": "gap-state-authority-convergence",
+      "plane": "data-persistence",
+      "priority": "P0",
+      "status": "open",
+      "gap": "State technology and authority are not fully separated: backend RAG stores authoritative-looking user progress/feedback/session records inside local Chroma, canonical OperationRecord state is not yet durably bound, and recovery ordering across authoritative versus derived stores is not proven.",
+      "construction": [
+        "use machine/state_topology.json as the canonical state authority registry",
+        "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
+        "keep Chroma collections as derived searchable projections carrying provenance and authority metadata",
+        "bind canonical OperationRecord state to a durable repository",
+        "define atomic transaction, transactional outbox, or deterministic reconciliation semantics between operation state transitions and durable stream events",
+        "make content/swarm/vector/cache/snapshot roles explicit and non-authoritative where declared",
+        "define migrations, backup, restore, retention and consistency for each authoritative state domain",
+        "run a restore/rebuild drill proving authoritative state first and derived projections second"
+      ],
+      "closure_evidence": [
+        "state topology validator passes",
+        "RAG authoritative-record migration tests",
+        "Chroma projection rebuild test",
+        "durable operation-state repository test",
+        "operation-state/event atomicity or reconciliation fault test",
+        "Mongo backup/restore rehearsal",
+        "derived-store loss and rebuild test",
+        "no authoritative domain exists solely in Chroma, process memory or snapshots"
+      ],
+      "verification_state": "architecture-contract-added"
+    },
+    {
       "id": "gap-cost-admission",
       "plane": "cost-capacity",
       "priority": "P0",
@@ -1565,14 +1603,16 @@
       "gaps": [
         "gap-governance-registry",
         "gap-cost-admission",
-        "gap-provider-surface-convergence"
+        "gap-provider-surface-convergence",
+        "gap-state-authority-convergence"
       ],
-      "goal": "Make every provider/data/action decision classifiable, receipt-governed, and budget-admissible before adding more autonomy.",
+      "goal": "Make provider/data/action/state decisions classifiable, receipt-governed, budget-admissible, and recoverable before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
         "traceable denial receipts",
-        "all credential-bearing provider surfaces declared and receipt-enforced"
+        "all credential-bearing provider surfaces declared and receipt-enforced",
+        "authoritative state survives restore independently of derived indexes"
       ]
     },
     {
@@ -2284,6 +2324,41 @@
       }
     },
     {
+      "id": "WP-P0-STATE-AUTHORITY",
+      "gap": "gap-state-authority-convergence",
+      "wave": 1,
+      "owners": [
+        "machine/state_topology.json",
+        "backend/core/databases.py",
+        "backend/services/database.py",
+        "backend/services/rag_service.py",
+        "skeleton/contracts/operation.py",
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/persistence/snapshots.py",
+        "docker-compose.yml"
+      ],
+      "objective": "Separate logical state authority from storage technology and prove durable recovery of canonical state before rebuilding projections.",
+      "steps": [
+        "freeze state-domain/source-of-truth registry",
+        "migrate canonical product records out of Chroma into core Mongo",
+        "make Chroma/vector/process stores derived-only",
+        "bind OperationRecord to durable repository",
+        "define operation-state to event-log consistency semantics",
+        "add schema/index migration ownership",
+        "define backup/restore order and readiness gates",
+        "prove loss/rebuild of all derived stores"
+      ],
+      "tests": [
+        "state topology validation",
+        "authoritative-versus-derived repository tests",
+        "Chroma rebuild test",
+        "operation durable-state/event consistency fault test",
+        "backup restore drill",
+        "cache/index/snapshot loss recovery"
+      ],
+      "exit": "every logical state domain has one declared authority; authoritative state restores without depending on derived stores; operation state and stream event durability are reconciled"
+    },
+    {
       "id": "WP-P0-STREAM",
       "gap": "gap-streaming-protocol",
       "wave": 2,
@@ -2594,5 +2669,11 @@
     "coverage": "all depends_on and validates edges exactly once",
     "ownership": "target plane retains authority",
     "merge_policy": "fail closed on missing, extra, stale, or mismatched interface entries"
+  },
+  "state_topology": {
+    "contract": "machine/state_topology.json",
+    "validator": "scripts/check_state_topology.py",
+    "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "policy": "one canonical authority per logical state domain; derived/scratch/recovery stores never silently become source of truth"
   }
 }
