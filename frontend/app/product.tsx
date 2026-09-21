@@ -152,8 +152,8 @@ export default function ProductShellRoute() {
               <Text style={styles.healthTitle}>Application runtime</Text>
               <Text style={styles.healthSubtitle}>
                 {health?.application
-                  ? `${health.application.name} v${health.application.version} · ${health.contractSource} contract · canonical backend and engine probes`
-                  : 'Canonical backend and Skeleton engine health from the assembly contract.'}
+                  ? `${health.application.name} v${health.application.version} · ${health.contractSource} contract · assembled runtime health`
+                  : 'Canonical application runtime health from the assembly contract.'}
               </Text>
             </View>
             <TouchableOpacity
@@ -168,13 +168,22 @@ export default function ProductShellRoute() {
             </TouchableOpacity>
           </View>
           <View style={styles.healthServices}>
-            {(['backend', 'skeleton'] as const).map((name) => {
-              const service = health?.services.find((candidate) => candidate.name === name);
+            {(health?.services.length ? health.services : [
+              { name: 'backend' as const },
+              { name: 'skeleton' as const },
+            ]).map((item) => {
+              const name = item.name;
+              const service = 'ok' in item ? item : health?.services.find((candidate) => candidate.name === name);
               const state = healthLoading && !service ? 'checking' : service?.ok ? 'healthy' : service ? 'degraded' : 'unknown';
+              const label = name === 'backend'
+                ? 'Application API'
+                : name === 'skeleton'
+                  ? 'Skeleton engine'
+                  : 'Mongo state';
               return (
                 <View key={name} style={styles.healthService}>
                   <View style={styles.healthServiceTop}>
-                    <Text style={styles.healthServiceName}>{name === 'backend' ? 'Application API' : 'Skeleton engine'}</Text>
+                    <Text style={styles.healthServiceName}>{label}</Text>
                     <Text style={[
                       styles.healthState,
                       state === 'healthy' ? styles.healthGood : state === 'degraded' ? styles.healthBad : styles.healthMuted,
