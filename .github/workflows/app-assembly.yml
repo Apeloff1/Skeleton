@@ -10,6 +10,7 @@ on:
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
       - "skeleton/testing/test_app_plan.py"
+      - "skeleton/testing/test_app_bootstrap.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "frontend/**"
@@ -80,7 +81,7 @@ jobs:
           yarn export:web
 
       - name: Compile assembly surface
-        run: python -m compileall -q skeleton/app skeleton/__main__.py
+        run: python -m compileall -q skeleton/app skeleton/__main__.py backend/routes/app_runtime.py
 
       - name: Audit repository-wide assembly contracts
         run: python scripts/check_app_assembly.py
@@ -88,7 +89,7 @@ jobs:
       - name: Run assembly contract tests
         env:
           PYTHONPATH: "."
-        run: python -m pytest -q skeleton/testing/test_app_assembly.py skeleton/testing/test_app_plan.py
+        run: python -m pytest -q skeleton/testing/test_app_assembly.py skeleton/testing/test_app_plan.py skeleton/testing/test_app_bootstrap.py
 
       - name: Validate structural assembly
         env:
@@ -132,6 +133,7 @@ jobs:
           required = {
               "skeleton/app/__init__.py",
               "skeleton/app/assembly.py",
+              "skeleton/app/bootstrap.py",
               "skeleton/app/cli.py",
               "skeleton/app/health.py",
               "skeleton/app/manifest.json",
