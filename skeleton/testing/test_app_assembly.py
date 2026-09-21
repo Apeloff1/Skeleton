@@ -339,3 +339,13 @@ def test_product_shell_health_client_matches_assembly_manifest():
     assert "probeAppHealth" in shell
     assert "Application runtime" in shell
     assert "Runtime" in shell
+
+
+def test_expo_dev_ports_are_hot_mode_only():
+    root = find_repo_root(Path(__file__))
+    base = (root / "docker-compose.yml").read_text(encoding="utf-8")
+    hot = (root / "docker-compose.hot.yml").read_text(encoding="utf-8")
+
+    for port in ("8081:8081", "19000:19000", "19001:19001", "19002:19002"):
+        assert port not in base
+        assert port in hot
