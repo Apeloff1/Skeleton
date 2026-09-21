@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.6.0",
-  "architecture_tag": "arch-map/v3.6",
+  "architecture_version": "3.7.0",
+  "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -18,7 +18,9 @@
     "stream_contract": "skeleton/frontier/operation_stream.py",
     "stream_store": "skeleton/frontier/operation_stream_store.py",
     "capability_interface_registry": "machine/capability_interfaces.json",
-    "capability_interface_validator": "scripts/check_capability_interfaces.py"
+    "capability_interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py"
   },
   "objectives": [
     "one product shell",
@@ -39,7 +41,9 @@
     "application routes contain no provider credentials or direct vendor SDK imports",
     "one canonical operation identity/state machine across API, orchestration, provider, tool, and stream planes",
     "one transport-neutral resumable event contract with explicit replay and fail-closed backpressure",
-    "every construction-plane relationship is materialized as an explicit capability interface contract"
+    "every construction-plane relationship is materialized as an explicit capability interface contract",
+    "one machine-readable state authority topology separating authoritative, derived, scratch, recovery, and transitional stores",
+    "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -52,7 +56,9 @@
     "runtime model providers must load the active construction contract before activation",
     "every capability plane has one owner, explicit dependencies, failure behavior, and acceptance evidence",
     "credential-bearing AI provider surfaces are explicitly inventoried and receipt-gated",
-    "provider-neutral libraries may model provider behavior but cannot own undeclared credentials or network activation"
+    "provider-neutral libraries may model provider behavior but cannot own undeclared credentials or network activation",
+    "storage technology never determines source-of-truth authority",
+    "durable derived stores remain projections unless the state authority contract explicitly promotes them"
   ],
   "canonical_roots": [
     {
@@ -176,7 +182,7 @@
       "roots": [
         "docker-compose.yml"
       ],
-      "responsibility": "declared durable and vector stores",
+      "responsibility": "declared durable, derived, scratch and recovery stores under machine/state_topology.json authority semantics",
       "may_depend_on": [],
       "must_not_own": [
         "application-policy"
@@ -541,7 +547,11 @@
     "model-routing is engine-owned; application routing surfaces are composition or compatibility layers",
     "release validation of frontend/backend contracts does not create upward engine dependencies",
     "every depends_on and validates relationship has exactly one capability interface registry entry",
-    "capability interface owners, zones, contract surfaces, failure semantics, and status match the canonical planes"
+    "capability interface owners, zones, contract surfaces, failure semantics, and status match the canonical planes",
+    "state authority topology architecture tag matches the active architecture",
+    "derived and scratch state cannot become sole canonical authority",
+    "mixed-authority and unbound-authority state is transitional and attached to an open P0 gap",
+    "authoritative state recovery precedes derived projection rebuild"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -551,7 +561,9 @@
     "provider_runtime_loader": "skeleton/provider_contract.py",
     "provider_runtime_boundary": "skeleton/provider_runtime.py",
     "policy": "contract-before-implementation; undeclared providers, planes, services, roots, and interfaces fail closed",
-    "provider_runtime_compatibility_loader": "backend/core/provider_architecture.py"
+    "provider_runtime_compatibility_loader": "backend/core/provider_architecture.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py"
   },
   "external_interfaces": [
     {
