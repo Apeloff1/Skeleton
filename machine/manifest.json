@@ -1,5 +1,5 @@
 {
-  "schema_version": "3.7",
+  "schema_version": "3.8",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -327,6 +327,11 @@
       ],
       "status": "staged",
       "note": "existing integration PRs reused"
+    },
+    "security_fix_wave": {
+      "count": 18,
+      "status": "staged",
+      "note": "all existing integration PRs reused; no duplicates created"
     }
   },
   "integrated_domains": [
