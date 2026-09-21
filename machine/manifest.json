@@ -38,12 +38,12 @@
         "ref": "integration/architecture-map-v1",
         "pr": 1904,
         "tag": "arch-map/v3.6",
-        "structure_tag": "structure-map/v1.2"
+        "structure_tag": "structure-map/v1.3"
       }
     ],
     "product_shell_pr": 1902,
     "architecture_pr": 1904,
-    "structure_tag": "structure-map/v1.2"
+    "structure_tag": "structure-map/v1.3"
   },
   "entrypoints": {
     "tests": "python -m pytest skeleton/testing -v",
