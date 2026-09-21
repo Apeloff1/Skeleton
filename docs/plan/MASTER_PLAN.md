@@ -385,6 +385,35 @@ A production capability is complete only when all applicable elements exist:
 - machine manifest updates;
 - architecture validation.
 
+## 24.1 Historical, obscure and edge-case depth
+
+The master plan has a cross-cutting anti-amnesia catalogue at `docs/plan/EDGE_CASES_HISTORICAL.md` with a machine mirror at `machine/ai_edge_case_catalog.json`.
+
+It captures historical mechanisms such as STRIPS, truth-maintenance systems, blackboard architectures, BDI/Contract Net, sparse IR baselines, actor/CSP/Petri-net coordination, WAL/MVCC/Sagas, logical clocks, consensus, capability security and supervision trees. Historical material is retained for the mechanism, original assumptions, discovered failure modes and modern analogue rather than nostalgia.
+
+It also records concrete obscure failure families that frequently evade happy-path designs:
+
+- duplicate keys, null/absent ambiguity, Unicode normalization/confusables, numeric precision and time anomalies;
+- duplicate/out-of-order events, split brain, stale leases, ABA, lost acknowledgements, retry/reconnect storms, deadlock/livelock/starvation and partial multi-store updates;
+- indirect prompt injection, memory/retrieval poisoning, stale evidence, temporal/scope mismatch, schema/model/version races, false multi-agent consensus, benchmark leakage, reward hacking and goal drift;
+- TOCTOU, symlink/hardlink/path/archive escapes, SSRF/DNS rebinding, secret inheritance and platform-specific filesystem/process behavior;
+- tombstone resurrection, stale indexes, embedding incompatibility, partial migrations, rollback incompatibility and backup/restore failures;
+- GPU resets, VRAM fragmentation, nondeterministic kernels, thermal/NUMA effects, suspend/resume and driver-runtime incompatibility;
+- browser refresh/reconnect, double-submit, multi-device concurrency, stale optimistic state and accessibility/locale edge cases.
+
+For every implemented capability, applicable catalogue entries must be considered during acceptance design. High-value cases should be promoted into executable evidence:
+
+```text
+edge/history entry
+  -> requirement/invariant
+  -> regression/property/fuzz/chaos test
+  -> observability signal
+  -> recovery/runbook
+  -> acceptance evidence
+```
+
+A successful happy path does not close a P0 gap when mapped high-impact failure cases remain undefined.
+
 ## 25. Scope freeze and future plan evolution
 
 Volume 420 freezes breadth. New discoveries should be inserted as chapters/subchapters under an existing volume. A new top-level volume requires an ADR showing that the requirement cannot be represented cleanly within the frozen domains.
