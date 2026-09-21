@@ -46,6 +46,11 @@ def _parser() -> argparse.ArgumentParser:
         help="use production backend and frontend image stages",
     )
     up.add_argument(
+        "--hot",
+        action="store_true",
+        help="bind repository source into dev containers for hot reload",
+    )
+    up.add_argument(
         "--no-verify",
         action="store_true",
         help="return after Compose starts without probing public application surfaces",
@@ -148,6 +153,9 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                     print(f"[FAIL] {check.message}")
             print("application start aborted: runtime preflight failed")
             return 1
+        if bool(args.production) and bool(args.hot):
+            print("--production and --hot are mutually exclusive")
+            return 2
         mode = "production" if bool(args.production) else "development"
         exit_code = _run_compose(
             compose_command(
@@ -155,6 +163,7 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
                 manifest=manifest,
                 full=bool(args.full),
                 build=not bool(args.no_build),
+                hot=bool(args.hot),
             ),
             root,
             env_overrides=manifest.mode_env(mode),
