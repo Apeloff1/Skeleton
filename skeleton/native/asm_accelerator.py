@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import array
 import ctypes
+import math
 import os
 import platform
 import shlex
@@ -33,6 +34,7 @@ _ASM_ABI_VERSION = 4
 _CAP_X86_SSE2 = 1 << 0
 _CAP_X86_AVX = 1 << 1
 _CAP_AARCH64_NEON = 1 << 2
+_KNOWN_CAPABILITY_MASK = _CAP_X86_SSE2 | _CAP_X86_AVX | _CAP_AARCH64_NEON
 _SUPPORTED_ARCHES = frozenset({"x86_64", "aarch64"})
 _ARCH_ALIASES = {
     "amd64": "x86_64",
@@ -214,6 +216,12 @@ class AsmVectorAccelerator:
         capability_function.argtypes = []
         capability_function.restype = ctypes.c_uint64
         capability_mask = int(capability_function())
+        unknown_capabilities = capability_mask & ~_KNOWN_CAPABILITY_MASK
+        if unknown_capabilities:
+            raise AsmAcceleratorAbiError(
+                "Assembly library reported unknown capability bits: "
+                f"0x{unknown_capabilities:x}"
+            )
 
         if arch == "x86_64" and not capability_mask & _CAP_X86_SSE2:
             raise AsmAcceleratorAbiError(
@@ -345,6 +353,14 @@ class AsmVectorAccelerator:
         architecture: str | None = None,
         timeout_seconds: float = _DEFAULT_BUILD_TIMEOUT_SECONDS,
     ) -> Path:
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not math.isfinite(float(timeout_seconds))
+            or float(timeout_seconds) <= 0.0
+        ):
+            raise ValueError("timeout_seconds must be finite and positive")
+
         arch = normalize_architecture(architecture)
         preflight = cls.preflight(
             compiler=compiler,
@@ -441,6 +457,12 @@ class AsmVectorAccelerator:
         candidates: Sequence[Sequence[float]],
     ) -> list[float]:
         dimensions = len(query)
+        rows = len(candidates)
+        if rows > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("output row count exceeds accelerator bound")
+        if rows * dimensions > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("matrix element count exceeds accelerator bound")
+
         matrix = array.array("f")
         for candidate in candidates:
             if len(candidate) != dimensions:
@@ -449,7 +471,7 @@ class AsmVectorAccelerator:
         return self._dot_batch_flat_f32(
             query,
             matrix,
-            rows=len(candidates),
+            rows=rows,
             dimensions=dimensions,
         )
 
@@ -511,6 +533,8 @@ class AsmVectorAccelerator:
             raise ValueError("query dimension mismatch")
 
         expected = rows * dims
+        if rows > _MAX_MATRIX_ELEMENTS:
+            raise ValueError("output row count exceeds accelerator bound")
         if expected > _MAX_MATRIX_ELEMENTS:
             raise ValueError("matrix element count exceeds accelerator bound")
         if len(matrix) != expected:
