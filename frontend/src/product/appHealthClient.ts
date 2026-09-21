@@ -1,6 +1,6 @@
 import { API_BASE, SKELETON_API_BASE } from '../../utils/apiBase';
 import { bootstrapService, getAppBootstrap, getAppRuntimeStatus } from './appBootstrapClient';
-import type { AppBootstrap } from './appBootstrapClient';
+import type { AppBootstrap, AppRuntimeProduct } from './appBootstrapClient';
 
 export type AppServiceHealth = {
   name: 'backend' | 'skeleton' | 'mongo';
@@ -15,6 +15,7 @@ export type AppHealthSnapshot = {
   checkedAt: number;
   services: readonly AppServiceHealth[];
   application: AppBootstrap['application'] | null;
+  product: AppRuntimeProduct | null;
   contractSource: 'runtime' | 'bootstrap-fallback' | 'static-fallback';
 };
 
@@ -110,6 +111,7 @@ export async function probeAppHealth(
             detail: service.detail,
           })),
           application: runtime.application,
+          product: runtime.product,
           contractSource: 'runtime',
         };
       }
@@ -133,6 +135,7 @@ export async function probeAppHealth(
     checkedAt: Date.now(),
     services,
     application: bootstrap?.application ?? null,
+    product: null,
     contractSource: bootstrap ? 'bootstrap-fallback' : 'static-fallback',
   };
 }
