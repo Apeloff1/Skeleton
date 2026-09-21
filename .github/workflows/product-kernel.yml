@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/core/charter_policy.py"
       - "backend/core/academy_product.py"
+      - "backend/core/gameforge_artifact_builder.py"
       - "backend/core/product_kernel.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/product_executor_registry.py"
@@ -17,6 +18,7 @@ on:
       - "backend/tests/test_product_executor_registry.py"
       - "backend/tests/test_execution_receipts.py"
       - "backend/tests/test_native_product_executors.py"
+      - "backend/tests/test_gameforge_artifact_builder.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/src/product/productControlClient.ts"
       - "frontend/app/product.tsx"
@@ -31,6 +33,7 @@ on:
     paths:
       - "backend/core/charter_policy.py"
       - "backend/core/academy_product.py"
+      - "backend/core/gameforge_artifact_builder.py"
       - "backend/core/product_kernel.py"
       - "backend/core/product_control_plane.py"
       - "backend/core/product_executor_registry.py"
@@ -42,6 +45,7 @@ on:
       - "backend/tests/test_product_executor_registry.py"
       - "backend/tests/test_execution_receipts.py"
       - "backend/tests/test_native_product_executors.py"
+      - "backend/tests/test_gameforge_artifact_builder.py"
       - "frontend/src/product/productCatalog.ts"
       - "frontend/src/product/productControlClient.ts"
       - "frontend/app/product.tsx"
@@ -82,6 +86,7 @@ jobs:
           tests/test_product_executor_registry.py
           tests/test_execution_receipts.py
           tests/test_native_product_executors.py
+          tests/test_gameforge_artifact_builder.py
 
   frontend-product-contract:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
