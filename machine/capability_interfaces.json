@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "registry_version": "1.0.0",
-  "architecture_tag": "arch-map/v3.5",
-  "construction_version": "3.5.0",
+  "architecture_tag": "arch-map/v3.6",
+  "construction_version": "3.6.0",
   "status": "active",
   "purpose": "Exact interface ledger for every construction-plane runtime dependency and acceptance target. It converts graph edges into owner-, contract-, failure-, and evidence-aware build obligations.",
   "sources": {
