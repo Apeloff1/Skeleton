@@ -576,7 +576,7 @@
   ],
   "structural_blueprint": {
     "schema_version": 1,
-    "structure_tag": "structure-map/v1.1",
+    "structure_tag": "structure-map/v1.2",
     "purpose": "Bind repository roots, runtime zones, capability planes, physical ownership, state authority, composition roots, and recovery domains into one validator-enforced structural model.",
     "levels": [
       {
@@ -1044,7 +1044,10 @@
       "every state class has exactly one authority plane and matching owner",
       "every construction plane belongs to exactly one recovery domain",
       "cross-zone plane dependencies follow the zone DAG unless an exact bounded dependency exception is declared",
-      "dependency exceptions never widen zone may_depend_on policy and carry a removal condition"
+      "dependency exceptions never widen zone may_depend_on policy and carry a removal condition",
+      "every construction plane has exactly one execution profile and host",
+      "execution host zone allowance matches physical plane placement",
+      "execution profiles define lifecycle, state, scale, shutdown, failure, and side-effect semantics"
     ],
     "dependency_exceptions": [],
     "acceptance_edges": [
@@ -1068,6 +1071,304 @@
         "target_plane": "product-experience",
         "kind": "release-evidence",
         "rationale": "Release orchestration validates product build and E2E evidence without an engine-to-product runtime dependency."
+      }
+    ],
+    "execution_hosts": [
+      {
+        "id": "skeleton-service",
+        "kind": "runtime-service",
+        "runtime_node": "skeleton",
+        "allowed_zones": [
+          "engine"
+        ],
+        "lifecycle": "compose-managed",
+        "responsibility": "Host engine-owned request, policy, state-adapter, worker, and evidence planes without changing their ownership."
+      },
+      {
+        "id": "backend-service",
+        "kind": "runtime-service",
+        "runtime_node": "backend",
+        "allowed_zones": [
+          "application"
+        ],
+        "lifecycle": "compose-managed",
+        "responsibility": "Host application API, product control, and realtime transport adapters."
+      },
+      {
+        "id": "frontend-client",
+        "kind": "client-runtime",
+        "runtime_node": "frontend",
+        "allowed_zones": [
+          "product"
+        ],
+        "lifecycle": "session-managed",
+        "responsibility": "Host the human product shell and session-local presentation state."
+      },
+      {
+        "id": "operator-ci",
+        "kind": "control-execution",
+        "runtime_node": null,
+        "allowed_zones": [
+          "engine"
+        ],
+        "lifecycle": "run-scoped",
+        "responsibility": "Execute release/build/promotion control from CLI or CI without becoming a long-running product service."
+      }
+    ],
+    "execution_profiles": [
+      {
+        "id": "library",
+        "lifecycle": "consumer-scoped",
+        "state_mode": "none-or-ephemeral",
+        "scale_unit": "consumer-process",
+        "shutdown": "consumer-managed",
+        "failure_policy": "propagate-to-owning-plane",
+        "side_effect_policy": "none-unless-declared"
+      },
+      {
+        "id": "request-service",
+        "lifecycle": "long-lived",
+        "state_mode": "externalized",
+        "scale_unit": "service-replica",
+        "shutdown": "drain-inflight-then-stop",
+        "failure_policy": "fail-health-and-reject-new-work",
+        "side_effect_policy": "idempotency-required-for-mutations"
+      },
+      {
+        "id": "provider-edge",
+        "lifecycle": "request-scoped-io",
+        "state_mode": "external-provider",
+        "scale_unit": "consumer-process",
+        "shutdown": "cancel-bounded-io",
+        "failure_policy": "fail-closed-or-explicit-router-degrade",
+        "side_effect_policy": "receipt-before-external-io"
+      },
+      {
+        "id": "durable-state",
+        "lifecycle": "long-lived",
+        "state_mode": "authoritative-durable",
+        "scale_unit": "partition-or-replica",
+        "shutdown": "flush-and-fence-writes",
+        "failure_policy": "reject-ambiguous-writes",
+        "side_effect_policy": "single-authority-writer"
+      },
+      {
+        "id": "durable-worker",
+        "lifecycle": "long-lived-worker",
+        "state_mode": "checkpointed",
+        "scale_unit": "worker-replica",
+        "shutdown": "checkpoint-or-terminalize",
+        "failure_policy": "retry-idempotently-or-terminalize",
+        "side_effect_policy": "operation-idempotency-and-receipts"
+      },
+      {
+        "id": "policy-control",
+        "lifecycle": "consumer-scoped",
+        "state_mode": "policy-or-ledger",
+        "scale_unit": "consumer-process",
+        "shutdown": "no-special-drain",
+        "failure_policy": "fail-closed-for-authority-bearing-decisions",
+        "side_effect_policy": "decision-receipt-before-effect"
+      },
+      {
+        "id": "realtime-transport",
+        "lifecycle": "long-lived",
+        "state_mode": "durable-cursor-plus-bounded-buffer",
+        "scale_unit": "transport-replica",
+        "shutdown": "preserve-resume-state-and-stop-accepting",
+        "failure_policy": "reconnect-resume-or-explicit-resync",
+        "side_effect_policy": "transport-never-owns-operation-truth"
+      },
+      {
+        "id": "product-client",
+        "lifecycle": "user-session",
+        "state_mode": "ephemeral-session",
+        "scale_unit": "client-session",
+        "shutdown": "persist-bounded-resume-state",
+        "failure_policy": "surface-degraded-mode-and-reconnect",
+        "side_effect_policy": "mutations-through-canonical-service-contracts"
+      },
+      {
+        "id": "evidence-control",
+        "lifecycle": "continuous-or-run-scoped",
+        "state_mode": "append-only-evidence",
+        "scale_unit": "observer-or-worker",
+        "shutdown": "flush-evidence",
+        "failure_policy": "do-not-fabricate-evidence; freeze-dependent-promotion",
+        "side_effect_policy": "observation-cannot-mutate-runtime-policy-directly"
+      },
+      {
+        "id": "release-control",
+        "lifecycle": "release-run",
+        "state_mode": "release-evidence-and-rollback-pointer",
+        "scale_unit": "operator-or-ci-run",
+        "shutdown": "atomic-complete-or-fail",
+        "failure_policy": "no-promotion-on-incomplete-evidence",
+        "side_effect_policy": "promotion-and-rollback-require-auditable-receipts"
+      }
+    ],
+    "plane_execution": [
+      {
+        "plane": "foundation",
+        "profile": "library",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "identity",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "configuration-secrets",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "model-provider",
+        "profile": "provider-edge",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "model-routing",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "prompt-context",
+        "profile": "library",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "orchestration",
+        "profile": "durable-worker",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "reasoning-verification",
+        "profile": "library",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "tool-runtime",
+        "profile": "provider-edge",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "memory",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "retrieval",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "data-persistence",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "jobs-durability",
+        "profile": "durable-worker",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "artifact-files",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "application-api",
+        "profile": "request-service",
+        "host": "backend-service",
+        "zone": "application"
+      },
+      {
+        "plane": "engine-api",
+        "profile": "request-service",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "product-experience",
+        "profile": "product-client",
+        "host": "frontend-client",
+        "zone": "product"
+      },
+      {
+        "plane": "streaming-realtime",
+        "profile": "realtime-transport",
+        "host": "backend-service",
+        "zone": "application"
+      },
+      {
+        "plane": "security-safety",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "governance",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "resilience",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "observability",
+        "profile": "evidence-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "evaluation",
+        "profile": "evidence-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "feedback-learning",
+        "profile": "evidence-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "cost-capacity",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "operator-control",
+        "profile": "policy-control",
+        "host": "backend-service",
+        "zone": "application"
+      },
+      {
+        "plane": "deployment-release",
+        "profile": "release-control",
+        "host": "operator-ci",
+        "zone": "engine"
       }
     ]
   },
