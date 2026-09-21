@@ -38,6 +38,20 @@ def test_runtime_status_aggregates_backend_engine_and_mongo(monkeypatch):
     monkeypatch.setattr(runtime, "core_db", FakeDB())
     monkeypatch.setattr(runtime, "_probe_engine", fake_engine)
 
+    monkeypatch.setattr(
+        runtime,
+        "public_readiness",
+        lambda: {
+            "canonical_actions": 21,
+            "ready_actions": 18,
+            "ready_pct": 85.7,
+            "governed_unbound": 3,
+            "unsafe_actions": 0,
+            "policy_gaps": 0,
+            "attestation_sha256": "abc123",
+        },
+    )
+
     payload = asyncio.run(runtime._runtime_status(500))
 
     assert payload["ok"] is True
@@ -49,6 +63,9 @@ def test_runtime_status_aggregates_backend_engine_and_mongo(monkeypatch):
         "mongo",
     ]
     assert all(item["ok"] for item in payload["services"])
+    assert payload["product"]["available"] is True
+    assert payload["product"]["ready_actions"] == 18
+    assert payload["product"]["canonical_actions"] == 21
 
 
 def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
@@ -59,6 +76,7 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
             raise RuntimeError("database unavailable")
 
     monkeypatch.setattr(runtime, "core_db", FailedDB())
+    monkeypatch.setattr(runtime, "public_readiness", lambda: (_ for _ in ()).throw(RuntimeError("readiness unavailable")))
     monkeypatch.setattr(
         runtime,
         "_probe_engine",
@@ -78,6 +96,9 @@ def test_runtime_status_fails_closed_when_state_is_unavailable(monkeypatch):
     assert mongo["ok"] is False
     assert mongo["detail"] == "RuntimeError"
     assert "database unavailable" not in json.dumps(payload)
+    assert payload["product"]["available"] is False
+    assert payload["product"]["detail"] == "RuntimeError"
+    assert "readiness unavailable" not in json.dumps(payload)
 
 
 def test_ready_endpoint_uses_http_status_for_whole_app_verdict(monkeypatch):
