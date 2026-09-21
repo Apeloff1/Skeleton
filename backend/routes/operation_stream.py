@@ -12,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from skeleton.frontier.operation_stream import StreamContractError
+
 from core.operation_stream_transport import (
     OperationAccessDenied,
     OperationStreamTransport,
@@ -111,6 +113,14 @@ def _map_transport_error(exc: Exception) -> HTTPException:
         return HTTPException(
             status_code=409,
             detail="Operation changed concurrently; retry",
+        )
+    if isinstance(exc, StreamContractError):
+        return HTTPException(
+            status_code=409,
+            detail={
+                "error": "stream_contract_conflict",
+                "detail": str(exc),
+            },
         )
     return HTTPException(status_code=503, detail="Operation transport unavailable")
 
