@@ -87,6 +87,7 @@ CANONICAL_DOCUMENTS = {
     "exotic_architecture_lab": "docs/architecture/exotic-architecture-lab.md",
     "frontier_research_atlas": "docs/architecture/frontier-research-atlas-2026.md",
     "frontier_research_experiment_protocols": "docs/architecture/frontier-research-experiment-protocols-2026.md",
+    "research_saturation_checklist": "docs/architecture/research-saturation-checklist-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -185,6 +186,16 @@ PLAN_CHECKPOINTS = {
         "experiment_protocol_range": ("RXP001", "RXP035"),
         "production_authority_granted": False,
         "research_refresh_required": True,
+    },
+    "PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY": {
+        "created_at": "2026-09-21T22:39:00+02:00",
+        "tracks": ("AD",),
+        "domain_count": 19,
+        "planning_status": "planning_covered",
+        "local_reproduction_status": "reproduction_pending",
+        "production_authority_granted": False,
+        "signoff_required_for_reproduction_claims": True,
+        "signoff_required_for_production_claims": True,
     }
 }
 
