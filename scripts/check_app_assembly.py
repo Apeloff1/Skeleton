@@ -174,6 +174,10 @@ def audit_compose_modes() -> None:
     ):
         check(mount in hot, f"hot-reload overlay missing source mount: {mount}")
 
+    for port in ("8081:8081", "19000:19000", "19001:19001", "19002:19002"):
+        check(port not in base, f"dev-only frontend port leaked into canonical compose: {port}")
+        check(port in hot, f"hot-reload overlay missing Expo development port: {port}")
+
     check(
         "target: ${FRONTEND_BUILD_TARGET:-development}" in base,
         "frontend build target must be assembly-selectable",
