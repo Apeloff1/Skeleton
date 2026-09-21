@@ -2079,7 +2079,7 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State authority convergence is partially implemented: Jeeves RAG product state is Mongo-authoritative and production Skeleton reasoning is bound to durable OperationEnvelope SQLite state with transactional outbox plus durable stream projection. Formal backup/restore rehearsal, full derived-store loss recovery, and broader cognitive execution/result/approval/usage ledger bindings remain open.",
+      "gap": "State authority convergence is partially implemented: Jeeves RAG product state is Mongo-authoritative and production Skeleton reasoning is bound to durable OperationEnvelope SQLite state with transactional outbox, durable stream projection, startup reconciliation, foreground dispatch and bounded background idle retry. Formal backup/restore rehearsal, full derived-store loss recovery, and broader cognitive execution/result/approval/usage ledger bindings remain open.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2100,7 +2100,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "rag-and-production-operation-authority-bound-restore-and-cognitive-ledgers-open"
+      "verification_state": "rag-and-production-operation-authority-bound-live-outbox-reconciliation-restore-and-cognitive-ledgers-open"
     },
     {
       "id": "gap-cost-admission",
@@ -3400,7 +3400,12 @@
           "production Skeleton intelligence/reason path bound to DurableOperationRuntime and canonical OperationEnvelope state",
           "transactional outbox dispatcher runs after state commits, on startup reconciliation, and on bounded shutdown drain",
           "production operation-state and operation-stream SQLite mounted on skeleton_data",
-          "operation state/event crash-window reconciliation and restart recovery regressions"
+          "operation state/event crash-window reconciliation and restart recovery regressions",
+          "production intelligence surface bound to DurableOperationRuntime rather than direct orchestrator execution",
+          "OperationEnvelope transitions commit transactional outbox intent atomically",
+          "startup and foreground outbox reconciliation use retry-stable event identities",
+          "bounded background dispatcher retries unpublished outbox rows during idle process time",
+          "API shutdown stops dispatcher and flushes pending outbox before store close"
         ],
         "remaining": [
           "define production backup and retention policy for operation state",
