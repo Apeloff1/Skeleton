@@ -410,6 +410,8 @@ def audit_production_ingress() -> None:
 
 def audit_launcher_convergence() -> None:
     launch = read("frontend/components/LaunchCascade.tsx")
+    boot = read("frontend/components/BootLauncher.tsx")
+    stages = read("frontend/src/boot/stages.ts")
     welcome = read("frontend/app/welcome.tsx")
     safe_mode = read("frontend/app/safe-mode.tsx")
 
@@ -425,6 +427,12 @@ def audit_launcher_convergence() -> None:
 
     check("Enter Product" in launch, "launch cascade product label drift")
     check("Enter Product" in welcome, "welcome product label drift")
+    check("id: 'assembly_contract'" in stages, "boot pipeline missing assembly contract stage")
+    check("id: 'app_runtime'" in stages, "boot pipeline missing aggregate runtime stage")
+    check("getAppBootstrap" in stages, "boot pipeline bypasses public bootstrap contract")
+    check("getAppRuntimeStatus" in stages, "boot pipeline bypasses aggregate runtime status")
+    check("finalSnapshot.stages.app_runtime" in boot, "warm boot cache bypasses aggregate runtime verdict")
+    check("runtimeOk" in boot, "warm boot cache runtime health marker missing")
 
 
 def _backend_product_policy() -> dict[str, tuple[str, ...]]:
