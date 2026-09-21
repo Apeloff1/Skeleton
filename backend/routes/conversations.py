@@ -36,6 +36,8 @@ def _translate(exc: Exception) -> HTTPException:
         return HTTPException(status_code=409, detail=str(exc))
     if isinstance(exc, ConversationStorageUnavailable):
         return HTTPException(status_code=503, detail="Conversation storage is unavailable")
+    if isinstance(exc, (ValueError, TypeError)):
+        return HTTPException(status_code=422, detail="Conversation request is invalid")
     return HTTPException(status_code=500, detail="Conversation operation failed")
 
 
