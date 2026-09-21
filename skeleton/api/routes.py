@@ -12,8 +12,10 @@ from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
 from skeleton.jeeves.core import SessionMode
 from skeleton.memory.guarded_compaction import compact_turns
+from skeleton.app.assembly import load_manifest
 
 router = APIRouter()
+_APP_MANIFEST = load_manifest()
 
 # Idempotency for retry-sensitive POSTs (forge materialise, gameforge runs):
 # a client retry replays the first recorded response instead of re-executing.
@@ -149,7 +151,14 @@ async def health(state=Depends(_state)) -> Dict[str, Any]:
 
 @router.get("/health/live")
 async def live(state=Depends(_state)) -> Dict[str, Any]:
-    return _require(state.health, "Health").liveness()
+    payload = dict(_require(state.health, "Health").liveness())
+    payload["application"] = {
+        "name": _APP_MANIFEST.name,
+        "version": _APP_MANIFEST.version,
+        "component": "engine",
+        "ingress_prefix": _APP_MANIFEST.service("skeleton").ingress_prefix,
+    }
+    return payload
 
 
 @router.get("/health/ready")
