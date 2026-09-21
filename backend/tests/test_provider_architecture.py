@@ -149,7 +149,7 @@ def test_direct_openai_adapter_cannot_bypass_architecture(monkeypatch) -> None:
     def deny(_provider_id: str):
         raise ProviderArchitectureError("missing contract")
 
-    monkeypatch.setattr("core.ai_provider.load_provider_architecture", deny)
+    monkeypatch.setattr("skeleton.provider_runtime.load_provider_architecture", deny)
     adapter = OpenAIProviderAdapter(
         api_key="test-key",
         model="test-model",
@@ -159,3 +159,20 @@ def test_direct_openai_adapter_cannot_bypass_architecture(monkeypatch) -> None:
     assert adapter.available is False
     with pytest.raises(ProviderUnavailableError, match="architecture acknowledgement failed"):
         adapter._get_client()
+
+
+def test_backend_provider_facade_reexports_engine_runtime() -> None:
+    from skeleton.provider_runtime import (
+        OpenAIProviderAdapter as EngineOpenAIProviderAdapter,
+        ProviderRegistry as EngineProviderRegistry,
+        ProviderRequest as EngineProviderRequest,
+    )
+    from core.ai_provider import (
+        OpenAIProviderAdapter as BackendOpenAIProviderAdapter,
+        ProviderRegistry as BackendProviderRegistry,
+        ProviderRequest as BackendProviderRequest,
+    )
+
+    assert BackendOpenAIProviderAdapter is EngineOpenAIProviderAdapter
+    assert BackendProviderRegistry is EngineProviderRegistry
+    assert BackendProviderRequest is EngineProviderRequest
