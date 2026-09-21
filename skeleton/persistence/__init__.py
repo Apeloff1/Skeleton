@@ -23,6 +23,10 @@ from skeleton.persistence.operation_store import (
     SQLiteOperationStore,
     StoredOperation,
 )
+from skeleton.persistence.operation_runtime import (
+    DurableOperationRuntime,
+    OutboxDispatchReport,
+)
 from skeleton.persistence.snapshots import (
     SnapshotStore,
     restore_genesis_state,
@@ -50,6 +54,8 @@ __all__ = [
     "OperationStoreError",
     "SQLiteOperationStore",
     "StoredOperation",
+    "DurableOperationRuntime",
+    "OutboxDispatchReport",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",
