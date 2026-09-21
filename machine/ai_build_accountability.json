@@ -18625,11 +18625,11 @@
       "id": "ACC-AIQ-S0-GOV-03",
       "type": "queue_task",
       "title": "AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines.",
-      "status": "pending",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-21T17:52:22Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -18656,8 +18656,26 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-21T17:52:22Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T17:52:22Z",
+          "git_sha": "b62e1aa3a94511cf898f7084bd33fbca3722d6d6",
+          "statement": "Begin AIQ-S0-GOV-03 governance lifecycle observability and audit timeline integration.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/b62e1aa3a94511cf898f7084bd33fbca3722d6d6",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "machine/accountability_events/ACC-AIQ-S0-GOV-03/start.json"
+          ]
+        }
+      ],
       "evidence": [],
       "baseline_status": "pending"
     },
