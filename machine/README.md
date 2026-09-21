@@ -96,6 +96,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Security/fix wave:** 18 security, supervisor, workflow, shell, and hardening sources revalidated; existing integration PRs reused.
 
+- **Throughput/science wave:** throughput mechanics/forge/pipeline, Ubuntu delivery, inventory gates, and Jeeves science/cost sources revalidated; zero-file model-routing remains lineage-only.
+
 ## Target layout
 
 ```text
