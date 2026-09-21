@@ -101,21 +101,23 @@
       ]
     },
     {
-      "id": "operation-state-unbound",
-      "technology": "canonical OperationRecord state machine with persistence adapter not yet bound",
+      "id": "operation-state-sqlite",
+      "technology": "SQLite canonical operation repository plus transactional outbox",
       "runtime_service": null,
       "compose_file": null,
       "volumes": [],
-      "durability": "unbound",
-      "production_role": "not production-ready; logical authority contract only",
-      "network": "in-process contract",
+      "durability": "file-backed-when-configured; in-memory-by-default-reference",
+      "production_role": "reference authoritative operation state with atomic event-intent outbox",
+      "network": "in-process only",
       "authentication": "inherits orchestrator authority",
-      "backup": "unimplemented until durable repository is bound",
-      "restore": "unimplemented until durable repository is bound",
-      "migration": "future durable repository must preserve operation schema/state transition compatibility",
+      "backup": "required when selected as production operation authority",
+      "restore": "reopen database, verify identity digests/state/version, then resume unpublished outbox delivery",
+      "migration": "schema migration must preserve operation identity, monotonic state/version and deterministic outbox identity",
       "evidence": [
         "skeleton/contracts/operation.py",
-        "skeleton/testing/test_operation_contract.py"
+        "skeleton/persistence/operation_store.py",
+        "skeleton/testing/test_operation_contract.py",
+        "skeleton/testing/test_operation_store.py"
       ]
     },
     {
@@ -312,26 +314,28 @@
     {
       "id": "canonical-operation-state",
       "owner_plane": "orchestration",
-      "physical_store": "operation-state-unbound",
-      "logical_location": "OperationRecord / OperationState contract",
-      "authority": "authoritative-unbound",
+      "physical_store": "operation-state-sqlite",
+      "logical_location": "SQLite namespace operation_state / OperationEnvelope contract",
+      "authority": "conditional-authoritative",
       "source_of_truth": true,
-      "status": "transitional",
+      "status": "reference-durable",
       "data_classes": [
         "internal",
         "confidential"
       ],
-      "transaction_scope": "state-transition contract; durable transaction binding pending",
-      "consistency": "legal monotonic state transitions and terminal finality",
-      "retention": "must be defined by durable operation repository",
-      "backup_restore": "unimplemented until persistence binding",
-      "migration": "durable repository schema must preserve operation identity/idempotency/state",
+      "transaction_scope": "BEGIN IMMEDIATE operation transition plus transactional outbox intent",
+      "consistency": "legal monotonic state transitions, optimistic version fencing, terminal finality, idempotency identity and atomic outbox intent",
+      "retention": "operation/governance lifecycle controlled; durable deployment policy still required",
+      "backup_restore": "required when selected as production operation authority; reference reopen/recovery is tested",
+      "migration": "preserve operation identity digest, state/version monotonicity and unpublished outbox rows",
       "derived_from": [],
       "rebuildable": false,
-      "gap": "gap-streaming-protocol",
+      "gap": "gap-state-authority-convergence",
       "evidence": [
         "skeleton/contracts/operation.py",
-        "skeleton/testing/test_operation_contract.py"
+        "skeleton/persistence/operation_store.py",
+        "skeleton/testing/test_operation_contract.py",
+        "skeleton/testing/test_operation_store.py"
       ]
     },
     {
@@ -453,8 +457,8 @@
       "from": "canonical-operation-state",
       "to": "operation-event-stream",
       "mode": "event-log",
-      "rule": "event append and operation transition require a defined atomic/outbox/reconciliation contract; transport events may not invent operation state",
-      "failure": "if operation and event commit cannot be proven consistent, fail/degrade rather than report durable resumable success"
+      "rule": "operation state commits with a deterministic transactional outbox intent; a dispatcher appends the retry-stable outbox event to the canonical stream and acknowledges it only after durable stream acceptance",
+      "failure": "unpublished outbox rows remain recoverable work; transport events may not invent or advance operation state independently"
     },
     {
       "id": "authoritative-to-in-memory",
