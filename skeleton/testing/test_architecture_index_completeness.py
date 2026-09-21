@@ -241,18 +241,26 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     source_audit = architecture_index.RESEARCH_SOURCE_AUDIT_INVARIANTS
     automation = architecture_index.RESEARCH_AUTOMATION_INVARIANTS
     monitorability = architecture_index.MONITORABILITY_RESEARCH_INVARIANTS
+    debt = architecture_index.RESEARCH_DEBT_INVARIANTS
+    rigor = architecture_index.RESEARCH_EXPERIMENT_RIGOR_INVARIANTS
 
     assert tracks["AD"] == "research_saturation_replication_frontier_synthesis"
     assert checkpoint["tracks"] == ("AD",)
     assert checkpoint["research_conclusion_range"] == ("FR001", "FR114")
     assert checkpoint["research_question_range"] == ("RQ001", "RQ010")
+    assert checkpoint["source_verification_range"] == ("SV001", "SV050")
+    assert checkpoint["frontier_delta_range"] == ("FD001", "FD016")
+    assert checkpoint["contradiction_range"] == ("CX001", "CX024")
+    assert checkpoint["research_debt_range"] == ("RDE001", "RDE036")
     assert checkpoint["production_authority_granted"] is False
     assert checkpoint["research_refresh_required"] is True
 
     assert len(architecture_index.RESEARCH_CONCLUSION_IDS) == 114
     assert len(architecture_index.RESEARCH_QUESTION_IDS) == 10
-    assert len(architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS) == 36
-    assert len(architecture_index.FRONTIER_DELTA_IDS) == 10
+    assert len(architecture_index.RESEARCH_SOURCE_VERIFICATION_IDS) == 50
+    assert len(architecture_index.FRONTIER_DELTA_IDS) == 16
+    assert len(architecture_index.RESEARCH_CONTRADICTION_IDS) == 24
+    assert len(architecture_index.RESEARCH_DEBT_IDS) == 36
 
     assert invariants["research_source_is_evidence_not_authority"] is True
     assert invariants["contradictory_evidence_is_retained"] is True
@@ -275,6 +283,17 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert monitorability["monitorability_is_not_assumed_monotonic_with_capability"] is True
     assert monitorability["learned_detector_ood_generalization_is_not_assumed"] is True
 
+    assert debt["open_research_debt_is_visible"] is True
+    assert debt["paper_claim_alone_cannot_retire_local_debt"] is True
+    assert debt["failed_reproduction_is_retained"] is True
+    assert debt["production_claim_lists_dependent_open_debt"] is True
+
+    assert rigor["selection_and_tuning_budget_is_recorded"] is True
+    assert rigor["failed_and_diverged_runs_are_not_silently_dropped"] is True
+    assert rigor["baseline_receives_comparable_tuning_and_kernels"] is True
+    assert rigor["multiple_comparisons_are_recorded"] is True
+    assert rigor["single_seed_is_not_zero_uncertainty"] is True
+
 
 def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     from pathlib import Path
@@ -293,6 +312,11 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "**AD** — research saturation, replication, and frontier synthesis" in index
     assert "Source-status verification audit" in atlas
     assert "September 2026 frontier delta" in atlas
+    assert "Domain evidence matrix" in atlas
+    assert "Contradiction and tension ledger" in atlas
+    assert "Research debt ledger" in atlas
+    assert "Statistical and experimental rigor contract" in atlas
+    assert "Research freshness tiers" in atlas
 
     for finding_id in architecture_index.RESEARCH_CONCLUSION_IDS:
         assert finding_id in atlas
@@ -302,6 +326,10 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
         assert source_id in atlas
     for delta_id in architecture_index.FRONTIER_DELTA_IDS:
         assert delta_id in atlas
+    for contradiction_id in architecture_index.RESEARCH_CONTRADICTION_IDS:
+        assert contradiction_id in atlas
+    for debt_id in architecture_index.RESEARCH_DEBT_IDS:
+        assert debt_id in atlas
 
     assert "RExBench" in atlas and "WITHDRAWN" in atlas
     assert "ToolTweak" in atlas and "SUBMISSION" in atlas
@@ -311,3 +339,5 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "Data Mixture Optimization" in atlas and "NeurIPS 2025 Poster" in atlas
     assert "To Infinity and Beyond" in atlas and "ICLR 2026 Oral" in atlas
     assert "research agent cannot mark its own result reproduced" in atlas.lower()
+    assert "AD60. Debt retirement and reopening" in plan
+    assert "FD001–FD016" in plan
