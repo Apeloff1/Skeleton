@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Jeeves Level System UI — XP Tracker (1,000,000 cap)
  * Shows Jeeves' level, XP progress, interactions, vault learning stats
@@ -16,8 +17,8 @@ const API_BASE = (() => {
   if (typeof window !== 'undefined' && (window as any).location?.origin && !(window as any).location.origin.startsWith('file:')) {
     return (window as any).location.origin.replace(/\/+$/, '');
   }
-  return (Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL as string)
-    || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  return (Constants.CANONICAL_API_BASE as string)
+    || CANONICAL_API_BASE || '';
 })();
 
 interface JeevesLevelModalProps {

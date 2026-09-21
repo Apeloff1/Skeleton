@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Immersive Learning Modal v11.6
  * Interactive, Gamified Learning Experience
@@ -15,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 
 import { apiFetch } from '../../utils/apiController';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || CANONICAL_API_BASE || '';
 
 interface ImmersiveLearningModalProps {
   visible: boolean;

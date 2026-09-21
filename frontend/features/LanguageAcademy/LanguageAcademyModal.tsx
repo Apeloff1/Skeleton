@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Language Academy — 451+ programming language classes browser
  */
@@ -6,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, FlatList, A
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const CAT_COLORS: Record<string, string> = {
   mainstream: '#3B82F6', emerging: '#10B981', niche: '#F59E0B',

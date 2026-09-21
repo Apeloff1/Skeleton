@@ -1,3 +1,4 @@
+import { API_BASE as CANONICAL_API_BASE } from '../../utils/apiBase';
 /**
  * Hyperscale Leaderboard Hub — 10 boards, time ranges, tier system
  */
@@ -6,7 +7,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIn
 import { Ionicons } from '@expo/vector-icons';
 
 import { apiFetch } from '../../utils/apiController';
-const API = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API = CANONICAL_API_BASE || '';
 
 const TIME_RANGES = [
   { id: 'all_time', label: 'All Time' },
