@@ -16,7 +16,7 @@ CATALOG = ROOT / "machine" / "ai_edge_case_catalog.json"
 PRIORITY = ROOT / "machine" / "ai_edge_case_priority_queue.json"
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-CHECK_RE = re.compile(r"^- \\[( |x)\\] `(ACC-[^`]+)`", re.MULTILINE)
+CHECK_RE = re.compile(r"^- \[( |x)\] `(ACC-[^`]+)`", re.MULTILINE)
 ALLOWED_SIGNER_TYPES = {"human", "agent", "ci", "service"}
 ALLOWED_SIGNATURE_METHODS = {
     "github_identity",
