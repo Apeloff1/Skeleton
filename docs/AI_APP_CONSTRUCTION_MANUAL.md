@@ -2768,3 +2768,47 @@ The state topology now reserves authoritative-unbound domains for the cognitive 
 7. Run crash injection, duplicate-side-effect protection, reconnect/slow-client tests and cross-plane golden journeys.
 
 The P0 gap remains open until the final stage has executable evidence.
+
+## Fully Functional AI Closure: Canonical Conversation State
+
+Multi-turn AI is not functionally complete if the browser supplies the transcript on every request. Canonical conversation continuity is server-owned product state.
+
+### Authority model
+
+The backend owns `ConversationThread` and `ConversationMessage`. The client submits a `thread_id`, the new user message, and an idempotency key. The server authorizes the thread, loads the canonical message projection, assembles context, launches the cognitive execution, and commits the assistant message from the resulting `AIExecutionResult`.
+
+Legacy `/ai/chat` `conversation_history` is compatibility-only after the canonical APIs land. It may be displayed or imported through a governed workflow, but it cannot silently become authoritative history merely because a caller sends it.
+
+### Thread/message invariants
+
+- thread identity is bound to tenant and owning principal;
+- messages are immutable after commit;
+- edits create a new message that supersedes the old message;
+- regeneration creates a sibling assistant branch rather than overwriting history;
+- message ordering is monotonic and fenced by thread version/exact-next sequence;
+- duplicate client retries reuse the same idempotency result;
+- assistant messages reference the causal operation and terminal/qualified execution result;
+- tool messages reference durable tool receipts/results;
+- system/product policy is injected separately and is never user-editable transcript content.
+
+### Context projection
+
+Prompt context is derived from the active authorized branch, durable summaries, relevant recent messages, authorized attachments/artifacts, memory, retrieval evidence, and current execution tool results. Token trimming affects only the projection; it never mutates the stored transcript.
+
+Conversation summaries are derived state with source message IDs and a source version. A stale summary is regenerated or ignored, never used to rewrite canonical messages.
+
+### Branching
+
+Edit and regenerate are causal branches. The active branch is a projection choice, not a destructive rewrite. Historical tool/action receipts remain immutable across branch selection so audit and replay retain the truth of what actually happened.
+
+### Governance
+
+Conversation deletion, export and retention are first-class governance operations. Delete propagates to message content references, derived summaries, permitted indexes and memory proposals according to policy. Export preserves ordered canonical messages, branch lineage and referenced artifacts/receipts that the requester is authorized to receive.
+
+### API target
+
+The canonical surface is versioned under `/api/v1/conversations`: create/read thread, append/read messages, edit, regenerate and delete. The frontend thread cache is rebuildable from these APIs plus replayable operation events.
+
+### Closure evidence
+
+P0 closure requires multi-turn continuation, tenant/thread isolation, duplicate-submit idempotency, concurrent append ordering, edit/regenerate lineage, operation/result binding, deletion/export propagation, context-provenance preservation, and browser refresh/reconnect reconstruction tests.
