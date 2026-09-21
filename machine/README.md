@@ -100,6 +100,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Control-plane/builder wave:** builder, repair receipts, durable checkpoints, squads, supervisor, backlog reasoning, and automerge sources revalidated; #1873/#1874 created for newly staged deltas.
 
+- **Security/reliability contracts:** repair intake, repo contracts/bots, archive/import safety, and secret-scan sources revalidated; existing integration PRs reused. Three older branch comparisons need another pass.
+
 ## Target layout
 
 ```text
