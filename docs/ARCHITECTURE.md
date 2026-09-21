@@ -248,7 +248,7 @@ single learned judge is treated as truth.
 Canonical navigation for this layer:
 
 - [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md) — master human index and authority order;
-- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–AB construction sequence;
+- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–AC construction sequence;
 - [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md) — scientific evidence, experiment, and promotion contract;
 - [architecture/research-source-catalog.md](architecture/research-source-catalog.md) — historical/frontier research canon and anti-canon;
 - [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
@@ -266,3 +266,20 @@ The scientific/optimizer plan is subordinate to the frontier hardening invariant
 A subsystem may be a useful research prototype while an applicable P0 hostile-audit gap is open, but it cannot claim production-grade status. Production claims require representation identity, data lineage, unified artifact identity, state-compatible rollback, eval isolation, authenticated principals, execution containment, supply-chain verification, declared storage semantics, stale-writer rejection, secret containment, verified recovery, protected control-plane capacity, immutable config identity, safe unknown-outcome reconciliation, deletion propagation, poisoning resistance, safe artifact loading, tamper-evident authority history, and a tested safe mode.
 
 This rule exists to prevent capability work from outrunning the substrate required to operate it safely and reproducibly.
+
+
+### Exotic architecture laboratory
+
+Track AC is a quarantined research plane for architecture families that challenge current assumptions rather than merely optimize them.
+
+Current candidate classes include test-time neural memory, dynamic byte-latent modeling, diffusion/non-autoregressive generation, recurrent latent depth, fixed-point/equilibrium computation, conditional depth, differential attention, native ternary weights, fully sparse activations, cross-layer shared sparse routing, latent multimodal modeling, reversible blocks, fast weights, generated adapters, world-model planning, graph-native computation, event-driven/neuromorphic substrates and bounded architecture synthesis.
+
+This plane does not weaken authority boundaries:
+
+- mutable inference-time neural state is not durable trusted memory;
+- tentative diffusion/revision/speculative generations are not committed outputs;
+- exotic candidates cannot execute privileged side effects from uncommitted states;
+- architecture-search results cannot self-promote;
+- compound architectures require component ablation;
+- Track AB P0 invariants remain binding;
+- a candidate must graduate through the Track AA full-stack promotion path before production consideration.
