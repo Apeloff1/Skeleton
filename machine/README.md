@@ -130,6 +130,8 @@ Target: **one coherent application** for human maintenance and automated machine
 
 - **Feature wave:** revalidated 46 feature branches. Existing integration PRs cover meaningful staged deltas; zero-file branches remain lineage. Large shell, PR-runner, Jeeves topology, and physics families remain held for reconciliation.
 
+- **Merge wave:** two merge snapshots audited; both are held for controlled reconciliation (115 and 150 files) rather than blindly merged.
+
 ## Target layout
 
 ```text
