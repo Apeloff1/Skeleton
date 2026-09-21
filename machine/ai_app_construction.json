@@ -355,7 +355,7 @@
     {
       "id": "orchestration",
       "owner": "skeleton/intelligence",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Task decomposition, plan execution, agent coordination and workflow state transitions.",
       "depends_on": [
         "foundation",
@@ -712,7 +712,7 @@
     {
       "id": "application-api",
       "owner": "backend",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Product/business API, canonical control plane and application workflows.",
       "depends_on": [
         "identity",
