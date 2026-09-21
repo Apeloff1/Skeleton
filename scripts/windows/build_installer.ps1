@@ -122,8 +122,8 @@ Write-Host "==> Compiling Windows setup executable with $Iscc"
 $InnoArgs = @(
     "/DAppVersion=$Version",
     "/DVersionInfoVersion=$VersionInfoVersion",
-    "/DPayloadDir=`"$PayloadDir`"",
-    "/DOutputDir=`"$OutputDir`"",
+    "/DPayloadDir=$PayloadDir",
+    "/DOutputDir=$OutputDir",
     $InstallerScript
 )
 & $Iscc @InnoArgs
