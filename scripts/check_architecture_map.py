@@ -486,6 +486,334 @@ def _validate_top_level_policy(
     return count
 
 
+
+def _path_is_within(path: str, root: str) -> bool:
+    return path == root or path.startswith(root + "/")
+
+
+def _validate_structural_blueprint(
+    architecture: dict[str, Any],
+    zones: dict[str, dict[str, Any]],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    blueprint = architecture.get("structural_blueprint")
+    if not isinstance(blueprint, dict):
+        errors.append("structural_blueprint must be an object")
+        return {}
+
+    if blueprint.get("schema_version") != 1:
+        errors.append("structural_blueprint.schema_version must be exactly 1")
+    structure_tag = blueprint.get("structure_tag")
+    if not isinstance(structure_tag, str) or not structure_tag.startswith("structure-map/"):
+        errors.append("structural_blueprint.structure_tag must start with 'structure-map/'")
+
+    levels = blueprint.get("levels")
+    if not isinstance(levels, list):
+        errors.append("structural_blueprint.levels must be a list")
+        levels = []
+    level_ids: list[str] = []
+    for index, level in enumerate(levels):
+        label = f"structural_blueprint.levels[{index}]"
+        if not isinstance(level, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        level_id = level.get("id")
+        if not isinstance(level_id, str) or not level_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if level_id in level_ids:
+            errors.append(f"duplicate structural level: {level_id}")
+        level_ids.append(level_id)
+        for key in ("name", "unit", "rule"):
+            if not isinstance(level.get(key), str) or not level[key].strip():
+                errors.append(f"{label}.{key} must be non-empty")
+    if level_ids != ["L0", "L1", "L2", "L3", "L4"]:
+        errors.append("structural_blueprint.levels must declare L0 through L4 in order")
+
+    required_rules = (
+        "plane_owner_must_materialize",
+        "plane_owner_must_be_inside_assigned_zone",
+        "construction_plane_must_be_placed_exactly_once",
+        "cross_zone_plane_dependency_must_follow_zone_dag",
+        "transitional_root_may_not_own_plane",
+        "composition_roots_may_wire_but_not_redefine_capability_ownership",
+        "state_class_has_single_authority",
+    )
+    rules = blueprint.get("dependency_rules")
+    if not isinstance(rules, dict):
+        errors.append("structural_blueprint.dependency_rules must be an object")
+        rules = {}
+    for key in required_rules:
+        if rules.get(key) is not True:
+            errors.append(f"structural_blueprint.dependency_rules.{key} must be true")
+
+    construction = architecture.get("construction")
+    if not isinstance(construction, dict):
+        errors.append("construction must be an object for structural blueprint validation")
+        return {}
+    try:
+        contract_path = _normalized_repo_path(construction.get("contract"))
+        contract = _load_json(repo_root / contract_path)
+    except ValueError as exc:
+        errors.append(f"structural blueprint construction contract: {exc}")
+        return {}
+
+    raw_planes = contract.get("planes")
+    if not isinstance(raw_planes, list):
+        errors.append("construction contract planes must be a list")
+        raw_planes = []
+    planes: dict[str, dict[str, Any]] = {}
+    for index, plane in enumerate(raw_planes):
+        if not isinstance(plane, dict):
+            errors.append(f"construction planes[{index}] must be an object")
+            continue
+        plane_id = plane.get("id")
+        if not isinstance(plane_id, str) or not plane_id:
+            errors.append(f"construction planes[{index}].id must be non-empty")
+            continue
+        if plane_id in planes:
+            errors.append(f"duplicate construction plane: {plane_id}")
+            continue
+        planes[plane_id] = plane
+
+    policy = architecture.get("top_level_policy")
+    transitional: list[str] = []
+    if isinstance(policy, dict):
+        values = policy.get("transitional_roots")
+        if isinstance(values, list):
+            for raw in values:
+                try:
+                    transitional.append(_normalized_repo_path(raw))
+                except ValueError as exc:
+                    errors.append(f"top_level_policy.transitional_roots: {exc}")
+
+    placements_raw = blueprint.get("plane_placements")
+    if not isinstance(placements_raw, list):
+        errors.append("structural_blueprint.plane_placements must be a list")
+        placements_raw = []
+    placements: dict[str, dict[str, Any]] = {}
+    for index, placement in enumerate(placements_raw):
+        label = f"structural_blueprint.plane_placements[{index}]"
+        if not isinstance(placement, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        plane_id = placement.get("plane")
+        if not isinstance(plane_id, str) or not plane_id:
+            errors.append(f"{label}.plane must be non-empty")
+            continue
+        if plane_id in placements:
+            errors.append(f"duplicate plane placement: {plane_id}")
+            continue
+        placements[plane_id] = placement
+        plane = planes.get(plane_id)
+        if plane is None:
+            errors.append(f"plane placement references unknown construction plane: {plane_id}")
+            continue
+        zone_id = placement.get("zone")
+        if not isinstance(zone_id, str) or zone_id not in zones:
+            errors.append(f"plane placement {plane_id} references unknown zone: {zone_id}")
+            continue
+        owner = placement.get("owner")
+        try:
+            owner_path = _normalized_repo_path(owner)
+        except ValueError as exc:
+            errors.append(f"plane placement {plane_id}.owner: {exc}")
+            continue
+        if owner_path != plane.get("owner"):
+            errors.append(
+                f"plane placement {plane_id} owner {owner_path} does not match "
+                f"construction owner {plane.get('owner')}"
+            )
+        owner_abs = repo_root / owner_path
+        if not owner_abs.exists():
+            errors.append(f"plane placement {plane_id} owner is missing: {owner_path}")
+        unit_type = placement.get("unit_type")
+        if unit_type not in {"module", "package"}:
+            errors.append(f"plane placement {plane_id}.unit_type must be module or package")
+        elif unit_type == "module" and owner_abs.exists() and not owner_abs.is_file():
+            errors.append(f"plane placement {plane_id} declares module but owner is not a file")
+        elif unit_type == "package" and owner_abs.exists() and not owner_abs.is_dir():
+            errors.append(f"plane placement {plane_id} declares package but owner is not a directory")
+
+        zone_roots: list[str] = []
+        for raw_root in zones[zone_id].get("roots", []):
+            try:
+                zone_roots.append(_normalized_repo_path(raw_root))
+            except ValueError:
+                continue
+        if not any(_path_is_within(owner_path, root) for root in zone_roots):
+            errors.append(
+                f"plane placement {plane_id} owner {owner_path} is outside zone {zone_id}"
+            )
+        if any(_path_is_within(owner_path, root) for root in transitional):
+            errors.append(
+                f"plane placement {plane_id} illegally uses transitional owner {owner_path}"
+            )
+        for key in ("boundary_class", "exposure"):
+            if not isinstance(placement.get(key), str) or not placement[key].strip():
+                errors.append(f"plane placement {plane_id}.{key} must be non-empty")
+
+    missing_placements = sorted(set(planes) - set(placements))
+    extra_placements = sorted(set(placements) - set(planes))
+    if missing_placements:
+        errors.append(
+            "construction planes missing structural placement: "
+            + ", ".join(missing_placements)
+        )
+    if extra_placements:
+        errors.append(
+            "structural placements without construction planes: "
+            + ", ".join(extra_placements)
+        )
+
+    for plane_id, plane in planes.items():
+        source = placements.get(plane_id)
+        if source is None:
+            continue
+        source_zone = source.get("zone")
+        for dependency in plane.get("depends_on", []):
+            target = placements.get(dependency)
+            if target is None:
+                continue
+            target_zone = target.get("zone")
+            if source_zone == target_zone:
+                continue
+            allowed = zones.get(source_zone, {}).get("may_depend_on", [])
+            if target_zone not in allowed:
+                errors.append(
+                    f"cross-zone plane dependency {plane_id}({source_zone}) -> "
+                    f"{dependency}({target_zone}) is not allowed by zone DAG"
+                )
+
+    roots_raw = blueprint.get("composition_roots")
+    if not isinstance(roots_raw, list):
+        errors.append("structural_blueprint.composition_roots must be a list")
+        roots_raw = []
+    composition_ids: set[str] = set()
+    composition_paths: set[str] = set()
+    for index, root in enumerate(roots_raw):
+        label = f"structural_blueprint.composition_roots[{index}]"
+        if not isinstance(root, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        root_id = root.get("id")
+        if not isinstance(root_id, str) or not root_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if root_id in composition_ids:
+            errors.append(f"duplicate composition root id: {root_id}")
+        composition_ids.add(root_id)
+        try:
+            path = _normalized_repo_path(root.get("path"))
+        except ValueError as exc:
+            errors.append(f"{label}.path: {exc}")
+            continue
+        if path in composition_paths:
+            errors.append(f"duplicate composition root path: {path}")
+        composition_paths.add(path)
+        if not (repo_root / path).is_file():
+            errors.append(f"composition root {root_id} must be a materialized file: {path}")
+        zone_id = root.get("zone")
+        if not isinstance(zone_id, str) or zone_id not in zones:
+            errors.append(f"composition root {root_id} references unknown zone: {zone_id}")
+        else:
+            zone_roots = [
+                str(raw) for raw in zones[zone_id].get("roots", []) if isinstance(raw, str)
+            ]
+            if not any(_path_is_within(path, zr) for zr in zone_roots):
+                errors.append(f"composition root {root_id} path {path} is outside zone {zone_id}")
+        if not isinstance(root.get("responsibility"), str) or not root["responsibility"].strip():
+            errors.append(f"composition root {root_id}.responsibility must be non-empty")
+
+    authorities_raw = blueprint.get("state_authorities")
+    if not isinstance(authorities_raw, list):
+        errors.append("structural_blueprint.state_authorities must be a list")
+        authorities_raw = []
+    state_names: set[str] = set()
+    for index, authority in enumerate(authorities_raw):
+        label = f"structural_blueprint.state_authorities[{index}]"
+        if not isinstance(authority, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        state = authority.get("state")
+        plane_id = authority.get("plane")
+        owner = authority.get("owner")
+        if not isinstance(state, str) or not state:
+            errors.append(f"{label}.state must be non-empty")
+            continue
+        if state in state_names:
+            errors.append(f"duplicate state authority: {state}")
+        state_names.add(state)
+        if plane_id not in planes:
+            errors.append(f"state authority {state} references unknown plane: {plane_id}")
+            continue
+        if owner != planes[plane_id].get("owner"):
+            errors.append(
+                f"state authority {state} owner {owner} does not match plane "
+                f"{plane_id} owner {planes[plane_id].get('owner')}"
+            )
+
+    recovery_raw = blueprint.get("recovery_domains")
+    if not isinstance(recovery_raw, list):
+        errors.append("structural_blueprint.recovery_domains must be a list")
+        recovery_raw = []
+    recovery_ids: set[str] = set()
+    recovered_planes: dict[str, str] = {}
+    for index, domain in enumerate(recovery_raw):
+        label = f"structural_blueprint.recovery_domains[{index}]"
+        if not isinstance(domain, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        domain_id = domain.get("id")
+        if not isinstance(domain_id, str) or not domain_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if domain_id in recovery_ids:
+            errors.append(f"duplicate recovery domain: {domain_id}")
+        recovery_ids.add(domain_id)
+        domain_planes = domain.get("planes")
+        if not isinstance(domain_planes, list) or not domain_planes:
+            errors.append(f"recovery domain {domain_id}.planes must be non-empty")
+            continue
+        for plane_id in domain_planes:
+            if plane_id not in planes:
+                errors.append(
+                    f"recovery domain {domain_id} references unknown plane: {plane_id}"
+                )
+                continue
+            prior = recovered_planes.get(plane_id)
+            if prior is not None:
+                errors.append(
+                    f"construction plane {plane_id} belongs to multiple recovery domains: "
+                    f"{prior}, {domain_id}"
+                )
+            else:
+                recovered_planes[plane_id] = domain_id
+        for key in ("restart_scope", "degraded_mode"):
+            if not isinstance(domain.get(key), str) or not domain[key].strip():
+                errors.append(f"recovery domain {domain_id}.{key} must be non-empty")
+    missing_recovery = sorted(set(planes) - set(recovered_planes))
+    if missing_recovery:
+        errors.append(
+            "construction planes missing recovery domain: " + ", ".join(missing_recovery)
+        )
+
+    invariants = blueprint.get("invariants")
+    if not isinstance(invariants, list) or not invariants or any(
+        not isinstance(item, str) or not item.strip() for item in invariants
+    ):
+        errors.append("structural_blueprint.invariants must be a non-empty string list")
+
+    return {
+        "levels": len(level_ids),
+        "plane_placements": len(placements),
+        "composition_roots": len(composition_ids),
+        "state_authorities": len(state_names),
+        "recovery_domains": len(recovery_ids),
+    }
+
+
 def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[str, Any]]:
     errors: list[str] = []
     architecture_path = repo_root / ARCHITECTURE_PATH
@@ -513,6 +841,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
     _validate_interfaces(architecture, nodes, roots, repo_root, errors)
     _validate_change_routing(architecture, roots, errors)
     top_level_paths = _validate_top_level_policy(architecture, repo_root, errors)
+    structure = _validate_structural_blueprint(architecture, zones, repo_root, errors)
 
     summary = {
         "ok": not errors,
@@ -527,6 +856,7 @@ def validate_architecture(repo_root: Path = REPO_ROOT) -> tuple[list[str], dict[
         if isinstance(architecture.get("interfaces"), list)
         else 0,
         "top_level_paths": top_level_paths,
+        "structure": structure,
         "errors": errors,
     }
     return errors, summary
@@ -563,6 +893,8 @@ def main(argv: list[str] | None = None) -> int:
             f"nodes={summary['runtime_nodes']}; "
             f"interfaces={summary['interfaces']}; "
             f"top-level={summary['top_level_paths']}; "
+            f"placements={summary['structure'].get('plane_placements', 0)}; "
+            f"recovery-domains={summary['structure'].get('recovery_domains', 0)}; "
             f"zone-order={zone_order}; "
             f"runtime-order={order})"
         )
