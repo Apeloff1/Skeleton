@@ -31,6 +31,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["exotic_architecture_lab"] == "docs/architecture/exotic-architecture-lab.md"
     assert documents["frontier_research_atlas"] == "docs/architecture/frontier-research-atlas-2026.md"
     assert documents["frontier_research_experiment_protocols"] == "docs/architecture/frontier-research-experiment-protocols-2026.md"
+    assert documents["research_saturation_checklist"] == "docs/architecture/research-saturation-checklist-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -390,3 +391,30 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "AD60. Debt retirement and reopening" in plan
     assert "AD65. Research experiment sequencing" in plan
     assert "FD001–FD021" in plan
+
+
+def test_research_saturation_accountability_distinguishes_planning_from_reproduction() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY"
+    ]
+
+    assert checkpoint["tracks"] == ("AD",)
+    assert checkpoint["domain_count"] == 19
+    assert checkpoint["planning_status"] == "planning_covered"
+    assert checkpoint["local_reproduction_status"] == "reproduction_pending"
+    assert checkpoint["production_authority_granted"] is False
+    assert checkpoint["signoff_required_for_reproduction_claims"] is True
+    assert checkpoint["signoff_required_for_production_claims"] is True
+
+    root = Path(__file__).resolve().parents[2]
+    checklist = (
+        root / "docs" / "architecture" / "research-saturation-checklist-2026.md"
+    ).read_text(encoding="utf-8")
+
+    assert "PLANNING_COVERED" in checklist
+    assert "REPRODUCTION_PENDING" in checklist
+    assert "No domain in this checklist is upgraded to production evidence" in checklist
+    assert "signoff_required_for_reproduction_claims: true" in checklist
+    assert "signoff_required_for_production_claims: true" in checklist
