@@ -87,39 +87,53 @@
     {
       "id": "operation-stream-sqlite",
       "technology": "SQLite",
-      "runtime_service": null,
-      "compose_file": null,
-      "volumes": [],
-      "durability": "file-backed-when-configured; in-memory-by-default-reference",
-      "production_role": "transport-neutral durable operation-stream reference/conformance store",
+      "runtime_service": "skeleton",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "skeleton_data"
+      ],
+      "durability": "persistent named volume in Compose via /app/data; in-memory only when explicitly left at local/test defaults",
+      "production_role": "durable resumable operation-event transport/projection driven from canonical operation transactional outbox",
       "network": "in-process only",
       "authentication": "inherits owning process authority",
-      "backup": "required only if selected as production operation-event authority",
-      "restore": "reopen database and preserve exact-next sequence, compaction watermark, terminal fence",
-      "migration": "schema migration required before changing durable event/head tables",
+      "backup": "preserve with skeleton_data when resume history is required; operation state remains the authoritative lifecycle owner",
+      "restore": "reopen operation_stream.sqlite, preserve sequence/terminal/consumer watermarks, then reconcile any unpublished operation outbox rows",
+      "migration": "schema migration must preserve event identity, sequence, terminal fences, consumer acknowledgements and replay-gap semantics",
       "evidence": [
         "skeleton/frontier/operation_stream_store.py",
-        "skeleton/testing/test_operation_stream_store.py"
+        "skeleton/testing/test_operation_stream_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py"
       ]
     },
     {
       "id": "operation-state-sqlite",
       "technology": "SQLite canonical operation repository plus transactional outbox",
-      "runtime_service": null,
-      "compose_file": null,
-      "volumes": [],
-      "durability": "file-backed-when-configured; in-memory-by-default-reference",
-      "production_role": "reference authoritative operation state with atomic event-intent outbox",
+      "runtime_service": "skeleton",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "skeleton_data"
+      ],
+      "durability": "persistent named volume in Compose via /app/data; in-memory only when explicitly left at local/test defaults",
+      "production_role": "authoritative Skeleton operation-state repository with transactional event-intent outbox",
       "network": "in-process only",
       "authentication": "inherits orchestrator authority",
-      "backup": "required when selected as production operation authority",
-      "restore": "reopen database, verify identity digests/state/version, then resume unpublished outbox delivery",
-      "migration": "schema migration must preserve operation identity, monotonic state/version and deterministic outbox identity",
+      "backup": "required with skeleton_data when this binding is used for production; formal restore rehearsal remains open",
+      "restore": "reopen operation_state.sqlite, validate operation identity/state/version, then drain unpublished outbox rows before serving dependent operation traffic",
+      "migration": "schema migration must preserve operation identity, state/version monotonicity, terminal fences and deterministic unpublished outbox identity",
       "evidence": [
         "skeleton/contracts/operation.py",
         "skeleton/persistence/operation_store.py",
         "skeleton/testing/test_operation_contract.py",
-        "skeleton/testing/test_operation_store.py"
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py"
       ]
     },
     {
@@ -340,18 +354,18 @@
       "owner_plane": "orchestration",
       "physical_store": "operation-state-sqlite",
       "logical_location": "SQLite namespace operation_state / OperationEnvelope contract",
-      "authority": "conditional-authoritative",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "reference-durable",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
       ],
       "transaction_scope": "BEGIN IMMEDIATE operation transition plus transactional outbox intent",
-      "consistency": "legal monotonic state transitions, optimistic version fencing, terminal finality, idempotency identity and atomic outbox intent",
-      "retention": "operation/governance lifecycle controlled; durable deployment policy still required",
-      "backup_restore": "required when selected as production operation authority; reference reopen/recovery is tested",
-      "migration": "preserve operation identity digest, state/version monotonicity and unpublished outbox rows",
+      "consistency": "legal monotonic OperationEnvelope transitions with optimistic version fencing, terminal finality, idempotency identity and same-transaction outbox intent; live /intelligence/reason uses DurableOperationRuntime",
+      "retention": "operation/governance lifecycle controlled; mounted persistence exists while formal backup/retention rehearsal remains STATE-03 work",
+      "backup_restore": "persistent Compose binding and SQLite reopen/restart reconciliation are implemented; full operator backup/restore rehearsal remains required",
+      "migration": "preserve operation identity digest, state/version monotonicity, terminal status and unpublished outbox rows",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-state-authority-convergence",
@@ -359,7 +373,12 @@
         "skeleton/contracts/operation.py",
         "skeleton/persistence/operation_store.py",
         "skeleton/testing/test_operation_contract.py",
-        "skeleton/testing/test_operation_store.py"
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py"
       ]
     },
     {
@@ -367,25 +386,29 @@
       "owner_plane": "streaming-realtime",
       "physical_store": "operation-stream-sqlite",
       "logical_location": "SQLite namespace operation_stream",
-      "authority": "conditional-authoritative",
-      "source_of_truth": true,
-      "status": "reference",
+      "authority": "durable-projection",
+      "source_of_truth": false,
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
       ],
       "transaction_scope": "BEGIN IMMEDIATE append/head/compaction transaction",
-      "consistency": "exact-next monotonic sequence; duplicate identity conflict rejection; terminal finality",
-      "retention": "compaction-watermark controlled",
-      "backup_restore": "required if selected as production stream authority; otherwise conformance/reference only",
-      "migration": "schema migration + protocol conformance required",
+      "consistency": "durable exact-next resumable projection of committed operation outbox intents; stream delivery never advances canonical operation state",
+      "retention": "consumer-watermark/compaction controlled; retain to satisfy resume policy",
+      "backup_restore": "persistent Compose binding is implemented; reopen preserves replay semantics and startup reconciliation drains unpublished operation outbox rows",
+      "migration": "preserve event IDs, sequence, terminal fence, replay watermark and consumer acknowledgements",
       "derived_from": [
         "canonical-operation-state"
       ],
       "rebuildable": false,
       "evidence": [
         "skeleton/frontier/operation_stream_store.py",
-        "skeleton/frontier/operation_stream.py"
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py"
       ]
     },
     {
@@ -725,8 +748,8 @@
       "from": "canonical-operation-state",
       "to": "operation-event-stream",
       "mode": "event-log",
-      "rule": "operation state commits with a deterministic transactional outbox intent; a dispatcher appends the retry-stable outbox event to the canonical stream and acknowledges it only after durable stream acceptance",
-      "failure": "unpublished outbox rows remain recoverable work; transport events may not invent or advance operation state independently"
+      "rule": "production Skeleton reasoning commits OperationEnvelope state plus deterministic outbox intent atomically; DurableOperationRuntime publishes the retry-stable event and acknowledges only after durable stream acceptance",
+      "failure": "stream publication failure leaves canonical state committed and the outbox pending; startup/next dispatch reconciles it idempotently, including crash-after-append-before-ack"
     },
     {
       "id": "authoritative-to-in-memory",
@@ -890,6 +913,9 @@
     "canonical user/tenant AI memory is durable document state; vector, MAG, CAG and process-memory representations are never its sole authority",
     "memory restore precedes semantic/vector/cache projection rebuild",
     "vector similarity never widens tenant/user/namespace memory authority",
-    "Jeeves learning sessions, user progress, co-coding ownership/state and feedback are Mongo-authoritative; Chroma is projection-only"
+    "Jeeves learning sessions, user progress, co-coding ownership/state and feedback are Mongo-authoritative; Chroma is projection-only",
+    "production Skeleton reasoning persists OperationEnvelope state before executing/advancing work and never treats the event stream as operation-state authority",
+    "stream delivery failure leaves a durable unpublished outbox row; startup and later dispatch reconcile it using retry-stable event identity",
+    "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage"
   ]
 }
