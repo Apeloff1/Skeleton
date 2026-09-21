@@ -77,9 +77,15 @@
         "/api/v1 versioning",
         "health/live",
         "health/ready",
-        "engine operation contracts"
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay"
       ],
-      "target_failure_contract": "engine-specific typed failure",
+      "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
         "clean build",
         "compose config",
@@ -90,9 +96,15 @@
       "target_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "acceptance_target:deployment-release->product-experience",
@@ -748,9 +760,15 @@
         "/api/v1 versioning",
         "health/live",
         "health/ready",
-        "engine operation contracts"
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay"
       ],
-      "target_failure_contract": "engine-specific typed failure",
+      "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
         "clean build",
         "compose config",
@@ -761,9 +779,15 @@
       "target_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:deployment-release->evaluation",
@@ -926,14 +950,20 @@
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
       "target_acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
         "tenant isolation tests"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:engine-api->memory",
@@ -958,7 +988,13 @@
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -966,7 +1002,7 @@
         "replay",
         "corruption recovery"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:engine-api->observability",
@@ -992,14 +1028,20 @@
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
       "target_acceptance": [
         "trace continuity tests",
         "redaction tests",
         "SLO dashboard/evidence"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:engine-api->orchestration",
@@ -1031,7 +1073,13 @@
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
       "target_acceptance": [
         "resume tests",
@@ -1070,7 +1118,13 @@
       "source_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
       "target_acceptance": [
         "recall/precision eval",
@@ -1078,7 +1132,7 @@
         "ACL leakage tests",
         "freshness invalidation"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:evaluation->observability",
@@ -2222,9 +2276,15 @@
         "/api/v1 versioning",
         "health/live",
         "health/ready",
-        "engine operation contracts"
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay"
       ],
-      "target_failure_contract": "engine-specific typed failure",
+      "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
         "typecheck",
         "web export",
@@ -2235,9 +2295,15 @@
       "target_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
-      "status": "present"
+      "status": "partial"
     },
     {
       "id": "runtime_dependency:product-experience->identity",
@@ -2978,9 +3044,15 @@
         "/api/v1 versioning",
         "health/live",
         "health/ready",
-        "engine operation contracts"
+        "engine operation contracts",
+        "AI execution submit",
+        "AI execution status/result",
+        "AI execution cancel",
+        "delegated authority envelope",
+        "idempotent service command",
+        "operation event replay"
       ],
-      "target_failure_contract": "engine-specific typed failure",
+      "target_failure_contract": "typed unavailable/denied/conflict response with no local backend provider fallback",
       "source_acceptance": [
         "slow client",
         "disconnect/reconnect",
@@ -2989,7 +3061,13 @@
       "target_acceptance": [
         "route collision gate",
         "liveness/readiness",
-        "version compatibility tests"
+        "version compatibility tests",
+        "backend-engine auth test",
+        "delegated authority test",
+        "execution idempotency test",
+        "cancel/result fencing test",
+        "engine outage degraded-readiness test",
+        "process credential ownership test"
       ],
       "status": "partial"
     },
