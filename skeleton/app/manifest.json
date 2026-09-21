@@ -41,7 +41,7 @@
     "contract": "machine/architecture.json",
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
-    "tag": "arch-map/v3.1"
+    "tag": "arch-map/v3.2"
   },
   "runtime": {
     "required_env": [
@@ -162,7 +162,11 @@
     "skeleton/vault/data_governance.py",
     "skeleton/intelligence/admission.py",
     "skeleton/testing/test_data_governance.py",
-    "skeleton/testing/test_cost_admission.py"
+    "skeleton/testing/test_cost_admission.py",
+    "backend/tests/test_ai_provider_media.py",
+    "backend/routes/image_generation.py",
+    "backend/routes/ai_reader.py",
+    "backend/core/expressive_tts.py"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -172,6 +176,7 @@
     "provider_activation_boundary": "backend/core/ai_provider.py",
     "provider_architecture_loader": "skeleton/provider_contract.py",
     "provider_architecture_compatibility_loader": "backend/core/provider_architecture.py",
-    "construction_version": "3.1.0"
+    "construction_version": "3.2.0",
+    "provider_runtime_boundary": "skeleton/provider_runtime.py"
   }
 }
