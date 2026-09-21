@@ -369,13 +369,13 @@ Track AD does not create a second research authority. It operationalizes Track Q
 
 The 2026-09-21 atlas currently defines:
 
-- **FR001–FR114** — scoped research conclusions;
-- **RQ001–RQ067** — unresolved frontier questions;
-- **SV001–SV066** — verified source/status records;
-- **FD001–FD026** — post-freeze frontier-delta findings;
+- **FR001–FR144** — scoped research conclusions;
+- **RQ001–RQ082** — unresolved frontier questions;
+- **SV001–SV072** — verified source/status records;
+- **FD001–FD031** — post-freeze frontier-delta findings;
 - **CX001–CX024** — explicit research contradictions/tensions;
-- **RDE001–RDE036** — local research-debt items;
-- **RXP001–RXP050** — predeclared high-information local experiment protocols;
+- **RDE001–RDE046** — local research-debt items;
+- **RXP001–RXP062** — predeclared high-information local experiment protocols;
 - **HL001–HL110** — historical cross-disciplinary research lineage anchors;
 - **RS001–RS055** — research source families and archive/artifact topology;
 - a staged experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability.
@@ -432,13 +432,13 @@ Planning checkpoint:
 ```text
 PLAN-20260921-FRONTIER-RESEARCH-SATURATION
 track=AD
-research_conclusions=FR001..FR114
-research_questions=RQ001..RQ067
-source_verifications=SV001..SV066
-frontier_delta=FD001..FD026
+research_conclusions=FR001..FR144
+research_questions=RQ001..RQ082
+source_verifications=SV001..SV072
+frontier_delta=FD001..FD031
 contradictions=CX001..CX024
-research_debt=RDE001..RDE036
-experiment_protocols=RXP001..RXP050
+research_debt=RDE001..RDE046
+experiment_protocols=RXP001..RXP062
 production_authority_granted=false
 research_refresh_required=true
 ```
@@ -446,7 +446,7 @@ research_refresh_required=true
 
 ### Track AD accountability checkpoint
 
-Planning coverage and local reproduction are separate states. The current checkpoint records all 19 research domains as planning-covered while local reproduction remains pending.
+Planning coverage and local reproduction are separate states. The current checkpoint records all 24 research domains as planning-covered while local reproduction remains pending.
 
 ```text
 PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY
