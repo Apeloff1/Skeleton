@@ -199,7 +199,12 @@ def build_web_artifact(
         for item in source_files
     )
     display_name = escape(str(game_name))
-    js_name = json.dumps(str(game_name))
+    js_name = (
+        json.dumps(str(game_name))
+        .replace("<", "\\u003c")
+        .replace(">", "\\u003e")
+        .replace("&", "\\u0026")
+    )
     html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{display_name} — GameForge Build</title>
