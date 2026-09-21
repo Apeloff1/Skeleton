@@ -531,7 +531,8 @@
       "objective": "Converge all model-visible instructions, conversation, memory, retrieval, artifacts, tools and skills through one deterministic governed ContextEnvelope compiler.",
       "target_files": {
         "contracts": [
-          "skeleton/contracts/context.py"
+          "skeleton/contracts/context.py",
+          "skeleton/context/instruction_policy.py"
         ],
         "runtime": [
           "skeleton/context/compiler.py",
@@ -546,7 +547,8 @@
           "backend/routes/ai.py"
         ],
         "tests": [
-          "skeleton/testing/test_context_compiler.py"
+          "skeleton/testing/test_context_compiler.py",
+          "skeleton/testing/test_instruction_policy.py"
         ]
       },
       "ordered_steps": [
@@ -556,12 +558,14 @@
         "implement remaining memory/artifact/tool/skill source adapters",
         "bind context snapshot/digest to AgentTurn and ProviderRequest",
         "add provenance-preserving compaction",
-        "migrate direct feature prompt/history assembly to compatibility delegation"
+        "migrate direct feature prompt/history assembly to compatibility delegation",
+        "migrate duplicate route/service system prompts to the versioned instruction-policy registry"
       ],
       "migration_cutover": [
         "complete memory/artifact/tool/skill source adapters",
         "bind context digest to AgentTurn/ProviderRequest",
-        "migrate direct feature prompt assembly"
+        "migrate direct feature prompt assembly",
+        "replace duplicate backend route/service control prompt tables with versioned instruction policy resolution"
       ],
       "closure_tests": [
         "deterministic packing",
@@ -572,7 +576,8 @@
         "oversized evidence",
         "compaction provenance",
         "context digest stability",
-        "legacy route delegation"
+        "legacy route delegation",
+        "instruction policy source ownership/parity"
       ],
       "closure_gate": "no canonical AI execution constructs provider prompt/history directly outside the ContextCompiler + provider projection boundary",
       "current_evidence": [
