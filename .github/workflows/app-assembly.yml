@@ -10,6 +10,7 @@ on:
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
       - "skeleton/testing/test_architecture_map.py"
+      - "skeleton/testing/test_ai_app_construction.py"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "frontend/**"
@@ -18,9 +19,17 @@ on:
       - ".env.example"
       - "scripts/check_app_assembly.py"
       - "scripts/check_architecture_map.py"
+      - "scripts/check_ai_app_construction.py"
+      - "scripts/check_provider_bootstrap.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
+      - "machine/ai_app_construction.json"
       - "docs/ARCHITECTURE_MAP.md"
+      - "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - ".github/copilot-instructions.md"
+      - ".cursor/rules/architecture.mdc"
       - ".github/workflows/app-assembly.yml"
 
 permissions:
@@ -54,6 +63,12 @@ jobs:
       - name: Validate architecture contract
         run: python scripts/check_architecture_map.py
 
+      - name: Validate AI construction contract
+        run: python scripts/check_ai_app_construction.py
+
+      - name: Validate mandatory provider bootstrap
+        run: python scripts/check_provider_bootstrap.py
+
       - name: Install focused test runtime
         run: >-
           python -m pip install --disable-pip-version-check
@@ -86,18 +101,24 @@ jobs:
           yarn export:web
 
       - name: Compile assembly surface
-        run: python -m compileall -q skeleton/app skeleton/__main__.py
+        run: >-
+          python -m compileall -q
+          skeleton/app skeleton/__main__.py
+          backend/core/ai_provider.py backend/core/provider_architecture.py
+          scripts/check_ai_app_construction.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
         run: python scripts/check_app_assembly.py
 
       - name: Run assembly contract tests
         env:
-          PYTHONPATH: "."
+          PYTHONPATH: ".:backend"
         run: >-
           python -m pytest -q
           skeleton/testing/test_architecture_map.py
+          skeleton/testing/test_ai_app_construction.py
           skeleton/testing/test_app_assembly.py
+          backend/tests/test_provider_architecture.py
 
       - name: Validate structural assembly
         env:
