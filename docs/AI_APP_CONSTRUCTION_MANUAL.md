@@ -3154,3 +3154,45 @@ If the durable memory repository is unavailable, writes fail or defer explicitly
 ### Closure
 
 The memory plane remains `partial` until restart-safe durable memory, namespace isolation, write-policy provenance, dedupe/version, delete/export/expiry propagation, vector-loss rebuild, process-memory-loss recovery and memory-outage degradation tests pass.
+
+## Fully Functional AI Closure: Foundational P0 Authority Planes
+
+Four lower-level P0s must close before higher autonomy can be considered complete: state authority, governance, cost admission, and provider-surface ownership. Their machine-readable blueprints are `state_authority_blueprint`, `governance_runtime_blueprint`, `cost_admission_blueprint`, and `provider_surface_convergence_blueprint`.
+
+### State authority
+
+Every logical domain has one declared durable authority. Mongo/document repositories own canonical application/user/memory state; vector stores, Chroma, process caches, summaries, browser caches and snapshots remain derived unless explicitly promoted in `machine/state_topology.json`.
+
+Canonical repositories must support idempotent identity, optimistic versioning or compare-and-set, typed conflict/corruption failure, schema/index migration, health, backup/restore metadata, and transaction/outbox semantics where state changes emit events.
+
+A write cannot silently fall back to a derived store when its authority is unavailable. Restore authoritative stores and AI ledgers first, then rebuild vector/search/cache projections.
+
+### Governance
+
+One governance registry classifies resource, tenant/subject, purpose, provenance, retention, deletion/export state and provider-transfer policy. Provider/tool transfer and canonical durable writes carry a governance decision receipt.
+
+Unknown classification, purpose mismatch, cross-tenant resource mixing, expired/deleting records, or a provider privacy ceiling violation fails closed. Deletion/export/retention workflows enumerate canonical records first and propagate to projections second.
+
+### Cost and capacity admission
+
+Every expensive boundary is admitted against one monotonic request/tenant budget before allocation. Provider tokens/cost, tool cost, artifact/storage bytes, wall time, queue/concurrency, retry and repair counts are budget dimensions.
+
+Production multi-worker quota state is durable/shared rather than process-local. Reservations are idempotent by operation/execution identity, actual usage never decreases, and restart cannot erase already-consumed quota. Unknown usage remains unknown and is handled conservatively rather than normalized to zero.
+
+Routing, context packing, tools and artifacts consume the same remaining budget contract.
+
+### Provider-surface ownership
+
+`skeleton/provider_runtime.py` is the only product runtime provider transport/credential owner. Routes, services, Jeeves modules and tools may be compatibility facades or declarations but do not construct SDK clients, own provider credentials or perform raw model-provider network transport.
+
+Provider-surface discovery scans backend and Skeleton code for provider keys, SDK imports, base URLs and transport patterns. Unexplained credential-bearing surfaces fail CI. Text, image, edit/variation and speech share the same governance/admission/receipt boundary.
+
+After application-to-engine cutover, runtime provider credentials are injected only into the Skeleton engine service.
+
+## Fully Functional AI Closure: Dependency DAG
+
+`functional_ai_dependency_graph` is the enforceable P0 closure order. It is a DAG of closure prerequisites, not a prohibition on starting independent implementation early.
+
+Stage 0 establishes state authority, governance, cost admission and provider-surface ownership. Stage 1 adds durable conversation/memory plus governed tools. Stage 2 fixes canonical context compilation and provider interaction. Stage 3 binds evidence verification. Stage 4 assembles the cognitive transaction. Stage 5 cuts product/application execution over to the authenticated engine boundary. Stage 6 proves realtime delivery/recovery. Stage 7 proves the assembled product through golden journeys.
+
+A gap cannot be marked closed before all declared dependencies are closed. Breaking a lower-stage contract invalidates dependent evidence and requires revalidation. Every declared P0 gap must appear exactly once in the closure ledger, dependency DAG, work-package schedule and required-blueprint set.
