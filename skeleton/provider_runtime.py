@@ -77,6 +77,23 @@ class ProviderPolicyError(ProviderError):
     """Raised when governance or admission denies provider-bound work."""
 
 
+def _read_provider_json(response: Any) -> Mapping[str, Any]:
+    """Read one provider JSON response under the canonical hard byte budget."""
+
+    raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
+        raise ProviderInvocationError("model provider response exceeded size limit")
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
+        raise ProviderInvocationError(
+            "model provider returned malformed JSON"
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise ProviderInvocationError("model provider returned malformed JSON")
+    return payload
+
+
 def _literal_ip_address(host: str) -> IPv4Address | IPv6Address | None:
     """Parse canonical and legacy numeric IP spellings without DNS resolution."""
 
@@ -1090,18 +1107,7 @@ class OpenAISyncProviderAdapter:
 
     @staticmethod
     def _decode_response(response: Any) -> Mapping[str, Any]:
-        raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
-        if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
-            raise ProviderInvocationError("model provider response exceeded size limit")
-        try:
-            payload = json.loads(raw)
-        except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
-            raise ProviderInvocationError(
-                "model provider returned malformed JSON"
-            ) from exc
-        if not isinstance(payload, Mapping):
-            raise ProviderInvocationError("model provider returned malformed JSON")
-        return payload
+        return _read_provider_json(response)
 
     def generate_sync(self, request: ProviderRequest) -> ProviderResponse:
         model = _validate_request(request, default_model=self.model)
