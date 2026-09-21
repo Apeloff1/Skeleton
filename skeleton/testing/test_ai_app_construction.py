@@ -20,6 +20,8 @@ def test_complete_ai_construction_contract_is_valid() -> None:
     assert summary["construction_version"] == "3.0.0"
     assert summary["planes"] >= 26
     assert summary["runtime_providers"] == ["openai"]
+    assert summary["automation_providers"] == ["repository-automation"]
+    assert summary["provider_surfaces"] >= 6
 
 
 def test_provider_bootstrap_is_fail_closed_and_materialized() -> None:
@@ -90,3 +92,36 @@ def test_no_required_evidence_path_is_virtual() -> None:
         assert (ROOT / plane["owner"]).exists(), plane["id"]
         for relative in plane["evidence"]:
             assert (ROOT / relative).exists(), (plane["id"], relative)
+
+
+def test_credential_bearing_provider_surfaces_are_declared_and_receipt_gated() -> None:
+    contract = _contract()
+    credential_surfaces = [
+        surface
+        for surface in contract["provider_surfaces"]
+        if surface["credential_bearing"] is True
+    ]
+
+    assert credential_surfaces
+    assert {
+        surface["owner"]
+        for surface in credential_surfaces
+    } >= {
+        "backend/core/ai_provider.py",
+        "skeleton/jeeves/providers.py",
+        "skeleton/automation/free_model.py",
+    }
+    assert all(surface["receipt_required"] is True for surface in credential_surfaces)
+    assert all((ROOT / surface["owner"]).is_file() for surface in credential_surfaces)
+
+
+def test_provider_families_have_one_shared_receipt_contract() -> None:
+    contract = _contract()
+    enforcement = contract["provider_bootstrap"]["runtime_enforcement"]
+
+    assert enforcement["loader"] == "skeleton/provider_contract.py"
+    assert set(enforcement["provider_families"]) == {
+        "runtime_model",
+        "automation_model",
+    }
+    assert enforcement["undeclared_provider_policy"] == "deny"
