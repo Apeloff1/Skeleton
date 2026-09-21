@@ -46,7 +46,7 @@ export function bootstrapService(
 
 
 export type AppRuntimeService = {
-  name: 'backend' | 'skeleton';
+  name: 'backend' | 'skeleton' | 'mongo';
   ok: boolean;
   status: number | null;
   latency_ms: number;
