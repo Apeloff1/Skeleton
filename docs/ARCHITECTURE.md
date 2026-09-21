@@ -248,11 +248,21 @@ single learned judge is treated as truth.
 Canonical navigation for this layer:
 
 - [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md) — master human index and authority order;
-- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–Y construction sequence;
+- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–AB construction sequence;
 - [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md) — scientific evidence, experiment, and promotion contract;
 - [architecture/research-source-catalog.md](architecture/research-source-catalog.md) — historical/frontier research canon and anti-canon;
 - [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
-- [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion.
+- [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion;
+- [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
+
+
+### Adversarial production-readiness layer
+
+The scientific/optimizer plan is subordinate to the frontier hardening invariants.
+
+A subsystem may be a useful research prototype while an applicable P0 hostile-audit gap is open, but it cannot claim production-grade status. Production claims require representation identity, data lineage, unified artifact identity, state-compatible rollback, eval isolation, authenticated principals, execution containment, supply-chain verification, declared storage semantics, stale-writer rejection, secret containment, verified recovery, protected control-plane capacity, immutable config identity, safe unknown-outcome reconciliation, deletion propagation, poisoning resistance, safe artifact loading, tamper-evident authority history, and a tested safe mode.
+
+This rule exists to prevent capability work from outrunning the substrate required to operate it safely and reproducibly.
