@@ -972,6 +972,97 @@ The first pass found architectural families. The second pass attacks race window
 
 **Open P0 rule:** any applicable open P0 blocks a production-readiness claim, regardless of benchmark or capability performance.
 
+
+## 4.2 Third hostile pass — systemic and lifecycle failures
+
+This pass attacks the architecture between subsystems: policy precedence, bootstrap/recovery dependency cycles, deployment transitions, cryptographic/service identity, region constraints, and long-lived workflow behavior.
+
+| ID | Severity | Systemic/lifecycle gap |
+| --- | --- | --- |
+| G131 | P0 | invariant/policy conflicts have no single precedence and conflict-resolution contract |
+| G132 | P1 | policy merge from system/developer/operator/tenant layers can be ambiguous |
+| G133 | P1 | configuration dependencies can form cycles or impossible combinations |
+| G134 | P1 | boot dependencies can deadlock before diagnostics/control plane are available |
+| G135 | P0 | recovery path can depend on the same failed storage/network/identity service it is meant to recover |
+| G136 | P0 | safe mode/break-glass can become unusable when normal auth/KMS/control plane is unavailable |
+| G137 | P1 | break-glass credentials can expire, be lost, or remain untested until disaster |
+| G138 | P1 | dual-control requirements can deadlock urgent recovery with no bounded escalation path |
+| G139 | P1 | alert storms can hide the causal signal and exhaust operator attention |
+| G140 | P1 | incident/runbook procedures can drift from current architecture and permissions |
+| G141 | P1 | staging/test can differ materially from production hardware, scale, network and policy |
+| G142 | P1 | fault-injection harness itself can be wrong and produce false confidence |
+| G143 | P1 | chaos tests need blast-radius boundaries and automatic abort conditions |
+| G144 | P1 | mocks/test doubles can provide stronger semantics than real dependencies |
+| G145 | P1 | production task distribution can drift away from eval populations |
+| G146 | P1 | canary cohort selection can systematically exclude the hardest/tail cases |
+| G147 | P1 | shadow execution cannot validate real side effects unless transactional simulators mirror them faithfully |
+| G148 | P1 | load tests can saturate data plane without testing protected control-plane reserve |
+| G149 | P1 | downstream rate-limit semantics/backoff headers may differ by provider/version |
+| G150 | P1 | external provider quota exhaustion can cause correlated fallback cascades |
+| G151 | P1 | billing/credit/account limits can be a hidden single point of service failure |
+| G152 | P1 | data-residency/region policy is not bound into placement, logs, backups and tools |
+| G153 | P1 | failover to another region can violate residency or policy constraints |
+| G154 | P1 | backup/restore destinations can cross prohibited boundaries |
+| G155 | P1 | encryption-at-rest/in-transit requirements are not explicit per data class |
+| G156 | P1 | encryption key scope/tenant/artifact binding is not explicit |
+| G157 | P1 | cryptographic randomness/nonce generation is not separated from model RNG |
+| G158 | P1 | entropy or secure-random initialization can fail during bootstrap/recovery |
+| G159 | P1 | internal service identity/mTLS or equivalent authentication is not a canonical boundary |
+| G160 | P1 | certificate rotation/pinning/CA migration can strand old or isolated nodes |
+| G161 | P0 | internal service impersonation can bypass capability assumptions if service identity is not cryptographically bound |
+| G162 | P1 | inbound webhook/event authenticity and replay protection are not universal |
+| G163 | P1 | inbound event signatures can verify while payload canonicalization differs |
+| G164 | P1 | outbound callbacks/webhooks can become SSRF/data-exfiltration channels |
+| G165 | P1 | prompt/template/system instruction versions are not always bound into evidence/cache identity |
+| G166 | P1 | system/developer instruction text can leak through outputs, traces, error messages or tool arguments |
+| G167 | P1 | hidden policy/context exfiltration can be induced through model/tool interactions |
+| G168 | P1 | sustained probing can extract model/system behavior or sensitive memorized content |
+| G169 | P1 | abuse/jailbreak rate controls are not integrated with global resource/economic governors |
+| G170 | P1 | public API nested/recursive payloads can bypass simple byte limits |
+| G171 | P1 | graph/memory traversal can explode through cycles or adversarial fanout |
+| G172 | P1 | retrieval fanout/reranking depth can create denial-of-wallet behavior |
+| G173 | P1 | graph/retrieval index can be poisoned through entity/edge creation rather than document content |
+| G174 | P1 | adversarial embeddings can create collisions/nearest-neighbor hijacking |
+| G175 | P1 | similarity thresholds can drift across embedding model generations |
+| G176 | P1 | document/content hashing can differ by normalization/container representation |
+| G177 | P1 | aggressive dedupe can delete semantically distinct but similar examples |
+| G178 | P1 | weak dedupe can leave benchmark/train leakage and frequency distortion |
+| G179 | P1 | source license/consent can be revoked after dataset/checkpoint creation |
+| G180 | P1 | model/data lineage needs policy for artifacts trained on later-revoked sources |
+| G181 | P1 | adapter merge can destroy separability and complicate rollback/provenance |
+| G182 | P1 | quantization/dequantization can be non-reversible and invalidate byte-level rollback assumptions |
+| G183 | P1 | multiple adapters can interact nonlinearly despite isolated evaluation |
+| G184 | P1 | optimizer state can become invalid after architecture surgery or parameter remapping |
+| G185 | P1 | tokenizer extension can break draft/speculative model compatibility |
+| G186 | P1 | model/provider router can enter feedback loops based on its own latency/failure observations |
+| G187 | P1 | routing optimized for cost/latency can systematically select lower-quality behavior for some populations |
+| G188 | P1 | fallback models may not preserve safety, tool, schema, context or capability contracts |
+| G189 | P1 | provider fallback mid-conversation/workflow can change semantics without explicit state transition |
+| G190 | P1 | one workflow can accidentally mix model/tool/schema versions without a version envelope |
+| G191 | P1 | long-running workflows can cross deployments and resume under incompatible code/policy |
+| G192 | P1 | workflow resume can use stale approvals/capabilities after revocation |
+| G193 | P0 | disaster restore/replay can repeat external side effects unless external-effect offsets/receipts are reconciled |
+| G194 | P1 | restored queues/jobs can duplicate work already completed outside the restored state |
+| G195 | P1 | VM/container snapshot restore can move wall clock backward |
+| G196 | P1 | monotonic-clock assumptions do not survive process/host restart without durable epochs |
+| G197 | P1 | restored leases/fencing tokens can regress unless epochs survive restore |
+| G198 | P1 | DNS/service-discovery caches can keep traffic on failed/retired endpoints after failover |
+| G199 | P1 | eventual-consistent object stores can expose promotion metadata before all referenced shards are readable |
+| G200 | P1 | atomic activation mechanisms differ across Windows/POSIX/object stores and require adapter-specific guarantees |
+
+### Third-pass closure rules
+
+- Policy/invariant precedence must be explicit and deterministic. Safety/security/authority invariants cannot be overridden by lower-precedence config.
+- Recovery dependencies must be modeled as a graph and tested for cycles. At least one minimal recovery path must remain usable with major dependencies unavailable.
+- Break-glass is a separately testable system, not documentation.
+- Production parity must be stated per dimension; unknown parity is recorded as uncertainty.
+- Chaos tooling has its own correctness tests and blast-radius controls.
+- Region/residency policy is part of placement, logging, backup, tool and failover decisions.
+- Internal service identity is authenticated and bound into principal/capability decisions.
+- Long-lived workflows carry a version envelope and revalidate policy/approvals on resume or deployment crossing.
+- Restore/replay reconciles external-effect receipts before re-dispatching work.
+- Activation/checkpoint protocols declare backend-specific atomicity guarantees rather than assuming POSIX semantics everywhere.
+
 # 5. Adversarial fault-campaign matrix
 
 Do not test failures one at a time only. The dangerous bugs are interactions.
@@ -1121,7 +1212,7 @@ This audit intentionally remains open-ended. Every incident, near miss, benchmar
 ## 8. Audit checkpoint
 
 PLAN-20260921-HOSTILE-GAP-AUDIT  
-scope=G001..G130 + Track AB  
+scope=G001..G200 + Track AB  
 open_P0_blocks_production_readiness=true  
 fault_model=single-axis + pairwise + selected-three-axis  
 signoff_required_for_closure=true
