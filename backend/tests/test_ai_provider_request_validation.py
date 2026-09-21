@@ -8,6 +8,7 @@ from core.ai_provider import (
     AIMessage,
     OpenAIProviderAdapter,
     ProviderInvocationError,
+    ProviderPolicyError,
     ProviderRequest,
     normalize_history,
 )
@@ -121,3 +122,73 @@ def test_normalize_history_ignores_non_text_role_and_content() -> None:
     )
 
     assert normalized == (AIMessage(role="user", content="valid"),)
+
+
+@pytest.mark.asyncio
+async def test_restricted_data_is_denied_before_provider_io(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    with pytest.raises(ProviderPolicyError, match="governance policy"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="sensitive input",
+                data_class="restricted",
+            )
+        )
+
+    assert adapter._client.responses.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_confidential_data_requires_tenant_binding(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    with pytest.raises(ProviderPolicyError, match="governance policy"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="tenant data",
+                data_class="confidential",
+                purpose="code-assistance",
+            )
+        )
+
+    assert adapter._client.responses.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_confidential_tenant_transfer_emits_governance_receipt(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    result = await adapter.generate(
+        ProviderRequest(
+            instructions="rules",
+            prompt="tenant data",
+            data_class="confidential",
+            purpose="code-assistance",
+            tenant_id="tenant-123",
+        )
+    )
+
+    assert result.text == "ok"
+    assert result.data_class == "confidential"
+    assert result.governance_decision_id
+    assert result.governance_decision_id.startswith("gov-")
+    assert adapter._client.responses.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_unknown_provider_transfer_purpose_fails_closed(
+    adapter: OpenAIProviderAdapter,
+) -> None:
+    with pytest.raises(ProviderPolicyError, match="governance policy"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="rules",
+                prompt="hello",
+                purpose="invented-side-channel",
+            )
+        )
+
+    assert adapter._client.responses.calls == 0
