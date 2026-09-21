@@ -1,0 +1,88 @@
+name: Windows Installer
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/app/**"
+      - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "pyproject.toml"
+      - ".github/workflows/windows-installer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/app/**"
+      - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "pyproject.toml"
+      - ".github/workflows/windows-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14.7"
+
+jobs:
+  build-windows-installer:
+    name: Build Setup.exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Install Inno Setup 7
+        shell: pwsh
+        run: |
+          winget install --id JRSoftware.InnoSetup.7 --exact --source winget --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
+
+      - name: Run Windows installer contract tests
+        shell: pwsh
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8,<9"
+          python -m pytest -q skeleton/testing/test_windows_installer.py
+
+      - name: Build installer
+        shell: pwsh
+        run: ./scripts/windows/build_installer.ps1 -SourceRef HEAD
+
+      - name: Verify installer checksum
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/windows/Skeleton-Setup-*-windows-x64.exe | Select-Object -First 1
+          if (-not $installer) { throw "installer missing" }
+          $checksum = Get-Content "$($installer.FullName).sha256"
+          $actual = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
+          if (-not $checksum.StartsWith($actual)) { throw "installer checksum mismatch" }
+          Write-Host "Verified $($installer.Name): $actual"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Skeleton-Windows-Installer-${{ github.sha }}
+          path: |
+            dist/windows/Skeleton-Setup-*-windows-x64.exe
+            dist/windows/Skeleton-Setup-*-windows-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
