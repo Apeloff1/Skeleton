@@ -67,6 +67,7 @@ A round that is not indexed is considered structurally incomplete.
 | Serving/inference | runtime/provider adapters | build plan | latency, throughput, memory, failure recovery |
 | Optimizer/training internals | `docs/BUILD_PLAN.md` Track Z | research source catalog | quality/token, stability, memory, communication, checkpoint/replay |
 | Massive upgrade program | `docs/BUILD_PLAN.md` Track AA | research/evidence evolution contract | ablation, full-stack benchmark, failure injection, migration + rollback |
+| Adversarial foundations | `docs/BUILD_PLAN.md` Track AB | `docs/architecture/masterplan-gap-audit.md` | P0 closure, fault injection, recovery, signed evidence |
 | Deployment | deploy/resilience packages | build plan | canary + rollback + observability |
 | Machine organization | `.machine/`, `machine/` | architecture index | deterministic inventory + drift checks |
 
@@ -141,7 +142,7 @@ No source may skip from discovery directly to production.
 
 ## 8. Build-plan frontier
 
-The current construction frontier is organized into Tracks Q–AA in [BUILD_PLAN.md](BUILD_PLAN.md):
+The current construction frontier is organized into Tracks Q–AB in [BUILD_PLAN.md](BUILD_PLAN.md):
 
 - **Q** — research evidence substrate;
 - **R** — model/training substrate;
@@ -153,7 +154,8 @@ The current construction frontier is organized into Tracks Q–AA in [BUILD_PLAN
 - **X** — evaluation, verification, and formal correctness;
 - **Y** — experiment, promotion, rollback, and continuous scientific refresh;
 - **Z** — deep internals and optimizer control plane;
-- **AA** — rare massive upgrades and full-stack step changes.
+- **AA** — rare massive upgrades and full-stack step changes;
+- **AB** — adversarial foundations and systemic hardening.
 
 The tracks are deliberately cross-linked. A model improvement is not finished until its serving, security, evaluation, provenance, and rollback consequences are accounted for.
 
@@ -251,3 +253,43 @@ created_at=2026-09-21T21:33:00+02:00
 scope=Track Z + Track AA
 implementation_claims_require_signed_evidence=true
 \`\`\`
+
+
+## 12. Hostile gap audit authority
+
+The canonical adversarial review is [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+
+Track AB exists because the frontier model/reasoning/optimizer plan did not, by itself, close several cross-cutting production risks. The hostile audit assigns stable gap IDs and makes the most dangerous omissions construction blockers.
+
+P0 families include:
+
+- representation/tokenizer identity;
+- deterministic training-data lineage;
+- unified model artifact identity;
+- schema/state-compatible rollback;
+- evaluation firewall and adaptive-overfitting controls;
+- authenticated principal/tenant/delegation;
+- execution containment;
+- supply-chain trust;
+- authoritative storage semantics;
+- distributed leases/fencing/ordering;
+- secret lifecycle;
+- verified disaster recovery;
+- control-plane isolation;
+- immutable configuration identity;
+- reconciliation for unknown side-effect outcomes;
+- deletion/tombstone propagation;
+- training poisoning/backdoor defense;
+- safe artifact loading;
+- tamper-evident authority audit;
+- unified safe mode/break-glass recovery.
+
+No subsystem with an applicable open P0 gap may claim production-grade status.
+
+The audit also defines a multi-axis fault campaign across state, network, worker, artifact/input, authority, resources and observability. P0 paths require single-axis testing; consequential side effects and promotion/rollback paths require pairwise and selected three-axis campaigns.
+
+Planning checkpoint:
+
+PLAN-20260921-HOSTILE-GAP-AUDIT  
+scope=G001..G070 + Track AB  
+production_readiness_blocked_by_applicable_open_P0=true
