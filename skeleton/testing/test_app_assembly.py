@@ -262,8 +262,9 @@ def test_production_web_ingress_routes_both_application_apis():
     root = find_repo_root(Path(__file__))
     nginx = (root / "frontend/nginx.conf").read_text(encoding="utf-8")
 
-    engine_location = nginx.index("location ^~ /api/v1/")
-    backend_location = nginx.index("location ^~ /api/")
+    directives = [line.strip() for line in nginx.splitlines()]
+    engine_location = directives.index("location ^~ /api/v1/ {")
+    backend_location = directives.index("location ^~ /api/ {")
     assert engine_location < backend_location
     assert "proxy_pass http://skeleton:8001;" in nginx
     assert "proxy_pass http://backend:8001;" in nginx
