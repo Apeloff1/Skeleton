@@ -135,3 +135,62 @@ async def test_terminal_sse_replay_emits_canonical_events_and_closes(
 
     operations.close()
     events.close()
+
+
+def test_json_replay_returns_resume_metadata(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    operations.create(operation, now=BASE_TIME)
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    payload = route.operation_event_replay(
+        operation.operation_id,
+        after_sequence=0,
+        limit=250,
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    assert payload["ok"] is True
+    assert payload["after_sequence"] == 0
+    assert payload["latest_sequence"] == 1
+    assert payload["terminal"] is False
+    assert payload["events"][0]["type"] == "operation.created"
+
+    operations.close()
+    events.close()
+
+
+def test_json_replay_maps_compaction_gap_to_resync_conflict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        "validated",
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.compact_through(operation.operation_id, 1)
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    with pytest.raises(Exception) as caught:
+        route.operation_event_replay(
+            operation.operation_id,
+            after_sequence=0,
+            limit=250,
+            user={"tenant_id": "tenant-a", "role": "viewer"},
+        )
+
+    assert getattr(caught.value, "status_code", None) == 409
+    detail = getattr(caught.value, "detail", {})
+    assert detail == {"error": "replay_gap", "resync_required": True}
+
+    operations.close()
+    events.close()
