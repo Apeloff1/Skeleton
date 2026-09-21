@@ -2055,7 +2055,9 @@
       "gap": "gap-governance-registry",
       "wave": 1,
       "owners": [
-        "skeleton/governance",
+        "skeleton/kernel/governance.py",
+        "skeleton/shells/ai/governance.py",
+        "backend/routes/governance.py",
         "backend/core/model_router.py",
         "skeleton/context",
         "skeleton/memory"
@@ -2189,9 +2191,10 @@
       "gap": "gap-feedback-promotion",
       "wave": 4,
       "owners": [
-        "skeleton/adaptive",
-        "skeleton/experiments",
-        "skeleton/evals"
+        "skeleton/intelligence/adaptive.py",
+        "skeleton/intelligence/experiment_tracker.py",
+        "skeleton/intelligence/eval_framework.py",
+        "skeleton/jeeves/feedback.py"
       ],
       "objective": "Separate observation from controlled production behavior changes.",
       "steps": [
