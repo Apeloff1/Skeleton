@@ -24,6 +24,10 @@ on:
       - "skeleton/contracts/operation.py"
       - "skeleton/persistence/operation_store.py"
       - "skeleton/testing/test_operation_store.py"
+      - "backend/core/operation_stream_transport.py"
+      - "backend/routes/operation_stream.py"
+      - "backend/tests/test_operation_stream_transport.py"
+      - "backend/tests/test_operation_stream_route.py"
       - "skeleton/vault/data_governance.py"
       - "skeleton/vault/data_lifecycle.py"
       - "skeleton/vault/governance_registry.py"
@@ -145,6 +149,7 @@ jobs:
           skeleton/provider_runtime.py skeleton/contracts/operation.py
           skeleton/persistence/operation_store.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
+          backend/core/operation_stream_transport.py backend/routes/operation_stream.py
           skeleton/automation/free_model.py
           skeleton/jeeves/providers.py
           skeleton/vault/data_governance.py skeleton/vault/data_lifecycle.py
@@ -191,6 +196,8 @@ jobs:
           backend/tests/test_ai_provider_adapter.py
           backend/tests/test_ai_provider_media.py
           backend/tests/test_ai_provider_request_validation.py
+          backend/tests/test_operation_stream_transport.py
+          backend/tests/test_operation_stream_route.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
 
