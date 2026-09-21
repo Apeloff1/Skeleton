@@ -3123,6 +3123,232 @@ scope-changing result
 ```
 
 
+
+
+---
+
+# 25I. Measurement-science hardening
+
+A research system can be perfectly reproducible and still measure the wrong thing.
+
+## M1 — Practical significance before leaderboard significance
+
+Every claimed win reports:
+- absolute effect;
+- relative effect;
+- uncertainty;
+- operational consequence.
+
+A 0.1% benchmark gain that doubles latency is not summarized as "better."
+
+## M2 — Paired comparisons where possible
+
+When candidate and baseline can evaluate the same items/workload trace:
+- use paired item-level comparisons;
+- retain per-item deltas;
+- inspect which populations gain/lose.
+
+Aggregate means can hide systematic subgroup regressions.
+
+## M3 — Benchmark stratification
+
+Report results by meaningful strata:
+- difficulty;
+- domain;
+- language;
+- sequence length;
+- user/task population;
+- hardware;
+- concurrency;
+- failure class.
+
+Do not universalize an average.
+
+## M4 — Timing instrumentation discipline
+
+Systems benchmarks record:
+- warmup;
+- compile/JIT state;
+- cache state;
+- batch/concurrency;
+- clock source;
+- synchronization;
+- background load;
+- power/thermal state where relevant.
+
+GPU timing without synchronization or warmup discipline is invalid systems evidence.
+
+## M5 — Cold/warm path separation
+
+Measure separately:
+- cold startup;
+- model load;
+- compile;
+- cold cache;
+- warm cache;
+- steady state;
+- failover/recovery.
+
+## M6 — Tail metrics
+
+Latency systems report at least:
+- p50;
+- p95;
+- p99;
+- failure/timeout rate.
+
+Mean latency alone is insufficient for interactive serving.
+
+## M7 — Distribution shifts
+
+A candidate must not be tuned and judged only on one mixture.
+
+Where practical:
+- development distribution;
+- matched held-out;
+- shifted/OOD;
+- adversarial;
+- long-tail.
+
+## M8 — Metric sensitivity
+
+If the result changes materially under a reasonable alternate metric, record the disagreement.
+
+Examples:
+- exact match vs semantic judge;
+- mean vs worst-domain;
+- pass@1 vs pass@K;
+- throughput vs SLO-attaining throughput.
+
+## M9 — Evaluator variance
+
+Learned or human evaluators require:
+- agreement;
+- repeatability;
+- calibration;
+- prompt/version identity;
+- tie/abstain behavior.
+
+## M10 — Missingness
+
+Record:
+- timed-out examples;
+- parser failures;
+- OOM;
+- unavailable tools;
+- judge errors;
+- dropped telemetry.
+
+Missing results are not silently removed.
+
+## M11 — Practical equivalence regions
+
+Define when two systems are operationally equivalent.
+
+If the confidence interval lies inside an equivalence region, report "no material difference" rather than selecting a winner from noise.
+
+## M12 — Regression asymmetry
+
+A small average gain cannot compensate automatically for a severe regression in:
+- safety;
+- authority;
+- deletion/privacy;
+- reliability;
+- catastrophic tail behavior.
+
+Hard floors dominate aggregate score.
+
+## M13 — Independent implementation replication
+
+When a result is architecturally important, prefer one replication that does not reuse the candidate's exact implementation stack.
+
+This detects:
+- hidden optimization;
+- accidental benchmark coupling;
+- undocumented defaults;
+- implementation-specific bugs.
+
+## M14 — Benchmark custody
+
+Blind/private evals track:
+- who can access answers;
+- access timestamps;
+- query counts;
+- export events;
+- derived labels;
+- benchmark version.
+
+## M15 — Analysis provenance
+
+Every figure/table should be traceable to:
+- result bundle;
+- analysis code;
+- query/filter;
+- plotting version.
+
+Manual spreadsheet edits are not authoritative research evidence unless themselves versioned and auditable.
+
+## M16 — Result reversibility
+
+Given a result bundle, another authorized researcher should be able to reconstruct:
+- reported metrics;
+- inclusion/exclusion;
+- plots;
+- decision state.
+
+## M17 — Scientific stop conditions
+
+Stop for:
+- clear falsification;
+- budget exhaustion;
+- unsafe behavior;
+- invalid measurement;
+- no plausible decision-changing information remaining.
+
+Do not continue only because compute has already been spent.
+
+## M18 — Decision value
+
+Before launching an expensive experiment, state:
+
+> What architecture decision changes under each plausible result?
+
+If no plausible result changes a decision, the experiment has low decision value.
+
+---
+
+# 25J. Research falsification map
+
+Current conclusions carry explicit reversal conditions.
+
+| Conclusion family | What would materially change Skeleton's position? |
+| --- | --- |
+| dense baseline mandatory | a broadly reproducible alternative family with equal-or-better quality, portability, debugability and systems support across core workloads |
+| hybrid model neutrality | evidence that one family dominates across all target workloads without unacceptable portability/recovery cost |
+| sparse attention challenger | repeated equal-wall-clock failures or unacceptable rare-token miss modes |
+| neural memory challenger | failure to reset/replay/provenance-bind, or no equal-cost advantage over retrieval/context |
+| byte-latent challenger | worse structured-output/security behavior and no compensating robustness/efficiency gain |
+| Muon/SOAP challenger | matched tuning shows gains vanish or systems/instability costs dominate |
+| FP8 viable | long-run numerical failures or quality loss beyond declared floor |
+| FP4 emerging | independent larger-scale failure or hardware support failing to realize claimed efficiency |
+| TTS useful | quality-cost curves show no task strata with positive marginal utility |
+| verifier allocation useful | verification cost approaches solve cost or correlated verifier failures dominate |
+| RLVR useful in verifiable domains | matched SFT/process baselines erase gains or causal/process quality degrades materially |
+| RAG/LC router | one strategy robustly dominates across target distributions and lifecycle cost |
+| graph/agentic RAG challenger | simple lexical/hybrid baselines dominate at target corpus scale |
+| prospective typed store challenger | gains fail outside PM-style tasks or false alarms/stale actions become unacceptable |
+| long-horizon abstraction | macro-actions/subgoals fail transfer or introduce worse irrecoverable errors |
+| P/D serving challenger | KV/network/queue overhead dominates under target fleet workloads |
+| attention-aware KV compression | downstream quality advantage disappears at equal bytes/latency |
+| CoT monitorability useful | monitorability collapses under deployed model/training/threat distribution |
+| specialized detector challenger | robust OOD/evasion results fail to exceed general monitor or deterministic controls |
+| interpretability diagnostic value | tools fail to improve counterfactual prediction, debugging, monitoring or intervention selection |
+| unlearning research lane | methods cannot beat policy/deletion/retraining alternatives on forget+retain+robustness cost |
+| research-agent acceleration | independent recomputation shows generated experiments/code are too unreliable or oversight cost cancels productivity gain |
+
+A conclusion should become weaker when falsification evidence arrives. The architecture is not rewarded for preserving yesterday's thesis.
+
+
 # 26. Research anti-patterns
 
 Skeleton must reject the following reasoning:
