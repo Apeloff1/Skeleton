@@ -19,7 +19,9 @@
       "EMERGENT_LLM_KEY",
       "STRIPE_API_KEY",
       "SKELETON_MASTER_SECRET",
-      "GF_SEAL_SECRET"
+      "GF_SEAL_SECRET",
+      "EXPO_PUBLIC_BACKEND_URL",
+      "EXPO_PUBLIC_SKELETON_URL"
     ]
   },
   "services": [
