@@ -263,7 +263,7 @@
       "stage": 0,
       "parallel_lane": "governance",
       "objective": "Bind governance receipts and lifecycle actions into canonical observability/audit timelines.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S0-GOV-02"
       ],
