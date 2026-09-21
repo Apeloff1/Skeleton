@@ -10,6 +10,10 @@ echo "==> Import smoke check"
 python -c "import skeleton; print('skeleton', skeleton.__version__)"
 python -c "from skeleton.genesis import Genesis; g = Genesis(seed=42).boot(); print('handles:', len(g.handles))"
 
+echo "==> Application assembly"
+python scripts/check_app_assembly.py
+python -m skeleton app check
+
 echo "==> Forge verification"
 bash scripts/verify-forge.sh
 

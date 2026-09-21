@@ -952,6 +952,35 @@ class WorkerResultEvidenceTests(unittest.TestCase):
                         worker="root-cause",
                     )
 
+    def test_no_change_accepts_and_binds_snapshot_evidence(self) -> None:
+        custody = runtime.WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint="b" * 64,
+            execution=execution(),
+        )
+        payload = json.dumps({
+            "status": "no-change",
+            "bot": "root-cause",
+            "supervisor_snapshot_fingerprint": "b" * 64,
+            "execution_fingerprint": custody.execution.fingerprint,
+        })
+        evidence = runtime.parse_worker_result(
+            payload,
+            worker="root-cause",
+        )
+        runtime.validate_worker_evidence_custody(
+            evidence,
+            custody,
+        )
+
+        altered = dict(evidence)
+        altered["supervisor_snapshot_fingerprint"] = "d" * 64
+        with self.assertRaises(runtime.SupervisorRuntimeError):
+            runtime.validate_worker_evidence_custody(
+                altered,
+                custody,
+            )
+
     def test_no_change_rejects_cross_status_custody_fields(self) -> None:
         payload = json.dumps({
             "status": "no-change",

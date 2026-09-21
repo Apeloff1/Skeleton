@@ -7,7 +7,6 @@ from __future__ import annotations
 from dataclasses import asdict
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -27,7 +26,7 @@ from core.deployment_evidence_checkpoint import verify_deployment_proof_against_
 from core.deployment_gateway import DeploymentGatewayError
 from core.durable_outbox import OutboxFullError
 from core.execution_receipts import ReceiptIntegrityError
-from core.product_control_plane import ProductControlPlane
+from core.product_control_runtime import get_product_control_plane as _control_plane
 from core.product_operations import OperationExecutionError, OperationRejected
 
 router = APIRouter(prefix="/api/admin/ops", tags=["ops"])
@@ -44,19 +43,6 @@ def _authorized(token: str) -> bool:
 def _require_ops(token: str) -> None:
     if not _authorized(token):
         raise HTTPException(status_code=403, detail="unauthorized")
-
-
-_CONTROL_PLANE: ProductControlPlane | None = None
-
-
-def _control_plane() -> ProductControlPlane:
-    global _CONTROL_PLANE
-    if _CONTROL_PLANE is None:
-        root = Path(os.environ.get("PRODUCT_CONTROL_ROOT", "data/product-control"))
-        cap = int(os.environ.get("PRODUCT_CONTROL_OUTBOX_CAP", "4096"))
-        bootstrap = os.environ.get("PRODUCT_CONTROL_BOOTSTRAP_POLICY", "1") not in {"0", "false", "False"}
-        _CONTROL_PLANE = ProductControlPlane(root, outbox_cap=cap, bootstrap_policy=bootstrap)
-    return _CONTROL_PLANE
 
 
 class RuleInput(BaseModel):

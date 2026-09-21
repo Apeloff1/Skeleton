@@ -8,7 +8,7 @@ import subprocess
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-_SECURITY_PATH = REPO_ROOT / "core" / "activation_security.py"
+_SECURITY_PATH = REPO_ROOT / "skeleton" / "security" / "activation_security.py"
 _SECURITY_SPEC = importlib.util.spec_from_file_location(
     "bot_activation_security_under_test",
     _SECURITY_PATH,
@@ -135,8 +135,11 @@ def test_model_entrypoints_import_dependency_free_gate() -> None:
         "core/shift_supervisor/model_gateway.py",
     ):
         source = (REPO_ROOT / relative).read_text(encoding="utf-8")
-        assert "from core.activation_security import enforce_bot_activation_security" in source
-        assert "skeleton.automation.activation_security" not in source
+        assert (
+            "from skeleton.security.activation_security "
+            "import enforce_bot_activation_security"
+        ) in source
+        assert "from core.activation_security import enforce_bot_activation_security" not in source
 
 
 def test_repair_intake_issue_body_stays_inside_yaml_shell_block() -> None:
@@ -148,3 +151,19 @@ def test_repair_intake_issue_body_stays_inside_yaml_shell_block() -> None:
     assert "\n${marker}\n" not in workflow
     assert "\n- Workflow: ${RUN_NAME}\n" not in workflow
     assert "\nCorrelate this observation against existing findings" not in workflow
+
+def test_legacy_core_activation_module_is_a_thin_canonical_shim() -> None:
+    source = (REPO_ROOT / "core" / "activation_security.py").read_text(encoding="utf-8")
+
+    assert "from skeleton.security.activation_security import (" in source
+    assert "run_bot_activation_security_baseline" in source
+    assert 'if __name__ == "__main__":' in source
+    assert "raise SystemExit(main())" in source
+
+def test_workflow_executes_activation_gate_without_importing_skeleton_root() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/workflow-input-security.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "run: python skeleton/security/activation_security.py" in workflow
+    assert "python -m skeleton.security.activation_security" not in workflow
