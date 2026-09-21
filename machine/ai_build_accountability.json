@@ -18824,22 +18824,31 @@
       "id": "ACC-AIQ-S0-COST-01",
       "type": "queue_task",
       "title": "AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T18:18:09Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-21T18:26:07Z",
+        "git_sha": "d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6c8d09b279e5aa898e09ad487960ccd0e238f01f",
+          "https://github.com/Apeloff1/Skeleton/commit/aab142cd7142d27e163fb3b3b821e0a30eb74d54",
+          "https://github.com/Apeloff1/Skeleton/commit/0cbe739ba63922191519e9e025b9480bffe7fc44",
+          "https://github.com/Apeloff1/Skeleton/commit/a51d64f4d28cb95a640213fb8263eff4737653ec",
+          "https://github.com/Apeloff1/Skeleton/commit/ffc01aa78a66c05c9aad86717b509b009f2cb762",
+          "https://github.com/Apeloff1/Skeleton/commit/696d8d2da1067a247403ab670a1fd2e3960b6b99",
+          "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
+          "machine/accountability_events/ACC-AIQ-S0-COST-01/implementation.json"
+        ],
+        "statement": "Implemented durable tenant quota windows/reservations with restart recovery and same-volume multi-worker transaction fencing.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9"
       },
       "verification_signoff": {
         "signed": false,
@@ -18855,7 +18864,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T18:18:09Z",
+      "last_event_at_utc": "2026-09-21T18:26:07Z",
       "history": [
         {
           "sequence": 1,
@@ -18873,9 +18882,42 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-AIQ-S0-COST-01/start.json"
           ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-21T18:26:07Z",
+          "git_sha": "d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
+          "statement": "Implemented durable tenant quota windows/reservations with restart recovery and same-volume multi-worker transaction fencing.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6c8d09b279e5aa898e09ad487960ccd0e238f01f",
+            "https://github.com/Apeloff1/Skeleton/commit/aab142cd7142d27e163fb3b3b821e0a30eb74d54",
+            "https://github.com/Apeloff1/Skeleton/commit/0cbe739ba63922191519e9e025b9480bffe7fc44",
+            "https://github.com/Apeloff1/Skeleton/commit/a51d64f4d28cb95a640213fb8263eff4737653ec",
+            "https://github.com/Apeloff1/Skeleton/commit/ffc01aa78a66c05c9aad86717b509b009f2cb762",
+            "https://github.com/Apeloff1/Skeleton/commit/696d8d2da1067a247403ab670a1fd2e3960b6b99",
+            "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
+            "machine/accountability_events/ACC-AIQ-S0-COST-01/implementation.json"
+          ]
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6c8d09b279e5aa898e09ad487960ccd0e238f01f",
+        "https://github.com/Apeloff1/Skeleton/commit/aab142cd7142d27e163fb3b3b821e0a30eb74d54",
+        "https://github.com/Apeloff1/Skeleton/commit/0cbe739ba63922191519e9e025b9480bffe7fc44",
+        "https://github.com/Apeloff1/Skeleton/commit/a51d64f4d28cb95a640213fb8263eff4737653ec",
+        "https://github.com/Apeloff1/Skeleton/commit/ffc01aa78a66c05c9aad86717b509b009f2cb762",
+        "https://github.com/Apeloff1/Skeleton/commit/696d8d2da1067a247403ab670a1fd2e3960b6b99",
+        "https://github.com/Apeloff1/Skeleton/commit/d435e8ba1a360ad5c245e9ed256621e8fc2916e9",
+        "machine/accountability_events/ACC-AIQ-S0-COST-01/implementation.json"
+      ],
       "baseline_status": "pending"
     },
     {
