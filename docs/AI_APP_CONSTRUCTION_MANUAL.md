@@ -1,10 +1,10 @@
 # Skeleton AI Application Construction Manual
 
-Architecture tag: `arch-map/v3.2`
+Architecture tag: `arch-map/v3.3`
 
 Machine contract: `machine/ai_app_construction.json`
 
-Construction version: `3.2.0`
+Construction version: `3.3.0`
 
 Architecture contract: `machine/architecture.json`
 
@@ -1585,3 +1585,89 @@ The mandatory provider rule is enforced at three different layers:
 This is deliberately redundant. The goal is not to trust that a provider
 "probably saw" the architecture; the goal is to make architecture
 acknowledgement a condition of activation or repository work.
+
+
+## 33. Canonical operation and stream construction
+
+The first transport-independent portion of `WP-P0-STREAM` is now materialized.
+
+### 33.1 Operation identity
+
+Use `skeleton/contracts/operation.py` for operation identity and state. Do not
+create route-local or provider-local operation state machines.
+
+The required path is:
+
+```text
+created
+ -> validated
+ -> authorized
+ -> admitted
+ -> {queued ->} running
+ -> optional waiting/retrying/degraded states
+ -> {completed | failed | cancelled}
+```
+
+Terminal states are final. Skipping validation/authorization/admission is an
+architecture violation for governed expensive work.
+
+`operation_id` is the durable unit-of-work identity. `trace_id` is only
+correlation. `idempotency_key` participates in duplicate identity and must not
+be replaced by the trace identifier.
+
+### 33.2 Event protocol
+
+Use `skeleton/frontier/operation_stream.py` as the protocol oracle.
+
+Every event has:
+
+- schema version;
+- operation ID;
+- unique event ID;
+- positive monotonic sequence;
+- normalized event type;
+- timezone-aware timestamp;
+- strict JSON bounded payload.
+
+The reference log intentionally fails on overflow. Dropping retained events to
+make room is prohibited because it can turn a reconnect into silent state loss.
+
+### 33.3 Replay
+
+A reconnect presents the operation ID plus last acknowledged sequence. Replay
+returns later events in sequence. If requested history was compacted, return an
+explicit replay-gap failure and reconstruct from durable operation state or force
+a state resync; never pretend that no events occurred.
+
+### 33.4 Duplicate and ordering semantics
+
+The same event ID may be accepted twice only when its full canonical content is
+identical. Reusing an event ID for different content is corruption.
+
+Pre-built events from durable producers must arrive at exactly the next
+sequence. Out-of-order delivery is rejected at the protocol boundary and may be
+buffered only by a higher-level adapter with explicit bounded policy.
+
+### 33.5 Terminal events
+
+`operation.completed`, `operation.failed`, and `operation.cancelled` are
+terminal. No later progress/result event may be appended for that operation.
+
+### 33.6 Backpressure
+
+The reference log backpressures publishers when its retained window is full.
+Production adapters may use bounded queues, durable streams, credits or consumer
+acks, but may not silently drop unacknowledged operation events.
+
+### 33.7 Remaining stream closure work
+
+This does not close the P0 streaming gap. Remaining required work is:
+
+1. durable stream storage preserving event IDs and sequence;
+2. backend SSE or WebSocket transport;
+3. heartbeat and idle timeout;
+4. cancellation bridge into `OperationEnvelope`;
+5. frontend reducer with event-ID and sequence handling;
+6. reconnect cursor and resync UX;
+7. multi-client acknowledgement strategy;
+8. slow-client, cancel-race and disconnect/reconnect E2E evidence.
