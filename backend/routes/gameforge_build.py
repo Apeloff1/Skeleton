@@ -23,76 +23,22 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
-from core.gameforge_artifact_builder import build_source_artifact, build_web_artifact
+from core.gameforge_artifact_builder import (
+    DEFAULT_ARTIFACTS_ROOT,
+    artifact_build as _artifact_build,
+    build_source_artifact,
+    build_web_artifact,
+    database as _db,
+    gamefiles as _gamefiles,
+    register_artifact as _register,
+    resolve_under_dir as _resolve_under_dir,
+    safe_segment as _safe_segment,
+)
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
-_ARTIFACTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "artifacts", "builds")
+_ARTIFACTS = str(DEFAULT_ARTIFACTS_ROOT)
 os.makedirs(_ARTIFACTS, exist_ok=True)
-
-
-def _safe_segment(value: str, *, what: str = "path") -> str:
-    """Reject path traversal / absolute segments in user-supplied ids."""
-    s = str(value or "").strip()
-    if (
-        not s
-        or s in {".", ".."}
-        or ".." in s
-        or "/" in s
-        or "\\" in s
-        or s.startswith(("~", "/", "\\"))
-    ):
-        raise ValueError(f"invalid {what}: {value!r}")
-    return s
-
-
-def _resolve_under_dir(root: str, *parts: str) -> str:
-    """Join under root; raise if result escapes root."""
-    root_r = os.path.realpath(root)
-    candidate = os.path.realpath(os.path.join(root_r, *parts))
-    if candidate != root_r and not candidate.startswith(root_r + os.sep):
-        raise ValueError("path escapes build sandbox")
-    return candidate
-
-
-def _artifact_build(game_name: str, kind: str):
-    """Sanitize game_name and return (safe_name, build_id, workdir) under _ARTIFACTS."""
-    safe = _safe_segment(str(game_name).replace(" ", "_"), what="game_name")
-    build_id = f"{safe}-{kind}-{int(time.time())}"
-    workdir = _resolve_under_dir(_ARTIFACTS, build_id)
-    return safe, build_id, workdir
-
-
-def _db():
-    from core.databases import get_sync_db
-    return get_sync_db()
-
-
-def _gamefiles(game_name: str) -> list[dict]:
-    try:
-        return list(_db()["gameforge_gamefiles"].find({"game_name": game_name}, {"_id": 0}))
-    except Exception:  # noqa: BLE001
-        return []
-
-
-def _register(build_id: str, game_name: str, kind: str, path: str) -> dict:
-    # Constrain artifact path to the builds sandbox (CodeQL #198/#199 leftovers).
-    root = os.path.realpath(_ARTIFACTS)
-    real = os.path.realpath(path)
-    if real != root and not real.startswith(root + os.sep):
-        raise ValueError("path escapes artifacts sandbox")
-    path = real
-    size = os.path.getsize(path)
-    with open(path, "rb") as f:
-        sha = hashlib.sha256(f.read()).hexdigest()
-    rec = {"build_id": build_id, "game_name": game_name, "kind": kind, "path": path,
-           "filename": os.path.basename(path), "size_bytes": size, "sha256": sha, "built_at": time.time()}
-    try:
-        _db()["gameforge_builds"].insert_one(dict(rec))
-    except Exception:  # noqa: BLE001
-        pass
-    return rec
-
 
 def _has_pyinstaller() -> bool:
     import importlib.util
