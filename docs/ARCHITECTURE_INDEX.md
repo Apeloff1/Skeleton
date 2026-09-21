@@ -18,9 +18,10 @@ When documents overlap, resolve them in this order:
 6. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
 7. **Frontier research atlas** — [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md).
 8. **Research experiment protocols** — [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md).
-9. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-10. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-11. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+9. **Research saturation accountability** — [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md).
+10. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+11. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+12. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
@@ -435,4 +436,19 @@ research_debt=RDE001..RDE036
 experiment_protocols=RXP001..RXP035
 production_authority_granted=false
 research_refresh_required=true
+```
+
+
+### Track AD accountability checkpoint
+
+Planning coverage and local reproduction are separate states. The current checkpoint records all 19 research domains as planning-covered while local reproduction remains pending.
+
+```text
+PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY
+domain_count=19
+planning_status=PLANNING_COVERED
+local_reproduction_status=REPRODUCTION_PENDING
+production_authority_granted=false
+signoff_required_for_reproduction_claims=true
+signoff_required_for_production_claims=true
 ```
