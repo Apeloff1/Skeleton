@@ -7759,5 +7759,13 @@
       "risks": [],
       "gaps": []
     }
-  ]
+  ],
+  "cross_cutting_catalogs": {
+    "edge_historical": {
+      "machine": "machine/ai_edge_case_catalog.json",
+      "human": "docs/plan/EDGE_CASES_HISTORICAL.md",
+      "breadth_freeze_compatible": true,
+      "policy": "Map cases into existing volumes and promote relevant entries to executable tests/invariants/evidence during implementation."
+    }
+  }
 }
