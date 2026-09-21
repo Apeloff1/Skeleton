@@ -16,9 +16,10 @@ When documents overlap, resolve them in this order:
 4. **Current construction sequence** — [BUILD_PLAN.md](BUILD_PLAN.md).
 5. **Research/evidence/evolution contract** — [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md).
 6. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
-7. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-8. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-9. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+7. **Frontier research atlas** — [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md).
+8. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+9. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+10. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
@@ -71,6 +72,7 @@ A round that is not indexed is considered structurally incomplete.
 | Massive upgrade program | `docs/BUILD_PLAN.md` Track AA | research/evidence evolution contract | ablation, full-stack benchmark, failure injection, migration + rollback |
 | Adversarial foundations | `docs/BUILD_PLAN.md` Track AB | `docs/architecture/masterplan-gap-audit.md` | P0 closure, fault injection, recovery, signed evidence |
 | Exotic architecture laboratory | `docs/BUILD_PLAN.md` Track AC | `docs/architecture/exotic-architecture-lab.md` + research source catalog | reproduction, falsification, kill criteria, sandbox, staged graduation |
+| Frontier research saturation | `docs/BUILD_PLAN.md` Track AD | `docs/architecture/frontier-research-atlas-2026.md` | source maturity, contradictions, reproduction, counterevidence, scale/system transfer |
 | Deployment | deploy/resilience packages | build plan | canary + rollback + observability |
 | Machine organization | `.machine/`, `machine/` | architecture index | deterministic inventory + drift checks |
 
@@ -145,7 +147,7 @@ No source may skip from discovery directly to production.
 
 ## 8. Build-plan frontier
 
-The current construction frontier is organized into Tracks Q–AC in [BUILD_PLAN.md](BUILD_PLAN.md):
+The current construction frontier is organized into Tracks Q–AD in [BUILD_PLAN.md](BUILD_PLAN.md):
 
 - **Q** — research evidence substrate;
 - **R** — model/training substrate;
@@ -159,7 +161,8 @@ The current construction frontier is organized into Tracks Q–AC in [BUILD_PLAN
 - **Z** — deep internals and optimizer control plane;
 - **AA** — rare massive upgrades and full-stack step changes;
 - **AB** — adversarial foundations and systemic hardening;
-- **AC** — exotic architecture laboratory.
+- **AC** — exotic architecture laboratory;
+- **AD** — research saturation, replication, and frontier synthesis.
 
 The tracks are deliberately cross-linked. A model improvement is not finished until its serving, security, evaluation, provenance, and rollback consequences are accounted for.
 
@@ -339,3 +342,41 @@ PLAN-20260921-EXOTIC-ARCHITECTURE-LAB
 scope=Track AC1..AC44
 production_authority_granted=false
 promotion_requires_track_ab_p0_closure=true
+
+
+## 14. Frontier research saturation authority
+
+The canonical dated synthesis is [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md).
+
+Track AD does not create a second research authority. It operationalizes Track Q by maintaining:
+
+- scoped research conclusions;
+- explicit confidence;
+- source maturity;
+- supporting and contradictory evidence;
+- unresolved variables;
+- local reproduction status;
+- scale/hardware/system transfer;
+- falsification conditions;
+- next experiments;
+- refresh dates.
+
+The 2026-09-21 atlas currently defines:
+
+- **FR001–FR114** research conclusions;
+- **RQ001–RQ010** unresolved frontier questions;
+- a staged local experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability;
+- an initial priority normalization list of fifty source records.
+
+Research conclusions are not production defaults. A conclusion can recommend a contract, baseline, experiment, watch state or negative guardrail. Architecture changes still require the normal experiment/ADR/shadow/canary path.
+
+Planning checkpoint:
+
+```text
+PLAN-20260921-FRONTIER-RESEARCH-SATURATION
+track=AD
+research_conclusions=FR001..FR114
+research_questions=RQ001..RQ010
+production_authority_granted=false
+research_refresh_required=true
+```
