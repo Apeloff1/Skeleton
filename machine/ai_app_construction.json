@@ -1,0 +1,1281 @@
+{
+  "schema_version": 1,
+  "construction_version": "2.0.0",
+  "architecture_tag": "arch-map/v2.0",
+  "status": "active",
+  "title": "Skeleton SOTA AI Application Construction Contract",
+  "purpose": "Canonical machine-readable build manual for constructing, assembling, validating, operating, and evolving the complete AI application without architecture gaps.",
+  "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+  "architecture_contract": "machine/architecture.json",
+  "runtime_contract": "skeleton/app/manifest.json",
+  "provider_bootstrap": {
+    "mandatory": true,
+    "mode": "fail_closed",
+    "rule": "Every AI development agent and every runtime model provider activation must load the active architecture and construction contracts before changing or serving the system.",
+    "must_read": [
+      "machine/manifest.json",
+      "machine/architecture.json",
+      "machine/ai_app_construction.json",
+      "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+    ],
+    "development_provider_entrypoints": [
+      {
+        "provider": "generic",
+        "path": "AGENTS.md",
+        "required": true
+      },
+      {
+        "provider": "anthropic-claude",
+        "path": "CLAUDE.md",
+        "required": true
+      },
+      {
+        "provider": "github-copilot",
+        "path": ".github/copilot-instructions.md",
+        "required": true
+      },
+      {
+        "provider": "cursor",
+        "path": ".cursor/rules/architecture.mdc",
+        "required": true
+      }
+    ],
+    "runtime_enforcement": {
+      "loader": "backend/core/provider_architecture.py",
+      "activation_boundary": "backend/core/ai_provider.py",
+      "docker_materialization": "backend/Dockerfile",
+      "receipt_required": true,
+      "undeclared_provider_policy": "deny"
+    }
+  },
+  "quality_attributes": {
+    "correctness": "Contract-first boundaries, deterministic validators, typed provider-neutral interfaces, evidence-backed release gates.",
+    "availability": "Bounded retries, circuit breaking, graceful degradation, durable checkpoints, provider failover, recovery drills.",
+    "latency": "Fast-path routing, streaming, caches, async I/O, parallel validation, isolated accelerators, budget-aware model selection.",
+    "security": "Least privilege, sealed secrets, SSRF-safe provider endpoints, input/output bounds, sandboxed tools, auditable authority.",
+    "privacy": "Explicit data classes, minimization, retention/deletion policy, tenant isolation, provider privacy ceilings.",
+    "observability": "Request/trace correlation, structured logs, metrics, cost/latency/quality telemetry, SLOs and evidence receipts.",
+    "evolvability": "Canonical owners, adapters before migrations, capability contracts, compatibility windows, architecture drift gates."
+  },
+  "build_principles": [
+    "contract before implementation",
+    "one canonical owner per capability",
+    "provider-neutral core with provider-specific adapters at the edge",
+    "fail closed on authority, secrets, provider registration, architecture drift, and destructive actions",
+    "bounded resource usage at every untrusted boundary",
+    "durability before autonomy",
+    "observability before optimization",
+    "evaluation before promotion",
+    "fallback before acceleration",
+    "migration by domain and interface, never by blind history merge"
+  ],
+  "planes": [
+    {
+      "id": "foundation",
+      "owner": "skeleton/kernel",
+      "state": "present",
+      "responsibility": "Core primitives, invariants, clocks, eventing, capability identities and error taxonomy.",
+      "depends_on": [],
+      "evidence": [
+        "skeleton/kernel",
+        "skeleton/primitives",
+        "skeleton/contracts"
+      ],
+      "required_interfaces": [
+        "stable error types",
+        "event/capability identity",
+        "deterministic serialization"
+      ],
+      "construction": [
+        "freeze primitive contracts",
+        "remove duplicate root primitives",
+        "define compatibility policy"
+      ],
+      "acceptance": [
+        "primitive unit suite",
+        "serialization compatibility",
+        "no heavy imports in skeleton/__init__.py"
+      ],
+      "failure_mode": "engine does not boot"
+    },
+    {
+      "id": "identity",
+      "owner": "skeleton/api",
+      "state": "present",
+      "responsibility": "Authentication, authorization, tenant/session identity and request authority.",
+      "depends_on": [
+        "foundation"
+      ],
+      "evidence": [
+        "skeleton/api/auth.py",
+        "skeleton/api/oauth.py",
+        "skeleton/vault"
+      ],
+      "required_interfaces": [
+        "principal",
+        "tenant",
+        "scope/capability",
+        "token/session lifecycle"
+      ],
+      "construction": [
+        "centralize identity extraction",
+        "bind authority to every write/tool action",
+        "define service identities"
+      ],
+      "acceptance": [
+        "unauthenticated denial tests",
+        "scope boundary tests",
+        "tenant isolation tests"
+      ],
+      "failure_mode": "deny protected operations"
+    },
+    {
+      "id": "configuration-secrets",
+      "owner": "skeleton/config",
+      "state": "present",
+      "responsibility": "Layered configuration, secret references, immutable deployment settings and validation.",
+      "depends_on": [
+        "foundation"
+      ],
+      "evidence": [
+        "skeleton/config",
+        "skeleton/vault",
+        "backend/services/vault_loader.py"
+      ],
+      "required_interfaces": [
+        "typed settings",
+        "secret reference",
+        "configuration snapshot"
+      ],
+      "construction": [
+        "separate secrets from config",
+        "validate at startup",
+        "record redacted effective configuration"
+      ],
+      "acceptance": [
+        "invalid config fails startup",
+        "secret redaction tests",
+        "snapshot reproducibility"
+      ],
+      "failure_mode": "fail startup or disable optional capability"
+    },
+    {
+      "id": "model-provider",
+      "owner": "backend/core/ai_provider.py",
+      "state": "present",
+      "responsibility": "Provider-neutral model request/response boundary and concrete runtime provider adapters.",
+      "depends_on": [
+        "foundation",
+        "configuration-secrets"
+      ],
+      "evidence": [
+        "backend/core/ai_provider.py",
+        "backend/core/ai_provider_compat.py",
+        "backend/emergentintegrations/llm/chat.py"
+      ],
+      "required_interfaces": [
+        "ProviderRequest",
+        "ProviderResponse",
+        "ProviderAdapter",
+        "provider architecture receipt"
+      ],
+      "construction": [
+        "provider reads mandatory construction contract",
+        "declare capabilities/models",
+        "bound retries/timeouts",
+        "normalize errors",
+        "never expose credentials"
+      ],
+      "acceptance": [
+        "provider contract gate",
+        "SDK isolation tests",
+        "unsafe base URL rejection",
+        "empty/invalid output rejection"
+      ],
+      "failure_mode": "provider unavailable, no credential leakage"
+    },
+    {
+      "id": "model-routing",
+      "owner": "backend/core/model_router.py",
+      "state": "present",
+      "responsibility": "Capability/privacy/cost/latency/quality-aware model selection with deterministic fallback ordering.",
+      "depends_on": [
+        "model-provider",
+        "observability"
+      ],
+      "evidence": [
+        "backend/core/model_router.py"
+      ],
+      "required_interfaces": [
+        "ModelEndpoint",
+        "RouteRequest",
+        "RouteDecision",
+        "endpoint telemetry"
+      ],
+      "construction": [
+        "register only declared providers",
+        "score against budgets",
+        "separate hard rejection from preference scoring",
+        "persist routing evidence"
+      ],
+      "acceptance": [
+        "no-route tests",
+        "privacy ceiling tests",
+        "cost/latency budget tests",
+        "deterministic tie-break tests"
+      ],
+      "failure_mode": "NoRoute with sanitized evidence"
+    },
+    {
+      "id": "prompt-context",
+      "owner": "skeleton/context",
+      "state": "present",
+      "responsibility": "System instructions, prompt composition, context budgeting, provenance and injection-resistant context assembly.",
+      "depends_on": [
+        "foundation",
+        "identity",
+        "retrieval"
+      ],
+      "evidence": [
+        "skeleton/context",
+        "skeleton/contexts",
+        "backend/core/ai_provider.py"
+      ],
+      "required_interfaces": [
+        "context envelope",
+        "instruction hierarchy",
+        "token/character budget",
+        "source provenance"
+      ],
+      "construction": [
+        "separate instructions from untrusted content",
+        "label sources",
+        "trim deterministically",
+        "protect policy/system segments"
+      ],
+      "acceptance": [
+        "prompt injection regression suite",
+        "budget tests",
+        "source attribution tests"
+      ],
+      "failure_mode": "drop unsafe/unbounded context"
+    },
+    {
+      "id": "orchestration",
+      "owner": "skeleton/intelligence",
+      "state": "present",
+      "responsibility": "Task decomposition, plan execution, agent coordination and workflow state transitions.",
+      "depends_on": [
+        "foundation",
+        "model-routing",
+        "prompt-context",
+        "tool-runtime",
+        "memory"
+      ],
+      "evidence": [
+        "skeleton/intelligence/orchestrator.py",
+        "skeleton/intelligence/pipeline_orchestrator.py",
+        "skeleton/agents"
+      ],
+      "required_interfaces": [
+        "task",
+        "plan",
+        "step",
+        "checkpoint",
+        "result",
+        "cancellation"
+      ],
+      "construction": [
+        "make steps idempotent",
+        "persist plan state",
+        "bound fan-out",
+        "require authority per action"
+      ],
+      "acceptance": [
+        "resume tests",
+        "cancellation tests",
+        "fan-out quota tests",
+        "duplicate execution tests"
+      ],
+      "failure_mode": "checkpoint and stop safely"
+    },
+    {
+      "id": "reasoning-verification",
+      "owner": "skeleton/intelligence",
+      "state": "present",
+      "responsibility": "Verification, uncertainty, repair, calibration and evidence checks around generated plans/results.",
+      "depends_on": [
+        "model-routing",
+        "orchestration",
+        "evaluation"
+      ],
+      "evidence": [
+        "skeleton/intelligence/verifier.py",
+        "skeleton/intelligence/verification.py",
+        "skeleton/intelligence/uncertainty.py",
+        "skeleton/intelligence/plan_verifier.py"
+      ],
+      "required_interfaces": [
+        "verdict",
+        "confidence",
+        "evidence",
+        "repair instruction"
+      ],
+      "construction": [
+        "separate generator/verifier roles",
+        "require evidence for high-impact claims/actions",
+        "calibrate confidence"
+      ],
+      "acceptance": [
+        "falsification tests",
+        "repair convergence tests",
+        "calibration evaluation"
+      ],
+      "failure_mode": "degrade to unverified result or block high-impact action"
+    },
+    {
+      "id": "tool-runtime",
+      "owner": "skeleton/skills",
+      "state": "present",
+      "responsibility": "Tool discovery, typed invocation, authority checks, sandboxing, idempotency and result normalization.",
+      "depends_on": [
+        "foundation",
+        "identity",
+        "configuration-secrets",
+        "observability"
+      ],
+      "evidence": [
+        "skeleton/skills",
+        "backend/services/tool_registry.py",
+        "skeleton/api/admit_write.py"
+      ],
+      "required_interfaces": [
+        "tool manifest",
+        "input schema",
+        "authority",
+        "execution receipt",
+        "result/error"
+      ],
+      "construction": [
+        "register tools declaratively",
+        "validate arguments",
+        "separate read/write/destructive authority",
+        "sandbox untrusted execution"
+      ],
+      "acceptance": [
+        "schema fuzzing",
+        "authority denial",
+        "idempotency",
+        "timeout/resource limit tests"
+      ],
+      "failure_mode": "tool denied or bounded failure receipt"
+    },
+    {
+      "id": "memory",
+      "owner": "skeleton/memory",
+      "state": "present",
+      "responsibility": "Working, episodic, semantic and durable memory with tenant isolation and retention.",
+      "depends_on": [
+        "foundation",
+        "identity",
+        "data-persistence",
+        "governance"
+      ],
+      "evidence": [
+        "skeleton/memory",
+        "backend/services/memory_engine.py",
+        "backend/services/cag.py",
+        "backend/services/mag.py"
+      ],
+      "required_interfaces": [
+        "memory record",
+        "namespace",
+        "retention class",
+        "write/read/delete",
+        "provenance"
+      ],
+      "construction": [
+        "separate short/long-term memory",
+        "namespace by tenant/user/task",
+        "deduplicate",
+        "expire/delete deterministically"
+      ],
+      "acceptance": [
+        "cross-tenant isolation",
+        "retention/deletion",
+        "replay",
+        "corruption recovery"
+      ],
+      "failure_mode": "memory miss without authority escalation"
+    },
+    {
+      "id": "retrieval",
+      "owner": "skeleton/retrieval",
+      "state": "present",
+      "responsibility": "Ingestion, chunking, embedding/search, hybrid retrieval, ranking, citation and freshness control.",
+      "depends_on": [
+        "data-persistence",
+        "memory",
+        "model-provider",
+        "governance"
+      ],
+      "evidence": [
+        "skeleton/retrieval",
+        "backend/services/rag_service.py",
+        "backend/services/agent_knowledge_rag.py"
+      ],
+      "required_interfaces": [
+        "document",
+        "chunk",
+        "index",
+        "query",
+        "ranked evidence",
+        "citation"
+      ],
+      "construction": [
+        "content-address source",
+        "preserve provenance",
+        "hybrid retrieve",
+        "rerank",
+        "deduplicate",
+        "enforce ACL at query time"
+      ],
+      "acceptance": [
+        "recall/precision eval",
+        "citation correctness",
+        "ACL leakage tests",
+        "freshness invalidation"
+      ],
+      "failure_mode": "return insufficient-evidence result"
+    },
+    {
+      "id": "data-persistence",
+      "owner": "skeleton/persistence",
+      "state": "present",
+      "responsibility": "Durable application/model state, transactions, migrations, backups and vector storage.",
+      "depends_on": [
+        "foundation",
+        "configuration-secrets"
+      ],
+      "evidence": [
+        "skeleton/persistence",
+        "docker-compose.yml",
+        "backend/services/database.py"
+      ],
+      "required_interfaces": [
+        "transaction",
+        "repository",
+        "migration",
+        "backup/restore",
+        "health"
+      ],
+      "construction": [
+        "schema migrations",
+        "transaction boundaries",
+        "indexes",
+        "backup cadence",
+        "restore proof"
+      ],
+      "acceptance": [
+        "migration forward/backward tests",
+        "backup restore drill",
+        "consistency tests"
+      ],
+      "failure_mode": "read-only/degraded mode where safe"
+    },
+    {
+      "id": "jobs-durability",
+      "owner": "skeleton/agents",
+      "state": "present",
+      "responsibility": "Durable asynchronous work, leases, retries, checkpoints, deduplication, scheduling and recovery.",
+      "depends_on": [
+        "data-persistence",
+        "identity",
+        "observability"
+      ],
+      "evidence": [
+        "skeleton/agents/swarm_checkpoint.py",
+        "skeleton/agents/swarm_durable.py",
+        "skeleton/agents/swarm_retry.py",
+        "skeleton/agents/swarm_idempotency.py"
+      ],
+      "required_interfaces": [
+        "job",
+        "lease",
+        "checkpoint",
+        "retry policy",
+        "dead-letter/recovery"
+      ],
+      "construction": [
+        "persist before execute",
+        "lease/fence ownership",
+        "idempotency keys",
+        "bounded retry with jitter",
+        "dead-letter evidence"
+      ],
+      "acceptance": [
+        "crash recovery",
+        "duplicate delivery",
+        "lease expiry",
+        "retry storm tests"
+      ],
+      "failure_mode": "park work with recovery receipt"
+    },
+    {
+      "id": "artifact-files",
+      "owner": "skeleton/artifact_plane",
+      "state": "present",
+      "responsibility": "User/model files, generated artifacts, content addressing, scanning, metadata and lifecycle.",
+      "depends_on": [
+        "data-persistence",
+        "identity",
+        "governance",
+        "security-safety"
+      ],
+      "evidence": [
+        "skeleton/artifact_plane",
+        "skeleton/assets"
+      ],
+      "required_interfaces": [
+        "artifact id",
+        "content hash",
+        "metadata",
+        "scan state",
+        "retention"
+      ],
+      "construction": [
+        "stream uploads",
+        "limit size/type",
+        "malware scan",
+        "separate metadata/blob",
+        "signed access"
+      ],
+      "acceptance": [
+        "large/invalid upload tests",
+        "malware gate",
+        "hash integrity",
+        "access expiry"
+      ],
+      "failure_mode": "quarantine artifact"
+    },
+    {
+      "id": "application-api",
+      "owner": "backend",
+      "state": "present",
+      "responsibility": "Product/business API, canonical control plane and application workflows.",
+      "depends_on": [
+        "identity",
+        "orchestration",
+        "model-provider",
+        "memory",
+        "retrieval",
+        "artifact-files"
+      ],
+      "evidence": [
+        "backend/server.py",
+        "backend/routes",
+        "backend/core/product_control_runtime.py"
+      ],
+      "required_interfaces": [
+        "versioned API",
+        "request bounds",
+        "idempotency",
+        "problem details",
+        "health/readiness"
+      ],
+      "construction": [
+        "thin route handlers",
+        "service/domain separation",
+        "stable schemas",
+        "sanitize provider failures"
+      ],
+      "acceptance": [
+        "OpenAPI/schema tests",
+        "route ownership tests",
+        "auth/idempotency tests"
+      ],
+      "failure_mode": "typed 4xx/5xx without secret leakage"
+    },
+    {
+      "id": "engine-api",
+      "owner": "skeleton/api",
+      "state": "present",
+      "responsibility": "Engine-native API for health, orchestration, retrieval, agents and governed engine operations.",
+      "depends_on": [
+        "identity",
+        "orchestration",
+        "memory",
+        "retrieval",
+        "observability"
+      ],
+      "evidence": [
+        "skeleton/api/server.py",
+        "skeleton/api/routes.py",
+        "skeleton/api/gateway.py"
+      ],
+      "required_interfaces": [
+        "/api/v1 versioning",
+        "health/live",
+        "health/ready",
+        "engine operation contracts"
+      ],
+      "construction": [
+        "keep engine ownership separate from product routes",
+        "version contracts",
+        "bound requests"
+      ],
+      "acceptance": [
+        "route collision gate",
+        "liveness/readiness",
+        "version compatibility tests"
+      ],
+      "failure_mode": "engine-specific typed failure"
+    },
+    {
+      "id": "product-experience",
+      "owner": "frontend",
+      "state": "present",
+      "responsibility": "Human interaction shell, streaming state, conversation/task UX, artifacts, errors, settings and control views.",
+      "depends_on": [
+        "application-api",
+        "engine-api",
+        "identity",
+        "observability"
+      ],
+      "evidence": [
+        "frontend/app/product.tsx",
+        "frontend/src/product",
+        "frontend/utils/apiBase.ts"
+      ],
+      "required_interfaces": [
+        "canonical endpoint resolver",
+        "stream/event reducer",
+        "optimistic state policy",
+        "accessible error state"
+      ],
+      "construction": [
+        "single network resolver",
+        "explicit loading/error/retry states",
+        "stream cancellation",
+        "offline/reconnect behavior"
+      ],
+      "acceptance": [
+        "typecheck",
+        "web export",
+        "route registry",
+        "E2E happy/degraded paths",
+        "accessibility"
+      ],
+      "failure_mode": "recoverable user-facing degraded state"
+    },
+    {
+      "id": "streaming-realtime",
+      "owner": "backend",
+      "state": "partial",
+      "responsibility": "Token/event streaming, progress, cancellation, reconnect and ordered delivery.",
+      "depends_on": [
+        "application-api",
+        "engine-api",
+        "jobs-durability",
+        "observability"
+      ],
+      "evidence": [
+        "skeleton/agents/messaging.py",
+        "skeleton/api/webhooks.py"
+      ],
+      "required_interfaces": [
+        "event id",
+        "stream cursor",
+        "heartbeat",
+        "cancel",
+        "resume"
+      ],
+      "construction": [
+        "choose SSE/WebSocket per contract",
+        "sequence events",
+        "resume from cursor",
+        "backpressure",
+        "disconnect cancellation"
+      ],
+      "acceptance": [
+        "slow client",
+        "disconnect/reconnect",
+        "out-of-order/duplicate event tests"
+      ],
+      "failure_mode": "resume or fall back to polling"
+    },
+    {
+      "id": "security-safety",
+      "owner": "skeleton/security",
+      "state": "present",
+      "responsibility": "Input/output safety, policy enforcement, exploit resistance, network boundaries and high-impact action controls.",
+      "depends_on": [
+        "identity",
+        "configuration-secrets",
+        "tool-runtime"
+      ],
+      "evidence": [
+        "skeleton/security",
+        "skeleton/resilience",
+        "skeleton/api/request_bounds.py"
+      ],
+      "required_interfaces": [
+        "policy decision",
+        "risk class",
+        "quarantine/deny",
+        "security receipt"
+      ],
+      "construction": [
+        "validate every external boundary",
+        "SSRF protections",
+        "tool allowlists",
+        "output handling",
+        "dependency/malware/secret gates"
+      ],
+      "acceptance": [
+        "abuse corpus",
+        "SSRF/path/deserialization tests",
+        "secret scan",
+        "malware gate"
+      ],
+      "failure_mode": "deny/quarantine with sanitized audit"
+    },
+    {
+      "id": "governance",
+      "owner": "skeleton/vault",
+      "state": "partial",
+      "responsibility": "Data classification, consent, retention, deletion, export, auditability and provider data-use policy.",
+      "depends_on": [
+        "identity",
+        "configuration-secrets"
+      ],
+      "evidence": [
+        "skeleton/vault",
+        "skeleton/artifact_plane"
+      ],
+      "required_interfaces": [
+        "data class",
+        "retention rule",
+        "deletion request",
+        "export request",
+        "provider privacy policy"
+      ],
+      "construction": [
+        "classify data before provider/tool transfer",
+        "tenant deletion workflow",
+        "audit access/export",
+        "document provider retention"
+      ],
+      "acceptance": [
+        "deletion propagation",
+        "export completeness",
+        "provider privacy routing tests"
+      ],
+      "failure_mode": "block transfer when classification/policy unknown"
+    },
+    {
+      "id": "resilience",
+      "owner": "skeleton/reliability",
+      "state": "present",
+      "responsibility": "Timeouts, retries, circuit breakers, load shedding, provider failover, backup/restore and chaos validation.",
+      "depends_on": [
+        "observability",
+        "jobs-durability",
+        "model-routing",
+        "data-persistence"
+      ],
+      "evidence": [
+        "skeleton/reliability",
+        "skeleton/resilience",
+        "skeleton/agents/swarm_circuit.py",
+        "skeleton/agents/swarm_failover.py"
+      ],
+      "required_interfaces": [
+        "retry policy",
+        "circuit state",
+        "degradation mode",
+        "recovery plan"
+      ],
+      "construction": [
+        "set budgets per dependency",
+        "never infinite retry",
+        "test partial outages",
+        "protect downstreams with concurrency limits"
+      ],
+      "acceptance": [
+        "provider outage",
+        "database loss",
+        "network partition",
+        "retry storm",
+        "restore drill"
+      ],
+      "failure_mode": "bounded degradation"
+    },
+    {
+      "id": "observability",
+      "owner": "skeleton/observability",
+      "state": "present",
+      "responsibility": "Structured logs, traces, metrics, correlation, provider telemetry, cost and SLO evidence.",
+      "depends_on": [
+        "foundation"
+      ],
+      "evidence": [
+        "skeleton/observability",
+        "skeleton/api/telemetry.py",
+        "skeleton/cognition/telemetry.py"
+      ],
+      "required_interfaces": [
+        "trace id",
+        "request id",
+        "tenant-safe log fields",
+        "metric",
+        "span",
+        "SLO"
+      ],
+      "construction": [
+        "correlate user->API->orchestrator->provider/tool",
+        "redact secrets/content",
+        "measure latency tokens cost quality"
+      ],
+      "acceptance": [
+        "trace continuity tests",
+        "redaction tests",
+        "SLO dashboard/evidence"
+      ],
+      "failure_mode": "service continues but promotion blocked if observability absent"
+    },
+    {
+      "id": "evaluation",
+      "owner": "skeleton/eval",
+      "state": "present",
+      "responsibility": "Offline/online evaluation, golden tasks, regression thresholds, safety/quality/latency/cost measurement.",
+      "depends_on": [
+        "observability",
+        "reasoning-verification"
+      ],
+      "evidence": [
+        "skeleton/eval",
+        "skeleton/intelligence/eval_framework.py",
+        "eval/fixtures"
+      ],
+      "required_interfaces": [
+        "eval case",
+        "dataset version",
+        "metric",
+        "threshold",
+        "promotion verdict"
+      ],
+      "construction": [
+        "version datasets",
+        "separate train/tune/eval",
+        "measure task success and safety",
+        "record provider/model config"
+      ],
+      "acceptance": [
+        "deterministic smoke eval",
+        "quality regression gate",
+        "safety suite",
+        "latency/cost budget gate"
+      ],
+      "failure_mode": "block promotion"
+    },
+    {
+      "id": "feedback-learning",
+      "owner": "skeleton/learning",
+      "state": "partial",
+      "responsibility": "User feedback, outcome signals, experiments and bounded adaptation without uncontrolled online mutation.",
+      "depends_on": [
+        "evaluation",
+        "observability",
+        "governance"
+      ],
+      "evidence": [
+        "skeleton/learning",
+        "skeleton/intelligence/adaptive.py",
+        "skeleton/intelligence/experiment_tracker.py"
+      ],
+      "required_interfaces": [
+        "feedback event",
+        "experiment assignment",
+        "learning proposal",
+        "promotion receipt"
+      ],
+      "construction": [
+        "capture explicit/implicit feedback",
+        "separate production data from promotion",
+        "require eval before behavior change"
+      ],
+      "acceptance": [
+        "experiment isolation",
+        "rollback",
+        "data consent",
+        "promotion gate"
+      ],
+      "failure_mode": "retain baseline behavior"
+    },
+    {
+      "id": "cost-capacity",
+      "owner": "skeleton/intelligence",
+      "state": "partial",
+      "responsibility": "Token, provider, storage, concurrency and latency budgeting with admission control.",
+      "depends_on": [
+        "model-routing",
+        "observability",
+        "jobs-durability"
+      ],
+      "evidence": [
+        "skeleton/intelligence/capacity_planner.py",
+        "skeleton/agents/swarm_quota.py",
+        "skeleton/agents/swarm_load_shed.py"
+      ],
+      "required_interfaces": [
+        "budget",
+        "quota",
+        "cost estimate",
+        "admission decision"
+      ],
+      "construction": [
+        "budget per request/tenant",
+        "rate limits",
+        "concurrency caps",
+        "cache where semantics permit"
+      ],
+      "acceptance": [
+        "quota exhaustion",
+        "load test",
+        "budget route selection",
+        "graceful shedding"
+      ],
+      "failure_mode": "reject/defer low-priority work"
+    },
+    {
+      "id": "operator-control",
+      "owner": "backend/core/product_control_runtime.py",
+      "state": "present",
+      "responsibility": "Administrative readiness, deployment preflight, controlled execution, receipts and audit.",
+      "depends_on": [
+        "application-api",
+        "observability",
+        "security-safety",
+        "deployment-release"
+      ],
+      "evidence": [
+        "backend/core/product_control_runtime.py",
+        "backend/routes/ops.py",
+        "frontend/src/product/productControlClient.ts"
+      ],
+      "required_interfaces": [
+        "readiness",
+        "preflight",
+        "admit",
+        "execute",
+        "receipt",
+        "audit"
+      ],
+      "construction": [
+        "separate read/write authority",
+        "preflight before mutation",
+        "immutable operation receipt"
+      ],
+      "acceptance": [
+        "admin auth",
+        "preflight denial",
+        "receipt integrity",
+        "audit ordering"
+      ],
+      "failure_mode": "no mutation without admitted operation"
+    },
+    {
+      "id": "deployment-release",
+      "owner": "skeleton/deploy",
+      "state": "present",
+      "responsibility": "Build, package, deploy, migrations, health gates, canary/rollback and reproducible releases.",
+      "depends_on": [
+        "evaluation",
+        "resilience",
+        "observability",
+        "security-safety",
+        "application-api",
+        "engine-api",
+        "product-experience"
+      ],
+      "evidence": [
+        "skeleton/deploy",
+        "skeleton/deployment",
+        "docker-compose.yml",
+        "Dockerfile",
+        "backend/Dockerfile",
+        "frontend/Dockerfile"
+      ],
+      "required_interfaces": [
+        "build artifact",
+        "release manifest",
+        "preflight",
+        "health/readiness",
+        "rollback"
+      ],
+      "construction": [
+        "immutable images",
+        "SBOM/provenance",
+        "migrate before traffic",
+        "canary",
+        "automatic rollback criteria"
+      ],
+      "acceptance": [
+        "clean build",
+        "compose config",
+        "image smoke",
+        "migration rehearsal",
+        "rollback drill"
+      ],
+      "failure_mode": "do not promote or rollback"
+    }
+  ],
+  "construction_phases": [
+    {
+      "order": 0,
+      "id": "contracts-first",
+      "goal": "Freeze canonical contracts and bootstrap rules before implementation.",
+      "planes": [
+        "foundation",
+        "configuration-secrets"
+      ],
+      "exit_gates": [
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    },
+    {
+      "order": 1,
+      "id": "secure-runtime-foundation",
+      "goal": "Establish identity, persistence, security and observability required by every higher plane.",
+      "planes": [
+        "identity",
+        "data-persistence",
+        "security-safety",
+        "governance",
+        "observability"
+      ],
+      "exit_gates": [
+        "security-boundaries",
+        "data-durability",
+        "traceability"
+      ]
+    },
+    {
+      "order": 2,
+      "id": "model-plane",
+      "goal": "Make provider execution neutral, declared, measurable, bounded and routable.",
+      "planes": [
+        "model-provider",
+        "model-routing",
+        "cost-capacity"
+      ],
+      "exit_gates": [
+        "provider-contract",
+        "routing-policy",
+        "provider-failure"
+      ]
+    },
+    {
+      "order": 3,
+      "id": "knowledge-plane",
+      "goal": "Construct governed memory, retrieval and context assembly.",
+      "planes": [
+        "memory",
+        "retrieval",
+        "prompt-context"
+      ],
+      "exit_gates": [
+        "tenant-isolation",
+        "retrieval-quality",
+        "context-safety"
+      ]
+    },
+    {
+      "order": 4,
+      "id": "cognition-plane",
+      "goal": "Construct orchestration, reasoning verification and durable job execution.",
+      "planes": [
+        "orchestration",
+        "reasoning-verification",
+        "jobs-durability"
+      ],
+      "exit_gates": [
+        "checkpoint-resume",
+        "verification",
+        "bounded-autonomy"
+      ]
+    },
+    {
+      "order": 5,
+      "id": "action-plane",
+      "goal": "Enable tools and artifacts with explicit authority and receipts.",
+      "planes": [
+        "tool-runtime",
+        "artifact-files"
+      ],
+      "exit_gates": [
+        "tool-authority",
+        "artifact-integrity"
+      ]
+    },
+    {
+      "order": 6,
+      "id": "service-plane",
+      "goal": "Expose stable engine/application APIs and realtime progress.",
+      "planes": [
+        "engine-api",
+        "application-api",
+        "streaming-realtime"
+      ],
+      "exit_gates": [
+        "api-contract",
+        "stream-recovery",
+        "health-readiness"
+      ]
+    },
+    {
+      "order": 7,
+      "id": "product-plane",
+      "goal": "Assemble the human product around the canonical service boundaries.",
+      "planes": [
+        "product-experience",
+        "operator-control"
+      ],
+      "exit_gates": [
+        "product-e2e",
+        "operator-preflight"
+      ]
+    },
+    {
+      "order": 8,
+      "id": "quality-plane",
+      "goal": "Prove quality, safety, resilience and learning discipline.",
+      "planes": [
+        "evaluation",
+        "resilience",
+        "feedback-learning"
+      ],
+      "exit_gates": [
+        "quality-regression",
+        "chaos-recovery",
+        "learning-promotion"
+      ]
+    },
+    {
+      "order": 9,
+      "id": "release-plane",
+      "goal": "Produce reproducible, observable, reversible production releases.",
+      "planes": [
+        "deployment-release"
+      ],
+      "exit_gates": [
+        "release-evidence",
+        "rollback-proof"
+      ]
+    },
+    {
+      "order": 10,
+      "id": "continuous-evolution",
+      "goal": "Evolve by measured domain changes while preserving all contracts.",
+      "planes": [],
+      "exit_gates": [
+        "architecture-drift",
+        "eval-nonregression",
+        "operational-slo"
+      ]
+    }
+  ],
+  "acceptance_gates": [
+    {
+      "id": "architecture-map",
+      "kind": "static",
+      "command": "python scripts/check_architecture_map.py",
+      "required": true
+    },
+    {
+      "id": "construction-contract",
+      "kind": "static",
+      "command": "python scripts/check_ai_app_construction.py",
+      "required": true
+    },
+    {
+      "id": "provider-bootstrap",
+      "kind": "static",
+      "command": "python scripts/check_provider_bootstrap.py",
+      "required": true
+    },
+    {
+      "id": "app-assembly",
+      "kind": "integration",
+      "command": "python scripts/check_app_assembly.py",
+      "required": true
+    },
+    {
+      "id": "focused-tests",
+      "kind": "test",
+      "command": "python -m pytest -q skeleton/testing/test_architecture_map.py skeleton/testing/test_ai_app_construction.py",
+      "required": true
+    },
+    {
+      "id": "backend-provider-tests",
+      "kind": "test",
+      "command": "python -m pytest -q backend/tests/test_ai_provider_adapter.py backend/tests/test_provider_architecture.py",
+      "required": true
+    },
+    {
+      "id": "runtime-preflight",
+      "kind": "runtime",
+      "command": "python -m skeleton app check",
+      "required": true
+    },
+    {
+      "id": "compose-topology",
+      "kind": "runtime",
+      "command": "docker compose -f docker-compose.yml config --quiet",
+      "required": true
+    },
+    {
+      "id": "release-evidence",
+      "kind": "release",
+      "command": "repository required checks + immutable artifact provenance",
+      "required": true
+    }
+  ],
+  "runtime_model_providers": [
+    {
+      "id": "openai",
+      "state": "active",
+      "adapter": "backend/core/ai_provider.py:OpenAIProviderAdapter",
+      "protocol": "OpenAI Responses API",
+      "architecture_read_required": true,
+      "construction_manual_read_required": true,
+      "activation_receipt_required": true,
+      "credentials": [
+        "OPENAI_API_KEY"
+      ],
+      "optional_configuration": [
+        "OPENAI_BASE_URL",
+        "AI_MODEL",
+        "AI_TIMEOUT_SECONDS",
+        "AI_MAX_RETRIES"
+      ],
+      "capabilities": [
+        "text-generation"
+      ],
+      "undeclared_capability_policy": "deny",
+      "network_policy": "https-only; no URL credentials; block localhost, metadata endpoints and non-global literal IPs"
+    }
+  ],
+  "gap_policy": {
+    "unknown_plane": "forbidden",
+    "undeclared_provider": "forbidden",
+    "undeclared_runtime_service": "forbidden",
+    "unowned_interface": "forbidden",
+    "missing_acceptance_gate": "forbidden",
+    "partial_plane_policy": "allowed only when construction requirements and promotion gates remain explicit",
+    "promotion_rule": "No plane moves to complete/present without executable evidence for its acceptance conditions."
+  }
+}
