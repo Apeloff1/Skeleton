@@ -14,6 +14,10 @@ python -m skeleton app up
 # Verify the assembled public surfaces
 python -m skeleton app smoke
 
+# Optional operating modes
+python -m skeleton app up --hot
+python -m skeleton app up --production
+
 # Boot only the in-process Skeleton engine runtime
 python -m skeleton run
 
