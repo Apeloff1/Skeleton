@@ -29,6 +29,12 @@ from skeleton.vault.data_lifecycle import (
     GovernedDataRecord,
     LifecycleState,
 )
+from skeleton.vault.lifecycle_adapters import (
+    DeletionExecutionResult,
+    GovernedExport,
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+)
 
 
 def _required_text(value: object, field: str) -> str:
@@ -365,6 +371,53 @@ class GovernanceRegistry:
 
     def export_inventory(self, tenant_id: str) -> dict[str, Any]:
         return self.lifecycle.export_inventory(tenant_id)
+
+    async def delete_with_adapters(
+        self,
+        adapters: LifecycleAdapterRegistry,
+        tenant_id: str,
+        *,
+        record_ids: Iterable[str] | None = None,
+        reason: str = "tenant-request",
+        now: float | None = None,
+    ) -> DeletionExecutionResult:
+        """Plan and physically execute governed deletion through adapters."""
+
+        plan = self.lifecycle.request_deletion(
+            tenant_id,
+            record_ids=record_ids,
+            reason=reason,
+            now=now,
+        )
+        return await LifecycleExecutor(
+            self.lifecycle,
+            adapters,
+        ).execute_deletion_plan(plan, now=now)
+
+    async def execute_retention_with_adapters(
+        self,
+        adapters: LifecycleAdapterRegistry,
+        *,
+        now: float | None = None,
+    ) -> tuple[DeletionExecutionResult, ...]:
+        """Plan expired records and physically delete them through adapters."""
+
+        return await LifecycleExecutor(
+            self.lifecycle,
+            adapters,
+        ).execute_retention_expiry(now=now)
+
+    async def export_with_adapters(
+        self,
+        adapters: LifecycleAdapterRegistry,
+        tenant_id: str,
+    ) -> GovernedExport:
+        """Export canonical payloads through owner-plane adapters."""
+
+        return await LifecycleExecutor(
+            self.lifecycle,
+            adapters,
+        ).export_tenant(tenant_id)
 
     def request_deletion(self, *args: Any, **kwargs: Any):
         return self.lifecycle.request_deletion(*args, **kwargs)
