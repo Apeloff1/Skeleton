@@ -9,12 +9,14 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from skeleton.app.assembly import load_manifest
 from skeleton.app.bootstrap import public_bootstrap_payload
 from core.databases import core_db
 
-router = APIRouter(prefix="/api/app", tags=["application"])
+_MANIFEST = load_manifest()
+router = APIRouter(prefix=_MANIFEST.public_contract["prefix"], tags=["application"])
 
 
 def _engine_internal_base() -> str:
@@ -86,17 +88,14 @@ def _probe_engine(timeout_s: float) -> dict[str, object]:
         }
 
 
-@router.get("/bootstrap")
+@router.get(_MANIFEST.public_contract["bootstrap"])
 def app_bootstrap() -> dict[str, object]:
     """Expose the sanitized canonical application contract to clients."""
 
     return public_bootstrap_payload()
 
 
-@router.get("/status")
-async def app_status(timeout_ms: int = 2500) -> dict[str, object]:
-    """Aggregate the public application runtime behind one backend contract."""
-
+async def _runtime_status(timeout_ms: int) -> dict[str, object]:
     timeout_ms = max(250, min(int(timeout_ms), 10_000))
     bootstrap = public_bootstrap_payload()
     timeout_s = timeout_ms / 1000.0
@@ -119,6 +118,22 @@ async def app_status(timeout_ms: int = 2500) -> dict[str, object]:
         "ok": all(bool(item["ok"]) for item in services),
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "application": bootstrap["application"],
+        "contract": bootstrap["contract"],
         "scope": "public-runtime",
         "services": services,
     }
+
+
+@router.get(_MANIFEST.public_contract["status"])
+async def app_status(timeout_ms: int = 2500) -> dict[str, object]:
+    """Aggregate the public application runtime behind one backend contract."""
+
+    return await _runtime_status(timeout_ms)
+
+
+@router.get(_MANIFEST.public_contract["ready"])
+async def app_ready(timeout_ms: int = 2500) -> JSONResponse:
+    """Return a fail-closed readiness verdict for the assembled application."""
+
+    payload = await _runtime_status(timeout_ms)
+    return JSONResponse(status_code=200 if payload["ok"] else 503, content=payload)
