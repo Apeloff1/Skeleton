@@ -12,6 +12,8 @@ LEDGER = ROOT / "machine" / "ai_build_accountability.json"
 HUMAN = ROOT / "docs" / "plan" / "BUILD_ACCOUNTABILITY_LEDGER.md"
 MASTER = ROOT / "machine" / "ai_master_plan.json"
 QUEUE = ROOT / "machine" / "ai_build_queue.json"
+CATALOG = ROOT / "machine" / "ai_edge_case_catalog.json"
+PRIORITY = ROOT / "machine" / "ai_edge_case_priority_queue.json"
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 CHECK_RE = re.compile(r"^- \\[( |x)\\] .(ACC-[^\x60]+).", re.MULTILINE)
@@ -101,7 +103,7 @@ def _exception_errors(record_id: str, exc: object) -> list[str]:
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for path in (LEDGER, HUMAN, MASTER, QUEUE):
+    for path in (LEDGER, HUMAN, MASTER, QUEUE, CATALOG, PRIORITY):
         if not path.is_file():
             errors.append(f"missing {path.relative_to(ROOT)}")
     if errors:
@@ -110,6 +112,8 @@ def validate() -> list[str]:
     ledger = json.loads(LEDGER.read_text(encoding="utf-8"))
     master = json.loads(MASTER.read_text(encoding="utf-8"))
     queue = json.loads(QUEUE.read_text(encoding="utf-8"))
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
+    priority = json.loads(PRIORITY.read_text(encoding="utf-8"))
     records = ledger.get("records")
     if not isinstance(records, list):
         return ["ledger.records must be a list"]
@@ -119,6 +123,7 @@ def validate() -> list[str]:
         + [f"ACC-WP-W{i:02d}" for i in range(31)]
         + [f"ACC-{task['task_id']}" for task in queue["tasks"]]
         + [f"ACC-{vs}" for vs in master["vertical_slices"]]
+        + [f"ACC-{entry['id']}" for entry in catalog["entries"]]
     )
     ids = [record.get("id") for record in records if isinstance(record, dict)]
     if ids != expected_ids:
@@ -135,6 +140,8 @@ def validate() -> list[str]:
         errors.append("tracked_counts.queue_tasks is stale")
     if counts.get("vertical_slices") != len(master["vertical_slices"]):
         errors.append("tracked_counts.vertical_slices is stale")
+    if counts.get("catalog_entries") != len(catalog["entries"]):
+        errors.append("tracked_counts.catalog_entries is stale")
     if counts.get("total") != len(records):
         errors.append("tracked_counts.total is stale")
 
@@ -189,6 +196,18 @@ def validate() -> list[str]:
                 errors.append(f"{rid}: history event {seq} needs full git SHA")
             if not isinstance(event.get("event_type"), str) or not event["event_type"].strip():
                 errors.append(f"{rid}: history event {seq} missing event_type")
+            if event.get("actor_type") not in ALLOWED_SIGNER_TYPES:
+                errors.append(f"{rid}: history event {seq} invalid actor_type")
+            if not isinstance(event.get("role"), str) or not event["role"].strip():
+                errors.append(f"{rid}: history event {seq} missing role")
+            if not isinstance(event.get("statement"), str) or not event["statement"].strip():
+                errors.append(f"{rid}: history event {seq} missing statement")
+            if event.get("signature_method") not in ALLOWED_SIGNATURE_METHODS:
+                errors.append(f"{rid}: history event {seq} invalid signature_method")
+            if event.get("signature_method") in SIGNATURE_REF_REQUIRED and not event.get("signature_ref"):
+                errors.append(f"{rid}: history event {seq} requires signature_ref")
+            if "from_status" not in event or "to_status" not in event:
+                errors.append(f"{rid}: history event {seq} requires from_status/to_status")
 
         started = record.get("started_at_utc")
         if started is not None and _utc(started) is None:
@@ -197,6 +216,14 @@ def validate() -> list[str]:
             errors.append(f"{rid}: started_at_utc requires a started history event")
 
         status = str(record.get("status", "")).lower()
+        baseline_status = str(record.get("baseline_status", "")).lower()
+        if not baseline_status:
+            errors.append(f"{rid}: baseline_status is required")
+        if status != baseline_status:
+            if not history:
+                errors.append(f"{rid}: changed status requires signed history")
+            elif str(history[-1].get("to_status", "")).lower() != status:
+                errors.append(f"{rid}: latest history to_status must match current status")
         if status in {"in_progress", "evidence_pending", "implemented", "integrated", "verified", "hardened", "production", "done", "closed"}:
             if _utc(started) is None:
                 errors.append(f"{rid}: status {status} requires started_at_utc")
@@ -228,6 +255,8 @@ def validate() -> list[str]:
             continue
         if task.get("accountability_required") is not True:
             errors.append(f"{task['task_id']}: accountability_required must be true")
+        if str(task.get("status", "")).lower() != str(rec.get("status", "")).lower():
+            errors.append(f"{task['task_id']}: queue status disagrees with accountability ledger")
         if task.get("completion_checkbox") != rec.get("checkbox"):
             errors.append(f"{task['task_id']}: queue checkbox disagrees with ledger")
         if task.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
@@ -244,8 +273,36 @@ def validate() -> list[str]:
             continue
         if volume.get("signing_required") is not True:
             errors.append(f"{volume['key']}: signing_required must be true")
+        if str(volume.get("implementation_status", "")).lower() != str(rec.get("status", "")).lower():
+            errors.append(f"{volume['key']}: volume implementation_status disagrees with accountability ledger")
         if volume.get("completion_checkbox") != rec.get("checkbox"):
             errors.append(f"{volume['key']}: volume checkbox disagrees with ledger")
+
+    for entry in catalog["entries"]:
+        rec = record_by_id.get(entry.get("accountability_id"))
+        if rec is None:
+            errors.append(f"{entry['id']}: missing accountability record")
+            continue
+        if entry.get("signing_required") is not True:
+            errors.append(f"{entry['id']}: signing_required must be true")
+        if entry.get("completion_checkbox") != rec.get("checkbox"):
+            errors.append(f"{entry['id']}: catalog checkbox disagrees with ledger")
+        if entry.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
+            errors.append(f"{entry['id']}: catalog checkbox mark disagrees with ledger")
+        if str(entry.get("status", "")).lower() != str(rec.get("status", "")).lower():
+            errors.append(f"{entry['id']}: catalog status disagrees with ledger")
+
+    for item in priority["items"]:
+        rec = record_by_id.get(item.get("accountability_id"))
+        if rec is None:
+            errors.append(f"{item['id']}: priority item missing accountability record")
+            continue
+        if item.get("signing_required") is not True:
+            errors.append(f"{item['id']}: priority signing_required must be true")
+        if item.get("completion_checkbox") != rec.get("checkbox"):
+            errors.append(f"{item['id']}: priority checkbox disagrees with ledger")
+        if item.get("completion_checkbox_mark") != rec.get("checkbox_mark"):
+            errors.append(f"{item['id']}: priority checkbox mark disagrees with ledger")
 
     human = HUMAN.read_text(encoding="utf-8")
     visible = {rid: mark for mark, rid in CHECK_RE.findall(human)}
