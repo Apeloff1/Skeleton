@@ -331,6 +331,29 @@ def _frontend_product_catalog() -> tuple[dict[str, tuple[str, ...]], dict[str, s
     return policy, surfaces
 
 
+def _backend_executor_bindings() -> tuple[set[tuple[str, str]], list[tuple[str, str]]]:
+    tree = ast.parse(read("backend/core/product_default_executors.py"))
+    ordered: list[tuple[str, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (
+            isinstance(func, ast.Attribute)
+            and func.attr == "register"
+            and isinstance(func.value, ast.Name)
+            and func.value.id == "registry"
+            and len(node.args) >= 2
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and isinstance(node.args[1], ast.Constant)
+            and isinstance(node.args[1].value, str)
+        ):
+            continue
+        ordered.append((node.args[0].value, node.args[1].value))
+    return set(ordered), ordered
+
+
 def audit_product_catalog_alignment() -> None:
     backend_policy = _backend_product_policy()
     kernel = _backend_product_kernel()
@@ -357,6 +380,21 @@ def audit_product_catalog_alignment() -> None:
             surface in prefixes,
             f"frontend backendSurface for {capability_id} is not owned by product kernel: {surface!r} not in {prefixes}",
         )
+
+    expected_bindings = {
+        (domain, action)
+        for domain, actions in backend_policy.items()
+        for action in actions
+    }
+    executor_bindings, ordered_bindings = _backend_executor_bindings()
+    check(
+        executor_bindings == expected_bindings,
+        f"canonical executor binding drift: bound={sorted(executor_bindings)} expected={sorted(expected_bindings)}",
+    )
+    check(
+        len(ordered_bindings) == len(executor_bindings),
+        "canonical executor bindings must not contain duplicate capability/action pairs",
+    )
 
 
 def audit_product_health_contract() -> None:
@@ -388,6 +426,24 @@ def audit_product_health_contract() -> None:
 
     check("probeAppHealth" in shell, "product shell no longer probes whole-app health")
     check("Application runtime" in shell, "product shell runtime health panel missing")
+
+
+def audit_public_product_readiness_contract() -> None:
+    route = read("backend/routes/product_runtime.py")
+    runtime = read("backend/core/product_control_runtime.py")
+    registry = read("backend/core/routes_registry.py")
+    client = read("frontend/src/product/productControlClient.ts")
+    capability = read("frontend/app/capability.tsx")
+    product = read("frontend/app/product.tsx")
+
+    check('APIRouter(prefix="/api/product"' in route, "public product router prefix drift")
+    check('@router.get("/readiness")' in route, "public product readiness route missing")
+    check("public_readiness()" in route, "public readiness route bypasses sanitized projection")
+    check('("routes.product_runtime",' in registry, "public product router is not registered")
+    check("def public_readiness(" in runtime, "sanitized product readiness projection missing")
+    check("const PUBLIC_ROOT = '/api/product';" in client, "frontend public product client root drift")
+    check("getProductReadiness" in capability, "capability UI bypasses public readiness client")
+    check("getProductReadiness" in product, "product shell bypasses public readiness client")
 
 
 def audit_product_control_contract() -> None:
@@ -447,6 +503,7 @@ def main() -> int:
     audit_launcher_convergence()
     audit_product_catalog_alignment()
     audit_product_health_contract()
+    audit_public_product_readiness_contract()
     audit_product_control_contract()
     audit_product_route_registry()
 
