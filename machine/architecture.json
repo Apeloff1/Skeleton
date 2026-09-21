@@ -1,14 +1,18 @@
 {
   "schema_version": 1,
-  "architecture_version": "1.4.0",
-  "architecture_tag": "arch-map/v1.4",
+  "architecture_version": "2.0.0",
+  "architecture_tag": "arch-map/v2.0",
   "status": "active",
-  "scope": "assembled application, machine control, and validation topology",
+  "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
     "runtime_contract": "skeleton/app/manifest.json",
     "repository_contract": "machine/manifest.json",
     "human_map": "docs/ARCHITECTURE_MAP.md",
-    "validator": "scripts/check_architecture_map.py"
+    "validator": "scripts/check_architecture_map.py",
+    "construction_contract": "machine/ai_app_construction.json",
+    "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "construction_validator": "scripts/check_ai_app_construction.py",
+    "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py"
   },
   "objectives": [
     "one product shell",
@@ -17,7 +21,10 @@
     "explicit data and accelerator dependencies",
     "machine-readable ownership and change routing",
     "parallel validation lanes with a short critical path",
-    "no new top-level runtime island without architecture review"
+    "no new top-level runtime island without architecture review",
+    "complete AI application capability map with construction and acceptance contracts",
+    "mandatory fail-closed architecture acknowledgement for runtime model providers",
+    "provider-specific development-agent bootstraps point to one canonical manual"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -25,7 +32,10 @@
     "cross-zone calls use declared interfaces instead of ad-hoc environment or path coupling",
     "new long-running services must be declared in both the runtime manifest and this map",
     "structural validation fails closed on unknown nodes, duplicate ownership, cycles, or missing paths",
-    "large reconciliation waves integrate by domain and file semantics rather than blind history merge"
+    "large reconciliation waves integrate by domain and file semantics rather than blind history merge",
+    "AI providers are edge adapters; provider SDKs never define application architecture",
+    "runtime model providers must load the active construction contract before activation",
+    "every capability plane has one owner, explicit dependencies, failure behavior, and acceptance evidence"
   ],
   "canonical_roots": [
     {
@@ -477,6 +487,28 @@
     "zone dependency graph is acyclic",
     "runtime dependency graph is acyclic",
     "architecture source files must exist in the repository",
-    "architecture changes must preserve a single machine-readable map"
+    "architecture changes must preserve a single machine-readable map",
+    "runtime model providers cannot activate without a valid architecture/construction receipt",
+    "provider-specific development instruction files reference the same canonical construction documents",
+    "the AI construction contract enumerates every required capability plane and promotion gate"
+  ],
+  "construction": {
+    "contract": "machine/ai_app_construction.json",
+    "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "validator": "scripts/check_ai_app_construction.py",
+    "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
+    "provider_runtime_loader": "backend/core/provider_architecture.py",
+    "provider_runtime_boundary": "backend/core/ai_provider.py",
+    "policy": "contract-before-implementation; undeclared providers, planes, services, roots, and interfaces fail closed"
+  },
+  "external_interfaces": [
+    {
+      "id": "backend-model-provider",
+      "from": "backend/core/ai_provider.py",
+      "to": "declared runtime model provider",
+      "transport": "provider SDK/API",
+      "contract": "ProviderRequest -> mandatory architecture receipt -> ProviderAdapter -> ProviderResponse",
+      "security": "credentials stay inside adapter; HTTPS/custom endpoint policy; bounded timeout/retry"
+    }
   ]
 }
