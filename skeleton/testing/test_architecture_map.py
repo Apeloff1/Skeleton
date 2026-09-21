@@ -134,6 +134,7 @@ def test_runtime_manifest_links_back_to_active_architecture() -> None:
         "validator": architecture["sources"]["validator"],
         "documentation": architecture["sources"]["human_map"],
         "tag": architecture["architecture_tag"],
+        "structure_tag": architecture["structural_blueprint"]["structure_tag"],
     }
 
 
@@ -266,3 +267,20 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "state_authorities": 13,
         "recovery_domains": 8,
     }
+
+def test_repository_manifest_links_architecture_and_structure_tags() -> None:
+    architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
+    repository = _load(REPO_ROOT / "machine/manifest.json")
+    assembly = repository["assembly"]
+    layer = next(
+        item
+        for item in assembly["layers"]
+        if item["name"] == "architecture-map"
+    )
+
+    assert assembly["architecture_contract"] == "machine/architecture.json"
+    assert assembly["structure_tag"] == architecture["structural_blueprint"]["structure_tag"]
+    assert layer["tag"] == architecture["architecture_tag"]
+    assert layer["structure_tag"] == architecture["structural_blueprint"]["structure_tag"]
+    assert layer["ref"] == assembly["architecture_branch"]
+
