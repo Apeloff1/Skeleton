@@ -137,6 +137,9 @@
     "backend/core/canonical_product_policy.py",
     "backend/core/product_control_runtime.py",
     "backend/routes/product_runtime.py",
+    "backend/routes/app_runtime.py",
+    "frontend/src/product/appBootstrapClient.ts",
+    "skeleton/app/bootstrap.py",
     "scripts/check_app_assembly.py"
   ]
 }
