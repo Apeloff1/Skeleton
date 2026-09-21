@@ -41,7 +41,7 @@
     "contract": "machine/architecture.json",
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
-    "tag": "arch-map/v3.5",
+    "tag": "arch-map/v3.6",
     "structure_tag": "structure-map/v1.2"
   },
   "runtime": {
@@ -184,7 +184,7 @@
     "provider_activation_boundary": "backend/core/ai_provider.py",
     "provider_architecture_loader": "skeleton/provider_contract.py",
     "provider_architecture_compatibility_loader": "backend/core/provider_architecture.py",
-    "construction_version": "3.5.0",
+    "construction_version": "3.6.0",
     "provider_runtime_boundary": "skeleton/provider_runtime.py",
     "operation_contract": "skeleton/contracts/operation.py",
     "stream_contract": "skeleton/frontier/operation_stream.py",
