@@ -22,8 +22,11 @@ on:
       - "skeleton/testing/test_operation_stream_store.py"
       - "skeleton/frontier/operation_stream_store.py"
       - "skeleton/contracts/operation.py"
+      - "skeleton/contracts/conversation.py"
       - "skeleton/persistence/operation_store.py"
+      - "skeleton/persistence/conversation_repository.py"
       - "skeleton/testing/test_operation_store.py"
+      - "skeleton/testing/test_conversation_repository.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
@@ -148,7 +151,8 @@ jobs:
           python -m compileall -q
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
-          skeleton/persistence/operation_store.py
+          skeleton/contracts/conversation.py
+          skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
           backend/core/operation_stream_transport.py backend/routes/operation_stream.py
           skeleton/automation/free_model.py
@@ -183,6 +187,7 @@ jobs:
           skeleton/testing/test_tenant_quota.py
           skeleton/testing/test_operation_contract.py
           skeleton/testing/test_operation_store.py
+          skeleton/testing/test_conversation_repository.py
           skeleton/testing/test_operation_stream.py
           skeleton/testing/test_operation_stream_store.py
           skeleton/testing/test_app_assembly.py
