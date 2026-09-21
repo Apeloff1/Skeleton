@@ -1470,6 +1470,165 @@ def _validate_runtime_schema_catalog(
     return result
 
 
+
+def _validate_implementation_handoff(
+    contract: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    """Validate file-level implementation handoff coverage for every functional-AI P0."""
+
+    link = contract.get("implementation_handoff")
+    result = {"entries": 0, "stages": 0}
+    if not isinstance(link, dict):
+        errors.append("implementation_handoff must be an object")
+        return result
+    if link.get("schema_version") != 1:
+        errors.append("implementation_handoff.schema_version must be 1")
+    if link.get("status") != "active":
+        errors.append("implementation_handoff.status must be active")
+
+    try:
+        relative = _path(link.get("path"))
+    except ValueError as exc:
+        errors.append(f"implementation_handoff.path: {exc}")
+        return result
+    try:
+        handoff = _load(repo_root / relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return result
+
+    if handoff.get("schema_version") != 1:
+        errors.append("AI implementation handoff schema_version must be 1")
+    if handoff.get("status") != "active":
+        errors.append("AI implementation handoff status must be active")
+    if handoff.get("handoff_version") != link.get("handoff_version"):
+        errors.append("implementation_handoff.handoff_version must match handoff file")
+    if handoff.get("architecture_tag") != contract.get("architecture_tag"):
+        errors.append("AI implementation handoff architecture_tag drift")
+    if handoff.get("construction_version") != contract.get("construction_version"):
+        errors.append("AI implementation handoff construction_version drift")
+
+    closure = contract.get("functional_ai_closure")
+    required_p0 = set(closure.get("required_p0_gaps", [])) if isinstance(closure, dict) else set()
+    graph = contract.get("functional_ai_dependency_graph")
+    graph_nodes = {
+        item.get("gap"): item
+        for item in graph.get("nodes", [])
+        if isinstance(item, dict) and isinstance(item.get("gap"), str)
+    } if isinstance(graph, dict) else {}
+    packages = {
+        item.get("gap"): item
+        for item in contract.get("construction_work_packages", [])
+        if isinstance(item, dict) and isinstance(item.get("gap"), str)
+    }
+    blueprint_by_gap = {
+        item.get("gap"): item.get("key")
+        for item in closure.get("required_blueprints", [])
+        if isinstance(item, dict)
+        and isinstance(item.get("gap"), str)
+        and isinstance(item.get("key"), str)
+    } if isinstance(closure, dict) else {}
+
+    entries = handoff.get("entries")
+    if not isinstance(entries, list) or not entries:
+        errors.append("AI implementation handoff entries must be non-empty")
+        return result
+
+    by_gap: dict[str, dict[str, Any]] = {}
+    stages: set[int] = set()
+    for index, item in enumerate(entries):
+        label = f"ai_implementation_handoff.entries[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        gap_id = item.get("gap")
+        if not isinstance(gap_id, str) or not gap_id.strip():
+            errors.append(f"{label}.gap must be non-empty")
+            continue
+        if gap_id in by_gap:
+            errors.append(f"duplicate AI implementation handoff gap: {gap_id}")
+            continue
+        by_gap[gap_id] = item
+
+        node = graph_nodes.get(gap_id)
+        if not isinstance(node, dict):
+            errors.append(f"{label} references gap missing from dependency graph: {gap_id}")
+        else:
+            if item.get("stage") != node.get("stage"):
+                errors.append(f"{label}.stage drift for {gap_id}")
+            deps = item.get("depends_on")
+            if deps != node.get("depends_on"):
+                errors.append(f"{label}.depends_on drift for {gap_id}")
+            stage = item.get("stage")
+            if isinstance(stage, int) and not isinstance(stage, bool):
+                stages.add(stage)
+
+        package = packages.get(gap_id)
+        if not isinstance(package, dict):
+            errors.append(f"{label} references gap without work package: {gap_id}")
+        elif item.get("work_package") != package.get("id"):
+            errors.append(f"{label}.work_package drift for {gap_id}")
+
+        expected_blueprint = blueprint_by_gap.get(gap_id)
+        if item.get("blueprint") != expected_blueprint:
+            errors.append(f"{label}.blueprint drift for {gap_id}")
+
+        targets = item.get("target_files")
+        if not isinstance(targets, dict):
+            errors.append(f"{label}.target_files must be an object")
+        else:
+            for key in ("contracts", "runtime", "persistence", "integration", "tests"):
+                _nonempty_strings(
+                    targets.get(key, []),
+                    label=f"{label}.target_files.{key}",
+                    errors=errors,
+                    allow_empty=True,
+                )
+
+        _nonempty_strings(
+            item.get("ordered_steps"),
+            label=f"{label}.ordered_steps",
+            errors=errors,
+        )
+        _nonempty_strings(
+            item.get("closure_tests"),
+            label=f"{label}.closure_tests",
+            errors=errors,
+        )
+        if not isinstance(item.get("closure_gate"), str) or not item["closure_gate"].strip():
+            errors.append(f"{label}.closure_gate must be non-empty")
+        if not isinstance(item.get("rollback_rule"), str) or not item["rollback_rule"].strip():
+            errors.append(f"{label}.rollback_rule must be non-empty")
+
+    missing = sorted(required_p0 - set(by_gap))
+    extra = sorted(set(by_gap) - required_p0)
+    if missing:
+        errors.append("AI implementation handoff missing P0 gaps: " + ", ".join(missing))
+    if extra:
+        errors.append("AI implementation handoff has non-P0 gaps: " + ", ".join(extra))
+
+    result["entries"] = len(by_gap)
+    result["stages"] = len(stages)
+    _nonempty_strings(
+        handoff.get("global_rules"),
+        label="AI implementation handoff global_rules",
+        errors=errors,
+    )
+    _nonempty_strings(
+        handoff.get("validation_commands"),
+        label="AI implementation handoff validation_commands",
+        errors=errors,
+    )
+    _nonempty_strings(
+        handoff.get("definition_of_handoff_complete"),
+        label="AI implementation handoff definition_of_handoff_complete",
+        errors=errors,
+    )
+    return result
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -1926,6 +2085,9 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     runtime_schemas = _validate_runtime_schema_catalog(
         contract, repo_root, errors
     )
+    implementation_handoff = _validate_implementation_handoff(
+        contract, repo_root, errors
+    )
     functional_ai = _validate_functional_ai_closure(
         contract, planes, repo_root, errors
     )
@@ -1967,6 +2129,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "provider_surfaces": provider_surfaces,
         "construction_ledger": ledger,
         "runtime_schemas": runtime_schemas,
+        "implementation_handoff": implementation_handoff,
         "functional_ai": functional_ai,
         "operation_stream": operation_stream,
         "provider_documents": must_read,
