@@ -1,9 +1,15 @@
 """Mongo-backed authoritative conversation state.
 
 This is the production adapter for the canonical conversation envelopes in
-skeleton.contracts.conversation. The adapter fails closed when a multi-document
-transaction cannot be established: authoritative message append and thread
-version advancement must commit together.
+skeleton.contracts.conversation. It uses a recoverable write-ahead append
+protocol so it works on standalone Mongo as well as replica sets:
+
+1. prepare the immutable message document;
+2. atomically advance the thread version/sequence as the commit point;
+3. mark the prepared message committed.
+
+Prepared rows beyond the thread sequence are not visible transcript state and
+can be completed or discarded deterministically after interruption.
 
 The browser is a cache/projection. Provider history is never authoritative.
 """
@@ -267,6 +273,118 @@ class MongoConversationAuthority:
             and existing.data_class == candidate.data_class
         )
 
+    async def _recover_prepared(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> ConversationThread:
+        """Complete or discard the single exact-next prepared append, if any."""
+
+        thread = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        try:
+            prepared = await self.messages.find_one(
+                {
+                    "thread_id": thread_id,
+                    "_commit_state": "prepared",
+                },
+                sort=[("sequence", ASCENDING)],
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "conversation recovery state is unavailable"
+            ) from exc
+        if prepared is None:
+            return thread
+
+        sequence = int(prepared.get("sequence", -1))
+        expected = int(prepared.get("_expected_thread_version", -1))
+        if sequence <= thread.message_sequence:
+            try:
+                await self.messages.update_one(
+                    {"_id": prepared["_id"], "_commit_state": "prepared"},
+                    {"$set": {"_commit_state": "committed"}},
+                )
+            except PyMongoError:
+                pass
+            return thread
+
+        if sequence != thread.message_sequence + 1 or expected != thread.version:
+            try:
+                await self.messages.delete_one(
+                    {"_id": prepared["_id"], "_commit_state": "prepared"}
+                )
+            except PyMongoError as exc:
+                raise ConversationStorageUnavailable(
+                    "stale conversation append could not be recovered"
+                ) from exc
+            return thread
+
+        branch_id = (
+            str(prepared["branch_id"])
+            if prepared.get("_activate_branch", True)
+            else thread.active_branch_id
+        )
+        try:
+            updated = await self.threads.find_one_and_update(
+                {
+                    **self._authorized_filter(
+                        thread_id,
+                        tenant_id=tenant_id,
+                        owner_id=owner_id,
+                    ),
+                    "version": expected,
+                    "message_sequence": sequence - 1,
+                    "state": ConversationThreadState.ACTIVE.value,
+                },
+                {
+                    "$set": {
+                        "updated_at": _utcnow(),
+                        "active_branch_id": branch_id,
+                        "message_sequence": sequence,
+                        "last_message_id": prepared["_id"],
+                    },
+                    "$inc": {"version": 1},
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "prepared conversation append could not be committed"
+            ) from exc
+        if updated is None:
+            refreshed = await self.get_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            if refreshed.message_sequence >= sequence:
+                try:
+                    await self.messages.update_one(
+                        {"_id": prepared["_id"]},
+                        {"$set": {"_commit_state": "committed"}},
+                    )
+                except PyMongoError:
+                    pass
+                return refreshed
+            raise ConversationConflict("prepared conversation append could not advance thread")
+
+        try:
+            await self.messages.update_one(
+                {"_id": prepared["_id"], "_commit_state": "prepared"},
+                {"$set": {"_commit_state": "committed"}},
+            )
+        except PyMongoError:
+            # The thread sequence is the commit point. A later recovery pass
+            # will normalize this operational marker without losing the turn.
+            pass
+        return _thread_from_doc(updated)
+
     async def append_message(
         self,
         message: ConversationMessage,
@@ -276,131 +394,111 @@ class MongoConversationAuthority:
         expected_thread_version: int,
         activate_branch: bool = True,
     ) -> tuple[ConversationThread, ConversationMessage]:
-        """Atomically append immutable message and advance thread sequence/version."""
+        """Append with a recoverable write-ahead intent and atomic thread commit."""
+
+        thread = await self._recover_prepared(
+            message.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        try:
+            existing = await self._message_by_idempotency(
+                message.thread_id,
+                message.idempotency_key,
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "conversation idempotency state is unavailable"
+            ) from exc
+        if existing is not None:
+            if not self._same_identity(existing, message):
+                raise ConversationConflict(
+                    "idempotency_key was reused with different content"
+                )
+            if existing.sequence <= thread.message_sequence:
+                return thread, existing
+
+        if not thread.writable:
+            raise ConversationConflict("thread is not writable")
+        if thread.version != expected_thread_version:
+            raise ConversationConflict("thread version conflict")
+        if message.sequence != thread.message_sequence + 1:
+            raise ConversationConflict(
+                f"message sequence must be exact-next ({thread.message_sequence + 1})"
+            )
 
         try:
-            async with await self.database.client.start_session() as session:
-                async with session.start_transaction():
-                    existing = await self._message_by_idempotency(
-                        message.thread_id,
-                        message.idempotency_key,
-                        session=session,
+            if message.parent_message_id is not None:
+                parent = await self.messages.find_one(
+                    {
+                        "_id": message.parent_message_id,
+                        "thread_id": message.thread_id,
+                        "sequence": {"$lte": thread.message_sequence},
+                    }
+                )
+                if parent is None or int(parent["sequence"]) >= message.sequence:
+                    raise ConversationConflict(
+                        "parent message is missing or invalid"
                     )
-                    if existing is not None:
-                        if not self._same_identity(existing, message):
-                            raise ConversationConflict(
-                                "idempotency_key was reused with different content"
-                            )
-                        thread_doc = await self.threads.find_one(
-                            self._authorized_filter(
-                                message.thread_id,
-                                tenant_id=tenant_id,
-                                owner_id=owner_id,
-                            ),
-                            session=session,
-                        )
-                        if thread_doc is None:
-                            raise ConversationNotFound(message.thread_id)
-                        return _thread_from_doc(thread_doc), existing
 
-                    thread_doc = await self.threads.find_one(
-                        self._authorized_filter(
-                            message.thread_id,
-                            tenant_id=tenant_id,
-                            owner_id=owner_id,
-                        ),
-                        session=session,
+            if message.supersedes_message_id is not None:
+                prior_doc = await self.messages.find_one(
+                    {
+                        "_id": message.supersedes_message_id,
+                        "thread_id": message.thread_id,
+                        "sequence": {"$lte": thread.message_sequence},
+                    }
+                )
+                if prior_doc is None:
+                    raise ConversationConflict(
+                        "superseded message does not exist"
                     )
-                    if thread_doc is None:
-                        raise ConversationNotFound(message.thread_id)
-                    thread = _thread_from_doc(thread_doc)
-                    if not thread.writable:
-                        raise ConversationConflict("thread is not writable")
-                    if thread.version != expected_thread_version:
-                        raise ConversationConflict("thread version conflict")
-                    if message.sequence != thread.message_sequence + 1:
-                        raise ConversationConflict(
-                            f"message sequence must be exact-next ({thread.message_sequence + 1})"
-                        )
+                prior = _message_from_doc(prior_doc)
+                if prior.author_type != message.author_type:
+                    raise ConversationConflict(
+                        "superseding message must preserve author type"
+                    )
 
-                    if message.parent_message_id is not None:
-                        parent = await self.messages.find_one(
-                            {
-                                "_id": message.parent_message_id,
-                                "thread_id": message.thread_id,
-                            },
-                            session=session,
-                        )
-                        if parent is None or int(parent["sequence"]) >= message.sequence:
-                            raise ConversationConflict(
-                                "parent message is missing or invalid"
-                            )
-
-                    if message.supersedes_message_id is not None:
-                        prior_doc = await self.messages.find_one(
-                            {
-                                "_id": message.supersedes_message_id,
-                                "thread_id": message.thread_id,
-                            },
-                            session=session,
-                        )
-                        if prior_doc is None:
-                            raise ConversationConflict(
-                                "superseded message does not exist"
-                            )
-                        prior = _message_from_doc(prior_doc)
-                        if prior.author_type != message.author_type:
-                            raise ConversationConflict(
-                                "superseding message must preserve author type"
-                            )
-
-                    await self.messages.insert_one(
-                        _message_doc(message),
-                        session=session,
-                    )
-                    now = _utcnow()
-                    branch_id = (
-                        message.branch_id
-                        if activate_branch
-                        else thread.active_branch_id
-                    )
-                    updated = await self.threads.find_one_and_update(
-                        {
-                            **self._authorized_filter(
-                                message.thread_id,
-                                tenant_id=tenant_id,
-                                owner_id=owner_id,
-                            ),
-                            "version": expected_thread_version,
-                            "message_sequence": message.sequence - 1,
-                            "state": ConversationThreadState.ACTIVE.value,
-                        },
-                        {
-                            "$set": {
-                                "updated_at": now,
-                                "active_branch_id": branch_id,
-                                "message_sequence": message.sequence,
-                            },
-                            "$inc": {"version": 1},
-                        },
-                        return_document=ReturnDocument.AFTER,
-                        session=session,
-                    )
-                    if updated is None:
-                        raise ConversationConflict(
-                            "thread changed during message append"
-                        )
-                    return _thread_from_doc(updated), message
-        except (ConversationConflict, ConversationNotFound):
+            prepared = _message_doc(message)
+            prepared["_commit_state"] = "prepared"
+            prepared["_expected_thread_version"] = expected_thread_version
+            prepared["_activate_branch"] = bool(activate_branch)
+            await self.messages.insert_one(prepared)
+        except ConversationConflict:
             raise
         except DuplicateKeyError as exc:
+            retry = await self.messages.find_one(
+                {
+                    "thread_id": message.thread_id,
+                    "idempotency_key": message.idempotency_key,
+                }
+            )
+            if retry is not None:
+                existing = _message_from_doc(retry)
+                if self._same_identity(existing, message):
+                    recovered = await self._recover_prepared(
+                        message.thread_id,
+                        tenant_id=tenant_id,
+                        owner_id=owner_id,
+                    )
+                    if existing.sequence <= recovered.message_sequence:
+                        return recovered, existing
             raise ConversationConflict(
                 "conversation message identity or ordering conflict"
             ) from exc
         except PyMongoError as exc:
             raise ConversationStorageUnavailable(
-                "transactional conversation append is unavailable"
+                "conversation append intent could not be prepared"
             ) from exc
+
+        committed = await self._recover_prepared(
+            message.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if committed.message_sequence < message.sequence:
+            raise ConversationConflict("conversation append did not reach commit point")
+        return committed, message
 
     async def append_user_message(
         self,
@@ -502,7 +600,7 @@ class MongoConversationAuthority:
         after_sequence: int = 0,
         limit: int = 100,
     ) -> tuple[ConversationMessage, ...]:
-        await self.get_thread(
+        thread = await self._recover_prepared(
             thread_id,
             tenant_id=tenant_id,
             owner_id=owner_id,
@@ -516,7 +614,10 @@ class MongoConversationAuthority:
                 self.messages.find(
                     {
                         "thread_id": thread_id,
-                        "sequence": {"$gt": after_sequence},
+                        "sequence": {
+                            "$gt": after_sequence,
+                            "$lte": thread.message_sequence,
+                        },
                     }
                 )
                 .sort("sequence", ASCENDING)
