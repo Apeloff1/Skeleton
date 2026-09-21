@@ -769,6 +769,325 @@ def _validate_execution_roadmap(
     return ids
 
 
+def _validate_construction_ledger(
+    contract: dict[str, Any],
+    planes: dict[str, dict[str, Any]],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    lifecycle = contract.get("request_lifecycle")
+    lifecycle_count = 0
+    if not isinstance(lifecycle, list) or not lifecycle:
+        errors.append("request_lifecycle must be a non-empty list")
+    else:
+        lifecycle_count = len(lifecycle)
+        orders: list[int] = []
+        ids: set[str] = set()
+        for index, item in enumerate(lifecycle):
+            label = f"request_lifecycle[{index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            stage_id = item.get("id")
+            order = item.get("order")
+            owner = item.get("owner_plane")
+            if not isinstance(stage_id, str) or not stage_id:
+                errors.append(f"{label}.id must be non-empty")
+            elif stage_id in ids:
+                errors.append(f"duplicate request lifecycle id: {stage_id}")
+            else:
+                ids.add(stage_id)
+            if isinstance(order, bool) or not isinstance(order, int) or order < 0:
+                errors.append(f"{label}.order must be a non-negative integer")
+            else:
+                orders.append(order)
+            if owner not in planes:
+                errors.append(f"{label}.owner_plane references unknown plane {owner!r}")
+            for key in ("input", "output", "failure"):
+                if not isinstance(item.get(key), str) or not item[key].strip():
+                    errors.append(f"{label}.{key} must be non-empty")
+        if sorted(orders) != list(range(len(orders))):
+            errors.append(
+                f"request lifecycle orders must be contiguous from zero: {sorted(orders)}"
+            )
+
+    data_classes = contract.get("data_classes")
+    data_class_count = 0
+    if not isinstance(data_classes, list) or not data_classes:
+        errors.append("data_classes must be a non-empty list")
+    else:
+        data_class_count = len(data_classes)
+        ids: set[str] = set()
+        ranks: list[int] = []
+        for index, item in enumerate(data_classes):
+            label = f"data_classes[{index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            class_id = item.get("id")
+            rank = item.get("rank")
+            if not isinstance(class_id, str) or not class_id:
+                errors.append(f"{label}.id must be non-empty")
+            elif class_id in ids:
+                errors.append(f"duplicate data class id: {class_id}")
+            else:
+                ids.add(class_id)
+            if isinstance(rank, bool) or not isinstance(rank, int) or rank < 0:
+                errors.append(f"{label}.rank must be a non-negative integer")
+            else:
+                ranks.append(rank)
+            for key in ("description", "provider_transfer", "logging"):
+                if not isinstance(item.get(key), str) or not item[key].strip():
+                    errors.append(f"{label}.{key} must be non-empty")
+        if sorted(ranks) != list(range(len(ranks))):
+            errors.append(
+                f"data class ranks must be contiguous from zero: {sorted(ranks)}"
+            )
+
+    trust_zones = contract.get("trust_zones")
+    trust_zone_count = 0
+    if not isinstance(trust_zones, list) or not trust_zones:
+        errors.append("trust_zones must be a non-empty list")
+    else:
+        trust_zone_count = len(trust_zones)
+        ids: set[str] = set()
+        for index, item in enumerate(trust_zones):
+            label = f"trust_zones[{index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            zone_id = item.get("id")
+            if not isinstance(zone_id, str) or not zone_id:
+                errors.append(f"{label}.id must be non-empty")
+            elif zone_id in ids:
+                errors.append(f"duplicate trust zone id: {zone_id}")
+            else:
+                ids.add(zone_id)
+            _nonempty_strings(
+                item.get("owners"),
+                label=f"{label}.owners",
+                errors=errors,
+            )
+            _nonempty_strings(
+                item.get("boundaries"),
+                label=f"{label}.boundaries",
+                errors=errors,
+            )
+            if not isinstance(item.get("trust"), str) or not item["trust"].strip():
+                errors.append(f"{label}.trust must be non-empty")
+            may_hold = item.get("may_hold_secrets")
+            if not isinstance(may_hold, (bool, str)):
+                errors.append(f"{label}.may_hold_secrets must be boolean or policy string")
+        for required in (
+            "human-client",
+            "application-api",
+            "engine-runtime",
+            "data-plane",
+            "external-provider",
+            "tool-sandbox",
+            "repository-automation",
+        ):
+            if required not in ids:
+                errors.append(f"mandatory trust zone missing: {required}")
+
+    profiles = contract.get("environment_profiles")
+    environment_count = 0
+    if not isinstance(profiles, list) or not profiles:
+        errors.append("environment_profiles must be a non-empty list")
+    else:
+        environment_count = len(profiles)
+        ids: set[str] = set()
+        for index, item in enumerate(profiles):
+            label = f"environment_profiles[{index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            profile_id = item.get("id")
+            if not isinstance(profile_id, str) or not profile_id:
+                errors.append(f"{label}.id must be non-empty")
+                continue
+            if profile_id in ids:
+                errors.append(f"duplicate environment profile: {profile_id}")
+            ids.add(profile_id)
+            for key in (
+                "network",
+                "secrets",
+                "durability",
+                "provider_policy",
+                "release_authority",
+            ):
+                if not isinstance(item.get(key), str) or not item[key].strip():
+                    errors.append(f"{label}.{key} must be non-empty")
+        required_profiles = {"development", "ci", "staging", "production"}
+        if ids != required_profiles:
+            errors.append(
+                "environment profiles must be exactly development, ci, staging, production"
+            )
+
+    envelopes = contract.get("canonical_envelopes")
+    envelope_count = 0
+    if not isinstance(envelopes, dict) or not envelopes:
+        errors.append("canonical_envelopes must be a non-empty object")
+    else:
+        envelope_count = len(envelopes)
+        for envelope_id, item in envelopes.items():
+            label = f"canonical_envelopes.{envelope_id}"
+            if not isinstance(envelope_id, str) or not envelope_id:
+                errors.append("canonical envelope id must be non-empty")
+                continue
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            owner = item.get("owner_plane")
+            if owner not in planes:
+                errors.append(f"{label}.owner_plane references unknown plane {owner!r}")
+            _nonempty_strings(
+                item.get("required_fields"),
+                label=f"{label}.required_fields",
+                errors=errors,
+            )
+        for required in (
+            "operation",
+            "provider_request",
+            "route_decision",
+            "evidence",
+            "tool_receipt",
+            "artifact",
+            "stream_event",
+            "release_evidence",
+        ):
+            if required not in envelopes:
+                errors.append(f"mandatory canonical envelope missing: {required}")
+
+    evidence_bundle = _nonempty_strings(
+        contract.get("release_evidence_bundle"),
+        label="release_evidence_bundle",
+        errors=errors,
+    )
+
+    gaps = contract.get("gap_register")
+    roadmap = contract.get("execution_roadmap")
+    work_packages = contract.get("construction_work_packages")
+    work_package_count = 0
+    known_gaps = {
+        item.get("id")
+        for item in gaps
+        if isinstance(gaps, list)
+        for item in gaps
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    } if isinstance(gaps, list) else set()
+    open_gaps = {
+        item.get("id")
+        for item in gaps
+        if isinstance(item, dict)
+        and item.get("status") == "open"
+        and isinstance(item.get("id"), str)
+    } if isinstance(gaps, list) else set()
+    gap_wave: dict[str, int] = {}
+    if isinstance(roadmap, list):
+        for wave in roadmap:
+            if not isinstance(wave, dict) or not isinstance(wave.get("wave"), int):
+                continue
+            for gap_id in wave.get("gaps", []):
+                if isinstance(gap_id, str):
+                    gap_wave[gap_id] = wave["wave"]
+
+    if not isinstance(work_packages, list) or not work_packages:
+        errors.append("construction_work_packages must be a non-empty list")
+    else:
+        work_package_count = len(work_packages)
+        ids: set[str] = set()
+        scheduled_gaps: list[str] = []
+        for index, item in enumerate(work_packages):
+            label = f"construction_work_packages[{index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{label} must be an object")
+                continue
+            package_id = item.get("id")
+            gap_id = item.get("gap")
+            wave = item.get("wave")
+            if not isinstance(package_id, str) or not package_id:
+                errors.append(f"{label}.id must be non-empty")
+            elif package_id in ids:
+                errors.append(f"duplicate construction work package: {package_id}")
+            else:
+                ids.add(package_id)
+            if gap_id not in known_gaps:
+                errors.append(f"{label}.gap references unknown gap {gap_id!r}")
+            elif isinstance(gap_id, str):
+                scheduled_gaps.append(gap_id)
+                expected_wave = gap_wave.get(gap_id)
+                if expected_wave is not None and wave != expected_wave:
+                    errors.append(
+                        f"work package {package_id} wave {wave!r} does not match roadmap wave {expected_wave}"
+                    )
+            if isinstance(wave, bool) or not isinstance(wave, int) or wave < 1:
+                errors.append(f"{label}.wave must be a positive integer")
+            owners = _nonempty_strings(
+                item.get("owners"),
+                label=f"{label}.owners",
+                errors=errors,
+            )
+            for owner in owners:
+                try:
+                    relative = _path(owner)
+                except ValueError as exc:
+                    errors.append(f"{label}.owners: {exc}")
+                    continue
+                if not (repo_root / relative).exists():
+                    errors.append(f"work package owner path missing: {relative}")
+            _nonempty_strings(
+                item.get("steps"),
+                label=f"{label}.steps",
+                errors=errors,
+            )
+            _nonempty_strings(
+                item.get("tests"),
+                label=f"{label}.tests",
+                errors=errors,
+            )
+            for key in ("objective", "exit"):
+                if not isinstance(item.get(key), str) or not item[key].strip():
+                    errors.append(f"{label}.{key} must be non-empty")
+
+        duplicates = sorted(
+            gap_id
+            for gap_id in set(scheduled_gaps)
+            if scheduled_gaps.count(gap_id) > 1
+        )
+        if duplicates:
+            errors.append(
+                "gaps assigned to multiple construction work packages: "
+                + ", ".join(duplicates)
+            )
+        missing = sorted(open_gaps - set(scheduled_gaps))
+        if missing:
+            errors.append(
+                "open gaps missing construction work packages: " + ", ".join(missing)
+            )
+
+    completion = contract.get("completion_criteria")
+    if not isinstance(completion, dict):
+        errors.append("completion_criteria must be an object")
+    else:
+        for key in ("structural_complete", "sota_complete", "prohibited_shortcuts"):
+            _nonempty_strings(
+                completion.get(key),
+                label=f"completion_criteria.{key}",
+                errors=errors,
+            )
+
+    return {
+        "lifecycle_stages": lifecycle_count,
+        "data_classes": data_class_count,
+        "trust_zones": trust_zone_count,
+        "environments": environment_count,
+        "envelopes": envelope_count,
+        "release_evidence_items": len(evidence_bundle),
+        "work_packages": work_package_count,
+    }
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -821,6 +1140,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         contract, "automation_model_providers", "automation model", errors
     )
     provider_surfaces = _validate_provider_surfaces(contract, repo_root, errors)
+    ledger = _validate_construction_ledger(contract, planes, repo_root, errors)
     gates = _validate_acceptance_gates(contract, errors)
     gaps = _validate_gap_register(contract, planes, errors)
     roadmap = _validate_execution_roadmap(contract, errors)
@@ -854,6 +1174,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "runtime_providers": providers,
         "automation_providers": automation_providers,
         "provider_surfaces": provider_surfaces,
+        "construction_ledger": ledger,
         "provider_documents": must_read,
         "acceptance_gates": gates,
         "gaps": gaps,
@@ -887,6 +1208,8 @@ def main(argv: list[str] | None = None) -> int:
             f"providers={','.join(summary['runtime_providers'])}; "
             f"automation={','.join(summary['automation_providers'])}; "
             f"surfaces={summary['provider_surfaces']}; "
+            f"lifecycle={summary['construction_ledger'].get('lifecycle_stages', 0)}; "
+            f"work-packages={summary['construction_ledger'].get('work_packages', 0)}; "
             f"gates={len(summary['acceptance_gates'])}; "
             f"gaps={summary['gaps'].get('total', 0)}; "
             f"p0-open={summary['gaps'].get('p0_open', 0)}; "
