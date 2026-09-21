@@ -2936,3 +2936,35 @@ Repair receives observable failed check IDs/reason codes plus an allowed remedia
 ### Closure
 
 The reasoning-verification plane remains `partial` until claim grounding, citation integrity, unsupported-claim handling, tool postconditions, canonical model-verifier routing, self-confidence non-authority, repair lineage, high-impact block and receipt-privacy tests pass.
+
+## Fully Functional AI Closure: Provider Interaction Protocol
+
+The provider boundary is not complete when it only supports prompt/history -> text. The cognitive runtime requires provider-neutral structured output and tool calling while preserving the same single credential/transport owner.
+
+### Request
+
+Provider requests bind operation, execution, turn and context identity and may include admitted tool definitions, a structured-output schema, tool-choice policy, deadline and resource budget.
+
+Only minimal admitted ToolManifest projections are translated into provider-native tools. Provider-specific schema/message objects stay inside `skeleton/provider_runtime.py`.
+
+### Response
+
+The neutral response carries normalized text, optional structured value, normalized tool calls, finish reason, usage, provider/model/request/response identity, policy receipts and latency.
+
+Tool call IDs are unique, tool IDs must have been offered, arguments are bounded JSON, and argument digests use canonical serialization. Unknown or provider-only metadata is discarded unless explicitly mapped.
+
+### Usage and finish reason
+
+Usage normalizes input/output/cached/reasoning tokens plus estimated/billed cost where available. Unsupported values remain unknown/null; they are never invented as zero. Finish reasons normalize to completed, tool calls, length, filtered, refusal, cancelled, deadline, provider error or unknown.
+
+### Optional provider streaming
+
+Provider streaming uses a separate normalized delta protocol for text/tool/structured/usage/terminal events. Partial provider tool-call arguments do not become executable proposals until normalized and validated. Provider stream events are not the durable operation event stream.
+
+### Cancellation
+
+Deadline/cancellation propagates into provider I/O. A late response may be recorded for telemetry but cannot reopen a cancelled or terminal operation.
+
+### Closure
+
+The model-provider plane remains `partial` until text compatibility, structured schema, tool-call normalization, unoffered-tool denial, argument bounds, usage/finish normalization, cancellation/deadline, optional stream finalization and native-type isolation tests pass.
