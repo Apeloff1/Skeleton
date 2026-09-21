@@ -140,6 +140,7 @@ jobs:
           EXPO_PUBLIC_SKELETON_URL: http://localhost:8010
         run: |
           yarn typecheck
+          yarn test:operation-stream
           yarn export:web
 
       - name: Compile assembly surface
