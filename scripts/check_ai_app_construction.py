@@ -1404,6 +1404,8 @@ def _validate_functional_ai_closure(
     result = {
         "blueprints": 0,
         "required_p0_gaps": 0,
+        "dependency_nodes": 0,
+        "dependency_stages": 0,
         "required_envelopes": 0,
         "required_state_domains": 0,
     }
@@ -1450,6 +1452,170 @@ def _validate_functional_ai_closure(
             "functional AI closure references non-P0/unknown gaps: " + ", ".join(extra_p0)
         )
     result["required_p0_gaps"] = len(required_p0_set)
+
+    graph_key = closure.get("dependency_graph")
+    if graph_key != "functional_ai_dependency_graph":
+        errors.append(
+            "functional_ai_closure.dependency_graph must be 'functional_ai_dependency_graph'"
+        )
+        graph = None
+    else:
+        graph = contract.get(graph_key)
+    graph_nodes: dict[str, dict[str, Any]] = {}
+    if not isinstance(graph, dict):
+        errors.append("functional_ai_dependency_graph must be an object")
+    else:
+        if graph.get("schema_version") != 1:
+            errors.append("functional_ai_dependency_graph.schema_version must be 1")
+        if graph.get("status") != "active":
+            errors.append("functional_ai_dependency_graph.status must be active")
+
+        raw_nodes = graph.get("nodes")
+        if not isinstance(raw_nodes, list) or not raw_nodes:
+            errors.append("functional_ai_dependency_graph.nodes must be non-empty")
+        else:
+            for index, node in enumerate(raw_nodes):
+                label = f"functional_ai_dependency_graph.nodes[{index}]"
+                if not isinstance(node, dict):
+                    errors.append(f"{label} must be an object")
+                    continue
+                gap_id = node.get("gap")
+                stage = node.get("stage")
+                if not isinstance(gap_id, str) or not gap_id.strip():
+                    errors.append(f"{label}.gap must be non-empty")
+                    continue
+                if gap_id in graph_nodes:
+                    errors.append(f"duplicate functional AI dependency node: {gap_id}")
+                    continue
+                graph_nodes[gap_id] = node
+                if gap_id not in required_p0_set:
+                    errors.append(
+                        f"functional AI dependency node is not a required P0 gap: {gap_id}"
+                    )
+                if isinstance(stage, bool) or not isinstance(stage, int) or stage < 0:
+                    errors.append(f"{label}.stage must be a non-negative integer")
+                dependencies = _nonempty_strings(
+                    node.get("depends_on"),
+                    label=f"{label}.depends_on",
+                    errors=errors,
+                    allow_empty=True,
+                )
+                for dependency in dependencies:
+                    if dependency == gap_id:
+                        errors.append(f"{label} must not depend on itself")
+                    if dependency not in required_p0_set:
+                        errors.append(
+                            f"{label} dependency is not a required P0 gap: {dependency}"
+                        )
+                if not isinstance(node.get("gate"), str) or not node["gate"].strip():
+                    errors.append(f"{label}.gate must be non-empty")
+
+            missing_nodes = sorted(required_p0_set - set(graph_nodes))
+            extra_nodes = sorted(set(graph_nodes) - required_p0_set)
+            if missing_nodes:
+                errors.append(
+                    "functional AI dependency graph missing P0 nodes: "
+                    + ", ".join(missing_nodes)
+                )
+            if extra_nodes:
+                errors.append(
+                    "functional AI dependency graph has extra nodes: "
+                    + ", ".join(extra_nodes)
+                )
+
+            for gap_id, node in graph_nodes.items():
+                stage = node.get("stage")
+                if isinstance(stage, bool) or not isinstance(stage, int):
+                    continue
+                for dependency in node.get("depends_on", []):
+                    target = graph_nodes.get(dependency)
+                    if not isinstance(target, dict):
+                        continue
+                    dep_stage = target.get("stage")
+                    if isinstance(dep_stage, bool) or not isinstance(dep_stage, int):
+                        continue
+                    if dep_stage >= stage:
+                        errors.append(
+                            f"functional AI dependency {gap_id}->{dependency} "
+                            f"must point to an earlier stage ({stage}>{dep_stage})"
+                        )
+
+            result["dependency_nodes"] = len(graph_nodes)
+
+        raw_stages = graph.get("stages")
+        stage_ids: set[str] = set()
+        stage_numbers: set[int] = set()
+        closed_by_stage: list[str] = []
+        if not isinstance(raw_stages, list) or not raw_stages:
+            errors.append("functional_ai_dependency_graph.stages must be non-empty")
+        else:
+            for index, stage_item in enumerate(raw_stages):
+                label = f"functional_ai_dependency_graph.stages[{index}]"
+                if not isinstance(stage_item, dict):
+                    errors.append(f"{label} must be an object")
+                    continue
+                stage_number = stage_item.get("stage")
+                stage_id = stage_item.get("id")
+                if isinstance(stage_number, bool) or not isinstance(stage_number, int) or stage_number < 0:
+                    errors.append(f"{label}.stage must be a non-negative integer")
+                    continue
+                if stage_number in stage_numbers:
+                    errors.append(f"duplicate functional AI stage number: {stage_number}")
+                stage_numbers.add(stage_number)
+                if not isinstance(stage_id, str) or not stage_id.strip():
+                    errors.append(f"{label}.id must be non-empty")
+                elif stage_id in stage_ids:
+                    errors.append(f"duplicate functional AI stage id: {stage_id}")
+                else:
+                    stage_ids.add(stage_id)
+                if not isinstance(stage_item.get("parallel"), bool):
+                    errors.append(f"{label}.parallel must be boolean")
+                closes = _nonempty_strings(
+                    stage_item.get("closes"),
+                    label=f"{label}.closes",
+                    errors=errors,
+                )
+                for gap_id in closes:
+                    if gap_id not in required_p0_set:
+                        errors.append(
+                            f"{label}.closes references non-P0 gap {gap_id!r}"
+                        )
+                    node = graph_nodes.get(gap_id)
+                    if isinstance(node, dict) and node.get("stage") != stage_number:
+                        errors.append(
+                            f"{label}.closes gap {gap_id} but node stage is {node.get('stage')!r}"
+                        )
+                    closed_by_stage.append(gap_id)
+                if not isinstance(stage_item.get("exit"), str) or not stage_item["exit"].strip():
+                    errors.append(f"{label}.exit must be non-empty")
+
+            if stage_numbers and sorted(stage_numbers) != list(range(min(stage_numbers), max(stage_numbers) + 1)):
+                errors.append(
+                    "functional AI stage numbers must be contiguous: "
+                    + ", ".join(str(x) for x in sorted(stage_numbers))
+                )
+            duplicates = sorted(
+                gap_id for gap_id in set(closed_by_stage)
+                if closed_by_stage.count(gap_id) > 1
+            )
+            if duplicates:
+                errors.append(
+                    "functional AI P0 gaps closed by multiple stages: "
+                    + ", ".join(duplicates)
+                )
+            missing_stage_gaps = sorted(required_p0_set - set(closed_by_stage))
+            if missing_stage_gaps:
+                errors.append(
+                    "functional AI stages missing P0 gaps: "
+                    + ", ".join(missing_stage_gaps)
+                )
+            result["dependency_stages"] = len(stage_numbers)
+
+        _nonempty_strings(
+            graph.get("scheduling_rules"),
+            label="functional_ai_dependency_graph.scheduling_rules",
+            errors=errors,
+        )
 
     required_blueprints = closure.get("required_blueprints")
     if not isinstance(required_blueprints, list) or not required_blueprints:
