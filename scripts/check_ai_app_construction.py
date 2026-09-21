@@ -527,6 +527,150 @@ def _validate_gap_register(
     }
 
 
+def _validate_execution_roadmap(
+    contract: dict[str, Any],
+    errors: list[str],
+) -> list[str]:
+    raw = contract.get("execution_roadmap")
+    gaps = contract.get("gap_register")
+    if not isinstance(raw, list) or not raw:
+        errors.append("execution_roadmap must be a non-empty list")
+        return []
+    if not isinstance(gaps, list):
+        errors.append("gap_register must exist before roadmap validation")
+        return []
+
+    known_gaps = {
+        gap.get("id")
+        for gap in gaps
+        if isinstance(gap, dict) and isinstance(gap.get("id"), str)
+    }
+    open_gaps = {
+        gap.get("id")
+        for gap in gaps
+        if isinstance(gap, dict)
+        and gap.get("status") == "open"
+        and isinstance(gap.get("id"), str)
+    }
+    p0_open = {
+        gap.get("id")
+        for gap in gaps
+        if isinstance(gap, dict)
+        and gap.get("status") == "open"
+        and gap.get("priority") == "P0"
+        and isinstance(gap.get("id"), str)
+    }
+
+    ids: list[str] = []
+    waves: list[int] = []
+    scheduled: list[str] = []
+    seen_ids: set[str] = set()
+    seen_waves: set[int] = set()
+    for index, item in enumerate(raw):
+        label = f"execution_roadmap[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        wave = item.get("wave")
+        wave_id = item.get("id")
+        if isinstance(wave, bool) or not isinstance(wave, int) or wave < 1:
+            errors.append(f"{label}.wave must be a positive integer")
+            continue
+        if wave in seen_waves:
+            errors.append(f"duplicate roadmap wave number: {wave}")
+        seen_waves.add(wave)
+        waves.append(wave)
+        if not isinstance(wave_id, str) or not wave_id:
+            errors.append(f"{label}.id must be non-empty")
+            continue
+        if wave_id in seen_ids:
+            errors.append(f"duplicate roadmap id: {wave_id}")
+        seen_ids.add(wave_id)
+        ids.append(wave_id)
+
+        gap_ids = _nonempty_strings(
+            item.get("gaps"),
+            label=f"{label}.gaps",
+            errors=errors,
+            allow_empty=wave_id == "sota-closure",
+        )
+        for gap_id in gap_ids:
+            if gap_id not in known_gaps:
+                errors.append(f"roadmap {wave_id} references unknown gap {gap_id!r}")
+            scheduled.append(gap_id)
+
+        if not isinstance(item.get("goal"), str) or not item["goal"].strip():
+            errors.append(f"{label}.goal must be non-empty")
+        _nonempty_strings(
+            item.get("exit"),
+            label=f"{label}.exit",
+            errors=errors,
+        )
+
+        dependencies = item.get("depends_on", [])
+        dep_ids = _nonempty_strings(
+            dependencies,
+            label=f"{label}.depends_on",
+            errors=errors,
+            allow_empty=True,
+        )
+        prior_ids = set(ids[:-1])
+        for dependency in dep_ids:
+            if dependency not in prior_ids:
+                errors.append(
+                    f"roadmap {wave_id} dependency must reference a prior wave: {dependency}"
+                )
+
+    if sorted(waves) != list(range(1, len(waves) + 1)):
+        errors.append(f"roadmap wave numbers must be contiguous from one: {sorted(waves)}")
+
+    duplicates = sorted(
+        gap_id for gap_id in set(scheduled) if scheduled.count(gap_id) > 1
+    )
+    if duplicates:
+        errors.append("open gaps scheduled more than once: " + ", ".join(duplicates))
+    missing = sorted(open_gaps - set(scheduled))
+    if missing:
+        errors.append("open gaps missing from execution roadmap: " + ", ".join(missing))
+
+    closure_index = next(
+        (i for i, item in enumerate(raw) if isinstance(item, dict) and item.get("id") == "sota-closure"),
+        None,
+    )
+    if closure_index is None:
+        errors.append("execution roadmap must end in sota-closure")
+    elif closure_index != len(raw) - 1:
+        errors.append("sota-closure must be the final roadmap wave")
+    else:
+        scheduled_before_closure = {
+            gap_id
+            for item in raw[:closure_index]
+            if isinstance(item, dict)
+            for gap_id in item.get("gaps", [])
+            if isinstance(gap_id, str)
+        }
+        missing_p0 = sorted(p0_open - scheduled_before_closure)
+        if missing_p0:
+            errors.append(
+                "P0 gaps must be scheduled before SOTA closure: " + ", ".join(missing_p0)
+            )
+
+    policy = contract.get("roadmap_policy")
+    if not isinstance(policy, dict):
+        errors.append("roadmap_policy must be an object")
+    else:
+        for key in (
+            "open_gap_must_be_scheduled",
+            "dependencies_must_reference_prior_waves",
+            "p0_before_sota_closure",
+            "parallelism_allowed_only_when_dependencies_are_independent",
+        ):
+            if policy.get(key) is not True:
+                errors.append(f"roadmap_policy.{key} must be true")
+
+    return ids
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -575,6 +719,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     providers = _validate_runtime_providers(contract, errors)
     gates = _validate_acceptance_gates(contract, errors)
     gaps = _validate_gap_register(contract, planes, errors)
+    roadmap = _validate_execution_roadmap(contract, errors)
 
     gap_policy = contract.get("gap_policy")
     if not isinstance(gap_policy, dict):
@@ -606,6 +751,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "provider_documents": must_read,
         "acceptance_gates": gates,
         "gaps": gaps,
+        "roadmap": roadmap,
         "errors": errors,
     }
     return errors, summary
@@ -635,7 +781,8 @@ def main(argv: list[str] | None = None) -> int:
             f"providers={','.join(summary['runtime_providers'])}; "
             f"gates={len(summary['acceptance_gates'])}; "
             f"gaps={summary['gaps'].get('total', 0)}; "
-            f"p0-open={summary['gaps'].get('p0_open', 0)})"
+            f"p0-open={summary['gaps'].get('p0_open', 0)}; "
+            f"roadmap-waves={len(summary['roadmap'])})"
         )
     return 1 if errors else 0
 
