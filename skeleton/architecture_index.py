@@ -177,6 +177,8 @@ PLAN_CHECKPOINTS = {
         "tracks": ("AD",),
         "research_conclusion_range": ("FR001", "FR114"),
         "research_question_range": ("RQ001", "RQ010"),
+        "source_verification_range": ("SV001", "SV046"),
+        "frontier_delta_range": ("FD001", "FD015"),
         "production_authority_granted": False,
         "research_refresh_required": True,
     }
@@ -336,8 +338,8 @@ RESEARCH_PASS_INVARIANTS = {
 
 RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
 RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 11))
-RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 37))
-FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 11))
+RESEARCH_SOURCE_VERIFICATION_IDS = tuple(f"SV{number:03d}" for number in range(1, 47))
+FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 16))
 
 RESEARCH_SOURCE_STATUS_STATES = (
     "accepted_peer_reviewed",
