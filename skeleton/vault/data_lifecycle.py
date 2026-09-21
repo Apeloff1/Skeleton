@@ -239,6 +239,27 @@ class DataLifecycleRegistry:
             self._entries[record.record_id] = _Entry(record=record)
         return record
 
+    def ensure_registered(self, record: GovernedDataRecord) -> GovernedDataRecord:
+        """Idempotently register an identical record or fail on identity reuse.
+
+        This is the retry-safe boundary for durable write reconciliation. A
+        caller replaying the same governed write receives the original record;
+        reusing a record_id with different lifecycle metadata fails closed.
+        """
+
+        if not isinstance(record, GovernedDataRecord):
+            raise TypeError("record must be a GovernedDataRecord")
+        with self._lock:
+            existing = self._entries.get(record.record_id)
+            if existing is None:
+                self._entries[record.record_id] = _Entry(record=record)
+                return record
+            if existing.record == record:
+                return existing.record
+            raise LifecycleConflict(
+                f"record identity conflicts with existing governance metadata: {record.record_id}"
+            )
+
     def get(self, record_id: str) -> dict[str, Any]:
         key = _required_id(record_id, "record_id")
         with self._lock:
