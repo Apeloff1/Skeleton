@@ -49,6 +49,24 @@ def _record_ids(values: Iterable[str]) -> tuple[str, ...]:
     return normalized
 
 
+def _normalized_string_values(
+    values: Iterable[str],
+    *,
+    field: str,
+) -> tuple[str, ...]:
+    if isinstance(values, (str, bytes)):
+        raise DataGovernanceDenied(f"{field} must be a collection, not a string")
+    normalized = tuple(
+        dict.fromkeys(
+            _required_text(value, field).lower()
+            for value in values
+        )
+    )
+    if not normalized:
+        raise DataGovernanceDenied(f"at least one {field} is required")
+    return normalized
+
+
 class CanonicalDataPlane(str, Enum):
     """Governed owner planes whose durable writes require lifecycle registration."""
 
@@ -192,17 +210,16 @@ class GovernanceRegistry:
 
         canonical = CanonicalDataPlane.parse(plane)
         policy = _CANONICAL_WRITE_POLICIES[canonical]
-        normalized_purposes = tuple(
-            dict.fromkeys(
-                _required_text(value, "purpose").lower()
-                for value in purposes
-            )
+        normalized_purposes = _normalized_string_values(
+            purposes,
+            field="purpose",
         )
-        if not normalized_purposes:
-            raise DataGovernanceDenied("at least one purpose is required")
 
         targets = (
-            tuple(deletion_targets)
+            _normalized_string_values(
+                deletion_targets,
+                field="deletion target",
+            )
             if deletion_targets is not None
             else policy.default_deletion_targets
         )
