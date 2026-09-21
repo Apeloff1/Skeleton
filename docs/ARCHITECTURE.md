@@ -256,7 +256,8 @@ Canonical navigation for this layer:
 - [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns;
 - [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md) — quarantined architecture-changing experiments, falsification batteries, state-containment and graduation rules;
 - [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md) — current frontier findings, contradictions, source-status audit, research questions, reproduction queue, and September 2026 research delta;
-- [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md) — RXP001–RXP035 controlled experiment designs, falsification conditions, evidence outputs, and research-debt targets.
+- [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md) — RXP001–RXP035 controlled experiment designs, falsification conditions, evidence outputs, and research-debt targets;
+- [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md) — 19-domain accountability record separating planning coverage from local reproduction and production evidence.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
