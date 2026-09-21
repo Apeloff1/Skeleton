@@ -85,6 +85,7 @@ CANONICAL_DOCUMENTS = {
     "adaptive_absorption_fabric": "docs/architecture/adaptive-absorption-fabric.md",
     "masterplan_gap_audit": "docs/architecture/masterplan-gap-audit.md",
     "exotic_architecture_lab": "docs/architecture/exotic-architecture-lab.md",
+    "frontier_research_atlas": "docs/architecture/frontier-research-atlas-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -145,6 +146,7 @@ CONSTRUCTION_TRACKS = {
     "AA": "rare_massive_upgrades_full_stack_step_changes",
     "AB": "adversarial_foundations_systemic_hardening",
     "AC": "exotic_architecture_laboratory",
+    "AD": "research_saturation_replication_frontier_synthesis",
 }
 
 PLAN_CHECKPOINTS = {
@@ -169,6 +171,14 @@ PLAN_CHECKPOINTS = {
         "tier_e3_ranges": (("AC27", "AC30"), ("AC40", "AC41")),
         "production_authority_granted": False,
         "promotion_requires_track_ab_p0_closure": True,
+    },
+    "PLAN-20260921-FRONTIER-RESEARCH-SATURATION": {
+        "created_at": "2026-09-21",
+        "tracks": ("AD",),
+        "research_conclusion_range": ("FR001", "FR114"),
+        "research_question_range": ("RQ001", "RQ010"),
+        "production_authority_granted": False,
+        "research_refresh_required": True,
     }
 }
 
@@ -281,6 +291,53 @@ EXOTIC_ARCHITECTURE_INVARIANTS = {
     "promotion_to_production_requires_track_aa_path": True,
 }
 
+FRONTIER_RESEARCH_DOMAINS = (
+    "model_architecture",
+    "representation_tokenization",
+    "neural_memory_retrieval",
+    "training_data_mixtures",
+    "optimization_numerics",
+    "test_time_reasoning",
+    "formal_reasoning_verification",
+    "agents_long_horizon",
+    "agent_memory_procedures",
+    "serving_inference",
+    "distributed_training",
+    "multimodal_world_models",
+    "evaluation_science",
+    "safety_security_monitorability",
+    "interpretability",
+    "uncertainty_calibration",
+    "continual_adaptation",
+    "hardware_precision_efficiency",
+    "research_automation",
+)
+
+RESEARCH_PASS_INVARIANTS = {
+    "research_source_is_evidence_not_authority": True,
+    "research_conclusion_is_scoped": True,
+    "research_conclusion_records_confidence": True,
+    "contradictory_evidence_is_retained": True,
+    "negative_results_are_first_class": True,
+    "paper_status_is_preserved": True,
+    "reproduction_class_is_explicit": True,
+    "baseline_parity_is_required_for_promotion_evidence": True,
+    "equal_resource_views_are_plural": True,
+    "scale_transfer_is_measured_not_assumed": True,
+    "hardware_transfer_is_measured_not_assumed": True,
+    "inference_protocol_is_part_of_reasoning_eval": True,
+    "synthetic_data_ancestry_is_tracked": True,
+    "verifier_independence_is_measured": True,
+    "research_agent_cannot_self_validate": True,
+    "blind_holdout_is_not_research_selection_metric": True,
+    "research_refresh_is_required": True,
+    "research_cannot_directly_mutate_production": True,
+}
+
+RESEARCH_CONCLUSION_IDS = tuple(f"FR{number:03d}" for number in range(1, 115))
+RESEARCH_QUESTION_IDS = tuple(f"RQ{number:03d}" for number in range(1, 11))
+
+
 
 
 def full_summary() -> Dict[str, Any]:
@@ -306,6 +363,10 @@ def full_summary() -> Dict[str, Any]:
         "adversarial_hardening_invariants": dict(ADVERSARIAL_HARDENING_INVARIANTS),
         "exotic_architecture_tiers": {key: list(value) for key, value in EXOTIC_ARCHITECTURE_TIERS.items()},
         "exotic_architecture_invariants": dict(EXOTIC_ARCHITECTURE_INVARIANTS),
+        "frontier_research_domains": list(FRONTIER_RESEARCH_DOMAINS),
+        "research_pass_invariants": dict(RESEARCH_PASS_INVARIANTS),
+        "research_conclusion_ids": list(RESEARCH_CONCLUSION_IDS),
+        "research_question_ids": list(RESEARCH_QUESTION_IDS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
@@ -331,5 +392,7 @@ def full_summary() -> Dict[str, Any]:
             "P0 production-readiness blockers for identity, data, artifacts, state, evals, sandboxing, storage, recovery, and audit",
             "Quarantined exotic architecture laboratory with falsification and kill criteria",
             "Test-time neural memory, byte-latent, diffusion, recurrent-depth, equilibrium, sparse/ternary and latent-multimodal candidate families",
+            "Frontier research saturation with scoped conclusions and contradiction tracking",
+            "Research reproduction classes, equal-resource normalization, scale-transfer and negative-evidence retention",
         ],
     }
