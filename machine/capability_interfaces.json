@@ -284,7 +284,13 @@
         "step",
         "checkpoint",
         "result",
-        "cancellation"
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken"
       ],
       "target_failure_contract": "checkpoint and stop safely",
       "source_acceptance": [
@@ -296,7 +302,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "status": "present"
     },
@@ -964,7 +975,13 @@
         "step",
         "checkpoint",
         "result",
-        "cancellation"
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken"
       ],
       "target_failure_contract": "checkpoint and stop safely",
       "source_acceptance": [
@@ -976,7 +993,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "status": "present"
     },
@@ -1863,7 +1885,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "target_acceptance": [
         "primitive unit suite",
@@ -1896,7 +1923,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "target_acceptance": [
         "cross-tenant isolation",
@@ -1929,7 +1961,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "target_acceptance": [
         "no-route tests",
@@ -1962,7 +1999,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "target_acceptance": [
         "prompt injection regression suite",
@@ -1995,7 +2037,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "target_acceptance": [
         "schema fuzzing",
@@ -2285,7 +2332,13 @@
         "step",
         "checkpoint",
         "result",
-        "cancellation"
+        "cancellation",
+        "AIExecutionRequest",
+        "AgentTurn",
+        "ExecutionCheckpoint",
+        "AIExecutionResult",
+        "StopPolicy",
+        "ResumeToken"
       ],
       "target_failure_contract": "checkpoint and stop safely",
       "source_acceptance": [
@@ -2297,7 +2350,12 @@
         "resume tests",
         "cancellation tests",
         "fan-out quota tests",
-        "duplicate execution tests"
+        "duplicate execution tests",
+        "bounded cognitive loop tests",
+        "turn lineage tests",
+        "checkpoint crash/replay tests",
+        "approval suspend/resume tests",
+        "final result evidence-binding tests"
       ],
       "status": "present"
     },
