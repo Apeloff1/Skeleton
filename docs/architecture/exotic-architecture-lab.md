@@ -1,8 +1,8 @@
 # Exotic Architecture Laboratory
 
-Status: canonical research architecture manual  
-Updated: 2026-09-21  
-Track: AC  
+Status: canonical research architecture manual
+Updated: 2026-09-21
+Track: AC
 Authority: research-only; no direct production promotion
 
 ## 1. Mission
