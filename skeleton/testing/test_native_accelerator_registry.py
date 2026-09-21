@@ -392,7 +392,7 @@ def test_unknown_native_accelerator_names_fail_closed(tmp_path: Path) -> None:
 def test_default_native_registry_is_process_singleton_and_thread_safe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(registry_module, "_default_registry", None)
+    monkeypatch.setattr(native_registry_module, "_default_registry", None)
     barrier = threading.Barrier(16)
 
     def resolve() -> NativeAcceleratorRegistry:
