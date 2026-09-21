@@ -410,3 +410,17 @@ def test_public_product_readiness_route_is_registered():
     assert "const PUBLIC_ROOT = '/api/product';" in client
     assert "getProductReadiness" in capability
     assert "getProductControlStatus(''," not in capability
+
+
+def test_product_routes_are_registered_in_canonical_route_registry():
+    root = find_repo_root(Path(__file__))
+    registry = (root / "frontend/utils/routeRegistry.ts").read_text(encoding="utf-8")
+
+    for route in (
+        "/product",
+        "/capability",
+        "/operation",
+        "/control-plane",
+        "/jeeves-workbench",
+    ):
+        assert f"path: '{route}'" in registry
