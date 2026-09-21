@@ -63,6 +63,15 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_tenant_quota_sqlite.py \
   skeleton/testing/test_admission_runtime.py
 
+printf '\n== Durable operation authority and outbox ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_operation_contract.py \
+  skeleton/testing/test_operation_store.py \
+  skeleton/testing/test_operation_runtime.py \
+  skeleton/testing/test_operation_server_binding.py \
+  skeleton/testing/test_operation_stream.py \
+  skeleton/testing/test_operation_stream_store.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
