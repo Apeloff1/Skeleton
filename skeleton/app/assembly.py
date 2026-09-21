@@ -14,7 +14,7 @@ import shutil
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
+from typing import Iterable, Mapping
 
 
 @dataclass(frozen=True)
@@ -308,11 +308,11 @@ def compose_command(
     base = ["docker", "compose", "-f", manifest.compose_file]
 
     if action == "up":
+        if full:
+            base.extend(["--profile", "full"])
         command = [*base, "up", "-d"]
         if build:
             command.append("--build")
-        if full:
-            command.extend(["--profile", "full"])
         command.extend(manifest.full_services if full else manifest.default_services)
         return tuple(command)
     if action == "down":
