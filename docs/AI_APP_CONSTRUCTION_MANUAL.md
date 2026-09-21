@@ -1,10 +1,10 @@
 # Skeleton AI Application Construction Manual
 
-Architecture tag: `arch-map/v3.3`
+Architecture tag: `arch-map/v3.4`
 
 Machine contract: `machine/ai_app_construction.json`
 
-Construction version: `3.3.0`
+Construction version: `3.4.0`
 
 Architecture contract: `machine/architecture.json`
 
@@ -1671,3 +1671,22 @@ This does not close the P0 streaming gap. Remaining required work is:
 6. reconnect cursor and resync UX;
 7. multi-client acknowledgement strategy;
 8. slow-client, cancel-race and disconnect/reconnect E2E evidence.
+
+
+## 34. Durable stream store
+
+`SQLiteOperationEventStore` is now the durable reference implementation for
+the canonical stream protocol.
+
+It provides transactional exact-next sequence enforcement, operation-scoped
+unique event IDs, durable terminal fencing, replay from an explicit cursor,
+explicit compaction watermarks, replay-gap failure, strict corruption rejection,
+and bounded retained-event capacity with backpressure.
+
+SQLite is a portable conformance backend, not an architectural mandate. Another
+durable substrate may replace it only if the same protocol invariants and tests
+remain green.
+
+The P0 stream gap remains open only for transport/client integration: backend
+SSE or WebSocket, heartbeat/idle policy, cancellation bridge, frontend
+reducer/resume, multi-client acknowledgement, and end-to-end recovery evidence.
