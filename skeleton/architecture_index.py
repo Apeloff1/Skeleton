@@ -83,6 +83,7 @@ CANONICAL_DOCUMENTS = {
     "research_source_catalog": "docs/architecture/research-source-catalog.md",
     "sota_absorb_engine": "docs/architecture/sota-absorb-engine.md",
     "adaptive_absorption_fabric": "docs/architecture/adaptive-absorption-fabric.md",
+    "masterplan_gap_audit": "docs/architecture/masterplan-gap-audit.md",
 }
 
 EVIDENCE_STATES = (
@@ -141,6 +142,7 @@ CONSTRUCTION_TRACKS = {
     "Y": "scientific_experiment_promotion_rollback_refresh",
     "Z": "deep_internals_optimizer_control",
     "AA": "rare_massive_upgrades_full_stack_step_changes",
+    "AB": "adversarial_foundations_systemic_hardening",
 }
 
 PLAN_CHECKPOINTS = {
@@ -148,6 +150,13 @@ PLAN_CHECKPOINTS = {
         "created_at": "2026-09-21T21:33:00+02:00",
         "tracks": ("Z", "AA"),
         "implementation_claims_require_signed_evidence": True,
+        "production_authority_granted": False,
+    },
+    "PLAN-20260921-HOSTILE-GAP-AUDIT": {
+        "created_at": "2026-09-21",
+        "tracks": ("AB",),
+        "gap_range": ("G001", "G070"),
+        "production_readiness_blocked_by_applicable_open_p0": True,
         "production_authority_granted": False,
     }
 }
@@ -170,6 +179,53 @@ MASSIVE_UPGRADE_INVARIANTS = {
     "negative_evidence_is_retained": True,
 }
 
+P0_HARDENING_GAPS = (
+    "G001_representation_identity",
+    "G002_data_lineage",
+    "G003_model_artifact_manifest",
+    "G004_state_schema_migration",
+    "G005_evaluation_firewall",
+    "G006_principal_tenant_delegation",
+    "G007_execution_sandbox",
+    "G008_supply_chain_trust",
+    "G009_storage_consistency",
+    "G010_leases_fencing_ordering",
+    "G011_secret_lifecycle",
+    "G012_disaster_recovery",
+    "G013_control_plane_isolation",
+    "G014_immutable_config_snapshot",
+    "G015_unknown_side_effect_reconciliation",
+    "G016_deletion_tombstone_propagation",
+    "G017_training_poisoning_backdoor_defense",
+    "G018_safe_artifact_loading",
+    "G019_tamper_evident_audit",
+    "G020_safe_mode_break_glass",
+)
+
+ADVERSARIAL_HARDENING_INVARIANTS = {
+    "open_applicable_p0_blocks_production_readiness": True,
+    "model_requires_representation_identity": True,
+    "training_checkpoint_requires_data_lineage_root": True,
+    "serving_requires_unified_model_artifact_manifest": True,
+    "rollback_requires_state_compatibility": True,
+    "blind_eval_isolated_from_training_and_search": True,
+    "side_effect_requires_authenticated_principal": True,
+    "high_risk_execution_requires_sandbox": True,
+    "privileged_artifact_load_requires_integrity_verification": True,
+    "authoritative_store_declares_consistency_and_restore_semantics": True,
+    "distributed_mutation_rejects_stale_writers": True,
+    "raw_secrets_are_not_ordinary_prompt_log_or_config_content": True,
+    "backup_claim_requires_restore_drill": True,
+    "control_plane_has_reserved_recovery_capacity": True,
+    "consequential_evidence_binds_immutable_config": True,
+    "unknown_irreversible_outcome_is_not_blindly_retried": True,
+    "deletion_propagates_to_derived_state": True,
+    "training_inputs_are_not_trusted_by_source_reputation_alone": True,
+    "untrusted_artifact_load_is_resource_bounded": True,
+    "authority_mutations_are_tamper_evident": True,
+    "safe_mode_is_required": True,
+}
+
 
 def full_summary() -> Dict[str, Any]:
     """Return the complete architecture summary across all indexed rounds."""
@@ -189,6 +245,8 @@ def full_summary() -> Dict[str, Any]:
         "plan_checkpoints": {key: dict(value) for key, value in PLAN_CHECKPOINTS.items()},
         "optimizer_control_invariants": dict(OPTIMIZER_CONTROL_INVARIANTS),
         "massive_upgrade_invariants": dict(MASSIVE_UPGRADE_INVARIANTS),
+        "p0_hardening_gaps": list(P0_HARDENING_GAPS),
+        "adversarial_hardening_invariants": dict(ADVERSARIAL_HARDENING_INVARIANTS),
         "key_capabilities": [
             "7+1 phase genesis boot with forge as first-class handle",
             "Complete indexed architecture history: base plus rounds 3 through 22",
@@ -210,5 +268,7 @@ def full_summary() -> Dict[str, Any]:
             "Tool intent, validation, authority, execution, and receipt boundary",
             "Plural verification with explicit verifier independence metadata",
             "Controlled fast, medium, and slow adaptation velocities",
+            "Adversarial foundations and systemic hardening construction track",
+            "P0 production-readiness blockers for identity, data, artifacts, state, evals, sandboxing, storage, recovery, and audit",
         ],
     }
