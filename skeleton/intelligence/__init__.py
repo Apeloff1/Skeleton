@@ -63,6 +63,13 @@ from skeleton.intelligence.admission import (
     evaluate_admission,
     require_admission,
 )
+from skeleton.intelligence.admission_runtime import (
+    AdmissionCompletion,
+    AdmissionLease,
+    AdmissionRuntime,
+    AdmissionRuntimeConflict,
+    AdmissionRuntimeError,
+)
 from skeleton.intelligence.quota import (
     QuotaCompletion,
     QuotaConflict,
@@ -131,6 +138,11 @@ __all__ = [
     "UsageEstimate",
     "evaluate_admission",
     "require_admission",
+    "AdmissionCompletion",
+    "AdmissionLease",
+    "AdmissionRuntime",
+    "AdmissionRuntimeConflict",
+    "AdmissionRuntimeError",
     "QuotaCompletion",
     "QuotaConflict",
     "QuotaError",
