@@ -88,6 +88,7 @@ CANONICAL_DOCUMENTS = {
     "frontier_research_atlas": "docs/architecture/frontier-research-atlas-2026.md",
     "frontier_research_experiment_protocols": "docs/architecture/frontier-research-experiment-protocols-2026.md",
     "research_saturation_checklist": "docs/architecture/research-saturation-checklist-2026.md",
+    "research_historical_lineage": "docs/architecture/research-historical-lineage.md",
 }
 
 EVIDENCE_STATES = (
@@ -186,6 +187,12 @@ PLAN_CHECKPOINTS = {
         "experiment_protocol_range": ("RXP001", "RXP035"),
         "production_authority_granted": False,
         "research_refresh_required": True,
+    },
+    "PLAN-20260921-HISTORICAL-RESEARCH-LINEAGE": {
+        "created_at": "2026-09-21",
+        "tracks": ("AD",),
+        "historical_anchor_range": ("HL001", "HL110"),
+        "production_authority_granted": False,
     },
     "PLAN-20260921-RESEARCH-SATURATION-ACCOUNTABILITY": {
         "created_at": "2026-09-21T22:39:00+02:00",
@@ -358,6 +365,7 @@ FRONTIER_DELTA_IDS = tuple(f"FD{number:03d}" for number in range(1, 22))
 RESEARCH_CONTRADICTION_IDS = tuple(f"CX{number:03d}" for number in range(1, 25))
 RESEARCH_DEBT_IDS = tuple(f"RDE{number:03d}" for number in range(1, 37))
 RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(1, 36))
+HISTORICAL_RESEARCH_LINEAGE_IDS = tuple(f"HL{number:03d}" for number in range(1, 111))
 
 RESEARCH_SOURCE_STATUS_STATES = (
     "accepted_peer_reviewed",
@@ -524,6 +532,7 @@ def full_summary() -> Dict[str, Any]:
         "research_contradiction_ids": list(RESEARCH_CONTRADICTION_IDS),
         "research_debt_ids": list(RESEARCH_DEBT_IDS),
         "research_experiment_protocol_ids": list(RESEARCH_EXPERIMENT_PROTOCOL_IDS),
+        "historical_research_lineage_ids": list(HISTORICAL_RESEARCH_LINEAGE_IDS),
         "research_source_status_states": list(RESEARCH_SOURCE_STATUS_STATES),
         "reproduction_classes": list(REPRODUCTION_CLASSES),
         "research_debt_states": list(RESEARCH_DEBT_STATES),
