@@ -886,6 +886,92 @@ Define precedence and handling when legal/audit retention obligations conflict w
 
 ---
 
+
+## 4.1 Second hostile pass — residual attack surfaces
+
+The first pass found architectural families. The second pass attacks race windows, boundary parsing, key infrastructure, cache identity, distributed checkpoint consistency and feedback loops.
+
+| ID | Severity | Residual gap |
+| --- | --- | --- |
+| G071 | P1 | canonical serialization for signed/hashed objects can drift across language/runtime versions |
+| G072 | P1 | TOCTOU between authorization/approval and actual execution |
+| G073 | P1 | approval replay against changed arguments, state, principal or policy |
+| G074 | P1 | SSRF and DNS rebinding through URL-capable tools/retrievers |
+| G075 | P1 | redirect chains can escape an originally allowed origin/network policy |
+| G076 | P1 | filesystem path traversal, symlink races and mount-boundary escape |
+| G077 | P1 | archive extraction path traversal / zip-slip / archive bombs |
+| G078 | P1 | package/plugin dependency confusion and namespace takeover |
+| G079 | P1 | generated code can install dependencies with arbitrary install-time scripts |
+| G080 | P1 | JIT/kernel/compiled-code cache poisoning or stale binary reuse |
+| G081 | P1 | cross-tenant accelerator-memory residue and buffer reuse |
+| G082 | P1 | KMS/secret-provider outage during boot, rotation or recovery |
+| G083 | P1 | partial key rotation leaves mixed writers/readers and unverifiable artifacts |
+| G084 | P0 | root signing/trust key compromise lacks explicit revoke, re-root and re-sign recovery |
+| G085 | P1 | distributed checkpoint shards can be individually valid but collectively inconsistent |
+| G086 | P1 | snapshot without quiescence/barrier can capture impossible cross-store state |
+| G087 | P1 | index rebuild can expose a mixture of old/new generations |
+| G088 | P1 | vector embeddings remain after embedding-model/version change |
+| G089 | P1 | retrieval index and query encoder can silently disagree on version/normalization |
+| G090 | P1 | low-grade memory poisoning accumulates gradually below per-write thresholds |
+| G091 | P1 | compaction/GC can accidentally resurrect or discard deletion tombstones |
+| G092 | P1 | randomness/seed ownership is not explicit across experiments and production sampling |
+| G093 | P1 | elastic resize can duplicate or reuse distributed RNG streams |
+| G094 | P1 | data-loader cursor recovery can skip or duplicate training samples |
+| G095 | P1 | collectives can hang/partially progress without a consistent recovery boundary |
+| G096 | P1 | silent memory/network/storage corruption needs end-to-end checks, not only file hashes |
+| G097 | P1 | counters/epochs/sequence IDs can overflow, wrap or be truncated |
+| G098 | P1 | unit confusion between bytes/tokens/seconds/ms/currency can defeat resource gates |
+| G099 | P1 | feature flags can form invalid combinations not tested individually |
+| G100 | P1 | rollout/feature/config skew across replicas can create non-reproducible behavior |
+| G101 | P1 | canary traffic may not represent tail users/tasks/hardware/failure conditions |
+| G102 | P1 | automated rollback/re-promote can flap between versions without hysteresis |
+| G103 | P1 | supposedly independent providers/regions can share correlated dependencies |
+| G104 | P1 | DNS/CDN/cache poisoning can change fetched artifacts without changing logical URL |
+| G105 | P1 | certificate expiry/rotation can brick bootstrap or recovery paths |
+| G106 | P1 | KMS credential bootstrap can become circular during disaster recovery |
+| G107 | P1 | audit-log signing-key rotation can break historical verification |
+| G108 | P1 | valid old receipts can be replayed as if they authorize a new action |
+| G109 | P1 | delayed/replayed events can arrive after policy or lease expiry |
+| G110 | P1 | idempotency keys need namespace/scope/TTL rules to prevent collisions and cross-action suppression |
+| G111 | P1 | generated IDs can collide or cross namespaces/tenants |
+| G112 | P1 | digest/signature algorithms need versioning and cryptographic agility |
+| G113 | P1 | semantically identical objects can hash differently without canonical serialization |
+| G114 | P1 | consumers can treat an incomplete streamed result as committed data |
+| G115 | P1 | speculative output may be externally consumed before later rejection/correction |
+| G116 | P1 | prompt/prefix caches can leak across policy/system-prompt versions |
+| G117 | P1 | context compression can drop authority/trust labels while keeping imperative text |
+| G118 | P1 | summaries can hallucinate provenance or collapse contradictory sources |
+| G119 | P1 | retrieval scores from different encoders/indexes are not directly comparable |
+| G120 | P1 | learned data-quality filters can drift and silently reshape the training population |
+| G121 | P1 | teacher/student synthetic-data loops can create circular evidence and error amplification |
+| G122 | P1 | benchmark answers can leak through repository files, tools, search or retrieval at eval time |
+| G123 | P1 | test/eval fixtures can later enter training corpora through repository ingestion |
+| G124 | P1 | generated evals can self-confirm the model family that generated them |
+| G125 | P1 | production behavior→feedback→training loops can amplify popularity rather than correctness |
+| G126 | P1 | malicious or low-quality user corrections can poison memory/training promotion |
+| G127 | P1 | agent-to-agent messages need authenticated sender identity and anti-impersonation |
+| G128 | P1 | workflow checkpoints can replay privileged steps after capability/policy revocation |
+| G129 | P1 | stale operator UI state and double-submit can issue obsolete or duplicate commands |
+| G130 | P1 | temporary files, local caches and crash residue can retain secrets or sensitive artifacts |
+
+### Second-pass closure rules
+
+- G084 is an additional P0: root-key compromise must have a tested revocation and trust-root replacement path.
+- Authorization/approval decisions bind the exact action digest and are revalidated at commit time.
+- Fetchers resolve/validate every redirect and final network target; DNS rebinding cannot bypass egress policy.
+- File extraction and path writes use canonicalized sandbox-relative paths and reject symlink/mount escapes.
+- Checkpoints use one manifest/commit marker so a mixed shard generation never appears complete.
+- Index/cache generations switch atomically by generation identifier.
+- Embedding/index identity is part of cache/retrieval keys.
+- RNG/data cursors are checkpointed as first-class distributed state.
+- Signed/hashed structures use canonical serialization and algorithm/version identifiers.
+- Speculative/partial output is never labeled committed before acceptance.
+- Authority/trust labels survive compression, summarization, translation and agent relays.
+- Promotion canaries include tail populations and use hysteresis to avoid rollback flapping.
+- Human/operator actions use fresh state and duplicate-submit protection.
+
+**Open P0 rule:** any applicable open P0 blocks a production-readiness claim, regardless of benchmark or capability performance.
+
 # 5. Adversarial fault-campaign matrix
 
 Do not test failures one at a time only. The dangerous bugs are interactions.
@@ -1030,3 +1116,12 @@ P1 items must be resolved or explicitly accepted with bounded scope before a sub
 P2 items are required before claiming broad frontier completeness.
 
 This audit intentionally remains open-ended. Every incident, near miss, benchmark leak, restore failure, security finding, failed research reproduction or production regression must be able to create a new gap ID without rewriting the audit format.
+
+
+## 8. Audit checkpoint
+
+PLAN-20260921-HOSTILE-GAP-AUDIT  
+scope=G001..G130 + Track AB  
+open_P0_blocks_production_readiness=true  
+fault_model=single-axis + pairwise + selected-three-axis  
+signoff_required_for_closure=true
