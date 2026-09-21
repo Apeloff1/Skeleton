@@ -305,8 +305,21 @@ class NativeAcceleratorRegistry:
             )
 
 
+_default_registry: NativeAcceleratorRegistry | None = None
+_default_registry_lock = threading.Lock()
+
+
+def get_default_native_registry() -> NativeAcceleratorRegistry:
+    global _default_registry
+    with _default_registry_lock:
+        if _default_registry is None:
+            _default_registry = NativeAcceleratorRegistry()
+        return _default_registry
+
+
 __all__ = [
     "NativeAcceleratorRegistry",
     "NativeAcceleratorRegistryError",
     "NativeAcceleratorRuntimeStatus",
+    "get_default_native_registry",
 ]
