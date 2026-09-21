@@ -17,6 +17,8 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Iterable, Mapping
 
+from skeleton.intelligence.admission import ResourceBudget
+
 
 class RoutingError(RuntimeError):
     """Base routing failure."""
@@ -139,6 +141,38 @@ class RouteRequest:
     excluded_endpoints: frozenset[str] = field(default_factory=frozenset)
     minimum_reliability: float = 0.0
     minimum_quality: float = 0.0
+
+    @classmethod
+    def from_resource_budget(
+        cls,
+        task_type: str,
+        budget: ResourceBudget,
+        *,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Project one admission budget into hard model-routing constraints."""
+
+        if not isinstance(budget, ResourceBudget):
+            raise TypeError("budget must be a ResourceBudget")
+        output_tokens = (
+            budget.max_output_tokens
+            if expected_output_tokens is None
+            else min(expected_output_tokens, budget.max_output_tokens)
+        )
+        if "latency_budget_ms" in kwargs or "cost_budget" in kwargs:
+            raise ValueError(
+                "resource budget owns latency_budget_ms and cost_budget"
+            )
+        return cls(
+            task_type=task_type,
+            context_tokens=context_tokens,
+            expected_output_tokens=output_tokens,
+            latency_budget_ms=budget.max_wall_seconds * 1000.0,
+            cost_budget=budget.max_cost_usd,
+            **kwargs,
+        )
 
     def __post_init__(self) -> None:
         task_type = self.task_type.strip().lower()
