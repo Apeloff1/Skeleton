@@ -95,3 +95,11 @@ def test_manual_unbound_attestation_is_not_allowed() -> None:
     assert {"github_identity", "git_gpg", "git_ssh", "sigstore", "ci_oidc"} <= (
         checker.ALLOWED_SIGNATURE_METHODS
     )
+
+
+def test_checkbox_regex_matches_literal_markdown_checkbox_lines() -> None:
+    sample = "- [ ] `ACC-VOL-000` — volume\n- [x] `ACC-AIQ-X` — task\n"
+    assert checker.CHECK_RE.findall(sample) == [
+        (" ", "ACC-VOL-000"),
+        ("x", "ACC-AIQ-X"),
+    ]
