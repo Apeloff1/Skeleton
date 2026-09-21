@@ -93,7 +93,7 @@ def validate() -> list[str]:
         if forbidden.intersection(wave):
             errors.append(f"{wid}: wave-local manual completion fields are forbidden")
 
-    if list(wp_owner) != EXPECTED_WPS:
+    if set(wp_owner) != set(EXPECTED_WPS) or len(wp_owner) != len(EXPECTED_WPS):
         missing = [wp for wp in EXPECTED_WPS if wp not in wp_owner]
         extra = [wp for wp in wp_owner if wp not in EXPECTED_WPS]
         errors.append(f"work-package primary coverage mismatch; missing={missing}, extra={extra}")
