@@ -18600,7 +18600,7 @@
       "id": "ACC-AIQ-S0-STATE-03",
       "type": "queue_task",
       "title": "AIQ-S0-STATE-03 Prove authoritative restore first and derived index/cache rebuild second.",
-      "status": "evidence_pending",
+      "status": "verified",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
@@ -18635,20 +18635,26 @@
         "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606"
       },
       "verification_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "github-actions:State Recovery Drill",
+        "signer_type": "ci",
+        "role": "independent-verifier",
+        "signed_at_utc": "2026-09-21T19:14:11Z",
+        "git_sha": "541e64e2016a13fb5ae677231e32f4cfefae5df5",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147",
+          "github-actions-job:106478069613",
+          "state-recovery-drill:backup_restore_digest=5d341ec0e455b74fb295621098be33e0f2991014d91076b4e5eccfbdd15c4ab1",
+          "state-recovery-drill:derived_digest=1be92375ecda43900c76a802ff81cfeeb6dd718c55bbfab36d4312c4b19f445d",
+          "machine/accountability_events/ACC-AIQ-S0-STATE-03/verification.json"
+        ],
+        "statement": "Live isolated Mongo recovery drill independently verified authoritative backup/restore integrity and restore-before-rebuild ordering.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147"
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T19:11:45Z",
+      "last_event_at_utc": "2026-09-21T19:14:11Z",
       "history": [
         {
           "sequence": 1,
@@ -18715,6 +18721,27 @@
             "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation-002.json"
           ],
           "supersedes_git_sha": "433aa55e8d15d0d7475a39669c56504e36d33108"
+        },
+        {
+          "sequence": 4,
+          "event_type": "verification_signed",
+          "actor_id": "github-actions:State Recovery Drill",
+          "actor_type": "ci",
+          "role": "independent-verifier",
+          "at_utc": "2026-09-21T19:14:11Z",
+          "git_sha": "541e64e2016a13fb5ae677231e32f4cfefae5df5",
+          "statement": "Live isolated Mongo recovery drill independently verified authoritative backup/restore integrity and restore-before-rebuild ordering.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147",
+          "from_status": "evidence_pending",
+          "to_status": "verified",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147",
+            "github-actions-job:106478069613",
+            "state-recovery-drill:backup_restore_digest=5d341ec0e455b74fb295621098be33e0f2991014d91076b4e5eccfbdd15c4ab1",
+            "state-recovery-drill:derived_digest=1be92375ecda43900c76a802ff81cfeeb6dd718c55bbfab36d4312c4b19f445d",
+            "machine/accountability_events/ACC-AIQ-S0-STATE-03/verification.json"
+          ]
         }
       ],
       "evidence": [
@@ -18733,7 +18760,12 @@
         "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation.json",
         "https://github.com/Apeloff1/Skeleton/commit/739889a96d525ba64cd2c744aae0877ecc36df31",
         "https://github.com/Apeloff1/Skeleton/commit/4ba7b22e23e77b88716df27a06733d7d9c4a9606",
-        "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation-002.json"
+        "machine/accountability_events/ACC-AIQ-S0-STATE-03/implementation-002.json",
+        "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147",
+        "github-actions-job:106478069613",
+        "state-recovery-drill:backup_restore_digest=5d341ec0e455b74fb295621098be33e0f2991014d91076b4e5eccfbdd15c4ab1",
+        "state-recovery-drill:derived_digest=1be92375ecda43900c76a802ff81cfeeb6dd718c55bbfab36d4312c4b19f445d",
+        "machine/accountability_events/ACC-AIQ-S0-STATE-03/verification.json"
       ],
       "baseline_status": "pending"
     },
