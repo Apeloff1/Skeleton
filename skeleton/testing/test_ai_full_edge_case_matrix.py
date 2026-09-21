@@ -58,3 +58,7 @@ def test_priority_queue_exactly_matches_critical_and_high_catalog() -> None:
     assert priority["counts"]["P1"] == sum(
         e["criticality"] == "high" for e in catalog["entries"]
     )
+
+
+def test_full_edge_case_matrix_main_success_path() -> None:
+    assert checker.main() == 0
