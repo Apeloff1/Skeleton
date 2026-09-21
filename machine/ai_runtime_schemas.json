@@ -1334,6 +1334,607 @@
         "user_safe_message contains no secret/raw stack trace/restricted payload",
         "retryable reflects semantic policy rather than UI guess"
       ]
+    },
+    "ProviderRequest": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "context_id": {
+          "type": "OpaqueId"
+        },
+        "context_digest": {
+          "type": "Digest256"
+        },
+        "instructions": {
+          "type": "string",
+          "max_length": 250000
+        },
+        "prompt": {
+          "type": "string",
+          "max_length": 1000000
+        },
+        "history": {
+          "type": "array<JsonObject>",
+          "max_items": 2048
+        },
+        "model": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 256
+        },
+        "max_output_tokens": {
+          "type": "NonNegativeInt",
+          "nullable": true
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "purpose": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "resource_budget": {
+          "type": "ResourceBudget"
+        },
+        "tools": {
+          "type": "array<ProviderToolDefinition>",
+          "max_items": 256
+        },
+        "structured_output": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "tool_choice": {
+          "type": "string",
+          "enum": [
+            "none",
+            "auto",
+            "required",
+            "specific"
+          ]
+        },
+        "deadline": {
+          "type": "RFC3339",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "context_id/context_digest bind request to ContextEnvelope",
+        "tools are already admitted minimal projections",
+        "deadline cannot exceed operation deadline"
+      ]
+    },
+    "RouteDecision": {
+      "schema_version": 1,
+      "owner_plane": "model-routing",
+      "fields": {
+        "decision_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "selected_endpoint": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "candidates": {
+          "type": "array<JsonObject>",
+          "max_items": 256
+        },
+        "rejected": {
+          "type": "array<JsonObject>",
+          "max_items": 256
+        },
+        "budgets": {
+          "type": "ResourceBudget"
+        },
+        "reason_codes": {
+          "type": "array<string>",
+          "max_items": 128
+        },
+        "routed_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "selected route satisfies capability/privacy/budget/deadline filters or is null with no-route reason"
+      ]
+    },
+    "EvidenceReference": {
+      "schema_version": 1,
+      "owner_plane": "retrieval",
+      "fields": {
+        "evidence_id": {
+          "type": "OpaqueId"
+        },
+        "source_type": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "source_id": {
+          "type": "OpaqueId"
+        },
+        "content_digest": {
+          "type": "Digest256"
+        },
+        "provenance": {
+          "type": "JsonObject"
+        },
+        "tenant_id": {
+          "type": "TenantId",
+          "nullable": true
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "source_version": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 256
+        },
+        "observed_at": {
+          "type": "RFC3339"
+        },
+        "authority_class": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "citation_metadata": {
+          "type": "JsonObject"
+        }
+      },
+      "invariants": [
+        "source identity/version/digest is sufficient for verification and authorized citation rendering"
+      ]
+    },
+    "ToolCallProposal": {
+      "schema_version": 1,
+      "owner_plane": "tool-runtime",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "call_id": {
+          "type": "OpaqueId"
+        },
+        "tool_id": {
+          "type": "OpaqueId"
+        },
+        "arguments": {
+          "type": "JsonObject"
+        },
+        "arguments_digest": {
+          "type": "Digest256"
+        },
+        "authority_required": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "approval_required": {
+          "type": "boolean"
+        }
+      },
+      "invariants": [
+        "proposal is normalized provider output and grants no authority by itself"
+      ]
+    },
+    "ArtifactRecord": {
+      "schema_version": 1,
+      "owner_plane": "artifact-files",
+      "fields": {
+        "artifact_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "owner_id": {
+          "type": "ActorId"
+        },
+        "kind": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "media_type": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "size_bytes": {
+          "type": "NonNegativeInt"
+        },
+        "content_digest": {
+          "type": "Digest256"
+        },
+        "storage_ref": {
+          "type": "Ref"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "purpose": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "scan_status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "clean",
+            "quarantined",
+            "failed",
+            "not_applicable"
+          ]
+        },
+        "lifecycle_status": {
+          "type": "ArtifactLifecycle"
+        },
+        "source_operation_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "provenance": {
+          "type": "JsonObject"
+        }
+      },
+      "invariants": [
+        "only clean/not_applicable + ready artifacts may enter model/tool context according to policy"
+      ]
+    },
+    "ReleaseEvidence": {
+      "schema_version": 1,
+      "owner_plane": "deployment-release",
+      "fields": {
+        "source_sha": {
+          "type": "string",
+          "min_length": 7,
+          "max_length": 64
+        },
+        "architecture_tag": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "construction_version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "schema_catalog_version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "tests": {
+          "type": "array<JsonObject>",
+          "max_items": 4096
+        },
+        "evaluations": {
+          "type": "array<JsonObject>",
+          "max_items": 4096
+        },
+        "security": {
+          "type": "array<JsonObject>",
+          "max_items": 4096
+        },
+        "migrations": {
+          "type": "array<JsonObject>",
+          "max_items": 2048
+        },
+        "golden_journeys": {
+          "type": "array<JsonObject>",
+          "max_items": 2048
+        },
+        "provenance": {
+          "type": "JsonObject"
+        },
+        "rollback_ref": {
+          "type": "Ref"
+        },
+        "created_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "release evidence identifies the exact source and contract versions evaluated"
+      ]
+    },
+    "AdmissionDecision": {
+      "schema_version": 1,
+      "owner_plane": "cost-capacity",
+      "fields": {
+        "decision_id": {
+          "type": "OpaqueId"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "admit",
+            "defer",
+            "reroute",
+            "reject"
+          ]
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "capability": {
+          "type": "CapabilityId"
+        },
+        "reason_code": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "estimate": {
+          "type": "JsonObject"
+        },
+        "reservation": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "remaining": {
+          "type": "JsonObject"
+        },
+        "expires_at": {
+          "type": "RFC3339",
+          "nullable": true
+        },
+        "decided_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "admit reservation is idempotent by operation/execution identity and cannot widen ResourceBudget"
+      ]
+    },
+    "ProviderTransferDecision": {
+      "schema_version": 1,
+      "owner_plane": "governance",
+      "fields": {
+        "decision_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "permitted": {
+          "type": "boolean"
+        },
+        "provider_id": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "purpose": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        },
+        "tenant_bound": {
+          "type": "boolean"
+        },
+        "reason_code": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 128
+        },
+        "routing_privacy": {
+          "type": "JsonObject"
+        },
+        "policy_version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "decided_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "permitted=false blocks external provider allocation for the governed payload"
+      ]
+    },
+    "VerificationRequest": {
+      "schema_version": 1,
+      "owner_plane": "reasoning-verification",
+      "fields": {
+        "verification_id": {
+          "type": "OpaqueId"
+        },
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "capability": {
+          "type": "CapabilityId"
+        },
+        "risk_class": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "required_level": {
+          "type": "VerificationLevel"
+        },
+        "candidate_ref": {
+          "type": "Ref"
+        },
+        "context_snapshot_id": {
+          "type": "OpaqueId"
+        },
+        "evidence_refs": {
+          "type": "array<Ref>",
+          "max_items": 4096
+        },
+        "tool_receipt_refs": {
+          "type": "array<Ref>",
+          "max_items": 2048
+        },
+        "artifact_refs": {
+          "type": "array<Ref>",
+          "max_items": 1024
+        },
+        "budget": {
+          "type": "ResourceBudget"
+        },
+        "deadline": {
+          "type": "RFC3339",
+          "nullable": true
+        }
+      },
+      "invariants": [
+        "required_level is selected by policy rather than model output"
+      ]
+    },
+    "EngineExecutionAck": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "state": {
+          "type": "OperationState"
+        },
+        "accepted_at": {
+          "type": "RFC3339"
+        },
+        "idempotency_digest": {
+          "type": "Digest256"
+        },
+        "status_ref": {
+          "type": "Ref"
+        },
+        "events_ref": {
+          "type": "Ref"
+        },
+        "trace_id": {
+          "type": "OpaqueId"
+        }
+      },
+      "invariants": [
+        "duplicate submit with same operation/idempotency identity returns same canonical acknowledgement"
+      ]
+    },
+    "EngineExecutionStatus": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "operation_state": {
+          "type": "OperationState"
+        },
+        "execution_state": {
+          "type": "ExecutionState"
+        },
+        "latest_checkpoint_version": {
+          "type": "NonNegativeInt"
+        },
+        "result_ref": {
+          "type": "Ref",
+          "nullable": true
+        },
+        "failure_code": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 128
+        },
+        "updated_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "operation_state=completed requires result_ref"
+      ]
+    },
+    "EngineCancelCommand": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "actor_id": {
+          "type": "ActorId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "reason": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 2048
+        },
+        "requested_at": {
+          "type": "RFC3339"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 256
+        }
+      },
+      "invariants": [
+        "cancel is idempotent and cannot reopen terminal operation"
+      ]
     }
   },
   "cross_record_invariants": [
