@@ -71,6 +71,7 @@ class AssemblyManifest:
     version: str
     compose_file: str
     hot_compose_file: str
+    public_contract: dict[str, str]
     modes: dict[str, dict[str, str]]
     default_services: tuple[str, ...]
     full_services: tuple[str, ...]
@@ -94,6 +95,14 @@ class AssemblyManifest:
             return dict(self.modes[name])
         except KeyError as exc:
             raise KeyError(f"unknown application mode: {name}") from exc
+
+    def contract_path(self, name: str) -> str:
+        try:
+            suffix = self.public_contract[name]
+            prefix = self.public_contract["prefix"]
+        except KeyError as exc:
+            raise KeyError(f"unknown public application contract route: {name}") from exc
+        return prefix.rstrip("/") + "/" + suffix.lstrip("/")
 
 
 @dataclass(frozen=True)
@@ -136,6 +145,21 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
     names = tuple(service.name for service in services)
     if len(set(names)) != len(names):
         raise ValueError("service names must be unique")
+
+    raw_contract = app.get("public_contract")
+    if not isinstance(raw_contract, dict):
+        raise ValueError("app public_contract must be an object")
+    required_contract_keys = ("prefix", "bootstrap", "status", "ready")
+    public_contract: dict[str, str] = {}
+    for key in required_contract_keys:
+        value = raw_contract.get(key)
+        if not isinstance(value, str) or not value.startswith("/"):
+            raise ValueError(f"public_contract {key!r} must be an absolute path fragment")
+        if value != "/" and value.endswith("/"):
+            raise ValueError(f"public_contract {key!r} must not end with '/'")
+        public_contract[key] = value
+    if len({public_contract[key] for key in ("bootstrap", "status", "ready")}) != 3:
+        raise ValueError("public_contract routes must be unique")
 
     raw_modes = app.get("modes", {"development": {}})
     if not isinstance(raw_modes, dict) or not raw_modes:
@@ -202,6 +226,7 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
         version=str(app.get("version", "")),
         compose_file=str(app.get("compose_file", "docker-compose.yml")),
         hot_compose_file=str(app.get("hot_compose_file", "docker-compose.hot.yml")),
+        public_contract=public_contract,
         modes=modes,
         default_services=default_services,
         full_services=full_services,
@@ -437,6 +462,7 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
         "version": manifest.version,
         "compose_file": manifest.compose_file,
         "hot_compose_file": manifest.hot_compose_file,
+        "public_contract": dict(manifest.public_contract),
         "modes": {name: dict(values) for name, values in manifest.modes.items()},
         "default_services": list(manifest.default_services),
         "full_services": list(manifest.full_services),
