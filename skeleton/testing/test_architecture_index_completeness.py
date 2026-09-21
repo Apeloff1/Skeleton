@@ -259,7 +259,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert checkpoint["frontier_delta_range"] == ("FD001", "FD026")
     assert checkpoint["contradiction_range"] == ("CX001", "CX024")
     assert checkpoint["research_debt_range"] == ("RDE001", "RDE036")
-    assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP035")
+    assert checkpoint["experiment_protocol_range"] == ("RXP001", "RXP050")
     assert checkpoint["production_authority_granted"] is False
     assert checkpoint["research_refresh_required"] is True
 
@@ -269,7 +269,7 @@ def test_frontier_research_saturation_is_machine_visible() -> None:
     assert len(architecture_index.FRONTIER_DELTA_IDS) == 26
     assert len(architecture_index.RESEARCH_CONTRADICTION_IDS) == 24
     assert len(architecture_index.RESEARCH_DEBT_IDS) == 36
-    assert len(architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS) == 35
+    assert len(architecture_index.RESEARCH_EXPERIMENT_PROTOCOL_IDS) == 50
     assert len(architecture_index.FRONTIER_RESEARCH_DOMAINS) == 19
 
     assert invariants["research_source_is_evidence_not_authority"] is True
@@ -404,6 +404,7 @@ def test_frontier_research_atlas_has_complete_reference_namespaces() -> None:
     assert "AD65. Research experiment sequencing" in plan
     assert "AD72. Experiment decision-value review" in plan
     assert "AD81. Domain-resolved question bank" in plan
+    assert "AD82. Expanded local protocol coverage" in plan
     assert "FD001–FD026" in plan
 
 
