@@ -1,0 +1,1167 @@
+{
+  "schema_version": 1,
+  "queue_version": "1.0.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "construction_version": "3.7.0",
+  "purpose": "Atomic implementation queue for the fully functional AI P0 closure program.",
+  "scheduling_policy": {
+    "closure_order": "functional_ai_dependency_graph",
+    "implementation_parallelism": "tasks may start early when their direct task dependencies are met, but gap closure remains blocked by closure_dependencies",
+    "stage_zero_parallel": true,
+    "max_rule": "capacity/admission and repository automation policy may further bound concurrent implementation work",
+    "mutation_rule": "builders update task status only with commit/test evidence; no speculative completion"
+  },
+  "status_values": [
+    "pending",
+    "in_progress",
+    "blocked",
+    "evidence_pending",
+    "done"
+  ],
+  "tasks": [
+    {
+      "task_id": "AIQ-S0-STATE-01",
+      "gap": "gap-state-authority-convergence",
+      "stage": 0,
+      "parallel_lane": "state-authority",
+      "objective": "Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/services/rag_service.py",
+        "backend/services/database.py",
+        "machine/state_topology.json"
+      ],
+      "acceptance": [
+        "authoritative-versus-derived repository tests",
+        "RAG migration tests"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-STATE-02",
+      "gap": "gap-state-authority-convergence",
+      "stage": 0,
+      "parallel_lane": "state-authority",
+      "objective": "Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-STATE-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/operation.py",
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/persistence"
+      ],
+      "acceptance": [
+        "operation state/event fault test",
+        "restart recovery"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-STATE-03",
+      "gap": "gap-state-authority-convergence",
+      "stage": 0,
+      "parallel_lane": "state-authority",
+      "objective": "Prove authoritative restore first and derived index/cache rebuild second.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-STATE-02"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "machine/state_topology.json",
+        "docker-compose.yml"
+      ],
+      "acceptance": [
+        "Mongo backup/restore drill",
+        "derived-store loss/rebuild"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-GOV-01",
+      "gap": "gap-governance-registry",
+      "stage": 0,
+      "parallel_lane": "governance",
+      "objective": "Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/vault/data_governance.py",
+        "skeleton/memory",
+        "skeleton/retrieval",
+        "skeleton/artifact_plane"
+      ],
+      "acceptance": [
+        "registration/classification tests",
+        "cross-tenant denial"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-GOV-02",
+      "gap": "gap-governance-registry",
+      "stage": 0,
+      "parallel_lane": "governance",
+      "objective": "Wire delete/export/retention decisions through real durable-store and projection adapters.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-GOV-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/vault",
+        "backend/routes/governance.py"
+      ],
+      "acceptance": [
+        "delete propagation",
+        "export completeness",
+        "retention expiry"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-GOV-03",
+      "gap": "gap-governance-registry",
+      "stage": 0,
+      "parallel_lane": "governance",
+      "objective": "Bind governance receipts and lifecycle actions into canonical observability/audit timelines.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-GOV-02"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/observability",
+        "skeleton/vault"
+      ],
+      "acceptance": [
+        "audit receipt linkage",
+        "redaction tests"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-COST-01",
+      "gap": "gap-cost-admission",
+      "stage": 0,
+      "parallel_lane": "cost-admission",
+      "objective": "Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/quota.py",
+        "skeleton/intelligence/admission_runtime.py"
+      ],
+      "acceptance": [
+        "durable quota restart",
+        "reservation race"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-COST-02",
+      "gap": "gap-cost-admission",
+      "stage": 0,
+      "parallel_lane": "cost-admission",
+      "objective": "Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/admission.py",
+        "skeleton/skills",
+        "skeleton/artifact_plane"
+      ],
+      "acceptance": [
+        "actual-vs-estimated usage",
+        "unknown-usage behavior"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-COST-03",
+      "gap": "gap-cost-admission",
+      "stage": 0,
+      "parallel_lane": "cost-admission",
+      "objective": "Add shared cross-process pressure/concurrency coordination and overload shedding.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/capacity_planner.py",
+        "skeleton/agents"
+      ],
+      "acceptance": [
+        "multi-worker saturation",
+        "noisy-neighbor fairness"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-PROV-01",
+      "gap": "gap-provider-surface-convergence",
+      "stage": 0,
+      "parallel_lane": "provider-surface",
+      "objective": "Run provider-surface discovery and classify every credential/network model edge.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "scripts/check_provider_bootstrap.py",
+        "machine/ai_app_construction.json"
+      ],
+      "acceptance": [
+        "provider-surface inventory",
+        "SDK isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-PROV-02",
+      "gap": "gap-provider-surface-convergence",
+      "stage": 0,
+      "parallel_lane": "provider-surface",
+      "objective": "Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-PROV-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_runtime.py",
+        "backend/core/ai_provider.py",
+        "skeleton/jeeves/providers.py",
+        "backend/routes/image_generation.py",
+        "backend/core/expressive_tts.py"
+      ],
+      "acceptance": [
+        "shadow provider denial",
+        "text/image/speech regression"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S0-PROV-03",
+      "gap": "gap-provider-surface-convergence",
+      "stage": 0,
+      "parallel_lane": "provider-surface",
+      "objective": "Produce current-head CI evidence that only declared source-level provider surfaces remain.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-PROV-02"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "scripts/check_provider_bootstrap.py"
+      ],
+      "acceptance": [
+        "provider bootstrap gate",
+        "application credential-read isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-CONV-01",
+      "gap": "gap-conversation-state-authority",
+      "stage": 1,
+      "parallel_lane": "conversation",
+      "objective": "Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/routes/ai.py",
+        "skeleton/persistence/conversation_repository.py"
+      ],
+      "acceptance": [
+        "client-history injection denial",
+        "message idempotency",
+        "concurrent append"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-CONV-02",
+      "gap": "gap-conversation-state-authority",
+      "stage": 1,
+      "parallel_lane": "conversation",
+      "objective": "Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-CONV-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/core/conversations.py",
+        "skeleton/contracts/conversation.py"
+      ],
+      "acceptance": [
+        "operation/result binding",
+        "edit/regenerate branching"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-CONV-03",
+      "gap": "gap-conversation-state-authority",
+      "stage": 1,
+      "parallel_lane": "conversation",
+      "objective": "Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-CONV-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "frontend/src/product/conversationClient.ts",
+        "backend/routes/conversations.py"
+      ],
+      "acceptance": [
+        "refresh reconstruction",
+        "delete/export"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-MEM-01",
+      "gap": "gap-memory-durable-authority",
+      "stage": 1,
+      "parallel_lane": "memory",
+      "objective": "Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py"
+      ],
+      "acceptance": [
+        "durable restart",
+        "namespace isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-MEM-02",
+      "gap": "gap-memory-durable-authority",
+      "stage": 1,
+      "parallel_lane": "memory",
+      "objective": "Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-MEM-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/memory/policy.py",
+        "skeleton/memory/writeback.py"
+      ],
+      "acceptance": [
+        "write policy/provenance",
+        "dedupe/version"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-MEM-03",
+      "gap": "gap-memory-durable-authority",
+      "stage": 1,
+      "parallel_lane": "memory",
+      "objective": "Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-MEM-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/memory",
+        "skeleton/retrieval"
+      ],
+      "acceptance": [
+        "vector loss/rebuild",
+        "process-memory loss",
+        "delete/export/expiry"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-01",
+      "gap": "gap-tool-runtime-convergence",
+      "stage": 1,
+      "parallel_lane": "tool-runtime",
+      "objective": "Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py"
+      ],
+      "acceptance": [
+        "manifest/schema fuzz",
+        "receipt lineage"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-02",
+      "gap": "gap-tool-runtime-convergence",
+      "stage": 1,
+      "parallel_lane": "tool-runtime",
+      "objective": "Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-TOOL-01"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/skills/tool_adapters/",
+        "backend/services/tool_registry.py"
+      ],
+      "acceptance": [
+        "sandbox escape/resource",
+        "database scope",
+        "network egress/result bounds"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-03",
+      "gap": "gap-tool-runtime-convergence",
+      "stage": 1,
+      "parallel_lane": "tool-runtime",
+      "objective": "Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-TOOL-02"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/skills/tool_runtime.py",
+        "backend/services/tool_registry.py"
+      ],
+      "acceptance": [
+        "authority/approval",
+        "idempotency/replay",
+        "compatibility delegation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S2-CTX-01",
+      "gap": "gap-context-compiler-convergence",
+      "stage": 2,
+      "parallel_lane": "context",
+      "objective": "Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/context/compiler.py",
+        "skeleton/context/sources/",
+        "skeleton/context/policy.py"
+      ],
+      "acceptance": [
+        "deterministic packing",
+        "tenant/data authorization",
+        "oversized evidence"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S2-CTX-02",
+      "gap": "gap-context-compiler-convergence",
+      "stage": 2,
+      "parallel_lane": "context",
+      "objective": "Converge legacy route/service system prompts onto versioned instruction-policy identities.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-CTX-01"
+      ],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/context/instruction_policy.py",
+        "backend/routes/ai.py",
+        "backend/services/ai_assistant_svc.py",
+        "backend/routes/image_generation.py"
+      ],
+      "acceptance": [
+        "instruction policy source ownership/parity",
+        "policy rollback/digest"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S2-CTX-03",
+      "gap": "gap-context-compiler-convergence",
+      "stage": 2,
+      "parallel_lane": "context",
+      "objective": "Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-CTX-02"
+      ],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/context.py",
+        "skeleton/provider_runtime.py",
+        "backend/routes/ai.py"
+      ],
+      "acceptance": [
+        "context digest stability",
+        "legacy route delegation",
+        "prompt injection"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-01",
+      "gap": "gap-provider-interaction-protocol",
+      "stage": 2,
+      "parallel_lane": "provider-protocol",
+      "objective": "Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_contract.py",
+        "machine/ai_runtime_schemas.json"
+      ],
+      "acceptance": [
+        "structured schema",
+        "native type isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-02",
+      "gap": "gap-provider-interaction-protocol",
+      "stage": 2,
+      "parallel_lane": "provider-protocol",
+      "objective": "Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-PROTO-01"
+      ],
+      "closure_dependencies": [
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_runtime.py"
+      ],
+      "acceptance": [
+        "tool normalization",
+        "unoffered tool denial",
+        "usage/finish",
+        "cancel/deadline"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-03",
+      "gap": "gap-provider-interaction-protocol",
+      "stage": 2,
+      "parallel_lane": "provider-protocol",
+      "objective": "Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-PROTO-02"
+      ],
+      "closure_dependencies": [
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_runtime.py"
+      ],
+      "acceptance": [
+        "stream finalization",
+        "text/media compatibility"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S3-VER-01",
+      "gap": "gap-verification-evidence-contract",
+      "stage": 3,
+      "parallel_lane": "verification",
+      "objective": "Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/verification.py",
+        "skeleton/intelligence/verification_policy.py"
+      ],
+      "acceptance": [
+        "structural verification",
+        "policy level selection"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S3-VER-02",
+      "gap": "gap-verification-evidence-contract",
+      "stage": 3,
+      "parallel_lane": "verification",
+      "objective": "Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S3-VER-01"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/retrieval",
+        "skeleton/skills"
+      ],
+      "acceptance": [
+        "claim grounding",
+        "citation integrity",
+        "tool postcondition"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S3-VER-03",
+      "gap": "gap-verification-evidence-contract",
+      "stage": 3,
+      "parallel_lane": "verification",
+      "objective": "Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S3-VER-02"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/verification_runtime.py"
+      ],
+      "acceptance": [
+        "model verifier routing",
+        "repair lineage",
+        "high-impact block",
+        "self-confidence non-authority"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-01",
+      "gap": "gap-cognitive-execution-loop",
+      "stage": 4,
+      "parallel_lane": "cognitive-runtime",
+      "objective": "Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py"
+      ],
+      "acceptance": [
+        "contract serialization",
+        "checkpoint compare-and-set"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-02",
+      "gap": "gap-cognitive-execution-loop",
+      "stage": 4,
+      "parallel_lane": "cognitive-runtime",
+      "objective": "Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S4-EXEC-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/execution_runtime.py"
+      ],
+      "acceptance": [
+        "prompt-only loop",
+        "tool loop",
+        "approval wait/resume",
+        "budget/deadline/cancel"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-03",
+      "gap": "gap-cognitive-execution-loop",
+      "stage": 4,
+      "parallel_lane": "cognitive-runtime",
+      "objective": "Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S4-EXEC-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/persistence/execution_repository.py"
+      ],
+      "acceptance": [
+        "crash/replay",
+        "no duplicate side effect",
+        "full evidence binding"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S5-ENG-01",
+      "gap": "gap-engine-application-execution-boundary",
+      "stage": 5,
+      "parallel_lane": "engine-boundary",
+      "objective": "Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/api",
+        "machine/ai_runtime_schemas.json"
+      ],
+      "acceptance": [
+        "service/delegated auth",
+        "submit idempotency"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S5-ENG-02",
+      "gap": "gap-engine-application-execution-boundary",
+      "stage": 5,
+      "parallel_lane": "engine-boundary",
+      "objective": "Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S5-ENG-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/core/engine_client.py",
+        "backend/routes"
+      ],
+      "acceptance": [
+        "trace/deadline/budget propagation",
+        "engine outage",
+        "status/result"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S5-ENG-03",
+      "gap": "gap-engine-application-execution-boundary",
+      "stage": 5,
+      "parallel_lane": "engine-boundary",
+      "objective": "Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S5-ENG-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "docker-compose.yml",
+        "backend/core/ai_provider.py",
+        "skeleton/app/manifest.json"
+      ],
+      "acceptance": [
+        "process credential isolation",
+        "no local fallback",
+        "cross-service golden trace"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-01",
+      "gap": "gap-streaming-protocol",
+      "stage": 6,
+      "parallel_lane": "realtime",
+      "objective": "Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "frontend"
+      ],
+      "acceptance": [
+        "ordered/duplicate/out-of-order reducer tests"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-02",
+      "gap": "gap-streaming-protocol",
+      "stage": 6,
+      "parallel_lane": "realtime",
+      "objective": "Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S6-STREAM-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "frontend",
+        "backend/core/operation_stream_transport.py"
+      ],
+      "acceptance": [
+        "disconnect/reconnect",
+        "cursor compaction resync",
+        "multi-client cursors"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-03",
+      "gap": "gap-streaming-protocol",
+      "stage": 6,
+      "parallel_lane": "realtime",
+      "objective": "Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S6-STREAM-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/routes/operation_stream.py",
+        "frontend"
+      ],
+      "acceptance": [
+        "slow client",
+        "cancel race",
+        "terminal finality"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S7-E2E-01",
+      "gap": "gap-e2e-golden-journeys",
+      "stage": 7,
+      "parallel_lane": "golden-journeys",
+      "objective": "Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "tests",
+        "frontend",
+        "backend",
+        "skeleton"
+      ],
+      "acceptance": [
+        "deterministic assembled topology smoke"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S7-E2E-02",
+      "gap": "gap-e2e-golden-journeys",
+      "stage": 7,
+      "parallel_lane": "golden-journeys",
+      "objective": "Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S7-E2E-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "tests"
+      ],
+      "acceptance": [
+        "browser E2E",
+        "API contract",
+        "trace/receipt assertions"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    },
+    {
+      "task_id": "AIQ-S7-E2E-03",
+      "gap": "gap-e2e-golden-journeys",
+      "stage": 7,
+      "parallel_lane": "golden-journeys",
+      "objective": "Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S7-E2E-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "tests",
+        "machine/ai_closure_evidence.json"
+      ],
+      "acceptance": [
+        "fault injection",
+        "no duplicate side effect",
+        "release evidence completeness"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean"
+    }
+  ],
+  "queue_invariants": [
+    "every task belongs to exactly one required P0 gap",
+    "within-gap task dependencies are acyclic",
+    "no task can mark its gap closed directly",
+    "gap closure remains controlled by machine/ai_closure_evidence.json",
+    "tasks changing canonical contracts must update dependent validators/manual/typed schemas in the same lane"
+  ]
+}
