@@ -270,6 +270,14 @@ def test_production_web_ingress_routes_both_application_apis():
     assert "proxy_pass http://backend:8001;" in nginx
 
 
+def test_frontend_security_probe_supplies_compose_upstream_names():
+    root = find_repo_root(Path(__file__))
+    workflow = (root / ".github/workflows/dependency-security.yml").read_text(encoding="utf-8")
+
+    assert "--add-host skeleton:127.0.0.1" in workflow
+    assert "--add-host backend:127.0.0.1" in workflow
+
+
 def test_backend_does_not_claim_skeleton_api_v1_prefix():
     root = find_repo_root(Path(__file__))
     registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
