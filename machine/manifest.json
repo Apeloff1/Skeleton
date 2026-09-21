@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.8",
+  "schema_version": "4.9",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -502,6 +502,12 @@
         "merge/1669-safe-20260920"
       ],
       "note": "115-file and 150-file waves remain held for file-level reconciliation; no blind merge"
+    },
+    "tmp_lineage": {
+      "revalidated": [
+        "tmp/java-accelerator-operations-rebase-20260920"
+      ],
+      "note": "zero-file delta versus assembly; retained as lineage only"
     }
   },
   "integrated_domains": [
