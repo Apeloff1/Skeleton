@@ -10,6 +10,7 @@ Canonical navigation: [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md)
 Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)
 Historical/frontier research catalog: [architecture/research-source-catalog.md](architecture/research-source-catalog.md)
 Exotic architecture manual: [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md)
+Frontier research atlas: [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md)
 
 ## 0. Construction constitution
 
@@ -2357,6 +2358,591 @@ Tier is evidence maturity, not prestige. Candidates may move both directions.
 
 ---
 
+
+## Track AD — Research saturation, replication, and frontier synthesis — 🔨
+
+Goal: turn frontier research into a continuously refreshed, contradiction-aware experimental program rather than a static bibliography.
+
+Canonical atlas: [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md)
+
+Track AD specializes Track Q. Q builds the evidence machinery; AD defines the **research workload** that must flow through it.
+
+### AD0. ResearchQuestion registry — ⬜
+
+Create a durable registry:
+
+```text
+ResearchQuestion
+  question_id
+  statement
+  affected_contracts[]
+  current_conclusion
+  confidence
+  evidence_for[]
+  evidence_against[]
+  unresolved_variables[]
+  next_experiment
+  falsification_condition
+  owner
+  review_at
+```
+
+Seed with RQ001–RQ010 from the atlas.
+
+**Gate:** unresolved research questions remain explicitly unresolved; no consensus score silently turns uncertainty into architecture truth.
+
+### AD1. Source-normalization backlog — ⬜
+
+Normalize the atlas priority source list into ResearchEvidence records.
+
+Required first wave includes:
+
+- foundational architecture/scaling/retrieval anchors;
+- 2025–2026 sparse attention, neural memory, byte latent, recurrent depth and diffusion work;
+- optimizer/precision frontier;
+- data mixture and synthetic-data evidence;
+- test-time reasoning/verifier work;
+- agent/memory/tool research;
+- serving/KV/network systems;
+- formal verification;
+- monitorability/agent safety;
+- interpretability.
+
+**Gate:** exact identifier/version and source state are stored; workshop, rejected, withdrawn, preprint and peer-reviewed items cannot collapse into one maturity class.
+
+### AD2. Claim-level decomposition — ⬜
+
+Break each source into atomic claims.
+
+Example:
+
+```text
+paper: optimizer X
+  claim A: lower training loss at equal tokens
+  claim B: lower wall-clock at hardware H
+  claim C: lower state memory
+  claim D: stable at batch B
+```
+
+Each claim gets its own evidence scope and contradiction edges.
+
+**Gate:** one paper cannot create "consensus" by contributing multiple correlated metrics as if they were independent replications.
+
+### AD3. Baseline registry — ⬜
+
+For each research family define the strongest credible baseline.
+
+Baseline metadata:
+
+- artifact/version;
+- training tokens;
+- tuning budget;
+- hardware;
+- software/kernel version;
+- precision;
+- inference protocol;
+- evaluation version;
+- operator effort.
+
+**Gate:** candidate comparisons without baseline parity are discovery evidence only.
+
+### AD4. Research reproduction classes — ⬜
+
+Support:
+
+1. **sanity reproduction** — smallest implementation proving the mechanism exists;
+2. **paper-scale reproduction** — reproduce reported setting where affordable;
+3. **transfer reproduction** — different data/model/hardware;
+4. **systems reproduction** — measure full-path wall-clock/cost;
+5. **adversarial reproduction** — intentionally search for failure regions.
+
+A research claim's maturity records which reproduction classes it has passed.
+
+### AD5. Equal-resource normalization — ⬜
+
+Every comparative experiment should expose multiple normalization views:
+
+- equal tokens;
+- equal training FLOPs;
+- equal wall-clock;
+- equal accelerator-hours;
+- equal peak memory;
+- equal inference latency;
+- equal monetary budget;
+- equal tuning/search budget.
+
+**Gate:** no single normalization is silently treated as universal.
+
+### AD6. Scale-transfer matrix — ⬜
+
+For each promising method track transfer across:
+
+- model width;
+- depth;
+- total parameters;
+- active parameters;
+- sequence length;
+- batch;
+- token budget;
+- data distribution;
+- hardware topology.
+
+Classify:
+
+`stable_transfer | partial_transfer | inversion | unknown`.
+
+### AD7. Hardware-transfer matrix — ⬜
+
+Research results are re-evaluated across relevant:
+
+- CPU;
+- NVIDIA GPU generations;
+- AMD/ROCm where supported;
+- Windows/DirectML where applicable;
+- accelerators/NPU;
+- cluster interconnect;
+- storage/network tiers.
+
+Theoretical FLOPs do not establish hardware transfer.
+
+### AD8. Negative-evidence registry — ⬜
+
+Permanently preserve:
+
+- failed reproduction;
+- null result;
+- unstable run;
+- optimizer divergence;
+- scale inversion;
+- hardware regression;
+- benchmark contamination;
+- unexpected quality tradeoff;
+- security regression;
+- operator-complexity blowup.
+
+A rejected method remains searchable.
+
+### AD9. Contradiction-resolution engine — ⬜
+
+When credible evidence disagrees, compare:
+
+- population/task;
+- model family;
+- model scale;
+- data;
+- training duration;
+- hyperparameter search;
+- hardware;
+- metric definition;
+- evaluator;
+- implementation maturity.
+
+Output may remain `mixed`.
+
+**Gate:** contradiction is not resolved by publication date or venue prestige alone.
+
+### AD10. Research freshness/decay — ⬜
+
+Every research conclusion gets:
+
+- evidence date;
+- last checked;
+- refresh trigger;
+- review date.
+
+High-velocity domains receive shorter refresh periods:
+
+- reasoning;
+- serving;
+- agents;
+- low precision;
+- model safety;
+- frontier architectures.
+
+### AD11. Architecture research lane — 🧪
+
+Reproduce and compare:
+
+- dense attention;
+- NSA-style sparse attention;
+- SSM/hybrid;
+- MoE;
+- conditional depth;
+- recurrent latent depth;
+- neural memory;
+- byte latent;
+- diffusion/AR hybrids.
+
+Track AC remains the quarantine for the most exotic variants.
+
+### AD12. Optimizer research lane — 🧪
+
+Priority:
+
+- tuned AdamW;
+- Muon;
+- SOAP;
+- GaLore/low-rank state;
+- LoRA-Pre;
+- memory-efficient/minimalist challengers.
+
+Required research details:
+
+- update-RMS normalization;
+- optimizer-state bytes;
+- communication;
+- numerical instability;
+- batch scaling;
+- scale transfer.
+
+### AD13. Precision research lane — 🧪
+
+Evaluate:
+
+- BF16 reference;
+- FP8;
+- low-precision optimizer state;
+- FP4 experimental;
+- ternary/native low-bit architecture separately.
+
+Measure late-run stability, not only short benchmarks.
+
+### AD14. Data-mixture research lane — 🧪
+
+Implement multi-fidelity mixture experiments.
+
+Track:
+
+- domain weights;
+- language weights;
+- quality;
+- diversity;
+- curriculum;
+- transfer-to-scale.
+
+### AD15. Synthetic-data research lane — 🧪
+
+Compare:
+
+- human-only;
+- unconstrained synthetic;
+- verified synthetic;
+- human-anchored synthetic;
+- token-edited/semi-synthetic;
+- bootstrapped synthetic;
+- multi-teacher synthetic.
+
+Track long-tail coverage and ancestry depth.
+
+### AD16. Retrieval/context/memory research lane — 🧪
+
+Experiments:
+
+- RAG vs long context;
+- multi-granularity memory;
+- conversation+document hybrid retrieval;
+- belief revision;
+- neural memory vs external memory;
+- graph state.
+
+### AD17. Reasoning/test-time compute lane — 🧪
+
+Compare under exact protocol manifests:
+
+- direct;
+- long single trace;
+- self-consistency;
+- Best-of-N;
+- tournament/aggregation;
+- tree/prefix search;
+- verifier-guided;
+- latent recurrent depth;
+- tool-assisted.
+
+### AD18. Verifier research lane — 🧪
+
+Study:
+
+- deterministic checkers;
+- execution;
+- formal proof;
+- process reward models;
+- generative PRMs;
+- independent model critics;
+- ensembles.
+
+Explicitly measure correlated failure and verifier gaming.
+
+### AD19. Agent horizon research lane — 🧪
+
+Build controlled tasks with fixed decision logic and increasing:
+
+- action count;
+- state transitions;
+- elapsed time;
+- tool diversity;
+- recovery requirements.
+
+Measure where success collapses.
+
+### AD20. Tool-use research lane — 🧪
+
+Study:
+
+- tool discovery;
+- selection;
+- schema quality;
+- tool-description manipulation;
+- deterministic retrieval;
+- stateful tool protocols;
+- failure recovery.
+
+Tool capability remains separate from tool authority.
+
+### AD21. Scientific-agent research lane — 🧪
+
+Evaluate research stages independently:
+
+- literature retrieval;
+- gap identification;
+- hypothesis;
+- experimental design;
+- coding;
+- debugging;
+- running;
+- statistical analysis;
+- replication;
+- report generation.
+
+Use FIRE/RExBench-like contamination-resistant tasks.
+
+### AD22. Serving/KV/network research lane — 🧪
+
+Priority reproductions:
+
+- disaggregated prefill/decode;
+- SmartGen-like selective KV transfer;
+- load-aware prefill deflection;
+- network-aware decode selection;
+- robust KV reservation under output-length uncertainty;
+- quality-aware compression + eviction;
+- prefix locality + fairness.
+
+### AD23. Evaluation-science lane — ⬜
+
+Build:
+
+- static regression sets;
+- blind promotion holdouts;
+- dynamic contamination-resistant evals;
+- saturation detectors;
+- benchmark retirement;
+- evaluator versioning;
+- query budgets.
+
+### AD24. Agent-safety/monitorability lane — ⬜
+
+Permanent research/eval families:
+
+- action-level monitoring;
+- covert sabotage simulations;
+- motivated judge mislabeling;
+- destructive action;
+- unauthorized disclosure;
+- monitorability;
+- CoT controllability;
+- tool manipulation;
+- indirect prompt injection.
+
+Use defense in depth; no single monitor is authority.
+
+### AD25. Interpretability usefulness lane — 🧪
+
+Compare:
+
+- neuron circuits;
+- SAE/transcoder circuits;
+- attribution;
+- causal intervention;
+- counterfactual behavior prediction.
+
+Success metric is utility for prediction/debugging/intervention, not human-plausible labels.
+
+### AD26. Formal-methods lane — 🧪
+
+Adapters for:
+
+- Lean;
+- SMT where applicable;
+- model checking;
+- schema/property checkers.
+
+Study natural-language → formal semantic preservation.
+
+### AD27. Uncertainty/calibration lane — 🧪
+
+Calibrate:
+
+- output correctness;
+- trajectory success;
+- retrieval correctness;
+- environment uncertainty;
+- verifier disagreement;
+- OOD.
+
+Build explicit abstention/escalation policies.
+
+### AD28. Multimodal/world-model lane — 🧪
+
+Research:
+
+- continuous multimodal latents;
+- reciprocal cross-modal reasoning;
+- GUI dynamics/world models;
+- action-conditioned world models;
+- rollout uncertainty;
+- simulator exploitation.
+
+Predicted state remains MODEL_GENERATED.
+
+### AD29. Research-agent self-evaluation quarantine — ⬜
+
+An AI research agent cannot declare its own hypothesis reproduced.
+
+Independent validation must come from:
+
+- deterministic tests;
+- separate evaluator;
+- held-out evidence;
+- human review where configured;
+- reproducible artifacts.
+
+### AD30. Research budget allocator — ⬜
+
+Allocate research compute by:
+
+- expected information gain;
+- potential system impact;
+- evidence uncertainty;
+- experiment cost;
+- reversibility;
+- dependency criticality.
+
+Cheap falsification runs precede giant training runs.
+
+### AD31. Sequential experiment design — 🧪
+
+Use previous experiments to narrow parameter/architecture search while preventing adaptive overfitting to blind promotion evals.
+
+Separate:
+
+- development metrics;
+- research-selection metrics;
+- blind promotion metrics.
+
+### AD32. Causal contribution / ablation ledger — ⬜
+
+For compound candidates record:
+
+- component;
+- interaction;
+- marginal gain;
+- cost;
+- failure contribution.
+
+No bundle receives causal credit without ablation.
+
+### AD33. Research artifact graph — ⬜
+
+Connect:
+
+```text
+source
+ -> claim
+ -> question
+ -> experiment
+ -> code
+ -> data
+ -> run
+ -> result
+ -> ADR
+ -> regression
+```
+
+Every edge is versioned and digest-addressable where practical.
+
+### AD34. Reproducibility capsule — ⬜
+
+Every major result should package:
+
+- git commit;
+- artifact manifests;
+- data roots;
+- config;
+- environment;
+- seeds;
+- hardware;
+- logs;
+- metrics;
+- raw outputs;
+- evaluator versions;
+- known nondeterminism.
+
+### AD35. Research conclusion compiler — ⬜
+
+Generate a scoped conclusion:
+
+```text
+For <population/model/hardware/task>,
+evidence as of <date> supports <claim>
+relative to <baseline>
+under <constraints>,
+with <uncertainty>.
+```
+
+The compiler must refuse an unscoped "SOTA" conclusion.
+
+### AD36. Frontier research dashboard — ⬜
+
+Per domain expose:
+
+- open questions;
+- maturity;
+- strongest evidence;
+- contradictory evidence;
+- local reproduction;
+- next experiment;
+- blockers;
+- last refresh.
+
+### AD37. Research regression tests — ⬜
+
+Machine checks ensure:
+
+- atlas is indexed;
+- source records retain maturity;
+- negative evidence cannot disappear silently;
+- open questions cannot be marked resolved without evidence;
+- production authority remains false for research-only candidates.
+
+### AD38. Research saturation checkpoint — ⬜
+
+Planning checkpoint:
+
+```text
+PLAN-20260921-FRONTIER-RESEARCH-SATURATION
+atlas=docs/architecture/frontier-research-atlas-2026.md
+conclusions=FR001..FR114
+research_questions=RQ001..RQ010
+experiment_queue=RA001..RI003
+production_authority_granted=false
+research_refresh_required=true
+```
+
+**Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
+
+---
+
 # Cross-track integration contracts
 
 ## Research → absorption
@@ -2426,7 +3012,9 @@ This ordering is adversarially revised: **P0 foundations precede exotic optimiza
 26. 🧪 Build Track AA forks for sparse attention, hybrid blocks, MoE, long context, low precision and distributed/serving step changes.
 27. 🧪 Establish Track AC ExoticCandidate harnesses and reproduce Tier E1 candidates independently.
 28. 🧪 Run Tier E2/E3 exotic candidates only inside bounded sandboxes with explicit kill criteria.
-29. ⬜ Bind every AB/Z/AA/AC validated or promoted state to timestamped evidence and signed artifact/ADR digests.
+29. 🔨 Establish Track AD research saturation: normalize priority sources, seed ResearchQuestion records, and bind every research family to reproduction/counterevidence.
+30. 🧪 Execute the AD high-information experiment queue before expensive full-scale architecture commitments.
+31. ⬜ Bind every AB/Z/AA/AC/AD validated or promoted state to timestamped evidence and signed artifact/ADR digests.
 
 Parallel research is allowed where isolation is real. Production-readiness gates are not bypassed to gain speed.
 
