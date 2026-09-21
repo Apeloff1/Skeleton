@@ -17,9 +17,10 @@ When documents overlap, resolve them in this order:
 5. **Research/evidence/evolution contract** — [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md).
 6. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
 7. **Frontier research atlas** — [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md).
-8. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-9. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-10. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+8. **Research experiment protocols** — [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md).
+9. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+10. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+11. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
@@ -370,6 +371,7 @@ The 2026-09-21 atlas currently defines:
 - **FD001–FD016** — post-freeze frontier-delta findings;
 - **CX001–CX024** — explicit research contradictions/tensions;
 - **RDE001–RDE036** — local research-debt items;
+- **RXP001–RXP035** — predeclared high-information local experiment protocols;
 - a staged experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability.
 
 Research conclusions are not production defaults. A conclusion can recommend a contract, baseline, experiment, watch state or negative guardrail. Architecture changes still require the normal experiment/ADR/shadow/canary path.
@@ -430,6 +432,7 @@ source_verifications=SV001..SV050
 frontier_delta=FD001..FD016
 contradictions=CX001..CX024
 research_debt=RDE001..RDE036
+experiment_protocols=RXP001..RXP035
 production_authority_granted=false
 research_refresh_required=true
 ```
