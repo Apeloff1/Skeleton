@@ -22,6 +22,7 @@ on:
       - "docker-compose.hot.yml"
       - "frontend/**"
       - "backend/**"
+      - "backend/tests/test_ai_provider_media.py"
       - "pyproject.toml"
       - ".env.example"
       - "scripts/check_app_assembly.py"
@@ -136,6 +137,7 @@ jobs:
           skeleton/testing/test_app_assembly.py
           backend/tests/test_provider_architecture.py
           backend/tests/test_ai_provider_adapter.py
+          backend/tests/test_ai_provider_media.py
           backend/tests/test_ai_provider_request_validation.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
