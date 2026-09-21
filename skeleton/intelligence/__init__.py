@@ -52,6 +52,17 @@ from skeleton.intelligence.narrative import (
     DialogueState,
     NpcRelationship,
 )
+from skeleton.intelligence.admission import (
+    AdmissionDecision,
+    AdmissionError,
+    AdmissionRequest,
+    AdmissionStatus,
+    ResourceBudget,
+    RuntimePressure,
+    UsageEstimate,
+    evaluate_admission,
+    require_admission,
+)
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -101,4 +112,13 @@ __all__ = [
     "QuestProgress",
     "QuestTemplate",
     "rank_quest_candidates",
+    "AdmissionDecision",
+    "AdmissionError",
+    "AdmissionRequest",
+    "AdmissionStatus",
+    "ResourceBudget",
+    "RuntimePressure",
+    "UsageEstimate",
+    "evaluate_admission",
+    "require_admission",
 ]
