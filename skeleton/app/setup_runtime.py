@@ -167,15 +167,10 @@ def ensure_runtime_environment(
     user_uri = quote(username, safe="")
     password_uri = quote(password, safe="")
 
+    mongo_authority = "mongodb://" + user_uri + ":" + password_uri + "@mongo:27017/"
     generated_uris = {
-        "MONGO_URL": (
-            f"mongodb://{user_uri}:{password_uri}@mongo:27017/tutolage"
-            "?authSource=admin"
-        ),
-        "SKL_MONGO_URI": (
-            f"mongodb://{user_uri}:{password_uri}@mongo:27017/skeleton"
-            "?authSource=admin"
-        ),
+        "MONGO_URL": mongo_authority + "tutolage?authSource=admin",
+        "SKL_MONGO_URI": mongo_authority + "skeleton?authSource=admin",
     }
     for key, generated in generated_uris.items():
         current = values.get(key, "")
