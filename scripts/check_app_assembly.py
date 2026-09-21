@@ -234,14 +234,19 @@ def audit_launcher_convergence() -> None:
 def _backend_product_policy() -> dict[str, tuple[str, ...]]:
     tree = ast.parse(read("backend/core/canonical_product_policy.py"))
     for node in tree.body:
-        if not isinstance(node, ast.Assign):
+        value = None
+        if isinstance(node, ast.AnnAssign):
+            if isinstance(node.target, ast.Name) and node.target.id == "CANONICAL_PRODUCT_POLICY":
+                value = node.value
+        elif isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY" for target in node.targets):
+                value = node.value
+        if value is None:
             continue
-        if not any(isinstance(target, ast.Name) and target.id == "CANONICAL_PRODUCT_POLICY" for target in node.targets):
-            continue
-        if not isinstance(node.value, ast.Tuple):
+        if not isinstance(value, ast.Tuple):
             break
         policy: dict[str, tuple[str, ...]] = {}
-        for item in node.value.elts:
+        for item in value.elts:
             check(
                 isinstance(item, ast.Call)
                 and isinstance(item.func, ast.Name)
@@ -313,7 +318,7 @@ def _backend_product_kernel() -> dict[str, tuple[str, ...]]:
 def _frontend_product_catalog() -> tuple[dict[str, tuple[str, ...]], dict[str, str]]:
     source = read("frontend/src/product/productCatalog.ts")
     block_re = re.compile(
-        r"(?ms)^  \\{\\n    id: '([^']+)'.*?^    backendSurface: '([^']+)',.*?^    actions: \\[(.*?)^    \\],\\n^  \\},"
+        r"(?ms)^  \{\n    id: '([^']+)'.*?^    backendSurface: '([^']+)',.*?^    actions: \[(.*?)^    \],\n^  \},"
     )
     policy: dict[str, tuple[str, ...]] = {}
     surfaces: dict[str, str] = {}
