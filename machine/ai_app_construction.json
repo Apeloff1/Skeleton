@@ -520,7 +520,7 @@
     {
       "id": "memory",
       "owner": "skeleton/memory",
-      "state": "present",
+      "state": "partial",
       "responsibility": "Working, episodic, semantic and durable memory with tenant isolation and retention.",
       "depends_on": [
         "foundation",
@@ -532,28 +532,49 @@
         "skeleton/memory",
         "backend/services/memory_engine.py",
         "backend/services/cag.py",
-        "backend/services/mag.py"
+        "backend/services/mag.py",
+        "skeleton/frontier/memory.py",
+        "skeleton/frontier/retrieval_context.py",
+        "skeleton/memory/frontier_adapter.py"
       ],
       "required_interfaces": [
         "memory record",
         "namespace",
         "retention class",
         "write/read/delete",
-        "provenance"
+        "provenance",
+        "MemoryRecord",
+        "MemoryWriteProposal",
+        "MemoryWriteReceipt",
+        "MemoryContract",
+        "RetrieverContract",
+        "memory namespace policy",
+        "memory retention/version contract"
       ],
       "construction": [
         "separate short/long-term memory",
         "namespace by tenant/user/task",
         "deduplicate",
-        "expire/delete deterministically"
+        "expire/delete deterministically",
+        "make Frontier MemoryContract/RetrieverContract the canonical runtime boundary",
+        "bind canonical durable memory records to Mongo",
+        "treat MAG/CAG/vector/in-memory implementations as adapters/projections until durably backed",
+        "stage governed memory write proposals from cognitive finalization",
+        "make vector indexes rebuildable projections of canonical memory",
+        "enforce tenant/user/namespace isolation and lifecycle policy"
       ],
       "acceptance": [
         "cross-tenant isolation",
         "retention/deletion",
         "replay",
-        "corruption recovery"
+        "corruption recovery",
+        "durable restart-safe memory test",
+        "memory authority/projection rebuild test",
+        "namespace isolation test",
+        "write-policy provenance test",
+        "delete/export/retention propagation test"
       ],
-      "failure_mode": "memory miss without authority escalation"
+      "failure_mode": "memory miss/degraded continuity without cross-tenant fallback or promotion of volatile state"
     },
     {
       "id": "retrieval",
@@ -1812,6 +1833,37 @@
       ]
     },
     {
+      "id": "gap-memory-durable-authority",
+      "plane": "memory",
+      "priority": "P0",
+      "status": "open",
+      "gap": "Canonical MemoryContract/RetrieverContract normalization exists, but production memory authority is not durably bound: MAG/CAG/vector/reference stores are largely process-local and legacy memory assembly treats memory as optional optimization. Fully functional AI requires restart-safe tenant-scoped memory records with explicit provenance, retention/deletion/export, while vector indexes and in-process stores remain derived projections.",
+      "construction": [
+        "reuse skeleton/frontier MemoryContract and RetrieverContract as canonical storage-neutral boundaries",
+        "define durable MemoryRecord and MemoryWriteProposal contracts with tenant/user/namespace/data-class/purpose/provenance/retention/version metadata",
+        "bind canonical long-term memory records to a durable Mongo repository",
+        "keep MAG/CAG/in-process/vector stores as caches, adapters or specialized projections unless explicitly backed by canonical records",
+        "make vector/Chroma indexes derived-only and rebuildable from canonical memory records",
+        "stage memory writes from cognitive finalization and require governance plus verification/authority before commit",
+        "enforce tenant/user/namespace filters at repository and retrieval boundaries",
+        "implement deterministic dedupe/conflict/version semantics",
+        "propagate delete/export/retention expiry from canonical records into derived projections",
+        "surface degraded continuity when durable memory is unavailable rather than silently relying on process-local state"
+      ],
+      "closure_evidence": [
+        "durable memory write/read/restart test",
+        "tenant/user/namespace isolation tests",
+        "unverified model speculation cannot become canonical memory",
+        "preference/outcome write policy tests",
+        "dedupe/version/conflict tests",
+        "canonical memory delete/export/retention propagation tests",
+        "vector/index loss and rebuild from canonical memory test",
+        "process-memory loss does not lose canonical memory test",
+        "retrieval provenance points back to canonical memory records",
+        "memory outage produces explicit degraded continuity behavior"
+      ]
+    },
+    {
       "id": "gap-state-authority-convergence",
       "plane": "data-persistence",
       "priority": "P0",
@@ -1967,9 +2019,10 @@
         "gap-tool-runtime-convergence",
         "gap-context-compiler-convergence",
         "gap-verification-evidence-contract",
-        "gap-provider-interaction-protocol"
+        "gap-provider-interaction-protocol",
+        "gap-memory-durable-authority"
       ],
-      "goal": "Make provider/data/action/tool/state/conversation/context/verification decisions classifiable, receipt-governed, budget-admissible, recoverable, server-authoritative, deterministically compilable, and evidence-bound before adding more autonomy.",
+      "goal": "Make provider/data/action/tool/state/conversation/context/verification/memory decisions classifiable, receipt-governed, budget-admissible, recoverable, server-authoritative, deterministically compilable, evidence-bound and restart-safe before adding more autonomy.",
       "exit": [
         "provider/data transfer policy enforced",
         "per-request and per-tenant admission budgets enforced",
@@ -1984,7 +2037,9 @@
         "context trust/provenance/budget selection is deterministic and auditable",
         "verification outcomes are evidence/postcondition-backed rather than confidence-only",
         "hidden chain-of-thought is not part of durable verification state",
-        "provider boundary supports normalized structured/tool interaction required by cognitive loop"
+        "provider boundary supports normalized structured/tool interaction required by cognitive loop",
+        "canonical long-term memory survives restart independently of vector/process projections",
+        "memory namespace/lifecycle/provenance are durable and governed"
       ]
     },
     {
@@ -2985,6 +3040,48 @@
           "cross-process/distributed pressure feed for multi-worker deployment"
         ]
       }
+    },
+    {
+      "id": "WP-P0-MEMORY-AUTHORITY",
+      "gap": "gap-memory-durable-authority",
+      "wave": 1,
+      "owners": [
+        "skeleton/frontier",
+        "skeleton/memory",
+        "skeleton/persistence",
+        "skeleton/retrieval",
+        "skeleton/vault"
+      ],
+      "objective": "Bind the existing storage-neutral memory/retrieval contracts to durable tenant-scoped canonical memory while keeping vector/MAG/CAG/process stores derived or compatibility-only.",
+      "steps": [
+        "freeze MemoryRecord/WriteProposal/WriteReceipt contracts",
+        "implement Mongo memory repository behind MemoryContract",
+        "bind tenant/user/namespace authorization and governance lifecycle",
+        "implement staged verified memory writeback",
+        "adapt retrieval to canonical records plus derived vector projections",
+        "implement dedupe/version conflict handling",
+        "propagate delete/export/retention to projections",
+        "prove restart/restore/rebuild and degraded behavior"
+      ],
+      "tests": [
+        "durable restart",
+        "namespace isolation",
+        "write policy/provenance",
+        "dedupe/version",
+        "delete/export/expiry",
+        "vector loss/rebuild",
+        "process-memory loss",
+        "retrieval provenance",
+        "repository outage degradation"
+      ],
+      "exit": "long-term memory is durable, governed, tenant-scoped and recoverable; no vector/MAG/CAG/process store is the sole source of canonical user memory",
+      "planned_outputs": [
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/policy.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/testing/test_memory_authority.py"
+      ]
     },
     {
       "id": "WP-P0-STATE-AUTHORITY",
@@ -5351,6 +5448,12 @@
         "gap": "gap-e2e-golden-journeys",
         "plane": "product-experience",
         "work_package": "WP-P0-GOLDEN-JOURNEYS"
+      },
+      {
+        "key": "memory_runtime_blueprint",
+        "gap": "gap-memory-durable-authority",
+        "plane": "memory",
+        "work_package": "WP-P0-MEMORY-AUTHORITY"
       }
     ],
     "required_envelopes": [
@@ -5384,7 +5487,8 @@
       "human-approval-ledger",
       "execution-usage-ledger",
       "verification-receipt-ledger",
-      "final-ai-result-ledger"
+      "final-ai-result-ledger",
+      "canonical-ai-memory-records"
     ],
     "closure_order": [
       "state authority + governance + cost admission + provider surface ownership",
@@ -5404,6 +5508,7 @@
       "gap-e2e-golden-journeys",
       "gap-engine-application-execution-boundary",
       "gap-governance-registry",
+      "gap-memory-durable-authority",
       "gap-provider-interaction-protocol",
       "gap-provider-surface-convergence",
       "gap-state-authority-convergence",
@@ -5862,5 +5967,205 @@
       "no-secret/no-duplicate-side-effect assertions"
     ],
     "closure_rule": "all mandatory journeys and applicable conditional capability journeys pass on the assembled topology; deterministic CI remains green without live provider credentials"
+  },
+  "memory_runtime_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "planned-p0",
+    "gap": "gap-memory-durable-authority",
+    "canonical_contracts": {
+      "storage": "skeleton/frontier/contracts.py:MemoryContract",
+      "normalization": "skeleton/frontier/memory.py",
+      "retrieval": "skeleton/frontier/retrieval_context.py:RetrieverContract",
+      "legacy_adapter": "skeleton/memory/frontier_adapter.py"
+    },
+    "planned_modules": {
+      "contracts": "skeleton/contracts/memory_record.py",
+      "repository": "skeleton/persistence/memory_repository.py",
+      "policy": "skeleton/memory/policy.py",
+      "writeback": "skeleton/memory/writeback.py"
+    },
+    "record": {
+      "required_fields": [
+        "memory_id",
+        "tenant_id",
+        "user_id",
+        "namespace",
+        "kind",
+        "content_ref",
+        "content_digest",
+        "data_class",
+        "purpose",
+        "provenance",
+        "authority_class",
+        "confidence_band",
+        "retention_class",
+        "created_at",
+        "updated_at",
+        "expires_at",
+        "dedupe_key",
+        "version",
+        "status"
+      ],
+      "kinds": [
+        "preference",
+        "episodic",
+        "semantic",
+        "conversation_summary",
+        "task_outcome",
+        "tool_fact"
+      ],
+      "statuses": [
+        "active",
+        "superseded",
+        "deleting",
+        "deleted",
+        "expired"
+      ],
+      "authority_classes": [
+        "user_explicit",
+        "tool_authoritative",
+        "verified_outcome",
+        "derived_summary",
+        "imported"
+      ],
+      "invariant": "canonical memory identity and lifecycle live in durable record state; embeddings/index entries never become source of truth"
+    },
+    "write_proposal": {
+      "required_fields": [
+        "proposal_id",
+        "operation_id",
+        "execution_id",
+        "tenant_id",
+        "user_id",
+        "namespace",
+        "kind",
+        "content_ref",
+        "content_digest",
+        "provenance",
+        "authority_class",
+        "data_class",
+        "purpose",
+        "retention_class",
+        "dedupe_key"
+      ],
+      "eligible_sources": [
+        "explicit user preference/instruction",
+        "verified durable task outcome",
+        "authoritative tool result",
+        "governed conversation summary",
+        "user-approved imported/long-term note"
+      ],
+      "prohibited": [
+        "raw credentials/secrets",
+        "unverified model speculation",
+        "cross-tenant data",
+        "provider-private metadata",
+        "content outside principal authority",
+        "automatic personality/preference inference without declared product policy"
+      ]
+    },
+    "commit_pipeline": [
+      "normalize proposal",
+      "authorize tenant/user/namespace",
+      "classify data/purpose",
+      "validate provenance/authority source",
+      "apply retention/consent policy",
+      "dedupe or resolve version conflict",
+      "commit canonical Mongo record",
+      "emit projection/index intent",
+      "update derived vector/search projection asynchronously",
+      "return durable MemoryWriteReceipt"
+    ],
+    "read_pipeline": [
+      "authorize tenant/user/namespace",
+      "query canonical/derived retrieval adapter with mandatory filters",
+      "validate every retrieval hit source/provenance",
+      "rerank/deduplicate under retrieval policy",
+      "return record ids/content refs/evidence metadata to ContextCompiler"
+    ],
+    "namespace_model": {
+      "dimensions": [
+        "tenant",
+        "user",
+        "product",
+        "thread",
+        "task",
+        "agent"
+      ],
+      "rules": [
+        "tenant is mandatory for confidential/user memory",
+        "user-scoped memory cannot be read by another user merely because vector similarity matches",
+        "thread/task scopes may narrow visibility but never widen tenant/user authority",
+        "agent namespace is a logical partition and cannot bypass human/product authority"
+      ]
+    },
+    "persistence": {
+      "target_store": "MongoDB engine/application durable document state",
+      "target_collection": "canonical memory_records repository abstraction",
+      "consistency": "acknowledge durable write only after canonical record commit",
+      "migration": "record schema/version migrations preserve memory identity, namespace, provenance and lifecycle",
+      "backup_restore": "canonical memory restores before vector/search projections"
+    },
+    "projections": [
+      {
+        "kind": "vector",
+        "targets": [
+          "optional-vector-index",
+          "in-process vector/reference stores"
+        ],
+        "authority": "derived",
+        "rebuild": "from active canonical memory records",
+        "failure": "degrade semantic retrieval; canonical records remain intact"
+      },
+      {
+        "kind": "MAG/CAG compatibility",
+        "targets": [
+          "skeleton/memory MAG/CAG stores",
+          "legacy backend memory facade"
+        ],
+        "authority": "cache/derived/adaptor",
+        "rebuild": "from canonical records/config where applicable",
+        "failure": "lose warm context only; do not lose canonical user memory"
+      }
+    ],
+    "lifecycle": {
+      "delete": [
+        "mark canonical record deleting/deleted under governance",
+        "remove or tombstone derived vector/index/cache entries",
+        "invalidate summaries/projections referencing deleted record where policy requires",
+        "retain only audit metadata allowed by governance"
+      ],
+      "export": "ordered canonical records plus provenance/lifecycle metadata authorized for requester; derived embeddings are not canonical export content",
+      "expiry": "retention worker marks/erases expired records and propagates projection deletion"
+    },
+    "degraded_behavior": [
+      "durable memory repository unavailable -> memory writes fail/defer explicitly",
+      "derived vector unavailable -> fall back to bounded canonical/lexical retrieval when allowed",
+      "process cache lost -> cold start/rebuild; never report memory deletion",
+      "memory unavailable never widens retrieval to another tenant/user"
+    ],
+    "legacy_convergence": [
+      {
+        "surface": "backend/services/memory_engine.py",
+        "current": "builds prompts and treats memory/RAG as optional facade",
+        "target": "compatibility source adapter into ContextCompiler; does not own canonical prompt or memory authority"
+      },
+      {
+        "surface": "skeleton/memory/mag.py",
+        "current": "process-local episodic/preference store",
+        "target": "cache/specialized projection over durable canonical memory or explicitly reference-only"
+      },
+      {
+        "surface": "skeleton/memory/cag.py",
+        "current": "process-local persona/knowledge context",
+        "target": "versioned product/config context plus derived cache; user durable facts live in canonical memory records"
+      },
+      {
+        "surface": "skeleton/memory/vector.py",
+        "current": "process-local vector store",
+        "target": "derived retrieval projection/reference implementation"
+      }
+    ]
   }
 }
