@@ -7,7 +7,8 @@ Updated 2026-09-21.
 This is the current construction sequence for turning Skeleton into a durable, model-neutral AI system. It preserves completed historical work while adding the research, reasoning, serving, learning, evaluation, and promotion layers required for a system that can improve as AI research changes.
 
 Canonical navigation: [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md)  
-Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)
+Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)  
+Historical/frontier research catalog: [architecture/research-source-catalog.md](architecture/research-source-catalog.md)
 
 ## 0. Construction constitution
 
@@ -93,6 +94,8 @@ Minimum fields:
 **Gate:** serialization is deterministic and schema migration is versioned.
 
 ### Q2. Scientific source adapters — ⬜
+
+Use [architecture/research-source-catalog.md](architecture/research-source-catalog.md) as the initial seeded canon/anti-canon, then expand it through adapters rather than manual SOTA claims.
 
 Initial adapters:
 
