@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "3.0.0",
-  "architecture_tag": "arch-map/v3.0",
+  "architecture_version": "3.1.0",
+  "architecture_tag": "arch-map/v3.1",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
@@ -27,7 +27,9 @@
     "mandatory fail-closed architecture acknowledgement for runtime model providers",
     "provider-specific development-agent bootstraps point to one canonical manual",
     "one shared architecture receipt contract across product runtime and repository automation AI providers",
-    "machine-readable request lifecycle, data classes, trust zones, environment profiles, envelopes, work packages, and completion criteria"
+    "machine-readable request lifecycle, data classes, trust zones, environment profiles, envelopes, work packages, and completion criteria",
+    "fail-closed data governance and resource admission before external provider I/O",
+    "shared ResourceBudget semantics between admission and model routing"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -512,7 +514,9 @@
     "the AI construction contract enumerates every required capability plane and promotion gate",
     "all credential-bearing AI provider surfaces are declared in the construction contract",
     "runtime and automation provider families share skeleton/provider_contract.py receipt semantics",
-    "every open construction gap has exactly one work package and roadmap wave"
+    "every open construction gap has exactly one work package and roadmap wave",
+    "external provider I/O follows validation -> governance -> admission -> architecture receipt -> client execution",
+    "model routing cannot widen ResourceBudget cost, output-token, or wall-time ceilings"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",
@@ -530,8 +534,8 @@
       "from": "backend/core/ai_provider.py",
       "to": "declared runtime model provider",
       "transport": "provider SDK/API",
-      "contract": "ProviderRequest -> mandatory architecture receipt -> ProviderAdapter -> ProviderResponse",
-      "security": "credentials stay inside adapter; HTTPS/custom endpoint policy; bounded timeout/retry"
+      "contract": "ProviderRequest -> governance receipt -> admission receipt -> mandatory architecture receipt -> ProviderAdapter -> ProviderResponse",
+      "security": "credentials stay inside adapter; data classification and budget are checked before client I/O; HTTPS/custom endpoint policy; bounded timeout/retry"
     },
     {
       "id": "automation-model-provider",
