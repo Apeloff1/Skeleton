@@ -17,6 +17,7 @@ Historical research lineage: [architecture/research-historical-lineage.md](archi
 Research source topology: [architecture/research-source-topology.md](architecture/research-source-topology.md)
 Research dependency map: [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md)
 Research execution program: [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md)
+Research program scorecard: [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md)
 
 ## 0. Construction constitution
 
@@ -3756,6 +3757,91 @@ Slow-track automatically for:
 Every run binds protocol/manifest/result/evidence/debt/question changes and signed artifact identity.
 
 **Gate:** a completed run without a reproducible result bundle does not advance the research state.
+
+### AD97. Multidimensional research scorecard — ⬜
+
+Maintain independent views for:
+- planning coverage;
+- local reproduction;
+- production evidence readiness;
+- source freshness;
+- open research debt;
+- experimental validity;
+- blocker clearance.
+
+**Gate:** these dimensions are never collapsed into one scalar completion score.
+
+### AD98. Reproduction coverage dashboard — ⬜
+
+Report protocols by:
+- not run;
+- sanity;
+- paper-scale;
+- transfer;
+- systems;
+- adversarial;
+- negative;
+- independent.
+
+A source count or protocol definition does not count as reproduction.
+
+### AD99. Research-debt aging and closure — ⬜
+
+Track state, age, owner, refresh deadline, affected decisions, and reopening events for RDE001–RDE046.
+
+### AD100. Research freshness dashboard — ⬜
+
+Surface:
+- sources due refresh;
+- stale conclusions;
+- unresolved statuses;
+- new counterevidence;
+- stronger baselines;
+- benchmark changes;
+- provider semantic drift.
+
+### AD101. Experimental-validity dashboard — ⬜
+
+Report:
+- baseline parity;
+- retained failed runs;
+- preregistration;
+- tuning-budget parity;
+- multiple-comparison accounting;
+- blind-eval custody;
+- complete result bundles.
+
+### AD102. Research-agent ROI — ⬜
+
+Measure accepted useful findings per total:
+- model/compute cost;
+- human review;
+- debugging;
+- independent recomputation.
+
+Do not use commits/LOC/experiments-launched as primary research productivity.
+
+### AD103. Information-yield accounting — ⬜
+
+For each RXP, record:
+- uncertainty reduced;
+- RDE debt changed;
+- RQ status changed;
+- ADR decision changed;
+- follow-up work avoided;
+- total cost.
+
+### AD104. Planning/evidence/readiness separation — ⬜
+
+Every progress report must distinguish:
+
+```text
+PLANNING COVERAGE
+LOCAL REPRODUCTION
+PRODUCTION EVIDENCE READINESS
+```
+
+**Gate:** high planning coverage cannot be reported as high production completion.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
