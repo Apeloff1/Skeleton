@@ -41,7 +41,9 @@ python -m compileall -q backend
 printf '\n== Provider timeout/failure chaos ==\n'
 (
   cd backend
-  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" \
+    PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+    python -m pytest -q --noconftest \
     tests/test_ai_provider_reliability.py
 )
 
