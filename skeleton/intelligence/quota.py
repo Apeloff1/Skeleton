@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Any
 
-from skeleton.intelligence.admission import AdmissionError, UsageEstimate
+from skeleton.intelligence.admission import UsageEstimate
 
 
 class QuotaError(RuntimeError):
