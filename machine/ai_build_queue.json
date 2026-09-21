@@ -78,7 +78,7 @@
       "stage": 0,
       "parallel_lane": "state-authority",
       "objective": "Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S0-STATE-01"
       ],
