@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "architecture_version": "2.0.0",
-  "architecture_tag": "arch-map/v2.0",
+  "architecture_version": "2.6.0",
+  "architecture_tag": "arch-map/v2.6",
   "status": "active",
   "scope": "assembled AI application, provider construction, machine control, and validation topology",
   "sources": {
