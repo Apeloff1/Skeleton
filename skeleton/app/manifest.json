@@ -41,7 +41,7 @@
     "contract": "machine/architecture.json",
     "validator": "scripts/check_architecture_map.py",
     "documentation": "docs/ARCHITECTURE_MAP.md",
-    "tag": "arch-map/v2.0"
+    "tag": "arch-map/v2.6"
   },
   "runtime": {
     "required_env": [
