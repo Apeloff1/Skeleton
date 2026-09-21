@@ -396,62 +396,41 @@ class RAGService:
         concepts_learned: List[str],
         total_hours: float
     ) -> str:
-        """Update user progress for a domain."""
-        collection = self._get_collection("user_progress")
-        
-        progress_id = f"{user_id}:{domain}"
-        
-        content = json.dumps({
-            "mastery_level": mastery_level,
-            "concepts_learned": concepts_learned,
-            "total_hours": total_hours
-        })
-        
-        metadata = {
-            "user_id": user_id,
-            "domain": domain,
-            "mastery_level": mastery_level,
-            "concept_count": len(concepts_learned),
-            "total_hours": total_hours,
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Delete existing and add new (upsert)
-        try:
-            collection.delete(ids=[progress_id])
-        except Exception:
-            pass
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[progress_id]
+        """Update authoritative user progress in Mongo only."""
+        row = self.state.upsert_user_progress(
+            user_id=user_id,
+            domain=domain,
+            mastery_level=mastery_level,
+            concepts_learned=concepts_learned,
+            total_hours=total_hours,
+            updated_at=self._utc_now(),
         )
-        
-        return progress_id
-    
+        return row["progress_id"]
+
     def get_user_progress(self, user_id: str) -> Dict[str, Any]:
-        """Get all progress for a user."""
-        collection = self._get_collection("user_progress")
-        
-        results = collection.get(where={"user_id": user_id})
-        
-        progress = {}
-        if results["documents"]:
-            for i, doc in enumerate(results["documents"]):
-                meta = results["metadatas"][i] if results["metadatas"] else {}
-                domain = meta.get("domain", "unknown")
-                progress[domain] = {
-                    "data": json.loads(doc) if doc.startswith("{") else {},
-                    "metadata": meta
-                }
-        
+        """Get authoritative user progress from Mongo."""
+        rows = self.state.get_user_progress(user_id)
+        progress: Dict[str, Any] = {}
+        for domain, row in rows.items():
+            progress[domain] = {
+                "data": {
+                    "mastery_level": row["mastery_level"],
+                    "concepts_learned": list(row["concepts_learned"]),
+                    "total_hours": row["total_hours"],
+                },
+                "metadata": {
+                    "progress_id": row["progress_id"],
+                    "user_id": row["user_id"],
+                    "domain": row["domain"],
+                    "mastery_level": row["mastery_level"],
+                    "concept_count": row["concept_count"],
+                    "total_hours": row["total_hours"],
+                    "updated_at": row["updated_at"],
+                    "authority": "mongo",
+                },
+            }
         return progress
-    
-    # =========================================================================
-    # Co-coding Context
-    # =========================================================================
-    
+
     def store_cocoding_context(
         self,
         session_id: str,
