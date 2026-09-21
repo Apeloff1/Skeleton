@@ -195,6 +195,7 @@ KNOWN_ROUTES: List[RouteEntry] = [
     ("routes.tournaments",                      "router"),
     ("routes.liveops",                          "router"),
     ("routes.ops",                              "router"),
+    ("routes.app_runtime",                      "router"),
     ("routes.product_runtime",                  "router"),
     ("routes.deployment_checkpoint_trust",      "router"),
     ("routes.governance",                       "router"),
