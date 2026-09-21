@@ -106,6 +106,7 @@ def test_windows_launcher_is_bundled_runtime_control_surface():
     assert "bundled_runtime=True" in source
     assert 'install_python=False' in source
     assert 'APP_URL = "http://localhost:3000"' in source
+    assert "production: bool = True" in source
     assert 'compose_command("down"' in source
     assert "shell=True" not in source
     assert "CREATE_NO_WINDOW" in source
