@@ -14,6 +14,7 @@ from .registry import (
     NativeAcceleratorRegistry,
     NativeAcceleratorRegistryError,
     NativeAcceleratorRuntimeStatus,
+    get_default_native_registry,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "NativeAcceleratorRegistry",
     "NativeAcceleratorRegistryError",
     "NativeAcceleratorRuntimeStatus",
+    "get_default_native_registry",
 ]
