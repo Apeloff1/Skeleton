@@ -144,17 +144,27 @@
         "principal",
         "tenant",
         "scope/capability",
-        "token/session lifecycle"
+        "token/session lifecycle",
+        "AuthorityContext",
+        "delegated authority subset",
+        "auth strength",
+        "tool/action scope"
       ],
       "construction": [
         "centralize identity extraction",
         "bind authority to every write/tool action",
-        "define service identities"
+        "define service identities",
+        "make tool/action authority independent of model text",
+        "enforce delegation and child-execution narrowing"
       ],
       "acceptance": [
         "unauthenticated denial tests",
         "scope boundary tests",
-        "tenant isolation tests"
+        "tenant isolation tests",
+        "delegation narrowing",
+        "approval non-widening",
+        "child authority subset",
+        "service/user identity separation"
       ],
       "failure_mode": "deny protected operations"
     },
@@ -394,7 +404,10 @@
         "ExecutionCheckpoint",
         "AIExecutionResult",
         "StopPolicy",
-        "ResumeToken"
+        "ResumeToken",
+        "ChildExecutionRequest",
+        "child join policy",
+        "interactive steering command"
       ],
       "construction": [
         "make steps idempotent",
@@ -406,7 +419,9 @@
         "keep persistence adapters behind skeleton/persistence/execution_repository.py",
         "commit checkpoints before and after external side-effect boundaries",
         "treat waiting_for_user as durable suspension rather than a fresh operation",
-        "bind finalization to verification, actual usage, governed memory writes and terminal operation state"
+        "bind finalization to verification, actual usage, governed memory writes and terminal operation state",
+        "schedule bounded child executions through same cognitive runtime",
+        "make interrupt/wait/resume semantics explicit"
       ],
       "acceptance": [
         "resume tests",
@@ -417,7 +432,9 @@
         "turn lineage tests",
         "checkpoint crash/replay tests",
         "approval suspend/resume tests",
-        "final result evidence-binding tests"
+        "final result evidence-binding tests",
+        "child budget/authority/depth tests",
+        "interactive interrupt/replace tests"
       ],
       "failure_mode": "checkpoint and stop safely"
     },
@@ -707,7 +724,9 @@
         "fair queue class",
         "tenant concurrency",
         "recovery reserve",
-        "queue age policy"
+        "queue age policy",
+        "child execution lease",
+        "parent/child cancellation propagation"
       ],
       "construction": [
         "persist before execute",
@@ -717,7 +736,8 @@
         "dead-letter evidence",
         "coordinate durable job scheduling with shared admission/capacity",
         "reserve capacity for reconciliation/finalization required for state consistency",
-        "prevent one tenant/operation from monopolizing provider/tool workers"
+        "prevent one tenant/operation from monopolizing provider/tool workers",
+        "persist child scheduling/join state and preserve parent lineage"
       ],
       "acceptance": [
         "crash recovery",
@@ -727,7 +747,8 @@
         "noisy-neighbor fairness",
         "interactive/background fairness",
         "recovery reserve",
-        "queue-age shedding"
+        "queue-age shedding",
+        "child crash/retry/join recovery"
       ],
       "failure_mode": "defer/shed bounded new work while preserving committed recovery/finalization"
     },
@@ -908,7 +929,10 @@
         "replay cursor",
         "approval interaction",
         "cancel interaction",
-        "golden journey observability"
+        "golden journey observability",
+        "safe response renderer",
+        "qualified/degraded rendering",
+        "interactive steering controls"
       ],
       "construction": [
         "single network resolver",
@@ -918,7 +942,9 @@
         "render canonical conversation state rather than browser-owned transcript authority",
         "reduce replayable operation events idempotently",
         "surface approval/cancel/degraded/reconnect states",
-        "bind displayed assistant result to canonical message/result identity"
+        "bind displayed assistant result to canonical message/result identity",
+        "sanitize model output and render canonical citations/tool status",
+        "support interrupt/replace/queue followup semantics"
       ],
       "acceptance": [
         "typecheck",
@@ -931,7 +957,10 @@
         "refresh/reconnect E2E",
         "cancel race E2E",
         "provider/engine degraded E2E",
-        "artifact/media E2E where declared"
+        "artifact/media E2E where declared",
+        "XSS/unsafe-link tests",
+        "steering race UX",
+        "qualified/degraded state accessibility"
       ],
       "failure_mode": "recoverable user-facing degraded state"
     },
@@ -990,20 +1019,28 @@
         "policy decision",
         "risk class",
         "quarantine/deny",
-        "security receipt"
+        "security receipt",
+        "SafetyDecisionReceipt",
+        "content quarantine",
+        "output safety gate"
       ],
       "construction": [
         "validate every external boundary",
         "SSRF protections",
         "tool allowlists",
         "output handling",
-        "dependency/malware/secret gates"
+        "dependency/malware/secret gates",
+        "apply safety decisions at ingress/provider/tool/output/artifact boundaries",
+        "version policy decisions"
       ],
       "acceptance": [
         "abuse corpus",
         "SSRF/path/deserialization tests",
         "secret scan",
-        "malware gate"
+        "malware gate",
+        "provider output quarantine",
+        "model cannot override action denial",
+        "safety receipt versioning"
       ],
       "failure_mode": "deny/quarantine with sanitized audit"
     },
@@ -5757,7 +5794,12 @@
       "ai_observability_blueprint",
       "ai_evaluation_release_blueprint",
       "scheduler_fairness_policy",
-      "runtime_schema_catalog"
+      "runtime_schema_catalog",
+      "ai_authority_model",
+      "child_execution_blueprint",
+      "interactive_steering_contract",
+      "ai_safety_policy_blueprint",
+      "ai_response_rendering_contract"
     ]
   },
   "engine_application_boundary_blueprint": {
@@ -8200,5 +8242,270 @@
       "engine_execution_status": "EngineExecutionStatus",
       "engine_cancel_command": "EngineCancelCommand"
     }
+  },
+  "ai_authority_model": {
+    "schema_version": 1,
+    "model_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "identity",
+    "principals": [
+      "end_user",
+      "service",
+      "operator",
+      "automation"
+    ],
+    "authority_context": {
+      "required_fields": [
+        "principal_id",
+        "principal_type",
+        "tenant_id",
+        "scopes",
+        "capabilities",
+        "resource_constraints",
+        "issued_at",
+        "expires_at",
+        "auth_strength",
+        "source"
+      ]
+    },
+    "scope_layers": [
+      "product/API scope",
+      "AI capability scope",
+      "tool capability/action scope",
+      "resource/tenant ownership",
+      "operator-only control"
+    ],
+    "rules": [
+      "authentication establishes identity but not tool/action authority",
+      "tenant binding is mandatory for tenant-owned confidential/restricted resources",
+      "service identity and delegated end-user identity remain distinct",
+      "delegation can narrow but never widen service or user authority",
+      "child executions inherit a subset of parent authority only",
+      "model output, prompt text, retrieved content and tool results cannot add scopes",
+      "approval authorizes the exact approved action but cannot manufacture missing base authority",
+      "operator authority is explicit and not inferred from network origin"
+    ],
+    "tool_authority": {
+      "read": "requires capability + resource scope",
+      "write": "requires explicit write action scope",
+      "destructive": "requires destructive action scope plus applicable approval",
+      "external_commit": "requires target/action scope plus applicable approval/idempotency",
+      "privileged": "requires operator/service policy and is never granted by model selection"
+    },
+    "auth_strength": [
+      "anonymous",
+      "session",
+      "verified_user",
+      "strong_user",
+      "service_authenticated",
+      "operator_strong"
+    ],
+    "tests": [
+      "cross-tenant denial",
+      "delegation narrowing",
+      "child authority narrowing",
+      "approval cannot widen authority",
+      "service/user identity separation",
+      "operator-only denial"
+    ]
+  },
+  "child_execution_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "owner_planes": [
+      "orchestration",
+      "jobs-durability"
+    ],
+    "objective": "Allow bounded subtask/sub-agent work without creating a second orchestration framework or widening authority/budget.",
+    "child_request": {
+      "required_fields": [
+        "parent_operation_id",
+        "parent_execution_id",
+        "child_execution_id",
+        "objective",
+        "capability",
+        "authority_subset",
+        "budget_subset",
+        "deadline",
+        "max_depth",
+        "join_policy"
+      ]
+    },
+    "rules": [
+      "child execution is created by orchestration, not directly by a model/provider object",
+      "child tenant and initiating actor lineage are immutable from parent",
+      "child authority is an explicit subset of parent authority",
+      "child ResourceBudget is reserved from and bounded by parent remaining budget",
+      "child deadline cannot exceed parent deadline",
+      "recursion depth and total child count are hard bounded",
+      "child tools/providers use the same canonical context/provider/tool/verification contracts",
+      "child result returns by immutable result reference; hidden chain-of-thought is not exchanged"
+    ],
+    "join_policies": [
+      "all_required",
+      "any_success",
+      "best_verified",
+      "fire_and_collect"
+    ],
+    "cancellation": [
+      "parent cancellation propagates to interruptible children",
+      "terminal child side effects remain recorded",
+      "child cancellation cannot cancel parent unless parent join/policy explicitly makes failure fatal"
+    ],
+    "failure": [
+      "child failure produces typed result/receipt",
+      "join policy determines whether parent repairs, substitutes, qualifies or fails",
+      "retry stays inside both child and parent remaining budgets"
+    ],
+    "tests": [
+      "authority subset",
+      "budget reservation",
+      "deadline inheritance",
+      "depth/fanout bound",
+      "parent cancel propagation",
+      "partial child failure join",
+      "no duplicate child side effect"
+    ]
+  },
+  "interactive_steering_contract": {
+    "schema_version": 1,
+    "contract_version": "1.0.0",
+    "status": "active",
+    "owner_planes": [
+      "application-api",
+      "orchestration",
+      "product-experience"
+    ],
+    "commands": [
+      "cancel",
+      "approve",
+      "deny",
+      "provide_required_input",
+      "interrupt_and_replace",
+      "queue_followup"
+    ],
+    "semantics": {
+      "cancel": "idempotent terminal cancellation request under operation fencing",
+      "approve": "decision on exact pending approval id/arguments digest",
+      "deny": "deny pending approval and resume/finalize according to operation policy",
+      "provide_required_input": "append authorized canonical user input to the waiting operation checkpoint without rewriting prior transcript",
+      "interrupt_and_replace": "request cancellation of current operation, append a new canonical user message/branch, start a new operation after defined fencing",
+      "queue_followup": "append follow-up intent linked to thread and schedule after current terminal state"
+    },
+    "invariants": [
+      "new user text never mutates an already-sent provider request",
+      "waiting_for_user resume uses same operation/execution when input satisfies the pending wait contract",
+      "a normal new conversational message creates a new causal operation rather than silently changing a running one",
+      "approval/deny/input commands are authorized against thread/operation ownership",
+      "UI provisional state reconciles to canonical command receipt"
+    ],
+    "race_rules": [
+      "terminal operation wins over late cancel/approval commands",
+      "interrupt cancellation is observed before starting replacement when side-effect ordering requires it",
+      "duplicate commands use command idempotency key"
+    ],
+    "tests": [
+      "late cancel",
+      "approval after expiry",
+      "duplicate steering command",
+      "interrupt during provider turn",
+      "interrupt during non-interruptible tool side effect",
+      "waiting input resume",
+      "queued followup ordering"
+    ]
+  },
+  "ai_safety_policy_blueprint": {
+    "schema_version": 1,
+    "blueprint_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "security-safety",
+    "decision_points": [
+      "request ingress",
+      "context/provider transfer",
+      "tool proposal/action",
+      "provider output normalization",
+      "final result/product rendering",
+      "artifact ingress/output"
+    ],
+    "decision_receipt": {
+      "required_fields": [
+        "safety_decision_id",
+        "operation_id",
+        "stage",
+        "risk_class",
+        "policy_version",
+        "outcome",
+        "reason_codes",
+        "input_refs",
+        "created_at"
+      ],
+      "outcomes": [
+        "allow",
+        "allow_with_constraints",
+        "quarantine",
+        "deny",
+        "escalate"
+      ]
+    },
+    "rules": [
+      "safety/security policy is deterministic/configured authority outside the generator",
+      "generator refusal is not a substitute for tool/action authorization",
+      "unsafe content returned by provider can be quarantined before product exposure",
+      "tool/action risk may require stronger approval or block regardless of generator request",
+      "safety policy never receives raw secrets merely to classify ordinary content",
+      "policy decisions are versioned so release/eval evidence identifies the policy used"
+    ],
+    "high_impact": [
+      "select stronger verification/approval requirements by configured capability/risk",
+      "fail closed on missing required safety dependency",
+      "postcondition verification is required for configured high-impact actions"
+    ],
+    "tests": [
+      "unsafe input deny/quarantine",
+      "unsafe provider output quarantine",
+      "model cannot override tool block",
+      "policy version receipt",
+      "high-impact approval/verification"
+    ]
+  },
+  "ai_response_rendering_contract": {
+    "schema_version": 1,
+    "contract_version": "1.0.0",
+    "status": "active",
+    "owner_plane": "product-experience",
+    "input": "canonical assistant message / AIExecutionResult projection",
+    "rules": [
+      "model/markdown/HTML output is untrusted display content",
+      "sanitize or render through a safe markdown/component renderer; never inject raw unsanitized HTML",
+      "links use safe protocol allowlist and clear external navigation behavior",
+      "code blocks are inert text until user explicitly invokes a sandboxed execution feature",
+      "artifact links resolve through authorized artifact APIs, not raw storage paths",
+      "citations render from canonical EvidenceReference metadata",
+      "tool/action status is rendered from durable receipts, not prose claims",
+      "qualified/abstain/blocked/degraded states are visually distinguishable from verified completion",
+      "streamed provisional content is marked internally as provisional and reconciled on final commit"
+    ],
+    "content_limits": [
+      "bounded DOM/render payload",
+      "large results collapse/paginate or use artifacts",
+      "malformed markdown cannot break application shell"
+    ],
+    "accessibility": [
+      "approval/destructive actions are keyboard/screen-reader operable",
+      "status is not conveyed by color alone",
+      "streaming updates avoid excessive live-region announcements",
+      "error/degraded states have actionable text"
+    ],
+    "tests": [
+      "XSS/unsafe HTML",
+      "javascript/data link protocol",
+      "malformed markdown",
+      "code block inertness",
+      "artifact authorization",
+      "citation rendering",
+      "provisional-to-final reconciliation",
+      "accessibility"
+    ]
   }
 }
