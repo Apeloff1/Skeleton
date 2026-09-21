@@ -532,6 +532,18 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
             raise ProviderPolicyError(
                 "model provider tool schema must be a non-empty mapping"
             )
+        try:
+            json.dumps(
+                dict(schema),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ProviderPolicyError(
+                "model provider tool schema must be strict JSON"
+            ) from exc
     if isinstance(request.estimated_cost_usd, bool):
         raise ProviderPolicyError("model provider estimated cost is invalid")
     try:
@@ -646,7 +658,7 @@ def provider_request_from_context(
             )
         parsed_tools.append(dict(schema))
 
-    return ProviderRequest(
+    request = ProviderRequest(
         instructions=projection.instructions,
         prompt=projection.prompt,
         history=tuple(
@@ -666,6 +678,15 @@ def provider_request_from_context(
         context_digest=envelope.context_digest,
         tool_schemas=tuple(parsed_tools),
     )
+    projected_tokens = _estimated_input_tokens(request)
+    input_capacity = envelope.budget.input_capacity(
+        tools_enabled=bool(request.tool_schemas)
+    )
+    if projected_tokens > input_capacity:
+        raise ProviderPolicyError(
+            "provider projection exceeds compiled context input capacity"
+        )
+    return request
 
 
 def _provider_operation_id(request: ProviderRequest) -> str:
@@ -1829,4 +1850,5 @@ __all__ = [
     "ProviderSpeechResponse",
     "ProviderUnavailableError",
     "normalize_history",
+    "provider_request_from_context",
 ]
