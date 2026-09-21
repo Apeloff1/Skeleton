@@ -118,6 +118,7 @@ def install_application(
     production: bool = False,
     hot: bool = False,
     rotate_secrets: bool = False,
+    bundled_runtime: bool = False,
     runner: Runner = subprocess.run,
 ) -> InstallReceipt:
     """Run the bounded installer pipeline and return a redacted receipt."""
@@ -131,7 +132,12 @@ def install_application(
             phases=(InstallPhase("arguments", False, "--production and --hot are mutually exclusive"),),
         )
 
-    preload = inspect_host(root, runner=runner)
+    preload = inspect_host(
+        root,
+        runner=runner,
+        require_python=not bundled_runtime,
+        require_pip=not bundled_runtime,
+    )
     phases.append(_preload_phase(preload))
     if not phases[-1].ok:
         return InstallReceipt(root=root, phases=tuple(phases))
@@ -154,7 +160,11 @@ def install_application(
             InstallPhase(
                 "python-install",
                 True,
-                "Python package installation skipped by operator",
+                (
+                    "Python package installation provided by bundled runtime"
+                    if bundled_runtime
+                    else "Python package installation skipped by operator"
+                ),
                 required=False,
             )
         )
