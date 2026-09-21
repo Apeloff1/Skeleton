@@ -3,7 +3,7 @@ import { bootstrapService, getAppBootstrap, getAppRuntimeStatus } from './appBoo
 import type { AppBootstrap } from './appBootstrapClient';
 
 export type AppServiceHealth = {
-  name: 'backend' | 'skeleton';
+  name: 'backend' | 'skeleton' | 'mongo';
   ok: boolean;
   status: number | null;
   latencyMs: number;
