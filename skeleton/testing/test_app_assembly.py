@@ -169,3 +169,77 @@ def test_frontend_skeleton_health_matches_engine_liveness_contract():
 
     assert "'/api/v1/health/live'" in client
     assert '@router.get("/health/live")' in routes
+
+
+def test_product_control_client_matches_mounted_backend_routes():
+    root = find_repo_root(Path(__file__))
+    client = (root / "frontend/src/product/productControlClient.ts").read_text(encoding="utf-8")
+    ops = (root / "backend/routes/ops.py").read_text(encoding="utf-8")
+    registry = (root / "backend/core/routes_registry.py").read_text(encoding="utf-8")
+
+    assert "const ROOT = '/api/admin/ops/product-control';" in client
+    assert 'router = APIRouter(prefix="/api/admin/ops"' in ops
+    assert '("routes.ops",' in registry
+
+    required_routes = (
+        "/product-control/status",
+        "/product-control/deployment-preflight",
+        "/product-control/deployments",
+        "/product-control/pending",
+        "/product-control/audit",
+        "/product-control/receipts",
+        "/product-control/receipt/{operation_id}/result",
+        "/product-control/execute/{seq}",
+        "/product-control/execute-pending",
+        "/product-control/admit",
+    )
+    for route in required_routes:
+        assert route in ops, f"frontend product control contract is missing backend route {route}"
+
+
+def test_safe_mode_recovers_into_canonical_product_shell():
+    root = find_repo_root(Path(__file__))
+    safe_mode = (root / "frontend/app/safe-mode.tsx").read_text(encoding="utf-8")
+
+    assert "router.replace('/product')" in safe_mode
+    assert "Try Product" in safe_mode
+
+
+def test_wait_for_application_retries_until_healthy(monkeypatch):
+    from skeleton.app.health import ProbeResult, wait_for_application
+
+    calls = []
+    sleeps = []
+
+    def fake_probe_application(*, manifest, full, timeout):
+        calls.append((full, timeout))
+        ok = len(calls) >= 3
+        return (
+            ProbeResult(
+                service="backend",
+                url="http://localhost:8001/api/health",
+                ok=ok,
+                status=200 if ok else None,
+                detail="healthy" if ok else "not ready",
+            ),
+        )
+
+    monkeypatch.setattr("skeleton.app.health.probe_application", fake_probe_application)
+    monkeypatch.setattr("skeleton.app.health.time.sleep", lambda delay: sleeps.append(delay))
+
+    results = wait_for_application(attempts=5, delay=0.25, timeout=1.5)
+
+    assert results[0].ok is True
+    assert calls == [(False, 1.5), (False, 1.5), (False, 1.5)]
+    assert sleeps == [0.25, 0.25]
+
+
+def test_wait_for_application_rejects_invalid_budget():
+    from skeleton.app.health import wait_for_application
+
+    with pytest.raises(ValueError, match="attempts"):
+        wait_for_application(attempts=0)
+    with pytest.raises(ValueError, match="timeout"):
+        wait_for_application(timeout=0)
+    with pytest.raises(ValueError, match="delay"):
+        wait_for_application(delay=-1)
