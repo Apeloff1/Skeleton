@@ -3081,3 +3081,39 @@ Fault journeys inject provider timeout, crash after provider response, crash aro
 ### Closure
 
 The product-experience P0 gap closes only when all mandatory and applicable conditional journeys pass against the assembled topology, while deterministic CI remains green without live provider credentials.
+
+## Fully Functional AI Closure: Durable Memory Authority
+
+The repository already has a canonical storage-neutral `MemoryContract` and retrieval boundary. The missing production guarantee is durable authority: process-local MAG/CAG/vector stores cannot be the only place long-term user memory exists.
+
+### Canonical authority
+
+Long-term AI memory is stored as durable canonical records in Mongo through a repository implementing the existing Frontier memory contract. Each record binds memory ID, tenant/user/namespace, kind, content reference/digest, data class, purpose, provenance, authority class, confidence band, retention, dedupe key, version and lifecycle status.
+
+Vector, MAG, CAG and in-process stores are reference implementations, caches, specialized projections or compatibility adapters unless explicitly backed by those canonical records.
+
+### Writeback
+
+Memory writeback is staged from cognitive finalization. Eligible sources are explicit user preferences/instructions, verified task outcomes, authoritative tool facts, governed conversation summaries and user-approved long-term imports.
+
+Raw secrets, unverified model speculation, cross-tenant data, provider-private metadata and unauthorized tool output are never promoted to canonical memory.
+
+The commit path is normalize -> authorize namespace -> classify/govern -> validate provenance/authority -> retention policy -> dedupe/version resolution -> durable record commit -> derived index intent -> MemoryWriteReceipt.
+
+### Retrieval
+
+Reads enforce tenant, user and namespace at the repository/retrieval boundary. Similarity is ranking only; vector similarity can never widen authority. Retrieval hits preserve canonical memory identity and provenance so the ContextCompiler can cite where remembered information came from.
+
+### Lifecycle
+
+Deletion and expiry originate from canonical records and propagate to vector/index/cache projections. Export returns authorized canonical records and lifecycle/provenance metadata; embeddings are not the canonical export.
+
+Restore order is canonical memory first, then vector/search/MAG/CAG/process projections.
+
+### Degraded behavior
+
+If the durable memory repository is unavailable, writes fail or defer explicitly and continuity degrades. If vector search is unavailable, bounded canonical/lexical retrieval may be used when policy permits. Loss of a process cache causes a cold rebuild, never apparent memory deletion.
+
+### Closure
+
+The memory plane remains `partial` until restart-safe durable memory, namespace isolation, write-policy provenance, dedupe/version, delete/export/expiry propagation, vector-loss rebuild, process-memory-loss recovery and memory-outage degradation tests pass.
