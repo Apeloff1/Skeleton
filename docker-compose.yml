@@ -82,8 +82,6 @@ services:
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
     volumes:
-      - ./backend:/app:ro
-      - ./skeleton:/app/skeleton:ro
       - backend_data:/app/data
     depends_on:
       mongo:
@@ -118,9 +116,6 @@ services:
       - EXPO_PUBLIC_BACKEND_URL=${EXPO_PUBLIC_BACKEND_URL:-http://localhost:8001}
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}
       - NODE_ENV=${NODE_ENV:-development}
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
       - skeleton
