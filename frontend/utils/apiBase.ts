@@ -17,7 +17,8 @@ type EndpointKey =
   | 'EXPO_PUBLIC_BACKEND_URL'
   | 'EXPO_BACKEND_URL'
   | 'EXPO_PUBLIC_SKELETON_URL'
-  | 'EXPO_SKELETON_URL';
+  | 'EXPO_SKELETON_URL'
+  | 'EXPO_PUBLIC_BACKEND_FALLBACK_URL';
 
 function clean(value: unknown): string {
   return typeof value === 'string' ? value.trim().replace(/\/+$/, '') : '';
@@ -39,6 +40,8 @@ function processValue(key: EndpointKey): string {
       return clean(process.env.EXPO_PUBLIC_SKELETON_URL);
     case 'EXPO_SKELETON_URL':
       return clean(process.env.EXPO_SKELETON_URL);
+    case 'EXPO_PUBLIC_BACKEND_FALLBACK_URL':
+      return clean(process.env.EXPO_PUBLIC_BACKEND_FALLBACK_URL);
   }
 }
 
@@ -79,8 +82,13 @@ export const SKELETON_API_BASE = resolveEndpoint(
   'http://localhost:8010',
 );
 
+export const API_FALLBACK_BASE = explicitEndpoint([
+  'EXPO_PUBLIC_BACKEND_FALLBACK_URL',
+]);
+
 export const RUNTIME_ENDPOINTS = Object.freeze({
   backend: API_BASE,
+  backendFallback: API_FALLBACK_BASE,
   skeleton: SKELETON_API_BASE,
 });
 
