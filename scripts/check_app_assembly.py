@@ -318,10 +318,55 @@ def audit_compose_modes() -> None:
 
 def audit_production_ingress() -> None:
     nginx = read("frontend/nginx.conf")
-    check("location ^~ /api/v1/" in nginx, "production engine ingress missing")
-    check("proxy_pass http://skeleton:8001;" in nginx, "production engine upstream drift")
-    check("location ^~ /api/" in nginx, "production backend ingress missing")
-    check("proxy_pass http://backend:8001;" in nginx, "production backend upstream drift")
+    raw = read("skeleton/app/manifest.json")
+    if not raw:
+        return
+    try:
+        manifest = json.loads(raw)
+    except json.JSONDecodeError:
+        return
+
+    services = {
+        item.get("name"): item
+        for item in manifest.get("services", [])
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    routed: list[tuple[str, str]] = []
+    for name in ("backend", "skeleton"):
+        service = services.get(name)
+        check(isinstance(service, dict), f"ingress service missing from manifest: {name}")
+        if not isinstance(service, dict):
+            continue
+        prefix = service.get("ingress_prefix")
+        port = service.get("container_port")
+        health_path = service.get("health_path")
+        check(isinstance(prefix, str) and prefix.startswith("/"), f"manifest ingress prefix missing: {name}")
+        check(isinstance(port, int), f"manifest container port missing: {name}")
+        if not isinstance(prefix, str) or not prefix.startswith("/") or not isinstance(port, int):
+            continue
+        location = f"location ^~ {prefix.rstrip('/')}/ {{"
+        upstream = f"proxy_pass http://{name}:{port};"
+        check(location in nginx, f"production ingress missing manifest route: {location}")
+        check(upstream in nginx, f"production ingress upstream drift: {upstream}")
+        if isinstance(health_path, str) and health_path:
+            check(
+                prefix == "/" or health_path.startswith(prefix.rstrip("/") + "/"),
+                f"{name} health path escapes ingress prefix: {health_path} vs {prefix}",
+            )
+        routed.append((prefix, location))
+
+    if len(routed) >= 2:
+        by_specificity = sorted(routed, key=lambda item: len(item[0]), reverse=True)
+        positions = [nginx.find(location) for _, location in by_specificity]
+        check(
+            all(position >= 0 for position in positions) and positions == sorted(positions),
+            "more-specific ingress prefixes must be declared before broader prefixes",
+        )
+
+    frontend = services.get("frontend")
+    if isinstance(frontend, dict):
+        check(frontend.get("ingress_prefix") == "/", "frontend must own the root ingress prefix")
+        check("location / {" in nginx, "production frontend root ingress missing")
 
     registry = read("backend/core/routes_registry.py")
     server = read("backend/server.py")
@@ -522,6 +567,7 @@ def audit_public_app_bootstrap_contract() -> None:
 
     check("def public_bootstrap_payload(" in bootstrap, "public bootstrap payload builder missing")
     check('"health_path": service.health_path' in bootstrap, "bootstrap does not source health paths from manifest")
+    check('"ingress_prefix": service.ingress_prefix' in bootstrap, "bootstrap does not source ingress prefixes from manifest")
     for forbidden in ("required_env", "optional_env", "public_url", "container_port", "entrypoint"):
         check(forbidden not in bootstrap, f"public bootstrap leaks internal field: {forbidden}")
 
