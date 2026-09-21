@@ -29,6 +29,12 @@ _ALLOWED_PROVIDER_SDK_IMPORTERS = frozenset(
         "backend/core/ai_provider.py",
     }
 )
+_SHADOW_PROVIDER_RUNTIME_MODULES = frozenset(
+    {
+        "skeleton.frontier.model_runtime",
+    }
+)
+_ALLOWED_SHADOW_RUNTIME_IMPORTERS = frozenset()
 
 
 def _load() -> dict:
@@ -49,23 +55,37 @@ def _sdk_root(name: str) -> str:
     return name.split(".", 1)[0]
 
 
-def _provider_sdk_imports(path: Path) -> list[str]:
+def _imported_modules(path: Path) -> list[str]:
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except (OSError, SyntaxError):
         return []
-    hits: list[str] = []
+    modules: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            names = [alias.name for alias in node.names]
+            modules.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module:
-            names = [node.module]
-        else:
-            continue
-        for name in names:
-            root = _sdk_root(name)
-            if root in _PROVIDER_SDK_ROOTS:
-                hits.append(name)
+            modules.append(node.module)
+    return modules
+
+
+def _provider_sdk_imports(path: Path) -> list[str]:
+    hits: list[str] = []
+    for name in _imported_modules(path):
+        root = _sdk_root(name)
+        if root in _PROVIDER_SDK_ROOTS:
+            hits.append(name)
+    return hits
+
+
+def _shadow_provider_runtime_imports(path: Path) -> list[str]:
+    hits: list[str] = []
+    for name in _imported_modules(path):
+        if any(
+            name == forbidden or name.startswith(forbidden + ".")
+            for forbidden in _SHADOW_PROVIDER_RUNTIME_MODULES
+        ):
+            hits.append(name)
     return hits
 
 
@@ -202,6 +222,13 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 errors.append(
                     f"provider SDK bypass outside canonical boundary: {relative}: {', '.join(hits)}"
                 )
+            if relative not in _ALLOWED_SHADOW_RUNTIME_IMPORTERS:
+                shadow_hits = _shadow_provider_runtime_imports(path)
+                if shadow_hits:
+                    errors.append(
+                        "shadow provider runtime import outside canonical boundary: "
+                        f"{relative}: {', '.join(shadow_hits)}"
+                    )
 
     return errors
 
