@@ -242,6 +242,34 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     f"provider compatibility loader is not a shared-contract re-export: {relative}"
                 )
 
+    compatibility_boundaries = runtime.get("compatibility_boundaries", [])
+    if not isinstance(compatibility_boundaries, list) or not compatibility_boundaries:
+        errors.append("provider compatibility boundaries are missing")
+    else:
+        for relative in compatibility_boundaries:
+            if not isinstance(relative, str):
+                errors.append("provider compatibility boundary path is invalid")
+                continue
+            path = repo_root / relative
+            if not path.is_file():
+                errors.append(f"provider compatibility boundary missing: {relative}")
+                continue
+            source = path.read_text(encoding="utf-8", errors="replace")
+            credential_hits = sorted(
+                marker for marker in _AI_CREDENTIAL_MARKERS if marker in source
+            )
+            if credential_hits:
+                errors.append(
+                    "provider compatibility boundary owns credential markers: "
+                    f"{relative}: {', '.join(credential_hits)}"
+                )
+            sdk_hits = _provider_sdk_imports(path)
+            if sdk_hits:
+                errors.append(
+                    "provider compatibility boundary imports provider SDKs: "
+                    f"{relative}: {', '.join(sdk_hits)}"
+                )
+
     families = runtime.get("provider_families")
     if not isinstance(families, list) or set(families) != {
         "runtime_model",
