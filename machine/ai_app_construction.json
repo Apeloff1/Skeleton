@@ -283,7 +283,11 @@
         "ModelEndpoint",
         "RouteRequest",
         "RouteDecision",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "RouteDecisionReceipt",
+        "capability/privacy/budget/deadline filter",
+        "fallback ceiling",
+        "no-route result"
       ],
       "construction": [
         "keep canonical capability/privacy/cost/latency routing in the engine zone",
@@ -291,15 +295,24 @@
         "register only declared providers",
         "score against budgets",
         "separate hard rejection from preference scoring",
-        "persist routing evidence"
+        "persist routing evidence",
+        "filter providers/models before scoring by governance and required protocol capability",
+        "never widen privacy/budget/deadline on fallback",
+        "record selected route and stable reason codes",
+        "route escalation only through remaining execution budget"
       ],
       "acceptance": [
         "no-route tests",
         "privacy ceiling tests",
         "cost/latency budget tests",
-        "deterministic tie-break tests"
+        "deterministic tie-break tests",
+        "privacy route denial",
+        "tool/structured/media capability filtering",
+        "budget/deadline route filtering",
+        "fallback ceiling preservation",
+        "deterministic no-route behavior"
       ],
-      "failure_mode": "NoRoute with sanitized evidence"
+      "failure_mode": "return typed no-route/degraded decision; never silently weaken required semantics"
     },
     {
       "id": "prompt-context",
@@ -598,7 +611,12 @@
         "index",
         "query",
         "ranked evidence",
-        "citation"
+        "citation",
+        "RetrievalQueryRequest",
+        "EvidenceReference",
+        "authorized source scope",
+        "source/version provenance",
+        "citation metadata"
       ],
       "construction": [
         "content-address source",
@@ -606,15 +624,24 @@
         "hybrid retrieve",
         "rerank",
         "deduplicate",
-        "enforce ACL at query time"
+        "enforce ACL at query time",
+        "authorize tenant/source scopes before ranking",
+        "emit provenance-bearing evidence records into ContextCompiler",
+        "treat vector/search indexes as derived where state topology declares",
+        "preserve source version/digest for verification"
       ],
       "acceptance": [
         "recall/precision eval",
         "citation correctness",
         "ACL leakage tests",
-        "freshness invalidation"
+        "freshness invalidation",
+        "tenant ACL before ranking",
+        "citation/source digest integrity",
+        "stale/orphan source handling",
+        "vector index loss/rebuild",
+        "retrieval injection isolation"
       ],
-      "failure_mode": "return insufficient-evidence result"
+      "failure_mode": "degrade to authorized fallback or explicit insufficient evidence; never widen ACL or invent citations"
     },
     {
       "id": "data-persistence",
@@ -676,22 +703,33 @@
         "lease",
         "checkpoint",
         "retry policy",
-        "dead-letter/recovery"
+        "dead-letter/recovery",
+        "fair queue class",
+        "tenant concurrency",
+        "recovery reserve",
+        "queue age policy"
       ],
       "construction": [
         "persist before execute",
         "lease/fence ownership",
         "idempotency keys",
         "bounded retry with jitter",
-        "dead-letter evidence"
+        "dead-letter evidence",
+        "coordinate durable job scheduling with shared admission/capacity",
+        "reserve capacity for reconciliation/finalization required for state consistency",
+        "prevent one tenant/operation from monopolizing provider/tool workers"
       ],
       "acceptance": [
         "crash recovery",
         "duplicate delivery",
         "lease expiry",
-        "retry storm tests"
+        "retry storm tests",
+        "noisy-neighbor fairness",
+        "interactive/background fairness",
+        "recovery reserve",
+        "queue-age shedding"
       ],
-      "failure_mode": "park work with recovery receipt"
+      "failure_mode": "defer/shed bounded new work while preserving committed recovery/finalization"
     },
     {
       "id": "artifact-files",
@@ -713,22 +751,37 @@
         "content hash",
         "metadata",
         "scan state",
-        "retention"
+        "retention",
+        "ArtifactRecord",
+        "artifact lifecycle",
+        "scan/quarantine receipt",
+        "bounded extraction",
+        "authorized artifact reference"
       ],
       "construction": [
         "stream uploads",
         "limit size/type",
         "malware scan",
         "separate metadata/blob",
-        "signed access"
+        "signed access",
+        "ingest files with digest/type/size/governance checks",
+        "scan/quarantine before model/tool eligibility",
+        "extract derived text/metadata with source provenance",
+        "expose artifacts by authorized references rather than raw paths"
       ],
       "acceptance": [
         "large/invalid upload tests",
         "malware gate",
         "hash integrity",
-        "access expiry"
+        "access expiry",
+        "oversize/media-spoof/path traversal",
+        "malware quarantine",
+        "tenant artifact isolation",
+        "large artifact context bounds",
+        "generated artifact lineage",
+        "artifact deletion propagation"
       ],
-      "failure_mode": "quarantine artifact"
+      "failure_mode": "quarantine/reject unsafe artifacts and preserve canonical lifecycle metadata"
     },
     {
       "id": "application-api",
@@ -1054,19 +1107,33 @@
         "tenant-safe log fields",
         "metric",
         "span",
-        "SLO"
+        "SLO",
+        "cross-plane trace correlation",
+        "operation timeline",
+        "redaction policy",
+        "unsampled critical receipts",
+        "AI usage/quality metrics"
       ],
       "construction": [
         "correlate user->API->orchestrator->provider/tool",
         "redact secrets/content",
-        "measure latency tokens cost quality"
+        "measure latency tokens cost quality",
+        "correlate product, conversation, engine, provider, tool, verification and stream spans",
+        "log ids/digests/metadata by default instead of raw restricted content",
+        "retain critical governance/security/terminal receipts independent of ordinary sampling",
+        "expose stuck/recovering operation views"
       ],
       "acceptance": [
         "trace continuity tests",
         "redaction tests",
-        "SLO dashboard/evidence"
+        "SLO dashboard/evidence",
+        "trace continuity golden journey",
+        "secret/redaction tests",
+        "critical receipt sampling test",
+        "usage/cost correlation",
+        "stuck-operation diagnostics"
       ],
-      "failure_mode": "service continues but promotion blocked if observability absent"
+      "failure_mode": "telemetry may degrade but must not leak secrets or make canonical state depend on telemetry availability"
     },
     {
       "id": "evaluation",
@@ -1087,21 +1154,34 @@
         "dataset version",
         "metric",
         "threshold",
-        "promotion verdict"
+        "promotion verdict",
+        "capability baseline",
+        "scenario harness",
+        "golden journey evidence",
+        "regression budget",
+        "flakiness record"
       ],
       "construction": [
         "version datasets",
         "separate train/tune/eval",
         "measure task success and safety",
-        "record provider/model config"
+        "record provider/model config",
+        "version evals by capability/runtime/model/routing policy",
+        "run deterministic scenario harness without live secrets",
+        "compare releases against approved baselines",
+        "quarantine flaky cases only with owner and expiry"
       ],
       "acceptance": [
         "deterministic smoke eval",
         "quality regression gate",
         "safety suite",
-        "latency/cost budget gate"
+        "latency/cost budget gate",
+        "baseline regression detection",
+        "scenario determinism",
+        "golden journey evidence binding",
+        "flakiness quarantine enforcement"
       ],
-      "failure_mode": "block promotion"
+      "failure_mode": "block promotion when required regression/evidence gates fail"
     },
     {
       "id": "feedback-learning",
@@ -1245,7 +1325,12 @@
         "release manifest",
         "preflight",
         "health/readiness",
-        "rollback"
+        "rollback",
+        "release evidence bundle",
+        "provider smoke",
+        "canary gate",
+        "rollback plan",
+        "contract compatibility evidence"
       ],
       "construction": [
         "consume product/application readiness through acceptance evidence rather than upward code dependencies",
@@ -1253,16 +1338,24 @@
         "SBOM/provenance",
         "migrate before traffic",
         "canary",
-        "automatic rollback criteria"
+        "automatic rollback criteria",
+        "require architecture/P0/eval/security/migration evidence before release",
+        "run tightly budgeted provider smoke only where configured",
+        "support deployment/routing/feature rollback without discarding canonical state",
+        "validate rolling-version compatibility for cross-service contracts"
       ],
       "acceptance": [
         "clean build",
         "compose config",
         "image smoke",
         "migration rehearsal",
-        "rollback drill"
+        "rollback drill",
+        "release evidence completeness",
+        "provider smoke budget",
+        "canary failure rollback",
+        "old/new contract compatibility"
       ],
-      "failure_mode": "do not promote or rollback",
+      "failure_mode": "hold/rollback release while preserving canonical user and operation state",
       "validates": [
         "application-api",
         "engine-api",
