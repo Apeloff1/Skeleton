@@ -374,7 +374,7 @@ The 2026-09-21 atlas currently defines:
 - **FD001–FD026** — post-freeze frontier-delta findings;
 - **CX001–CX024** — explicit research contradictions/tensions;
 - **RDE001–RDE036** — local research-debt items;
-- **RXP001–RXP035** — predeclared high-information local experiment protocols;
+- **RXP001–RXP050** — predeclared high-information local experiment protocols;
 - **HL001–HL110** — historical cross-disciplinary research lineage anchors;
 - **RS001–RS055** — research source families and archive/artifact topology;
 - a staged experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability.
@@ -437,7 +437,7 @@ source_verifications=SV001..SV066
 frontier_delta=FD001..FD026
 contradictions=CX001..CX024
 research_debt=RDE001..RDE036
-experiment_protocols=RXP001..RXP035
+experiment_protocols=RXP001..RXP050
 production_authority_granted=false
 research_refresh_required=true
 ```
