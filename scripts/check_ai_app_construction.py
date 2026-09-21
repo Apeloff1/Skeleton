@@ -1351,6 +1351,125 @@ def _validate_operation_stream_contracts(
     return result
 
 
+
+def _validate_runtime_schema_catalog(
+    contract: dict[str, Any],
+    repo_root: Path,
+    errors: list[str],
+) -> dict[str, int]:
+    """Validate canonical-envelope parity with the typed runtime schema catalog."""
+
+    link = contract.get("runtime_schema_catalog")
+    result = {"records": 0, "mapped_envelopes": 0}
+    if not isinstance(link, dict):
+        errors.append("runtime_schema_catalog must be an object")
+        return result
+    if link.get("schema_version") != 1:
+        errors.append("runtime_schema_catalog.schema_version must be 1")
+    if link.get("status") != "active":
+        errors.append("runtime_schema_catalog.status must be active")
+
+    try:
+        relative = _path(link.get("path"))
+    except ValueError as exc:
+        errors.append(f"runtime_schema_catalog.path: {exc}")
+        return result
+    try:
+        catalog = _load(repo_root / relative)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return result
+
+    if catalog.get("schema_version") != 1:
+        errors.append("AI runtime schema catalog schema_version must be 1")
+    if catalog.get("status") != "active":
+        errors.append("AI runtime schema catalog status must be active")
+    if catalog.get("catalog_version") != link.get("catalog_version"):
+        errors.append(
+            "runtime_schema_catalog.catalog_version must match catalog file"
+        )
+    if catalog.get("architecture_tag") != contract.get("architecture_tag"):
+        errors.append(
+            "AI runtime schema catalog architecture_tag must match construction contract"
+        )
+
+    records = catalog.get("records")
+    if not isinstance(records, dict) or not records:
+        errors.append("AI runtime schema catalog records must be non-empty")
+        records = {}
+    result["records"] = len(records)
+
+    envelopes = contract.get("canonical_envelopes")
+    mapping = link.get("envelope_record_map")
+    if not isinstance(envelopes, dict):
+        errors.append("canonical_envelopes must exist for runtime schema validation")
+        return result
+    if not isinstance(mapping, dict):
+        errors.append("runtime_schema_catalog.envelope_record_map must be an object")
+        return result
+
+    missing_map = sorted(set(envelopes) - set(mapping))
+    extra_map = sorted(set(mapping) - set(envelopes))
+    if missing_map:
+        errors.append(
+            "canonical envelopes missing typed record mapping: " + ", ".join(missing_map)
+        )
+    if extra_map:
+        errors.append(
+            "typed record mapping references unknown canonical envelopes: "
+            + ", ".join(extra_map)
+        )
+
+    for envelope_id, envelope in envelopes.items():
+        record_name = mapping.get(envelope_id)
+        if not isinstance(record_name, str) or not record_name.strip():
+            continue
+        record = records.get(record_name)
+        if not isinstance(record, dict):
+            errors.append(
+                f"canonical envelope {envelope_id} maps to missing record {record_name!r}"
+            )
+            continue
+        fields = record.get("fields")
+        if not isinstance(fields, dict):
+            errors.append(f"typed runtime record {record_name}.fields must be an object")
+            continue
+        required_fields = envelope.get("required_fields")
+        if not isinstance(required_fields, list):
+            errors.append(
+                f"canonical envelope {envelope_id}.required_fields must be a list"
+            )
+            continue
+        missing_fields = sorted(
+            field
+            for field in required_fields
+            if isinstance(field, str) and field not in fields
+        )
+        if missing_fields:
+            errors.append(
+                f"typed runtime record {record_name} missing canonical fields for "
+                f"{envelope_id}: " + ", ".join(missing_fields)
+            )
+        owner = envelope.get("owner_plane")
+        record_owner = record.get("owner_plane")
+        if owner != record_owner:
+            errors.append(
+                f"typed runtime record {record_name}.owner_plane {record_owner!r} "
+                f"does not match canonical envelope {envelope_id} owner {owner!r}"
+            )
+        if record.get("schema_version") != 1:
+            errors.append(f"typed runtime record {record_name}.schema_version must be 1")
+        result["mapped_envelopes"] += 1
+
+    cross = catalog.get("cross_record_invariants")
+    _nonempty_strings(
+        cross,
+        label="AI runtime schema catalog cross_record_invariants",
+        errors=errors,
+    )
+    return result
+
+
 def _validate_acceptance_gates(
     contract: dict[str, Any],
     errors: list[str],
@@ -1804,6 +1923,9 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
     )
     provider_surfaces = _validate_provider_surfaces(contract, repo_root, errors)
     ledger = _validate_construction_ledger(contract, planes, repo_root, errors)
+    runtime_schemas = _validate_runtime_schema_catalog(
+        contract, repo_root, errors
+    )
     functional_ai = _validate_functional_ai_closure(
         contract, planes, repo_root, errors
     )
@@ -1844,6 +1966,7 @@ def validate_construction(repo_root: Path = ROOT) -> tuple[list[str], dict[str, 
         "automation_providers": automation_providers,
         "provider_surfaces": provider_surfaces,
         "construction_ledger": ledger,
+        "runtime_schemas": runtime_schemas,
         "functional_ai": functional_ai,
         "operation_stream": operation_stream,
         "provider_documents": must_read,
