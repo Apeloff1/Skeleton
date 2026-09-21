@@ -544,48 +544,185 @@ class RAGService:
         rating: Optional[int] = None,
         context: Optional[Dict] = None
     ) -> str:
-        """Store user feedback."""
-        collection = self._get_collection("feedback")
-        
+        """Commit feedback to Mongo before semantic projection."""
+        timestamp = self._utc_now()
         feedback_id = hashlib.sha256(
-            f"{user_id}:{feedback_type}:{datetime.utcnow().isoformat()}".encode()
+            f"{user_id}:{feedback_type}:{timestamp}".encode()
         ).hexdigest()[:16]
-        
-        metadata = {
-            "user_id": user_id,
-            "feedback_type": feedback_type,
-            "rating": rating,
-            "timestamp": datetime.utcnow().isoformat(),
-            **(context or {})
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[feedback_id]
+        row = self.state.put_feedback(
+            feedback_id=feedback_id,
+            user_id=user_id,
+            feedback_type=feedback_type,
+            content=content,
+            rating=rating,
+            context=context,
+            timestamp=timestamp,
         )
-        
-        return feedback_id
-    
-    # =========================================================================
-    # Statistics
-    # =========================================================================
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get RAG service statistics."""
-        stats = {
-            "collections": {},
-            "total_documents": 0,
-            "status": "healthy"
+        self._project_add(
+            "feedback",
+            document=row["content"],
+            metadata={
+                "feedback_id": row["feedback_id"],
+                "user_id": row["user_id"],
+                "feedback_type": row["feedback_type"],
+                "rating": row["rating"],
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["feedback_id"],
+        )
+        return row["feedback_id"]
+
+    def migrate_legacy_chroma_state(self) -> Dict[str, int]:
+        """Idempotently import legacy Chroma-owned product state into Mongo."""
+        migrated = {
+            "learning_sessions": 0,
+            "user_progress": 0,
+            "cocoding_context": 0,
+            "feedback": 0,
+            "conflicts": 0,
+            "skipped": 0,
         }
-        
-        for name in self.COLLECTIONS:
-            collection = self._get_collection(name)
-            count = collection.count()
-            stats["collections"][name] = count
-            stats["total_documents"] += count
-        
-        return stats
+
+        def legacy_rows(name: str):
+            try:
+                raw = self.client.get_or_create_collection(
+                    name=f"jeeves_{name}",
+                    metadata={"description": f"legacy Jeeves {name}"},
+                ).get()
+            except Exception:
+                return ()
+            ids = raw.get("ids") or []
+            docs = raw.get("documents") or []
+            metas = raw.get("metadatas") or []
+            return tuple(
+                (
+                    str(ids[i]),
+                    str(docs[i]) if i < len(docs) and docs[i] is not None else "",
+                    dict(metas[i] or {}) if i < len(metas) else {},
+                )
+                for i in range(len(ids))
+            )
+
+        for record_id, document, meta in legacy_rows("learning_sessions"):
+            try:
+                self.state.put_learning_session(
+                    session_id=record_id,
+                    user_id=str(meta.get("user_id") or "unknown"),
+                    topic=str(meta.get("topic") or "general"),
+                    content=document,
+                    duration_minutes=int(meta.get("duration_minutes") or 0),
+                    mastery_delta=float(meta.get("mastery_delta") or 0.0),
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                    metadata={"migrated_from": "chroma"},
+                )
+                migrated["learning_sessions"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for _, document, meta in legacy_rows("user_progress"):
+            try:
+                payload = json.loads(document) if document.startswith("{") else {}
+                user_id = str(meta.get("user_id") or "")
+                domain = str(meta.get("domain") or "")
+                if not user_id or not domain:
+                    migrated["skipped"] += 1
+                    continue
+                self.state.upsert_user_progress(
+                    user_id=user_id,
+                    domain=domain,
+                    mastery_level=float(
+                        payload.get("mastery_level", meta.get("mastery_level", 0.0))
+                    ),
+                    concepts_learned=list(payload.get("concepts_learned") or []),
+                    total_hours=float(
+                        payload.get("total_hours", meta.get("total_hours", 0.0))
+                    ),
+                    updated_at=str(meta.get("updated_at") or self._utc_now()),
+                )
+                migrated["user_progress"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for record_id, document, meta in legacy_rows("cocoding_context"):
+            try:
+                user_id = str(meta.get("user_id") or "")
+                pipeline = str(meta.get("pipeline") or "unknown")
+                if not user_id:
+                    migrated["skipped"] += 1
+                    continue
+                self.state.put_cocoding_context(
+                    session_id=record_id,
+                    user_id=user_id,
+                    pipeline=pipeline,
+                    context=document,
+                    code_snippets=[],
+                    decisions=[],
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                )
+                migrated["cocoding_context"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for record_id, document, meta in legacy_rows("feedback"):
+            try:
+                user_id = str(meta.get("user_id") or "")
+                feedback_type = str(meta.get("feedback_type") or "general")
+                if not user_id:
+                    migrated["skipped"] += 1
+                    continue
+                self.state.put_feedback(
+                    feedback_id=record_id,
+                    user_id=user_id,
+                    feedback_type=feedback_type,
+                    content=document,
+                    rating=meta.get("rating"),
+                    context={"migrated_from": "chroma"},
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                )
+                migrated["feedback"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        return migrated
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Expose canonical authority and rebuildable projection statistics."""
+        projection_counts: Dict[str, int] = {}
+        total_projection_documents = 0
+        for name in self.PROJECTION_COLLECTIONS:
+            try:
+                count = int(self._get_collection(name).count())
+            except Exception:
+                count = -1
+            projection_counts[name] = count
+            if count > 0:
+                total_projection_documents += count
+
+        authority_counts = self.state.stats()
+        return {
+            "status": "healthy",
+            "authority": {
+                "store": "mongo",
+                "collections": authority_counts,
+                "total_records": sum(authority_counts.values()),
+            },
+            "projection": {
+                "store": "chroma",
+                "rebuildable": True,
+                "collections": projection_counts,
+                "total_documents": total_projection_documents,
+                "write_failures": self._projection_failures,
+            },
+            "collections": projection_counts,
+            "total_documents": total_projection_documents,
+        }
 
 
 # =============================================================================
