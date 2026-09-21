@@ -24,6 +24,10 @@ Full W00–W30 edge matrix: [`FULL_EDGE_CASE_BUILD_MATRIX.md`](FULL_EDGE_CASE_BU
 
 Machine full matrix: [`machine/ai_full_edge_case_matrix.json`](../../machine/ai_full_edge_case_matrix.json)
 
+Critical/high edge queue: [`EDGE_CASE_PRIORITY_QUEUE.md`](EDGE_CASE_PRIORITY_QUEUE.md)
+
+Machine priority queue: [`machine/ai_edge_case_priority_queue.json`](../../machine/ai_edge_case_priority_queue.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
