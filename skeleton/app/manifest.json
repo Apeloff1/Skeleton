@@ -35,7 +35,13 @@
       "skeleton",
       "backend",
       "frontend"
-    ]
+    ],
+    "public_contract": {
+      "prefix": "/api/app",
+      "bootstrap": "/bootstrap",
+      "status": "/status",
+      "ready": "/ready"
+    }
   },
   "runtime": {
     "required_env": [
