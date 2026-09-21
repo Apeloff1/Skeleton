@@ -56,7 +56,8 @@ export type Workspace = {
 export type Attachment = { modality: 'image' | 'pdf'; base64: string; name: string };
 export type ChatBody = {
   message: string;
-  session_id?: string;
+  session_id: string;
+  client_message_id?: string;
   force_all_forms: boolean;
   context: string;
   history: { role: 'user' | 'assistant'; content: string }[];
@@ -213,7 +214,13 @@ export function transcript(conversation: Conversation): string {
   ).join('');
 }
 
-export function buildChatBody(conversation: Conversation, message: string, attachment?: Attachment, now = Date.now()): ChatBody {
+export function buildChatBody(
+  conversation: Conversation,
+  message: string,
+  attachment?: Attachment,
+  now = Date.now(),
+  clientMessageId?: string,
+): ChatBody {
   // Only completed user/assistant exchanges enter the history; omit failed and in-flight turns.
   const history = conversation.messages.filter(m => m.status === 'complete').slice(-20)
     .map(m => ({ role: m.role === 'jeeves' ? 'assistant' as const : 'user' as const, content: m.text.slice(0, 4000) }));
@@ -224,10 +231,18 @@ export function buildChatBody(conversation: Conversation, message: string, attac
     remaining -= m.content.length;
     return true;
   }).reverse();
+  const serverSessionId = (
+    conversation.sessionId
+    && now >= conversation.sessionUpdatedAt
+    && now - conversation.sessionUpdatedAt <= SESSION_TTL
+  ) ? conversation.sessionId : conversation.id;
   return {
-    message, force_all_forms: conversation.allForms, context: conversation.context, history: bounded,
-    ...(conversation.sessionId && now >= conversation.sessionUpdatedAt && now - conversation.sessionUpdatedAt <= SESSION_TTL
-      ? { session_id: conversation.sessionId } : {}),
+    message,
+    session_id: serverSessionId,
+    ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
+    force_all_forms: conversation.allForms,
+    context: conversation.context,
+    history: bounded,
     ...(attachment?.modality === 'image' ? { image_base64: attachment.base64 } : {}),
     ...(attachment?.modality === 'pdf' ? { pdf_base64: attachment.base64 } : {}),
   };
