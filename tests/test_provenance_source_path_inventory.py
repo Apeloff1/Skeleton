@@ -25,6 +25,7 @@ LIVE_EXAMPLES = (
     ("tests/test_architecture_boundaries.py", "first-party"),
     ("docs/CANONICAL_MODULE_BOUNDARIES.md", "first-party"),
     (".github/workflows/provenance-policy.yml", "first-party"),
+    (".cursor/rules/architecture.mdc", "first-party"),
     (".machine/README.md", "first-party"),
     (".machine/repository.toml", "first-party"),
     ("machine/README.md", "first-party"),
@@ -134,6 +135,7 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("tests/test_provenance_source_path_inventory.py"), "first-party")
         self.assertEqual(policy.classify_path("docs/CANONICAL_MODULE_BOUNDARIES.md"), "first-party")
         self.assertEqual(policy.classify_path(".github/workflows/ci.yml"), "first-party")
+        self.assertEqual(policy.classify_path(".cursor/rules/architecture.mdc"), "first-party")
         self.assertEqual(policy.classify_path(".machine/README.md"), "first-party")
         self.assertEqual(policy.classify_path(".machine/repository.toml"), "first-party")
         self.assertEqual(policy.classify_path("machine/README.md"), "first-party")
