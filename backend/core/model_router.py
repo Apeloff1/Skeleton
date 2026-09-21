@@ -86,53 +86,6 @@ class ModelEndpoint:
     enabled: bool = True
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
-    @classmethod
-    def from_governance_context(
-        cls,
-        task_type: str,
-        governance: GovernanceContext,
-        *,
-        budget: ResourceBudget | None = None,
-        context_tokens: int = 0,
-        expected_output_tokens: int | None = None,
-        **kwargs: Any,
-    ) -> "RouteRequest":
-        """Build a route request whose privacy is derived from governed records.
-
-        Callers cannot supply or weaken privacy when governed data is present.
-        When a resource budget is supplied, cost/latency/output bounds and
-        governance privacy are composed into the same hard route request.
-        """
-
-        if not isinstance(governance, GovernanceContext):
-            raise TypeError("governance must be a GovernanceContext")
-        if "privacy" in kwargs:
-            raise ValueError("governance context owns privacy")
-        governed = {
-            "privacy": governance.routing_privacy,
-            "governance_record_ids": governance.record_ids,
-            "governance_tenant_id": governance.tenant_id,
-            "governance_purpose": governance.purpose,
-        }
-        if budget is not None:
-            return cls.from_resource_budget(
-                task_type,
-                budget,
-                context_tokens=context_tokens,
-                expected_output_tokens=expected_output_tokens,
-                **governed,
-                **kwargs,
-            )
-        return cls(
-            task_type=task_type,
-            context_tokens=context_tokens,
-            expected_output_tokens=(
-                0 if expected_output_tokens is None else expected_output_tokens
-            ),
-            **governed,
-            **kwargs,
-        )
-
     def __post_init__(self) -> None:
         endpoint_id = self.endpoint_id.strip()
         provider = self.provider.strip()
@@ -192,6 +145,53 @@ class RouteRequest:
     governance_record_ids: tuple[str, ...] = field(default_factory=tuple)
     governance_tenant_id: str | None = None
     governance_purpose: str | None = None
+
+    @classmethod
+    def from_governance_context(
+        cls,
+        task_type: str,
+        governance: GovernanceContext,
+        *,
+        budget: ResourceBudget | None = None,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Build a route request whose privacy is derived from governed records.
+
+        Callers cannot supply or weaken privacy when governed data is present.
+        When a resource budget is supplied, cost/latency/output bounds and
+        governance privacy are composed into the same hard route request.
+        """
+
+        if not isinstance(governance, GovernanceContext):
+            raise TypeError("governance must be a GovernanceContext")
+        if "privacy" in kwargs:
+            raise ValueError("governance context owns privacy")
+        governed = {
+            "privacy": governance.routing_privacy,
+            "governance_record_ids": governance.record_ids,
+            "governance_tenant_id": governance.tenant_id,
+            "governance_purpose": governance.purpose,
+        }
+        if budget is not None:
+            return cls.from_resource_budget(
+                task_type,
+                budget,
+                context_tokens=context_tokens,
+                expected_output_tokens=expected_output_tokens,
+                **governed,
+                **kwargs,
+            )
+        return cls(
+            task_type=task_type,
+            context_tokens=context_tokens,
+            expected_output_tokens=(
+                0 if expected_output_tokens is None else expected_output_tokens
+            ),
+            **governed,
+            **kwargs,
+        )
 
     @classmethod
     def from_resource_budget(
