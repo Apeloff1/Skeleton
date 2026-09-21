@@ -1,5 +1,5 @@
 {
-  "schema_version": "4.6",
+  "schema_version": "4.7",
   "project": "Tutolage Skeleton",
   "version": "16.0.0",
   "purpose": "machine-readable map for automated agents and tooling",
@@ -478,6 +478,23 @@
         "feat/pr-runner-hygiene-pack-e-20260920"
       ],
       "note": "topology learning remains a 129-commit reconciliation input; PR runner hygiene remains a 111-file wave"
+    },
+    "ops_throughput_wave": {
+      "revalidated": [
+        "supervisor downstream/hierarchy/resilience",
+        "PR runner v2",
+        "provider resilience",
+        "SMB shift managers",
+        "tools cockpit doctor",
+        "throughput deterministic/forge/request pipeline",
+        "Ubuntu 9k delivery",
+        "x-agent orchestration"
+      ],
+      "lineage_only": [
+        "supervisor delegation authority",
+        "throughput observability correlation"
+      ],
+      "note": "existing integration PRs reused; zero-file branches remain lineage-only"
     }
   },
   "integrated_domains": [
