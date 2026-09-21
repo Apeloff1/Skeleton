@@ -80,6 +80,7 @@ from skeleton.intelligence.quota import (
     TenantQuota,
     TenantQuotaLedger,
 )
+from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -151,4 +152,5 @@ __all__ = [
     "QuotaUsage",
     "TenantQuota",
     "TenantQuotaLedger",
+    "SqliteTenantQuotaLedger",
 ]
