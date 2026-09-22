@@ -122,7 +122,11 @@ def test_architecture_sources_link_all_contract_layers() -> None:
             "capability_interface_registry": "machine/capability_interfaces.json",
             "capability_interface_validator": "scripts/check_capability_interfaces.py",
             "state_topology": "machine/state_topology.json",
-            "state_topology_validator": "scripts/check_state_topology.py"
+            "state_topology_validator": "scripts/check_state_topology.py",
+            "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+            "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
+            "ai_closure_evidence": "machine/ai_closure_evidence.json",
+            "ai_capability_registry": "machine/ai_capabilities.json"
         }
 
 
