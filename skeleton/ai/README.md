@@ -25,6 +25,7 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `agents/core/` — core agent/swarm execution runtime.
 - `shell/` — AI control-plane/shell implementation: governance, planning, policy, verification, durable recovery, trust and release evidence.
 - `cognition/`, `learning/`, `evaluation/` — cognition, controlled learning, and evaluation support.
+- `research/historical/architecture_registry/` — base architecture metadata and numbered architecture rounds retained as non-authoritative research lineage.
 - `simulation/`, `forge/` — explicit masterplan domains for bounded world-model simulation and candidate forge workflows.
 - `build/shift_supervisor/` — planning/scheduling/build-control code promoted from the transitional `core/` root.
 - `build/{automation,repo_intelligence}/` — repository-side AI build/control support.
