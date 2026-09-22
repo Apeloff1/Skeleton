@@ -43,3 +43,10 @@ def test_required_dimensions_are_unique_and_canonical() -> None:
     ids = [d["id"] for d in data["engineering_dimensions"]]
     assert len(ids) == len(set(ids))
     assert set(ids) == checker.REQUIRED_DIMENSIONS
+
+
+def test_engineering_pass_links_atomic_task_matrix() -> None:
+    data = json.loads(checker.ENGINEERING.read_text(encoding="utf-8"))
+    task = data["task_propagation"]
+    assert task["machine_contract"] == "machine/ai_engineering_task_matrix.json"
+    assert task["human_contract"] == "docs/plan/ENGINEERING_TASK_MATRIX.md"
