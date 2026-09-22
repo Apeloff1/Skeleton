@@ -1,59 +1,248 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
 
+class ScoringKind(str,Enum):
+    PRIMARY="primary"
+    SECONDARY="secondary"
+    TERTIARY="tertiary"
+    BLOCKING="blocking"
+    ADVISORY="advisory"
 
-class ScoringKind(str, Enum):
-    PRIMARY = "primary"
-    SECONDARY = "secondary"
-    TERTIARY = "tertiary"
-    BLOCKING = "blocking"
-    ADVISORY = "advisory"
-
-
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True,slots=True)
 class ScoringRule:
-    name: str
-    kind: ScoringKind
-    threshold: float
-    rationale: str
+    name:str
+    kind:ScoringKind
+    threshold:float
+    rationale:str
+    def applies(self,value:float)->bool:
+        if not isinstance(value,(int,float)) or isinstance(value,bool) or not isfinite(float(value)): raise ValueError("value must be finite")
+        return float(value)>=self.threshold
 
-    def applies(self, value: float) -> bool:
-        if (
-            not isinstance(value, (int, float))
-            or isinstance(value, bool)
-            or not isfinite(float(value))
-        ):
-            raise ValueError("value must be finite")
-        return float(value) >= self.threshold
-
-
-_KIND_CYCLE = (
-    ScoringKind.PRIMARY,
-    ScoringKind.SECONDARY,
-    ScoringKind.TERTIARY,
-    ScoringKind.BLOCKING,
-    ScoringKind.ADVISORY,
+RULES=(
+    ScoringRule("scoring_001",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded scoring rule 1"),
+    ScoringRule("scoring_002",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded scoring rule 2"),
+    ScoringRule("scoring_003",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded scoring rule 3"),
+    ScoringRule("scoring_004",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded scoring rule 4"),
+    ScoringRule("scoring_005",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded scoring rule 5"),
+    ScoringRule("scoring_006",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded scoring rule 6"),
+    ScoringRule("scoring_007",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded scoring rule 7"),
+    ScoringRule("scoring_008",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded scoring rule 8"),
+    ScoringRule("scoring_009",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded scoring rule 9"),
+    ScoringRule("scoring_010",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded scoring rule 10"),
+    ScoringRule("scoring_011",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded scoring rule 11"),
+    ScoringRule("scoring_012",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded scoring rule 12"),
+    ScoringRule("scoring_013",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded scoring rule 13"),
+    ScoringRule("scoring_014",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded scoring rule 14"),
+    ScoringRule("scoring_015",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded scoring rule 15"),
+    ScoringRule("scoring_016",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded scoring rule 16"),
+    ScoringRule("scoring_017",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded scoring rule 17"),
+    ScoringRule("scoring_018",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded scoring rule 18"),
+    ScoringRule("scoring_019",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded scoring rule 19"),
+    ScoringRule("scoring_020",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded scoring rule 20"),
+    ScoringRule("scoring_021",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded scoring rule 21"),
+    ScoringRule("scoring_022",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded scoring rule 22"),
+    ScoringRule("scoring_023",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded scoring rule 23"),
+    ScoringRule("scoring_024",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded scoring rule 24"),
+    ScoringRule("scoring_025",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded scoring rule 25"),
+    ScoringRule("scoring_026",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded scoring rule 26"),
+    ScoringRule("scoring_027",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded scoring rule 27"),
+    ScoringRule("scoring_028",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded scoring rule 28"),
+    ScoringRule("scoring_029",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded scoring rule 29"),
+    ScoringRule("scoring_030",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded scoring rule 30"),
+    ScoringRule("scoring_031",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded scoring rule 31"),
+    ScoringRule("scoring_032",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded scoring rule 32"),
+    ScoringRule("scoring_033",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded scoring rule 33"),
+    ScoringRule("scoring_034",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded scoring rule 34"),
+    ScoringRule("scoring_035",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded scoring rule 35"),
+    ScoringRule("scoring_036",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded scoring rule 36"),
+    ScoringRule("scoring_037",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded scoring rule 37"),
+    ScoringRule("scoring_038",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded scoring rule 38"),
+    ScoringRule("scoring_039",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded scoring rule 39"),
+    ScoringRule("scoring_040",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded scoring rule 40"),
+    ScoringRule("scoring_041",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.41,"bounded scoring rule 41"),
+    ScoringRule("scoring_042",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.42,"bounded scoring rule 42"),
+    ScoringRule("scoring_043",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.43,"bounded scoring rule 43"),
+    ScoringRule("scoring_044",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.44,"bounded scoring rule 44"),
+    ScoringRule("scoring_045",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.45,"bounded scoring rule 45"),
+    ScoringRule("scoring_046",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.46,"bounded scoring rule 46"),
+    ScoringRule("scoring_047",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.47,"bounded scoring rule 47"),
+    ScoringRule("scoring_048",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.48,"bounded scoring rule 48"),
+    ScoringRule("scoring_049",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.49,"bounded scoring rule 49"),
+    ScoringRule("scoring_050",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.5,"bounded scoring rule 50"),
+    ScoringRule("scoring_051",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.51,"bounded scoring rule 51"),
+    ScoringRule("scoring_052",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.52,"bounded scoring rule 52"),
+    ScoringRule("scoring_053",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.53,"bounded scoring rule 53"),
+    ScoringRule("scoring_054",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.54,"bounded scoring rule 54"),
+    ScoringRule("scoring_055",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.55,"bounded scoring rule 55"),
+    ScoringRule("scoring_056",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.56,"bounded scoring rule 56"),
+    ScoringRule("scoring_057",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.57,"bounded scoring rule 57"),
+    ScoringRule("scoring_058",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.58,"bounded scoring rule 58"),
+    ScoringRule("scoring_059",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.59,"bounded scoring rule 59"),
+    ScoringRule("scoring_060",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.6,"bounded scoring rule 60"),
+    ScoringRule("scoring_061",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.61,"bounded scoring rule 61"),
+    ScoringRule("scoring_062",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.62,"bounded scoring rule 62"),
+    ScoringRule("scoring_063",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.63,"bounded scoring rule 63"),
+    ScoringRule("scoring_064",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.64,"bounded scoring rule 64"),
+    ScoringRule("scoring_065",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.65,"bounded scoring rule 65"),
+    ScoringRule("scoring_066",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.66,"bounded scoring rule 66"),
+    ScoringRule("scoring_067",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.67,"bounded scoring rule 67"),
+    ScoringRule("scoring_068",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.68,"bounded scoring rule 68"),
+    ScoringRule("scoring_069",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.69,"bounded scoring rule 69"),
+    ScoringRule("scoring_070",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.7,"bounded scoring rule 70"),
+    ScoringRule("scoring_071",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.71,"bounded scoring rule 71"),
+    ScoringRule("scoring_072",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.72,"bounded scoring rule 72"),
+    ScoringRule("scoring_073",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.73,"bounded scoring rule 73"),
+    ScoringRule("scoring_074",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.74,"bounded scoring rule 74"),
+    ScoringRule("scoring_075",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.75,"bounded scoring rule 75"),
+    ScoringRule("scoring_076",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.76,"bounded scoring rule 76"),
+    ScoringRule("scoring_077",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.77,"bounded scoring rule 77"),
+    ScoringRule("scoring_078",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.78,"bounded scoring rule 78"),
+    ScoringRule("scoring_079",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.79,"bounded scoring rule 79"),
+    ScoringRule("scoring_080",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.8,"bounded scoring rule 80"),
+    ScoringRule("scoring_081",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.81,"bounded scoring rule 81"),
+    ScoringRule("scoring_082",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.82,"bounded scoring rule 82"),
+    ScoringRule("scoring_083",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.83,"bounded scoring rule 83"),
+    ScoringRule("scoring_084",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.84,"bounded scoring rule 84"),
+    ScoringRule("scoring_085",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.85,"bounded scoring rule 85"),
+    ScoringRule("scoring_086",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.86,"bounded scoring rule 86"),
+    ScoringRule("scoring_087",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.87,"bounded scoring rule 87"),
+    ScoringRule("scoring_088",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.88,"bounded scoring rule 88"),
+    ScoringRule("scoring_089",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.89,"bounded scoring rule 89"),
+    ScoringRule("scoring_090",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.9,"bounded scoring rule 90"),
+    ScoringRule("scoring_091",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.91,"bounded scoring rule 91"),
+    ScoringRule("scoring_092",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.92,"bounded scoring rule 92"),
+    ScoringRule("scoring_093",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.93,"bounded scoring rule 93"),
+    ScoringRule("scoring_094",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.94,"bounded scoring rule 94"),
+    ScoringRule("scoring_095",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.95,"bounded scoring rule 95"),
+    ScoringRule("scoring_096",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.96,"bounded scoring rule 96"),
+    ScoringRule("scoring_097",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.97,"bounded scoring rule 97"),
+    ScoringRule("scoring_098",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.98,"bounded scoring rule 98"),
+    ScoringRule("scoring_099",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.99,"bounded scoring rule 99"),
+    ScoringRule("scoring_100",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0,"bounded scoring rule 100"),
+    ScoringRule("scoring_101",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded scoring rule 101"),
+    ScoringRule("scoring_102",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded scoring rule 102"),
+    ScoringRule("scoring_103",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded scoring rule 103"),
+    ScoringRule("scoring_104",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded scoring rule 104"),
+    ScoringRule("scoring_105",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded scoring rule 105"),
+    ScoringRule("scoring_106",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded scoring rule 106"),
+    ScoringRule("scoring_107",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded scoring rule 107"),
+    ScoringRule("scoring_108",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded scoring rule 108"),
+    ScoringRule("scoring_109",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded scoring rule 109"),
+    ScoringRule("scoring_110",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded scoring rule 110"),
+    ScoringRule("scoring_111",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded scoring rule 111"),
+    ScoringRule("scoring_112",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded scoring rule 112"),
+    ScoringRule("scoring_113",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded scoring rule 113"),
+    ScoringRule("scoring_114",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded scoring rule 114"),
+    ScoringRule("scoring_115",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded scoring rule 115"),
+    ScoringRule("scoring_116",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded scoring rule 116"),
+    ScoringRule("scoring_117",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded scoring rule 117"),
+    ScoringRule("scoring_118",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded scoring rule 118"),
+    ScoringRule("scoring_119",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded scoring rule 119"),
+    ScoringRule("scoring_120",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded scoring rule 120"),
+    ScoringRule("scoring_121",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.21,"bounded scoring rule 121"),
+    ScoringRule("scoring_122",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.22,"bounded scoring rule 122"),
+    ScoringRule("scoring_123",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.23,"bounded scoring rule 123"),
+    ScoringRule("scoring_124",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.24,"bounded scoring rule 124"),
+    ScoringRule("scoring_125",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.25,"bounded scoring rule 125"),
+    ScoringRule("scoring_126",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.26,"bounded scoring rule 126"),
+    ScoringRule("scoring_127",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.27,"bounded scoring rule 127"),
+    ScoringRule("scoring_128",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.28,"bounded scoring rule 128"),
+    ScoringRule("scoring_129",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.29,"bounded scoring rule 129"),
+    ScoringRule("scoring_130",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.3,"bounded scoring rule 130"),
+    ScoringRule("scoring_131",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.31,"bounded scoring rule 131"),
+    ScoringRule("scoring_132",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.32,"bounded scoring rule 132"),
+    ScoringRule("scoring_133",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.33,"bounded scoring rule 133"),
+    ScoringRule("scoring_134",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.34,"bounded scoring rule 134"),
+    ScoringRule("scoring_135",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.35,"bounded scoring rule 135"),
+    ScoringRule("scoring_136",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.36,"bounded scoring rule 136"),
+    ScoringRule("scoring_137",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.37,"bounded scoring rule 137"),
+    ScoringRule("scoring_138",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.38,"bounded scoring rule 138"),
+    ScoringRule("scoring_139",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.39,"bounded scoring rule 139"),
+    ScoringRule("scoring_140",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.4,"bounded scoring rule 140"),
+    ScoringRule("scoring_141",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.41,"bounded scoring rule 141"),
+    ScoringRule("scoring_142",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.42,"bounded scoring rule 142"),
+    ScoringRule("scoring_143",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.43,"bounded scoring rule 143"),
+    ScoringRule("scoring_144",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.44,"bounded scoring rule 144"),
+    ScoringRule("scoring_145",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.45,"bounded scoring rule 145"),
+    ScoringRule("scoring_146",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.46,"bounded scoring rule 146"),
+    ScoringRule("scoring_147",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.47,"bounded scoring rule 147"),
+    ScoringRule("scoring_148",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.48,"bounded scoring rule 148"),
+    ScoringRule("scoring_149",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.49,"bounded scoring rule 149"),
+    ScoringRule("scoring_150",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.5,"bounded scoring rule 150"),
+    ScoringRule("scoring_151",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.51,"bounded scoring rule 151"),
+    ScoringRule("scoring_152",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.52,"bounded scoring rule 152"),
+    ScoringRule("scoring_153",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.53,"bounded scoring rule 153"),
+    ScoringRule("scoring_154",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.54,"bounded scoring rule 154"),
+    ScoringRule("scoring_155",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.55,"bounded scoring rule 155"),
+    ScoringRule("scoring_156",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.56,"bounded scoring rule 156"),
+    ScoringRule("scoring_157",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.57,"bounded scoring rule 157"),
+    ScoringRule("scoring_158",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.58,"bounded scoring rule 158"),
+    ScoringRule("scoring_159",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.59,"bounded scoring rule 159"),
+    ScoringRule("scoring_160",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.6,"bounded scoring rule 160"),
+    ScoringRule("scoring_161",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.61,"bounded scoring rule 161"),
+    ScoringRule("scoring_162",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.62,"bounded scoring rule 162"),
+    ScoringRule("scoring_163",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.63,"bounded scoring rule 163"),
+    ScoringRule("scoring_164",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.64,"bounded scoring rule 164"),
+    ScoringRule("scoring_165",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.65,"bounded scoring rule 165"),
+    ScoringRule("scoring_166",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.66,"bounded scoring rule 166"),
+    ScoringRule("scoring_167",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.67,"bounded scoring rule 167"),
+    ScoringRule("scoring_168",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.68,"bounded scoring rule 168"),
+    ScoringRule("scoring_169",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.69,"bounded scoring rule 169"),
+    ScoringRule("scoring_170",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.7,"bounded scoring rule 170"),
+    ScoringRule("scoring_171",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.71,"bounded scoring rule 171"),
+    ScoringRule("scoring_172",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.72,"bounded scoring rule 172"),
+    ScoringRule("scoring_173",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.73,"bounded scoring rule 173"),
+    ScoringRule("scoring_174",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.74,"bounded scoring rule 174"),
+    ScoringRule("scoring_175",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.75,"bounded scoring rule 175"),
+    ScoringRule("scoring_176",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.76,"bounded scoring rule 176"),
+    ScoringRule("scoring_177",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.77,"bounded scoring rule 177"),
+    ScoringRule("scoring_178",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.78,"bounded scoring rule 178"),
+    ScoringRule("scoring_179",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.79,"bounded scoring rule 179"),
+    ScoringRule("scoring_180",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.8,"bounded scoring rule 180"),
+    ScoringRule("scoring_181",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.81,"bounded scoring rule 181"),
+    ScoringRule("scoring_182",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.82,"bounded scoring rule 182"),
+    ScoringRule("scoring_183",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.83,"bounded scoring rule 183"),
+    ScoringRule("scoring_184",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.84,"bounded scoring rule 184"),
+    ScoringRule("scoring_185",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.85,"bounded scoring rule 185"),
+    ScoringRule("scoring_186",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.86,"bounded scoring rule 186"),
+    ScoringRule("scoring_187",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.87,"bounded scoring rule 187"),
+    ScoringRule("scoring_188",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.88,"bounded scoring rule 188"),
+    ScoringRule("scoring_189",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.89,"bounded scoring rule 189"),
+    ScoringRule("scoring_190",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.9,"bounded scoring rule 190"),
+    ScoringRule("scoring_191",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.91,"bounded scoring rule 191"),
+    ScoringRule("scoring_192",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.92,"bounded scoring rule 192"),
+    ScoringRule("scoring_193",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.93,"bounded scoring rule 193"),
+    ScoringRule("scoring_194",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.94,"bounded scoring rule 194"),
+    ScoringRule("scoring_195",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.95,"bounded scoring rule 195"),
+    ScoringRule("scoring_196",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.96,"bounded scoring rule 196"),
+    ScoringRule("scoring_197",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.97,"bounded scoring rule 197"),
+    ScoringRule("scoring_198",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.98,"bounded scoring rule 198"),
+    ScoringRule("scoring_199",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.99,"bounded scoring rule 199"),
+    ScoringRule("scoring_200",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0,"bounded scoring rule 200"),
+    ScoringRule("scoring_201",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.01,"bounded scoring rule 201"),
+    ScoringRule("scoring_202",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.02,"bounded scoring rule 202"),
+    ScoringRule("scoring_203",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.03,"bounded scoring rule 203"),
+    ScoringRule("scoring_204",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.04,"bounded scoring rule 204"),
+    ScoringRule("scoring_205",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.05,"bounded scoring rule 205"),
+    ScoringRule("scoring_206",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.06,"bounded scoring rule 206"),
+    ScoringRule("scoring_207",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.07,"bounded scoring rule 207"),
+    ScoringRule("scoring_208",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.08,"bounded scoring rule 208"),
+    ScoringRule("scoring_209",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.09,"bounded scoring rule 209"),
+    ScoringRule("scoring_210",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.1,"bounded scoring rule 210"),
+    ScoringRule("scoring_211",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.11,"bounded scoring rule 211"),
+    ScoringRule("scoring_212",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.12,"bounded scoring rule 212"),
+    ScoringRule("scoring_213",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.13,"bounded scoring rule 213"),
+    ScoringRule("scoring_214",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.14,"bounded scoring rule 214"),
+    ScoringRule("scoring_215",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.15,"bounded scoring rule 215"),
+    ScoringRule("scoring_216",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.16,"bounded scoring rule 216"),
+    ScoringRule("scoring_217",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.17,"bounded scoring rule 217"),
+    ScoringRule("scoring_218",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.18,"bounded scoring rule 218"),
+    ScoringRule("scoring_219",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.19,"bounded scoring rule 219"),
+    ScoringRule("scoring_220",ScoringKind.{0: "PRIMARY",1:"SECONDARY",2:"TERTIARY",3:"BLOCKING",4:"ADVISORY"}[i%5],0.2,"bounded scoring rule 220"),
 )
 
-_RULE_COUNT = 220
+def active(value:float): return tuple(r.name for r in RULES if r.applies(value))
 
-RULES = tuple(
-    ScoringRule(
-        name=f"scoring_{index:03d}",
-        kind=_KIND_CYCLE[index % len(_KIND_CYCLE)],
-        threshold=(index % 100) / 100,
-        rationale=f"bounded scoring rule {index}",
-    )
-    for index in range(1, _RULE_COUNT + 1)
-)
-
-
-def active(value: float):
-    return tuple(rule.name for rule in RULES if rule.applies(value))
-
-
-def by_kind(kind: ScoringKind):
-    return tuple(rule for rule in RULES if rule.kind is kind)
+def by_kind(kind:ScoringKind): return tuple(r for r in RULES if r.kind is kind)
