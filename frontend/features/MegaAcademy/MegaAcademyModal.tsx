@@ -416,24 +416,14 @@ export function MegaAcademyModal({ visible, onClose, initialSearch }: Props) {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.6}
           contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-          ListEmptyComponent={
-            loading ? null : (
-              <View style={s.emptyWrap}>
+          ListEmptyComponent={() => loading ? null : (<View style={s.emptyWrap}>
                 <Ionicons name={tab.icon as any} size={48} color="#334155" />
                 <Text style={s.emptyText}>No {activeTab} found</Text>
-              </View>
-            )
-          }
-          ListFooterComponent={
-            loading ? (
-              <View style={s.loader}>
+              </View>)}
+          ListFooterComponent={() => loading ? (<View style={s.loader}>
                 <ActivityIndicator color={tab.color} />
                 <Text style={s.loaderText}>Loading…</Text>
-              </View>
-            ) : (!hasMore && items.length > 0) ? (
-              <Text style={s.endText}>— End of {activeTab} —</Text>
-            ) : null
-          }
+              </View>) : (!hasMore && items.length > 0) ? (<Text style={s.endText}>— End of {activeTab} —</Text>) : null}
         />
         )}
 
