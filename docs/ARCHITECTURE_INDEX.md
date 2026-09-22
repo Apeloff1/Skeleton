@@ -13,23 +13,25 @@ When documents overlap, resolve them in this order:
 1. **Runtime and dependency contracts** — [FRONTIER_ARCHITECTURE.md](FRONTIER_ARCHITECTURE.md) and `skeleton/architecture.py`.
 2. **Machine-readable architecture registry** — `skeleton/architecture_index.py`.
 3. **Definitive architecture narrative** — [ARCHITECTURE.md](ARCHITECTURE.md).
-4. **Current construction sequence** — [BUILD_PLAN.md](BUILD_PLAN.md).
-5. **Research/evidence/evolution contract** — [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md).
-6. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
-7. **Frontier research atlas** — [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md).
-8. **Research experiment protocols** — [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md).
-9. **Research saturation accountability** — [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md).
-10. **Historical research lineage** — [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md).
-11. **Research source topology** — [architecture/research-source-topology.md](architecture/research-source-topology.md).
-12. **Research dependency map** — [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md).
-13. **Research execution program** — [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md).
-14. **Research program scorecard** — [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md).
-15. **Research control-plane internals** — [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md).
-16. **Research control-plane build backlog** — [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md).
-17. **Research control-plane adversarial gap audit** — [architecture/research-control-plane-gap-audit-2026.md](architecture/research-control-plane-gap-audit-2026.md).
-18. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-19. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-20. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+4. **Program target, construction, maturity, and completion authority** — [plan/MASTER_PLAN.md](plan/MASTER_PLAN.md) and `machine/ai_master_plan.json`.
+5. **Frontier construction and research detail** — [BUILD_PLAN.md](BUILD_PLAN.md); subordinate to item 4 for scope, W00–W30 ownership, build-wave ordering, maturity, completion, and accountability.
+6. **Research/evidence/evolution contract** — [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md).
+7. **Exotic architecture laboratory** — [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md).
+8. **Frontier research atlas** — [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md).
+9. **Research experiment protocols** — [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md).
+10. **Research saturation accountability** — [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md).
+11. **Historical research lineage** — [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md).
+12. **Research source topology** — [architecture/research-source-topology.md](architecture/research-source-topology.md).
+13. **Research dependency map** — [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md).
+14. **Research execution program** — [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md).
+15. **Research program scorecard** — [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md).
+16. **Research control-plane internals** — [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md).
+17. **Research control-plane build backlog** — [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md).
+18. **Research control-plane adversarial gap audit** — [architecture/research-control-plane-gap-audit-2026.md](architecture/research-control-plane-gap-audit-2026.md).
+19. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+20. **Adversarial cross-condition closure** — [plan/ADVERSARIAL_CLOSURE_PASS.md](plan/ADVERSARIAL_CLOSURE_PASS.md) and `machine/ai_adversarial_closure.json`; a maturity-proof overlay, not a separate architecture root.
+21. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+22. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
