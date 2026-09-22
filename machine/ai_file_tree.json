@@ -3661,7 +3661,7 @@
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
-      "status": "open",
+      "status": "closed",
       "scope": "downstream_frontend_base_state",
       "detected_on_payload_sha": "ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e",
       "current_main_sha": "90ff896e8f18d8a472ce6b301156d461a8e8dc7f",
@@ -3693,7 +3693,18 @@
         "ScrollView instance refs typed as component functions",
         "InteractionManager missing from current React Native exports"
       ],
-      "effect": "Blocks cutover_complete, compatibility-source deletion, and independent completion claim until App Assembly is green on a reconciled base."
+      "effect": "Closed. The inherited frontend TypeScript/toolchain blocker is resolved; cutover remains gated by current security checks and distinct independent verification signoff.",
+      "resolved_on_payload_sha": "4b0eb00067d01b2abfdbe253d4a8d333180cfde9",
+      "resolved_app_assembly_run_id": 35756044720,
+      "resolved_app_assembly_job_id": 106841951517,
+      "resolution_evidence": [
+        "App Assembly #1261 completed success on payload SHA 4b0eb00067d01b2abfdbe253d4a8d333180cfde9",
+        "Validate assembled frontend passed: TypeScript, operation-stream regression, and Expo web export",
+        "Engine assembly contract tests passed",
+        "Isolated backend provider contract tests passed",
+        "Structural assembly, Compose topology, and wheel manifest verification passed",
+        "Product Kernel #1490 completed success on the same payload SHA"
+      ]
     }
   ],
   "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
