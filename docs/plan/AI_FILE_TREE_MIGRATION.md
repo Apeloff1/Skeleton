@@ -229,3 +229,25 @@ The current governed set contains **80 mappings**. The prior direct Git-object a
 - `AIFT-AI-SHELL`: `skeleton/shells/ai` -> `skeleton/ai/shell`
 
 Both are tagged `ai-tree:mapped`, `migration:staged-mirror`, and `cutover:parity-ready` in `B1-core-runtime`. Their implementation payload is identity-bound, but fresh parity/object-audit and CI evidence are still required before any import inversion or source retirement.
+
+
+## Compatibility convergence surfaces
+
+Legacy runtime packages that overlap a canonical owner are staged under
+`skeleton/ai/compat` instead of being promoted as new authorities.
+
+- `skeleton/turn -> skeleton/ai/compat/turn` must converge into canonical
+  conversation/execution state owners.
+- `skeleton/telemetry -> skeleton/ai/compat/telemetry` must converge into
+  canonical observability/operation-stream owners.
+
+These mirrors are evidence and migration inputs only. Their relocation cannot
+create production authority or satisfy completion checkboxes.
+
+## AI shell and configuration
+
+`skeleton/config` and `skeleton/shells/ai` are plan-owned engine surfaces
+and are mirrored under `skeleton/ai/runtime/config` and `skeleton/ai/shell`.
+The shell migration preserves provider-boundary isolation: routing and provider
+health code may consume canonical provider contracts but must not acquire
+credentials or provider-SDK ownership.
