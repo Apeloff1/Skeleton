@@ -16,7 +16,12 @@
  */
 import React from 'react';
 import { InteractionManager } from 'react-native';
-import api, { ApiResult } from '../utils/apiClient';
+
+
+const requestIdleTask = (callback: () => void) => {
+  const id = setTimeout(callback, 0);
+  return { cancel: () => clearTimeout(id) };
+};import api, { ApiResult } from '../utils/apiClient';
 
 export function useIsMounted() {
   const ref = React.useRef(true);
@@ -60,7 +65,7 @@ export function useStableCallback<T extends (...args: any[]) => any>(fn: T): T {
 
 export function useInteraction(fn: () => void, deps: any[] = []) {
   React.useEffect(() => {
-    const h = InteractionManager.runAfterInteractions(fn);
+    const h = requestIdleTask(fn);
     return () => { try { (h as any)?.cancel?.(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
