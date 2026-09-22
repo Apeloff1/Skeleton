@@ -4,7 +4,7 @@
 
 The first migration is deliberately non-disruptive: build-plan-relevant code
 from current `main`, including Jeeves, is mirrored here using the exact Git
-objects already in the repository. Existing imports remain compatibility paths. Non-credential code is held to exact source/destination parity, while credential-bearing destinations must be pure non-owning compatibility facades declared by `machine/ai_file_tree.json`.
+objects already in the repository. Existing imports remain compatibility paths. Python mirrors must remain AST-equivalent to their sources, non-Python content remains byte-identical, and credential-bearing destinations must be pure non-owning compatibility facades declared by `machine/ai_file_tree.json`.
 
 ## Layout
 
@@ -22,6 +22,7 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `agents/jeeves/` — Jeeves reasoning and agent system.
 - `agents/core/` — core agent/swarm execution runtime.
 - `cognition/`, `learning/`, `evaluation/` — cognition, controlled learning, and evaluation support.
+- `simulation/`, `forge/` — explicit masterplan domains for bounded world-model simulation and candidate forge workflows.
 - `build/shift_supervisor/` — planning/scheduling/build-control code promoted from the transitional `core/` root.
 - `build/{automation,repo_intelligence}/` — repository-side AI build/control support.
 
