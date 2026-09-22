@@ -23,19 +23,19 @@ class HybridRAGWiring:
         Hybrid retrieval: Vector + Graph + Keyword + Category synergy.
         """
         results = []
-        
+
         # 1. Keyword + Category lookup
         keyword_results = self._keyword_category_lookup(query, room_id)
-        
+
         # 2. Vector similarity (placeholder)
         vector_results = self._vector_similarity(query, room_id)
-        
+
         # 3. Graph traversal for synergy
         graph_results = self._graph_synergy_traversal(query, room_id)
-        
+
         # Merge + re-rank with coherence score
         merged = self._merge_and_rerank(keyword_results, vector_results, graph_results)
-        
+
         return merged[:top_k]
 
     def _keyword_category_lookup(self, query: str, room_id: str) -> List[Dict]:
