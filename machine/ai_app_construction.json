@@ -7213,7 +7213,61 @@
       "Jeeves/tool shadow provider denial",
       "undeclared provider denial",
       "compatibility application modules contain no provider credential reads or raw provider SDK/network transport"
-    ]
+    ],
+    "application_isolation_surfaces": [
+      {
+        "path": "backend/core/ai_provider.py",
+        "role": "runtime compatibility facade",
+        "required_tokens": [
+          "from skeleton import provider_runtime as _runtime"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "skeleton/jeeves/providers.py",
+        "role": "Jeeves compatibility facade",
+        "required_tokens": [
+          "OpenAISyncProviderAdapter",
+          "ProviderRequest"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "backend/routes/image_generation.py",
+        "role": "media request adapter delegating to canonical provider runtime",
+        "required_tokens": [
+          "ProviderRegistry",
+          "ProviderImageRequest"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "backend/core/expressive_tts.py",
+        "role": "provider-neutral speech cadence preparation",
+        "required_tokens": [
+          "shape_cadence",
+          "resolve_tone"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      }
+    ],
+    "application_isolation_rule": "Application, media, compatibility and presentation modules may prepare or delegate provider work but may not own provider credentials, vendor SDK clients, or raw provider transport."
   },
   "functional_ai_acceptance_matrix": {
     "schema_version": 1,
