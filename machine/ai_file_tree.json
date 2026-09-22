@@ -4123,7 +4123,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending distinct verification after transfer-v2 CI/App Assembly is green and BASE-FRONTEND-SSR-RAF-01 is closed. BASE-FRONTEND-TSC-01 is resolved.",
+    "statement": "Pending distinct verification after the final transfer-v2 validation PR is green. BASE-FRONTEND-TSC-01 is resolved; BASE-FRONTEND-SSR-RAF-01 has a repair applied and awaits App Assembly proof.",
     "signature_method": null
   },
   "parity_policy": {
@@ -4226,7 +4226,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_full_object_parity_audit_green_pending_ci_ssr_export_gate_and_independent_verification",
+  "validation_state": "130_mapping_transfer_v2_repairs_applied_pending_fresh_ci_and_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4284,7 +4284,7 @@
     },
     {
       "id": "BASE-FRONTEND-SSR-RAF-01",
-      "status": "open",
+      "status": "repair_applied_pending_validation",
       "scope": "downstream_frontend_base_state",
       "detected_on_payload_sha": "57d28bc4bd57b74330c5a2883f08c775c82a5f03",
       "current_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
@@ -4299,7 +4299,14 @@
       "representative_error": "ReferenceError: requestAnimationFrame is not defined",
       "failure_origin": "react-native-worklets/lib/module/threads.js under Node v24.20.0 during Expo static rendering",
       "evidence": "PR #1936 merged the Expo 54 React/React Native alignment and closed BASE-FRONTEND-TSC-01. Its latest available App Assembly progressed through TypeScript and reducer validation, then failed during Node-side static web export. Transfer-v2 contains no frontend/* changes, so this is inherited base-state debt rather than a transfer-v2 regression.",
-      "effect": "Blocks cutover_complete, compatibility-source deletion, and independent completion signoff until a reconciled App Assembly run completes successfully."
+      "effect": "Repair is staged. Blocks cutover_complete, compatibility-source deletion, and independent completion signoff until App Assembly proves static web export succeeds.",
+      "repair_branch": "integration/ai-file-tree-transfer-v2-validated",
+      "repair_head_sha": "72dd90cbac181daf5db40a83d283dc2fa2fc48a8",
+      "repair_commits": [
+        "e8af82c2ff14147996eefb8e66345ec7edfb2300",
+        "f35dd1cc0826586a7c42f4559332c838f84f78ff"
+      ],
+      "repair_summary": "Added an Expo Router custom entry point that installs requestAnimationFrame/cancelAnimationFrame only when absent before loading expo-router/entry; package main now points to index.js."
     }
   ],
   "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
@@ -4595,6 +4602,13 @@
       "facade_contract_errors": 0,
       "forbidden_provider_marker_hits": 0,
       "method": "Git tree/blob identity + governed overlay membership + compatibility-facade contract inspection"
+    },
+    "quarantine_hygiene_normalization": {
+      "normalized_mirror_file_count": 11,
+      "policy": "Trailing whitespace was stripped only from staged research-quarantine Python destinations. Legacy sources remain unchanged. The canonical validator permits Python AST-equivalent parity, so semantic migration parity is preserved while repository hygiene is restored.",
+      "destination_only": true,
+      "semantic_parity_required": true,
+      "byte_identity_required": false
     }
   },
   "move_tag_contract": {
