@@ -329,3 +329,10 @@ Fourteen legacy GameForge AI trees are quarantined under `skeleton/ai/research/l
 Six backend-core modules are staged under `skeleton/ai/compat/backend_core`: `agent_ledger.py`, `agent_mesh.py`, `collection_agents.py`, `deployment_planner.py`, `director_agent.py`, and `playable_simulation.py`.
 
 The provider-bearing `backend/core/ai_provider.py` and `backend/core/ai_provider_compat.py` remain deliberately excluded until a non-owning facade/authority-cutover design is approved.
+
+
+### Durable v2B audit evidence
+
+Payload `bf4743b745bab32ee3528e9cccc0302a8eec80a3` (tree `55dace49044ef38d8f76b822b1dd53b298c118f4`) contains **150 governed mappings**. A full Git-object/source-identity audit reports zero stale source identities, zero missing source/destination objects, zero undeclared exact-object drift, and exact source-object identity for all 20 v2B mappings. The two backend provider surfaces remain deliberately deferred rather than duplicated.
+
+Implementation attestation is bound to the payload SHA above. Independent verification remains unsigned.

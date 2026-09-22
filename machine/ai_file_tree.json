@@ -4537,15 +4537,22 @@
     ]
   },
   "implementation_signoff": {
-    "signed": false,
-    "signer_id": null,
-    "signer_type": null,
+    "signed": true,
+    "signer_id": "github:Apeloff1",
+    "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": null,
-    "git_sha": null,
-    "evidence_refs": [],
-    "statement": "Pending identity-bound implementation attestation for durable transfer-v2B recovery payload after the 150-mapping commit is created and audited.",
-    "signature_method": null
+    "signed_at_utc": "2026-09-22T16:00:25Z",
+    "git_sha": "bf4743b745bab32ee3528e9cccc0302a8eec80a3",
+    "evidence_refs": [
+      "git:bf4743b745bab32ee3528e9cccc0302a8eec80a3",
+      "git-tree:55dace49044ef38d8f76b822b1dd53b298c118f4",
+      "object-audit:durable-v2b-full-150-mapping-zero-structural-drift",
+      "object-audit:v2b-20-mappings-exact-source-object-identity",
+      "provider-boundary:backend-core-ai-provider-surfaces-deferred",
+      "parent-line:integration/ai-file-tree-transfer-v2@d810cb721bf812c97b736b36edee7194da65cc9d"
+    ],
+    "statement": "Durable transfer-v2B recovery implementation is identity-bound to GitHub user Apeloff1 at the cited 150-mapping payload SHA. Full structural inspection found zero stale source identities and zero source/destination object drift across all 150 mappings outside the 16 explicitly declared facade/parity-exception surfaces. The 20 v2B mappings reuse exact source Git objects. backend/core/ai_provider.py and backend/core/ai_provider_compat.py remain deliberately outside the transfer pending explicit non-owning facade/authority-cutover design. This attestation records staged-mirror preparation only; CI/App Assembly, canonical-owner convergence, source retirement, AIQ/work-package completion, and independent verification remain separately gated.",
+    "signature_method": "github_identity"
   },
   "verification_signoff": {
     "signed": false,
@@ -4658,7 +4665,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "150_mapping_transfer_v2b_recovery_payload_pending_full_object_audit_ci_and_independent_verification",
+  "validation_state": "150_mapping_transfer_v2b_full_object_parity_audit_green_pending_ci_and_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4946,30 +4953,9 @@
   "object_audit": {
     "payload_git_sha": "83483a87f5a19d15f4158ad2b34d655c31e0f22b",
     "payload_tree_sha": "b554c929c4e607847835752290f7c0114303aad0",
-    "checked_mapping_count": 130,
+    "checked_mapping_count": 150,
     "pending_assignments": 0,
-    "pending_mapping_ids": [
-      "AIFT-V2B-GAMEFORGE-AGENTS",
-      "AIFT-V2B-GAMEFORGE-JEEVES",
-      "AIFT-V2B-GAMEFORGE-WORKFLOW",
-      "AIFT-V2B-GAMEFORGE-RUNTIME",
-      "AIFT-V2B-GAMEFORGE-OMEGA",
-      "AIFT-V2B-GAMEFORGE-PERSONAL-DIARIES",
-      "AIFT-V2B-GAMEFORGE-PERSONAL-LOGS",
-      "AIFT-V2B-GAMEFORGE-FORGES",
-      "AIFT-V2B-GAMEFORGE-KNOWLEDGE",
-      "AIFT-V2B-GAMEFORGE-SKILLS",
-      "AIFT-V2B-GAMEFORGE-NAVIGATION",
-      "AIFT-V2B-GAMEFORGE-BOOTSTRAP",
-      "AIFT-V2B-GAMEFORGE-ORCHESTRATOR",
-      "AIFT-V2B-GAMEFORGE-INDEXING",
-      "AIFT-V2B-BACKEND-CORE-AGENT-LEDGER",
-      "AIFT-V2B-BACKEND-CORE-AGENT-MESH",
-      "AIFT-V2B-BACKEND-CORE-COLLECTION-AGENTS",
-      "AIFT-V2B-BACKEND-CORE-DEPLOYMENT-PLANNER",
-      "AIFT-V2B-BACKEND-CORE-DIRECTOR-AGENT",
-      "AIFT-V2B-BACKEND-CORE-PLAYABLE-SIMULATION"
-    ],
+    "pending_mapping_ids": [],
     "source_identity_errors": 0,
     "tree_membership_errors": 0,
     "exact_parity_errors": 0,
@@ -4978,7 +4964,7 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_base": 0,
     "current_mapping_count": 150,
-    "audit_scope_status": "prior_130_mapping_audit_green_durable_v2b_recovery_requires_refresh",
+    "audit_scope_status": "durable_v2b_full_150_mapping_object_and_parity_audit_current",
     "transfer_v2": {
       "added_mapping_count": 26,
       "new_mirrored_file_count": 89,
@@ -4999,6 +4985,23 @@
         "backend/core/ai_provider_compat.py"
       ],
       "policy": "Provider-bearing backend/core surfaces remain outside this recovery payload pending explicit non-owning facade/authority-cutover design."
+    },
+    "durable_v2b_full_150_audit": {
+      "audited_payload_sha": "bf4743b745bab32ee3528e9cccc0302a8eec80a3",
+      "payload_tree_sha": "55dace49044ef38d8f76b822b1dd53b298c118f4",
+      "mapping_count": 150,
+      "source_identity_errors": 0,
+      "missing_source_or_destination_errors": 0,
+      "membership_drift_errors": 0,
+      "exact_object_drift_errors": 0,
+      "declared_facade_or_exception_surfaces": 16,
+      "v2b_mapping_count": 20,
+      "v2b_exact_source_object_identity": true,
+      "provider_surfaces_deferred": [
+        "backend/core/ai_provider.py",
+        "backend/core/ai_provider_compat.py"
+      ],
+      "result": "clean"
     }
   },
   "move_tag_contract": {
@@ -5024,7 +5027,7 @@
     }
   },
   "pre_move_readiness": {
-    "status": "fully_classified_staged_mirror_v2b_recovery_pending_object_audit_cutover_not_authorized",
+    "status": "fully_classified_staged_mirror_object_audit_green_cutover_not_authorized",
     "governed_mapping_count": 150,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 33,
@@ -5035,7 +5038,7 @@
       "B4-research-quarantine": 49,
       "B3-compat-convergence": 28
     },
-    "fresh_object_audit_required": true,
+    "fresh_object_audit_required": false,
     "global_cutover_blockers": [
       "required CI/App Assembly must be green on the final main-based PR composition",
       "independent verification signoff is unsigned",
