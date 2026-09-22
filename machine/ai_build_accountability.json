@@ -19335,11 +19335,11 @@
       "id": "ACC-AIQ-S0-PROV-01",
       "type": "queue_task",
       "title": "AIQ-S0-PROV-01 Run provider-surface discovery and classify every credential/network model edge.",
-      "status": "pending",
+      "status": "in_progress",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-22T19:00:08Z",
       "implementation_signoff": {
         "signed": false,
         "signer_id": null,
@@ -19366,8 +19366,17 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
+      "last_event_at_utc": "2026-09-22T19:00:08Z",
+      "history": [
+        {
+          "event": "implementation_started",
+          "at_utc": "2026-09-22T19:00:08Z",
+          "actor_id": "openai-chatgpt",
+          "actor_type": "ai",
+          "git_sha": "5113bc528794ab5f1bf4fd0b27beaad5c724a454",
+          "statement": "Started deterministic provider-surface discovery/classification and fail-closed network-edge ownership enforcement."
+        }
+      ],
       "evidence": [],
       "baseline_status": "pending"
     },
