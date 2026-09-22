@@ -189,10 +189,13 @@ jobs:
           python -m compileall -q
           skeleton/pr_automation
           skeleton/automation
+          skeleton/repo_machine
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
       - name: Validate runner v2 privileged contract
         run: python scripts/check_runner_v2_contract.py
+      - name: Validate machine repository organization contract
+        run: python scripts/check_repo_machine.py
       - name: Run PR automation contracts
         env:
           PYTHONPATH: "."
@@ -215,6 +218,11 @@ jobs:
           skeleton/testing/test_runner_v2_runtime.py
           skeleton/testing/test_runner_v2_transaction_report.py
           skeleton/testing/test_runner_v2_engine.py
+          tests/test_repo_machine.py
+          tests/test_repo_machine_advanced.py
+          tests/test_repo_machine_growth.py
+          tests/test_repo_machine_catalog.py
+          tests/test_repo_machine_sota.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
           tests/test_builder_plane.py
