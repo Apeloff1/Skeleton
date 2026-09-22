@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "queue_version": "1.1.0",
+  "queue_version": "1.2.0",
   "status": "active",
   "architecture_tag": "arch-map/v3.7",
   "construction_version": "3.7.0",
