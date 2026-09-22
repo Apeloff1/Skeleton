@@ -36,6 +36,10 @@ Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
 
+Reverse-engineering end-state proof pass: [`REVERSE_ENGINEERING_PASS.md`](REVERSE_ENGINEERING_PASS.md)
+
+Machine reverse proof contract: [`machine/ai_reverse_engineering_pass.json`](../../machine/ai_reverse_engineering_pass.json)
+
 Foundational volume depth pass: [`VOLUME_DEPTH_000_040.md`](VOLUME_DEPTH_000_040.md)
 
 ## Purpose
