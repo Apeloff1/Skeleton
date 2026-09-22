@@ -53,9 +53,7 @@ remain application compatibility surfaces.
 
 ## Migration and compatibility
 
-The sequence is **strangler mirror -> import inversion -> compatibility facade
--> source removal**. While mirrored, every mapped source and destination must
-remain byte-identical; drift fails closed.
+The sequence is **strangler mirror -> import inversion -> compatibility facade -> source removal**. Non-credential implementation remains byte-identical while mirrored. Credential-bearing surfaces are the explicit exception: the destination must be a pure re-export facade so provider credentials, SDK imports, and network ownership remain singular at the canonical source until cutover. Any undeclared drift fails closed.
 
 ## Failure, recovery, and rollback
 
@@ -78,9 +76,7 @@ signals until runtime cutover.
 
 ## Edge-case obligations
 
-The packet guards stale compatibility code, dual-owner drift, partial moves,
-missing package parents, provider-boundary widening, accidental completion
-claims, and rollback loss. Existing full-program edge obligations continue
+The packet guards stale compatibility code, dual-owner drift, partial moves, missing package parents, provider-boundary widening, accidental duplicate credential owners, accidental completion claims, and rollback loss. Existing full-program edge obligations continue
 through referenced work packages.
 
 ## Evidence references
