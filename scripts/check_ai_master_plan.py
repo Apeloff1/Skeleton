@@ -51,6 +51,17 @@ def validate(data: dict) -> list[str]:
         required_promotions = engineering.get("required_for_promotion")
         if required_promotions != ["verified", "hardened", "production"]:
             errors.append("engineering_pass required_for_promotion must be verified/hardened/production")
+    adversarial = data.get("adversarial_closure")
+    if not isinstance(adversarial, dict):
+        errors.append("adversarial_closure must be an object")
+    else:
+        if adversarial.get("machine_contract") != "machine/ai_adversarial_closure.json":
+            errors.append("adversarial_closure machine contract path drifted")
+        if adversarial.get("human_contract") != "docs/plan/ADVERSARIAL_CLOSURE_PASS.md":
+            errors.append("adversarial_closure human contract path drifted")
+        if adversarial.get("required_for_promotion") != ["verified", "hardened", "production"]:
+            errors.append("adversarial_closure required_for_promotion must be verified/hardened/production")
+
     freeze = data.get("breadth_freeze")
     if not isinstance(freeze, dict) or freeze.get("enabled") is not True:
         errors.append("breadth_freeze.enabled must be true")
@@ -141,7 +152,7 @@ def validate(data: dict) -> list[str]:
 
     if PLAN.is_file():
         text = PLAN.read_text(encoding="utf-8")
-        for marker in ("## 21. P0 build program", "## 21.5 Systems-engineering closure overlay", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 24.3 Volume depth passes", "## 25. Scope freeze"):
+        for marker in ("## 21. P0 build program", "## 21.5 Systems-engineering closure overlay", "## 21.6 Adversarial cross-condition closure overlay", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 24.3 Volume depth passes", "## 25. Scope freeze"):
             if marker not in text:
                 errors.append(f"master plan missing required section: {marker}")
 
