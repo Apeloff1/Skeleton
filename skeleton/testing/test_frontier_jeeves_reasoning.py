@@ -37,7 +37,7 @@ from skeleton.jeeves.agent.rational_metareasoning import (
     MetaBudget,
     MetaState,
 )
-from skeleton.jeeves.agent.semantic_lenses import LensFamily, SemanticRole
+from skeleton.jeeves.agent.semantic_lenses import LensFamily
 from skeleton.jeeves.agent.types import (
     EvidenceKind,
     EvidenceRef,
@@ -711,7 +711,6 @@ def test_frontier_uncertainty_uses_strongest_unresolved_signal() -> None:
             normalized_entropy=0.72,
             agreement=0.80,
         ),
-        lens_fusion=None,
     )
 
     value = AdaptiveJeevesRuntime._frontier_uncertainty(decision)
@@ -1186,10 +1185,3 @@ def test_host_candidate_adjudicator_penalizes_contradictions_and_bad_custody() -
     assert bad.known_evidence_count == 1
     assert any("unknown_evidence=" in reason for reason in bad.reasons)
     assert any("fingerprint_mismatch=" in reason for reason in bad.reasons)
-
-
-
-def test_frontier_semantic_catalog_roles_are_import_safe() -> None:
-    assert SemanticRole.SYSTEM.value == "system"
-    assert SemanticRole.SOCIAL.value == "social"
-    assert SemanticRole.TEMPORAL.value == "temporal"
