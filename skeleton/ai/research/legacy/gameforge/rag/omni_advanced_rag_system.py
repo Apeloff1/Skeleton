@@ -12,8 +12,8 @@ from datetime import datetime
 class OmniAdvancedRAGSystem:
     def __init__(self):
         self.index = "Omni Hyper Index (12-Facet)"
-        self.retrieval_modes = ["vector", "graph", "keyword", "wiki", "kv_cache", 
-                               "temporal", "spatial", "exocortex", "skill", 
+        self.retrieval_modes = ["vector", "graph", "keyword", "wiki", "kv_cache",
+                               "temporal", "spatial", "exocortex", "skill",
                                "reasoning_history", "blackboard", "mcp"]
 
     def retrieve(self, query: str, context: Dict = None, max_results: int = 12) -> List[Dict]:
@@ -21,7 +21,7 @@ class OmniAdvancedRAGSystem:
         Advanced multi-facet retrieval using the full Omni Hyper Index.
         """
         results = []
-        
+
         # Simulate retrieval across all 12 facets
         for facet in self.retrieval_modes:
             result = {
@@ -31,7 +31,7 @@ class OmniAdvancedRAGSystem:
                 "source": "omni_index"
             }
             results.append(result)
-        
+
         # Sort and return top results
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:max_results]
@@ -39,7 +39,7 @@ class OmniAdvancedRAGSystem:
     def retrieve_with_latent_refinement(self, query: str, previous_latent_state: Dict = None) -> Dict:
         """Retrieve + refine using latent space self-refinement."""
         base_results = self.retrieve(query)
-        
+
         refined = {
             "query": query,
             "base_results": base_results,
