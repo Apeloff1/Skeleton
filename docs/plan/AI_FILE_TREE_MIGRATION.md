@@ -309,3 +309,8 @@ After #1930 merged, current `main` changed five exact-parity files under `skelet
 - B4-research-quarantine: 35
 
 Independent verification remains unsigned. Fresh full 130-mapping object/parity audit, the canonical file-tree validator, affected-domain validation, and required CI remain mandatory before any cutover or source retirement.
+
+
+### Transfer-v2 implementation attestation
+
+Implementation preparation is identity-bound to payload `fab8888ce760274984b52cbb50733f943a909581` and tree `1b44c743dfa667b7519adfb46756f9914cd36a94` by GitHub identity. This attestation does not authorize import inversion, source retirement, or production cutover. Independent verification remains unsigned.

@@ -4098,15 +4098,22 @@
     ]
   },
   "implementation_signoff": {
-    "signed": false,
-    "signer_id": null,
-    "signer_type": null,
+    "signed": true,
+    "signer_id": "github:Apeloff1",
+    "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": null,
-    "git_sha": null,
-    "evidence_refs": [],
-    "statement": "Pending identity-bound implementation attestation for transfer-v2 after the reconciled 130-mapping payload commit is created and inspected.",
-    "signature_method": null
+    "signed_at_utc": "2026-09-22T15:31:00Z",
+    "git_sha": "fab8888ce760274984b52cbb50733f943a909581",
+    "evidence_refs": [
+      "git:fab8888ce760274984b52cbb50733f943a909581",
+      "git-tree:1b44c743dfa667b7519adfb46756f9914cd36a94",
+      "object-audit:transfer-v2-26-mappings-89-files-exact-git-object-reuse",
+      "parity-repair:post-1930-automation-five-exact-mirrors",
+      "base:main@392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
+      "pr:1937"
+    ],
+    "statement": "Transfer-v2 implementation is identity-bound to GitHub user Apeloff1 at the cited reconciled payload SHA. The payload adds six quarantined legacy GameForge AI trees and twenty backend-core compatibility-convergence mappings using exact source Git objects, and refreshes five non-exception automation mirrors that drifted after PR #1930 merged. This attestation records staged-mirror preparation only; canonical-owner convergence, import inversion, source retirement, full 130-mapping parity validation, green CI, AIQ/work-package completion, and independent verification remain separately gated.",
+    "signature_method": "github_identity"
   },
   "verification_signoff": {
     "signed": false,
@@ -4219,7 +4226,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_reconciled_payload_pending_identity_attestation_and_fresh_full_object_audit",
+  "validation_state": "130_mapping_transfer_v2_preparation_signed_pending_full_parity_validator_ci_and_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4581,6 +4588,17 @@
       ],
       "compatibility_facade_preserved": "specialist_bots.py",
       "policy": "Only non-exception exact-parity files are mirrored. Credential-sensitive parity exceptions remain non-owning facades."
+    },
+    "transfer_v2": {
+      "payload_git_sha": "fab8888ce760274984b52cbb50733f943a909581",
+      "payload_tree_sha": "1b44c743dfa667b7519adfb46756f9914cd36a94",
+      "added_mapping_count": 26,
+      "mirrored_file_count": 89,
+      "post_1930_exact_parity_repairs": 5,
+      "source_identity_errors": 0,
+      "destination_object_drift": 0,
+      "method": "v2 destinations reuse exact source Git tree/blob objects; five inherited automation exact-parity files reuse current-main source blobs",
+      "scope": "transfer-v2 additions and identified post-1930 automation drift; full 130-mapping validator remains mandatory"
     }
   },
   "move_tag_contract": {
