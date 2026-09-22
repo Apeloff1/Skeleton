@@ -11,13 +11,16 @@
     "full_edge_case_matrix": "machine/ai_full_edge_case_matrix.json",
     "edge_priority_queue": "machine/ai_edge_case_priority_queue.json",
     "accountability": "machine/ai_build_accountability.json",
-    "human": "docs/plan/MASTER_BUILD_SEQUENCE.md"
+    "human": "docs/plan/MASTER_BUILD_SEQUENCE.md",
+    "ai_file_tree": "machine/ai_file_tree.json"
   },
   "scope_policy": {
     "breadth_frozen_at_volume": 420,
     "new_top_level_architecture_forbidden_without_adr": true,
     "wave_is_aggregate_view": true,
-    "wave_does_not_create_new_completion_authority": true
+    "wave_does_not_create_new_completion_authority": true,
+    "canonical_ai_file_tree": "skeleton/ai",
+    "ai_file_tree_migration_mode": "strangler_mirror_then_explicit_cutover"
   },
   "completion_semantics": {
     "mode": "derived_from_existing_accountability",
@@ -654,7 +657,8 @@
     "AIQ stages 0 through 7 are represented by at least one wave.",
     "Every critical/high edge obligation maps to at least one wave through work-package ownership.",
     "Wave completion is derived from existing signed accountability; no wave-local manual completion flag exists.",
-    "A later wave may prototype early only when direct dependencies permit, but promotion cannot bypass hard dependencies or evidence gates."
+    "A later wave may prototype early only when direct dependencies permit, but promotion cannot bypass hard dependencies or evidence gates.",
+    "Physical AI consolidation follows machine/ai_file_tree.json; compatibility mirrors remain drift-free until import ownership and CI paths are explicitly cut over."
   ],
   "build_packet_standard": {
     "required_fields": [
