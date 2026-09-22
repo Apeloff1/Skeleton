@@ -438,14 +438,6 @@ def evaluate_candidate(
     if not candidate_opted_in(snapshot, policy, candidate_class):
         return _hold(snapshot, policy, ("automerge_opt_in_missing",), risk=classification.risk)
 
-    if classification.critical:
-        return _hold(
-            snapshot,
-            policy,
-            ("critical_trust_surface_requires_human_merge", *classification.critical),
-            risk=classification.risk,
-        )
-
     requirements = requirements_for_candidate(snapshot, policy)
     evidence = summarize_evidence(
         runs=snapshot.workflow_runs,

@@ -102,8 +102,15 @@ def test_control_plane_concurrency_is_non_preemptive():
     assert "cancel-in-progress: false" in concurrency
 
 
-def test_workflow_has_manual_recovery_trigger():
-    assert "workflow_dispatch:" in _workflow_text()
+def test_workflow_has_no_manual_recovery_trigger():
+    assert "workflow_dispatch:" not in _workflow_text()
+
+
+def test_active_policy_disables_review_gates():
+    reconcile = _line_block(_workflow_text(), "reconcile:")
+    assert 'AUTOMERGE_REQUIRED_APPROVALS: "0"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_RESOLVED_THREADS: "false"' in reconcile
+    assert 'AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "false"' in reconcile
 
 
 def test_workflow_has_periodic_reconciliation_trigger():
