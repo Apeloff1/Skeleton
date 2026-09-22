@@ -23,7 +23,7 @@ import java.util.concurrent.Executors;
  *
  * <ul>
  *   <li>histogram summaries and exact-order quantiles for large batches;</li>
- *   <li>many independent summaries on a bounded CPU worker pool;</li>
+ *   <li>many independent summaries in one request;</li>
  *   <li>rolling anomaly scans using O(1) window updates.</li>
  * </ul>
  *
@@ -50,7 +50,6 @@ public final class AcceleratorMain {
     static final int MAX_SERIES = 4096;
     static final int MAX_ERROR_BYTES = 8192;
     static final int PARALLEL_SORT_THRESHOLD = 131_072;
-    static final int MAX_CPU_WORKERS = 32;
 
     private AcceleratorMain() {}
 
@@ -70,11 +69,7 @@ public final class AcceleratorMain {
     static void runService() throws IOException {
         var in = new DataInputStream(new BufferedInputStream(System.in, 1 << 20));
         var out = new DataOutputStream(new BufferedOutputStream(System.out, 1 << 20));
-        int workerCount = Math.max(
-            1,
-            Math.min(MAX_CPU_WORKERS, Runtime.getRuntime().availableProcessors())
-        );
-        try (var workers = Executors.newFixedThreadPool(workerCount)) {
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
             while (true) {
                 RequestHeader header;
                 try {
@@ -204,7 +199,6 @@ public final class AcceleratorMain {
             throw new ProtocolException("threshold must be in (0, 1000]");
         }
 
-        boolean includeCurrent = in.readBoolean();
         double[] history = readValues(in, windowSize);
         double[] incoming = readValues(in, MAX_VALUES);
         var window = new RollingWindow(windowSize);
@@ -214,13 +208,12 @@ public final class AcceleratorMain {
         var rows = new AnomalyRow[incoming.length];
         for (int i = 0; i < incoming.length; i++) {
             double value = incoming[i];
-            if (includeCurrent) window.add(value);
             boolean ready = window.size() >= 10;
             double mean = ready ? window.mean() : 0.0;
             double stdev = ready ? window.sampleStdDev() : 0.0;
             boolean anomaly = ready && stdev > 0.0 && Math.abs(value - mean) > threshold * stdev;
             rows[i] = new AnomalyRow(ready, anomaly, mean, stdev);
-            if (!includeCurrent) window.add(value);
+            window.add(value);
         }
 
         writeHeader(out, header.op(), STATUS_OK, header.requestId());
@@ -489,11 +482,7 @@ public final class AcceleratorMain {
         double stdev = window.sampleStdDev();
         check(Math.abs(1000.0 - mean) > 3.0 * stdev, "outlier detection");
 
-        int workerCount = Math.max(
-            1,
-            Math.min(MAX_CPU_WORKERS, Runtime.getRuntime().availableProcessors())
-        );
-        try (var workers = Executors.newFixedThreadPool(workerCount)) {
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
             var tasks = new ArrayList<Callable<Summary>>();
             for (int i = 0; i < 64; i++) {
                 final int offset = i;
@@ -501,7 +490,7 @@ public final class AcceleratorMain {
             }
             var futures = workers.invokeAll(tasks);
             for (int i = 0; i < futures.size(); i++) {
-                check(close(futures.get(i).get().mean(), i + 1.0), "parallel batch " + i);
+                check(close(futures.get(i).get().mean(), i + 1.0), "virtual-thread batch " + i);
             }
         }
 
