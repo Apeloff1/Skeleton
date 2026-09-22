@@ -146,12 +146,12 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **130 governed source -> destination mappings**
+- **134 governed source -> destination mappings**
 - **1,997 changed files under `skeleton/ai`** in this migration PR
 - package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
   sources have been promoted into `mappings`
-- **33 top-level/package/deployment/authority surfaces** are explicitly retained
+- **34 top-level/package/deployment/authority surfaces** are explicitly retained
   outside the AI tree instead of being silently ignored
 
 Every governed mapping now carries three machine-enforced tags:
@@ -176,10 +176,10 @@ The prepared units are divided into five deterministic batches:
   parity exceptions. Provider credentials, network ownership, or other
   authority-bearing implementation stays at the legacy owner until an explicit
   owner/import cutover is approved.
-- **B4-research-quarantine (29 mappings):** historical and model-internals
+- **B4-research-quarantine (39 mappings):** historical and model-internals
   research lineage. These units remain characterization-gated and are not
   production cutover candidates.
-- **B3-compat-convergence (2 mappings):** Turn and Telemetry compatibility
+- **B3-compat-convergence (22 mappings):** Turn and Telemetry compatibility
   mirrors that must merge into existing canonical owners rather than become
   independent production authorities.
 
@@ -226,10 +226,9 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **130 mappings**. The prior direct Git-object
-audit covered the first **78 mappings**. The remaining **26 current mappings**
-are explicitly carried in the pending refresh scope; stale references to the
-removed legacy project-manifest mirror have been dropped.
+The current governed set contains **134 mappings**. A completed full-object/parity
+audit covers the prior 130-mapping set. Four newly recovered `skeleton/acquired`
+units are exact Git-object mirrors and form the current incremental audit scope.
 
 The preparation ledger is now internally consistent:
 
@@ -237,12 +236,13 @@ The preparation ledger is now internally consistent:
 - 12 mappings in `B2-domain-build`
 - 7 mappings in `B3-owner-sensitive`
 - 22 mappings in `B3-compat-convergence`
-- 35 mappings in `B4-research-quarantine`
+- 39 mappings in `B4-research-quarantine`
 - 0 pending move assignments
-- 33 retained-outside classifications
+- 34 retained-outside classifications
 
-Fresh full-object/parity audit and CI evidence are still required before import
-inversion, source retirement, or any cutover-complete claim.
+Fresh incremental object/parity audit and CI evidence for the four acquired
+mappings are still required before import inversion, source retirement, or any
+cutover-complete claim.
 
 
 ## Compatibility convergence surfaces
@@ -370,3 +370,26 @@ Two focused validation repairs are staged and deliberately remain **pending CI e
 Commit `8f076935c39fead4fbccef61872290bc68d50566` normalized trailing whitespace in one quarantined Python mirror. The source/destination blob IDs therefore differ for that file, but the canonical validator's Python semantic-parity rule remains satisfied; this is not runtime drift or a custody promotion.
 
 Neither validation repair closes `BASE-FRONTEND-SSR-RAF-01` until current-head App Assembly succeeds through typecheck, reducer tests, and `expo export --platform web`. Independent verification and all source retirement remain blocked.
+
+
+## Remaining Skeleton acquired-source recovery
+
+The remaining characterized payload under `skeleton/acquired` is now preserved
+inside the governed AI tree as **research-quarantine lineage**:
+
+- `skeleton/acquired/gaming` -> `skeleton/ai/research/acquired/gaming`
+- `skeleton/acquired/gates` -> `skeleton/ai/research/acquired/gates`
+- `skeleton/acquired/genos` -> `skeleton/ai/research/acquired/genos`
+- `skeleton/acquired/ingest.py` -> `skeleton/ai/research/acquired/ingest.py`
+
+The destination trees/files reuse the original Git objects. Gaming primitives
+and reference metadata, the historical provider/model gate catalogue, Genos
+pulse/evaluation data, and the asset-ingest implementation are therefore
+preserved without content rewriting.
+
+This is deliberately not a production-authority move. The mixed
+`skeleton/acquired` root remains a provenance/quarantine owner, while the four
+new mappings carry `cutover:quarantine` and `B4-research-quarantine`.
+Promotion into runtime, provider, model, simulation, or artifact ownership
+requires characterization, focused tests/evaluation, explicit convergence into
+the canonical owner, and independent evidence.
