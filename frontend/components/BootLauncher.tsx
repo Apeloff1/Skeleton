@@ -203,12 +203,12 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         durable('warm_cache_read', {
           hit: !!cache,
           score: cache?.score,
-          backendOk: cache?.backendOk,
+          runtimeOk: cache?.runtimeOk ?? cache?.backendOk,
           age,
         });
         if (
           cache &&
-          cache.backendOk &&
+          (cache.runtimeOk ?? cache.backendOk ?? false) &&
           cache.score >= WARM_BOOT_MIN_SCORE &&
           age >= 0 &&
           age < WARM_BOOT_MAX_AGE_MS
@@ -312,7 +312,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         }
 
         // Do not overwrite a previously healthy warm cache with a local-only
-        // snapshot. Backend health is not known until phase 1 has run.
+        // snapshot. Whole-application runtime health is not known until phase 1.
         const elapsed = Date.now() - mountedAt;
         if (elapsed < minimumVisibleMs) {
           await new Promise(resolve => setTimeout(resolve, minimumVisibleMs - elapsed));
@@ -332,11 +332,12 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
         }
 
         runner.waitForPhase(2).then(finalSnapshot => {
-          const backendOk = finalSnapshot.stages.backend?.status === 'ok';
+          const runtimeOk = finalSnapshot.stages.app_runtime?.status === 'ok';
           writeBootCache({
             ts: Date.now(),
             score: finalSnapshot.bootScore,
-            backendOk,
+            runtimeOk,
+            backendOk: runtimeOk,
           }).catch(() => {});
           try {
             api.post('/api/telemetry/boot', {
@@ -345,7 +346,7 @@ export default function BootLauncher({ onReady, onEscalate }: Props) {
               elapsed_ms: finalSnapshot.elapsedMs,
               stages: finalSnapshot.stages,
               ok: finalSnapshot.ok,
-              backend_ok: backendOk,
+              runtime_ok: runtimeOk,
             }, { timeoutMs: 3000, retries: 0 }).catch(() => {});
           } catch {}
         }).catch(() => {});

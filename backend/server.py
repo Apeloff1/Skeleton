@@ -104,7 +104,7 @@ logging.basicConfig(
     stream=_sys.stdout,
     force=True,
 )
-logger = logging.getLogger("CodeDock.Nexus")
+logger = logging.getLogger("Skeleton.Backend")
 print(f"[BOOT] {_time.strftime('%H:%M:%S')} logger configured, env loaded", flush=True)
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3217,8 +3217,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete.")
 
 app = FastAPI(
-    title="CodeDock Quantum Nexus",
-    description="Beyond Bleeding-Edge Multi-Language Compiler Platform",
+    title="Skeleton Application API",
+    description="Application API for the assembled Skeleton product",
     version=SYSTEM_VERSION,
     lifespan=lifespan
 )

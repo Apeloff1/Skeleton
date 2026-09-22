@@ -13,7 +13,7 @@ and one operator command.
 | Service | Role | Public development endpoint |
 | --- | --- | --- |
 | `frontend` | Expo / browser interface | `http://localhost:3000` |
-| `backend` | Tutolage application API | `http://localhost:8001` |
+| `backend` | Skeleton application API | `http://localhost:8001` |
 | `skeleton` | Skeleton v16 engine API | `http://localhost:8010` |
 | `mongo` | durable state | local-only host binding |
 | `chroma` | optional vector store | `http://localhost:8000` with `--full` |
@@ -22,6 +22,13 @@ The backend and Skeleton API remain separate processes during consolidation.
 Combining them prematurely would create route, dependency, startup, and
 security regressions. They are one application at the operational boundary
 and can be progressively reconciled behind that boundary.
+
+The canonical displayed application name is **Skeleton** and the canonical
+application version is **16.0.0**, matching the Python package and engine API.
+Expo uses the same display name and application version. Existing mobile slug,
+URL scheme, bundle identifier, Android package identifier, iOS build number,
+and Android versionCode remain stable in this pass so identity convergence does
+not silently break installed-client upgrade compatibility.
 
 ## Setup and installer plane
 
@@ -100,9 +107,11 @@ secret file.
 ## Canonical commands
 
 ```bash
-# Inspect topology
+# Inspect topology and dependency-aware startup order
 python -m skeleton app status
 python -m skeleton app status --live
+python -m skeleton app plan
+python -m skeleton app plan --full
 
 # Structural repository validation
 python -m skeleton app check
@@ -128,13 +137,19 @@ python -m skeleton app down
 
 After startup, `python -m skeleton app smoke` probes the frontend, backend health endpoint, and Skeleton liveness endpoint as one application verdict. `app up` performs the same bounded readiness verification by default; `--no-verify` is reserved for diagnostics where Compose launch success is intentionally inspected separately.
 
+The launcher now derives startup order from manifest dependencies. `app plan` exposes the dependency layers, automatically closes over transitive dependencies, and rejects cycles. `app up` consumes the same plan, so the inspected topology and the executed topology cannot silently diverge.
+
 The CLI never uses a shell to construct Docker commands. Service names are
 validated against the manifest before they are passed to Compose.
 
 ## Runtime modes
 
 The canonical Compose file runs application code from built images. Source
-bind-mounts are isolated in `docker-compose.hot.yml`. Metro/Expo development\nports are isolated there as well, so the production topology exposes only the\nbrowser-facing frontend port.
+bind-mounts are isolated in `docker-compose.hot.yml`. Metro/Expo development
+ports are isolated there as well, so the production topology exposes only the
+browser-facing frontend port. The frontend starts only after both backend and
+Skeleton engine health checks pass; Mongo remains a health-gated dependency of
+the API services.
 
 ```bash
 # Built development images, verified after startup
@@ -165,6 +180,24 @@ Optional provider/payment/seal values remain optional until the corresponding
 feature is used. `app up` fails closed when required runtime values are empty
 or obvious placeholders.
 
+## Public application bootstrap
+
+The backend exposes `GET /api/app/bootstrap` as the sanitized runtime contract
+for browser and native clients. Its payload is built directly from
+`skeleton/app/manifest.json` and includes the canonical application identity,
+service roles, dependency layers, profile membership, and declared health
+paths. It intentionally excludes runtime environment names/values, container
+ports, internal URLs, and process entrypoints.
+
+The product shell fetches this contract before probing runtime health. If the
+backend itself is unreachable, it falls back to the last static health-path
+contract so the engine can still be diagnosed independently. The UI surfaces
+whether health came from `bootstrap` or `fallback` metadata.
+
+Legacy `/api/health` fields remain compatibility-stable; canonical Skeleton
+identity is attached there as `canonical_application` while new clients use
+`/api/app/bootstrap` as the source of truth.
+
 ## Frontend endpoint boundary
 
 `frontend/utils/apiBase.ts` is the single endpoint resolver for browser and
@@ -180,6 +213,12 @@ The engine liveness contract is `GET /api/v1/health/live`; frontend health
 checks must not invent a shorter `/health` path on the Skeleton service.
 
 ## Production web ingress
+
+Ingress ownership is declared in the application manifest: the frontend owns
+`/`, the application backend owns `/api`, and the Skeleton engine owns
+`/api/v1`. Health paths must remain inside their owning prefix. The assembly
+audit derives Nginx location/upstream expectations from this metadata and also
+requires more-specific prefixes to appear before broader prefixes.
 
 The production Nginx image is the browser-facing ingress for the assembled app.
 When no explicit public endpoint override is baked into the Expo export,
@@ -201,7 +240,9 @@ because the Expo development server is not the production reverse proxy.
    service DNS names are internal implementation details and must not be
    embedded into the exported frontend bundle.
 4. `python -m skeleton app check` is the minimum structural regression gate
-   for assembly work.
-5. Existing subsystem PRs should reconcile into
-   `integration/app-consolidation` rather than create a competing assembly
-   trunk.
+   for assembly work; it includes the manifest dependency-graph verdict.
+5. The manifest and Docker Compose must declare the same service set, and the
+   Expo display name must match the manifest application name.
+6. Existing subsystem work should reconcile through bounded integration
+   branches based on the latest assembled `main`; do not revive the superseded
+   mega-diff consolidation trunk or create a competing application root.
