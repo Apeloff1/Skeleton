@@ -15,6 +15,7 @@ INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
 DEPTH_000_040 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_000_040.md"
 DEPTH_041_080 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_041_080.md"
+DEPTH_081_120 = ROOT / "docs" / "plan" / "VOLUME_DEPTH_081_120.md"
 
 EXPECTED_FIRST = 0
 EXPECTED_LAST = 420
@@ -116,7 +117,7 @@ def validate(data: dict) -> list[str]:
                     f"volume {volume.get('id', '?')} status {status} requires non-empty {required_field}"
                 )
 
-    for path in (INDEX, PLAN, DEPTH_000_040, DEPTH_041_080):
+    for path in (INDEX, PLAN, DEPTH_000_040, DEPTH_041_080, DEPTH_081_120):
         if not path.is_file():
             errors.append(f"missing document: {path.relative_to(ROOT)}")
 
@@ -167,6 +168,24 @@ def validate(data: dict) -> list[str]:
                         if not isinstance(value, list) or not value:
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
+        dp3 = next((x for x in depth_passes if isinstance(x, dict) and x.get("id") == "DP-081-120"), None)
+        if not isinstance(dp3, dict):
+            errors.append("missing DP-081-120 depth pass")
+        else:
+            if dp3.get("volume_range") != [81, 120]:
+                errors.append("DP-081-120 volume_range must equal [81, 120]")
+            fields3 = dp3.get("required_nonempty_fields")
+            if not isinstance(fields3, list) or not fields3:
+                errors.append("DP-081-120 required_nonempty_fields must be non-empty")
+            else:
+                for volume in volumes[81:121]:
+                    if volume.get("depth_pass") != "DP-081-120":
+                        errors.append(f"{volume.get('key', '?')}: missing DP-081-120 marker")
+                    for field in fields3:
+                        value = volume.get(field)
+                        if not isinstance(value, list) or not value:
+                            errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
+
     if DEPTH_000_040.is_file():
         depth_text = DEPTH_000_040.read_text(encoding="utf-8")
         for marker in ("DP-000-040", "VOL-000", "VOL-040", "Remaining work after DP-000-040"):
@@ -176,6 +195,12 @@ def validate(data: dict) -> list[str]:
     if DEPTH_041_080.is_file():
         depth_text = DEPTH_041_080.read_text(encoding="utf-8")
         for marker in ("DP-041-080", "VOL-041", "VOL-080", "Remaining work after DP-041-080"):
+            if marker not in depth_text:
+                errors.append(f"sequential volume depth doc missing marker: {marker}")
+
+    if DEPTH_081_120.is_file():
+        depth_text = DEPTH_081_120.read_text(encoding="utf-8")
+        for marker in ("DP-081-120", "VOL-081", "VOL-120", "Remaining work after DP-081-120"):
             if marker not in depth_text:
                 errors.append(f"sequential volume depth doc missing marker: {marker}")
 
