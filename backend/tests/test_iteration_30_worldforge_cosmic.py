@@ -12,14 +12,15 @@ Covers:
   - Vault bridge: /sources, /from-game (save=true → vault asset tagged WG), /worlds, /worlds/{id}
   - AI lore for cosmic scale (LIVE LLM, ~5-15s, single call)
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import uuid
 import pytest
 import requests
 from pymongo import MongoClient
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL",
                           "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")

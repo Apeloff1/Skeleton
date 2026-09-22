@@ -16,14 +16,15 @@ Scope (backend-only):
      - GET /api/gameforge/architecture → 9/9 live
      - GET /api/gameforge/rooms → total == 1000
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (
     os.environ.get("EXPO_BACKEND_URL")
     or os.environ.get("EXPO_PUBLIC_BACKEND_URL")

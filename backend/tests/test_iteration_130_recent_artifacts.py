@@ -1,12 +1,13 @@
 """Iteration 130 — Recent Artifacts strip + /api/binary/recent endpoint.
 Validates the new endpoint that powers the Hub's RecentArtifactsStrip,
 plus a light regression smoke on adjacent binary endpoints."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")
 
 

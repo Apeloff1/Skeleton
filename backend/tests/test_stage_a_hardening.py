@@ -7,6 +7,9 @@ Covers:
   A4 — /api/health/registry ok count + groups classification.
   REGRESSION — coverage/selftest, prood/readiness, lafs/recall, omega roles/sessions.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import sys
 import time
@@ -16,8 +19,6 @@ import subprocess
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 
 # Ensure the backend module tree is importable for A2

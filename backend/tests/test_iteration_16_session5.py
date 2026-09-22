@@ -1,11 +1,12 @@
 """Session-5 deltas: reactions → trending velocity / ranking, /most-loved rail,
 reactions_total in leaderboard."""
-import os
-import requests
-
 import pytest
 
 pytestmark = pytest.mark.live_service
+
+import os
+import requests
+
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
 if not BASE:
     # fallback to frontend public URL key

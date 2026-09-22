@@ -8,13 +8,14 @@ Covers:
 - POST /api/multiplayer/scaffold — generates 5 files w/ content; respects model/max_players
 - POST → GET /api/multiplayer/scaffold/{pid} round-trip
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 
 

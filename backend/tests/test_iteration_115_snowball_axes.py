@@ -8,15 +8,16 @@ Tests the genuine, hand-authored axis catalog at /api/galaxy-studio/axes:
   * regression: galaxy-studio/systems/catalog still works, 150 prefixed routers
   * code-level: item_foundry & build_config honour the new axes
 """
+import pytest
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
 import sys
 import requests
 
-import pytest
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get(
     "EXPO_BACKEND_URL",
     os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001"),

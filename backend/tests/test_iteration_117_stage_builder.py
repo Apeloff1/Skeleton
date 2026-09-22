@@ -5,6 +5,9 @@ Validates:
  * add → list → summary → build → crosswire to 14-gate engine → delete → reorder → update
  * Iteration-118 regression: text-gamefile generators (count==10) + quest_from_text
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -14,8 +17,6 @@ import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")
             or os.environ.get("EXPO_BACKEND_URL")
             or "http://localhost:8001").rstrip("/")

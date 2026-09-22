@@ -10,14 +10,15 @@ Covers:
   • Regression: construct snowball/forge still 200 + universal>0; universal
     assets DO NOT leak into /constructs/list or /materials/list.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL") or os.environ.get(
     "EXPO_PUBLIC_BACKEND_URL", "https://player-retention.preview.emergentagent.com"
 ).rstrip("/")

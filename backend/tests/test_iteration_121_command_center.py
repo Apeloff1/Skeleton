@@ -10,14 +10,15 @@ Validates:
     overall_score, passed, 14 stages, aaa_passed bool (gates crosswired
     to gamefile target).
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or \
     "https://player-retention.preview.emergentagent.com"
 

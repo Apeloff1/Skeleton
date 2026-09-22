@@ -13,6 +13,9 @@ Covers:
 Note: LLM forges (procedural/launch/refine/qa) can take 30-90s each. The test
 sequentially polls a single procedural job up to ~3 min.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -20,8 +23,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_BACKEND_URL") or "http://localhost:8001").rstrip("/")
 SEED_PID = "d02790d6d8174ff59bf7005221cd7609"  # remix · arcade · most artifacts present
 

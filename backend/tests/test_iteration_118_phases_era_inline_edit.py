@@ -1,14 +1,15 @@
 """Iteration 118 — era file_count_standard, /snowball/{pid}/phases crosswire,
 era scaling on the 100-phase build, /stages inline edit + build."""
+import pytest
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
 import uuid
 import requests
 
-import pytest
-
-pytestmark = pytest.mark.live_service
 BASE = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")
         or os.environ.get("EXPO_BACKEND_URL")
         or "https://player-retention.preview.emergentagent.com").rstrip("/")

@@ -2,13 +2,14 @@
 Session 4 deltas — Leaderboard search/sort, Emoji reactions, Daily spotlight,
 Collection share card.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 API = f"{BASE}/api"
 

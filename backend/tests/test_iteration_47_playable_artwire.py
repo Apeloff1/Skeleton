@@ -14,6 +14,9 @@ per the agent-to-agent note. Instead we verify the wiring is correct against a
 pre-applied game (d02790d6d8174ff59bf7005221cd7609) and we test the negative
 path on a game with no linked assets.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -22,8 +25,6 @@ import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or \
            os.environ.get("EXPO_BACKEND_URL", "").rstrip("/")
 

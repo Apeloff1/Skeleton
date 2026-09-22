@@ -2,14 +2,15 @@
 VII.5 Governance v2 — creator appeal lifecycle + report rate-limit.
 Backend regression for iteration 41. Self-contained (no fixtures from conftest needed).
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 GOV = f"{BASE_URL}/api/governance"
 PLAY = f"{BASE_URL}/api/playable"

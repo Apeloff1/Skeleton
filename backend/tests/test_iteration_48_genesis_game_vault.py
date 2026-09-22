@@ -8,11 +8,12 @@ Validates:
  - Regressions: /styles still 8/8/6; /list returns {assets,count}; /{aid}.png 200; apply-assets/async ⇒ job_id;
    /api/health/registry ok=140
 """
-import os, requests, pytest
-
 import pytest
 
 pytestmark = pytest.mark.live_service
+
+import os, requests, pytest
+
 BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/") if "EXPO_PUBLIC_BACKEND_URL" in os.environ else \
        "https://gemini-game-craft.preview.emergentagent.com"
 PID = "d02790d6d8174ff59bf7005221cd7609"

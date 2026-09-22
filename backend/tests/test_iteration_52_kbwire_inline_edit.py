@@ -3,13 +3,14 @@ Iteration 52 — KB inline edit (PUT /api/pipeline/{pid}/kb/{artifact}) +
                 Apply KB to game (POST /api/playable/{pid}/apply-kb/async)
                 + regressions.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', '').rstrip('/') or \
            'https://gemini-game-craft.preview.emergentagent.com'
 PID = "d02790d6d8174ff59bf7005221cd7609"

@@ -6,14 +6,15 @@ which were migrated off the materialised _CAT_BY_KEY dict to the new
 _VirtualCatIndex (.get / [] / in).
 """
 
+pytestmark = pytest.mark.live_service
+
+
 # ── module: env + base url ─────────────────────────────────────────────────
 import os
 import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
 if not BASE_URL:
     BASE_URL = "https://player-retention.preview.emergentagent.com"

@@ -10,6 +10,9 @@ Review-request scope (kept tight):
   * Vault zip: POST /vault/zip/{bid} → 200 (no 500), GET download_url → 200
   * Quick catalog sanity: /manifest /genres /eras /watchdog/health /my-builds
 """
+
+pytestmark = pytest.mark.live_service
+
 import io
 import os
 import statistics
@@ -19,8 +22,6 @@ import zipfile
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 # fall back: prefer local socket for tight time-boxing
 BASE_LOCAL = "http://localhost:8001"

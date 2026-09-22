@@ -19,13 +19,14 @@ Regression: /api/playable/leaderboard, /api/marketplace/listings still 200.
 
 Cleanup: any report we create + any restriction we apply is restored on teardown.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import uuid
 import requests
 import pytest
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get(
     "EXPO_PUBLIC_BACKEND_URL",
     "https://gemini-game-craft.preview.emergentagent.com",

@@ -7,6 +7,9 @@ Covers the live CI-pipeline-style streaming console wiring:
 - Sync /package still returns full 7-stage result
 - /play HTML and /game.zip downloads after a build
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -17,8 +20,6 @@ import io
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or \
            os.environ.get("EXPO_BACKEND_URL", "").rstrip("/") or \
            "http://localhost:8001"

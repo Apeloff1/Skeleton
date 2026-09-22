@@ -6,13 +6,14 @@ Verifies all endpoints listed in the iteration 99 review request:
 
 Targets the PUBLIC preview backend (EXPO_PUBLIC_BACKEND_URL).
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get(
     "EXPO_PUBLIC_BACKEND_URL",
     "https://player-retention.preview.emergentagent.com",

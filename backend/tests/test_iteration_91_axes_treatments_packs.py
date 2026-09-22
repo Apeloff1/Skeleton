@@ -7,6 +7,9 @@ Validates:
 - /forge/compose returns by_region with treatments/accents
 - regression: plain compose works
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -14,8 +17,6 @@ import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")
             or os.environ.get("EXPO_BACKEND_URL")
             or "https://player-retention.preview.emergentagent.com").rstrip("/")

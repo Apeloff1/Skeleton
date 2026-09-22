@@ -1,4 +1,7 @@
 """Iteration 151: Jeeves free-tier cascade + multi-format composer + chat + idle_augment."""
+
+pytestmark = pytest.mark.live_service
+
 import base64
 import io
 import os
@@ -7,8 +10,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/") or "http://localhost:8001"
 TIMEOUT = 60
 

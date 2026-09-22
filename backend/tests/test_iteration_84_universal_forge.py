@@ -12,6 +12,9 @@ Covers:
   - Regression: constructs/list, materials/list, constructs/presets, constructs/snowball/forge
     still work AND universal-forge assets do not pollute construct/material lists.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -19,8 +22,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")
             or os.environ.get("EXPO_BACKEND_URL")
             or "http://localhost:8001").rstrip("/")

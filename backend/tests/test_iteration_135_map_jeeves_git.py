@@ -3,12 +3,13 @@ Iteration 135 — CNS Map surface + Jeeves self-training + Git readiness.
 Covers: /api/gameforge/activate, /map/*, /studio/jeeves/*, /studio/git/*,
 questionnaire/steps/forge/deploy build flow.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE_URL}/api/gameforge"
 

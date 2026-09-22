@@ -12,12 +12,13 @@ Runs against the public URL from frontend/.env (EXPO_PUBLIC_BACKEND_URL) — sam
 that the deployed app will hit.
 """
 
+pytestmark = pytest.mark.live_service
+
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 # Prefer the public preview URL, fall back to localhost only for local dev.
 BASE_URL = (
     os.environ.get("EXPO_BACKEND_URL")
