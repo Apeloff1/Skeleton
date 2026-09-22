@@ -36,9 +36,9 @@ Every proposed change is:
 1. generated outside `main`;
 2. restricted to `skeleton/`, `tests/`, or `docs/`;
 3. prevented from touching workflows, deployment files, secrets, or env files;
-4. syntax-checked without executing model-generated code on the privileged bot runner;
+4. checked with a fixed allowlist of safe local test commands;
 5. pushed to an isolated bot branch; and
-6. opened as a normal pull request, where ordinary unprivileged PR CI executes the repository's tests and security gates.
+6. opened as a normal pull request so the repository's existing CI and security gates remain authoritative.
 
 The bots cannot merge their own work or disable/weaken repository gates.
 

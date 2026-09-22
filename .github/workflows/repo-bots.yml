@@ -13,43 +13,49 @@ on:
     - cron: "17 * * * *"
 
 concurrency:
-  group: repo-bots-${{ github.ref }}
+  group: repo-bots-${{ github.repository }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  actions: read
+  contents: write
+  issues: read
+  pull-requests: write
 
 jobs:
   bot:
-    permissions:
-      actions: read
-      contents: write
-      issues: read
-      pull-requests: write
-    name: ${{ matrix.bot }}
+    name: Bounded repository maintenance
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        bot: [triage, ci, security, cleanup]
+    timeout-minutes: 30
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      MODEL_API_URL: ${{ vars.MODEL_API_URL }}
+      MODEL_NAME: ${{ vars.MODEL_NAME }}
+      MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+      PYTHONPATH: ${{ github.workspace }}
+      BOT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.bot || 'all' }}
     steps:
-      - name: Checkout
-        if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
+      - name: Checkout trusted default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
+      - name: Restore bot health state
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .skeleton-bot-state.json
+          key: skeleton-bot-state-${{ github.repository_id }}-${{ github.run_id }}
+          restore-keys: |
+            skeleton-bot-state-${{ github.repository_id }}-
       - name: Setup Python
-        if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11.16"
-      - name: Run bounded repository bot
-        if: github.event_name == 'schedule' || github.event.inputs.bot == 'all' || github.event.inputs.bot == matrix.bot
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          MODEL_API_URL: ${{ vars.MODEL_API_URL }}
-          MODEL_NAME: ${{ vars.MODEL_NAME }}
-          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
-          PYTHONPATH: ${{ github.workspace }}
-        run: python -m skeleton.automation.repo_bots --mode "${{ matrix.bot }}"
+      - name: Run bounded repository bots
+        run: python -m skeleton.automation.repo_bots --mode "$BOT_MODE"
+      - name: Persist bot health state
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .skeleton-bot-state.json
+          key: skeleton-bot-state-${{ github.repository_id }}-${{ github.run_id }}
