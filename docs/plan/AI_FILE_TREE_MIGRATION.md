@@ -146,7 +146,7 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **130 governed source -> destination mappings**
+- **150 governed source -> destination mappings**
 - **1,997 changed files under `skeleton/ai`** in this migration PR
 - package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
@@ -226,7 +226,7 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **130 mappings**. The prior direct Git-object
+The current governed set contains **150 mappings**. The prior direct Git-object
 audit covered the first **78 mappings**. The remaining **26 current mappings**
 are explicitly carried in the pending refresh scope; stale references to the
 removed legacy project-manifest mirror have been dropped.
@@ -236,8 +236,8 @@ The preparation ledger is now internally consistent:
 - 54 mappings in `B1-core-runtime`
 - 12 mappings in `B2-domain-build`
 - 7 mappings in `B3-owner-sensitive`
-- 22 mappings in `B3-compat-convergence`
-- 35 mappings in `B4-research-quarantine`
+- 28 mappings in `B3-compat-convergence`
+- 49 mappings in `B4-research-quarantine`
 - 0 pending move assignments
 - 33 retained-outside classifications
 
@@ -305,8 +305,8 @@ After #1930 merged, current `main` changed five exact-parity files under `skelet
 - B1-core-runtime: 54
 - B2-domain-build: 12
 - B3-owner-sensitive: 7
-- B3-compat-convergence: 22
-- B4-research-quarantine: 35
+- B3-compat-convergence: 28
+- B4-research-quarantine: 49
 
 Independent verification remains unsigned. Fresh full 130-mapping object/parity audit, the canonical file-tree validator, affected-domain validation, and required CI remain mandatory before any cutover or source retirement.
 
@@ -370,3 +370,23 @@ Two focused validation repairs are staged and deliberately remain **pending CI e
 Commit `8f076935c39fead4fbccef61872290bc68d50566` normalized trailing whitespace in one quarantined Python mirror. The source/destination blob IDs therefore differ for that file, but the canonical validator's Python semantic-parity rule remains satisfied; this is not runtime drift or a custody promotion.
 
 Neither validation repair closes `BASE-FRONTEND-SSR-RAF-01` until current-head App Assembly succeeds through typecheck, reducer tests, and `expo export --platform web`. Independent verification and all source retirement remain blocked.
+
+
+## Transfer v2 Wave 2B — deep legacy AI recovery
+
+Wave 2B extends the validated transfer-v2 line from **130 to 150 governed mappings** using **20 exact current-source Git objects**.
+
+Research-quarantine additions under `skeleton/ai/research/legacy/gameforge`: `agents`, `jeeves`, `workflow`, `runtime`, `omega`, `personal/diaries`, `personal/logs`, `forges`, `knowledge`, `skills`, `navigation`, `bootstrap`, `orchestrator`, and `indexing`.
+
+Compatibility-convergence additions under `skeleton/ai/compat/backend_core`: `agent_ledger.py`, `agent_mesh.py`, `collection_agents.py`, `deployment_planner.py`, `director_agent.py`, and `playable_simulation.py`.
+
+These are staged migration inputs only. Research trees remain quarantine evidence; backend-core mirrors must converge into existing canonical owners before legacy retirement. No provider, memory, retrieval, planning, execution, simulation, or orchestration authority is created by relocation.
+
+Updated batch counts:
+- B1-core-runtime: 54
+- B2-domain-build: 12
+- B3-owner-sensitive: 7
+- B3-compat-convergence: 28
+- B4-research-quarantine: 49
+
+The 130-map implementation attestation is invalidated by this extension. A new attestation must bind to the actual 150-map payload SHA. Independent verification, full 150-map object/parity validation, canonical CI/App Assembly, and owner convergence remain mandatory.

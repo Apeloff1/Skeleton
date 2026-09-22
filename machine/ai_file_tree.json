@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.5.0",
+  "tree_version": "1.6.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -4086,6 +4086,445 @@
       ],
       "move_batch": "B3-compat-convergence",
       "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-AGENTS",
+      "source": "backend/gameforge/agents",
+      "destination": "skeleton/ai/research/legacy/gameforge/agents",
+      "kind": "tree",
+      "source_git_object_sha": "4322b9b84e3aeeb573ba2b3fc89a5274f5e7eb81",
+      "role": "Legacy GameForge agent spawning, reputation, role-binding, and coordination code retained for characterization.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-JEEVES",
+      "source": "backend/gameforge/jeeves",
+      "destination": "skeleton/ai/research/legacy/gameforge/jeeves",
+      "kind": "tree",
+      "source_git_object_sha": "8fe11234ae7b10b0b16c07531410770e793f1e02",
+      "role": "Legacy GameForge Jeeves implementation/status lineage retained as non-authoritative evidence.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-WORKFLOW",
+      "source": "backend/gameforge/workflow",
+      "destination": "skeleton/ai/research/legacy/gameforge/workflow",
+      "kind": "tree",
+      "source_git_object_sha": "f316087d57199d0341539537684c71c4d8d3f30d",
+      "role": "Legacy autonomous/project workflow orchestration retained for selective capability mining.",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-RUNTIME",
+      "source": "backend/gameforge/runtime",
+      "destination": "skeleton/ai/research/legacy/gameforge/runtime",
+      "kind": "tree",
+      "source_git_object_sha": "0d23c9de6ad37270942511c7874f1a601a86ebfb",
+      "role": "Legacy agent/generation runtime surfaces retained for comparison against canonical runtime owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-OMEGA",
+      "source": "backend/gameforge/omega",
+      "destination": "skeleton/ai/research/legacy/gameforge/omega",
+      "kind": "tree",
+      "source_git_object_sha": "8837635eaee04f3112f319342af58b9426a912ce",
+      "role": "Legacy conductor/integration/memory orchestration lineage retained for evaluation only.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-PERSONAL-DIARIES",
+      "source": "backend/gameforge/personal/diaries",
+      "destination": "skeleton/ai/research/legacy/gameforge/personal/diaries",
+      "kind": "tree",
+      "source_git_object_sha": "76582974b541f84672c912887ba2c1f003d6f282",
+      "role": "Legacy diary/vector-memory surfaces retained as research provenance.",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-PERSONAL-LOGS",
+      "source": "backend/gameforge/personal/logs",
+      "destination": "skeleton/ai/research/legacy/gameforge/personal/logs",
+      "kind": "tree",
+      "source_git_object_sha": "41e4813e9e053add5c9218aa36661026d08de774",
+      "role": "Legacy personal logging/insight surfaces retained for characterization.",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-FORGES",
+      "source": "backend/gameforge/forges",
+      "destination": "skeleton/ai/research/legacy/gameforge/forges",
+      "kind": "tree",
+      "source_git_object_sha": "347f32628f7a38950cc1f7724189fc3d89d441a4",
+      "role": "Legacy GameForge forge implementations retained as historical candidates, not canonical Forge authority.",
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-KNOWLEDGE",
+      "source": "backend/gameforge/knowledge",
+      "destination": "skeleton/ai/research/legacy/gameforge/knowledge",
+      "kind": "tree",
+      "source_git_object_sha": "4f877b37278f8951e62f9028e91351cbc39728f8",
+      "role": "Legacy knowledge/free-API ingestion retained as untrusted research evidence.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-SKILLS",
+      "source": "backend/gameforge/skills",
+      "destination": "skeleton/ai/research/legacy/gameforge/skills",
+      "kind": "tree",
+      "source_git_object_sha": "3e678dfd05c1c8a8a3f48ba0e0c6d4c4c67af2d9",
+      "role": "Legacy skill-bank/tool conversion material retained for characterization.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-NAVIGATION",
+      "source": "backend/gameforge/navigation",
+      "destination": "skeleton/ai/research/legacy/gameforge/navigation",
+      "kind": "tree",
+      "source_git_object_sha": "6313fd757be837fd50300d0ebcf31603f01be814",
+      "role": "Legacy agentic navigation and knowledge-fog prototypes retained for evaluation.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-BOOTSTRAP",
+      "source": "backend/gameforge/bootstrap",
+      "destination": "skeleton/ai/research/legacy/gameforge/bootstrap",
+      "kind": "tree",
+      "source_git_object_sha": "fdcd00bbbbc2256b316a29ab43accc3b757c7087",
+      "role": "Legacy agent/bootstrap activation code retained as research lineage only.",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-ORCHESTRATOR",
+      "source": "backend/gameforge/orchestrator",
+      "destination": "skeleton/ai/research/legacy/gameforge/orchestrator",
+      "kind": "tree",
+      "source_git_object_sha": "1ee32f6fcf128b7d3d71ca21ea1ac4046d0402d6",
+      "role": "Legacy CNS execution orchestrator retained for convergence research.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-GAMEFORGE-INDEXING",
+      "source": "backend/gameforge/indexing",
+      "destination": "skeleton/ai/research/legacy/gameforge/indexing",
+      "kind": "tree",
+      "source_git_object_sha": "6b0ef2448d9489ee99e419a89592d588f88398d4",
+      "role": "Legacy indexing/cache/continuous-update prototypes retained for evaluation.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2B-BACKEND-CORE-AGENT-LEDGER",
+      "source": "backend/core/agent_ledger.py",
+      "destination": "skeleton/ai/compat/backend_core/agent_ledger.py",
+      "kind": "file",
+      "source_git_object_sha": "9409bbbdbee19dd40803d5c8a9bdb237e599127a",
+      "role": "Legacy agent ledger staged for convergence into canonical state/agent ownership.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2B-BACKEND-CORE-AGENT-MESH",
+      "source": "backend/core/agent_mesh.py",
+      "destination": "skeleton/ai/compat/backend_core/agent_mesh.py",
+      "kind": "file",
+      "source_git_object_sha": "e7b9877b13177ad70820894686fb23fdb77daa25",
+      "role": "Legacy agent mesh staged for convergence into canonical swarm/orchestration ownership.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W15"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2B-BACKEND-CORE-COLLECTION-AGENTS",
+      "source": "backend/core/collection_agents.py",
+      "destination": "skeleton/ai/compat/backend_core/collection_agents.py",
+      "kind": "file",
+      "source_git_object_sha": "da5ade1981f33f9cbbcd5656b42b4e1aeee37a59",
+      "role": "Legacy collection-agent implementation staged for convergence into canonical agent ownership.",
+      "work_package_refs": [
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2B-BACKEND-CORE-DEPLOYMENT-PLANNER",
+      "source": "backend/core/deployment_planner.py",
+      "destination": "skeleton/ai/compat/backend_core/deployment_planner.py",
+      "kind": "file",
+      "source_git_object_sha": "a0f24779fa73f03cf733c2aa945e14945f0bf1ab",
+      "role": "Legacy deployment planner staged as a convergence input without changing release/deployment authority.",
+      "work_package_refs": [
+        "WP-W15"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2B-BACKEND-CORE-DIRECTOR-AGENT",
+      "source": "backend/core/director_agent.py",
+      "destination": "skeleton/ai/compat/backend_core/director_agent.py",
+      "kind": "file",
+      "source_git_object_sha": "b412863985771612b52ba4950c920b37cb9bac0b",
+      "role": "Legacy director agent staged for convergence into canonical planning/orchestration ownership.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2B-BACKEND-CORE-PLAYABLE-SIMULATION",
+      "source": "backend/core/playable_simulation.py",
+      "destination": "skeleton/ai/compat/backend_core/playable_simulation.py",
+      "kind": "file",
+      "source_git_object_sha": "771d2d7c3c70f500a524e92a3d88b7419a7de0e9",
+      "role": "Legacy playable simulation staged for convergence into canonical simulation/world-model ownership.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
     }
   ],
   "ci_enforcement": {
@@ -4098,22 +4537,15 @@
     ]
   },
   "implementation_signoff": {
-    "signed": true,
-    "signer_id": "github:Apeloff1",
-    "signer_type": "service",
+    "signed": false,
+    "signer_id": null,
+    "signer_type": null,
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T15:31:00Z",
-    "git_sha": "fab8888ce760274984b52cbb50733f943a909581",
-    "evidence_refs": [
-      "git:fab8888ce760274984b52cbb50733f943a909581",
-      "git-tree:1b44c743dfa667b7519adfb46756f9914cd36a94",
-      "object-audit:transfer-v2-26-mappings-89-files-exact-git-object-reuse",
-      "parity-repair:post-1930-automation-five-exact-mirrors",
-      "base:main@392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
-      "pr:1937"
-    ],
-    "statement": "Transfer-v2 implementation is identity-bound to GitHub user Apeloff1 at the cited reconciled payload SHA. The payload adds six quarantined legacy GameForge AI trees and twenty backend-core compatibility-convergence mappings using exact source Git objects, and refreshes five non-exception automation mirrors that drifted after PR #1930 merged. This attestation records staged-mirror preparation only; canonical-owner convergence, import inversion, source retirement, full 130-mapping parity validation, green CI, AIQ/work-package completion, and independent verification remain separately gated.",
-    "signature_method": "github_identity"
+    "signed_at_utc": null,
+    "git_sha": null,
+    "evidence_refs": [],
+    "statement": "Pending identity-bound implementation attestation for transfer-v2 Wave 2B after the 150-mapping payload commit is created and inspected.",
+    "signature_method": null
   },
   "verification_signoff": {
     "signed": false,
@@ -4226,7 +4658,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_semantic_parity_green_ssr_raf_repair_pending_ci_and_independent_verification",
+  "validation_state": "150_mapping_transfer_v2_wave_2b_payload_pending_attestation_fresh_ci_full_object_audit",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4577,9 +5009,30 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "Transfer-v2 remains structurally and semantically parity-clean across 130 mappings. After the full audit, commit 8f076935c39fead4fbccef61872290bc68d50566 normalized trailing whitespace in one quarantined Python mirror only; source and destination remain AST-equivalent under the canonical Python semantic-parity policy. No runtime/custody authority changed.",
-    "current_mapping_count": 130,
-    "audit_scope_status": "full_130_mapping_object_and_parity_audit_current",
-    "pending_mapping_ids": [],
+    "current_mapping_count": 150,
+    "audit_scope_status": "validated_130_mapping_line_extended_to_150_requires_full_refresh",
+    "pending_mapping_ids": [
+      "AIFT-V2B-GAMEFORGE-AGENTS",
+      "AIFT-V2B-GAMEFORGE-JEEVES",
+      "AIFT-V2B-GAMEFORGE-WORKFLOW",
+      "AIFT-V2B-GAMEFORGE-RUNTIME",
+      "AIFT-V2B-GAMEFORGE-OMEGA",
+      "AIFT-V2B-GAMEFORGE-PERSONAL-DIARIES",
+      "AIFT-V2B-GAMEFORGE-PERSONAL-LOGS",
+      "AIFT-V2B-GAMEFORGE-FORGES",
+      "AIFT-V2B-GAMEFORGE-KNOWLEDGE",
+      "AIFT-V2B-GAMEFORGE-SKILLS",
+      "AIFT-V2B-GAMEFORGE-NAVIGATION",
+      "AIFT-V2B-GAMEFORGE-BOOTSTRAP",
+      "AIFT-V2B-GAMEFORGE-ORCHESTRATOR",
+      "AIFT-V2B-GAMEFORGE-INDEXING",
+      "AIFT-V2B-BACKEND-CORE-AGENT-LEDGER",
+      "AIFT-V2B-BACKEND-CORE-AGENT-MESH",
+      "AIFT-V2B-BACKEND-CORE-COLLECTION-AGENTS",
+      "AIFT-V2B-BACKEND-CORE-DEPLOYMENT-PLANNER",
+      "AIFT-V2B-BACKEND-CORE-DIRECTOR-AGENT",
+      "AIFT-V2B-BACKEND-CORE-PLAYABLE-SIMULATION"
+    ],
     "post_1930_parity_repair": {
       "base_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
       "mapping_id": "AIFT-AUTOMATION",
@@ -4626,6 +5079,13 @@
       "destination_only": true,
       "semantic_parity_required": true,
       "byte_identity_required": false
+    },
+    "transfer_v2_wave_2b": {
+      "added_mapping_count": 20,
+      "source_identity_errors": 0,
+      "destination_preexistence_errors": 0,
+      "exact_source_object_reuse": 20,
+      "note": "Wave 2B stages 14 GameForge legacy research trees and 6 backend-core convergence files. Full 150-map audit and CI remain required."
     }
   },
   "move_tag_contract": {
@@ -4652,17 +5112,17 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_object_audit_green_cutover_not_authorized",
-    "governed_mapping_count": 130,
+    "governed_mapping_count": 150,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 33,
     "batch_counts": {
       "B1-core-runtime": 54,
       "B3-owner-sensitive": 7,
       "B2-domain-build": 12,
-      "B4-research-quarantine": 35,
-      "B3-compat-convergence": 22
+      "B4-research-quarantine": 49,
+      "B3-compat-convergence": 28
     },
-    "fresh_object_audit_required": false,
+    "fresh_object_audit_required": true,
     "global_cutover_blockers": [
       "BASE-FRONTEND-SSR-RAF-01"
     ],
