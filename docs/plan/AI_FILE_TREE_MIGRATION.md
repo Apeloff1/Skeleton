@@ -227,3 +227,13 @@ neither:
 This prevents future "move everything" passes from accidentally relocating
 architecture authority, package/bootstrap metadata, release infrastructure, or
 uncharacterized acquired code.
+
+
+### Classification audit source-of-truth correction
+
+The top-level classification gate enumerates Git-tracked `skeleton/*` paths
+with `git ls-files`, not arbitrary live directories. Earlier architecture
+checks may create untracked runtime/generated directories such as
+`skeleton/telemetry` or `skeleton/turn`; those are not source roots and must
+not force false move classifications. Failure to enumerate the Git index is
+itself fail-closed.

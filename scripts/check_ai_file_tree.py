@@ -6,6 +6,7 @@ import ast
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -497,16 +498,26 @@ def validate() -> list[str]:
                 classified_top_level.add(root)
     classified_top_level.update(retained_paths)
 
-    skeleton_root = ROOT / "skeleton"
-    live_top_level = {
-        f"skeleton/{path.name}"
-        for path in skeleton_root.iterdir()
-        if path.name != "__pycache__"
+    try:
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z", "skeleton"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout.decode("utf-8").split("\0")
+    except (OSError, subprocess.CalledProcessError, UnicodeDecodeError) as exc:
+        errors.append(f"cannot enumerate git-tracked skeleton paths for classification audit: {exc}")
+        tracked = []
+
+    tracked_top_level = {
+        "/".join(Path(path_value).parts[:2])
+        for path_value in tracked
+        if path_value and len(Path(path_value).parts) >= 2
     }
-    unclassified_live = sorted(live_top_level - classified_top_level)
+    unclassified_live = sorted(tracked_top_level - classified_top_level)
     if unclassified_live:
         errors.append(
-            "live top-level skeleton paths lack AI-tree move/retain classification: "
+            "git-tracked top-level skeleton paths lack AI-tree move/retain classification: "
             + ", ".join(unclassified_live)
         )
 
