@@ -30,6 +30,8 @@ class PlanReadAPI:
 
     @staticmethod
     def _payload(item: PlanItem) -> dict[str, Any]:
+        conflict_domain = item.metadata.get("conflict_domain")
+        relevant_paths = item.metadata.get("relevant_paths", [])
         return {
             "id": item.id,
             "title": item.title,
@@ -39,6 +41,8 @@ class PlanReadAPI:
             "owner": item.owner,
             "dependencies": list(item.dependencies),
             "research_refs": list(item.research_refs),
+            "conflict_domain": conflict_domain if isinstance(conflict_domain, str) else None,
+            "relevant_paths": list(relevant_paths) if isinstance(relevant_paths, list) else [],
             "expected_output": item.expected_output,
             "validation": list(item.validation),
             "metadata": dict(item.metadata),
@@ -96,6 +100,7 @@ class PlanQueueAPI:
                 and item.owner is None
                 and not self._is_squad_item(item)
                 and self.store._dependencies_satisfied(item)  # noqa: SLF001
+                and self.store._conflict_domain_available(item)  # noqa: SLF001
             ]
             if not eligible:
                 return None
