@@ -45,7 +45,7 @@ def authorize_url(redirect_uri: Optional[str] = None, scope: str = "repo,read:us
     cid = client_id()
     if not cid:
         return {"error": "SKELETON_GITHUB_CLIENT_ID not set"}
-
+    
     redirect = redirect_uri or "https://skeleton.dev/auth/github/callback"
     url = (
         f"https://github.com/login/oauth/authorize"
@@ -53,7 +53,7 @@ def authorize_url(redirect_uri: Optional[str] = None, scope: str = "repo,read:us
         f"&redirect_uri={redirect}"
         f"&scope={scope}"
     )
-
+    
     return {
         "url": url,
         "client_id": cid[:4] + "..." + cid[-4:] if len(cid) > 8 else cid,
@@ -63,14 +63,14 @@ def authorize_url(redirect_uri: Optional[str] = None, scope: str = "repo,read:us
 
 def exchange_code(code: str) -> Dict[str, Any]:
     """Exchange OAuth authorization code for access token.
-
+    
     Note: This is a stub. In production, this would make a POST
     request to https://github.com/login/oauth/access_token
     """
     secret = client_secret()
     if not secret:
         return {"error": "SKELETON_GITHUB_CLIENT_SECRET not set"}
-
+    
     # Stub: in production, make actual OAuth token exchange
     return {
         "access_token": "gho_stub_token",

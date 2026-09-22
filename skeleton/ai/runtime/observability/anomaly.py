@@ -42,7 +42,7 @@ class AdaptiveThreshold:
     def update(self, value: float, is_anomaly: bool, confirmed: bool = False) -> None:
         """Update threshold based on feedback."""
         self._history.append(value)
-
+        
         if confirmed:
             if is_anomaly:
                 self._true_positives += 1
@@ -57,13 +57,13 @@ class AdaptiveThreshold:
         """Get current expected value bounds."""
         if len(self._history) < 10:
             return (float('-inf'), float('inf'))
-
+        
         mean = statistics.mean(self._history)
         try:
             stdev = statistics.stdev(self._history)
         except statistics.StatisticsError:
             stdev = 0
-
+        
         return (mean - self.multiplier * stdev, mean + self.multiplier * stdev)
 
     def is_anomalous(self, value: float) -> bool:
@@ -86,14 +86,14 @@ class SeasonalDecomposer:
         """Extract seasonal component if enough data."""
         if len(self._values) < self.period:
             return None
-
+        
         values = list(self._values)
         # Simple moving average as trend
         trend = []
         for i in range(len(values)):
             window = values[max(0, i - self.period // 2):min(len(values), i + self.period // 2 + 1)]
             trend.append(sum(window) / len(window))
-
+        
         # Seasonal = observed - trend
         seasonal = [v - t for v, t in zip(values, trend)]
         return seasonal
@@ -108,7 +108,7 @@ class SeasonalDecomposer:
 
 class AnomalyDetector:
     """Statistical anomaly detection with multiple strategies.
-
+    
     Supports:
     - Statistical: mean/stdev based
     - Adaptive: self-adjusting thresholds
@@ -145,28 +145,28 @@ class AnomalyDetector:
         self._values.append(value)
         self._seasonal.add(value)
         self._stats["checks"] += 1
-
+        
         if len(self._values) < 10:
             return None
-
+        
         is_anomaly = False
         expected_range = (float('-inf'), float('inf'))
-
+        
         if self._strategy == "statistical":
             mean = statistics.mean(self._values)
             try:
                 stdev = statistics.stdev(self._values)
             except statistics.StatisticsError:
                 stdev = 0
-
+            
             threshold = 3.0 * stdev
             expected_range = (mean - threshold, mean + threshold)
             is_anomaly = abs(value - mean) > threshold and stdev > 0
-
+        
         elif self._strategy == "adaptive":
             expected_range = self._adaptive.get_bounds()
             is_anomaly = self._adaptive.is_anomalous(value)
-
+        
         elif self._strategy == "seasonal":
             deseasonalized = self._seasonal.deseasonalize(value, len(self._values) - 1)
             self._values[-1] = deseasonalized  # Replace with deseasonalized for stats
@@ -177,10 +177,10 @@ class AnomalyDetector:
                 stdev = 0
             expected_range = (mean - 3 * stdev, mean + 3 * stdev)
             is_anomaly = abs(deseasonalized - mean) > 3 * stdev and stdev > 0
-
+        
         if is_anomaly:
             self._stats["anomalies"] += 1
-
+            
             # Determine severity
             if expected_range[0] != float('-inf') and expected_range[1] != float('inf'):
                 range_width = expected_range[1] - expected_range[0]
@@ -190,9 +190,9 @@ class AnomalyDetector:
                     deviation = 0
             else:
                 deviation = 0
-
+            
             severity = "critical" if deviation > 2.0 else "high" if deviation > 1.0 else "medium" if deviation > 0.5 else "low"
-
+            
             report = AnomalyReport(
                 timestamp=time.time(),
                 metric_name=metric_name,
@@ -201,7 +201,7 @@ class AnomalyDetector:
                 severity=severity,
                 context=context or {},
             )
-
+            
             if self._bus:
                 self._bus.emit("observability.anomaly.detected", {
                     "metric": metric_name,
@@ -209,9 +209,9 @@ class AnomalyDetector:
                     "severity": severity,
                     "strategy": self._strategy,
                 })
-
+            
             return report
-
+        
         return None
 
     def observe_many(
@@ -330,7 +330,7 @@ class AnomalyDetector:
         if self._strategy == "adaptive":
             last_value = self._values[-1] if self._values else 0
             self._adaptive.update(last_value, was_anomaly, confirmed)
-
+        
         if not was_anomaly and confirmed:
             self._stats["false_positives"] += 1
 
