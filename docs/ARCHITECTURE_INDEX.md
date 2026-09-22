@@ -2,7 +2,7 @@
 
 > Canonical navigation for architecture, construction, research evidence, and promotion.
 >
-> Updated: 2026-09-21
+> Updated: 2026-09-22
 >
 > Rule: an architecture feature is not complete if it exists only in prose, only in code, or only in a historical round. It must be reachable from this index and represented in the machine architecture index where applicable.
 
