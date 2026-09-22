@@ -145,7 +145,7 @@ export default function ChatWorkspace() {
   const [context, setContext] = useState('');
   const [attachment, setAttachment] = useState<Attachment | undefined>();
   const [picking, setPicking] = useState(false);
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<React.ElementRef<typeof ScrollView>>(null);
   const pickerGeneration = useRef(0);
   const mounted = useRef(true);
 
