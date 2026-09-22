@@ -587,22 +587,17 @@ def test_failed_late_input_correction_restores_world_commands_and_history() -> N
     before_ticks = session.history.ticks()
     original_frame = session.commands.frame(1)
 
-    original_step = PhysicsWorld.step
-
-    def fail_step(self: PhysicsWorld, steps: int = 1):
-        if self is world:
+    class _FailingConstraintSolver:
+        def solve(self, bodies, joints, *, dt):
             raise RuntimeError("synthetic correction failure")
-        return original_step(self, steps)
 
-    PhysicsWorld.step = fail_step
-    try:
-        with pytest.raises(RuntimeError, match="synthetic correction failure"):
-            session.correct_and_resimulate(
-                1,
-                (_impulse_command(0, 9.0),),
-            )
-    finally:
-        PhysicsWorld.step = original_step
+    world._constraint_solver = _FailingConstraintSolver()  # type: ignore[assignment]
+
+    with pytest.raises(RuntimeError, match="synthetic correction failure"):
+        session.correct_and_resimulate(
+            1,
+            (_impulse_command(0, 9.0),),
+        )
 
     assert world.tick == before_tick
     assert world.state_digest == before_digest
