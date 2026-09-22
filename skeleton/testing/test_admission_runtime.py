@@ -15,6 +15,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntimeError,
 )
 from skeleton.intelligence.quota import (
+    QuotaConflict,
     TenantQuota,
     TenantQuotaLedger,
 )
@@ -307,5 +308,5 @@ def test_metered_usage_cannot_be_discarded_by_release() -> None:
         now_wall=10.1,
     )
 
-    with pytest.raises(Exception, match="cannot release reservation after metered usage"):
+    with pytest.raises(QuotaConflict, match="cannot release reservation after metered usage"):
         runtime.release("op-metered-release")
