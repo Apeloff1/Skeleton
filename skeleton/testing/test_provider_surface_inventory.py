@@ -133,3 +133,40 @@ def test_application_provider_surfaces_are_delegation_only() -> None:
             edges.add("network_transport")
 
         assert not edges.intersection(item["forbidden_edge_classes"])
+
+
+def test_provider_surface_evidence_receipt_is_current_head_and_secret_free() -> None:
+    module = _checker()
+    evidence = module.build_provider_surface_evidence(
+        ROOT,
+        head_sha="0123456789abcdef",
+        errors=[],
+    )
+
+    assert evidence["schema_version"] == 1
+    assert evidence["head_sha"] == "0123456789abcdef"
+    assert evidence["valid"] is True
+    assert evidence["validation_errors"] == []
+
+    declared = {item["id"]: item for item in evidence["declared_surfaces"]}
+    assert declared["engine-runtime"]["credential_owner"] is True
+    assert declared["engine-runtime"]["network_transport_owner"] is True
+    assert declared["engine-runtime"]["sdk_client_owner"] is True
+    assert "skeleton/provider_runtime.py" in evidence["discovered_surfaces"]
+    assert "skeleton/automation/free_model.py" in evidence["discovered_surfaces"]
+
+    rendered = json.dumps(evidence, sort_keys=True)
+    assert "Bearer " not in rendered
+    assert "api_key_value" not in rendered
+
+
+def test_provider_surface_evidence_records_validation_failure() -> None:
+    module = _checker()
+    evidence = module.build_provider_surface_evidence(
+        ROOT,
+        head_sha="bad-head",
+        errors=["synthetic failure"],
+    )
+
+    assert evidence["valid"] is False
+    assert evidence["validation_errors"] == ["synthetic failure"]
