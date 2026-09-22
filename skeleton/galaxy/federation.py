@@ -46,7 +46,7 @@ class NodeRegistry:
             node_id=node_id,
             address=address,
             region=region,
-            capabilities=capabilities or set(),
+            capabilities=set(capabilities or ()),
         )
         self._nodes[node_id] = node
         self._stats["registered"] += 1
@@ -59,6 +59,24 @@ class NodeRegistry:
             })
         
         return node
+
+    def update_capabilities(self, node_id: str, capabilities: Set[str]) -> bool:
+        """Replace a registered node's advertised capabilities."""
+        node = self._nodes.get(node_id)
+        if node is None:
+            return False
+
+        next_capabilities = set(capabilities)
+        if node.capabilities == next_capabilities:
+            return True
+
+        node.capabilities = next_capabilities
+        if self._bus:
+            self._bus.emit("galaxy.node.capabilities.updated", {
+                "node_id": node_id,
+                "capabilities": sorted(next_capabilities),
+            })
+        return True
 
     def heartbeat(self, node_id: str) -> bool:
         """Update node heartbeat."""
@@ -208,8 +226,32 @@ class GalaxyNode:
         self._capabilities: Set[str] = set()
         self._started = False
 
+    @property
+    def capabilities(self) -> Set[str]:
+        """Return a copy of this node's currently advertised capabilities."""
+        return set(self._capabilities)
+
+    def _sync_capabilities(self) -> None:
+        if self._started:
+            self._registry.update_capabilities(self.node_id, self._capabilities)
+
     def add_capability(self, capability: str) -> None:
+        """Advertise a capability, updating the live registry after start."""
         self._capabilities.add(capability)
+        self._sync_capabilities()
+
+    def remove_capability(self, capability: str) -> bool:
+        """Stop advertising a capability without requiring a node restart."""
+        if capability not in self._capabilities:
+            return False
+        self._capabilities.remove(capability)
+        self._sync_capabilities()
+        return True
+
+    def set_capabilities(self, capabilities: Set[str]) -> None:
+        """Replace the node's advertised capability set."""
+        self._capabilities = set(capabilities)
+        self._sync_capabilities()
 
     def start(self) -> None:
         """Start the galaxy node."""
