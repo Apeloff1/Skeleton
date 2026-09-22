@@ -4636,5 +4636,19 @@
       "BASE-FRONTEND-SSR-RAF-01"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
+  },
+  "validation_request": {
+    "requested_at_utc": "2026-09-22T15:47:00Z",
+    "requested_from_head": "7d4d4a64eddd2c0f52a55fb5d6a091f54d714b04",
+    "reason": "Force repository-native validation after transfer-v2 was assembled through Git object/ref operations that did not emit a PR Actions run for the resulting head.",
+    "required_gates": [
+      "canonical AI file-tree validator",
+      "App Assembly",
+      "Backend Quality",
+      "CI/CD",
+      "Merge Readiness"
+    ],
+    "expected_active_blocker": "BASE-FRONTEND-SSR-RAF-01",
+    "invariant": "This request records validation intent only and does not change cutover or completion authority."
   }
 }
