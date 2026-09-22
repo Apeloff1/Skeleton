@@ -19,6 +19,7 @@ Research dependency map: [architecture/research-dependency-map-2026.md](architec
 Research execution program: [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md)
 Research program scorecard: [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md)
 Research control-plane internals: [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md)
+Research control-plane build backlog: [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md)
 
 ## 0. Construction constitution
 
@@ -3950,6 +3951,12 @@ Build in order:
 - M8 C2+ launch integration.
 
 **Exit gate:** demonstrate source status history, open debt→protocol linkage, frozen manifest, success+failure retention, independent review, debt transition, claim invalidation, benchmark custody, idempotent launch reconciliation, restore drill, and zero research-agent→production authority path.
+
+### AD121. Research control-plane build backlog — ⬜
+
+Execute RCB001–RCB120 in milestone order M0–M8, with RCB-A01–RCB-A10 as cross-milestone acceptance campaigns.
+
+**Gate:** no RCB item is complete from prose, code presence, or commit count alone. Completion requires the declared acceptance evidence.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
