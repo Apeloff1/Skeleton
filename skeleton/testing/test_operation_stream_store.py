@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -8,6 +8,7 @@ import pytest
 
 from skeleton.frontier.operation_stream import (
     ReplayCursor,
+    StreamContractError,
     StreamBackpressureError,
     StreamDuplicateConflictError,
     StreamEvent,
