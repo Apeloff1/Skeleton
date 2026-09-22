@@ -121,7 +121,7 @@ export default function MyClassesScreen() {
                 colors={[accent + '14', 'transparent'] as any}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}
+                style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
               />
               <Pressable style={s.cardHead} onPress={() => openClass({ id: en.class_id })}>
                 <View style={[s.cardIcon, { backgroundColor: accent + '22', borderColor: accent + '44' }]}>
