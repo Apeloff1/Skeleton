@@ -136,6 +136,8 @@ def validate() -> list[str]:
         ROOT / "docs/plan/AI_FILE_TREE_MIGRATION.md",
         ROOT / "skeleton/ai/__init__.py",
         ROOT / "skeleton/testing/test_ai_file_tree.py",
+        ROOT / "machine/ai_master_plan.json",
+        ROOT / "machine/ai_app_construction.json",
     ]
     for path in required:
         if not path.is_file():
@@ -243,6 +245,115 @@ def validate() -> list[str]:
         errors.append("Jeeves engine mapping is mandatory")
     if not has_build:
         errors.append("shift-supervisor build/planning mapping is mandatory")
+
+    audit = data.get("planned_path_audit")
+    if not isinstance(audit, dict):
+        errors.append("planned_path_audit must be an object")
+    else:
+        def _root(path_value: object) -> str | None:
+            if not isinstance(path_value, str) or not path_value.startswith("skeleton/"):
+                return None
+            suffix = path_value[len("skeleton/"):].split("/", 1)[0]
+            return f"skeleton/{suffix}" if suffix else None
+
+        mapped_by_id = {
+            item.get("id"): item
+            for item in mappings
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        classified_roots: set[str] = {str(data.get("canonical_root", "skeleton/ai"))}
+        for item in mappings:
+            if isinstance(item, dict):
+                root = _root(item.get("source"))
+                if root:
+                    classified_roots.add(root)
+
+        external = audit.get("intentionally_external", [])
+        if not isinstance(external, list):
+            errors.append("planned_path_audit.intentionally_external must be a list")
+            external = []
+        for item in external:
+            if not isinstance(item, dict):
+                errors.append("planned-path external entry must be an object")
+                continue
+            path_value = item.get("path")
+            root = _root(path_value)
+            if root:
+                classified_roots.add(root)
+            if not isinstance(path_value, str) or not (ROOT / path_value).exists():
+                errors.append(f"planned external path missing: {path_value!r}")
+            if not item.get("owner") or not item.get("reason"):
+                errors.append(f"planned external path lacks owner/reason: {path_value!r}")
+
+        aliases = audit.get("covered_aliases", [])
+        if not isinstance(aliases, list):
+            errors.append("planned_path_audit.covered_aliases must be a list")
+            aliases = []
+        for item in aliases:
+            if not isinstance(item, dict):
+                errors.append("planned-path alias entry must be an object")
+                continue
+            planned_path = item.get("planned_path")
+            implemented_path = item.get("implemented_path")
+            mapping_id = item.get("mapping_id")
+            root = _root(planned_path)
+            if root:
+                classified_roots.add(root)
+            mapping = mapped_by_id.get(mapping_id)
+            if not isinstance(mapping, dict):
+                errors.append(f"planned-path alias references unknown mapping: {mapping_id!r}")
+            elif mapping.get("source") != implemented_path:
+                errors.append(
+                    f"planned-path alias implementation drift: {planned_path!r} -> {implemented_path!r}"
+                )
+            if not isinstance(implemented_path, str) or not (ROOT / implemented_path).exists():
+                errors.append(f"planned-path alias implementation missing: {implemented_path!r}")
+
+        absent = audit.get("planned_but_absent", [])
+        if not isinstance(absent, list):
+            errors.append("planned_path_audit.planned_but_absent must be a list")
+            absent = []
+        for path_value in absent:
+            root = _root(path_value)
+            if root:
+                classified_roots.add(root)
+            if not isinstance(path_value, str) or not path_value.startswith("skeleton/"):
+                errors.append(f"invalid planned-but-absent path: {path_value!r}")
+            elif (ROOT / path_value).exists():
+                errors.append(
+                    f"planned-but-absent engine path now exists and requires migration/classification: {path_value}"
+                )
+
+        exclusions = audit.get("non_engine_root_exclusions", [])
+        if not isinstance(exclusions, list):
+            errors.append("planned_path_audit.non_engine_root_exclusions must be a list")
+            exclusions = []
+        for path_value in exclusions:
+            root = _root(path_value)
+            if root:
+                classified_roots.add(root)
+
+        planned_roots: set[str] = set()
+        for contract_path in (
+            ROOT / "machine/ai_master_plan.json",
+            ROOT / "machine/ai_app_construction.json",
+        ):
+            try:
+                contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                errors.append(f"cannot parse planned-path authority {contract_path.name}: {exc}")
+                continue
+            serialized = json.dumps(contract, ensure_ascii=False)
+            planned_roots.update(
+                re.findall(r"\bskeleton/[A-Za-z0-9_.-]+", serialized)
+            )
+
+        unclassified = sorted(planned_roots - classified_roots)
+        if unclassified:
+            errors.append(
+                "masterplan/construction skeleton roots lack AI-tree disposition: "
+                + ", ".join(unclassified)
+            )
 
     forbidden = data.get("promotion_policy", {}).get("forbidden", [])
     if "marking AIQ/work-package completion from file relocation alone" not in forbidden:
