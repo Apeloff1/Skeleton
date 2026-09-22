@@ -1064,27 +1064,6 @@
       ]
     },
     {
-      "id": "AIFT-NEXT-TELEMETRY",
-      "priority": 1,
-      "source": "skeleton/telemetry",
-      "destination": "skeleton/ai/runtime/observability/telemetry",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W21",
-        "WP-W22"
-      ],
-      "volume_refs": [
-        "VOL-034",
-        "VOL-040"
-      ],
-      "rationale": "Event-store/SSE telemetry is observability/stream delivery support and should converge under the AI runtime observability plane.",
-      "preconditions": [
-        "preserve terminal-event semantics",
-        "bound buffering",
-        "retain operation correlation and redaction"
-      ]
-    },
-    {
       "id": "AIFT-NEXT-QUALITY",
       "priority": 1,
       "source": "skeleton/quality",
