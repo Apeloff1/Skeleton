@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -118,12 +119,7 @@ def test_memory_contract_rejects_bad_digest_and_naive_expiry() -> None:
         _proposal(digest="not-a-digest")
 
     with pytest.raises(MemoryContractError, match="timezone-aware"):
-        MemoryWriteProposal(
-            **{
-                **_proposal().__dict__,
-                "expires_at": datetime(2030, 1, 1),
-            }
-        )
+        replace(_proposal(), expires_at=datetime(2030, 1, 1))
 
 
 def test_memory_survives_repository_restart_and_deduplicates() -> None:
