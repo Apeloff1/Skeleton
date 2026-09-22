@@ -1,0 +1,52 @@
+{
+  "card": {
+    "C": 0.328,
+    "G": 1.114747,
+    "H": 1.0,
+    "M": 1.0,
+    "epsilon": 0.0,
+    "eta": 0.3498,
+    "eval": {
+      "beats": {
+        "bpe_compresses": true,
+        "gates_alive": true,
+        "mid_finite": true,
+        "mix_ready": true,
+        "neo_finite": true,
+        "pfc_finite": true,
+        "ppl_finite": true,
+        "rms_finite": true
+      },
+      "bias_acc": 0.9167,
+      "bias_n": 12,
+      "bpe_compression": 0.672,
+      "coupling": 0.009348,
+      "gate_entropy": 1.3855,
+      "left_fitted": 12,
+      "mix_hits": 2,
+      "mix_mae": 2.6667,
+      "mix_n": 3,
+      "ppl": 33.0873,
+      "ppl_mid": 137.6755,
+      "ppl_neo": 33.0873,
+      "ppl_pfc": 134.3691,
+      "ppl_rms": 69.1137
+    },
+    "growth": 1.114747,
+    "mouth": "neo",
+    "ok": 1,
+    "peak": 1.114747,
+    "perf": 0.04051144,
+    "pulse": 1,
+    "sleep": {
+      "buffer": 8,
+      "cycles": 1,
+      "distills": 15,
+      "heads_steps": 19,
+      "hebbs": 3,
+      "replays": 4
+    }
+  },
+  "kind": "genos-spree",
+  "sha256": "8dfd2acc57c67a38e4457b4b6891bf344397ed9aedba9e8c5332d67ebb55982f"
+}
