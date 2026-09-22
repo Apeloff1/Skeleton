@@ -251,3 +251,17 @@ and are mirrored under `skeleton/ai/runtime/config` and `skeleton/ai/shell`.
 The shell migration preserves provider-boundary isolation: routing and provider
 health code may consume canonical provider contracts but must not acquire
 credentials or provider-SDK ownership.
+
+
+## Historical architecture lineage
+
+The legacy Python architecture registry and numbered architecture rounds
+(`skeleton/architecture.py`, `architecture_index.py`, and rounds 3–22) are
+mirrored under `skeleton/ai/research/historical/architecture_registry`.
+
+These files are preserved for reverse engineering, provenance, and comparison
+against later designs. They are explicitly **non-authoritative**:
+`machine/architecture.json` remains the sole current architecture authority.
+No historical module can become a production owner through relocation alone;
+promotion requires an explicit masterplan adoption, evaluation evidence, and
+the normal signed-accountability process.
