@@ -12,14 +12,20 @@ from skeleton.automation.builder_plane import (
     BuilderBudget,
     BuilderManifest,
     BuilderPlaneError,
+    BuilderProposalReceipt,
+    builder_worker_branch,
     compile_builder_manifest,
+    compile_builder_proposal_receipt,
     validate_builder_custody,
+    validate_builder_proposal_receipt,
     validate_builder_worker_evidence,
 )
 from skeleton.automation.supervisor_runtime import (
     ExecutionIdentity,
+    SupervisorRuntimeError,
     WorkerCustody,
     parse_worker_result,
+    validate_worker_evidence_custody,
 )
 
 
@@ -68,6 +74,25 @@ def manifest(
         authorization(),
         snapshot_fingerprint=snapshot,
         execution=run or execution(),
+    )
+
+
+def proposal_receipt(
+    value: BuilderManifest | None = None,
+) -> BuilderProposalReceipt:
+    current = value or manifest()
+    return compile_builder_proposal_receipt(
+        current,
+        proposal_digest="c" * 64,
+        branch=builder_worker_branch(current),
+        files=(
+            {
+                "path": "skeleton/feature.py",
+                "content": "VALUE = 1\n",
+            },
+        ),
+        tests=("focused regression",),
+        changed_lines=12,
     )
 
 
@@ -178,6 +203,162 @@ class SecretaryBuilderPlaneIntegrationTests(unittest.TestCase):
                 build_authorization=auth,
                 builder_manifest=wrong,
             )
+
+
+class FeatureBuilderPreflightTests(unittest.TestCase):
+    def test_matching_task_branch_converges_on_existing_pr(self) -> None:
+        value = manifest()
+        expected_branch = builder_worker_branch(value)
+        active = {
+            "number": 91,
+            "headRefName": expected_branch,
+            "baseRefName": "main",
+        }
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=active,
+            ),
+        ):
+            branch, selected = specialist_bots._preflight(
+                feature_custody(),
+                builder_manifest=value,
+            )
+        self.assertEqual(branch, expected_branch)
+        self.assertEqual(selected, active)
+
+    def test_different_task_pr_on_same_base_fails_closed(self) -> None:
+        value = manifest()
+        active = {
+            "number": 92,
+            "headRefName": (
+                "bot/specialist-feature-builder-" + ("f" * 16)
+            ),
+            "baseRefName": "main",
+        }
+        self.assertNotEqual(
+            active["headRefName"],
+            builder_worker_branch(value),
+        )
+        with (
+            patch(
+                "skeleton.automation.specialist_bots.require_exact_head"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_clean_worktree"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.require_remote_base_unchanged"
+            ),
+            patch(
+                "skeleton.automation.specialist_bots.find_open_pr_for_worker",
+                return_value=active,
+            ),
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots._preflight(
+                    feature_custody(),
+                    builder_manifest=value,
+                )
+
+
+class WorkerLiveAuthorityRebindTests(unittest.TestCase):
+    def test_exact_live_authority_rebind_is_accepted(self) -> None:
+        auth = authorization()
+        value = manifest()
+        with patch(
+            "skeleton.automation.specialist_bots."
+            "revalidate_live_build_authorization",
+            return_value=auth,
+        ) as live:
+            current = specialist_bots.revalidate_builder_authority(
+                feature_custody(),
+                auth,
+                value,
+            )
+        self.assertEqual(current, auth)
+        live.assert_called_once_with(auth)
+
+    def test_changed_live_authority_fails_closed(self) -> None:
+        auth = authorization()
+        changed = BuildAuthorization.from_issue(
+            REPO,
+            {
+                "number": 77,
+                "title": "Build typed integration capability",
+                "body": "Implement a changed task with regression tests.",
+                "labels": (
+                    "automation-approved",
+                    "enhancement",
+                    "integration",
+                ),
+                "updatedAt": "2026-09-20T03:01:00Z",
+                "automation_authorized": True,
+            },
+        )
+        with patch(
+            "skeleton.automation.specialist_bots."
+            "revalidate_live_build_authorization",
+            return_value=changed,
+        ):
+            with self.assertRaises(
+                specialist_bots.WorkerAdmissionError
+            ):
+                specialist_bots.revalidate_builder_authority(
+                    feature_custody(),
+                    auth,
+                    manifest(),
+                )
+
+    def test_manifestless_feature_revalidation_is_rejected(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.revalidate_builder_authority(
+                feature_custody(),
+                authorization(),
+                None,
+            )
+
+    def test_non_builder_cannot_receive_build_authority(self) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.revalidate_builder_authority(
+                custody,
+                authorization(),
+                manifest(),
+            )
+
+    def test_non_builder_without_authority_remains_inert(self) -> None:
+        custody = WorkerCustody(
+            worker="root-cause",
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        self.assertIsNone(
+            specialist_bots.revalidate_builder_authority(
+                custody,
+                None,
+                None,
+            )
+        )
 
 
 class WorkerManifestAdmissionTests(unittest.TestCase):
@@ -341,6 +522,119 @@ class WorkerBuilderPromptTests(unittest.TestCase):
         self.assertNotIn("permission", payload)
 
 
+class WorkerBuilderRegressionPolicyTests(unittest.TestCase):
+    def test_feature_builder_registry_requires_tests(self) -> None:
+        self.assertTrue(
+            specialist_bots.spec_for("feature-builder").requires_tests
+        )
+
+    def test_non_documentation_build_requires_regression_intent(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.validate_builder_regression_policy(
+                {
+                    "summary": "implementation",
+                    "files": [
+                        {
+                            "path": "skeleton/feature.py",
+                            "content": "VALUE = 1\n",
+                        }
+                    ],
+                    "tests": [],
+                },
+                specialist_bots.spec_for("feature-builder"),
+                manifest(),
+            )
+
+    def test_non_documentation_build_accepts_bounded_regression_intent(
+        self,
+    ) -> None:
+        specialist_bots.validate_builder_regression_policy(
+            {
+                "summary": "implementation",
+                "files": [
+                    {
+                        "path": "skeleton/feature.py",
+                        "content": "VALUE = 1\n",
+                    }
+                ],
+                "tests": ["exercise the authorized feature behavior"],
+            },
+            specialist_bots.spec_for("feature-builder"),
+            manifest(),
+        )
+
+    def test_empty_regression_intent_entry_is_rejected(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.validate_builder_regression_policy(
+                {
+                    "summary": "implementation",
+                    "files": [
+                        {
+                            "path": "skeleton/feature.py",
+                            "content": "VALUE = 1\n",
+                        }
+                    ],
+                    "tests": ["   "],
+                },
+                specialist_bots.spec_for("feature-builder"),
+                manifest(),
+            )
+
+    def test_pure_documentation_build_does_not_invent_tests(self) -> None:
+        auth = BuildAuthorization.from_issue(
+            REPO,
+            {
+                "number": 88,
+                "title": "Update documentation guide",
+                "body": "Refresh documentation guide wording only.",
+                "labels": ("automation-approved",),
+                "updatedAt": "2026-09-20T03:10:00Z",
+                "automation_authorized": True,
+            },
+        )
+        docs_manifest = compile_builder_manifest(
+            auth,
+            snapshot_fingerprint=SNAPSHOT,
+            execution=execution(),
+        )
+        self.assertEqual(
+            docs_manifest.signals,
+            ("documentation",),
+        )
+        specialist_bots.validate_builder_regression_policy(
+            {
+                "summary": "docs only",
+                "files": [
+                    {
+                        "path": "docs/guide.md",
+                        "content": "Updated guide.\n",
+                    }
+                ],
+                "tests": [],
+            },
+            specialist_bots.spec_for("feature-builder"),
+            docs_manifest,
+        )
+
+    def test_regression_policy_rejects_non_builder_specialist(self) -> None:
+        with self.assertRaises(
+            specialist_bots.WorkerAdmissionError
+        ):
+            specialist_bots.validate_builder_regression_policy(
+                {
+                    "summary": "irrelevant",
+                    "files": [],
+                    "tests": [],
+                },
+                specialist_bots.spec_for("root-cause"),
+                manifest(),
+            )
+
+
 class WorkerBuilderBudgetTests(unittest.TestCase):
     def test_file_budget_is_enforced_before_write(self) -> None:
         value = replace(
@@ -444,21 +738,122 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
         *,
         digest: str | None = None,
         bot: str = "feature-builder",
+        branch: str | None = None,
+        task_digest: str | None = None,
+        issue_number: int | None = None,
     ) -> dict[str, object]:
         value = manifest()
         return {
             "status": "pull-request-created",
             "bot": bot,
-            "branch": "bot/specialist-feature-builder-" + BASE[:16],
+            "branch": (
+                builder_worker_branch(value)
+                if branch is None
+                else branch
+            ),
             "changed_lines": 12,
             "proposal_digest": "c" * 64,
             "base_sha": BASE,
             "supervisor_snapshot_fingerprint": SNAPSHOT,
             "execution_fingerprint": execution().fingerprint,
+            "build_issue_number": (
+                value.issue_number
+                if issue_number is None
+                else issue_number
+            ),
+            "build_task_digest": (
+                value.task_digest
+                if task_digest is None
+                else task_digest
+            ),
             "builder_manifest_digest": (
                 value.manifest_digest if digest is None else digest
             ),
+            "builder_proposal_receipt": (
+                proposal_receipt(value).as_dict()
+            ),
         }
+
+    def existing_evidence(
+        self,
+        *,
+        branch: str | None = None,
+        task_digest: str | None = None,
+        issue_number: int | None = None,
+    ) -> dict[str, object]:
+        value = manifest()
+        return {
+            "status": "existing-pr",
+            "bot": "feature-builder",
+            "branch": (
+                builder_worker_branch(value)
+                if branch is None
+                else branch
+            ),
+            "pull_request": 93,
+            "supervisor_snapshot_fingerprint": SNAPSHOT,
+            "build_issue_number": (
+                value.issue_number
+                if issue_number is None
+                else issue_number
+            ),
+            "build_task_digest": (
+                value.task_digest
+                if task_digest is None
+                else task_digest
+            ),
+        }
+
+    def updated_evidence(
+        self,
+        *,
+        repair_parent_sha: str = "d" * 40,
+    ) -> dict[str, object]:
+        value = self.created_evidence()
+        value["status"] = "pull-request-updated"
+        value["pull_request"] = 93
+        value["repair_parent_sha"] = repair_parent_sha
+        return value
+
+    def test_updated_pr_evidence_is_receipt_and_manifest_bound(self) -> None:
+        value = manifest()
+        evidence = parse_worker_result(
+            json.dumps(self.updated_evidence()),
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence["repair_parent_sha"],
+            "d" * 40,
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+            expected_branch=builder_worker_branch(value),
+        )
+        validate_builder_worker_evidence(
+            evidence,
+            value,
+        )
+
+    def test_updated_pr_evidence_requires_repair_parent(self) -> None:
+        evidence = self.updated_evidence()
+        evidence.pop("repair_parent_sha")
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(evidence),
+                worker="feature-builder",
+            )
+
+    def test_updated_pr_evidence_rejects_invalid_repair_parent(self) -> None:
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(
+                    self.updated_evidence(
+                        repair_parent_sha="not-a-sha"
+                    )
+                ),
+                worker="feature-builder",
+            )
 
     def test_runtime_parser_retains_manifest_digest(self) -> None:
         payload = json.dumps(self.created_evidence())
@@ -470,12 +865,165 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
             evidence["builder_manifest_digest"],
             manifest().manifest_digest,
         )
+        parsed_receipt = BuilderProposalReceipt.from_payload(
+            evidence["builder_proposal_receipt"]
+        )
+        self.assertEqual(
+            parsed_receipt.receipt_digest,
+            proposal_receipt().receipt_digest,
+        )
+
+
+    def test_created_evidence_receipt_is_manifest_bound(self) -> None:
+        evidence = self.created_evidence()
+        receipt = BuilderProposalReceipt.from_payload(
+            evidence["builder_proposal_receipt"]
+        )
+        validate_builder_proposal_receipt(
+            receipt,
+            manifest(),
+            evidence=evidence,
+        )
+
+    def test_created_evidence_rejects_receipt_digest_tamper(self) -> None:
+        evidence = self.created_evidence()
+        evidence["builder_proposal_receipt"]["receipt_digest"] = (
+            "0" * 64
+        )
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                evidence,
+                manifest(),
+            )
+
+    def test_created_evidence_rejects_receipt_path_tamper(self) -> None:
+        evidence = self.created_evidence()
+        evidence["builder_proposal_receipt"]["paths"] = [
+            "../escape.py"
+        ]
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                evidence,
+                manifest(),
+            )
+
+    def test_runtime_parser_requires_feature_receipt(self) -> None:
+        evidence = self.created_evidence()
+        evidence.pop("builder_proposal_receipt")
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(evidence),
+                worker="feature-builder",
+            )
+
+    def test_runtime_parser_rejects_receipt_on_non_builder(self) -> None:
+        evidence = {
+            "status": "pull-request-created",
+            "bot": "root-cause",
+            "branch": "bot/specialist-root-cause-aaaaaaaaaaaaaaaa",
+            "changed_lines": 1,
+            "proposal_digest": "c" * 64,
+            "base_sha": BASE,
+            "supervisor_snapshot_fingerprint": SNAPSHOT,
+            "execution_fingerprint": execution().fingerprint,
+            "builder_proposal_receipt": proposal_receipt().as_dict(),
+        }
+        with self.assertRaises(SupervisorRuntimeError):
+            parse_worker_result(
+                json.dumps(evidence),
+                worker="root-cause",
+            )
 
     def test_exact_manifest_bound_evidence_is_accepted(self) -> None:
         validate_builder_worker_evidence(
             self.created_evidence(),
             manifest(),
         )
+
+    def test_shared_custody_accepts_explicit_task_bound_branch(self) -> None:
+        value = manifest()
+        evidence = parse_worker_result(
+            json.dumps(self.created_evidence()),
+            worker="feature-builder",
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+            expected_branch=builder_worker_branch(value),
+        )
+
+    def test_shared_custody_rejects_wrong_explicit_branch(self) -> None:
+        evidence = parse_worker_result(
+            json.dumps(self.created_evidence()),
+            worker="feature-builder",
+        )
+        with self.assertRaises(SupervisorRuntimeError):
+            validate_worker_evidence_custody(
+                evidence,
+                feature_custody(),
+                expected_branch=(
+                    "bot/specialist-feature-builder-" + ("f" * 16)
+                ),
+            )
+
+    def test_existing_pr_parser_retains_task_identity(self) -> None:
+        value = manifest()
+        evidence = parse_worker_result(
+            json.dumps(self.existing_evidence()),
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence["build_issue_number"],
+            value.issue_number,
+        )
+        self.assertEqual(
+            evidence["build_task_digest"],
+            value.task_digest,
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+            expected_branch=builder_worker_branch(value),
+        )
+        validate_builder_worker_evidence(evidence, value)
+
+    def test_created_evidence_rejects_wrong_task_branch(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(
+                    branch=(
+                        "bot/specialist-feature-builder-" + ("f" * 16)
+                    )
+                ),
+                manifest(),
+            )
+
+    def test_created_evidence_rejects_wrong_task_digest(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(task_digest="0" * 64),
+                manifest(),
+            )
+
+    def test_created_evidence_rejects_wrong_issue_number(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.created_evidence(issue_number=999),
+                manifest(),
+            )
+
+    def test_existing_pr_evidence_is_task_bound(self) -> None:
+        validate_builder_worker_evidence(
+            self.existing_evidence(),
+            manifest(),
+        )
+
+    def test_existing_pr_rejects_cross_task_reuse(self) -> None:
+        with self.assertRaises(BuilderPlaneError):
+            validate_builder_worker_evidence(
+                self.existing_evidence(task_digest="0" * 64),
+                manifest(),
+            )
 
     def test_manifest_evidence_digest_mismatch_is_rejected(self) -> None:
         with self.assertRaises(BuilderPlaneError):
@@ -497,6 +1045,33 @@ class BuilderWorkerEvidenceTests(unittest.TestCase):
                 "status": "no-change",
                 "bot": "feature-builder",
             },
+            manifest(),
+        )
+
+    def test_no_change_worker_output_is_admitted_without_custody_fields(self) -> None:
+        evidence = parse_worker_result(
+            json.dumps(
+                {
+                    "status": "no-change",
+                    "bot": "feature-builder",
+                    "summary": "authorized task already satisfied",
+                }
+            ),
+            worker="feature-builder",
+        )
+        self.assertEqual(
+            evidence,
+            {
+                "status": "no-change",
+                "bot": "feature-builder",
+            },
+        )
+        validate_worker_evidence_custody(
+            evidence,
+            feature_custody(),
+        )
+        validate_builder_worker_evidence(
+            evidence,
             manifest(),
         )
 
