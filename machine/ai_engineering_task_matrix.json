@@ -73,27 +73,27 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "partial commit",
-        "stale read",
         "corruption",
         "duplicate event",
+        "lost ack",
+        "partial commit",
         "reordering",
-        "lost ack"
+        "stale read"
       ],
       "recovery_requirements": [
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation"
+        "poison-event isolation",
+        "schema rollback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-STATE-01",
@@ -150,27 +150,27 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "partial commit",
-        "stale read",
         "corruption",
         "duplicate event",
+        "lost ack",
+        "partial commit",
         "reordering",
-        "lost ack"
+        "stale read"
       ],
       "recovery_requirements": [
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation"
+        "poison-event isolation",
+        "schema rollback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-STATE-02",
@@ -227,27 +227,27 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "partial commit",
-        "stale read",
         "corruption",
         "duplicate event",
+        "lost ack",
+        "partial commit",
         "reordering",
-        "lost ack"
+        "stale read"
       ],
       "recovery_requirements": [
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation"
+        "poison-event isolation",
+        "schema rollback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-STATE-03",
@@ -334,43 +334,43 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "split-brain architecture",
         "bypassed breadth freeze",
-        "stale generated mirrors",
-        "partial commit",
-        "stale read",
+        "contradiction collapse",
         "corruption",
+        "cross-tenant leak",
+        "embedding mismatch",
+        "false merge",
+        "partial commit",
         "poisoning",
         "resurrection",
-        "contradiction collapse",
-        "cross-tenant leak",
-        "stale index",
-        "embedding mismatch",
-        "stale claim",
         "source loss",
-        "false merge"
+        "split-brain architecture",
+        "stale claim",
+        "stale generated mirrors",
+        "stale index",
+        "stale read"
       ],
       "recovery_requirements": [
-        "rollback manifest change",
-        "restore prior authority graph",
         "WAL/transaction recovery",
         "backup/restore",
+        "degraded lexical path",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
         "schema rollback",
         "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
-        "degraded lexical path",
-        "rebuild from source ledger",
-        "quarantine invalid edges"
+        "version pin/fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-GOV-01",
@@ -457,43 +457,43 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "split-brain architecture",
         "bypassed breadth freeze",
-        "stale generated mirrors",
-        "partial commit",
-        "stale read",
+        "contradiction collapse",
         "corruption",
+        "cross-tenant leak",
+        "embedding mismatch",
+        "false merge",
+        "partial commit",
         "poisoning",
         "resurrection",
-        "contradiction collapse",
-        "cross-tenant leak",
-        "stale index",
-        "embedding mismatch",
-        "stale claim",
         "source loss",
-        "false merge"
+        "split-brain architecture",
+        "stale claim",
+        "stale generated mirrors",
+        "stale index",
+        "stale read"
       ],
       "recovery_requirements": [
-        "rollback manifest change",
-        "restore prior authority graph",
         "WAL/transaction recovery",
         "backup/restore",
+        "degraded lexical path",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
         "schema rollback",
         "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
-        "degraded lexical path",
-        "rebuild from source ledger",
-        "quarantine invalid edges"
+        "version pin/fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-GOV-02",
@@ -580,43 +580,43 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "split-brain architecture",
         "bypassed breadth freeze",
-        "stale generated mirrors",
-        "partial commit",
-        "stale read",
+        "contradiction collapse",
         "corruption",
+        "cross-tenant leak",
+        "embedding mismatch",
+        "false merge",
+        "partial commit",
         "poisoning",
         "resurrection",
-        "contradiction collapse",
-        "cross-tenant leak",
-        "stale index",
-        "embedding mismatch",
-        "stale claim",
         "source loss",
-        "false merge"
+        "split-brain architecture",
+        "stale claim",
+        "stale generated mirrors",
+        "stale index",
+        "stale read"
       ],
       "recovery_requirements": [
-        "rollback manifest change",
-        "restore prior authority graph",
         "WAL/transaction recovery",
         "backup/restore",
+        "degraded lexical path",
+        "index rebuild",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
         "schema rollback",
         "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
-        "degraded lexical path",
-        "rebuild from source ledger",
-        "quarantine invalid edges"
+        "version pin/fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-GOV-03",
@@ -680,27 +680,27 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "route oscillation",
-        "stale health",
         "budget bypass",
+        "goal drift",
         "infinite loop",
         "retry amplification",
-        "goal drift"
+        "route oscillation",
+        "stale health"
       ],
       "recovery_requirements": [
-        "route fallback",
-        "circuit break",
-        "safe default",
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "circuit break",
+        "route fallback",
+        "safe default",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-COST-01",
@@ -764,27 +764,27 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "route oscillation",
-        "stale health",
         "budget bypass",
+        "goal drift",
         "infinite loop",
         "retry amplification",
-        "goal drift"
+        "route oscillation",
+        "stale health"
       ],
       "recovery_requirements": [
-        "route fallback",
-        "circuit break",
-        "safe default",
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "circuit break",
+        "route fallback",
+        "safe default",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-COST-02",
@@ -848,27 +848,27 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "route oscillation",
-        "stale health",
         "budget bypass",
+        "goal drift",
         "infinite loop",
         "retry amplification",
-        "goal drift"
+        "route oscillation",
+        "stale health"
       ],
       "recovery_requirements": [
-        "route fallback",
-        "circuit break",
-        "safe default",
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "circuit break",
+        "route fallback",
+        "safe default",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-COST-03",
@@ -928,27 +928,27 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "provider timeout",
+        "budget bypass",
         "malformed output",
-        "stream truncation",
+        "provider timeout",
         "route oscillation",
         "stale health",
-        "budget bypass"
+        "stream truncation"
       ],
       "recovery_requirements": [
+        "circuit break",
         "fallback/abort",
-        "stream reconciliation",
         "provider quarantine",
         "route fallback",
-        "circuit break",
-        "safe default"
+        "safe default",
+        "stream reconciliation"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-PROV-01",
@@ -1008,27 +1008,27 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "provider timeout",
+        "budget bypass",
         "malformed output",
-        "stream truncation",
+        "provider timeout",
         "route oscillation",
         "stale health",
-        "budget bypass"
+        "stream truncation"
       ],
       "recovery_requirements": [
+        "circuit break",
         "fallback/abort",
-        "stream reconciliation",
         "provider quarantine",
         "route fallback",
-        "circuit break",
-        "safe default"
+        "safe default",
+        "stream reconciliation"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-PROV-02",
@@ -1088,27 +1088,27 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "provider timeout",
+        "budget bypass",
         "malformed output",
-        "stream truncation",
+        "provider timeout",
         "route oscillation",
         "stale health",
-        "budget bypass"
+        "stream truncation"
       ],
       "recovery_requirements": [
+        "circuit break",
         "fallback/abort",
-        "stream reconciliation",
         "provider quarantine",
         "route fallback",
-        "circuit break",
-        "safe default"
+        "safe default",
+        "stream reconciliation"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S0-PROV-03",
@@ -1187,38 +1187,38 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "partial commit",
-        "stale read",
+        "budget overflow",
         "corruption",
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "prompt injection",
-        "trust-label loss",
-        "budget overflow",
+        "goal drift",
         "infinite loop",
+        "lost ack",
+        "partial commit",
+        "prompt injection",
+        "reordering",
         "retry amplification",
-        "goal drift"
+        "stale read",
+        "trust-label loss"
       ],
       "recovery_requirements": [
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
+        "checkpoint/abort",
         "cursor resync",
         "dead-letter/replay",
+        "evidence omission signal",
         "poison-event isolation",
         "safe minimal context fallback",
-        "evidence omission signal",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "safe terminal response",
+        "schema rollback",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-CONV-01",
@@ -1297,38 +1297,38 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "partial commit",
-        "stale read",
+        "budget overflow",
         "corruption",
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "prompt injection",
-        "trust-label loss",
-        "budget overflow",
+        "goal drift",
         "infinite loop",
+        "lost ack",
+        "partial commit",
+        "prompt injection",
+        "reordering",
         "retry amplification",
-        "goal drift"
+        "stale read",
+        "trust-label loss"
       ],
       "recovery_requirements": [
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
+        "checkpoint/abort",
         "cursor resync",
         "dead-letter/replay",
+        "evidence omission signal",
         "poison-event isolation",
         "safe minimal context fallback",
-        "evidence omission signal",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "safe terminal response",
+        "schema rollback",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-CONV-02",
@@ -1407,38 +1407,38 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "partial commit",
-        "stale read",
+        "budget overflow",
         "corruption",
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "prompt injection",
-        "trust-label loss",
-        "budget overflow",
+        "goal drift",
         "infinite loop",
+        "lost ack",
+        "partial commit",
+        "prompt injection",
+        "reordering",
         "retry amplification",
-        "goal drift"
+        "stale read",
+        "trust-label loss"
       ],
       "recovery_requirements": [
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
+        "checkpoint/abort",
         "cursor resync",
         "dead-letter/replay",
+        "evidence omission signal",
         "poison-event isolation",
         "safe minimal context fallback",
-        "evidence omission signal",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "safe terminal response",
+        "schema rollback",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-CONV-03",
@@ -1515,37 +1515,37 @@
         "token-budget"
       ],
       "principal_failure_modes": [
-        "poisoning",
-        "resurrection",
+        "budget overflow",
         "contradiction collapse",
         "cross-tenant leak",
-        "stale index",
         "embedding mismatch",
-        "stale claim",
-        "source loss",
         "false merge",
+        "poisoning",
         "prompt injection",
-        "trust-label loss",
-        "budget overflow"
+        "resurrection",
+        "source loss",
+        "stale claim",
+        "stale index",
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
         "degraded lexical path",
-        "rebuild from source ledger",
+        "evidence omission signal",
+        "index rebuild",
+        "quarantine",
         "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
         "safe minimal context fallback",
-        "evidence omission signal"
+        "tombstone-safe restore",
+        "version pin/fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-MEM-01",
@@ -1622,37 +1622,37 @@
         "token-budget"
       ],
       "principal_failure_modes": [
-        "poisoning",
-        "resurrection",
+        "budget overflow",
         "contradiction collapse",
         "cross-tenant leak",
-        "stale index",
         "embedding mismatch",
-        "stale claim",
-        "source loss",
         "false merge",
+        "poisoning",
         "prompt injection",
-        "trust-label loss",
-        "budget overflow"
+        "resurrection",
+        "source loss",
+        "stale claim",
+        "stale index",
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
         "degraded lexical path",
-        "rebuild from source ledger",
+        "evidence omission signal",
+        "index rebuild",
+        "quarantine",
         "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
         "safe minimal context fallback",
-        "evidence omission signal"
+        "tombstone-safe restore",
+        "version pin/fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-MEM-02",
@@ -1729,37 +1729,37 @@
         "token-budget"
       ],
       "principal_failure_modes": [
-        "poisoning",
-        "resurrection",
+        "budget overflow",
         "contradiction collapse",
         "cross-tenant leak",
-        "stale index",
         "embedding mismatch",
-        "stale claim",
-        "source loss",
         "false merge",
+        "poisoning",
         "prompt injection",
-        "trust-label loss",
-        "budget overflow"
+        "resurrection",
+        "source loss",
+        "stale claim",
+        "stale index",
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
         "degraded lexical path",
-        "rebuild from source ledger",
+        "evidence omission signal",
+        "index rebuild",
+        "quarantine",
         "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
         "safe minimal context fallback",
-        "evidence omission signal"
+        "tombstone-safe restore",
+        "version pin/fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-MEM-03",
@@ -1827,33 +1827,33 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
-        "duplicate side effect",
         "TOCTOU",
+        "confused deputy",
+        "duplicate side effect",
+        "goal drift",
+        "infinite loop",
         "malformed tool output",
         "policy bypass",
-        "confused deputy",
+        "retry amplification",
         "stale decision"
       ],
       "recovery_requirements": [
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "compensation",
-        "idempotency replay",
-        "revoke/disable tool",
+        "decision invalidation",
         "fail closed",
+        "idempotency replay",
         "policy rollback",
-        "decision invalidation"
+        "revoke/disable tool",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-TOOL-01",
@@ -1921,33 +1921,33 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
-        "duplicate side effect",
         "TOCTOU",
+        "confused deputy",
+        "duplicate side effect",
+        "goal drift",
+        "infinite loop",
         "malformed tool output",
         "policy bypass",
-        "confused deputy",
+        "retry amplification",
         "stale decision"
       ],
       "recovery_requirements": [
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "compensation",
-        "idempotency replay",
-        "revoke/disable tool",
+        "decision invalidation",
         "fail closed",
+        "idempotency replay",
         "policy rollback",
-        "decision invalidation"
+        "revoke/disable tool",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-TOOL-02",
@@ -2015,33 +2015,33 @@
         "simulation"
       ],
       "principal_failure_modes": [
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
-        "duplicate side effect",
         "TOCTOU",
+        "confused deputy",
+        "duplicate side effect",
+        "goal drift",
+        "infinite loop",
         "malformed tool output",
         "policy bypass",
-        "confused deputy",
+        "retry amplification",
         "stale decision"
       ],
       "recovery_requirements": [
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "compensation",
-        "idempotency replay",
-        "revoke/disable tool",
+        "decision invalidation",
         "fail closed",
+        "idempotency replay",
         "policy rollback",
-        "decision invalidation"
+        "revoke/disable tool",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S1-TOOL-03",
@@ -2095,20 +2095,20 @@
         "token-budget"
       ],
       "principal_failure_modes": [
+        "budget overflow",
         "prompt injection",
-        "trust-label loss",
-        "budget overflow"
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "safe minimal context fallback",
-        "evidence omission signal"
+        "evidence omission signal",
+        "safe minimal context fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S2-CTX-01",
@@ -2162,20 +2162,20 @@
         "token-budget"
       ],
       "principal_failure_modes": [
+        "budget overflow",
         "prompt injection",
-        "trust-label loss",
-        "budget overflow"
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "safe minimal context fallback",
-        "evidence omission signal"
+        "evidence omission signal",
+        "safe minimal context fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S2-CTX-02",
@@ -2229,20 +2229,20 @@
         "token-budget"
       ],
       "principal_failure_modes": [
+        "budget overflow",
         "prompt injection",
-        "trust-label loss",
-        "budget overflow"
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "safe minimal context fallback",
-        "evidence omission signal"
+        "evidence omission signal",
+        "safe minimal context fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S2-CTX-03",
@@ -2307,25 +2307,25 @@
       ],
       "principal_failure_modes": [
         "ambiguous null/absent",
-        "time/ID collision",
         "incompatible schema change",
-        "provider timeout",
         "malformed output",
-        "stream truncation"
+        "provider timeout",
+        "stream truncation",
+        "time/ID collision"
       ],
       "recovery_requirements": [
-        "versioned decoder fallback",
-        "migration/rollback fixture",
         "fallback/abort",
+        "migration/rollback fixture",
+        "provider quarantine",
         "stream reconciliation",
-        "provider quarantine"
+        "versioned decoder fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S2-PROTO-01",
@@ -2390,25 +2390,25 @@
       ],
       "principal_failure_modes": [
         "ambiguous null/absent",
-        "time/ID collision",
         "incompatible schema change",
-        "provider timeout",
         "malformed output",
-        "stream truncation"
+        "provider timeout",
+        "stream truncation",
+        "time/ID collision"
       ],
       "recovery_requirements": [
-        "versioned decoder fallback",
-        "migration/rollback fixture",
         "fallback/abort",
+        "migration/rollback fixture",
+        "provider quarantine",
         "stream reconciliation",
-        "provider quarantine"
+        "versioned decoder fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S2-PROTO-02",
@@ -2473,25 +2473,25 @@
       ],
       "principal_failure_modes": [
         "ambiguous null/absent",
-        "time/ID collision",
         "incompatible schema change",
-        "provider timeout",
         "malformed output",
-        "stream truncation"
+        "provider timeout",
+        "stream truncation",
+        "time/ID collision"
       ],
       "recovery_requirements": [
-        "versioned decoder fallback",
-        "migration/rollback fixture",
         "fallback/abort",
+        "migration/rollback fixture",
+        "provider quarantine",
         "stream reconciliation",
-        "provider quarantine"
+        "versioned decoder fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S2-PROTO-03",
@@ -2560,32 +2560,32 @@
         "temporal eval"
       ],
       "principal_failure_modes": [
-        "stale claim",
-        "source loss",
         "false merge",
+        "goal drift",
         "infinite loop",
         "retry amplification",
-        "goal drift",
         "self-verification bias",
+        "source loss",
+        "stale claim",
         "stale evidence",
         "unverifiable claim"
       ],
       "recovery_requirements": [
-        "rebuild from source ledger",
-        "quarantine invalid edges",
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
-        "reject/redo",
+        "escalation",
         "evidence refresh",
-        "escalation"
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reject/redo",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S3-VER-01",
@@ -2654,32 +2654,32 @@
         "temporal eval"
       ],
       "principal_failure_modes": [
-        "stale claim",
-        "source loss",
         "false merge",
+        "goal drift",
         "infinite loop",
         "retry amplification",
-        "goal drift",
         "self-verification bias",
+        "source loss",
+        "stale claim",
         "stale evidence",
         "unverifiable claim"
       ],
       "recovery_requirements": [
-        "rebuild from source ledger",
-        "quarantine invalid edges",
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
-        "reject/redo",
+        "escalation",
         "evidence refresh",
-        "escalation"
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reject/redo",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S3-VER-02",
@@ -2748,32 +2748,32 @@
         "temporal eval"
       ],
       "principal_failure_modes": [
-        "stale claim",
-        "source loss",
         "false merge",
+        "goal drift",
         "infinite loop",
         "retry amplification",
-        "goal drift",
         "self-verification bias",
+        "source loss",
+        "stale claim",
         "stale evidence",
         "unverifiable claim"
       ],
       "recovery_requirements": [
-        "rebuild from source ledger",
-        "quarantine invalid edges",
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
-        "reject/redo",
+        "escalation",
         "evidence refresh",
-        "escalation"
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reject/redo",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S3-VER-03",
@@ -2827,21 +2827,21 @@
         "simulation"
       ],
       "principal_failure_modes": [
+        "goal drift",
         "infinite loop",
-        "retry amplification",
-        "goal drift"
+        "retry amplification"
       ],
       "recovery_requirements": [
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S4-EXEC-01",
@@ -2895,21 +2895,21 @@
         "simulation"
       ],
       "principal_failure_modes": [
+        "goal drift",
         "infinite loop",
-        "retry amplification",
-        "goal drift"
+        "retry amplification"
       ],
       "recovery_requirements": [
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S4-EXEC-02",
@@ -2963,21 +2963,21 @@
         "simulation"
       ],
       "principal_failure_modes": [
+        "goal drift",
         "infinite loop",
-        "retry amplification",
-        "goal drift"
+        "retry amplification"
       ],
       "recovery_requirements": [
         "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response"
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S4-EXEC-03",
@@ -3059,39 +3059,39 @@
         "state-machine"
       ],
       "principal_failure_modes": [
-        "partial boot",
-        "stuck shutdown",
         "dependency startup race",
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
         "duplicate submit",
         "gap",
+        "goal drift",
+        "infinite loop",
+        "lost ack",
         "out-of-order",
-        "reconnect storm"
+        "partial boot",
+        "reconnect storm",
+        "reordering",
+        "retry amplification",
+        "stuck shutdown"
       ],
       "recovery_requirements": [
-        "safe restart",
-        "orphan cleanup",
-        "startup rollback",
+        "checkpoint/abort",
+        "client backoff",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "idempotent submit",
-        "client backoff"
+        "orphan cleanup",
+        "poison-event isolation",
+        "safe restart",
+        "safe terminal response",
+        "startup rollback",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S5-ENG-01",
@@ -3173,39 +3173,39 @@
         "state-machine"
       ],
       "principal_failure_modes": [
-        "partial boot",
-        "stuck shutdown",
         "dependency startup race",
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
         "duplicate submit",
         "gap",
+        "goal drift",
+        "infinite loop",
+        "lost ack",
         "out-of-order",
-        "reconnect storm"
+        "partial boot",
+        "reconnect storm",
+        "reordering",
+        "retry amplification",
+        "stuck shutdown"
       ],
       "recovery_requirements": [
-        "safe restart",
-        "orphan cleanup",
-        "startup rollback",
+        "checkpoint/abort",
+        "client backoff",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "idempotent submit",
-        "client backoff"
+        "orphan cleanup",
+        "poison-event isolation",
+        "safe restart",
+        "safe terminal response",
+        "startup rollback",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S5-ENG-02",
@@ -3287,39 +3287,39 @@
         "state-machine"
       ],
       "principal_failure_modes": [
-        "partial boot",
-        "stuck shutdown",
         "dependency startup race",
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
         "duplicate submit",
         "gap",
+        "goal drift",
+        "infinite loop",
+        "lost ack",
         "out-of-order",
-        "reconnect storm"
+        "partial boot",
+        "reconnect storm",
+        "reordering",
+        "retry amplification",
+        "stuck shutdown"
       ],
       "recovery_requirements": [
-        "safe restart",
-        "orphan cleanup",
-        "startup rollback",
+        "checkpoint/abort",
+        "client backoff",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "idempotent submit",
-        "client backoff"
+        "orphan cleanup",
+        "poison-event isolation",
+        "safe restart",
+        "safe terminal response",
+        "startup rollback",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S5-ENG-03",
@@ -3396,32 +3396,32 @@
       ],
       "principal_failure_modes": [
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
         "duplicate submit",
         "gap",
+        "goal drift",
+        "infinite loop",
+        "lost ack",
         "out-of-order",
-        "reconnect storm"
+        "reconnect storm",
+        "reordering",
+        "retry amplification"
       ],
       "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "idempotent submit",
-        "client backoff"
+        "poison-event isolation",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S6-STREAM-01",
@@ -3498,32 +3498,32 @@
       ],
       "principal_failure_modes": [
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
         "duplicate submit",
         "gap",
+        "goal drift",
+        "infinite loop",
+        "lost ack",
         "out-of-order",
-        "reconnect storm"
+        "reconnect storm",
+        "reordering",
+        "retry amplification"
       ],
       "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "idempotent submit",
-        "client backoff"
+        "poison-event isolation",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S6-STREAM-02",
@@ -3600,32 +3600,32 @@
       ],
       "principal_failure_modes": [
         "duplicate event",
-        "reordering",
-        "lost ack",
-        "infinite loop",
-        "retry amplification",
-        "goal drift",
         "duplicate submit",
         "gap",
+        "goal drift",
+        "infinite loop",
+        "lost ack",
         "out-of-order",
-        "reconnect storm"
+        "reconnect storm",
+        "reordering",
+        "retry amplification"
       ],
       "recovery_requirements": [
+        "checkpoint/abort",
+        "client backoff",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "checkpoint/abort",
-        "strategy downgrade",
-        "safe terminal response",
         "idempotent submit",
-        "client backoff"
+        "poison-event isolation",
+        "safe terminal response",
+        "strategy downgrade"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S6-STREAM-03",
@@ -3750,83 +3750,83 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "split-brain architecture",
-        "bypassed breadth freeze",
-        "stale generated mirrors",
         "ambiguous null/absent",
-        "time/ID collision",
-        "incompatible schema change",
-        "partial boot",
-        "stuck shutdown",
-        "dependency startup race",
-        "partial commit",
-        "stale read",
-        "corruption",
-        "duplicate event",
-        "reordering",
-        "lost ack",
-        "provider timeout",
-        "malformed output",
-        "stream truncation",
-        "route oscillation",
-        "stale health",
         "budget bypass",
-        "poisoning",
-        "resurrection",
-        "contradiction collapse",
-        "cross-tenant leak",
-        "stale index",
-        "embedding mismatch",
-        "stale claim",
-        "source loss",
-        "false merge",
-        "prompt injection",
-        "trust-label loss",
         "budget overflow",
+        "bypassed breadth freeze",
+        "contradiction collapse",
+        "corruption",
+        "cross-tenant leak",
+        "dependency startup race",
+        "duplicate event",
+        "embedding mismatch",
+        "false merge",
+        "goal drift",
+        "incompatible schema change",
         "infinite loop",
+        "lost ack",
+        "malformed output",
+        "partial boot",
+        "partial commit",
+        "poisoning",
+        "prompt injection",
+        "provider timeout",
+        "reordering",
+        "resurrection",
         "retry amplification",
-        "goal drift"
+        "route oscillation",
+        "source loss",
+        "split-brain architecture",
+        "stale claim",
+        "stale generated mirrors",
+        "stale health",
+        "stale index",
+        "stale read",
+        "stream truncation",
+        "stuck shutdown",
+        "time/ID collision",
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "rollback manifest change",
-        "restore prior authority graph",
-        "versioned decoder fallback",
-        "migration/rollback fixture",
-        "safe restart",
-        "orphan cleanup",
-        "startup rollback",
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
+        "checkpoint/abort",
+        "circuit break",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "fallback/abort",
-        "stream reconciliation",
-        "provider quarantine",
-        "route fallback",
-        "circuit break",
-        "safe default",
-        "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
         "degraded lexical path",
-        "rebuild from source ledger",
-        "quarantine invalid edges",
-        "safe minimal context fallback",
         "evidence omission signal",
-        "checkpoint/abort",
+        "fallback/abort",
+        "index rebuild",
+        "migration/rollback fixture",
+        "orphan cleanup",
+        "poison-event isolation",
+        "provider quarantine",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "route fallback",
+        "safe default",
+        "safe minimal context fallback",
+        "safe restart",
+        "safe terminal response",
+        "schema rollback",
+        "startup rollback",
         "strategy downgrade",
-        "safe terminal response"
+        "stream reconciliation",
+        "tombstone-safe restore",
+        "version pin/fallback",
+        "versioned decoder fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S7-E2E-01",
@@ -3951,83 +3951,83 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "split-brain architecture",
-        "bypassed breadth freeze",
-        "stale generated mirrors",
         "ambiguous null/absent",
-        "time/ID collision",
-        "incompatible schema change",
-        "partial boot",
-        "stuck shutdown",
-        "dependency startup race",
-        "partial commit",
-        "stale read",
-        "corruption",
-        "duplicate event",
-        "reordering",
-        "lost ack",
-        "provider timeout",
-        "malformed output",
-        "stream truncation",
-        "route oscillation",
-        "stale health",
         "budget bypass",
-        "poisoning",
-        "resurrection",
-        "contradiction collapse",
-        "cross-tenant leak",
-        "stale index",
-        "embedding mismatch",
-        "stale claim",
-        "source loss",
-        "false merge",
-        "prompt injection",
-        "trust-label loss",
         "budget overflow",
+        "bypassed breadth freeze",
+        "contradiction collapse",
+        "corruption",
+        "cross-tenant leak",
+        "dependency startup race",
+        "duplicate event",
+        "embedding mismatch",
+        "false merge",
+        "goal drift",
+        "incompatible schema change",
         "infinite loop",
+        "lost ack",
+        "malformed output",
+        "partial boot",
+        "partial commit",
+        "poisoning",
+        "prompt injection",
+        "provider timeout",
+        "reordering",
+        "resurrection",
         "retry amplification",
-        "goal drift"
+        "route oscillation",
+        "source loss",
+        "split-brain architecture",
+        "stale claim",
+        "stale generated mirrors",
+        "stale health",
+        "stale index",
+        "stale read",
+        "stream truncation",
+        "stuck shutdown",
+        "time/ID collision",
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "rollback manifest change",
-        "restore prior authority graph",
-        "versioned decoder fallback",
-        "migration/rollback fixture",
-        "safe restart",
-        "orphan cleanup",
-        "startup rollback",
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
+        "checkpoint/abort",
+        "circuit break",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "fallback/abort",
-        "stream reconciliation",
-        "provider quarantine",
-        "route fallback",
-        "circuit break",
-        "safe default",
-        "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
         "degraded lexical path",
-        "rebuild from source ledger",
-        "quarantine invalid edges",
-        "safe minimal context fallback",
         "evidence omission signal",
-        "checkpoint/abort",
+        "fallback/abort",
+        "index rebuild",
+        "migration/rollback fixture",
+        "orphan cleanup",
+        "poison-event isolation",
+        "provider quarantine",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "route fallback",
+        "safe default",
+        "safe minimal context fallback",
+        "safe restart",
+        "safe terminal response",
+        "schema rollback",
+        "startup rollback",
         "strategy downgrade",
-        "safe terminal response"
+        "stream reconciliation",
+        "tombstone-safe restore",
+        "version pin/fallback",
+        "versioned decoder fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S7-E2E-02",
@@ -4152,83 +4152,83 @@
         "transaction"
       ],
       "principal_failure_modes": [
-        "split-brain architecture",
-        "bypassed breadth freeze",
-        "stale generated mirrors",
         "ambiguous null/absent",
-        "time/ID collision",
-        "incompatible schema change",
-        "partial boot",
-        "stuck shutdown",
-        "dependency startup race",
-        "partial commit",
-        "stale read",
-        "corruption",
-        "duplicate event",
-        "reordering",
-        "lost ack",
-        "provider timeout",
-        "malformed output",
-        "stream truncation",
-        "route oscillation",
-        "stale health",
         "budget bypass",
-        "poisoning",
-        "resurrection",
-        "contradiction collapse",
-        "cross-tenant leak",
-        "stale index",
-        "embedding mismatch",
-        "stale claim",
-        "source loss",
-        "false merge",
-        "prompt injection",
-        "trust-label loss",
         "budget overflow",
+        "bypassed breadth freeze",
+        "contradiction collapse",
+        "corruption",
+        "cross-tenant leak",
+        "dependency startup race",
+        "duplicate event",
+        "embedding mismatch",
+        "false merge",
+        "goal drift",
+        "incompatible schema change",
         "infinite loop",
+        "lost ack",
+        "malformed output",
+        "partial boot",
+        "partial commit",
+        "poisoning",
+        "prompt injection",
+        "provider timeout",
+        "reordering",
+        "resurrection",
         "retry amplification",
-        "goal drift"
+        "route oscillation",
+        "source loss",
+        "split-brain architecture",
+        "stale claim",
+        "stale generated mirrors",
+        "stale health",
+        "stale index",
+        "stale read",
+        "stream truncation",
+        "stuck shutdown",
+        "time/ID collision",
+        "trust-label loss"
       ],
       "recovery_requirements": [
-        "rollback manifest change",
-        "restore prior authority graph",
-        "versioned decoder fallback",
-        "migration/rollback fixture",
-        "safe restart",
-        "orphan cleanup",
-        "startup rollback",
         "WAL/transaction recovery",
         "backup/restore",
-        "schema rollback",
+        "checkpoint/abort",
+        "circuit break",
         "cursor resync",
         "dead-letter/replay",
-        "poison-event isolation",
-        "fallback/abort",
-        "stream reconciliation",
-        "provider quarantine",
-        "route fallback",
-        "circuit break",
-        "safe default",
-        "tombstone-safe restore",
-        "reindex",
-        "quarantine",
-        "index rebuild",
-        "version pin/fallback",
         "degraded lexical path",
-        "rebuild from source ledger",
-        "quarantine invalid edges",
-        "safe minimal context fallback",
         "evidence omission signal",
-        "checkpoint/abort",
+        "fallback/abort",
+        "index rebuild",
+        "migration/rollback fixture",
+        "orphan cleanup",
+        "poison-event isolation",
+        "provider quarantine",
+        "quarantine",
+        "quarantine invalid edges",
+        "rebuild from source ledger",
+        "reindex",
+        "restore prior authority graph",
+        "rollback manifest change",
+        "route fallback",
+        "safe default",
+        "safe minimal context fallback",
+        "safe restart",
+        "safe terminal response",
+        "schema rollback",
+        "startup rollback",
         "strategy downgrade",
-        "safe terminal response"
+        "stream reconciliation",
+        "tombstone-safe restore",
+        "version pin/fallback",
+        "versioned decoder fallback"
       ],
       "change_impact_triggers": [
-        "public or cross-boundary schema/API/config change",
         "authoritative state or lifecycle change",
-        "security/trust/permission boundary change",
+        "budget/SLO/capacity assumption change",
+        "public or cross-boundary schema/API/config change",
         "retry/recovery/idempotency semantics change",
-        "budget/SLO/capacity assumption change"
+        "security/trust/permission boundary change"
       ],
       "edge_case_source": "machine/ai_full_edge_case_matrix.json",
       "accountability_id": "ACC-AIQ-S7-E2E-03",
