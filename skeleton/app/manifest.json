@@ -2,7 +2,7 @@
   "schema_version": 1,
   "app": {
     "name": "Skeleton",
-    "version": "16",
+    "version": "16.0.0",
     "compose_file": "docker-compose.yml",
     "hot_compose_file": "docker-compose.hot.yml",
     "modes": {
@@ -35,7 +35,13 @@
       "skeleton",
       "backend",
       "frontend"
-    ]
+    ],
+    "public_contract": {
+      "prefix": "/api/app",
+      "bootstrap": "/bootstrap",
+      "status": "/status",
+      "ready": "/ready"
+    }
   },
   "runtime": {
     "required_env": [
@@ -51,7 +57,8 @@
       "SKELETON_MASTER_SECRET",
       "GF_SEAL_SECRET",
       "EXPO_PUBLIC_BACKEND_URL",
-      "EXPO_PUBLIC_SKELETON_URL"
+      "EXPO_PUBLIC_SKELETON_URL",
+      "SKELETON_INTERNAL_URL"
     ]
   },
   "services": [
@@ -67,7 +74,8 @@
         "backend",
         "skeleton"
       ],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": "/"
     },
     {
       "name": "backend",
@@ -81,7 +89,8 @@
       "depends_on": [
         "mongo"
       ],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": "/api"
     },
     {
       "name": "skeleton",
@@ -95,7 +104,8 @@
       "depends_on": [
         "mongo"
       ],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": "/api/v1"
     },
     {
       "name": "mongo",
@@ -104,7 +114,8 @@
       "kind": "database",
       "container_port": 27017,
       "depends_on": [],
-      "canonical": true
+      "canonical": true,
+      "ingress_prefix": ""
     },
     {
       "name": "chroma",
@@ -115,7 +126,8 @@
       "container_port": 8000,
       "depends_on": [],
       "canonical": false,
-      "profile": "full"
+      "profile": "full",
+      "ingress_prefix": ""
     }
   ],
   "required_paths": [
@@ -128,6 +140,7 @@
     "frontend/package.json",
     "frontend/Dockerfile",
     "skeleton/__main__.py",
+    "skeleton/app/plan.py",
     "skeleton/api/server.py",
     "frontend/app/product.tsx",
     "frontend/utils/apiBase.ts",
@@ -136,7 +149,13 @@
     "backend/core/canonical_product_policy.py",
     "backend/core/product_control_runtime.py",
     "backend/routes/product_runtime.py",
+    "backend/routes/app_runtime.py",
+    "frontend/src/product/appBootstrapClient.ts",
+    "skeleton/app/bootstrap.py",
     "scripts/check_app_assembly.py",
+    "scripts/check_app_compose_parity.py",
+    "skeleton/testing/test_app_compose_parity.py",
+    "skeleton/testing/test_app_runtime_contract.py",
     "skeleton/app/preloader.py",
     "skeleton/app/setup_runtime.py",
     "skeleton/app/installer.py",

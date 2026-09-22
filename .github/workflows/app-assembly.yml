@@ -9,6 +9,10 @@ on:
       - "skeleton/app/**"
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
+      - "skeleton/testing/test_app_plan.py"
+      - "skeleton/testing/test_app_compose_parity.py"
+      - "skeleton/testing/test_app_bootstrap.py"
+      - "skeleton/testing/test_app_runtime_contract.py"
       - "skeleton/testing/test_app_installer.py"
       - "skeleton/testing/test_windows_installer.py"
       - "packaging/windows/**"
@@ -20,6 +24,7 @@ on:
       - "pyproject.toml"
       - ".env.example"
       - "scripts/check_app_assembly.py"
+      - "scripts/check_app_compose_parity.py"
       - "machine/manifest.json"
       - ".github/workflows/app-assembly.yml"
 
@@ -57,6 +62,10 @@ jobs:
           "pytest>=8,<9"
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
+          "fastapi==0.141.1"
+          "motor==3.7.1"
+          "pymongo==4.18.1"
+          "python-dotenv==1.2.3"
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -83,7 +92,7 @@ jobs:
           yarn export:web
 
       - name: Compile assembly surface
-        run: python -m compileall -q skeleton/app skeleton/__main__.py
+        run: python -m compileall -q skeleton/app skeleton/__main__.py backend/routes/app_runtime.py
 
       - name: Audit repository-wide assembly contracts
         run: python scripts/check_app_assembly.py
@@ -91,17 +100,23 @@ jobs:
       - name: Run assembly contract tests
         env:
           PYTHONPATH: "."
-        run: |
-          python -m pytest -q \
-            skeleton/testing/test_app_assembly.py \
-            skeleton/testing/test_app_installer.py \
-            skeleton/testing/test_windows_installer.py
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_app_assembly.py
+          skeleton/testing/test_app_plan.py
+          skeleton/testing/test_app_compose_parity.py
+          skeleton/testing/test_app_bootstrap.py
+          skeleton/testing/test_app_runtime_contract.py
+          skeleton/testing/test_app_installer.py
+          skeleton/testing/test_windows_installer.py
 
       - name: Validate structural assembly
         env:
           PYTHONPATH: "."
         run: |
           python -m skeleton app check
+          python -m skeleton app plan --json > /tmp/skeleton-app-plan.json
+          python -m json.tool /tmp/skeleton-app-plan.json >/dev/null
           python -m skeleton app status --json > /tmp/skeleton-app-status.json
           python -m json.tool /tmp/skeleton-app-status.json >/dev/null
 
@@ -114,7 +129,11 @@ jobs:
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml --profile "*" config --format json > /tmp/skeleton-compose.json
+          python scripts/check_app_compose_parity.py /tmp/skeleton-compose.json
           docker compose -f docker-compose.yml -f docker-compose.hot.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.hot.yml --profile "*" config --format json > /tmp/skeleton-compose-hot.json
+          python scripts/check_app_compose_parity.py /tmp/skeleton-compose-hot.json
           BUILD_TARGET=production \
           FRONTEND_BUILD_TARGET=production \
           FRONTEND_CONTAINER_PORT=8080 \
@@ -137,6 +156,7 @@ jobs:
           required = {
               "skeleton/app/__init__.py",
               "skeleton/app/assembly.py",
+              "skeleton/app/bootstrap.py",
               "skeleton/app/cli.py",
               "skeleton/app/health.py",
               "skeleton/app/installer.py",
@@ -144,6 +164,7 @@ jobs:
               "skeleton/app/setup_runtime.py",
               "skeleton/app/windows_launcher.py",
               "skeleton/app/manifest.json",
+              "skeleton/app/plan.py",
           }
           missing = sorted(required - names)
           if missing:

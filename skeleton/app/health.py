@@ -28,8 +28,42 @@ class ProbeResult:
         }
 
 
+def probe_http(name: str, url: str, *, timeout: float = 3.0) -> ProbeResult:
+    """Probe one HTTP endpoint without external client dependencies."""
+
+    request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            status = int(getattr(response, "status", 200))
+            response.read(256)
+        ok = 200 <= status < 400
+        return ProbeResult(
+            service=name,
+            url=url,
+            ok=ok,
+            status=status,
+            detail="healthy" if ok else f"unexpected HTTP status {status}",
+        )
+    except HTTPError as exc:
+        return ProbeResult(
+            service=name,
+            url=url,
+            ok=False,
+            status=int(exc.code),
+            detail=f"HTTP error {exc.code}",
+        )
+    except (URLError, TimeoutError, OSError) as exc:
+        return ProbeResult(
+            service=name,
+            url=url,
+            ok=False,
+            status=None,
+            detail=f"{type(exc).__name__}: {exc}",
+        )
+
+
 def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
-    """Probe one public HTTP service without external client dependencies."""
+    """Probe one declared public HTTP service."""
 
     if not service.public_url or not service.health_path:
         return ProbeResult(
@@ -41,36 +75,7 @@ def probe_url(service: ServiceSpec, *, timeout: float = 3.0) -> ProbeResult:
         )
 
     url = service.public_url.rstrip("/") + "/" + service.health_path.lstrip("/")
-    request = Request(url, headers={"User-Agent": "skeleton-app-smoke/1"})
-    try:
-        with urlopen(request, timeout=timeout) as response:
-            status = int(getattr(response, "status", 200))
-            response.read(256)
-        ok = 200 <= status < 400
-        return ProbeResult(
-            service=service.name,
-            url=url,
-            ok=ok,
-            status=status,
-            detail="healthy" if ok else f"unexpected HTTP status {status}",
-        )
-    except HTTPError as exc:
-        return ProbeResult(
-            service=service.name,
-            url=url,
-            ok=False,
-            status=int(exc.code),
-            detail=f"HTTP error {exc.code}",
-        )
-    except (URLError, TimeoutError, OSError) as exc:
-        return ProbeResult(
-            service=service.name,
-            url=url,
-            ok=False,
-            status=None,
-            detail=f"{type(exc).__name__}: {exc}",
-        )
-
+    return probe_http(service.name, url, timeout=timeout)
 
 def probe_application(
     *,
@@ -89,6 +94,10 @@ def probe_application(
         if not service.public_url or not service.health_path:
             continue
         results.append(probe_url(service, timeout=timeout))
+
+    backend = manifest.service("backend")
+    ready_url = backend.public_url.rstrip("/") + manifest.contract_path("ready")
+    results.append(probe_http("application", ready_url, timeout=timeout))
     return tuple(results)
 
 

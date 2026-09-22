@@ -343,8 +343,12 @@ def test_product_shell_health_client_matches_assembly_manifest():
 
     backend = manifest.service("backend")
     skeleton = manifest.service("skeleton")
-    assert f"probe('backend', API_BASE, '{backend.health_path}'" in client
-    assert f"probe('skeleton', SKELETON_API_BASE, '{skeleton.health_path}'" in client
+    assert "getAppBootstrap" in client
+    assert "getAppRuntimeStatus" in client
+    assert f"backend: '{backend.health_path}'" in client
+    assert f"skeleton: '{skeleton.health_path}'" in client
+    assert "bootstrapService(bootstrap, 'backend')" in client
+    assert "bootstrapService(bootstrap, 'skeleton')" in client
     assert "probeAppHealth" in shell
     assert "Application runtime" in shell
     assert "Runtime" in shell
@@ -433,3 +437,31 @@ def test_product_routes_are_registered_in_canonical_route_registry():
         "/jeeves-workbench",
     ):
         assert f"path: '{route}'" in registry
+
+
+def test_application_probe_includes_aggregate_readiness(monkeypatch):
+    from skeleton.app.assembly import load_manifest
+    from skeleton.app.health import ProbeResult, probe_application
+
+    seen = []
+
+    def fake_probe_url(service, *, timeout):
+        seen.append((service.name, service.health_path, timeout))
+        return ProbeResult(service.name, service.public_url, True, 200, "healthy")
+
+    def fake_probe_http(name, url, *, timeout):
+        seen.append((name, url, timeout))
+        return ProbeResult(name, url, True, 200, "healthy")
+
+    monkeypatch.setattr("skeleton.app.health.probe_url", fake_probe_url)
+    monkeypatch.setattr("skeleton.app.health.probe_http", fake_probe_http)
+
+    manifest = load_manifest()
+    results = probe_application(manifest=manifest, timeout=1.5)
+
+    assert [item.service for item in results][-1] == "application"
+    assert (
+        "application",
+        "http://localhost:8001/api/app/ready",
+        1.5,
+    ) in seen

@@ -18,8 +18,6 @@ import {
 } from '../src/product/productCatalog';
 import { probeAppHealth } from '../src/product/appHealthClient';
 import type { AppHealthSnapshot } from '../src/product/appHealthClient';
-import { getProductReadiness } from '../src/product/productControlClient';
-import type { PublicReadinessReport } from '../src/product/productControlClient';
 
 const PILLARS: readonly { id: ProductPillar; title: string; subtitle: string }[] = [
   { id: 'create', title: 'Create', subtitle: 'Design, generate and ship worlds and playable projects.' },
@@ -39,7 +37,6 @@ export default function ProductShellRoute() {
   const [query, setQuery] = useState('');
   const [health, setHealth] = useState<AppHealthSnapshot | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
-  const [actionReadiness, setActionReadiness] = useState<PublicReadinessReport | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
   const isWide = width >= 760;
 
@@ -60,22 +57,6 @@ export default function ProductShellRoute() {
       try { controller?.abort(); } catch {}
     };
   }, [refreshHealth]);
-
-  useEffect(() => {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    getProductReadiness(controller?.signal)
-      .then((result) => {
-        if (!controller?.signal.aborted && result.ok && result.data) {
-          setActionReadiness(result.data);
-        }
-      })
-      .catch(() => {
-        // Product navigation remains available when readiness telemetry is offline.
-      });
-    return () => {
-      try { controller?.abort(); } catch {}
-    };
-  }, []);
 
   const visibleCapabilities = useMemo(() => {
     if (!normalizedQuery) return PRODUCT_CAPABILITIES;
@@ -137,11 +118,21 @@ export default function ProductShellRoute() {
             <Metric label="Pillars" value={String(normalizedQuery ? visiblePillars.length : PILLARS.length)} />
             <Metric
               label="Runtime"
-              value={healthLoading && !health ? 'Checking' : health?.ok ? 'Healthy' : health ? 'Degraded' : 'Unknown'}
+              value={
+                healthLoading && !health
+                  ? 'Checking'
+                  : health?.ok
+                    ? 'Healthy'
+                    : health?.contractSource && health.contractSource !== 'runtime'
+                      ? 'Partial'
+                      : health
+                        ? 'Degraded'
+                        : 'Unknown'
+              }
             />
             <Metric
               label="Actions"
-              value={actionReadiness ? `${actionReadiness.ready_actions}/${actionReadiness.canonical_actions}` : '—'}
+              value={health?.product?.available ? `${health.product.ready_actions}/${health.product.canonical_actions}` : '—'}
             />
           </View>
         </View>
@@ -151,7 +142,9 @@ export default function ProductShellRoute() {
             <View style={styles.healthCopy}>
               <Text style={styles.healthTitle}>Application runtime</Text>
               <Text style={styles.healthSubtitle}>
-                Canonical backend and Skeleton engine health from the same endpoints used by startup verification.
+                {health?.application
+                  ? `${health.application.name} v${health.application.version} · ${health.contractSource} contract · assembled runtime health`
+                  : 'Canonical application runtime health from the assembly contract.'}
               </Text>
             </View>
             <TouchableOpacity
@@ -166,13 +159,22 @@ export default function ProductShellRoute() {
             </TouchableOpacity>
           </View>
           <View style={styles.healthServices}>
-            {(['backend', 'skeleton'] as const).map((name) => {
-              const service = health?.services.find((candidate) => candidate.name === name);
+            {(health?.services.length ? health.services : [
+              { name: 'backend' as const },
+              { name: 'skeleton' as const },
+            ]).map((item) => {
+              const name = item.name;
+              const service = 'ok' in item ? item : health?.services.find((candidate) => candidate.name === name);
               const state = healthLoading && !service ? 'checking' : service?.ok ? 'healthy' : service ? 'degraded' : 'unknown';
+              const label = name === 'backend'
+                ? 'Application API'
+                : name === 'skeleton'
+                  ? 'Skeleton engine'
+                  : 'Mongo state';
               return (
                 <View key={name} style={styles.healthService}>
                   <View style={styles.healthServiceTop}>
-                    <Text style={styles.healthServiceName}>{name === 'backend' ? 'Application API' : 'Skeleton engine'}</Text>
+                    <Text style={styles.healthServiceName}>{label}</Text>
                     <Text style={[
                       styles.healthState,
                       state === 'healthy' ? styles.healthGood : state === 'degraded' ? styles.healthBad : styles.healthMuted,

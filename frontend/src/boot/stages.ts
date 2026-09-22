@@ -8,7 +8,7 @@
 import { Platform } from 'react-native';
 import { safeGetItem, safeSetItem, pruneExpired } from '../../utils/safeStorage';
 import api from '../utils/apiClient';
-import { probeBackend } from '../utils/bootHealth';
+import { getAppBootstrap, getAppRuntimeStatus } from '../product/appBootstrapClient';
 import { loadFlags } from '../feature-flags/flagsClient';
 
 export interface StageRun { ok: boolean; note?: string }
@@ -30,7 +30,9 @@ const BOOT_CACHE_KEY = '@boot/last_ok:v1';
 export interface CachedBoot {
   ts: number;
   score: number;
-  backendOk: boolean;
+  runtimeOk?: boolean;
+  /** @deprecated retained for compatibility with pre-assembly boot caches */
+  backendOk?: boolean;
 }
 
 export async function readBootCache(): Promise<CachedBoot | null> {
@@ -101,17 +103,40 @@ export const STAGES: BootStageDef[] = [
     },
   },
   {
-    id: 'backend', label: 'Backend connection', deps: ['finalize'],
-    timeoutMs: 3_500, critical: false, weight: 30, phase: 1,
+    id: 'assembly_contract', label: 'Application contract', deps: ['finalize'],
+    timeoutMs: 3_000, critical: false, weight: 10, phase: 1,
     retries: 0,
     run: async (signal) => {
       if (signal?.aborted) return { ok: false, note: 'aborted' };
-      const result = await probeBackend(1, signal, 3_000);
-      return result.ok ? { ok: true } : { ok: false, note: result.lastError || 'no response' };
+      const bootstrap = await getAppBootstrap(signal);
+      if (!bootstrap) return { ok: false, note: 'bootstrap unavailable' };
+      if (bootstrap.application.name !== 'Skeleton') {
+        return { ok: false, note: `identity=${bootstrap.application.name}` };
+      }
+      return {
+        ok: true,
+        note: `v${bootstrap.application.version} · ${bootstrap.profiles.default.services.length} services`,
+      };
     },
   },
   {
-    id: 'feature_flags', label: 'Feature flags', deps: ['backend'],
+    id: 'app_runtime', label: 'Application runtime', deps: ['assembly_contract'],
+    timeoutMs: 4_000, critical: false, weight: 25, phase: 1,
+    retries: 0,
+    run: async (signal) => {
+      if (signal?.aborted) return { ok: false, note: 'aborted' };
+      const bootstrap = await getAppBootstrap(signal);
+      if (!bootstrap) return { ok: false, note: 'bootstrap unavailable' };
+      const runtime = await getAppRuntimeStatus(3_000, signal, bootstrap);
+      if (!runtime) return { ok: false, note: 'runtime status unavailable' };
+      const failed = runtime.services.filter(service => !service.ok).map(service => service.name);
+      return runtime.ok
+        ? { ok: true, note: `${runtime.services.length} services healthy` }
+        : { ok: false, note: failed.length ? `degraded: ${failed.join(', ')}` : 'degraded' };
+    },
+  },
+  {
+    id: 'feature_flags', label: 'Feature flags', deps: ['app_runtime'],
     timeoutMs: 4_000, critical: false, weight: 10, phase: 1,
     retries: 0,
     run: async (signal) => {

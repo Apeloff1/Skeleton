@@ -40,6 +40,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     check.add_argument("--json", action="store_true", dest="as_json")
 
+    plan = sub.add_parser("plan", help="show dependency-aware application startup order")
+    plan.add_argument("--full", action="store_true", help="include optional full-profile services")
+    plan.add_argument("--json", action="store_true", dest="as_json")
+
     up = sub.add_parser("up", help="build and start the assembled application")
     up.add_argument("--full", action="store_true", help="include optional full-profile services")
     up.add_argument("--no-build", action="store_true", help="do not rebuild images")
@@ -187,10 +191,25 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
+    if command == "plan":
+        from skeleton.app.plan import build_plan
+
+        plan = build_plan(full=bool(args.full))
+        if bool(args.as_json):
+            print(json.dumps(plan.to_dict(), indent=2, sort_keys=True))
+        else:
+            print(f"assembly profile: {plan.profile}")
+            print("requested: " + ", ".join(plan.requested))
+            for index, layer in enumerate(plan.layers):
+                print(f"layer {index}: " + ", ".join(layer))
+            print("startup order: " + " -> ".join(plan.services))
+        return 0
+
     if command in {"preload", "setup", "install"}:
         from skeleton.app.installer import run_setup_command
 
         return run_setup_command(command, args)
+
 
     root = find_repo_root()
     manifest = load_manifest()
