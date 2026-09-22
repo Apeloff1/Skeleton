@@ -56,7 +56,6 @@ class LensDependenceKind(str, Enum):
     SHARED_OBSERVATION = "shared_observation"
     SAME_FAMILY = "same_family"
     SHARED_CALIBRATION = "shared_calibration"
-    SHARED_PROVENANCE = "shared_provenance"
     EXPLICIT = "explicit"
 
 
@@ -200,7 +199,6 @@ class LensFusionPolicy:
     same_lens_weight: float = 0.90
     same_family_weight: float = 0.25
     shared_calibration_weight: float = 0.12
-    shared_provenance_weight: float = 0.88
     dependence_discount: float = 0.85
     maximum_family_weight: float = 0.80
     maximum_single_weight: float = 0.65
@@ -218,7 +216,6 @@ class LensFusionPolicy:
             "same_lens_weight",
             "same_family_weight",
             "shared_calibration_weight",
-            "shared_provenance_weight",
             "dependence_discount",
             "maximum_family_weight",
             "maximum_single_weight",
@@ -338,20 +335,6 @@ class LensFusionEngine:
                             LensDependenceKind.SHARED_CALIBRATION,
                             self.policy.shared_calibration_weight,
                             "signals share a calibration population",
-                        )
-                    )
-                provenance_overlap = _jaccard(left.provenance_ids, right.provenance_ids)
-                if provenance_overlap:
-                    candidates.append(
-                        LensDependence(
-                            left.signal_id,
-                            right.signal_id,
-                            LensDependenceKind.SHARED_PROVENANCE,
-                            min(
-                                1.0,
-                                self.policy.shared_provenance_weight * provenance_overlap,
-                            ),
-                            "signals descend from shared semantic findings or interactions",
                         )
                     )
                 for edge in candidates:
@@ -487,12 +470,12 @@ class LensFusionEngine:
             sum(w * (p - mean) ** 2 for w, p in zip(signal_weights, probs)) / norm
         )
         positive_mass = sum(
-            contrib.effective_weight
+            item.effective_weight
             for item, contrib in zip(ordered, contributions)
             if item.probability > 0.5 and contrib.effective_weight > 0
         )
         negative_mass = sum(
-            contrib.effective_weight
+            item.effective_weight
             for item, contrib in zip(ordered, contributions)
             if item.probability < 0.5 and contrib.effective_weight > 0
         )
