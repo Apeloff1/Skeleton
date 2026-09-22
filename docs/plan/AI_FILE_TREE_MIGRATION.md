@@ -146,8 +146,8 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **104 governed source -> destination mappings**
-- **1,997 changed files under `skeleton/ai`** in this migration PR
+- **130 governed source -> destination mappings**
+- **2,086 governed mirror files under `skeleton/ai` across transfer v1 + v2** in this migration PR
 - package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
   sources have been promoted into `mappings`
@@ -176,10 +176,10 @@ The prepared units are divided into five deterministic batches:
   parity exceptions. Provider credentials, network ownership, or other
   authority-bearing implementation stays at the legacy owner until an explicit
   owner/import cutover is approved.
-- **B4-research-quarantine (29 mappings):** historical and model-internals
+- **B4-research-quarantine (35 mappings):** historical and model-internals
   research lineage. These units remain characterization-gated and are not
   production cutover candidates.
-- **B3-compat-convergence (2 mappings):** Turn and Telemetry compatibility
+- **B3-compat-convergence (22 mappings):** Turn and Telemetry compatibility
   mirrors that must merge into existing canonical owners rather than become
   independent production authorities.
 
@@ -226,23 +226,18 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **104 mappings**. The prior direct Git-object
-audit covered the first **78 mappings**. The remaining **26 current mappings**
-are explicitly carried in the pending refresh scope; stale references to the
-removed legacy project-manifest mirror have been dropped.
+The current governed set contains **130 mappings**. Transfer v2 adds 26 governed mappings on top of the 104-mapping first transfer. A fresh full-object/parity audit is rebound to each rebuilt payload before implementation attestation.
 
-The preparation ledger is now internally consistent:
-
+The preparation ledger is:
 - 54 mappings in `B1-core-runtime`
 - 12 mappings in `B2-domain-build`
 - 7 mappings in `B3-owner-sensitive`
-- 2 mappings in `B3-compat-convergence`
-- 29 mappings in `B4-research-quarantine`
+- 22 mappings in `B3-compat-convergence`
+- 35 mappings in `B4-research-quarantine`
 - 0 pending move assignments
 - 33 retained-outside classifications
 
-Fresh full-object/parity audit and CI evidence are still required before import
-inversion, source retirement, or any cutover-complete claim.
+CI and independent verification remain required before import inversion, source retirement, or any cutover-complete claim.
 
 
 ## Compatibility convergence surfaces
@@ -279,3 +274,40 @@ against later designs. They are explicitly **non-authoritative**:
 No historical module can become a production owner through relocation alone;
 promotion requires an explicit masterplan adoption, evaluation evidence, and
 the normal signed-accountability process.
+
+
+## Transfer v2 clean rebuild
+
+Transfer v2 is rebuilt directly on the hardened baseline bridge to eliminate unrelated reconciliation history.
+
+Scope:
+- 26 new governed mappings
+- 89 new mirrored files
+- 5 `skeleton/automation` parity refreshes are owned by the baseline bridge and inherited unchanged; they are no longer part of the transfer-v2 PR delta
+- 2 governance files updated (`machine/ai_file_tree.json`, this migration packet)
+- expected PR delta after latest bridge reconciliation: 91 files (89 new mirrors + 2 governance files)
+
+New research-quarantine mappings:
+- `backend/gameforge/exocortex/agentic`
+- `backend/gameforge/exocortex/zaibatsu`
+- `backend/gameforge/reasoning`
+- `backend/gameforge/rag`
+- `backend/gameforge/math_exocortex`
+- `backend/gameforge/personal/neuro`
+
+Twenty selected `backend/core` Jeeves/model/memory/swarm/world modules are staged under `skeleton/ai/compat/backend_core` as convergence inputs only. They do not become independent authorities by relocation.
+
+No import inversion, source retirement, AIQ completion, work-package completion, or production-readiness claim is made by this transfer.
+
+
+### Transfer v2 clean-audit evidence
+
+The latest bridge-rebased payload is intentionally created before its final identity can be written into the manifest. The following attestation commit must bind the actual payload SHA/tree after a fresh recursive 130-mapping audit confirms:
+- 0 stale source Git-object identities
+- 0 missing source/destination mappings
+- 0 tree-membership drift
+- 0 exact mirror blob drift
+- all 16 compatibility facades satisfy their required non-owning import contracts
+- 0 forbidden provider credential/network markers in those facades
+
+Independent verification remains unsigned and final bridge-based CI/App Assembly must still pass.
