@@ -215,3 +215,19 @@ def test_ai_file_tree_preserves_remaining_acquired_lineage() -> None:
 
     assert manifest["pre_move_readiness"]["governed_mapping_count"] == 134
     assert manifest["pre_move_readiness"]["batch_counts"]["B4-research-quarantine"] == 39
+
+
+def test_ai_file_tree_ignores_runtime_generated_membership_noise(tmp_path: Path) -> None:
+    module = _module()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    (source / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (destination / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    generated = source / "__pycache__"
+    generated.mkdir()
+    (generated / "module.cpython-311.pyc").write_bytes(b"runtime-only")
+
+    assert module._compare(source, destination) == []
