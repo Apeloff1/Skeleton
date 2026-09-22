@@ -53,7 +53,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
       <View style={styles.iconWrap}>
         <LinearGradient
           colors={['#EF444433', '#EF444411'] as any}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
         <Ionicons name="alert-circle" size={44} color={theme.colors.danger} />
       </View>
