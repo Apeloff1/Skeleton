@@ -7,6 +7,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - "skeleton/app/**"
+      - "skeleton/ai/**"
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
       - "skeleton/testing/test_app_plan.py"
@@ -24,6 +25,7 @@ on:
       - "skeleton/testing/test_ai_p0_edge_case_matrix.py"
       - "skeleton/testing/test_ai_full_edge_case_matrix.py"
       - "skeleton/testing/test_ai_master_build_sequence.py"
+      - "skeleton/testing/test_ai_file_tree.py"
       - "skeleton/testing/test_ai_engineering_pass.py"
       - "skeleton/testing/test_ai_engineering_task_matrix.py"
       - "skeleton/testing/test_ai_adversarial_closure.py"
@@ -97,6 +99,7 @@ on:
       - "scripts/check_ai_p0_edge_case_matrix.py"
       - "scripts/check_ai_full_edge_case_matrix.py"
       - "scripts/check_ai_master_build_sequence.py"
+      - "scripts/check_ai_file_tree.py"
       - "scripts/check_ai_engineering_pass.py"
       - "scripts/check_ai_engineering_task_matrix.py"
       - "scripts/check_ai_adversarial_closure.py"
@@ -116,6 +119,7 @@ on:
       - "machine/ai_p0_edge_case_matrix.json"
       - "machine/ai_full_edge_case_matrix.json"
       - "machine/ai_master_build_sequence.json"
+      - "machine/ai_file_tree.json"
       - "machine/ai_engineering_pass.json"
       - "machine/ai_engineering_task_matrix.json"
       - "machine/ai_adversarial_closure.json"
@@ -185,6 +189,9 @@ jobs:
 
       - name: Validate master build sequence
         run: python scripts/check_ai_master_build_sequence.py
+
+      - name: Validate canonical AI file tree
+        run: python scripts/check_ai_file_tree.py
 
       - name: Validate masterplan engineering pass
         run: python scripts/check_ai_engineering_pass.py
