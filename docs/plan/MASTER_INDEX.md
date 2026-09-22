@@ -42,6 +42,10 @@ Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
 Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
 
+Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md)
+
+Machine exotic catalogue: [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -76,8 +80,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 22. `docs/plan/VOLUME_DEPTH_000_040.md`
 23. `docs/plan/ENGINEERING_PASS.md`
 24. `machine/ai_engineering_pass.json`
+25. `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`
+26. `machine/ai_exotic_systems_catalog.json`
 
-The first ten remain the present implementation/construction authority. Items 11–24 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
+The first ten remain the present implementation/construction authority. Items 11–26 form the frozen long-range planning, risk, sequencing, depth, exotic-research and engineering-validation stack.
 
 ## Index laws
 
@@ -612,3 +618,11 @@ At initial publication it contains **240 mapped entries**:
 Relevant catalogue entries should be converted into requirements, invariants, tests, fuzz/property suites, chaos cases, runbooks, or explicit accepted risks when their mapped capabilities enter implementation.
 
 The architecture breadth freeze at Volume 420 is deliberate: the next phase is construction depth, not additional top-level-box accumulation.
+
+## Cross-cutting exotic systems depth
+
+The frozen volume structure also carries a machine-validated exotic-systems reservoir. It currently holds **60 research candidates across 12 categories**, ranging from active-inference and vector-symbolic memory through formal verification, CRDT/differential-dataflow experiments, sparse inference, unusual hardware, continual-learning controls and adversarial research mechanisms.
+
+Exotics are depth, not breadth: each candidate must map to existing volumes and work packages, default to no production authority, preserve a canonical fallback, expose an independent kill switch, and earn promotion through reproducible comparative evidence plus ordinary maturity/accountability gates.
+
+See [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) and [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json).
