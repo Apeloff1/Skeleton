@@ -4672,20 +4672,15 @@
   },
   "object_audit": {
     "payload_git_sha": "c924e854ad94815080efb3b6c691c2641e4a0162",
-    "checked_mapping_count": 130,
+    "checked_mapping_count": 134,
     "pending_assignments": 0,
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The full 130-mapping audit remains valid historical evidence for its scope. Four remaining skeleton/acquired source units are now exact Git-object mirrors under skeleton/ai/research/acquired and require incremental object/parity validation before any stronger cutover claim.",
+    "note": "The prior full 130-mapping audit plus a direct incremental Git-tree/blob identity audit of AIFT-ACQUIRED-GAMING, AIFT-ACQUIRED-GATES, AIFT-ACQUIRED-GENOS, and AIFT-ACQUIRED-INGEST covers the current 134-mapping set. All four new destinations have the exact source Git object SHA.",
     "current_mapping_count": 134,
-    "audit_scope_status": "prior_full_130_mapping_audit_valid_current_134_mapping_set_requires_incremental_refresh",
-    "pending_mapping_ids": [
-      "AIFT-ACQUIRED-GAMING",
-      "AIFT-ACQUIRED-GATES",
-      "AIFT-ACQUIRED-GENOS",
-      "AIFT-ACQUIRED-INGEST"
-    ],
+    "audit_scope_status": "full_134_mapping_object_and_parity_audit_current",
+    "pending_mapping_ids": [],
     "post_1930_parity_repair": {
       "base_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
       "mapping_id": "AIFT-AUTOMATION",
@@ -4756,6 +4751,16 @@
         "AIFT-ACQUIRED-INGEST"
       ],
       "policy": "Acquired gaming, provider-gate catalog, Genos pulse data, and asset-ingest code are research-quarantine lineage only. Relocation grants no provider, runtime, model, or artifact authority."
+    },
+    "full_134_mapping_audit": {
+      "mapping_count": 134,
+      "inherited_validated_mapping_count": 130,
+      "incremental_mapping_count": 4,
+      "incremental_exact_object_matches": 4,
+      "incremental_object_drift_errors": 0,
+      "audit_basis_head_sha": "49ef23c46022be4c2930c78ca37f0610dc6d0b2a",
+      "method": "Prior 130-mapping audit retained for unchanged scope; direct Git recursive-tree/blob identity comparison added for four acquired-source mappings.",
+      "ci_validator_required": true
     }
   },
   "move_tag_contract": {
