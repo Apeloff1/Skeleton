@@ -40,7 +40,9 @@ Foundational volume depth pass: [`VOLUME_DEPTH_000_040.md`](VOLUME_DEPTH_000_040
 
 Sequential volume depth pass: [`VOLUME_DEPTH_041_080.md`](VOLUME_DEPTH_041_080.md)
 
-Next sequential depth target: **VOL-081** (`DP-081-120`).
+Qualification volume depth pass: [`VOLUME_DEPTH_081_120.md`](VOLUME_DEPTH_081_120.md)
+
+Next sequential depth target: **VOL-121** (`DP-121-160`).
 
 Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
@@ -91,14 +93,15 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 21. `machine/ai_master_build_sequence.json`
 22. `docs/plan/VOLUME_DEPTH_000_040.md`
 23. `docs/plan/VOLUME_DEPTH_041_080.md`
-24. `docs/plan/ENGINEERING_PASS.md`
-25. `machine/ai_engineering_pass.json`
-26. `docs/plan/ADVERSARIAL_CLOSURE_PASS.md`
-27. `machine/ai_adversarial_closure.json`
-28. `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`
-29. `machine/ai_exotic_systems_catalog.json`
-30. `docs/plan/ENGINEERING_TASK_MATRIX.md`
-31. `machine/ai_engineering_task_matrix.json`
+24. `docs/plan/VOLUME_DEPTH_081_120.md`
+25. `docs/plan/ENGINEERING_PASS.md`
+26. `machine/ai_engineering_pass.json`
+27. `docs/plan/ADVERSARIAL_CLOSURE_PASS.md`
+28. `machine/ai_adversarial_closure.json`
+29. `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`
+30. `machine/ai_exotic_systems_catalog.json`
+31. `docs/plan/ENGINEERING_TASK_MATRIX.md`
+32. `machine/ai_engineering_task_matrix.json`
 
 The first ten remain the present implementation/construction authority. Items 11–30 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack.
 
