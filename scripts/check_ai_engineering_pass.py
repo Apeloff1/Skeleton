@@ -98,6 +98,8 @@ def validate() -> list[str]:
             errors.append("task_propagation machine path drifted")
         if task_propagation.get("human_contract") != "docs/plan/ENGINEERING_TASK_MATRIX.md":
             errors.append("task_propagation human path drifted")
+        if task_propagation.get("adversarial_source") != "machine/ai_adversarial_closure.json":
+            errors.append("task_propagation adversarial source drifted")
 
     budget = engineering.get("budget_binding_policy", {})
     fields = budget.get("required_fields")
