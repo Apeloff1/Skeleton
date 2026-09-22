@@ -329,3 +329,4 @@ jobs:
           tests/test_queue_drain_housekeeping_cooldown.py
           tests/test_arm64_workflow_trigger_scope.py
           tests/test_ci_java_accelerator_dependencies.py
+          tests/test_backend_quality_plan_fast_path.py
