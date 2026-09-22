@@ -355,11 +355,12 @@ def deterministic_worker_branch(custody: WorkerCustody) -> str:
     return validate_branch(branch, label="derived worker branch")
 
 
-def remote_branch_exists(
+def remote_branch_head(
     branch: str,
     *,
     cwd: Path | str = ".",
-) -> bool:
+) -> str | None:
+    """Return the exact remote worker-branch head, or None when absent."""
     branch = validate_branch(branch)
     try:
         raw = subprocess.check_output(
@@ -374,7 +375,7 @@ def remote_branch_exists(
             text=True,
             stderr=subprocess.DEVNULL,
             timeout=30,
-        )
+        ).strip()
     except (
         OSError,
         subprocess.CalledProcessError,
@@ -383,7 +384,36 @@ def remote_branch_exists(
         raise SupervisorRuntimeError(
             "unable to inspect remote worker branch"
         ) from exc
-    return bool(raw.strip())
+    if not raw:
+        return None
+    lines = raw.splitlines()
+    if len(lines) != 1:
+        raise SupervisorRuntimeError(
+            "remote worker branch lookup returned ambiguous refs"
+        )
+    sha, separator, ref = lines[0].partition("\t")
+    if (
+        not separator
+        or ref != f"refs/heads/{branch}"
+    ):
+        raise SupervisorRuntimeError(
+            "remote worker branch lookup returned invalid ref"
+        )
+    return validate_sha(
+        sha,
+        label="remote worker branch SHA",
+    )
+
+
+def remote_branch_exists(
+    branch: str,
+    *,
+    cwd: Path | str = ".",
+) -> bool:
+    return remote_branch_head(
+        branch,
+        cwd=cwd,
+    ) is not None
 
 
 def _open_pull_requests(
@@ -729,6 +759,7 @@ WORKER_RESULT_STATUSES = frozenset({
     "existing-pr",
     "no-change",
     "pull-request-created",
+    "pull-request-updated",
 })
 MAX_WORKER_RESULT_BYTES = 16_384
 
@@ -786,6 +817,7 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         "execution_fingerprint",
         "build_task_digest",
         "builder_manifest_digest",
+        "repair_parent_sha",
     ):
         item = value.get(key)
         if item is not None:
@@ -803,9 +835,47 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
                 )
             admitted[key] = item
 
+    builder_receipt = value.get("builder_proposal_receipt")
+    if builder_receipt is not None:
+        if (
+            worker != "feature-builder"
+            or status != "pull-request-created"
+        ):
+            raise SupervisorRuntimeError(
+                "Builder proposal receipt escaped its admitted worker status"
+            )
+        if not isinstance(builder_receipt, dict):
+            raise SupervisorRuntimeError(
+                "Builder proposal receipt must be an object"
+            )
+        if len(canonical_json(builder_receipt)) > 12_000:
+            raise SupervisorRuntimeError(
+                "Builder proposal receipt exceeds evidence budget"
+            )
+        admitted["builder_proposal_receipt"] = builder_receipt
+
+    repair_receipt = value.get("builder_repair_receipt")
+    if repair_receipt is not None:
+        if (
+            worker != "feature-builder"
+            or status != "pull-request-updated"
+        ):
+            raise SupervisorRuntimeError(
+                "Builder repair receipt escaped its admitted worker status"
+            )
+        if not isinstance(repair_receipt, dict):
+            raise SupervisorRuntimeError(
+                "Builder repair receipt must be an object"
+            )
+        if len(canonical_json(repair_receipt)) > 16_000:
+            raise SupervisorRuntimeError(
+                "Builder repair receipt exceeds evidence budget"
+            )
+        admitted["builder_repair_receipt"] = repair_receipt
+
     # Evidence that claims a mutation must carry the immutable custody proofs
     # needed to correlate the remote proposal with this exact execution.
-    if status == "pull-request-created":
+    if status in {"pull-request-created", "pull-request-updated"}:
         required = (
             "branch",
             "proposal_digest",
@@ -826,9 +896,52 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
         validate_fingerprint(admitted["execution_fingerprint"])
         if "builder_manifest_digest" in admitted:
             validate_fingerprint(admitted["builder_manifest_digest"])
+        if (
+            status == "pull-request-created"
+            and worker == "feature-builder"
+            and "builder_proposal_receipt" not in admitted
+        ):
+            raise SupervisorRuntimeError(
+                "feature-builder created-PR evidence is missing proposal receipt"
+            )
+        if (
+            status == "pull-request-updated"
+            and worker == "feature-builder"
+            and "builder_repair_receipt" not in admitted
+        ):
+            raise SupervisorRuntimeError(
+                "feature-builder updated-PR evidence is missing repair receipt"
+            )
         if admitted["changed_lines"] <= 0:
             raise SupervisorRuntimeError(
-                "created-PR evidence has invalid changed-line count"
+                "mutating PR evidence has invalid changed-line count"
+            )
+        branch = validate_branch(
+            admitted["branch"],
+            label="worker evidence branch",
+        )
+        if status == "pull-request-updated":
+            if not branch.startswith(
+                worker_branch_prefix(worker)
+            ):
+                raise SupervisorRuntimeError(
+                    "updated-PR evidence is outside worker namespace"
+                )
+            if (
+                "pull_request" not in admitted
+                or admitted["pull_request"] <= 0
+            ):
+                raise SupervisorRuntimeError(
+                    "updated-PR evidence has invalid pull request identity"
+                )
+            parent = admitted.get("repair_parent_sha")
+            if not isinstance(parent, str):
+                raise SupervisorRuntimeError(
+                    "updated-PR evidence missing repair parent"
+                )
+            validate_sha(
+                parent,
+                label="worker repair parent SHA",
             )
     elif status == "existing-pr":
         required = (
@@ -855,37 +968,43 @@ def parse_worker_result(output: object, *, worker: str) -> dict[str, Any]:
             )
         validate_fingerprint(admitted["supervisor_snapshot_fingerprint"])
     else:
-        allowed_no_change = {
-            "status",
-            "bot",
-            "supervisor_snapshot_fingerprint",
-            "execution_fingerprint",
-            "builder_manifest_digest",
-        }
-        unexpected = set(admitted) - allowed_no_change
+        unexpected = set(admitted) - {"status", "bot"}
         if unexpected:
             raise SupervisorRuntimeError(
                 "no-change evidence contains unsupported custody fields"
             )
-        for key in (
-            "supervisor_snapshot_fingerprint",
-            "execution_fingerprint",
-            "builder_manifest_digest",
-        ):
-            if key in admitted:
-                validate_fingerprint(admitted[key])
     return admitted
 
 
 def validate_worker_evidence_custody(
     evidence: Mapping[str, Any],
     custody: WorkerCustody,
+    *,
+    expected_branch: str | None = None,
 ) -> None:
-    """Bind admitted worker evidence back to Secretary-issued custody."""
+    """Bind admitted worker evidence back to Secretary-issued custody.
+
+    A task-bound builder branch may be supplied explicitly while ordinary
+    workers retain the deterministic worker/base branch identity.
+    """
     if evidence.get("bot") != custody.worker:
         raise SupervisorRuntimeError("worker evidence custody mismatch")
+
+    admitted_branch: str | None = None
+    if expected_branch is not None:
+        admitted_branch = validate_branch(
+            expected_branch,
+            label="expected worker evidence branch",
+        )
+        if not admitted_branch.startswith(
+            worker_branch_prefix(custody.worker)
+        ):
+            raise SupervisorRuntimeError(
+                "expected worker branch is outside worker namespace"
+            )
+
     status = evidence.get("status")
-    if status == "pull-request-created":
+    if status in {"pull-request-created", "pull-request-updated"}:
         if evidence.get("base_sha") != custody.execution.base_sha:
             raise SupervisorRuntimeError("worker evidence base mismatch")
         if (
@@ -895,9 +1014,36 @@ def validate_worker_evidence_custody(
             raise SupervisorRuntimeError("worker evidence snapshot mismatch")
         if evidence.get("execution_fingerprint") != custody.execution.fingerprint:
             raise SupervisorRuntimeError("worker evidence execution mismatch")
-        expected_branch = deterministic_worker_branch(custody)
-        if evidence.get("branch") != expected_branch:
-            raise SupervisorRuntimeError("worker evidence branch mismatch")
+        branch = evidence.get("branch")
+        if status == "pull-request-created":
+            required_branch = (
+                admitted_branch
+                if admitted_branch is not None
+                else deterministic_worker_branch(custody)
+            )
+            if branch != required_branch:
+                raise SupervisorRuntimeError(
+                    "worker evidence branch mismatch"
+                )
+        else:
+            if (
+                not isinstance(branch, str)
+                or not branch.startswith(
+                    worker_branch_prefix(custody.worker)
+                )
+            ):
+                raise SupervisorRuntimeError(
+                    "worker repair evidence branch mismatch"
+                )
+            parent = evidence.get("repair_parent_sha")
+            if not isinstance(parent, str):
+                raise SupervisorRuntimeError(
+                    "worker repair evidence missing parent"
+                )
+            validate_sha(
+                parent,
+                label="worker repair parent SHA",
+            )
     elif status == "existing-pr":
         if (
             evidence.get("supervisor_snapshot_fingerprint")
@@ -910,20 +1056,9 @@ def validate_worker_evidence_custody(
             or not branch.startswith(worker_branch_prefix(custody.worker))
         ):
             raise SupervisorRuntimeError("worker evidence branch mismatch")
-    elif status == "no-change":
-        snapshot = evidence.get("supervisor_snapshot_fingerprint")
-        if (
-            snapshot is not None
-            and snapshot != custody.snapshot_fingerprint
-        ):
-            raise SupervisorRuntimeError("worker evidence snapshot mismatch")
-        execution = evidence.get("execution_fingerprint")
-        if (
-            execution is not None
-            and execution != custody.execution.fingerprint
-        ):
-            raise SupervisorRuntimeError("worker evidence execution mismatch")
-    else:
+        if admitted_branch is not None and branch != admitted_branch:
+            raise SupervisorRuntimeError("worker evidence branch mismatch")
+    elif status != "no-change":
         raise SupervisorRuntimeError("worker evidence status is not admitted")
 
 
