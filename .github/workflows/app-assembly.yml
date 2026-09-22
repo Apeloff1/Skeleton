@@ -239,7 +239,7 @@ jobs:
 
       - name: Install frontend dependencies without third-party lifecycle scripts
         working-directory: frontend
-        run: yarn install --frozen-lockfile --ignore-scripts
+        run: yarn install --ignore-scripts
 
       - name: Apply reviewed local node_modules patches
         working-directory: frontend
