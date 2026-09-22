@@ -563,7 +563,7 @@
       "stage": 0,
       "parallel_lane": "provider-surface",
       "objective": "Run provider-surface discovery and classify every credential/network model edge.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [],
       "closure_dependencies": [],
       "can_start_before_closure_dependencies_close": true,
