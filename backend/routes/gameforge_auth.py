@@ -15,7 +15,8 @@ from typing import Annotated, Literal
 import bcrypt as _bcrypt
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel, EmailStr, Field
 
 from core.auth_security import (
@@ -191,7 +192,7 @@ def get_current_user(token: Annotated[str | None, Depends(oauth2_scheme)]):
         email, role = payload.get("sub"), payload.get("role")
         if not email or role not in ROLE_RANK:
             return None
-    except JWTError:
+    except InvalidTokenError:
         return None
     return _users().find_one(
         {"email": email, "disabled": {"$ne": True}},
