@@ -215,3 +215,105 @@ def test_quota_snapshot_contains_no_operation_payload() -> None:
     rendered = str(ledger.snapshot("tenant-a"))
     assert "prompt" not in rendered
     assert "secret" not in rendered
+
+
+def test_in_memory_incremental_usage_is_idempotent_and_reconciled() -> None:
+    ledger = _ledger()
+    reservation = ledger.reserve(
+        "tenant-a",
+        "op-meter",
+        UsageEstimate(tool_calls=1, artifact_bytes=10),
+        now=10.0,
+    )
+
+    first = ledger.record_usage_event(
+        reservation.reservation_id,
+        "event-1",
+        "tool",
+        UsageEstimate(tool_calls=2),
+        max_tool_calls=5,
+        now=10.5,
+    )
+    replay = ledger.record_usage_event(
+        reservation.reservation_id,
+        "event-1",
+        "tool",
+        UsageEstimate(tool_calls=2),
+        max_tool_calls=5,
+        now=99.0,
+    )
+
+    assert replay == first
+    assert ledger.snapshot("tenant-a")["usage_events"] == 1
+    assert ledger.snapshot("tenant-a")["reserved"]["tool_calls"] == 2
+
+    completion = ledger.complete(
+        reservation.reservation_id,
+        UsageEstimate(),
+        now=11.0,
+    )
+    assert completion.actual.tool_calls == 2
+    assert ledger.snapshot("tenant-a")["committed"]["tool_calls"] == 2
+
+
+def test_in_memory_unknown_usage_is_durable_within_ledger_and_fail_closed() -> None:
+    ledger = _ledger()
+    reservation = ledger.reserve(
+        "tenant-a",
+        "op-unknown",
+        UsageEstimate(),
+        now=10.0,
+    )
+    marker = ledger.mark_usage_unknown(
+        reservation.reservation_id,
+        "unknown-1",
+        "storage",
+        now=10.5,
+    )
+
+    assert marker.category == "unknown:storage"
+    assert ledger.snapshot("tenant-a")["unknown_usage_events"] == 1
+
+    with pytest.raises(QuotaConflict, match="actual_usage_unknown:storage"):
+        ledger.complete(
+            reservation.reservation_id,
+            UsageEstimate(),
+            now=11.0,
+        )
+
+    resolved = ledger.resolve_unknown_usage(
+        reservation.reservation_id,
+        "unknown-1",
+        UsageEstimate(artifact_bytes=50),
+        max_artifact_bytes=100,
+        now=11.5,
+    )
+    assert resolved.category == "storage"
+    assert ledger.snapshot("tenant-a")["unknown_usage_events"] == 0
+
+    completion = ledger.complete(
+        reservation.reservation_id,
+        UsageEstimate(),
+        now=12.0,
+    )
+    assert completion.actual.artifact_bytes == 50
+
+
+def test_release_refuses_to_erase_metered_usage() -> None:
+    ledger = _ledger()
+    reservation = ledger.reserve(
+        "tenant-a",
+        "op-metered",
+        UsageEstimate(),
+        now=10.0,
+    )
+    ledger.record_usage_event(
+        reservation.reservation_id,
+        "event-1",
+        "artifact",
+        UsageEstimate(artifact_bytes=1),
+        now=10.5,
+    )
+
+    with pytest.raises(QuotaConflict, match="cannot release reservation after metered usage"):
+        ledger.release(reservation.reservation_id)
