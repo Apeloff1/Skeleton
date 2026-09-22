@@ -85,6 +85,7 @@ def _compare(
     destination: Path,
     *,
     parity_exceptions: dict[str, dict[str, object]] | None = None,
+    overlay_children: set[str] | None = None,
 ) -> list[str]:
     if source.is_symlink() or destination.is_symlink():
         return [f"symlink mapping forbidden: {source} -> {destination}"]
@@ -96,14 +97,20 @@ def _compare(
         ]
 
     exceptions = parity_exceptions or {}
+    overlays = overlay_children or set()
     src = _tree_files(source)
     dst = _tree_files(destination)
-    if set(src) != set(dst):
-        missing = sorted(set(src) - set(dst))
-        extra = sorted(set(dst) - set(src))
+    governed_dst = {
+        rel: path
+        for rel, path in dst.items()
+        if not any(rel == overlay or rel.startswith(overlay + "/") for overlay in overlays)
+    }
+    if set(src) != set(governed_dst):
+        missing = sorted(set(src) - set(governed_dst))
+        extra = sorted(set(governed_dst) - set(src))
         return [
             f"tree membership drift: {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)} "
-            f"missing={missing[:10]} extra={extra[:10]}"
+            f"missing={missing[:10]} extra={extra[:10]} overlays={sorted(overlays)}"
         ]
 
     errors: list[str] = []
@@ -125,7 +132,7 @@ def _compare(
                 )
             )
             continue
-        if not _content_equivalent(src[rel], dst[rel]):
+        if not _content_equivalent(src[rel], governed_dst[rel]):
             errors.append(f"tree semantic/content drift: {source.relative_to(ROOT)}/{rel}")
     return errors
 
@@ -165,6 +172,12 @@ def validate() -> list[str]:
     mappings = data.get("mappings")
     if not isinstance(mappings, list) or len(mappings) < 10:
         return errors + ["mappings must contain the governed consolidation set"]
+
+    declared_destinations = {
+        item.get("destination")
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("destination"), str)
+    }
 
     seen_ids: set[str] = set()
     seen_destinations: set[str] = set()
@@ -235,7 +248,39 @@ def validate() -> list[str]:
                             errors.append(f"{mid}: duplicate parity exception {rel}")
                             continue
                         exceptions[rel] = exception
-                errors.extend(_compare(source, destination, parity_exceptions=exceptions))
+                raw_overlays = item.get("overlay_children", [])
+                overlays: set[str] = set()
+                if not isinstance(raw_overlays, list):
+                    errors.append(f"{mid}: overlay_children must be a list")
+                else:
+                    for overlay in raw_overlays:
+                        if (
+                            not isinstance(overlay, str)
+                            or not overlay
+                            or overlay.startswith("/")
+                            or ".." in Path(overlay).parts
+                        ):
+                            errors.append(f"{mid}: invalid overlay child")
+                            continue
+                        if overlay in overlays:
+                            errors.append(f"{mid}: duplicate overlay child {overlay}")
+                            continue
+                        full_destination = f"{dst}/{overlay}"
+                        if full_destination not in declared_destinations:
+                            errors.append(
+                                f"{mid}: overlay child is not a governed mapping destination: "
+                                f"{full_destination}"
+                            )
+                            continue
+                        overlays.add(overlay)
+                errors.extend(
+                    _compare(
+                        source,
+                        destination,
+                        parity_exceptions=exceptions,
+                        overlay_children=overlays,
+                    )
+                )
             else:
                 errors.append(f"{mid}: unknown parity_mode {parity_mode!r}")
 
