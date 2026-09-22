@@ -68,10 +68,10 @@ class SynCLIPOmniVision:
         # Simulate attention maps (real: CLIP-based region-text alignment)
         original_map = np.random.rand(self.spatial_resolution, self.spatial_resolution)
         synonym_maps = [np.random.rand(self.spatial_resolution, self.spatial_resolution) for _ in synonyms]
-        
+
         consistency = self.semantic_consistent_spatial_attention(original_map, synonym_maps)
         refined_map = self.spatial_attention_refinement(original_map, np.ones_like(original_map) * 0.8)  # proxy semantic relevance
-        
+
         attention_record = SynonymAttentionMap(
             original_expression=text_expression,
             synonymous_expressions=synonyms,
@@ -79,7 +79,7 @@ class SynCLIPOmniVision:
             consistency_score=consistency
         )
         self.attention_maps.append(attention_record)
-        
+
         return {
             "grounding_consistency": consistency,
             "refined_attention_map": refined_map.tolist(),
