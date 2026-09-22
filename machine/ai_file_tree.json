@@ -1481,6 +1481,14 @@
         "preserve fail-closed classification",
         "keep inventory read-only with respect to authority",
         "bind inventory drift to validation"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "capabilities.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.inventory.capabilities import",
+          "note": "The source is an inventory classifier that contains credential-name sentinels as data. Keep those sentinels out of skeleton.ai so provider-bootstrap does not treat the mirror as a second credential-bearing surface."
+        }
       ]
     },
     {
