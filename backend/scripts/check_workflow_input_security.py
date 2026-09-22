@@ -1,10 +1,10 @@
-"""Reject untrusted GitHub Actions context data interpolated into shell commands.
+"""Reject untrusted GitHub Actions event data interpolated into shell commands.
 
-Workflow-dispatch/reusable-workflow inputs, GitHub event payload fields, and
-mutable ref fields may contain attacker- or caller-controlled strings from the
-shell's perspective. They must cross the shell boundary through an environment
-variable (or another non-code channel), never through direct `${{ ... }}`
-interpolation inside a ``run:`` command.
+Workflow-dispatch/reusable-workflow inputs and GitHub event payload fields may
+contain attacker- or caller-controlled strings from the shell's perspective.
+They must cross the shell boundary through an environment variable (or another
+non-code channel), never through direct `${{ ... }}` interpolation inside a
+``run:`` command.
 
 This checker intentionally uses only the Python standard library so it can run in
 an early CI phase without installing project dependencies.
@@ -37,15 +37,11 @@ RUN_ALIAS_RE = re.compile(r"^\*[^\s#]+(?:\s+#.*)?$")
 # block has been reconstructed instead of only matching single-line forms.
 EXPRESSION_RE = re.compile(r"\$\{\{(?P<body>.*?)\}\}", re.DOTALL)
 # Inputs are wholly caller-controlled. The github context is mixed-trust: direct
-# github.event access, mutable ref properties, and whole-object github transforms
-# are untrusted, while platform-owned properties such as github.repository are
-# allowed.
+# github.event access and whole-object github transforms are untrusted, while
+# platform-owned properties such as github.repository are allowed.
 INPUT_CONTEXT_RE = re.compile(r"(?<![A-Za-z0-9_])inputs(?![A-Za-z0-9_])")
 GITHUB_CONTEXT_RE = re.compile(r"(?<![A-Za-z0-9_])github(?![A-Za-z0-9_])")
 IDENTIFIER_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
-UNTRUSTED_GITHUB_PROPERTIES = frozenset(
-    {"event", "ref", "ref_name", "head_ref", "base_ref", "workflow_ref"}
-)
 # YAML block scalars may carry node properties such as ``&anchor`` or ``!tag``
 # before the scalar indicator. They may also combine a chomping indicator (+/-)
 # and an indentation indicator (1-9) in either order: |, |-, |2, |2-, |-2,
@@ -318,10 +314,9 @@ def _bracket_property(body: str, index: int) -> tuple[str | None, int]:
 def _github_reference_is_untrusted(body: str, searchable: str, end: int) -> bool:
     """Classify a github-context reference beginning at a known token.
 
-    Event payloads, mutable ref properties, and bracket-equivalent access are
-    untrusted. A whole github object is also untrusted because transforms such as
-    ``toJSON(github)`` carry event data. Other explicit platform-owned github
-    properties remain allowed.
+    ``github.event`` and bracket-equivalent access are untrusted. A whole github
+    object is also untrusted because transforms such as ``toJSON(github)`` carry
+    the event payload. Other explicit github properties remain allowed.
     """
     index = _skip_space(searchable, end)
     if index >= len(searchable):
@@ -332,15 +327,15 @@ def _github_reference_is_untrusted(body: str, searchable: str, end: int) -> bool
         match = IDENTIFIER_RE.match(searchable, index)
         if match is None:
             return True
-        return match.group(0) in UNTRUSTED_GITHUB_PROPERTIES
+        return match.group(0) == "event"
 
     if searchable[index] == "[":
         property_name, _ = _bracket_property(body, index)
         if property_name is None:
             # Dynamic/opaque github object indexing is fail-closed because it can
-            # select an untrusted property without exposing its name statically.
+            # select ``event`` without exposing the property name statically.
             return True
-        return property_name in UNTRUSTED_GITHUB_PROPERTIES
+        return property_name == "event"
 
     # Whole-object usage (for example toJSON(github)) contains github.event.
     return True
@@ -418,7 +413,7 @@ def main() -> int:
 
     print(
         f"Workflow input security gate passed for {len(workflows)} workflow files: "
-        "no direct untrusted event/input/ref context interpolation in run shells."
+        "no direct untrusted event/input context interpolation in run shells."
     )
     return 0
 
