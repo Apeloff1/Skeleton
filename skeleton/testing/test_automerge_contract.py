@@ -226,10 +226,15 @@ def test_github_adapter_uses_bounded_retries():
     assert "attempt >= self.retries" in source
 
 
-def test_policy_keeps_own_trust_surface_human_only():
+def test_policy_keeps_own_trust_surface_critical_and_evidence_gated():
     source = (PACKAGE / "automerge_policy.py").read_text(encoding="utf-8")
-    assert "critical_trust_surface_requires_human_merge" in source
     assert '"skeleton/pr_automation/"' in source
+    assert '".github/workflows/"' in source
+    assert '".github/actions/"' in source
+    assert "RiskTier.CRITICAL" in source
+    assert "SECURITY_WORKFLOWS" in source
+    assert "evidence_complete(" in source
+    assert "stability_elapsed(" in source
 
 
 def test_policy_requires_stability_window():
