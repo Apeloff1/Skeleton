@@ -29,7 +29,7 @@ class FeatureExtractor:
     @staticmethod
     def extract(query: str, document: str) -> Dict[str, float]:
         """Extract features from a query-document pair.
-        
+
         Features:
         - term_overlap: Jaccard similarity of terms
         - phrase_match: Exact phrase match count
@@ -39,17 +39,17 @@ class FeatureExtractor:
         query_terms = set(query.lower().split())
         doc_terms = document.lower().split()
         doc_set = set(doc_terms)
-        
+
         # Term overlap (Jaccard)
         if query_terms and doc_set:
             overlap = len(query_terms & doc_set) / len(query_terms | doc_set)
         else:
             overlap = 0.0
-        
+
         # Phrase matches
-        phrase_count = sum(1 for i in range(len(doc_terms)) 
+        phrase_count = sum(1 for i in range(len(doc_terms))
                           if " ".join(doc_terms[i:i+len(query_terms)]) == query.lower())
-        
+
         # Length ratio (prefer medium-length documents)
         query_len = len(query_terms)
         doc_len = len(doc_terms)
@@ -57,14 +57,14 @@ class FeatureExtractor:
             length_ratio = min(doc_len / query_len, 5.0) / 5.0  # Normalize, cap at 5x
         else:
             length_ratio = 0.5
-        
+
         # Position feature (earlier is better)
         positions = []
         for term in query_terms:
             if term in doc_terms:
                 positions.append(doc_terms.index(term) / max(len(doc_terms), 1))
         position = 1.0 - (sum(positions) / max(len(positions), 1)) if positions else 0.0
-        
+
         return {
             "term_overlap": overlap,
             "phrase_match": min(phrase_count / 3.0, 1.0),  # Normalize
@@ -75,7 +75,7 @@ class FeatureExtractor:
 
 class FeatureReranker:
     """Re-rank results using feature-based scoring.
-    
+
     Learns feature weights from feedback and applies them
     to re-score retrieval results.
     """
@@ -159,19 +159,19 @@ class FeatureReranker:
 
     def record_feedback(self, query: str, document_id: str, relevant: bool) -> None:
         """Record user feedback to adjust weights.
-        
+
         Simple online learning: boost weights for features
         that correlate with relevance.
         """
         self._stats["feedback"] += 1
-        
+
         # In a real implementation, this would update weights
         # based on gradient descent or perceptron learning
         if relevant:
             # Slightly boost all weights (simplified)
             for key in self._weights:
                 self._weights[key] *= 1.01
-        
+
         if self._bus:
             self._bus.emit("retrieval.reranker.feedback", {
                 "document_id": document_id,
