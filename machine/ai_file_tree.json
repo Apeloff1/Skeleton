@@ -2210,6 +2210,16 @@
       "path": "skeleton/ubuntu",
       "owner": "deployment/platform support",
       "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
+    },
+    {
+      "path": "skeleton/telemetry",
+      "owner": "observability/telemetry boundary",
+      "reason": "Top-level telemetry compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/turn",
+      "owner": "package/compatibility boundary",
+      "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
     }
   ],
   "classification_coverage": {
