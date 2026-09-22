@@ -331,3 +331,12 @@ A fresh full-object/parity audit was completed on PR #1937 head `a3d200375e6775e
 The inherited `BASE-FRONTEND-TSC-01` blocker is closed by merged PR #1936 (`3ec4a71a53186887853a6c188bb3110701fed6d8`). Current `main` carries Expo 54 with React 19.1.0, React DOM 19.1.0, React Native 0.81.6, and matching React types. This closes the historical frontend dependency mismatch only; it does not substitute for fresh App Assembly/CI on transfer-v2.
 
 Remaining transfer-v2 gates are canonical CI/App Assembly and affected-domain validation on the PR head, independent verification signoff, and explicit owner convergence before any compatibility-source retirement.
+
+
+## Transfer-v2 frontend blocker transition
+
+`BASE-FRONTEND-TSC-01` is retained as resolved historical evidence. PR #1936 merged the Expo 54 React/React Native alignment, and App Assembly run `35743872291` / job `106800300393` shows `yarn tsc --noEmit` completing successfully. The operation-stream reducer suite also passes 10/10.
+
+The active inherited frontend gate is `BASE-FRONTEND-SSR-RAF-01`. The same App Assembly run advances into `expo export --platform web` and then fails during Node-side static rendering with `ReferenceError: requestAnimationFrame is not defined`, originating from `react-native-worklets/lib/module/threads.js` under Node v24.20.0.
+
+Transfer-v2 changes no `frontend/*` files. The SSR/export failure is therefore tracked as downstream base-state debt rather than transfer-v2 object/parity drift. The full 130-mapping object/parity audit remains green, but App Assembly must be green before source retirement, `cutover_complete`, or independent completion signoff.

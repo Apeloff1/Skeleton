@@ -4123,7 +4123,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending distinct verification after transfer-v2 CI/App Assembly is green. The inherited BASE-FRONTEND-TSC-01 blocker was resolved by merged PR #1936.",
+    "statement": "Pending distinct verification after transfer-v2 CI/App Assembly is green and BASE-FRONTEND-SSR-RAF-01 is closed. BASE-FRONTEND-TSC-01 is resolved.",
     "signature_method": null
   },
   "parity_policy": {
@@ -4226,7 +4226,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_full_object_parity_audit_green_pending_ci_and_independent_verification",
+  "validation_state": "130_mapping_transfer_v2_full_object_parity_audit_green_pending_ci_ssr_export_gate_and_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4262,7 +4262,7 @@
         "ScrollView instance refs typed as component functions",
         "InteractionManager missing from current React Native exports"
       ],
-      "effect": "Historical blocker retained for provenance. It no longer blocks transfer-v2 staging; fresh App Assembly/CI and independent verification remain required before any cutover claim.",
+      "effect": "Historical blocker retained for provenance. TypeScript validation is green; the active inherited frontend gate is BASE-FRONTEND-SSR-RAF-01.",
       "resolved_by_pr": 1936,
       "resolved_merge_sha": "3ec4a71a53186887853a6c188bb3110701fed6d8",
       "resolved_at_utc": "2026-09-22T15:25:46Z",
@@ -4274,8 +4274,32 @@
           "react_native": "0.81.6",
           "react_types": "~19.1.0"
         },
-        "note": "PR #1936 merged the Expo 54 React/React Native alignment. BASE-FRONTEND-TSC-01 is no longer a live transfer-v2 blocker; App Assembly/CI on PR #1937 remains required as fresh validation."
-      }
+        "note": "PR #1936 resolved the TypeScript declaration/toolchain blocker. The same run later failed in Expo static export for a different reason.",
+        "app_assembly_run_id": 35743872291,
+        "app_assembly_job_id": 106800300393,
+        "tsc_result": "`yarn tsc --noEmit` completed successfully",
+        "reducer_result": "operation-stream reducer tests passed 10/10"
+      },
+      "superseded_by": "BASE-FRONTEND-SSR-RAF-01"
+    },
+    {
+      "id": "BASE-FRONTEND-SSR-RAF-01",
+      "status": "open",
+      "scope": "downstream_frontend_base_state",
+      "detected_on_payload_sha": "57d28bc4bd57b74330c5a2883f08c775c82a5f03",
+      "current_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
+      "app_assembly_run_id": 35743872291,
+      "app_assembly_job_id": 106800300393,
+      "failing_step": "Validate assembled frontend",
+      "prerequisites_passed": [
+        "yarn tsc --noEmit",
+        "operation-stream reducer tests: 10/10"
+      ],
+      "failing_command": "expo export --platform web",
+      "representative_error": "ReferenceError: requestAnimationFrame is not defined",
+      "failure_origin": "react-native-worklets/lib/module/threads.js under Node v24.20.0 during Expo static rendering",
+      "evidence": "PR #1936 merged the Expo 54 React/React Native alignment and closed BASE-FRONTEND-TSC-01. Its latest available App Assembly progressed through TypeScript and reducer validation, then failed during Node-side static web export. Transfer-v2 contains no frontend/* changes, so this is inherited base-state debt rather than a transfer-v2 regression.",
+      "effect": "Blocks cutover_complete, compatibility-source deletion, and independent completion signoff until a reconciled App Assembly run completes successfully."
     }
   ],
   "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
@@ -4608,7 +4632,9 @@
       "B3-compat-convergence": 22
     },
     "fresh_object_audit_required": false,
-    "global_cutover_blockers": [],
+    "global_cutover_blockers": [
+      "BASE-FRONTEND-SSR-RAF-01"
+    ],
     "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
   }
 }
