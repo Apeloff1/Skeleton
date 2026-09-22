@@ -28,8 +28,13 @@ research_debt_defined: RDE001..RDE046
 local_experiment_protocols_defined: RXP001..RXP062
 historical_lineage_anchors_defined: HL001..HL110
 source_families_defined: RS001..RS055
+research_control_plane_backlog_defined: RCB001..RCB120
+research_control_plane_gaps_defined: RCG001..RCG100
+research_control_plane_acceptance_campaigns_defined: RCB-A01..RCB-A10
 
 local_protocol_execution_claimed_by_this_planning_pass: 0
+research_control_plane_backlog_items_claimed_implemented: 0
+research_control_plane_gaps_claimed_closed: 0
 local_reproductions_claimed_by_this_planning_pass: 0
 research_debt_retired_by_literature_only: 0
 production_authority_granted: false
@@ -320,6 +325,9 @@ research_debt_items: 46
 experiment_protocols: 62
 historical_anchors: 110
 source_families: 55
+research_control_plane_backlog_items: 120
+research_control_plane_gaps: 100
+research_control_plane_acceptance_campaigns: 10
 planning_coverage_is_not_reproduction: true
 single_scalar_score_forbidden: true
 production_authority_granted: false
