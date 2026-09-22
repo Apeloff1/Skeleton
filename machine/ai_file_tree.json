@@ -4123,7 +4123,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending distinct verification after BASE-FRONTEND-TSC-01 is closed and required cutover validation is green.",
+    "statement": "Pending distinct verification after transfer-v2 CI/App Assembly is green. The inherited BASE-FRONTEND-TSC-01 blocker was resolved by merged PR #1936.",
     "signature_method": null
   },
   "parity_policy": {
@@ -4226,14 +4226,14 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_preparation_signed_pending_full_parity_validator_ci_and_independent_verification",
+  "validation_state": "130_mapping_transfer_v2_full_object_parity_audit_green_pending_ci_and_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
-      "status": "open",
+      "status": "resolved",
       "scope": "downstream_frontend_base_state",
       "detected_on_payload_sha": "ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e",
-      "current_main_sha": "90ff896e8f18d8a472ce6b301156d461a8e8dc7f",
+      "current_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
       "app_assembly_run_id": 35732594976,
       "app_assembly_job_id": 106761777382,
       "failing_step": "Validate assembled frontend",
@@ -4262,7 +4262,20 @@
         "ScrollView instance refs typed as component functions",
         "InteractionManager missing from current React Native exports"
       ],
-      "effect": "Blocks cutover_complete, compatibility-source deletion, and independent completion claim until App Assembly is green on a reconciled base."
+      "effect": "Historical blocker retained for provenance. It no longer blocks transfer-v2 staging; fresh App Assembly/CI and independent verification remain required before any cutover claim.",
+      "resolved_by_pr": 1936,
+      "resolved_merge_sha": "3ec4a71a53186887853a6c188bb3110701fed6d8",
+      "resolved_at_utc": "2026-09-22T15:25:46Z",
+      "resolution_evidence": {
+        "frontend_package_versions": {
+          "expo": "~54.0.35",
+          "react": "19.1.0",
+          "react_dom": "19.1.0",
+          "react_native": "0.81.6",
+          "react_types": "~19.1.0"
+        },
+        "note": "PR #1936 merged the Expo 54 React/React Native alignment. BASE-FRONTEND-TSC-01 is no longer a live transfer-v2 blocker; App Assembly/CI on PR #1937 remains required as fresh validation."
+      }
     }
   ],
   "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
@@ -4513,68 +4526,15 @@
   },
   "object_audit": {
     "payload_git_sha": "c924e854ad94815080efb3b6c691c2641e4a0162",
-    "checked_mapping_count": 78,
+    "checked_mapping_count": 130,
     "pending_assignments": 0,
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "Transfer-v2 extends the prepared set to 130 mappings. Reconciliation onto current main also refreshes five exact-parity automation mirrors changed after PR #1930 merged. Fresh full-object/parity audit is still required before cutover.",
+    "note": "Full transfer-v2 Git-object audit completed on PR #1937 head a3d200375e6775e95ac50add5daaca30bbabe058: all 130 recorded source identities current; all source/destination memberships present; exact mappings and overlays show zero object drift; all 16 declared compatibility facades contain their required re-export and no forbidden provider credential/network markers.",
     "current_mapping_count": 130,
-    "audit_scope_status": "prior_78_mapping_audit_valid_current_130_mapping_set_requires_full_refresh",
-    "pending_mapping_ids": [
-      "AIFT-CONFIG",
-      "AIFT-AI-SHELL",
-      "AIFT-TURN-COMPAT",
-      "AIFT-TELEMETRY-COMPAT",
-      "AIFT-ARCHITECTURE-LEGACY",
-      "AIFT-ARCHITECTURE-INDEX-LEGACY",
-      "AIFT-ARCHITECTURE-R03",
-      "AIFT-ARCHITECTURE-R04",
-      "AIFT-ARCHITECTURE-R05",
-      "AIFT-ARCHITECTURE-R06",
-      "AIFT-ARCHITECTURE-R07",
-      "AIFT-ARCHITECTURE-R08",
-      "AIFT-ARCHITECTURE-R09",
-      "AIFT-ARCHITECTURE-R10",
-      "AIFT-ARCHITECTURE-R11",
-      "AIFT-ARCHITECTURE-R12",
-      "AIFT-ARCHITECTURE-R13",
-      "AIFT-ARCHITECTURE-R14",
-      "AIFT-ARCHITECTURE-R15",
-      "AIFT-ARCHITECTURE-R16",
-      "AIFT-ARCHITECTURE-R17",
-      "AIFT-ARCHITECTURE-R18",
-      "AIFT-ARCHITECTURE-R19",
-      "AIFT-ARCHITECTURE-R20",
-      "AIFT-ARCHITECTURE-R21",
-      "AIFT-ARCHITECTURE-R22",
-      "AIFT-V2-GAMEFORGE-EXOCORTEX-AGENTIC",
-      "AIFT-V2-GAMEFORGE-EXOCORTEX-ZAIBATSU",
-      "AIFT-V2-GAMEFORGE-REASONING",
-      "AIFT-V2-GAMEFORGE-RAG",
-      "AIFT-V2-GAMEFORGE-MATH-EXOCORTEX",
-      "AIFT-V2-GAMEFORGE-NEURO",
-      "AIFT-V2-BACKEND-CORE-JEEVES-CAPABILITIES",
-      "AIFT-V2-BACKEND-CORE-JEEVES-CONTROL-PLANE",
-      "AIFT-V2-BACKEND-CORE-JEEVES-EXECUTION-KERNEL",
-      "AIFT-V2-BACKEND-CORE-JEEVES-MEMORY",
-      "AIFT-V2-BACKEND-CORE-KNOWLEDGE-AUGMENTED-JEEVES",
-      "AIFT-V2-BACKEND-CORE-MODEL-ROUTER",
-      "AIFT-V2-BACKEND-CORE-KNOWLEDGE-FABRIC",
-      "AIFT-V2-BACKEND-CORE-GAME-KNOWLEDGE-VAULT",
-      "AIFT-V2-BACKEND-CORE-SKILL-GRAPH",
-      "AIFT-V2-BACKEND-CORE-SWARM-AGENTS",
-      "AIFT-V2-BACKEND-CORE-SWARM-PLANNER",
-      "AIFT-V2-BACKEND-CORE-SWARM-SCHEDULER",
-      "AIFT-V2-BACKEND-CORE-WORLD-AGENTS",
-      "AIFT-V2-BACKEND-CORE-WORLD-GRAPH",
-      "AIFT-V2-BACKEND-CORE-WORLD-GRAPH-PROJECTION",
-      "AIFT-V2-BACKEND-CORE-WORLD-RUNTIME",
-      "AIFT-V2-BACKEND-CORE-WORLD-SYSTEM-COMPOSER",
-      "AIFT-V2-BACKEND-CORE-RELATIONSHIP-MEMORY",
-      "AIFT-V2-BACKEND-CORE-PROGRESSION-INTELLIGENCE",
-      "AIFT-V2-BACKEND-CORE-SYSTEMS-KNOWLEDGE"
-    ],
+    "audit_scope_status": "full_130_mapping_object_and_parity_audit_current",
+    "pending_mapping_ids": [],
     "post_1930_parity_repair": {
       "base_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
       "mapping_id": "AIFT-AUTOMATION",
@@ -4599,6 +4559,18 @@
       "destination_object_drift": 0,
       "method": "v2 destinations reuse exact source Git tree/blob objects; five inherited automation exact-parity files reuse current-main source blobs",
       "scope": "transfer-v2 additions and identified post-1930 automation drift; full 130-mapping validator remains mandatory"
+    },
+    "full_130_mapping_audit": {
+      "audited_head_sha": "a3d200375e6775e95ac50add5daaca30bbabe058",
+      "mapping_count": 130,
+      "source_identity_errors": 0,
+      "missing_source_or_destination_errors": 0,
+      "membership_drift_errors": 0,
+      "exact_object_drift_errors": 0,
+      "facade_count": 16,
+      "facade_contract_errors": 0,
+      "forbidden_provider_marker_hits": 0,
+      "method": "Git tree/blob identity + governed overlay membership + compatibility-facade contract inspection"
     }
   },
   "move_tag_contract": {
@@ -4624,7 +4596,7 @@
     }
   },
   "pre_move_readiness": {
-    "status": "fully_classified_staged_mirror_cutover_not_authorized",
+    "status": "fully_classified_staged_mirror_object_audit_green_cutover_not_authorized",
     "governed_mapping_count": 130,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 33,
@@ -4635,10 +4607,8 @@
       "B4-research-quarantine": 35,
       "B3-compat-convergence": 22
     },
-    "fresh_object_audit_required": true,
-    "global_cutover_blockers": [
-      "BASE-FRONTEND-TSC-01"
-    ],
+    "fresh_object_audit_required": false,
+    "global_cutover_blockers": [],
     "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
   }
 }
