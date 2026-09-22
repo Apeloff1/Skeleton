@@ -41,8 +41,11 @@ Canonical destinations are:
 - `skeleton/ai/agents/jeeves`
 - `skeleton/ai/build/shift_supervisor`
 
-The machine manifest records every exact source, destination, and source Git
-object identity.
+The machine manifest records every exact source, destination, source Git object identity, work-package reference, and AIQ reference.
+
+### Second plan-owned batch
+
+The plan-derived expansion also maps the engine API, governance vault, core agents, repository automation, artifact plane, observability, extended contexts, security, evaluation, kernel, reliability, controlled learning, resilience, cognition, primitives, and repository intelligence into governed `skeleton/ai` destinations. Product shell, tests, installer/deployment support, and accelerator roots remain outside this tree because their ownership is separate in the architecture contract.
 
 ## Authority, security, and privacy notes
 
