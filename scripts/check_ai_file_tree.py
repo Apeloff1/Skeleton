@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "machine" / "ai_file_tree.json"
+MASTER_PLAN = ROOT / "machine" / "ai_master_plan.json"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 MIRROR_STATES = {"staged_mirror", "cutover_pending"}
 ALLOWED_SIGNATURE_METHODS = {"github_identity", "git_gpg", "git_ssh", "sigstore", "ci_oidc"}
@@ -137,6 +138,31 @@ def _compare(
     return errors
 
 
+
+def _planned_implementation_sources(value: object, key_path: tuple[str, ...] = ()) -> set[str]:
+    result: set[str] = set()
+    if isinstance(value, dict):
+        for key, child in value.items():
+            result.update(_planned_implementation_sources(child, key_path + (str(key),)))
+        return result
+    if isinstance(value, list):
+        for child in value:
+            result.update(_planned_implementation_sources(child, key_path))
+        return result
+    if (
+        isinstance(value, str)
+        and "implementation_paths" in key_path
+        and value.startswith("planned:skeleton/")
+    ):
+        result.add(value.removeprefix("planned:").rstrip("/"))
+    return result
+
+
+def _source_exists(relative: str) -> bool:
+    path = ROOT / relative
+    return path.exists()
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     required = [
@@ -172,6 +198,24 @@ def validate() -> list[str]:
     mappings = data.get("mappings")
     if not isinstance(mappings, list) or len(mappings) < 10:
         return errors + ["mappings must contain the governed consolidation set"]
+
+    try:
+        master_plan = json.loads(MASTER_PLAN.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        errors.append(f"cannot parse AI master plan for file-tree coverage: {exc}")
+        master_plan = {}
+
+    mapped_sources = {
+        item.get("source")
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("source"), str)
+    }
+    for planned_source in sorted(_planned_implementation_sources(master_plan)):
+        if _source_exists(planned_source) and planned_source not in mapped_sources:
+            errors.append(
+                "extant planned implementation path is not governed by AI file tree: "
+                f"{planned_source}"
+            )
 
     declared_destinations = {
         item.get("destination")
