@@ -1,0 +1,2062 @@
+{
+  "schema_version": 1,
+  "engineering_pass_version": "1.0.0",
+  "status": "active",
+  "scope": "Depth-only systems-engineering overlay for the breadth-frozen VOL-000..420 masterplan.",
+  "sources": {
+    "master_plan": "machine/ai_master_plan.json",
+    "build_sequence": "machine/ai_master_build_sequence.json",
+    "build_queue": "machine/ai_build_queue.json",
+    "architecture": "machine/architecture.json",
+    "accountability": "machine/ai_build_accountability.json"
+  },
+  "breadth_policy": {
+    "adds_top_level_volumes": false,
+    "last_top_level_volume": 420
+  },
+  "closure_chain": [
+    "requirement",
+    "interface",
+    "state_and_invariant",
+    "authority",
+    "failure_model",
+    "quantitative_budget",
+    "implementation",
+    "executable_test_or_eval",
+    "fault_or_recovery_evidence",
+    "telemetry",
+    "migration_and_rollback",
+    "reproducibility_record",
+    "independent_verification",
+    "signed_accountability"
+  ],
+  "engineering_dimensions": [
+    {
+      "id": "ENG-REQ",
+      "name": "Requirement testability",
+      "rule": "Every requirement must be falsifiable or have an explicit evidence method."
+    },
+    {
+      "id": "ENG-IFACE",
+      "name": "Interface ownership",
+      "rule": "Every cross-component interaction names producer, consumer, schema/version and compatibility policy."
+    },
+    {
+      "id": "ENG-STATE",
+      "name": "State authority",
+      "rule": "Authoritative state, projections, transitions and concurrency semantics must be explicit."
+    },
+    {
+      "id": "ENG-AUTH",
+      "name": "Authority and trust",
+      "rule": "Identity, capability, policy, trust labels and privilege boundaries survive normalization and delegation."
+    },
+    {
+      "id": "ENG-FAIL",
+      "name": "Failure containment",
+      "rule": "Timeout, retry, partial failure, overload and dependency failure behavior is bounded and testable."
+    },
+    {
+      "id": "ENG-REC",
+      "name": "Recovery",
+      "rule": "Checkpoint, replay, rollback, restore, compensation and terminal-state behavior are defined where applicable."
+    },
+    {
+      "id": "ENG-NFR",
+      "name": "Quantitative budgets",
+      "rule": "Applicable latency, throughput, durability, availability, resource, cost and quality budgets have units, environment and measurement method before production promotion."
+    },
+    {
+      "id": "ENG-CAP",
+      "name": "Capacity and backpressure",
+      "rule": "Queues, concurrency, memory/storage growth and fan-out have explicit ceilings and load-shed behavior."
+    },
+    {
+      "id": "ENG-COMPAT",
+      "name": "Compatibility and migration",
+      "rule": "Schema/API/config/storage/model compatibility, migration and rollback windows are declared."
+    },
+    {
+      "id": "ENG-OBS",
+      "name": "Observability",
+      "rule": "Critical transitions, denials, retries, degradation and recovery emit reconstructable telemetry."
+    },
+    {
+      "id": "ENG-TEST",
+      "name": "Executable verification",
+      "rule": "Unit/property/contract/integration/fault/recovery tests cover the declared invariants."
+    },
+    {
+      "id": "ENG-EVAL",
+      "name": "Evaluation",
+      "rule": "Probabilistic capabilities have versioned datasets, baselines, budgets and acceptance thresholds."
+    },
+    {
+      "id": "ENG-REPRO",
+      "name": "Reproducibility",
+      "rule": "Build/test/eval evidence records code, config, dependency, data/model and environment identity."
+    },
+    {
+      "id": "ENG-DEPLOY",
+      "name": "Release and rollback",
+      "rule": "Promotion, canary, rollback and incompatibility stop conditions are explicit."
+    },
+    {
+      "id": "ENG-OWN",
+      "name": "Ownership and impact",
+      "rule": "Code, schema, config, tests, runbooks and change-impact triggers have accountable owners."
+    }
+  ],
+  "budget_binding_policy": {
+    "rule": "Do not invent universal numeric thresholds in the plan. Before implementation can be promoted beyond scaffolded/experimental, each applicable budget class must bind a threshold with unit, percentile/window where relevant, workload, environment, measurement method, owner and exception policy.",
+    "required_fields": [
+      "metric",
+      "threshold",
+      "unit",
+      "measurement_window_or_percentile",
+      "workload",
+      "environment",
+      "measurement_method",
+      "owner",
+      "exception_or_waiver_ref"
+    ],
+    "production_rule": "Production evidence must contain measured values against the bound threshold; target text alone is not evidence."
+  },
+  "compatibility_policy": {
+    "rule": "Any cross-boundary contract change must declare additive/breaking semantics, reader/writer compatibility, migration order, rollback window and mixed-version behavior.",
+    "forbidden": [
+      "silent breaking change",
+      "one-way migration without declared rollback/restore strategy",
+      "consumer upgrade assumed atomic across distributed components"
+    ]
+  },
+  "failure_policy": {
+    "rule": "Every package must model dependency failure, timeout, duplicate/replay, overload, partial completion, cancellation and restart where applicable.",
+    "proof_modes": [
+      "fault_injection",
+      "property_test",
+      "chaos_or_partition_test",
+      "crash_recovery_test",
+      "replay_test",
+      "operator_rehearsal"
+    ]
+  },
+  "evidence_policy": {
+    "rule": "Planned tests/evals are design intent only. Evidence must point to a concrete run/artifact bound to git SHA, configuration and environment.",
+    "minimum_metadata": [
+      "git_sha",
+      "artifact_or_run_ref",
+      "config_identity",
+      "environment_identity",
+      "timestamp_utc",
+      "result",
+      "independent_verifier_or_automation_identity"
+    ]
+  },
+  "work_package_profiles": [
+    {
+      "id": "WP-W00",
+      "name": "Architecture authority",
+      "primary_wave": "MBW-00",
+      "engineering_class": "control",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-OWN",
+        "ENG-COMPAT",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY"
+      ],
+      "primary_interfaces": [
+        "architecture manifests",
+        "plan contracts",
+        "ADRs"
+      ],
+      "hard_invariants": [
+        "one authority order",
+        "no undeclared production root",
+        "target/current drift recorded"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors"
+      ],
+      "nfr_budget_classes": [
+        "change_failure_rate",
+        "validation_latency",
+        "plan_drift"
+      ],
+      "evidence_modes": [
+        "contract",
+        "mutation",
+        "architecture fitness"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W01",
+      "name": "Contract primitives",
+      "primary_wave": "MBW-00",
+      "engineering_class": "contract",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-COMPAT",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "serialized contracts",
+        "IDs/time/version/provenance"
+      ],
+      "hard_invariants": [
+        "canonical normalization",
+        "stable identity",
+        "explicit compatibility"
+      ],
+      "principal_failure_modes": [
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change"
+      ],
+      "nfr_budget_classes": [
+        "compatibility_window",
+        "serialization_cost",
+        "schema_error_rate"
+      ],
+      "evidence_modes": [
+        "schema",
+        "property",
+        "compatibility",
+        "fuzz"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "versioned decoder fallback",
+        "migration/rollback fixture"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W02",
+      "name": "Kernel/lifecycle",
+      "primary_wave": "MBW-01",
+      "engineering_class": "runtime",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-COMPAT",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "boot/shutdown",
+        "operation lifecycle",
+        "dependency startup"
+      ],
+      "hard_invariants": [
+        "terminal-state finality",
+        "deterministic lifecycle",
+        "bounded shutdown"
+      ],
+      "principal_failure_modes": [
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race"
+      ],
+      "nfr_budget_classes": [
+        "startup_shutdown_latency",
+        "availability",
+        "recovery_time",
+        "resource_ceiling"
+      ],
+      "evidence_modes": [
+        "state-machine",
+        "integration",
+        "fault injection"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W03",
+      "name": "Durable state",
+      "primary_wave": "MBW-01",
+      "engineering_class": "state",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "repositories",
+        "transactions",
+        "persistence adapters"
+      ],
+      "hard_invariants": [
+        "durable state is authority",
+        "atomicity boundaries explicit",
+        "read-your-write where promised"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption"
+      ],
+      "nfr_budget_classes": [
+        "durability",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "transaction_latency"
+      ],
+      "evidence_modes": [
+        "transaction",
+        "crash recovery",
+        "migration",
+        "property"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W04",
+      "name": "Events",
+      "primary_wave": "MBW-01",
+      "engineering_class": "state",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "event envelope",
+        "outbox/inbox",
+        "stream cursor"
+      ],
+      "hard_invariants": [
+        "idempotent consumption",
+        "ordering semantics explicit",
+        "replay cannot duplicate effects"
+      ],
+      "principal_failure_modes": [
+        "duplicate event",
+        "reordering",
+        "lost ack"
+      ],
+      "nfr_budget_classes": [
+        "durability",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "transaction_latency"
+      ],
+      "evidence_modes": [
+        "property",
+        "replay",
+        "fault injection",
+        "integration"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W05",
+      "name": "Model runtime",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "model request/result",
+        "provider adapter",
+        "streaming inference"
+      ],
+      "hard_invariants": [
+        "provider objects stop at adapter",
+        "cancellation propagates",
+        "output validation"
+      ],
+      "principal_failure_modes": [
+        "provider timeout",
+        "malformed output",
+        "stream truncation"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "throughput",
+        "quality",
+        "cost",
+        "context_or_memory_budget"
+      ],
+      "evidence_modes": [
+        "contract",
+        "integration",
+        "cancellation",
+        "fault injection"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W06",
+      "name": "Model routing",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "route request",
+        "capability descriptor",
+        "health/cost signals"
+      ],
+      "hard_invariants": [
+        "routing respects authority/budget",
+        "deterministic tie rules",
+        "fallback bounded"
+      ],
+      "principal_failure_modes": [
+        "route oscillation",
+        "stale health",
+        "budget bypass"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "throughput",
+        "quality",
+        "cost",
+        "context_or_memory_budget"
+      ],
+      "evidence_modes": [
+        "simulation",
+        "policy",
+        "load",
+        "regression"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "route fallback",
+        "circuit break",
+        "safe default"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W07",
+      "name": "Memory",
+      "primary_wave": "MBW-02",
+      "engineering_class": "state",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "memory record",
+        "promotion policy",
+        "retrieval interface"
+      ],
+      "hard_invariants": [
+        "writes require policy",
+        "provenance retained",
+        "deletion/tombstone semantics explicit"
+      ],
+      "principal_failure_modes": [
+        "poisoning",
+        "resurrection",
+        "contradiction collapse"
+      ],
+      "nfr_budget_classes": [
+        "durability",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "transaction_latency"
+      ],
+      "evidence_modes": [
+        "policy",
+        "lifecycle",
+        "adversarial",
+        "migration"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W08",
+      "name": "Retrieval",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "query/result/evidence",
+        "index adapters"
+      ],
+      "hard_invariants": [
+        "authorization at query time",
+        "provenance on result",
+        "stale index detectable"
+      ],
+      "principal_failure_modes": [
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "throughput",
+        "quality",
+        "cost",
+        "context_or_memory_budget"
+      ],
+      "evidence_modes": [
+        "retrieval eval",
+        "access-control",
+        "migration",
+        "fault"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W09",
+      "name": "Knowledge/evidence",
+      "primary_wave": "MBW-02",
+      "engineering_class": "evidence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "claim/evidence/entity graph",
+        "source lineage"
+      ],
+      "hard_invariants": [
+        "contradictions coexist",
+        "temporal/scope qualifiers preserved",
+        "source immutable"
+      ],
+      "principal_failure_modes": [
+        "stale claim",
+        "source loss",
+        "false merge"
+      ],
+      "nfr_budget_classes": [
+        "evidence_freshness",
+        "verification_latency",
+        "storage_growth",
+        "false_accept_rate"
+      ],
+      "evidence_modes": [
+        "graph property",
+        "provenance",
+        "temporal eval"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rebuild from source ledger",
+        "quarantine invalid edges"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W10",
+      "name": "Context compiler",
+      "primary_wave": "MBW-02",
+      "engineering_class": "intelligence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "compiled context",
+        "trust labels",
+        "budget allocator"
+      ],
+      "hard_invariants": [
+        "instruction authority preserved",
+        "untrusted text cannot self-promote",
+        "truncation policy deterministic"
+      ],
+      "principal_failure_modes": [
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "throughput",
+        "quality",
+        "cost",
+        "context_or_memory_budget"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "token-budget",
+        "regression"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W11",
+      "name": "Cognitive runtime",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "strategy/step proposal",
+        "verifier feedback",
+        "stopping policy"
+      ],
+      "hard_invariants": [
+        "all loops bounded",
+        "hidden reasoning not required for replay",
+        "budgets propagate"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "nfr_budget_classes": [
+        "step_budget",
+        "fanout",
+        "wall_clock",
+        "cost",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "simulation",
+        "long-horizon",
+        "budget",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W12",
+      "name": "Planning",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "plan DAG",
+        "pre/postconditions",
+        "scheduler"
+      ],
+      "hard_invariants": [
+        "acyclic executable graph",
+        "terminal behavior exists",
+        "preconditions enforced"
+      ],
+      "principal_failure_modes": [
+        "cycle",
+        "unreachable step",
+        "stale dependency"
+      ],
+      "nfr_budget_classes": [
+        "step_budget",
+        "fanout",
+        "wall_clock",
+        "cost",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "static analysis",
+        "property",
+        "simulation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "replan from durable checkpoint",
+        "dependency invalidation"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W13",
+      "name": "Tools",
+      "primary_wave": "MBW-03",
+      "engineering_class": "action",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "tool descriptor/proposal/invocation/result/receipt"
+      ],
+      "hard_invariants": [
+        "schema validation before action",
+        "idempotency/compensation",
+        "exact resource authorization"
+      ],
+      "principal_failure_modes": [
+        "duplicate side effect",
+        "TOCTOU",
+        "malformed tool output"
+      ],
+      "nfr_budget_classes": [
+        "authorization_latency",
+        "side_effect_rate",
+        "sandbox_resource",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "sandbox",
+        "contract",
+        "fault",
+        "side-effect replay"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "compensation",
+        "idempotency replay",
+        "revoke/disable tool"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W14",
+      "name": "Policy",
+      "primary_wave": "MBW-03",
+      "engineering_class": "action",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "authorization request/decision",
+        "policy bundle",
+        "trust context"
+      ],
+      "hard_invariants": [
+        "deny-by-default",
+        "exact normalized resource check",
+        "policy version bound to decision"
+      ],
+      "principal_failure_modes": [
+        "policy bypass",
+        "confused deputy",
+        "stale decision"
+      ],
+      "nfr_budget_classes": [
+        "authorization_latency",
+        "side_effect_rate",
+        "sandbox_resource",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "policy mutation",
+        "adversarial",
+        "authorization matrix"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "fail closed",
+        "policy rollback",
+        "decision invalidation"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W15",
+      "name": "Agent runtime",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "agent identity",
+        "delegation envelope",
+        "checkpoint/handoff"
+      ],
+      "hard_invariants": [
+        "child authority subset parent",
+        "identity durable",
+        "lease ownership checked"
+      ],
+      "principal_failure_modes": [
+        "authority escalation",
+        "stale lease",
+        "orphan agent"
+      ],
+      "nfr_budget_classes": [
+        "step_budget",
+        "fanout",
+        "wall_clock",
+        "cost",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "property",
+        "lease fault",
+        "integration",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "lease fencing",
+        "checkpoint resume",
+        "revoke delegation"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W16",
+      "name": "Swarm",
+      "primary_wave": "MBW-04",
+      "engineering_class": "autonomy",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "handoff packet",
+        "conflict domain",
+        "coordination protocol"
+      ],
+      "hard_invariants": [
+        "bounded fan-out",
+        "single writer per conflict domain",
+        "disagreement evidence-based"
+      ],
+      "principal_failure_modes": [
+        "deadlock",
+        "livelock",
+        "false consensus"
+      ],
+      "nfr_budget_classes": [
+        "step_budget",
+        "fanout",
+        "wall_clock",
+        "cost",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "simulation",
+        "concurrency",
+        "chaos",
+        "long-horizon"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "re-elect/reassign",
+        "conflict abort",
+        "bounded decomposition"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W17",
+      "name": "Verification",
+      "primary_wave": "MBW-03",
+      "engineering_class": "evidence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "verification request/result",
+        "evidence bundle",
+        "acceptance record"
+      ],
+      "hard_invariants": [
+        "verification separate from confidence",
+        "evidence immutable",
+        "high-impact acceptance independent"
+      ],
+      "principal_failure_modes": [
+        "self-verification bias",
+        "stale evidence",
+        "unverifiable claim"
+      ],
+      "nfr_budget_classes": [
+        "evidence_freshness",
+        "verification_latency",
+        "storage_growth",
+        "false_accept_rate"
+      ],
+      "evidence_modes": [
+        "independent verifier",
+        "deterministic checks",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "reject/redo",
+        "evidence refresh",
+        "escalation"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W18",
+      "name": "Evaluation",
+      "primary_wave": "MBW-06",
+      "engineering_class": "evidence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "benchmark config/result",
+        "dataset manifest",
+        "baseline record"
+      ],
+      "hard_invariants": [
+        "versioned data/config",
+        "contamination tracked",
+        "uncertainty reported"
+      ],
+      "principal_failure_modes": [
+        "benchmark leakage",
+        "metric gaming",
+        "baseline drift"
+      ],
+      "nfr_budget_classes": [
+        "evidence_freshness",
+        "verification_latency",
+        "storage_growth",
+        "false_accept_rate"
+      ],
+      "evidence_modes": [
+        "benchmark",
+        "statistical",
+        "contamination",
+        "reproducibility"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "freeze/revert benchmark",
+        "invalidate contaminated runs"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W19",
+      "name": "Resilience",
+      "primary_wave": "MBW-01",
+      "engineering_class": "runtime",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-COMPAT",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "retry policy",
+        "breaker",
+        "bulkhead",
+        "recovery record"
+      ],
+      "hard_invariants": [
+        "retry bounded",
+        "jitter/backoff",
+        "failure domains isolated"
+      ],
+      "principal_failure_modes": [
+        "retry storm",
+        "cascading failure",
+        "recovery loop"
+      ],
+      "nfr_budget_classes": [
+        "startup_shutdown_latency",
+        "availability",
+        "recovery_time",
+        "resource_ceiling"
+      ],
+      "evidence_modes": [
+        "chaos",
+        "soak",
+        "fault injection",
+        "recovery drill"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "trip breaker",
+        "shed load",
+        "restore checkpoint"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W20",
+      "name": "Security",
+      "primary_wave": "MBW-03",
+      "engineering_class": "action",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "identity/capability",
+        "secret reference",
+        "sandbox/egress policy"
+      ],
+      "hard_invariants": [
+        "least authority",
+        "secrets never become model data by default",
+        "tenant boundaries enforced"
+      ],
+      "principal_failure_modes": [
+        "secret leak",
+        "SSRF",
+        "path escape",
+        "privilege escalation"
+      ],
+      "nfr_budget_classes": [
+        "authorization_latency",
+        "side_effect_rate",
+        "sandbox_resource",
+        "recovery_time"
+      ],
+      "evidence_modes": [
+        "threat-model tests",
+        "fuzz",
+        "sandbox",
+        "penetration"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "revoke credential",
+        "isolate workspace",
+        "incident rollback"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W21",
+      "name": "Observability",
+      "primary_wave": "MBW-05",
+      "engineering_class": "evidence",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "trace/span/log/metric schema",
+        "correlation IDs"
+      ],
+      "hard_invariants": [
+        "operation reconstructable",
+        "telemetry bounded",
+        "sensitive data classified"
+      ],
+      "principal_failure_modes": [
+        "missing correlation",
+        "cardinality explosion",
+        "PII leak"
+      ],
+      "nfr_budget_classes": [
+        "evidence_freshness",
+        "verification_latency",
+        "storage_growth",
+        "false_accept_rate"
+      ],
+      "evidence_modes": [
+        "telemetry contract",
+        "load",
+        "redaction",
+        "replay reconstruction"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "degraded telemetry mode",
+        "sampling control",
+        "retention repair"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W22",
+      "name": "API/streaming",
+      "primary_wave": "MBW-05",
+      "engineering_class": "surface",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "submit/status/cancel/events",
+        "cursor protocol"
+      ],
+      "hard_invariants": [
+        "terminal finality",
+        "replay/resync",
+        "slow client bounded"
+      ],
+      "principal_failure_modes": [
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "reconnect_budget",
+        "memory_ceiling",
+        "accessibility"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "reconnect",
+        "load",
+        "race"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W23",
+      "name": "Product",
+      "primary_wave": "MBW-05",
+      "engineering_class": "surface",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "operation state projection",
+        "evidence/artifact views"
+      ],
+      "hard_invariants": [
+        "UI never authoritative",
+        "blockers/warnings visible",
+        "destructive action confirmed"
+      ],
+      "principal_failure_modes": [
+        "stale optimistic state",
+        "hidden failure",
+        "double submit"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "reconnect_budget",
+        "memory_ceiling",
+        "accessibility"
+      ],
+      "evidence_modes": [
+        "e2e",
+        "accessibility",
+        "concurrency",
+        "offline/reconnect"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "reconcile from durable state",
+        "disable unsafe action"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W24",
+      "name": "Desktop",
+      "primary_wave": "MBW-05",
+      "engineering_class": "surface",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "desktop bridge",
+        "local permissions",
+        "process lifecycle"
+      ],
+      "hard_invariants": [
+        "least local privilege",
+        "platform path/process semantics explicit",
+        "safe shutdown"
+      ],
+      "principal_failure_modes": [
+        "permission drift",
+        "suspend/resume",
+        "orphan process"
+      ],
+      "nfr_budget_classes": [
+        "latency",
+        "reconnect_budget",
+        "memory_ceiling",
+        "accessibility"
+      ],
+      "evidence_modes": [
+        "platform matrix",
+        "lifecycle",
+        "upgrade",
+        "security"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "repair/doctor",
+        "restart",
+        "settings rollback"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W25",
+      "name": "Installer",
+      "primary_wave": "MBW-07",
+      "engineering_class": "production",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "package manifest",
+        "install/update/rollback transaction"
+      ],
+      "hard_invariants": [
+        "verified artifacts",
+        "atomic update boundary",
+        "rollback compatibility proven"
+      ],
+      "principal_failure_modes": [
+        "partial install",
+        "broken upgrade",
+        "unsigned artifact"
+      ],
+      "nfr_budget_classes": [
+        "availability",
+        "capacity",
+        "recovery_time",
+        "recovery_point",
+        "rollback_time",
+        "cost"
+      ],
+      "evidence_modes": [
+        "clean-machine",
+        "upgrade",
+        "rollback",
+        "supply-chain"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "transaction rollback",
+        "repair mode",
+        "previous-version restore"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W26",
+      "name": "Research",
+      "primary_wave": "MBW-06",
+      "engineering_class": "research",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "source/claim/experiment/replication records"
+      ],
+      "hard_invariants": [
+        "source lineage immutable",
+        "retractions propagate",
+        "research cannot promote itself"
+      ],
+      "principal_failure_modes": [
+        "retracted claim retained",
+        "irreproducible experiment",
+        "source bias"
+      ],
+      "nfr_budget_classes": [
+        "reproducibility",
+        "experiment_cost",
+        "dataset_or_artifact_growth",
+        "promotion_latency"
+      ],
+      "evidence_modes": [
+        "replication",
+        "provenance",
+        "methodology review"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "invalidate candidate",
+        "preserve negative result",
+        "source correction"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W27",
+      "name": "Forge",
+      "primary_wave": "MBW-06",
+      "engineering_class": "research",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "candidate manifest",
+        "sandbox run",
+        "comparison result"
+      ],
+      "hard_invariants": [
+        "candidate isolation",
+        "no direct production mutation",
+        "champion baseline fixed"
+      ],
+      "principal_failure_modes": [
+        "candidate escapes sandbox",
+        "cherry-picked metric",
+        "artifact collision"
+      ],
+      "nfr_budget_classes": [
+        "reproducibility",
+        "experiment_cost",
+        "dataset_or_artifact_growth",
+        "promotion_latency"
+      ],
+      "evidence_modes": [
+        "sandbox",
+        "comparison",
+        "adversarial",
+        "reproducibility"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "discard candidate",
+        "restore champion",
+        "quarantine artifacts"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W28",
+      "name": "Learning",
+      "primary_wave": "MBW-06",
+      "engineering_class": "research",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "learning signal",
+        "policy/model candidate",
+        "promotion record"
+      ],
+      "hard_invariants": [
+        "feedback provenance",
+        "no silent online authority change",
+        "rollback target retained"
+      ],
+      "principal_failure_modes": [
+        "reward hacking",
+        "feedback poisoning",
+        "catastrophic regression"
+      ],
+      "nfr_budget_classes": [
+        "reproducibility",
+        "experiment_cost",
+        "dataset_or_artifact_growth",
+        "promotion_latency"
+      ],
+      "evidence_modes": [
+        "offline eval",
+        "shadow/canary",
+        "drift",
+        "adversarial"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rollback candidate",
+        "disable signal source",
+        "retrain from frozen data"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W29",
+      "name": "Distributed runtime",
+      "primary_wave": "MBW-07",
+      "engineering_class": "production",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "scheduler/lease",
+        "worker protocol",
+        "placement/health"
+      ],
+      "hard_invariants": [
+        "fencing tokens",
+        "topology/resource budgets",
+        "no split-brain writer"
+      ],
+      "principal_failure_modes": [
+        "partition",
+        "stale worker",
+        "oversubscription",
+        "straggler amplification"
+      ],
+      "nfr_budget_classes": [
+        "availability",
+        "capacity",
+        "recovery_time",
+        "recovery_point",
+        "rollback_time",
+        "cost"
+      ],
+      "evidence_modes": [
+        "distributed fault",
+        "partition",
+        "load",
+        "soak"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "fence/reassign",
+        "drain worker",
+        "checkpoint restore"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    },
+    {
+      "id": "WP-W30",
+      "name": "Production hardening",
+      "primary_wave": "MBW-07",
+      "engineering_class": "production",
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "primary_interfaces": [
+        "release evidence",
+        "SLO/error budget",
+        "runbooks/DR"
+      ],
+      "hard_invariants": [
+        "promotion evidence complete",
+        "rollback executable",
+        "operational ownership explicit"
+      ],
+      "principal_failure_modes": [
+        "green CI with hidden risk",
+        "rollback failure",
+        "capacity cliff"
+      ],
+      "nfr_budget_classes": [
+        "availability",
+        "capacity",
+        "recovery_time",
+        "recovery_point",
+        "rollback_time",
+        "cost"
+      ],
+      "evidence_modes": [
+        "release rehearsal",
+        "DR drill",
+        "soak",
+        "security review"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "recovery_requirements": [
+        "rollback/redeploy",
+        "incident mode",
+        "restore from verified backup"
+      ],
+      "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
+    }
+  ]
+}
