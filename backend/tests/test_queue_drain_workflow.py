@@ -15,7 +15,7 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
     assert "schedule:" in workflow
     assert 'cron: "2-57/5 * * * *"' in workflow
     assert "workflow_run:" in workflow
-    assert 'workflows: ["Merge Readiness"]' in workflow
+    assert 'workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]' in workflow
     assert "types: [completed]" in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
@@ -41,7 +41,7 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
 def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
     workflow = _workflow_text()
 
-    assert 'workflows: ["Merge Readiness"]' in workflow
+    assert 'workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]' in workflow
     assert 'workflows: ["Drain obsolete PR Actions"]' not in workflow
     assert "branches: [main]" in workflow
 
