@@ -47,6 +47,11 @@ on:
       - "skeleton/contracts/operation.py"
       - "skeleton/contracts/conversation.py"
       - "skeleton/contracts/context.py"
+      - "skeleton/contracts/memory_record.py"
+      - "skeleton/ai/runtime/contracts/memory_record.py"
+      - "skeleton/persistence/memory_repository.py"
+      - "skeleton/ai/runtime/persistence/memory_repository.py"
+      - "skeleton/testing/test_memory_repository.py"
       - "skeleton/context/compiler.py"
       - "skeleton/context/policy.py"
       - "skeleton/context/sources/**"
@@ -314,6 +319,8 @@ jobs:
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
           skeleton/contracts/conversation.py skeleton/contracts/context.py
+          skeleton/contracts/memory_record.py skeleton/persistence/memory_repository.py
+          skeleton/ai/runtime/contracts/memory_record.py skeleton/ai/runtime/persistence/memory_repository.py
           skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py
           skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
