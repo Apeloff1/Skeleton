@@ -50,3 +50,4 @@ def test_engineering_pass_links_atomic_task_matrix() -> None:
     task = data["task_propagation"]
     assert task["machine_contract"] == "machine/ai_engineering_task_matrix.json"
     assert task["human_contract"] == "docs/plan/ENGINEERING_TASK_MATRIX.md"
+    assert task["adversarial_source"] == "machine/ai_adversarial_closure.json"
