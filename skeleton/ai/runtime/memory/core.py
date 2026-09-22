@@ -52,18 +52,18 @@ class InMemoryTFIDFStore:
         freq: Dict[str, int] = {}
         for term in terms:
             freq[term] = freq.get(term, 0) + 1
-        
+
         for term, count in freq.items():
             self._term_freq.setdefault(term, {})[chunk.chunk_id] = count
             self._doc_freq[term] = self._doc_freq.get(term, 0) + 1
-        
+
         self._total_docs += 1
 
     def query(self, text: str, top_k: int = 5) -> List[ScoredChunk]:
         terms = self._tokenize(text)
         if not terms or self._total_docs == 0:
             return []
-        
+
         scores: Dict[str, float] = {}
         for term in terms:
             if term not in self._term_freq:
@@ -72,12 +72,12 @@ class InMemoryTFIDFStore:
             for doc_id, tf in self._term_freq[term].items():
                 tf_weight = 1 + math.log(tf)
                 scores[doc_id] = scores.get(doc_id, 0) + tf_weight * idf
-        
+
         # Normalize by doc length
         for doc_id in scores:
             doc_len = len(self._tokenize(self._docs[doc_id].text))
             scores[doc_id] /= math.sqrt(doc_len) if doc_len > 0 else 1
-        
+
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
         return [
             ScoredChunk(chunk=self._docs[doc_id], score=score, plane="rag")
@@ -176,25 +176,25 @@ class MemoryTrinity:
     def query_unified(self, query_text: str, top_k_per_tier: int = 3, metadata_filter: Optional[Dict[str, Any]] = None) -> TrinityResult:
         # Query each plane
         rag_results = self.rag.query(query_text, top_k=top_k_per_tier)
-        
+
         # CAG associative recall
         cag_results = []
         for entry in self.cag.query(query_text):
             chunk = Chunk(text=str(entry["value"]), metadata={"source": "cag", "key": entry["key"]})
             cag_results.append(ScoredChunk(chunk=chunk, score=0.7, plane="cag"))
-        
+
         # MAG episodic recall
         mag_results = []
         for tag in query_text.split():
             for episode in self.mag.recall_by_tag(tag):
                 chunk = Chunk(text=episode["content"], metadata={"source": "mag", "tags": episode["tags"]})
                 mag_results.append(ScoredChunk(chunk=chunk, score=0.6, plane="mag"))
-        
+
         all_results = rag_results + cag_results + mag_results[:top_k_per_tier]
-        
+
         # RRF fusion
         fused = self._reciprocal_rank_fusion(all_results)
-        
+
         result = TrinityResult(
             facts=fused[:top_k_per_tier],
             persona_frame=cag_results[:top_k_per_tier],
@@ -203,14 +203,14 @@ class MemoryTrinity:
             token_estimate=sum(len(r.chunk.text.split()) for r in fused[:top_k_per_tier]) * 1.3,
             provenance_chain=[r.plane for r in fused[:top_k_per_tier]],
         )
-        
+
         if self._bus:
             self._bus.emit("memory.trinity.query", {
                 "query": query_text,
                 "results": len(all_results),
                 "fused": len(fused),
             })
-        
+
         return result
 
     @staticmethod
@@ -218,12 +218,12 @@ class MemoryTrinity:
         """RRF: fuse results from multiple retrieval planes."""
         scores: Dict[str, float] = {}
         chunks: Dict[str, Chunk] = {}
-        
+
         for rank, result in enumerate(results, 1):
             cid = result.chunk.chunk_id or hash(result.chunk.text)
             scores[cid] = scores.get(cid, 0) + 1.0 / (k + rank)
             chunks[cid] = result.chunk
-        
+
         ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         return [ScoredChunk(chunk=chunks[cid], score=score, plane="fused") for cid, score in ranked]
 
@@ -254,25 +254,25 @@ class RepetitionScheduler:
         """Process a review, return new interval in hours."""
         if item_id not in self._schedule:
             self.schedule(item_id)
-        
+
         entry = self._schedule[item_id]
         entry["repetitions"] += 1
-        
+
         # SM-2 inspired interval calculation
         if performance >= 0.6:
             entry["interval"] *= (1.5 + 0.1 * performance)
         else:
             entry["interval"] = max(1, entry["interval"] * 0.5)
-        
+
         entry["next_review"] = time.time() + entry["interval"] * 3600
-        
+
         if self._bus:
             self._bus.emit("memory.repetition.review", {
                 "item": item_id,
                 "performance": performance,
                 "interval": entry["interval"],
             })
-        
+
         return entry["interval"]
 
     def due_items(self) -> List[str]:
