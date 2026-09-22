@@ -402,6 +402,31 @@ class AdmissionRuntime:
                 raise AdmissionRuntimeError(
                     "operation has no active admission lease"
                 )
+            reservation = active.lease.quota_reservation
+            if reservation is not None:
+                if self.quota_ledger is None:
+                    raise AdmissionRuntimeError(
+                        "quota reservation exists without a quota ledger"
+                    )
+                marker_writer = getattr(self.quota_ledger, "mark_usage_unknown", None)
+                if not callable(marker_writer):
+                    raise AdmissionRuntimeError(
+                        "quota ledger does not support durable unknown usage"
+                    )
+                try:
+                    marker_writer(
+                        reservation.reservation_id,
+                        event,
+                        normalized_category,
+                        now=wall,
+                    )
+                except QuotaConflict as exc:
+                    raise AdmissionRuntimeConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise AdmissionRuntimeError(
+                        "unknown_usage_marker_unavailable"
+                    ) from exc
+
             existing = active.unknown_usage.get(event)
             if existing is not None:
                 if (
@@ -447,16 +472,42 @@ class AdmissionRuntime:
                 raise AdmissionRuntimeError(
                     "operation has no active admission lease"
                 )
-            marker = active.unknown_usage.get(event)
-            if marker is None:
-                raise AdmissionRuntimeError("unknown usage marker does not exist")
-            recorded = self.record_usage_event(
-                operation,
-                event,
-                marker.category,
-                delta,
-                now_wall=now_wall,
+            reservation = active.lease.quota_reservation
+            if reservation is None or self.quota_ledger is None:
+                raise AdmissionRuntimeError(
+                    "operation has no durable quota reservation"
+                )
+            resolver = getattr(self.quota_ledger, "resolve_unknown_usage", None)
+            if not callable(resolver):
+                raise AdmissionRuntimeError(
+                    "quota ledger does not support durable unknown usage"
+                )
+            decision = active.lease.decision
+            max_tool_calls = int(
+                decision.estimated.tool_calls
+                + int(decision.remaining["tool_calls"])
             )
+            max_artifact_bytes = int(
+                decision.estimated.artifact_bytes
+                + int(decision.remaining["artifact_bytes"])
+            )
+            try:
+                recorded = resolver(
+                    reservation.reservation_id,
+                    event,
+                    delta,
+                    max_tool_calls=max_tool_calls,
+                    max_artifact_bytes=max_artifact_bytes,
+                    now=_wall_time(now_wall, field="now_wall"),
+                )
+            except QuotaExceeded as exc:
+                raise AdmissionError(str(exc)) from exc
+            except QuotaConflict as exc:
+                raise AdmissionRuntimeConflict(str(exc)) from exc
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "unknown_usage_resolution_unavailable"
+                ) from exc
             active.unknown_usage.pop(event, None)
             return recorded
 
@@ -496,11 +547,20 @@ class AdmissionRuntime:
                     raise AdmissionRuntimeError(
                         "quota reservation exists without a quota ledger"
                     )
-                quota_completion = self.quota_ledger.complete(
-                    reservation.reservation_id,
-                    actual,
-                    now=wall,
-                )
+                try:
+                    quota_completion = self.quota_ledger.complete(
+                        reservation.reservation_id,
+                        actual,
+                        now=wall,
+                    )
+                except QuotaConflict as exc:
+                    if str(exc).startswith("actual_usage_unknown:"):
+                        raise AdmissionRuntimeError(str(exc)) from exc
+                    raise AdmissionRuntimeConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise AdmissionRuntimeError(
+                        "quota_completion_unavailable"
+                    ) from exc
 
             self._active.pop(operation)
             return AdmissionCompletion(
