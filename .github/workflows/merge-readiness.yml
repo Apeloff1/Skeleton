@@ -189,7 +189,7 @@ jobs:
           skeleton/automation
       - name: Validate auto-merge workflow contract
         run: python scripts/check_automerge_contract.py
-      - name: Validate runner v2 privileged contract
+      - name: Validate runner-v2 privileged contract
         run: python scripts/check_runner_v2_contract.py
       - name: Run PR automation contracts
         env:
@@ -202,21 +202,31 @@ jobs:
           skeleton/testing/test_pr_automation_sensitive_paths.py
           skeleton/testing/test_pr_automation_workflow.py
           skeleton/testing/test_pr_automation_branch_completions.py
+          skeleton/testing/test_runner_v2_contracts.py
+          skeleton/testing/test_runner_v2_evidence.py
+          skeleton/testing/test_runner_v2_runtime.py
+          skeleton/testing/test_runner_v2_transaction_report.py
+          skeleton/testing/test_runner_v2_engine.py
           skeleton/testing/test_automerge_model.py
           skeleton/testing/test_automerge_evidence.py
           skeleton/testing/test_automerge_policy.py
           skeleton/testing/test_automerge_stack.py
           skeleton/testing/test_automerge_engine.py
           skeleton/testing/test_automerge_contract.py
-          skeleton/testing/test_runner_v2_contracts.py
-          skeleton/testing/test_runner_v2_evidence.py
-          skeleton/testing/test_runner_v2_runtime.py
-          skeleton/testing/test_runner_v2_transaction_report.py
-          skeleton/testing/test_runner_v2_engine.py
           tests/test_autonomous_supervisor.py
           tests/test_build_authority.py
           tests/test_builder_plane.py
           tests/test_builder_plane_integration.py
+          tests/test_builder_repair_receipt.py
+          tests/test_build_contracts.py
+          tests/test_build_edits.py
+          tests/test_build_followup.py
+          tests/test_build_graph.py
+          tests/test_build_plane.py
+          tests/test_build_repair.py
+          tests/test_build_review.py
+          tests/test_build_session.py
+          tests/test_build_validation.py
           tests/test_supervisor_runtime.py
           tests/test_worker_health.py
           tests/test_traffic_manager.py
