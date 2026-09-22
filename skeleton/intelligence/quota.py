@@ -33,6 +33,9 @@ class QuotaConflict(QuotaError):
     """A reservation/window transition conflicts with active state."""
 
 
+_USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+
+
 def _required_id(value: str, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise QuotaError(f"{field} is required")
@@ -237,6 +240,7 @@ class _TenantState:
     reservations: dict[str, QuotaReservation]
     by_operation: dict[str, str]
     completions: list[QuotaCompletion]
+    usage_events: dict[str, QuotaUsageEvent]
 
 
 def _reservation_id(
@@ -308,6 +312,7 @@ class TenantQuotaLedger:
                 reservations={},
                 by_operation={},
                 completions=[],
+                usage_events={},
             )
         return quota
 
@@ -319,10 +324,30 @@ class TenantQuotaLedger:
             raise QuotaError("tenant quota is not configured") from exc
 
     @staticmethod
-    def _reserved_usage(state: _TenantState) -> QuotaUsage:
+    def _usage_max(left: QuotaUsage, right: QuotaUsage) -> QuotaUsage:
+        return QuotaUsage(
+            operations=max(left.operations, right.operations),
+            input_tokens=max(left.input_tokens, right.input_tokens),
+            output_tokens=max(left.output_tokens, right.output_tokens),
+            cost_usd=max(left.cost_usd, right.cost_usd),
+            tool_calls=max(left.tool_calls, right.tool_calls),
+            artifact_bytes=max(left.artifact_bytes, right.artifact_bytes),
+        )
+
+    @staticmethod
+    def _metered_usage(state: _TenantState, reservation_id: str) -> QuotaUsage:
+        total = QuotaUsage()
+        for event in state.usage_events.values():
+            if event.reservation_id == reservation_id:
+                total = total.plus(event.delta)
+        return total
+
+    @classmethod
+    def _reserved_usage(cls, state: _TenantState) -> QuotaUsage:
         total = QuotaUsage()
         for reservation in state.reservations.values():
-            total = total.plus(reservation.estimate)
+            observed = cls._metered_usage(state, reservation.reservation_id)
+            total = total.plus(cls._usage_max(reservation.estimate, observed))
         return total
 
     def reserve(
@@ -386,13 +411,153 @@ class TenantQuotaLedger:
             state.by_operation[operation] = reservation.reservation_id
             return reservation
 
+    def record_usage_event(
+        self,
+        reservation_id: str,
+        event_id: str,
+        category: str,
+        delta: UsageEstimate,
+        *,
+        max_tool_calls: int | None = None,
+        max_artifact_bytes: int | None = None,
+        now: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Record one idempotent incremental actual-usage observation.
+
+        The in-memory ledger follows the durable SQLite semantics: observed
+        usage immediately counts against operation and tenant budgets, replay
+        with identical inputs is stable, and a reservation with observed usage
+        cannot be released without reconciliation.
+        """
+
+        key = _required_id(reservation_id, "reservation_id")
+        event = _required_id(event_id, "event_id")
+        normalized_category = str(category).strip().lower()
+        if normalized_category not in _USAGE_CATEGORIES:
+            raise QuotaError("unsupported usage category")
+        if not isinstance(delta, UsageEstimate):
+            raise QuotaError("delta must be UsageEstimate")
+        for field, value in (
+            ("max_tool_calls", max_tool_calls),
+            ("max_artifact_bytes", max_artifact_bytes),
+        ):
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise QuotaError(f"{field} must be a non-negative integer")
+        timestamp = time.time() if now is None else _finite_nonnegative(now, "now")
+        delta_usage = QuotaUsage(
+            operations=0,
+            input_tokens=delta.input_tokens,
+            output_tokens=delta.output_tokens,
+            cost_usd=delta.cost_usd,
+            tool_calls=delta.tool_calls,
+            artifact_bytes=delta.artifact_bytes,
+        )
+
+        with self._lock:
+            matched_state: _TenantState | None = None
+            reservation: QuotaReservation | None = None
+            for state in self._states.values():
+                candidate = state.reservations.get(key)
+                if candidate is not None:
+                    matched_state = state
+                    reservation = candidate
+                    break
+            if matched_state is None or reservation is None:
+                for state in self._states.values():
+                    if any(item.reservation_id == key for item in state.completions):
+                        raise QuotaConflict("cannot meter a completed quota reservation")
+                raise QuotaError("unknown active quota reservation")
+
+            for state in self._states.values():
+                existing = state.usage_events.get(event)
+                if existing is None:
+                    continue
+                if (
+                    existing.reservation_id != key
+                    or existing.category != normalized_category
+                    or existing.delta != delta_usage
+                ):
+                    raise QuotaConflict("usage event id replayed with different inputs")
+                return existing
+
+            observed = self._metered_usage(matched_state, key)
+            prospective = observed.plus(delta_usage)
+            if max_tool_calls is not None and prospective.tool_calls > max_tool_calls:
+                raise QuotaExceeded("operation_budget_exceeded:tool_calls")
+            if (
+                max_artifact_bytes is not None
+                and prospective.artifact_bytes > max_artifact_bytes
+            ):
+                raise QuotaExceeded("operation_budget_exceeded:artifact_bytes")
+
+            other_reserved = QuotaUsage()
+            for other in matched_state.reservations.values():
+                if other.reservation_id == key:
+                    continue
+                other_observed = self._metered_usage(
+                    matched_state,
+                    other.reservation_id,
+                )
+                other_reserved = other_reserved.plus(
+                    self._usage_max(other.estimate, other_observed)
+                )
+            effective_current = self._usage_max(
+                reservation.estimate,
+                prospective,
+            )
+            projected = (
+                matched_state.committed
+                .plus(other_reserved)
+                .plus(effective_current)
+            )
+            excess = _quota_excess(matched_state.quota, projected)
+            if excess:
+                raise QuotaExceeded(
+                    "tenant_quota_exceeded:" + ",".join(excess)
+                )
+
+            usage_event = QuotaUsageEvent(
+                event_id=event,
+                reservation_id=reservation.reservation_id,
+                tenant_id=reservation.tenant_id,
+                window_id=reservation.window_id,
+                operation_id=reservation.operation_id,
+                category=normalized_category,
+                delta=delta_usage,
+                recorded_at=timestamp,
+            )
+            matched_state.usage_events[event] = usage_event
+            return usage_event
+
+    def metered_usage(self, reservation_id: str) -> QuotaUsage:
+        key = _required_id(reservation_id, "reservation_id")
+        with self._lock:
+            for state in self._states.values():
+                active = key in state.reservations
+                completed = any(item.reservation_id == key for item in state.completions)
+                if active or completed:
+                    return self._metered_usage(state, key)
+        raise QuotaError("unknown quota reservation")
+
     def release(self, reservation_id: str) -> QuotaReservation:
         key = _required_id(reservation_id, "reservation_id")
         with self._lock:
             for state in self._states.values():
-                reservation = state.reservations.pop(key, None)
+                reservation = state.reservations.get(key)
                 if reservation is None:
                     continue
+                if any(
+                    event.reservation_id == key
+                    for event in state.usage_events.values()
+                ):
+                    raise QuotaConflict(
+                        "cannot release reservation after metered usage; complete it instead"
+                    )
+                state.reservations.pop(key)
                 state.by_operation.pop(reservation.operation_id, None)
                 return reservation
         raise QuotaError("unknown active quota reservation")
@@ -408,7 +573,7 @@ class TenantQuotaLedger:
         if not isinstance(actual, UsageEstimate):
             raise QuotaError("actual must be UsageEstimate")
         timestamp = time.time() if now is None else _finite_nonnegative(now, "now")
-        actual_usage = QuotaUsage.from_estimate(actual)
+        reported_usage = QuotaUsage.from_estimate(actual)
 
         with self._lock:
             matched_state: _TenantState | None = None
@@ -422,6 +587,8 @@ class TenantQuotaLedger:
             if matched_state is None or reservation is None:
                 raise QuotaError("unknown active quota reservation")
 
+            observed_usage = self._metered_usage(matched_state, key)
+            actual_usage = self._usage_max(reported_usage, observed_usage)
             projected = matched_state.committed.plus(actual_usage)
             overruns = _quota_excess(matched_state.quota, projected)
             completion = QuotaCompletion(
@@ -462,6 +629,24 @@ class TenantQuotaLedger:
                 "projected": projected.as_dict(),
                 "active_reservations": len(state.reservations),
                 "completions": len(state.completions),
+                "usage_events": len(state.usage_events),
+                "metered_by_category": {
+                    category: {
+                        "tool_calls": sum(
+                            event.delta.tool_calls
+                            for event in state.usage_events.values()
+                            if event.category == category
+                        ),
+                        "artifact_bytes": sum(
+                            event.delta.artifact_bytes
+                            for event in state.usage_events.values()
+                            if event.category == category
+                        ),
+                    }
+                    for category in sorted(
+                        {event.category for event in state.usage_events.values()}
+                    )
+                },
                 "over_quota_dimensions": list(
                     _quota_excess(state.quota, projected)
                 ),
@@ -489,6 +674,7 @@ class TenantQuotaLedger:
                 reservations={},
                 by_operation={},
                 completions=[],
+                usage_events={},
             )
         return quota
 
