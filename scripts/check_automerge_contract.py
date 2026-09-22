@@ -272,11 +272,24 @@ def _workflow_findings(text: str) -> list[Finding]:
             )
         )
 
-    if "python -m skeleton.pr_automation.automerge_cli" not in reconcile:
+    cli_index = reconcile.find("python -m skeleton.pr_automation.automerge_cli")
+    pydantic_index = reconcile.find('"pydantic>=2,<3"')
+    settings_index = reconcile.find('"pydantic-settings>=2.1,<3"')
+    if cli_index < 0:
         findings.append(
             Finding(
                 "runtime-entrypoint",
                 "reconcile job must invoke the canonical Python entrypoint",
+                rel,
+            )
+        )
+    if pydantic_index < 0 or settings_index < 0 or cli_index < 0 or not (
+        pydantic_index < cli_index and settings_index < cli_index
+    ):
+        findings.append(
+            Finding(
+                "runtime-dependencies",
+                "reconcile job must install pydantic and pydantic-settings before importing skeleton",
                 rel,
             )
         )
