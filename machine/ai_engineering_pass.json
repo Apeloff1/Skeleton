@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "engineering_pass_version": "1.0.0",
+  "engineering_pass_version": "1.1.0",
   "status": "active",
   "scope": "Depth-only systems-engineering overlay for the breadth-frozen VOL-000..420 masterplan.",
   "sources": {
@@ -2058,5 +2058,13 @@
       ],
       "promotion_rule": "No verified/hardened/production promotion until applicable dimensions have concrete artifacts, measured thresholds where quantitative, executable evidence, and accountability references."
     }
-  ]
+  ],
+  "task_propagation": {
+    "status": "active",
+    "machine_contract": "machine/ai_engineering_task_matrix.json",
+    "human_contract": "docs/plan/ENGINEERING_TASK_MATRIX.md",
+    "validator": "scripts/check_ai_engineering_task_matrix.py",
+    "regression_test": "skeleton/testing/test_ai_engineering_task_matrix.py",
+    "rule": "Every atomic AIQ task inherits the exact union of engineering obligations from all work_package_refs. Task completion does not by itself satisfy verified/hardened/production capability promotion."
+  }
 }
