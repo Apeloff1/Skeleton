@@ -76,6 +76,10 @@ def _parser() -> argparse.ArgumentParser:
     logs.add_argument("-f", "--follow", action="store_true")
 
     sub.add_parser("config", help="render and validate the Docker Compose configuration")
+
+    from skeleton.app.installer import configure_setup_parsers
+
+    configure_setup_parsers(sub)
     return parser
 
 
@@ -183,6 +187,10 @@ def run_app_cli(argv: Sequence[str] | None = None) -> int:
         )
     if command == "check":
         return _print_checks(bool(args.runtime), bool(args.as_json))
+    if command in {"preload", "setup", "install"}:
+        from skeleton.app.installer import run_setup_command
+
+        return run_setup_command(command, args)
 
     root = find_repo_root()
     manifest = load_manifest()

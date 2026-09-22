@@ -1,0 +1,176 @@
+name: Windows Installer
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/app/**"
+      - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "pyproject.toml"
+      - ".github/workflows/windows-installer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packaging/windows/**"
+      - "scripts/windows/**"
+      - "skeleton/app/**"
+      - "docker-compose.yml"
+      - "docker-compose.hot.yml"
+      - "pyproject.toml"
+      - ".github/workflows/windows-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.14.7"
+
+jobs:
+  build-windows-installer:
+    name: Build Setup.exe
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Enable Windows long paths
+        shell: pwsh
+        run: git config --global core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/windows-installer.yml
+            /.dockerignore
+            /.env.example
+            /Dockerfile
+            /README.md
+            /docker-compose.yml
+            /docker-compose.hot.yml
+            /pyproject.toml
+            /requirements.txt
+            /backend/
+            /frontend/
+            /skeleton/
+            /scripts/
+            /packaging/
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Install Inno Setup 7
+        shell: pwsh
+        run: |
+          winget install --id JRSoftware.InnoSetup.7 --version 7.1.0 --exact --source winget --silent --disable-interactivity --accept-package-agreements --accept-source-agreements
+
+      - name: Run Windows installer contract tests
+        shell: pwsh
+        env:
+          PYTHONPATH: "."
+        run: |
+          python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic==2.13.5" "pydantic-settings==2.15.0"
+          python -m pytest -q skeleton/testing/test_windows_installer.py
+
+      - name: Build installer
+        shell: pwsh
+        run: ./scripts/windows/build_installer.ps1 -SourceRef HEAD
+
+      - name: Verify installer checksum
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/windows/Skeleton-Setup-*-windows-x64.exe | Select-Object -First 1
+          if (-not $installer) { throw "installer missing" }
+          $checksum = Get-Content "$($installer.FullName).sha256"
+          $actual = (Get-FileHash -Algorithm SHA256 $installer.FullName).Hash.ToLowerInvariant()
+          if (-not $checksum.StartsWith($actual)) { throw "installer checksum mismatch" }
+          Write-Host "Verified $($installer.Name): $actual"
+
+      - name: Smoke install generated Setup.exe
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist/windows/Skeleton-Setup-*-windows-x64.exe | Select-Object -First 1
+          if (-not $installer) { throw "installer missing" }
+
+          $installDir = Join-Path $env:RUNNER_TEMP "SkeletonInstallerSmoke"
+          if (Test-Path -LiteralPath $installDir) {
+            Remove-Item -LiteralPath $installDir -Recurse -Force
+          }
+
+          $setupLog = Join-Path $env:RUNNER_TEMP "SkeletonSetup-smoke.log"
+          if (Test-Path -LiteralPath $setupLog) {
+            Remove-Item -LiteralPath $setupLog -Force
+          }
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/LOG=$setupLog",
+            "/DIR=$installDir"
+          ) -Wait -PassThru
+          if ($install.ExitCode -ne 0) {
+            if (Test-Path -LiteralPath $setupLog) {
+              Write-Host "---- Inno Setup failure context ----"
+              $patterns = "error|exception|abort|failed|denied|access|cannot|unable|not found|rollback"
+              $matches = Select-String -LiteralPath $setupLog -Pattern $patterns -CaseSensitive:$false -Context 8,16
+              if ($matches) {
+                $matches | ForEach-Object { $_.Context.PreContext; $_.Line; $_.Context.PostContext }
+              } else {
+                Write-Host "No explicit error token found; printing log head and tail."
+                Get-Content -LiteralPath $setupLog -TotalCount 100
+                Get-Content -LiteralPath $setupLog -Tail 100
+              }
+              Write-Host "---- end Inno Setup failure context ----"
+            }
+            throw "silent installer exited $($install.ExitCode)"
+          }
+
+          $launcher = Join-Path $installDir "Skeleton.exe"
+          if (-not (Test-Path -LiteralPath $launcher)) {
+            throw "installed Skeleton.exe missing"
+          }
+          $launch = Start-Process -FilePath $launcher -ArgumentList @("--help") -Wait -PassThru
+          if ($launch.ExitCode -ne 0) {
+            throw "installed Skeleton.exe launch smoke exited $($launch.ExitCode)"
+          }
+
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          if (-not (Test-Path -LiteralPath $uninstaller)) {
+            throw "uninstaller missing"
+          }
+          $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART"
+          ) -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) {
+            throw "silent uninstaller exited $($uninstall.ExitCode)"
+          }
+          Start-Sleep -Seconds 1
+          if (Test-Path -LiteralPath $launcher) {
+            throw "uninstall left installed launcher behind"
+          }
+
+      - name: Upload Windows installer
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Skeleton-Windows-Installer-${{ github.sha }}
+          path: |
+            dist/windows/Skeleton-Setup-*-windows-x64.exe
+            dist/windows/Skeleton-Setup-*-windows-x64.exe.sha256
+            ${{ runner.temp }}/SkeletonSetup-smoke.log
+          if-no-files-found: error
+          retention-days: 14

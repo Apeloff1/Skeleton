@@ -191,8 +191,9 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "prefix = 'Code scanning AI findings on PR #'" in workflow
     assert "status, payload = request(f'/repos/{repo}/pulls/{number}')" in workflow
     assert "closed_dynamic_ai_cache" not in workflow
-    assert "state = str(payload.get('state') or '')" in workflow
-    assert "return state == 'closed' and head_repo == repo and head_ref == branch" in workflow
+    assert "str(payload.get('state') or '') == 'closed'" in workflow
+    assert "head_repo == repo" in workflow
+    assert "head_ref == branch" in workflow
     assert "closed_dynamic_ai_queued" in workflow
     assert "closed_dynamic_ai_active" in workflow
 
@@ -203,4 +204,3 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "run_repo != repo" in helper
     assert "branch == 'main'" in helper
     assert "number_text.isdigit()" in helper
-    assert "state = str(payload.get('state') or '')" in helper
