@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "tree_version": "1.0.0",
+  "tree_version": "1.1.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
-  "purpose": "Consolidate build-plan-relevant AI engine code and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
+  "purpose": "Consolidate build-plan-relevant AI engine, governance, agent, evaluation, reliability, build-control code and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
   "authorities": {
     "architecture": "machine/architecture.json",
     "master_plan": "machine/ai_master_plan.json",
@@ -246,6 +246,423 @@
           "facade_required_import": "from core.shift_supervisor.model_gateway import",
           "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
         }
+      ]
+    },
+    {
+      "id": "AIFT-ENGINE-API",
+      "source": "skeleton/api",
+      "destination": "skeleton/ai/runtime/api",
+      "kind": "tree",
+      "source_git_object_sha": "904dfc4a2f4c93d427ee0a68f504014c2fbc4619",
+      "role": "engine API/auth/gateway runtime",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "aiq_refs": [
+        "AIQ-S5-ENG-01",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-VAULT",
+      "source": "skeleton/vault",
+      "destination": "skeleton/ai/runtime/vault",
+      "kind": "tree",
+      "source_git_object_sha": "c0d43bd5703b877710fd7f32f0e31db08c266d11",
+      "role": "data governance lifecycle and audit authority",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-AGENTS",
+      "source": "skeleton/agents",
+      "destination": "skeleton/ai/agents/core",
+      "kind": "tree",
+      "source_git_object_sha": "940ef2520e015bf13d7eba00813a792b575a7b3d",
+      "role": "core agent/swarm execution runtime",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-COST-03",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-AUTOMATION",
+      "source": "skeleton/automation",
+      "destination": "skeleton/ai/build/automation",
+      "kind": "tree",
+      "source_git_object_sha": "fac1338e8ee20de30ea2dbd60b91532ce03bdc35",
+      "role": "repository automation AI support plane",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "free_model.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.free_model import",
+          "note": "Repository-automation provider credential/network ownership remains singular at skeleton/automation/free_model.py until cutover."
+        }
+      ]
+    },
+    {
+      "id": "AIFT-ARTIFACT-PLANE",
+      "source": "skeleton/artifact_plane",
+      "destination": "skeleton/ai/runtime/artifact_plane",
+      "kind": "tree",
+      "source_git_object_sha": "9ae9937eb4f748ce827105abd4307fc32d62bc16",
+      "role": "artifact production and governance plane",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-COST-02",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-OBSERVABILITY",
+      "source": "skeleton/observability",
+      "destination": "skeleton/ai/runtime/observability",
+      "kind": "tree",
+      "source_git_object_sha": "744531d4f24d24e738f54b80d91343684c134268",
+      "role": "AI runtime observability audit and telemetry plane",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-03",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-CONTEXTS",
+      "source": "skeleton/contexts",
+      "destination": "skeleton/ai/runtime/contexts",
+      "kind": "tree",
+      "source_git_object_sha": "8f3df332fdca226208a0c4f7cbd4560b291b15fe",
+      "role": "legacy/extended context runtime support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-SECURITY",
+      "source": "skeleton/security",
+      "destination": "skeleton/ai/runtime/security",
+      "kind": "tree",
+      "source_git_object_sha": "62acf8347687d2c69fd1047fa593e5e9618d9270",
+      "role": "AI runtime security and activation controls",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-EVALUATION",
+      "source": "skeleton/eval",
+      "destination": "skeleton/ai/evaluation",
+      "kind": "tree",
+      "source_git_object_sha": "337e6ec148d5e141984f602e94bc75e5348c2bb1",
+      "role": "evaluation and evidence support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-KERNEL",
+      "source": "skeleton/kernel",
+      "destination": "skeleton/ai/runtime/kernel",
+      "kind": "tree",
+      "source_git_object_sha": "d070a8f416237ede18c124076dfe2d22f278ee36",
+      "role": "engine kernel and governance primitives",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-RELIABILITY",
+      "source": "skeleton/reliability",
+      "destination": "skeleton/ai/runtime/reliability",
+      "kind": "tree",
+      "source_git_object_sha": "3b51243d6072a6d853ef104e6f4cc510d678d459",
+      "role": "runtime reliability controls",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-LEARNING",
+      "source": "skeleton/learning",
+      "destination": "skeleton/ai/learning",
+      "kind": "tree",
+      "source_git_object_sha": "aa2e9a8c65dae1849dbd6a559e2e0c4b598c1dde",
+      "role": "controlled learning support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-RESILIENCE",
+      "source": "skeleton/resilience",
+      "destination": "skeleton/ai/runtime/resilience",
+      "kind": "tree",
+      "source_git_object_sha": "66754623097eb6c97e4e8e02c261467e4d2ac9b3",
+      "role": "failure recovery and resilience runtime",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-COGNITION",
+      "source": "skeleton/cognition",
+      "destination": "skeleton/ai/cognition",
+      "kind": "tree",
+      "source_git_object_sha": "24f689205da1c891c3794ab43dd1d99ab20a1703",
+      "role": "cognition and telemetry support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-PRIMITIVES",
+      "source": "skeleton/primitives",
+      "destination": "skeleton/ai/runtime/primitives",
+      "kind": "tree",
+      "source_git_object_sha": "35369ec7cc85ab9759d1540762f549b6d75c242d",
+      "role": "AI runtime primitive contracts and utilities",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-REPO-INTELLIGENCE",
+      "source": "skeleton/repo_intelligence",
+      "destination": "skeleton/ai/build/repo_intelligence",
+      "kind": "tree",
+      "source_git_object_sha": "a089e3c09730d6c67ef71b8f2ee493ce891506db",
+      "role": "repository intelligence for build/control workflows",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
       ]
     }
   ],
