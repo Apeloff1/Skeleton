@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.4.0**
+Plan version: **1.5.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -463,6 +463,27 @@ Numeric targets are bound at implementation depth rather than invented globally.
 Cross-boundary schema/API/config/storage/model changes must also declare mixed-version behavior, migration order and rollback/restore semantics. Promotion stops if a queue/fan-out/store can grow without a bound, replay can duplicate an effect, cancellation/restart can violate terminal finality, a migration assumes atomic fleet upgrade, or evidence cannot be reproduced from code/config/data/model/environment identity.
 
 The engineering overlay is a stronger definition of implementation depth. It does not override current runtime authority; it makes `verified`, `hardened` and `production` claims require concrete engineering proof in addition to the existing signed accountability contract.
+
+## 21.6 Atomic task engineering propagation
+
+The engineering obligations defined for W00–W30 are now propagated into every atomic AIQ task through `machine/ai_engineering_task_matrix.json`, documented in `docs/plan/ENGINEERING_TASK_MATRIX.md`.
+
+This closes a previously important gap between package-level engineering policy and executable queue work. Each AIQ task inherits the exact union of its referenced work packages' required engineering dimensions, NFR budget classes, evidence modes, principal failure modes, recovery requirements, change-impact triggers and construction-wave ownership.
+
+```text
+AIQ task
+-> work_package_refs
+-> engineering profiles
+-> inherited dimensions/budgets/failures/recovery
+-> implementation packet
+-> executable evidence
+-> independent verification
+-> signed accountability
+```
+
+The inheritance is fail-closed. A shorter task-local acceptance list cannot silently narrow package-level engineering obligations. Any not-applicable disposition must be explicit and reviewable.
+
+Task completion and engineering-strong capability promotion remain separate claims. Existing signed AIQ completion state is preserved, but it cannot by itself justify `verified`, `hardened` or `production` maturity. Those stronger claims require bound quantitative budgets, executable engineering evidence, compatibility/recovery proof, independent verification and the existing signed-accountability contract.
 
 ## 22. Vertical-slice acceptance ladder
 
