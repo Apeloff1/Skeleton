@@ -33,6 +33,22 @@ When documents overlap, resolve them in this order:
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
+### Program-plan authority bridge
+
+The frozen program-level target, construction ordering, maturity/completion rules, and signed accountability live in [plan/MASTER_PLAN.md](plan/MASTER_PLAN.md) with machine mirror `machine/ai_master_plan.json`. The frontier [BUILD_PLAN.md](BUILD_PLAN.md) is a detailed implementation/research decomposition under that program authority; it may refine work but may not silently override the program scope freeze, work-package ownership, maturity gates, or completion semantics.
+
+The adversarial cross-condition proof overlay is [plan/ADVERSARIAL_CLOSURE_PASS.md](plan/ADVERSARIAL_CLOSURE_PASS.md) with machine contract `machine/ai_adversarial_closure.json`. It is depth-only and gates strong maturity claims; it does not create another architecture root.
+
+Conflict rule:
+
+```text
+current runtime truth -> runtime/machine contracts
+program target/order/completion -> docs/plan/MASTER_PLAN.md + machine/ai_master_plan.json
+frontier implementation/research detail -> docs/BUILD_PLAN.md
+adversarial maturity proof -> adversarial closure overlay
+```
+
+
 ## 2. Frozen architectural invariants
 
 These rules survive model, provider, framework, and research changes:

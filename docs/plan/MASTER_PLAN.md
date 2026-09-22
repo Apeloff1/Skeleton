@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.4.0**
+Plan version: **1.5.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -463,6 +463,40 @@ Numeric targets are bound at implementation depth rather than invented globally.
 Cross-boundary schema/API/config/storage/model changes must also declare mixed-version behavior, migration order and rollback/restore semantics. Promotion stops if a queue/fan-out/store can grow without a bound, replay can duplicate an effect, cancellation/restart can violate terminal finality, a migration assumes atomic fleet upgrade, or evidence cannot be reproduced from code/config/data/model/environment identity.
 
 The engineering overlay is a stronger definition of implementation depth. It does not override current runtime authority; it makes `verified`, `hardened` and `production` claims require concrete engineering proof in addition to the existing signed accountability contract.
+
+
+## 21.6 Adversarial cross-condition closure overlay
+
+The systems-engineering pass closes individual requirement/interface/state/failure/budget/evidence dimensions. The adversarial closure pass closes the remaining interaction loophole: a package may not reach strong maturity by satisfying those dimensions independently while failing under combined lifecycle, authority, resource, restore, semantic-drift, or evidence conditions.
+
+Canonical contracts:
+
+- human: `docs/plan/ADVERSARIAL_CLOSURE_PASS.md`;
+- machine: `machine/ai_adversarial_closure.json`;
+- validator: `scripts/check_ai_adversarial_closure.py`;
+- regression: `skeleton/testing/test_ai_adversarial_closure.py`.
+
+The overlay defines 24 closure axes and 12 permanent compound-fault campaigns covering bootstrap/root trust, quiescence/restart, hard resource exhaustion, degraded dependency behavior, unknown external outcomes, reconciliation/orphans, mixed-version migration/rollback, restore/tombstone/external-effect reconciliation, time/lease semantics, identity/key continuity, silent semantic drift, canonicalization/TOCTOU, hostile parser/resource bombs, evidence integrity, economic denial of service, telemetry failure, cross-tenant isolation, data rebuild/compaction, human break-glass recovery, plan/machine/code drift, recovery dependency cycles, reproducibility/hermeticity, long-horizon aging, and multi-axis fault interaction.
+
+Every `WP-W00` through `WP-W30` must carry the applicable closure-axis references in its build packet and evidence. A missing applicability decision is not implicitly `N/A`.
+
+Strong maturity promotion is cumulative:
+
+```text
+ADV-E0 applicability
+  -> ADV-E1 single-axis executable evidence
+  -> ADV-E2 pairwise interaction evidence
+  -> ADV-E3 applicable compound campaigns
+  -> ADV-E4 replayable recovery/rollback/restore
+  -> ADV-E5 independent digest-bound closure sign-off
+```
+
+Consequential side-effect, authority, durable-state, migration, rollback, restore, and trust-root paths may not use single-fault testing as a substitute for applicable compound campaigns.
+
+Unknown external outcome is a first-class recovery state. Restore is not complete until tombstones, revoked authority, leases, derived state, and external effects are reconciled. Fallback may preserve or reduce capability, but may not silently widen privilege, privacy exposure, data residency, irreversibility, or cost.
+
+No signature is fabricated by planning. Verified/hardened/production closure requires real artifact-bound evidence and the existing signed accountability mechanism.
+
 
 ## 22. Vertical-slice acceptance ladder
 

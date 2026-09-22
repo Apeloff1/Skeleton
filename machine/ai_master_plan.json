@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.4.0",
+  "plan_version": "1.5.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -10930,5 +10930,19 @@
       "production"
     ],
     "closure_rule": "Applicable interface, invariant, failure/recovery, budget, compatibility, observability, reproducibility and release obligations require concrete evidence before strong maturity claims."
+  },
+  "adversarial_closure": {
+    "status": "active",
+    "machine_contract": "machine/ai_adversarial_closure.json",
+    "human_contract": "docs/plan/ADVERSARIAL_CLOSURE_PASS.md",
+    "validator": "scripts/check_ai_adversarial_closure.py",
+    "regression_test": "skeleton/testing/test_ai_adversarial_closure.py",
+    "scope": "Depth-only cross-condition and compound-fault closure for W00-W30; Volume 420 breadth freeze preserved.",
+    "required_for_promotion": [
+      "verified",
+      "hardened",
+      "production"
+    ],
+    "closure_rule": "Strong maturity claims require applicable adversarial axes, pairwise interaction coverage, compound campaigns, replayable recovery, and independent artifact-bound evidence."
   }
 }

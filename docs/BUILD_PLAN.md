@@ -6,7 +6,12 @@ Updated 2026-09-21.
 
 This is the current construction sequence for turning Skeleton into a durable, model-neutral AI system. It preserves completed historical work while adding the research, reasoning, serving, learning, evaluation, and promotion layers required for a system that can improve as AI research changes.
 
+Authority note: this frontier construction plan is subordinate to `docs/plan/MASTER_PLAN.md` for frozen scope, W00–W30 ownership, build-wave ordering, maturity/completion semantics, and signed accountability. If the two disagree, record and repair the drift; do not choose the more permissive interpretation.
+
 Canonical navigation: [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md)
+Program masterplan: [plan/MASTER_PLAN.md](plan/MASTER_PLAN.md)
+Machine masterplan: `machine/ai_master_plan.json`
+Adversarial closure overlay: [plan/ADVERSARIAL_CLOSURE_PASS.md](plan/ADVERSARIAL_CLOSURE_PASS.md) / `machine/ai_adversarial_closure.json`
 Scientific promotion contract: [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md)
 Historical/frontier research catalog: [architecture/research-source-catalog.md](architecture/research-source-catalog.md)
 Exotic architecture manual: [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md)
