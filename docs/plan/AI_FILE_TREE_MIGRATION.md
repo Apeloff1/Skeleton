@@ -56,7 +56,7 @@ remain application compatibility surfaces.
 
 ## Migration and compatibility
 
-The sequence is **strangler mirror -> import inversion -> compatibility facade -> source removal**. Non-credential implementation remains byte-identical while mirrored. Credential-bearing surfaces are the explicit exception: the destination must be a pure re-export facade so provider credentials, SDK imports, and network ownership remain singular at the canonical source until cutover. Any undeclared drift fails closed.
+The sequence is **strangler mirror -> import inversion -> compatibility facade -> source removal**. Mirrored Python implementation remains AST-equivalent while non-Python content stays byte-identical. Credential-bearing surfaces are the explicit exception: the destination must be a pure re-export facade so provider credentials, SDK imports, and network ownership remain singular at the canonical source until cutover. Any undeclared drift fails closed.
 
 ## Failure, recovery, and rollback
 
@@ -97,3 +97,13 @@ actual GitHub identity can be bound to that full SHA.
 Independent verification is not self-issued. A distinct verifier must validate
 the payload, parity, plan references, quality gates, and rollback semantics.
 Until then, source deletion and migration-complete state are forbidden.
+
+
+### Explicit planned-domain recovery
+
+Two existing main-tree implementations were already named by the masterplan but still marked as planned/unverified:
+
+- `VOL-019 World Models & Simulation` -> `skeleton/ai/simulation` with cognitive/planning ownership (`WP-W11`, `WP-W12`).
+- `VOL-023 Forge` -> `skeleton/ai/forge` with primary Forge ownership (`WP-W27`).
+
+Moving them into the governed tree does **not** mark either volume complete. Their existing accountability checkboxes remain open until the planned tests/evaluations and independent evidence exist.
