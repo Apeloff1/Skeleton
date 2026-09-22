@@ -629,9 +629,11 @@ The seventh enforced tranche is **DP-241-280**, documented in `docs/plan/VOLUME_
 
 The eighth enforced tranche is **DP-281-320**, documented in `docs/plan/VOLUME_DEPTH_281_320.md`. It deepens doctor/self-diagnosis/safe-repair/digital-twin/deployment planning, scheduler/fairness/backpressure/load-shedding/queue/retry/breaker/bulkhead/dead-letter/replay primitives, determinism/time/identity/logical ordering, master control/objective/constraint/decision/workflow compilation and migration, task complexity/decomposition/critical-path/scheduling simulation, and autonomy control/levels/escalation/de-escalation.
 
+The ninth enforced tranche is **DP-321-360**, documented in `docs/plan/VOLUME_DEPTH_321_360.md`. It deepens human override/interrupt/goal-drift/specification-gaming/plan-execution alignment, human factors/approval fatigue/trust/intent/project memory/workspaces, resource/artifact/change-impact/change-risk/safe-change/system compiler domains, generated/internal/provider/storage/event/evaluation SDKs, data/index/embedding/freshness lifecycle, and source-trust/claim/knowledge reconciliation/snapshots.
+
 The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
 
-Future depth passes should continue forward from **VOL-321** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+Future depth passes should continue forward from **VOL-361** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
 
 ## 24.4 Exotic systems depth layer
 
