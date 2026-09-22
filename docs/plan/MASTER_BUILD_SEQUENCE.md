@@ -166,3 +166,19 @@ A wave hands downstream **contracts and proven capabilities**, not assumptions. 
 - which evidence refs demonstrate the advertised behavior.
 
 Downstream work may prototype against an incomplete upstream wave only when the dependency contract is stable enough and the incomplete behavior is represented as an explicit gap. Prototype success never upgrades the upstream wave’s completion state.
+
+## Canonical AI file-tree migration
+
+The assembly destination for AI implementation code is `skeleton/ai`, governed
+by `machine/ai_file_tree.json` and the build packet in
+`docs/plan/AI_FILE_TREE_MIGRATION.md`.
+
+Migration is strangler-style rather than a blind rename wave. A legacy source
+may remain only as a compatibility mirror while the manifest requires
+byte-for-byte parity. It may be removed only after import ownership,
+route/package ownership, focused tests, App Assembly, rollback evidence, and
+signed accountability are explicit.
+
+This migration creates no new completion authority. AIQ/work-package completion
+continues to derive from `machine/ai_build_accountability.json`; relocation
+alone cannot mark plan work complete.
