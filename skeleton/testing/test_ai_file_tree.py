@@ -96,4 +96,3 @@ def test_ai_file_tree_cortex_and_organism_keep_sensitive_owners_singular() -> No
     assert "KIMI_API_KEY" not in cortex_interchange
     assert "OPENAI_API_KEY" not in cortex_gates
     assert "SKELETON_MASTER_SECRET" not in organism_secrets
-
