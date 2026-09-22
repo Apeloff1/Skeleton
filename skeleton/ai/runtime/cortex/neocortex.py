@@ -1000,4 +1000,3 @@ class ControlSurface:
 
     def stats(self) -> Dict[str, Any]:
         return {"interventions": len(self._interventions)}
-
