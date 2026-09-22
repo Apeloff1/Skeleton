@@ -20,6 +20,9 @@ on:
   workflow_run:
     workflows:
       - "Merge Readiness"
+    branches:
+      - "*"
+      - "**"
     types:
       - completed
     branches:
