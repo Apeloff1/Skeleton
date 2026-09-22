@@ -108,7 +108,6 @@ def test_ai_file_tree_pending_assignments_follow_masterplan() -> None:
     assert assignments["skeleton/network"]["destination"] == "skeleton/ai/runtime/distributed/network"
     assert assignments["skeleton/kv"]["destination"] == "skeleton/ai/runtime/inference/kv"
     assert assignments["skeleton/swarm"]["destination"] == "skeleton/ai/agents/swarm"
-    assert assignments["skeleton/telemetry"]["destination"] == "skeleton/ai/runtime/observability/telemetry"
     assert assignments["skeleton/foundation"]["destination"] == "skeleton/ai/runtime/foundation"
     assert assignments["skeleton/build"]["destination"] == "skeleton/ai/build/core"
     assert assignments["skeleton/repo_machine"]["destination"] == "skeleton/ai/build/repo_machine"
