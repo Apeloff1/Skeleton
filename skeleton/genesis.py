@@ -177,7 +177,7 @@ class Genesis:
 
     def _phase_swarm(self) -> None:
         self.report.phases.append("swarm")
-        from skeleton.swarm import HiveMind, SwarmMesh
+        from skeleton.swarm.mesh import HiveMind, SwarmMesh
         from skeleton.swarm.negotiation import CapabilityNegotiator
         from skeleton.swarm.platoons import standard_platoons
         from skeleton.swarm.stigmergy import PheromoneField, StigmergicRouter
