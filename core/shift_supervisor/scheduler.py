@@ -97,9 +97,10 @@ class SupervisorScheduler:
         if not run_secretary and not run_manager:
             raise ValueError("at least one supervisor actor must run")
 
-        project_context = self.project_context_supplier()
-        self._ingest_worker_snapshots(project_context.get("worker_snapshots", []))
+        raw_project_context = self.project_context_supplier()
+        self._ingest_worker_snapshots(raw_project_context.get("worker_snapshots", []))
         self._rollover_daily_totals()
+        project_context = self._planning_context(raw_project_context)
         revisions: dict[str, Any] = {}
         if run_secretary:
             revisions["secretary"] = asdict(self.secretary.enrich_plan(project_context))
@@ -155,6 +156,15 @@ class SupervisorScheduler:
 
     def stop(self) -> None:
         self._stop.set()
+
+    @staticmethod
+    def _planning_context(project_context: Mapping[str, Any]) -> dict[str, Any]:
+        """Keep raw worker records local while preserving aggregate capacity evidence."""
+        context = dict(project_context)
+        snapshots = context.pop("worker_snapshots", None)
+        if isinstance(snapshots, list):
+            context["worker_snapshot_count"] = len(snapshots)
+        return context
 
     def _ingest_worker_snapshots(self, raw: Any) -> None:
         if not isinstance(raw, list):
