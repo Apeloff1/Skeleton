@@ -555,6 +555,9 @@ def test_research_program_scorecard_separates_planning_from_evidence() -> None:
     assert checkpoint["experiment_protocols"] == 62
     assert checkpoint["historical_anchors"] == 110
     assert checkpoint["source_families"] == 55
+    assert checkpoint["research_control_plane_backlog_items"] == 120
+    assert checkpoint["research_control_plane_gaps"] == 100
+    assert checkpoint["research_control_plane_acceptance_campaigns"] == 10
     assert checkpoint["planning_coverage_is_not_reproduction"] is True
     assert checkpoint["single_scalar_score_forbidden"] is True
     assert checkpoint["production_authority_granted"] is False
@@ -567,6 +570,8 @@ def test_research_program_scorecard_separates_planning_from_evidence() -> None:
 
     assert "There is **no single research completion score**" in scorecard
     assert "local_protocol_execution_claimed_by_this_planning_pass: 0" in scorecard
+    assert "research_control_plane_backlog_items_claimed_implemented: 0" in scorecard
+    assert "research_control_plane_gaps_claimed_closed: 0" in scorecard
     assert "PLANNING COVERAGE" in scorecard
     assert "LOCAL REPRODUCTION" in scorecard
     assert "PRODUCTION EVIDENCE READINESS" in scorecard
