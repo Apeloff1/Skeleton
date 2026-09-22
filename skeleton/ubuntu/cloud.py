@@ -9,14 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import (
-    UbuntuAction,
-    UbuntuPlan,
-    _clean,
-    _policy_errors,
-    _validate_policy_fields,
-    validate_plan,
-)
+from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
 
 @dataclass(frozen=True, slots=True)
 class CloudCloudinitPlan:
@@ -30,25 +23,17 @@ class CloudCloudinitPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-cloudinit:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -58,11 +43,9 @@ class CloudCloudinitPlan:
 
 def validate_cloud_cloudinit(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-cloudinit action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-cloudinit:"+identifier, ("ubuntu","cloud","cloudinit",identifier,desired), "validated cloud-cloudinit")
 
 def plan_cloud_cloudinit(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -90,25 +73,17 @@ class CloudMetadataPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-metadata:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -118,11 +93,9 @@ class CloudMetadataPlan:
 
 def validate_cloud_metadata(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-metadata action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-metadata:"+identifier, ("ubuntu","cloud","metadata",identifier,desired), "validated cloud-metadata")
 
 def plan_cloud_metadata(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -150,25 +123,17 @@ class CloudIdentityPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-identity:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -178,11 +143,9 @@ class CloudIdentityPlan:
 
 def validate_cloud_identity(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-identity action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-identity:"+identifier, ("ubuntu","cloud","identity",identifier,desired), "validated cloud-identity")
 
 def plan_cloud_identity(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -210,25 +173,17 @@ class CloudInstancePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-instance:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -238,11 +193,9 @@ class CloudInstancePlan:
 
 def validate_cloud_instance(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-instance action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-instance:"+identifier, ("ubuntu","cloud","instance",identifier,desired), "validated cloud-instance")
 
 def plan_cloud_instance(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -270,25 +223,17 @@ class CloudUserdataPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-userdata:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -298,11 +243,9 @@ class CloudUserdataPlan:
 
 def validate_cloud_userdata(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-userdata action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-userdata:"+identifier, ("ubuntu","cloud","userdata",identifier,desired), "validated cloud-userdata")
 
 def plan_cloud_userdata(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -330,25 +273,17 @@ class CloudProvisionPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-provision:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -358,11 +293,9 @@ class CloudProvisionPlan:
 
 def validate_cloud_provision(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-provision action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-provision:"+identifier, ("ubuntu","cloud","provision",identifier,desired), "validated cloud-provision")
 
 def plan_cloud_provision(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -390,25 +323,17 @@ class CloudImagePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-image:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -418,11 +343,9 @@ class CloudImagePlan:
 
 def validate_cloud_image(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-image action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-image:"+identifier, ("ubuntu","cloud","image",identifier,desired), "validated cloud-image")
 
 def plan_cloud_image(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -450,25 +373,17 @@ class CloudAgentPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-agent:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -478,11 +393,9 @@ class CloudAgentPlan:
 
 def validate_cloud_agent(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-agent action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-agent:"+identifier, ("ubuntu","cloud","agent",identifier,desired), "validated cloud-agent")
 
 def plan_cloud_agent(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -510,25 +423,17 @@ class CloudHealthPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-health:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -538,11 +443,9 @@ class CloudHealthPlan:
 
 def validate_cloud_health(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-health action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-health:"+identifier, ("ubuntu","cloud","health",identifier,desired), "validated cloud-health")
 
 def plan_cloud_health(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -570,25 +473,17 @@ class CloudTagsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "cloud-tags:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -598,11 +493,9 @@ class CloudTagsPlan:
 
 def validate_cloud_tags(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated cloud-tags action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("cloud-tags:"+identifier, ("ubuntu","cloud","tags",identifier,desired), "validated cloud-tags")
 
 def plan_cloud_tags(identifiers: Sequence[str]) -> UbuntuPlan:

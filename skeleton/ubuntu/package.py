@@ -9,14 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import (
-    UbuntuAction,
-    UbuntuPlan,
-    _clean,
-    _policy_errors,
-    _validate_policy_fields,
-    validate_plan,
-)
+from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
 
 @dataclass(frozen=True, slots=True)
 class PackageAptPlan:
@@ -30,25 +23,17 @@ class PackageAptPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-apt:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -58,11 +43,9 @@ class PackageAptPlan:
 
 def validate_package_apt(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-apt action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-apt:"+identifier, ("ubuntu","package","apt",identifier,desired), "validated package-apt")
 
 def plan_package_apt(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -90,25 +73,17 @@ class PackageSnapPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-snap:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -118,11 +93,9 @@ class PackageSnapPlan:
 
 def validate_package_snap(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-snap action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-snap:"+identifier, ("ubuntu","package","snap",identifier,desired), "validated package-snap")
 
 def plan_package_snap(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -150,25 +123,17 @@ class PackageDebPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-deb:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -178,11 +143,9 @@ class PackageDebPlan:
 
 def validate_package_deb(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-deb action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-deb:"+identifier, ("ubuntu","package","deb",identifier,desired), "validated package-deb")
 
 def plan_package_deb(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -210,25 +173,17 @@ class PackageRepoPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-repo:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -238,11 +193,9 @@ class PackageRepoPlan:
 
 def validate_package_repo(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-repo action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-repo:"+identifier, ("ubuntu","package","repo",identifier,desired), "validated package-repo")
 
 def plan_package_repo(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -270,25 +223,17 @@ class PackagePinPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-pin:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -298,11 +243,9 @@ class PackagePinPlan:
 
 def validate_package_pin(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-pin action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-pin:"+identifier, ("ubuntu","package","pin",identifier,desired), "validated package-pin")
 
 def plan_package_pin(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -330,25 +273,17 @@ class PackageHoldPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-hold:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -358,11 +293,9 @@ class PackageHoldPlan:
 
 def validate_package_hold(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-hold action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-hold:"+identifier, ("ubuntu","package","hold",identifier,desired), "validated package-hold")
 
 def plan_package_hold(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -390,25 +323,17 @@ class PackageCachePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-cache:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -418,11 +343,9 @@ class PackageCachePlan:
 
 def validate_package_cache(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-cache action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-cache:"+identifier, ("ubuntu","package","cache",identifier,desired), "validated package-cache")
 
 def plan_package_cache(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -450,25 +373,17 @@ class PackageMirrorPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-mirror:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -478,11 +393,9 @@ class PackageMirrorPlan:
 
 def validate_package_mirror(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-mirror action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-mirror:"+identifier, ("ubuntu","package","mirror",identifier,desired), "validated package-mirror")
 
 def plan_package_mirror(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -510,25 +423,17 @@ class PackageKeyringPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-keyring:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -538,11 +443,9 @@ class PackageKeyringPlan:
 
 def validate_package_keyring(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-keyring action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-keyring:"+identifier, ("ubuntu","package","keyring",identifier,desired), "validated package-keyring")
 
 def plan_package_keyring(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -570,25 +473,17 @@ class PackagePolicyPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "package-policy:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -598,11 +493,9 @@ class PackagePolicyPlan:
 
 def validate_package_policy(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated package-policy action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("package-policy:"+identifier, ("ubuntu","package","policy",identifier,desired), "validated package-policy")
 
 def plan_package_policy(identifiers: Sequence[str]) -> UbuntuPlan:
