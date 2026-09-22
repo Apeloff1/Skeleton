@@ -17825,12 +17825,12 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "GC uses retention, reference, supersession and tombstone rules.",
-        "Deletion is auditable and reversible where policy requires."
+        "GC uses reachability/retention/trust policy rather than age alone.",
+        "Deletion candidates preserve legal/audit/tombstone requirements."
       ],
       "capabilities": [
-        "memory GC",
-        "reachability analysis",
+        "memory compaction",
+        "reachability GC",
         "retention enforcement"
       ],
       "contracts": [
@@ -17846,16 +17846,16 @@
         "planned:skeleton/testing/test_memory_gc.py"
       ],
       "evaluations": [
-        "planned:orphan/still-referenced memory evaluation"
+        "planned:GC resurrection/retention evaluation"
       ],
       "evidence": [],
       "risks": [
-        "live memory collected",
-        "privacy deletion blocked by references"
+        "useful memory deleted",
+        "tombstone removed"
       ],
       "gaps": [
-        "define GC roots",
-        "bind memory policy registry"
+        "define roots/retention graph",
+        "bind project/personal memory policies"
       ],
       "accountability_id": "ACC-VOL-361",
       "completion_checkbox": false,
@@ -17872,18 +17872,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Evaluate retrieval/use outcomes, not only storage correctness.",
-        "Track stale/incorrect memory separately from missing memory."
+        "Evaluate memory against source/current truth where possible.",
+        "Quality scores cannot bypass trust/authorization rules."
       ],
       "capabilities": [
-        "memory benchmarks",
-        "quality metrics",
-        "error attribution"
+        "memory quality scoring",
+        "freshness checks",
+        "memory audits"
       ],
       "contracts": [
-        "MemoryEval",
-        "MemoryQualityMetric",
-        "MemoryError"
+        "MemoryQuality",
+        "MemoryEvalCase",
+        "MemoryQualityFinding"
       ],
       "implementation_paths": [
         "skeleton/eval",
@@ -17893,15 +17893,15 @@
         "planned:skeleton/testing/test_memory_quality.py"
       ],
       "evaluations": [
-        "planned:memory retrieval benchmark"
+        "planned:stale/false-memory benchmark"
       ],
       "evidence": [],
       "risks": [
         "self-confirming memory",
-        "quality metric hides poisoning"
+        "low-quality memory retained"
       ],
       "gaps": [
-        "define eval corpus",
+        "build memory eval corpus",
         "bind promotion/GC"
       ],
       "accountability_id": "ACC-VOL-362",
@@ -17919,37 +17919,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Test conflicting memories and stale superseded facts.",
-        "Verify tenant/project/context isolation under retrieval pressure."
+        "Include conflicting, stale and poisoned memories in evaluation.",
+        "Scope violations are hard failures regardless of task success."
       ],
       "capabilities": [
-        "interference scenarios",
-        "conflict tests",
-        "isolation tests"
+        "memory interference scenarios",
+        "poisoning tests",
+        "scope isolation"
       ],
       "contracts": [
         "MemoryInterferenceCase",
-        "MemoryConflict",
-        "InterferenceFinding"
+        "InterferenceFinding",
+        "MemoryScope"
       ],
       "implementation_paths": [
-        "skeleton/testing",
+        "skeleton/eval",
         "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_memory_interference.py"
       ],
       "evaluations": [
-        "planned:cross-context contamination campaign"
+        "planned:cross-project contamination suite"
       ],
       "evidence": [],
       "risks": [
         "memory bleed",
-        "old fact dominates newer"
+        "poisoned instruction persistence"
       ],
       "gaps": [
-        "seed conflict corpus",
-        "bind reconciliation policies"
+        "seed adversarial cases",
+        "bind trust labels"
       ],
       "accountability_id": "ACC-VOL-363",
       "completion_checkbox": false,
@@ -17966,37 +17966,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Updates append lineage rather than overwrite history blindly.",
-        "Consumers can pin or request current compatible versions."
+        "Every mutation records predecessor/version and source.",
+        "Concurrent edits use explicit conflict semantics."
       ],
       "capabilities": [
-        "memory versions",
-        "supersession",
-        "version resolution"
+        "memory revisions",
+        "optimistic concurrency",
+        "rollback"
       ],
       "contracts": [
         "MemoryVersion",
         "MemoryRevision",
-        "MemoryVersionPolicy"
+        "MemoryConflict"
       ],
       "implementation_paths": [
-        "skeleton/ai",
-        "skeleton/persistence"
+        "skeleton/persistence",
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_memory_versioning.py"
       ],
       "evaluations": [
-        "planned:version migration evaluation"
+        "planned:concurrent update evaluation"
       ],
       "evidence": [],
       "risks": [
-        "version ambiguity",
-        "rollback resurrects deleted data"
+        "lost update",
+        "rollback resurrects deleted memory"
       ],
       "gaps": [
-        "define revision schema",
-        "bind deletion/tombstones"
+        "define revision model",
+        "bind reconciliation"
       ],
       "accountability_id": "ACC-VOL-364",
       "completion_checkbox": false,
@@ -18013,18 +18013,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Conflicts remain explicit until justified resolution.",
-        "Reconciliation produces durable decision/evidence lineage."
+        "Reconciliation never silently merges different scopes/users/projects.",
+        "Keep unresolved conflict sets when evidence is insufficient."
       ],
       "capabilities": [
-        "memory conflict resolution",
-        "deduplication",
+        "memory merge",
+        "conflict sets",
         "supersession"
       ],
       "contracts": [
         "MemoryConflictSet",
-        "MemoryReconciliation",
-        "MemoryDecision"
+        "MemoryMerge",
+        "MemoryResolution"
       ],
       "implementation_paths": [
         "skeleton/ai",
@@ -18034,16 +18034,16 @@
         "planned:skeleton/testing/test_memory_reconciliation.py"
       ],
       "evaluations": [
-        "planned:contradictory-memory evaluation"
+        "planned:conflict resolution benchmark"
       ],
       "evidence": [],
       "risks": [
         "false merge",
-        "popularity wins over evidence"
+        "newer but wrong memory wins"
       ],
       "gaps": [
-        "bind claim reconciliation",
-        "define human review thresholds"
+        "define reconciliation policy",
+        "bind memory quality"
       ],
       "accountability_id": "ACC-VOL-365",
       "completion_checkbox": false,
@@ -18060,8 +18060,8 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Strategies are versioned capabilities, not hidden prompt tricks.",
-        "Strategy use is traceable to operation/task context."
+        "Strategies are versioned capabilities, not hidden prompt fragments.",
+        "Production eligibility requires benchmark/eval evidence."
       ],
       "capabilities": [
         "strategy registry",
@@ -18085,11 +18085,11 @@
       ],
       "evidence": [],
       "risks": [
-        "untracked reasoning changes",
-        "strategy marketing without evidence"
+        "strategy sprawl",
+        "untested strategy used"
       ],
       "gaps": [
-        "inventory strategies",
+        "inventory current strategies",
         "bind selection engine"
       ],
       "accountability_id": "ACC-VOL-366",
@@ -18107,18 +18107,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Selection obeys policy/resource constraints before utility.",
-        "Fallback strategy is explicit and evaluated."
+        "Selection remains within allowed strategy set and budgets.",
+        "Fallback/abstention occurs when no strategy satisfies constraints."
       ],
       "capabilities": [
         "strategy routing",
-        "fallback",
-        "adaptive selection"
+        "adaptive selection",
+        "fallback"
       ],
       "contracts": [
-        "StrategyDecision",
+        "StrategySelection",
         "StrategyConstraint",
-        "StrategyOutcome"
+        "StrategyDecision"
       ],
       "implementation_paths": [
         "skeleton/ai",
@@ -18132,12 +18132,12 @@
       ],
       "evidence": [],
       "risks": [
-        "wrong strategy bias",
-        "cost explosion"
+        "wrong strategy cost explosion",
+        "selection overfits eval"
       ],
       "gaps": [
-        "define selector baselines",
-        "bind performance feedback"
+        "define baseline selector",
+        "bind performance evidence"
       ],
       "accountability_id": "ACC-VOL-367",
       "completion_checkbox": false,
@@ -18154,36 +18154,36 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Capture cost per task/strategy without exposing hidden chain-of-thought.",
-        "Use observable stage/action metadata only."
+        "Attribute cost by operation/strategy/model/version.",
+        "Cost accounting cannot expose hidden reasoning content."
       ],
       "capabilities": [
-        "reasoning cost metrics",
-        "strategy cost comparison",
-        "budget enforcement"
+        "reasoning cost ledger",
+        "stage attribution",
+        "budget reporting"
       ],
       "contracts": [
         "ReasoningCost",
-        "ReasoningStageMetric",
-        "StrategyCost"
+        "ReasoningStage",
+        "CostAttribution"
       ],
       "implementation_paths": [
         "skeleton/observability",
         "skeleton/ai"
       ],
       "tests": [
-        "planned:skeleton/testing/test_reasoning_cost_accounting.py"
+        "planned:skeleton/testing/test_reasoning_cost.py"
       ],
       "evaluations": [
         "planned:cost attribution audit"
       ],
       "evidence": [],
       "risks": [
-        "hidden cost leakage",
-        "cost metric encourages low quality"
+        "double counting",
+        "cost telemetry leaks content"
       ],
       "gaps": [
-        "define stage accounting",
+        "define stage IDs",
         "bind cost governor"
       ],
       "accountability_id": "ACC-VOL-368",
@@ -18201,18 +18201,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Use stable observable outputs/trajectories, not private thought text.",
-        "Include adversarial and uncertainty-sensitive cases."
+        "Keep task fixtures/versioned scorers stable enough for comparisons.",
+        "Evaluate correctness, robustness and cost rather than style."
       ],
       "capabilities": [
-        "reasoning regression suites",
-        "baseline comparison",
-        "robustness tests"
+        "reasoning regression suite",
+        "trajectory comparison",
+        "budget regression"
       ],
       "contracts": [
-        "ReasoningRegression",
-        "ReasoningCase",
-        "ReasoningBaseline"
+        "ReasoningTest",
+        "ReasoningBaseline",
+        "ReasoningRegression"
       ],
       "implementation_paths": [
         "skeleton/eval",
@@ -18222,16 +18222,16 @@
         "planned:skeleton/testing/test_reasoning_regressions.py"
       ],
       "evaluations": [
-        "planned:reasoning mutation evaluation"
+        "planned:strategy mutation suite"
       ],
       "evidence": [],
       "risks": [
-        "overfit benchmark",
-        "nondeterministic false alarms"
+        "benchmark overfit",
+        "nondeterminism noise"
       ],
       "gaps": [
-        "build representative suite",
-        "bind strategy promotion"
+        "build diverse fixtures",
+        "bind strategy releases"
       ],
       "accountability_id": "ACC-VOL-369",
       "completion_checkbox": false,
@@ -18248,18 +18248,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Verifier is independent from plan generator for high-risk plans.",
-        "Verification result references exact plan digest/version."
+        "Verifier is independent of planner for high-risk plans.",
+        "Invalid or under-specified plans cannot execute privileged steps."
       ],
       "capabilities": [
         "plan verification",
         "constraint checks",
-        "verification evidence"
+        "verification receipts"
       ],
       "contracts": [
         "PlanVerification",
         "PlanFinding",
-        "PlanDigest"
+        "PlanApproval"
       ],
       "implementation_paths": [
         "skeleton/ai",
@@ -18269,16 +18269,16 @@
         "planned:skeleton/testing/test_plan_verifier.py"
       ],
       "evaluations": [
-        "planned:unsafe-plan corpus"
+        "planned:known-bad plan corpus"
       ],
       "evidence": [],
       "risks": [
         "self-verification bias",
-        "stale plan approval"
+        "missed dependency"
       ],
       "gaps": [
         "define verifier rules",
-        "bind safe change/workflow planning"
+        "bind execution admission"
       ],
       "accountability_id": "ACC-VOL-370",
       "completion_checkbox": false,
@@ -18295,18 +18295,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Static checks are deterministic and versioned.",
-        "Unknown dynamic behavior is surfaced as uncertainty rather than ignored."
+        "Analysis is deterministic over versioned plan IR.",
+        "Findings have location/severity/remediation."
       ],
       "capabilities": [
-        "cycle detection",
-        "dataflow checks",
-        "failure-path analysis"
+        "static plan checks",
+        "graph analysis",
+        "policy linting"
       ],
       "contracts": [
-        "PlanAnalysis",
-        "PlanIssue",
-        "PlanGraph"
+        "PlanLintRule",
+        "PlanDiagnostic",
+        "PlanAnalysis"
       ],
       "implementation_paths": [
         "skeleton/ai",
@@ -18316,16 +18316,16 @@
         "planned:skeleton/testing/test_plan_static_analyzer.py"
       ],
       "evaluations": [
-        "planned:known-bad plan fixtures"
+        "planned:plan mutation tests"
       ],
       "evidence": [],
       "risks": [
-        "false clean analysis",
-        "dynamic side effect invisible"
+        "false negatives",
+        "rule drift"
       ],
       "gaps": [
-        "define analyzer passes",
-        "bind Workflow IR"
+        "seed core lint rules",
+        "bind workflow compiler"
       ],
       "accountability_id": "ACC-VOL-371",
       "completion_checkbox": false,
@@ -18342,18 +18342,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Simulation is clearly non-authoritative and side-effect free.",
-        "Differences between simulation and real environment are recorded."
+        "Simulation receipts are marked non-production evidence.",
+        "Include failure/timeout/resource scenarios, not only happy path."
       ],
       "capabilities": [
-        "plan simulation",
-        "what-if analysis",
-        "failure rehearsal"
+        "plan dry run",
+        "fault simulation",
+        "outcome comparison"
       ],
       "contracts": [
         "PlanSimulation",
-        "SimulationTrace",
-        "SimulationGap"
+        "SimulatedStep",
+        "SimulationFinding"
       ],
       "implementation_paths": [
         "skeleton/simulation",
@@ -18363,16 +18363,16 @@
         "planned:skeleton/testing/test_plan_simulation.py"
       ],
       "evaluations": [
-        "planned:sim-vs-real evaluation"
+        "planned:risky-plan simulation suite"
       ],
       "evidence": [],
       "risks": [
-        "simulation optimism",
-        "simulated success treated proof"
+        "simulation mismatch",
+        "simulated success overtrusted"
       ],
       "gaps": [
         "bind digital twin",
-        "add uncertainty annotations"
+        "define promotion thresholds"
       ],
       "accountability_id": "ACC-VOL-372",
       "completion_checkbox": false,
@@ -18389,18 +18389,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Composition checks authority and compatibility per step.",
-        "Unknown-outcome/compensation semantics are preserved across chain."
+        "Composition cannot aggregate permissions into broader authority.",
+        "Data transformations between tools are schema/trust checked."
       ],
       "capabilities": [
-        "tool composition",
-        "type linking",
-        "composite execution"
+        "tool workflows",
+        "adapter composition",
+        "composition validation"
       ],
       "contracts": [
         "ToolComposition",
-        "ToolLink",
-        "CompositeToolPlan"
+        "ToolBinding",
+        "CompositionResult"
       ],
       "implementation_paths": [
         "skeleton/ai",
@@ -18410,16 +18410,16 @@
         "planned:skeleton/testing/test_tool_composition.py"
       ],
       "evaluations": [
-        "planned:multi-tool failure evaluation"
+        "planned:confused-deputy composition suite"
       ],
       "evidence": [],
       "risks": [
-        "tool output injection",
-        "authority amplification"
+        "authority amplification",
+        "schema mismatch"
       ],
       "gaps": [
         "define composition IR",
-        "bind Tool SDK"
+        "bind tool SDK/workflows"
       ],
       "accountability_id": "ACC-VOL-373",
       "completion_checkbox": false,
@@ -18436,18 +18436,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Edges include hard/soft and version requirements.",
-        "Tool availability reflects dependency health, not registration only."
+        "Dependencies are versioned and typed.",
+        "Planner can detect unavailable/conflicting tool chains before execution."
       ],
       "capabilities": [
-        "tool graph",
-        "dependency checks",
-        "availability projection"
+        "tool dependency registry",
+        "availability graph",
+        "compatibility analysis"
       ],
       "contracts": [
         "ToolDependency",
         "ToolGraph",
-        "ToolAvailability"
+        "ToolCompatibility"
       ],
       "implementation_paths": [
         "machine",
@@ -18462,11 +18462,11 @@
       "evidence": [],
       "risks": [
         "hidden dependency",
-        "false available tool"
+        "cyclic tool chain"
       ],
       "gaps": [
         "populate graph",
-        "bind health/impact"
+        "bind impact/failover"
       ],
       "accountability_id": "ACC-VOL-374",
       "completion_checkbox": false,
@@ -18483,18 +18483,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Health is operation/scenario scoped, not a single uptime boolean.",
-        "Security/policy failures remain distinct from provider outages."
+        "Health distinguishes transport success from semantic correctness.",
+        "Stale health cannot authorize risky operations."
       ],
       "capabilities": [
-        "tool SLIs",
-        "health scoring",
-        "degradation"
+        "tool probes",
+        "quota/auth health",
+        "semantic canaries"
       ],
       "contracts": [
         "ToolHealth",
-        "ToolObservation",
-        "ToolDegradation"
+        "ToolProbe",
+        "ToolHealthState"
       ],
       "implementation_paths": [
         "skeleton/observability",
@@ -18504,16 +18504,16 @@
         "planned:skeleton/testing/test_tool_health.py"
       ],
       "evaluations": [
-        "planned:failure-mode classification evaluation"
+        "planned:semantic failure evaluation"
       ],
       "evidence": [],
       "risks": [
-        "healthy but wrong outputs",
-        "mixed failure causes"
+        "200-OK but wrong result",
+        "probe causes side effect"
       ],
       "gaps": [
-        "define health dimensions",
-        "bind routing"
+        "define safe probes",
+        "bind tool routing"
       ],
       "accountability_id": "ACC-VOL-375",
       "completion_checkbox": false,
@@ -18530,37 +18530,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Discovery results are filtered by caller authority/context.",
-        "Discovered descriptions never override canonical schemas/policy."
+        "Discovery data is untrusted until validated/signed according to source.",
+        "Discovered capability never implies granted authority."
       ],
       "capabilities": [
-        "tool discovery",
-        "capability filtering",
-        "version resolution"
+        "capability discovery",
+        "manifest validation",
+        "filtered exposure"
       ],
       "contracts": [
-        "ToolDiscovery",
-        "DiscoveredTool",
-        "ToolCapability"
+        "ToolCapability",
+        "ToolManifest",
+        "ToolDiscoveryResult"
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "machine"
+        "skeleton/security"
       ],
       "tests": [
         "planned:skeleton/testing/test_tool_discovery.py"
       ],
       "evaluations": [
-        "planned:unauthorized discovery evaluation"
+        "planned:malicious manifest evaluation"
       ],
       "evidence": [],
       "risks": [
-        "capability leak",
-        "description prompt injection"
+        "prompt injection via metadata",
+        "capability=authority confusion"
       ],
       "gaps": [
-        "define discovery API",
-        "bind Tool SDK"
+        "define discovery trust contract",
+        "bind tool SDK"
       ],
       "accountability_id": "ACC-VOL-376",
       "completion_checkbox": false,
@@ -18577,36 +18577,36 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Tool output remains untrusted data unless contract/evidence upgrades it.",
-        "Propagate taint/trust into memory/context/artifacts."
+        "Tool output is data, not instructions or authority.",
+        "High-impact results require independent validation where appropriate."
       ],
       "capabilities": [
+        "result trust labels",
         "result validation",
-        "trust labels",
-        "taint propagation"
+        "provenance"
       ],
       "contracts": [
         "ToolResultTrust",
         "ToolEvidence",
-        "TrustUpgrade"
+        "ToolValidation"
       ],
       "implementation_paths": [
-        "skeleton/security",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/security"
       ],
       "tests": [
         "planned:skeleton/testing/test_tool_result_trust.py"
       ],
       "evaluations": [
-        "planned:malicious tool output campaign"
+        "planned:malicious/incorrect tool result suite"
       ],
       "evidence": [],
       "risks": [
-        "tool output becomes instruction",
-        "lost provenance"
+        "tool output injection",
+        "stale result trusted"
       ],
       "gaps": [
-        "define trust transitions",
+        "define result trust levels",
         "bind context compiler"
       ],
       "accountability_id": "ACC-VOL-377",
@@ -18624,13 +18624,13 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Ledger is durable before/around effects according to operation class.",
-        "Unknown outcomes remain unresolved until reconciled."
+        "Ledger entries are durable before/after effects according to operation class.",
+        "Unknown outcomes remain unresolved until reconciliation."
       ],
       "capabilities": [
-        "effect tracking",
-        "idempotency receipts",
-        "unknown-outcome state"
+        "effect accounting",
+        "idempotency tracking",
+        "unknown outcome state"
       ],
       "contracts": [
         "SideEffect",
@@ -18645,16 +18645,16 @@
         "planned:skeleton/testing/test_side_effect_ledger.py"
       ],
       "evaluations": [
-        "planned:network-loss-after-effect drill"
+        "planned:network-loss-after-effect evaluation"
       ],
       "evidence": [],
       "risks": [
-        "duplicate effect",
-        "false success"
+        "effect executed twice",
+        "unknown marked failed"
       ],
       "gaps": [
         "define effect state machine",
-        "bind saga/compensation"
+        "bind tools/sagas"
       ],
       "accountability_id": "ACC-VOL-378",
       "completion_checkbox": false,
@@ -18671,17 +18671,17 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Compensation is not assumed equivalent to rollback; limitations are recorded.",
-        "Compensation itself is idempotent/retriable or reconciled."
+        "Compensation semantics are explicit and not assumed equivalent to rollback.",
+        "Failed compensation becomes durable incident/reconciliation work."
       ],
       "capabilities": [
         "compensation planning",
         "compensation execution",
-        "verification"
+        "compensation evidence"
       ],
       "contracts": [
-        "CompensationAction",
-        "CompensationPlan",
+        "Compensation",
+        "CompensationStep",
         "CompensationResult"
       ],
       "implementation_paths": [
@@ -18692,16 +18692,16 @@
         "planned:skeleton/testing/test_compensation_engine.py"
       ],
       "evaluations": [
-        "planned:partial compensation evaluation"
+        "planned:compensation failure campaign"
       ],
       "evidence": [],
       "risks": [
-        "compensation worsens state",
-        "non-idempotent undo"
+        "compensation duplicates harm",
+        "false rollback claim"
       ],
       "gaps": [
-        "bind side-effect ledger",
-        "define compensation registry"
+        "catalog compensable effects",
+        "bind side-effect ledger"
       ],
       "accountability_id": "ACC-VOL-379",
       "completion_checkbox": false,
@@ -18718,18 +18718,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Saga state survives crashes and worker changes.",
-        "Each step declares idempotency, timeout and compensation/reconciliation."
+        "Saga state is durable and resumable across process failure.",
+        "Each step has idempotency, timeout and compensation/reconciliation policy."
       ],
       "capabilities": [
-        "saga execution",
-        "persistent saga state",
+        "saga orchestration",
+        "step state",
         "recovery"
       ],
       "contracts": [
-        "SagaWorkflow",
-        "SagaState",
-        "SagaStepResult"
+        "SagaDefinition",
+        "SagaInstance",
+        "SagaTransition"
       ],
       "implementation_paths": [
         "skeleton/ai",
@@ -18739,16 +18739,16 @@
         "planned:skeleton/testing/test_saga_workflows.py"
       ],
       "evaluations": [
-        "planned:crash-every-step saga campaign"
+        "planned:crash-every-step saga evaluation"
       ],
       "evidence": [],
       "risks": [
-        "stuck saga",
-        "compensation chain failure"
+        "orphan saga",
+        "compensation order error"
       ],
       "gaps": [
-        "materialize saga runtime",
-        "bind distributed transactions"
+        "unify transaction strategy",
+        "materialize saga runtime"
       ],
       "accountability_id": "ACC-VOL-380",
       "completion_checkbox": false,
@@ -18765,36 +18765,36 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Separate control state from request data plane.",
-        "Routing decisions bind to healthy compatible model/version/capacity."
+        "Control state is fenced/versioned to avoid split-brain scheduling.",
+        "Data/control planes remain separate."
       ],
       "capabilities": [
-        "replica registry",
-        "routing control",
-        "inference admission"
+        "inference cluster orchestration",
+        "worker registry",
+        "routing state"
       ],
       "contracts": [
-        "InferenceReplica",
-        "InferenceRoute",
-        "InferenceControlState"
+        "InferenceWorker",
+        "InferenceControlState",
+        "InferenceAssignment"
       ],
       "implementation_paths": [
-        "skeleton/ai/providers",
-        "skeleton/runtime"
+        "skeleton/ai",
+        "skeleton/network"
       ],
       "tests": [
         "planned:skeleton/testing/test_inference_control_plane.py"
       ],
       "evaluations": [
-        "planned:replica failure/partition evaluation"
+        "planned:leader/partition evaluation"
       ],
       "evidence": [],
       "risks": [
-        "stale replica routing",
-        "control-plane split brain"
+        "split brain",
+        "stale routing"
       ],
       "gaps": [
-        "define replica leases",
+        "define worker protocol",
         "bind model ops"
       ],
       "accountability_id": "ACC-VOL-381",
@@ -18812,37 +18812,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Placement checks hard hardware/model constraints first.",
-        "Rebalancing is bounded to avoid thrash."
+        "Placement validates compatibility before load.",
+        "Anti-affinity/failure-domain rules prevent correlated loss where needed."
       ],
       "capabilities": [
-        "placement solver",
-        "affinity",
-        "rebalancing"
+        "placement scheduling",
+        "constraint matching",
+        "replica distribution"
       ],
       "contracts": [
         "ModelPlacement",
         "PlacementConstraint",
-        "PlacementDecision"
+        "ReplicaAssignment"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/ai/providers"
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_model_placement.py"
       ],
       "evaluations": [
-        "planned:heterogeneous cluster placement"
+        "planned:heterogeneous cluster benchmark"
       ],
       "evidence": [],
       "risks": [
-        "oversubscribed GPU",
-        "placement thrash"
+        "OOM placement",
+        "correlated replica failure"
       ],
       "gaps": [
-        "define resource descriptors",
-        "bind hardware topology"
+        "define resource profiles",
+        "bind topology model"
       ],
       "accountability_id": "ACC-VOL-382",
       "completion_checkbox": false,
@@ -18859,37 +18859,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Admission uses measured/free/reserved memory, not static estimates only.",
-        "OOM recovery cannot corrupt shared inference state."
+        "Admission reserves memory before load/request batch.",
+        "Manager handles fragmentation and concurrent reservations deterministically."
       ],
       "capabilities": [
-        "GPU memory accounting",
-        "admission",
-        "OOM recovery"
+        "GPU reservations",
+        "memory accounting",
+        "fragmentation handling"
       ],
       "contracts": [
-        "GPUMemoryState",
-        "GPUReservation",
+        "GPUMemoryPool",
+        "GPUMemoryReservation",
         "GPUAllocation"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/observability"
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_gpu_memory_manager.py"
       ],
       "evaluations": [
-        "planned:fragmentation/OOM evaluation"
+        "planned:fragmentation/pressure evaluation"
       ],
       "evidence": [],
       "risks": [
-        "OOM cascade",
-        "memory leak"
+        "GPU OOM",
+        "reservation leak"
       ],
       "gaps": [
-        "define allocator model",
-        "bind placement/batching"
+        "define memory accounting",
+        "bind model/KV caches"
       ],
       "accountability_id": "ACC-VOL-383",
       "completion_checkbox": false,
@@ -18906,36 +18906,36 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Eviction respects pinned/active sessions and warmup cost.",
-        "Evicted model version remains reconstructable from registry/artifact."
+        "Eviction excludes pinned/in-flight models until safe boundary.",
+        "Eviction decisions are observable and reversible by reload."
       ],
       "capabilities": [
+        "model unload",
         "eviction policy",
-        "drain",
-        "reload metadata"
+        "safe drain"
       ],
       "contracts": [
-        "ModelEviction",
         "EvictionPolicy",
-        "EvictionReceipt"
+        "ModelEviction",
+        "DrainState"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/ai/providers"
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_model_eviction.py"
       ],
       "evaluations": [
-        "planned:pressure/active-session evaluation"
+        "planned:load/evict thrash evaluation"
       ],
       "evidence": [],
       "risks": [
-        "evict active model",
+        "evict in-flight model",
         "thrashing"
       ],
       "gaps": [
-        "define pinning/age policy",
+        "define pin/drain semantics",
         "bind warming"
       ],
       "accountability_id": "ACC-VOL-384",
@@ -18953,22 +18953,22 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Warm actions cannot crowd out active critical workloads.",
-        "Warmed artifact identity is verified before serving."
+        "Warmup obeys resource/cost budgets.",
+        "Warm readiness is validated before routing traffic."
       ],
       "capabilities": [
-        "preload",
-        "warm pools",
-        "warm readiness"
+        "preload scheduling",
+        "warm readiness",
+        "demand-driven warmup"
       ],
       "contracts": [
-        "WarmRequest",
-        "ModelWarmState",
-        "WarmReceipt"
+        "WarmupPlan",
+        "WarmModel",
+        "WarmupEvidence"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/ai/providers"
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_model_warming.py"
@@ -18979,11 +18979,11 @@
       "evidence": [],
       "risks": [
         "wasted memory",
-        "warm wrong version"
+        "warmup overload"
       ],
       "gaps": [
-        "bind forecasting",
-        "define readiness checks"
+        "bind forecast/placement",
+        "define readiness probes"
       ],
       "accountability_id": "ACC-VOL-385",
       "completion_checkbox": false,
@@ -19000,36 +19000,36 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Batch compatibility includes model/version/decoding semantics.",
-        "Fairness/latency bounds prevent throughput-only optimization."
+        "Batching respects model/config/privacy/tenant compatibility.",
+        "Cancellation/deadline can remove or mask requests safely."
       ],
       "capabilities": [
         "dynamic batching",
-        "batch admission",
-        "batch cancellation"
+        "deadline-aware batching",
+        "batch telemetry"
       ],
       "contracts": [
         "InferenceBatch",
-        "BatchSlot",
-        "BatchDecision"
+        "BatchMember",
+        "BatchSchedule"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/ai/providers"
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_continuous_batching.py"
       ],
       "evaluations": [
-        "planned:latency-throughput benchmark"
+        "planned:throughput/tail-latency benchmark"
       ],
       "evidence": [],
       "risks": [
-        "tail latency explosion",
-        "tenant starvation"
+        "head-of-line blocking",
+        "cross-tenant leakage"
       ],
       "gaps": [
-        "define batching constraints",
+        "define batch compatibility",
         "bind latency budgets"
       ],
       "accountability_id": "ACC-VOL-386",
@@ -19047,37 +19047,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Cache keys bind model/version/tokenization/context identity.",
-        "Cross-tenant/session reuse is prohibited unless explicitly safe/public."
+        "Cache entries bind to exact model/config/token prefix/session context.",
+        "Never reuse across incompatible privacy/tenant/model boundaries."
       ],
       "capabilities": [
-        "KV cache",
-        "capacity/invalidation",
-        "session binding"
+        "KV cache allocation",
+        "session reuse",
+        "cache eviction"
       ],
       "contracts": [
         "KVCacheKey",
         "KVCacheEntry",
-        "KVCachePolicy"
+        "KVCacheLease"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/ai/providers"
+        "skeleton/kv"
       ],
       "tests": [
         "planned:skeleton/testing/test_kv_cache_service.py"
       ],
       "evaluations": [
-        "planned:isolation/cache corruption evaluation"
+        "planned:cross-session isolation evaluation"
       ],
       "evidence": [],
       "risks": [
-        "cross-tenant leak",
-        "stale model cache"
+        "context leak",
+        "wrong model cache reuse"
       ],
       "gaps": [
-        "define key schema",
-        "bind GPU memory"
+        "formalize key identity",
+        "bind GPU memory manager"
       ],
       "accountability_id": "ACC-VOL-387",
       "completion_checkbox": false,
@@ -19094,37 +19094,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Prefix identity includes model/tokenizer/instruction version and trust scope.",
-        "Private/user data cannot enter globally shared prefix cache."
+        "Prefix cache key includes instruction/prompt/model/tokenizer/version.",
+        "Sensitive prefixes are not shared beyond authorized scope."
       ],
       "capabilities": [
         "prefix caching",
-        "prefix fingerprint",
-        "cache scope"
+        "prefix fingerprints",
+        "reuse policy"
       ],
       "contracts": [
         "PrefixCacheKey",
-        "PrefixEntry",
-        "PrefixScope"
+        "PrefixArtifact",
+        "PrefixReuseDecision"
       ],
       "implementation_paths": [
-        "skeleton/runtime",
-        "skeleton/ai/providers"
+        "skeleton/kv",
+        "skeleton/ai"
       ],
       "tests": [
         "planned:skeleton/testing/test_prefix_cache.py"
       ],
       "evaluations": [
-        "planned:scope collision evaluation"
+        "planned:cache contamination evaluation"
       ],
       "evidence": [],
       "risks": [
-        "private prefix leak",
-        "tokenizer mismatch"
+        "stale prompt prefix",
+        "sensitive prefix leak"
       ],
       "gaps": [
-        "define sharing policy",
-        "bind prompt registry"
+        "define key composition",
+        "bind instruction registry"
       ],
       "accountability_id": "ACC-VOL-388",
       "completion_checkbox": false,
@@ -19141,37 +19141,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Fallback remains target-model-correct when speculation fails.",
-        "Measure acceptance, latency, quality and cost per model pair."
+        "Verify draft tokens against target model before acceptance.",
+        "Track quality/latency/cost and fallback to normal decoding."
       ],
       "capabilities": [
-        "draft generation",
+        "draft decoding",
         "verification",
-        "speculation metrics"
+        "speculation policy"
       ],
       "contracts": [
         "SpeculativePlan",
-        "DraftTokens",
-        "SpeculationResult"
+        "DraftToken",
+        "VerificationStep"
       ],
       "implementation_paths": [
-        "skeleton/ai/providers",
-        "skeleton/eval"
+        "skeleton/ai",
+        "experiments"
       ],
       "tests": [
         "planned:skeleton/testing/test_speculative_inference.py"
       ],
       "evaluations": [
-        "planned:equivalence/performance benchmark"
+        "planned:quality-equivalence benchmark"
       ],
       "evidence": [],
       "risks": [
         "semantic drift",
-        "more cost than baseline"
+        "overhead exceeds gain"
       ],
       "gaps": [
-        "define provider capability contract",
-        "bind model ops"
+        "define compatible model pairs",
+        "bind eval/cost gates"
       ],
       "accountability_id": "ACC-VOL-389",
       "completion_checkbox": false,
@@ -19188,18 +19188,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Autoscaling accounts for model load/warm time and resource scarcity.",
-        "Scale-down drains safely and respects SLO/error budget."
+        "Scaling respects warmup time/resource quotas.",
+        "Prevent oscillation and admission beyond cluster capacity."
       ],
       "capabilities": [
-        "autoscaling",
-        "capacity signals",
-        "drain"
+        "autoscaling policy",
+        "scale decisions",
+        "capacity forecast"
       ],
       "contracts": [
         "AutoscalePolicy",
-        "ScaleDecision",
-        "ReplicaCapacity"
+        "ScaleSignal",
+        "ScaleDecision"
       ],
       "implementation_paths": [
         "skeleton/runtime",
@@ -19209,16 +19209,16 @@
         "planned:skeleton/testing/test_inference_autoscaling.py"
       ],
       "evaluations": [
-        "planned:burst/oscillation evaluation"
+        "planned:burst/oscillation simulation"
       ],
       "evidence": [],
       "risks": [
-        "scaling oscillation",
-        "cold-start SLO breach"
+        "scale thrash",
+        "late scale-up"
       ],
       "gaps": [
-        "define control policy",
-        "bind forecasts/queues"
+        "define baseline controller",
+        "bind warming/placement"
       ],
       "accountability_id": "ACC-VOL-390",
       "completion_checkbox": false,
@@ -19235,13 +19235,13 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Load tests pin hardware/model/runtime configuration.",
-        "Measure p50/p95/p99, saturation and failure behavior."
+        "Measure throughput, p95/p99 latency, memory, errors and quality degradation.",
+        "Use release-like hardware/config identity."
       ],
       "capabilities": [
-        "load generator",
-        "inference metrics",
-        "capacity characterization"
+        "load scenarios",
+        "capacity characterization",
+        "saturation analysis"
       ],
       "contracts": [
         "InferenceLoadTest",
@@ -19250,22 +19250,22 @@
       ],
       "implementation_paths": [
         "benchmarks",
-        "skeleton/runtime"
+        "skeleton/eval"
       ],
       "tests": [
         "planned:skeleton/testing/test_inference_load_profiles.py"
       ],
       "evaluations": [
-        "planned:capacity benchmark matrix"
+        "planned:saturation/long-context benchmark"
       ],
       "evidence": [],
       "risks": [
-        "unrepresentative prompt sizes",
-        "benchmark overloads shared env"
+        "unrepresentative load",
+        "load test destabilizes shared env"
       ],
       "gaps": [
-        "define profiles",
-        "bind capacity planning"
+        "define canonical profiles",
+        "bind capacity plan"
       ],
       "accountability_id": "ACC-VOL-391",
       "completion_checkbox": false,
@@ -19282,17 +19282,17 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Topology snapshots include freshness and discovery source.",
-        "Schedulers distinguish hard topology constraints from preferences."
+        "Topology is versioned/discovered with validation.",
+        "Scheduling uses canonical topology rather than host-name heuristics."
       ],
       "capabilities": [
         "hardware inventory",
-        "topology graph",
-        "capability queries"
+        "failure domains",
+        "resource graph"
       ],
       "contracts": [
         "HardwareNode",
-        "HardwareLink",
+        "Device",
         "HardwareTopology"
       ],
       "implementation_paths": [
@@ -19303,16 +19303,16 @@
         "planned:skeleton/testing/test_hardware_topology.py"
       ],
       "evaluations": [
-        "planned:discovery consistency evaluation"
+        "planned:topology discovery validation"
       ],
       "evidence": [],
       "risks": [
-        "stale inventory",
-        "capability misreport"
+        "stale topology",
+        "device misidentification"
       ],
       "gaps": [
-        "define topology schema",
-        "bind placement/build farms"
+        "define discovery adapters",
+        "bind scheduler"
       ],
       "accountability_id": "ACC-VOL-392",
       "completion_checkbox": false,
@@ -19329,13 +19329,13 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "NUMA optimization is optional/fallback-safe on unsupported systems.",
-        "Measure benefit before complexity is enabled."
+        "Topology-aware policy is optional only when topology irrelevant/unknown.",
+        "Measure benefit and fallback behavior."
       ],
       "capabilities": [
-        "NUMA discovery",
-        "affinity placement",
-        "locality metrics"
+        "NUMA placement",
+        "memory locality",
+        "NUMA telemetry"
       ],
       "contracts": [
         "NUMANode",
@@ -19354,12 +19354,12 @@
       ],
       "evidence": [],
       "risks": [
-        "over-pinning harms scheduler",
-        "platform-specific failure"
+        "incorrect pinning hurts throughput",
+        "platform incompatibility"
       ],
       "gaps": [
-        "add topology adapter",
-        "gate by measured benefit"
+        "implement Linux-aware adapter",
+        "bind hardware topology"
       ],
       "accountability_id": "ACC-VOL-393",
       "completion_checkbox": false,
@@ -19376,36 +19376,36 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Interconnect capabilities come from measured/discovered topology.",
-        "Placement degrades safely when topology unknown."
+        "Do not assume homogeneous connectivity.",
+        "Collective/sharding choices reference measured/topology capability."
       ],
       "capabilities": [
-        "GPU link topology",
-        "multi-GPU placement",
-        "transfer cost model"
+        "GPU topology",
+        "collective placement",
+        "interconnect metrics"
       ],
       "contracts": [
         "GPUInterconnect",
         "GPUPath",
-        "InterconnectCost"
+        "CollectivePlacement"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "benchmarks"
+        "training"
       ],
       "tests": [
         "planned:skeleton/testing/test_gpu_interconnect.py"
       ],
       "evaluations": [
-        "planned:multi-GPU transfer benchmark"
+        "planned:multi-GPU topology benchmark"
       ],
       "evidence": [],
       "risks": [
-        "wrong topology assumption",
-        "cross-socket bottleneck"
+        "slow link bottleneck",
+        "topology mismatch"
       ],
       "gaps": [
-        "integrate discovery",
+        "model interconnect graph",
         "bind distributed inference/training"
       ],
       "accountability_id": "ACC-VOL-394",
@@ -19423,37 +19423,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Authoritative durability requirements constrain tier movement.",
-        "Tier transitions preserve content identity/provenance."
+        "Tier movement preserves digest/metadata/availability semantics.",
+        "Critical artifacts maintain required redundancy."
       ],
       "capabilities": [
-        "tier policy",
+        "tier policies",
         "promotion/demotion",
-        "storage accounting"
+        "storage health"
       ],
       "contracts": [
         "StorageTier",
-        "TierPlacement",
-        "TierTransition"
+        "TieringPolicy",
+        "TierMove"
       ],
       "implementation_paths": [
-        "skeleton/persistence",
+        "skeleton/storage",
         "skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_storage_tiering.py"
       ],
       "evaluations": [
-        "planned:hot/cold workload evaluation"
+        "planned:tier failure/latency evaluation"
       ],
       "evidence": [],
       "risks": [
-        "data lost on ephemeral tier",
-        "migration thrash"
+        "cold tier unexpectedly unavailable",
+        "duplicate stale copies"
       ],
       "gaps": [
-        "define tier capabilities",
-        "bind data locality"
+        "define tiers",
+        "bind CAS/model/data registries"
       ],
       "accountability_id": "ACC-VOL-395",
       "completion_checkbox": false,
@@ -19470,33 +19470,33 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Locality optimization cannot violate policy/residency.",
-        "Data movement cost/staleness is explicit."
+        "Locality is optimization after security/authority constraints.",
+        "Movement decisions account for transfer cost/freshness."
       ],
       "capabilities": [
-        "locality hints",
-        "data-aware placement",
-        "movement planning"
+        "locality-aware scheduling",
+        "data placement",
+        "transfer decisions"
       ],
       "contracts": [
         "DataLocation",
-        "LocalityRequirement",
-        "DataMovement"
+        "LocalityConstraint",
+        "TransferPlan"
       ],
       "implementation_paths": [
         "skeleton/runtime",
-        "skeleton/persistence"
+        "skeleton/data"
       ],
       "tests": [
         "planned:skeleton/testing/test_data_locality.py"
       ],
       "evaluations": [
-        "planned:distributed locality benchmark"
+        "planned:remote/local tradeoff benchmark"
       ],
       "evidence": [],
       "risks": [
-        "privacy-violating move",
-        "stale replica use"
+        "data copied across forbidden boundary",
+        "stale local replica"
       ],
       "gaps": [
         "bind lineage/location metadata",
@@ -19517,18 +19517,18 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Topology observations are time-scoped and fall back safely.",
-        "Placement accounts for shared bottlenecks/failure domains."
+        "Topology updates invalidate stale placement assumptions.",
+        "Routing/scheduling distinguish control and bulk data traffic."
       ],
       "capabilities": [
         "network graph",
-        "path cost",
-        "failure domains"
+        "bandwidth-aware planning",
+        "zone constraints"
       ],
       "contracts": [
+        "NetworkLink",
         "NetworkTopology",
-        "NetworkPath",
-        "FailureDomain"
+        "NetworkCost"
       ],
       "implementation_paths": [
         "skeleton/network",
@@ -19538,16 +19538,16 @@
         "planned:skeleton/testing/test_network_topology_awareness.py"
       ],
       "evaluations": [
-        "planned:path degradation evaluation"
+        "planned:degraded-link simulation"
       ],
       "evidence": [],
       "risks": [
-        "stale path metric",
-        "traffic hotspot"
+        "oversubscribed link",
+        "zone failure correlation"
       ],
       "gaps": [
-        "collect topology metrics",
-        "bind placement"
+        "populate network metrics",
+        "bind placement/remote execution"
       ],
       "accountability_id": "ACC-VOL-397",
       "completion_checkbox": false,
@@ -19564,37 +19564,37 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Worker receives only task-scoped authority/resources.",
-        "Protocol handles timeout, duplicate, stale lease and unknown outcome."
+        "Worker executes only signed/authorized task envelope and declared inputs.",
+        "Results bind to worker/task/environment identity."
       ],
       "capabilities": [
-        "remote task dispatch",
-        "worker leases",
-        "result verification"
+        "remote tasks",
+        "lease/cancellation",
+        "result receipts"
       ],
       "contracts": [
         "RemoteTask",
-        "ExecutionLease",
-        "RemoteResult"
+        "RemoteLease",
+        "RemoteExecutionResult"
       ],
       "implementation_paths": [
-        "skeleton/network",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/network"
       ],
       "tests": [
-        "planned:skeleton/testing/test_remote_execution.py"
+        "planned:skeleton/testing/test_remote_execution_protocol.py"
       ],
       "evaluations": [
-        "planned:partition/stale-worker campaign"
+        "planned:worker-loss/replay evaluation"
       ],
       "evidence": [],
       "risks": [
-        "remote code escalation",
-        "duplicate execution"
+        "stale worker executes",
+        "result spoofing"
       ],
       "gaps": [
         "define protocol envelope",
-        "bind worker attestation"
+        "bind attestation"
       ],
       "accountability_id": "ACC-VOL-398",
       "completion_checkbox": false,
@@ -19611,17 +19611,17 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Attestation claims are scoped and verified against policy.",
-        "Failure/unavailable attestation yields explicit trust degradation or denial."
+        "Attestation policy is scoped by workload risk.",
+        "Failure/revocation drains worker and invalidates future assignments."
       ],
       "capabilities": [
         "worker identity",
-        "runtime attestation",
-        "trust policy"
+        "attestation verification",
+        "worker trust state"
       ],
       "contracts": [
         "WorkerAttestation",
-        "AttestationClaim",
+        "AttestationPolicy",
         "WorkerTrust"
       ],
       "implementation_paths": [
@@ -19637,11 +19637,11 @@
       "evidence": [],
       "risks": [
         "forged attestation",
-        "stale attestation"
+        "stale trusted worker"
       ],
       "gaps": [
-        "define attestation format",
-        "bind remote/build/eval farms"
+        "define initial software attestation",
+        "bind remote execution"
       ],
       "accountability_id": "ACC-VOL-399",
       "completion_checkbox": false,
@@ -19658,8 +19658,8 @@
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
       "requirements": [
-        "Jobs bind source/toolchain/input digests and produce signed receipts.",
-        "Untrusted worker outputs require independent verification/rebuild."
+        "Jobs run from immutable source/build inputs.",
+        "Outputs/logs/attestations bind to job and worker identity."
       ],
       "capabilities": [
         "distributed builds",
@@ -19667,28 +19667,28 @@
         "build provenance"
       ],
       "contracts": [
-        "BuildJob",
+        "BuildFarmJob",
         "BuildWorker",
-        "BuildReceipt"
+        "BuildFarmArtifact"
       ],
       "implementation_paths": [
         "skeleton/ai/build",
-        "release"
+        "scripts"
       ],
       "tests": [
         "planned:skeleton/testing/test_build_farm.py"
       ],
       "evaluations": [
-        "planned:worker-failure/reproducibility evaluation"
+        "planned:multi-worker reproducibility evaluation"
       ],
       "evidence": [],
       "risks": [
-        "poisoned build worker",
-        "cache contamination"
+        "worker contamination",
+        "non-hermetic cache leak"
       ],
       "gaps": [
-        "define build job protocol",
-        "bind hermeticity/attestation"
+        "bind hermetic build profile",
+        "integrate worker attestation"
       ],
       "accountability_id": "ACC-VOL-400",
       "completion_checkbox": false,
