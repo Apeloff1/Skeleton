@@ -91,7 +91,7 @@ export default function WelcomeScreen() {
 
   return (
     <Pressable onPress={handleEnter} style={styles.fill}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+      <StatusBar barStyle="light-content" />
       <View style={styles.bg}>
         {StarfallBackground ? (
           <StarfallBackground colorBase="#a78bfa" speedMs={[2200, 4800]} />
