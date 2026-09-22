@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.4.0",
+  "tree_version": "1.3.1",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -127,7 +127,7 @@
       "source": "skeleton/retrieval",
       "destination": "skeleton/ai/runtime/retrieval",
       "kind": "tree",
-      "source_git_object_sha": "1f3156c531756cfe36c6fd649258b800378a260d",
+      "source_git_object_sha": "d34439f931e844ede82f22393760014db831b162",
       "role": "retrieval and grounding",
       "work_package_refs": [
         "WP-W08",
@@ -143,7 +143,7 @@
       "source": "skeleton/memory",
       "destination": "skeleton/ai/runtime/memory",
       "kind": "tree",
-      "source_git_object_sha": "9a93d6463d792b7ac421757d7d8b8fca58464aed",
+      "source_git_object_sha": "0745fd645cf03a4ab3b7ede95563f56802970662",
       "role": "memory authority and recall",
       "work_package_refs": [
         "WP-W07"
@@ -158,7 +158,7 @@
       "source": "skeleton/intelligence",
       "destination": "skeleton/ai/runtime/intelligence",
       "kind": "tree",
-      "source_git_object_sha": "0f854a60c88c6b323c17502bcd8d1cf22a6ab6be",
+      "source_git_object_sha": "1ee7fbd18489713a01711fb4b261df9e4fbfecc5",
       "role": "admission verification and execution",
       "work_package_refs": [
         "WP-W06",
@@ -210,7 +210,7 @@
       "source": "skeleton/jeeves",
       "destination": "skeleton/ai/agents/jeeves",
       "kind": "tree",
-      "source_git_object_sha": "d7a9ea66dcf79e70fa9717cecccae1c88f196c3f",
+      "source_git_object_sha": "bb1bb10fa461417ab1cd609dc4f849a1bcd5a6e7",
       "role": "Jeeves reasoning planning semantics verification and agent runtime",
       "work_package_refs": [
         "WP-W11",
@@ -253,7 +253,7 @@
       "source": "skeleton/api",
       "destination": "skeleton/ai/runtime/api",
       "kind": "tree",
-      "source_git_object_sha": "904dfc4a2f4c93d427ee0a68f504014c2fbc4619",
+      "source_git_object_sha": "5e2d7c09c42b2f7df6e42edf4bd74d6d576810b3",
       "role": "engine API/auth/gateway runtime",
       "work_package_refs": [
         "WP-W00",
@@ -394,7 +394,7 @@
       "source": "skeleton/observability",
       "destination": "skeleton/ai/runtime/observability",
       "kind": "tree",
-      "source_git_object_sha": "744531d4f24d24e738f54b80d91343684c134268",
+      "source_git_object_sha": "3fa6e2abe22110c24ff5829764684156c70cbb54",
       "role": "AI runtime observability audit and telemetry plane",
       "work_package_refs": [
         "WP-W00",
@@ -570,7 +570,7 @@
       "source": "skeleton/resilience",
       "destination": "skeleton/ai/runtime/resilience",
       "kind": "tree",
-      "source_git_object_sha": "66754623097eb6c97e4e8e02c261467e4d2ac9b3",
+      "source_git_object_sha": "c96ed099d077363019a7ee96dd351c50582c8c74",
       "role": "failure recovery and resilience runtime",
       "work_package_refs": [
         "WP-W00",
@@ -688,7 +688,7 @@
       "source": "skeleton/forge",
       "destination": "skeleton/ai/forge",
       "kind": "tree",
-      "source_git_object_sha": "a8176afc2a76fc999e3e36564291ad15d271bc37",
+      "source_git_object_sha": "64b73768128390fa7dbd23133de4a1d7e54d2dff",
       "role": "bounded candidate generation and champion/challenger forge plane",
       "work_package_refs": [
         "WP-W27"
@@ -724,7 +724,7 @@
       "source": "skeleton/cortex",
       "destination": "skeleton/ai/runtime/cortex",
       "kind": "tree",
-      "source_git_object_sha": "86285469513ff164e7cd426c9eef0120f1d2d130",
+      "source_git_object_sha": "7661cbfa36ecfe96ce841d41fff4eefc10383d44",
       "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
       "work_package_refs": [
         "WP-W05",
@@ -753,7 +753,7 @@
       "source": "skeleton/organism",
       "destination": "skeleton/ai/runtime/organism",
       "kind": "tree",
-      "source_git_object_sha": "a755a165bea2da544a4d2998ade1b2cc614e0e9c",
+      "source_git_object_sha": "bc423ad5d959119aa4c905e6eaeff55e6dc043bd",
       "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
       "work_package_refs": [
         "WP-W02",
@@ -890,5 +890,11 @@
     "non_engine_root_exclusions": [
       "skeleton/__init__.py"
     ]
+  },
+  "provenance_refresh": {
+    "status": "current",
+    "refreshed_from_head": "b747f5818bf1fc4c49299359fd7004819af84cc8",
+    "refreshed_mapping_count": 10,
+    "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline."
   }
 }
