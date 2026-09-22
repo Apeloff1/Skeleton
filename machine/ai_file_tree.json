@@ -4537,15 +4537,21 @@
     ]
   },
   "implementation_signoff": {
-    "signed": false,
-    "signer_id": null,
-    "signer_type": null,
+    "signed": true,
+    "signer_id": "github:Apeloff1",
+    "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": null,
-    "git_sha": null,
-    "evidence_refs": [],
-    "statement": "Pending identity-bound implementation attestation for transfer-v2 Wave 2B after the 150-mapping payload commit is created and inspected.",
-    "signature_method": null
+    "signed_at_utc": "2026-09-22T16:00:00Z",
+    "git_sha": "1bb0dc5b69b5ea241629352ce8866df0ff4d1dac",
+    "evidence_refs": [
+      "git:1bb0dc5b69b5ea241629352ce8866df0ff4d1dac",
+      "git-tree:3d41418b11d0375a86fda7370ac26884d857bc98",
+      "object-audit:wave2b-20-mappings-148-files-exact-object-reuse",
+      "parent-pr:1941",
+      "parent-head:93223217d6b9875db50fb561357dac677b73cc62"
+    ],
+    "statement": "Transfer-v2 Wave 2B implementation is identity-bound to GitHub user Apeloff1 at the cited payload SHA. The payload adds fourteen quarantined GameForge AI trees and six backend-core compatibility-convergence mappings using exact current-source Git objects, totaling 20 mappings and 148 mirrored files. This attestation records staged-mirror preparation only; full 150-mapping audit, canonical CI/App Assembly, canonical-owner convergence, import inversion, source retirement, AIQ/work-package completion, and independent verification remain separately gated.",
+    "signature_method": "github_identity"
   },
   "verification_signoff": {
     "signed": false,
@@ -4658,7 +4664,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "150_mapping_transfer_v2_wave_2b_payload_pending_attestation_fresh_ci_full_object_audit",
+  "validation_state": "150_mapping_transfer_v2_wave_2b_preparation_signed_pending_fresh_ci_full_object_audit_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -5085,7 +5091,12 @@
       "source_identity_errors": 0,
       "destination_preexistence_errors": 0,
       "exact_source_object_reuse": 20,
-      "note": "Wave 2B stages 14 GameForge legacy research trees and 6 backend-core convergence files. Full 150-map audit and CI remain required."
+      "note": "Wave 2B stages 14 GameForge legacy research trees and 6 backend-core convergence files. Full 150-map audit and CI remain required.",
+      "payload_git_sha": "1bb0dc5b69b5ea241629352ce8866df0ff4d1dac",
+      "payload_tree_sha": "3d41418b11d0375a86fda7370ac26884d857bc98",
+      "mirrored_file_count": 148,
+      "object_parity_errors": 0,
+      "scope": "Wave 2B additions only; full 150-mapping audit remains required before cutover."
     }
   },
   "move_tag_contract": {

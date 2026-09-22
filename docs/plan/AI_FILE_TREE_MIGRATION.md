@@ -390,3 +390,8 @@ Updated batch counts:
 - B4-research-quarantine: 49
 
 The 130-map implementation attestation is invalidated by this extension. A new attestation must bind to the actual 150-map payload SHA. Independent verification, full 150-map object/parity validation, canonical CI/App Assembly, and owner convergence remain mandatory.
+
+
+### Wave 2B implementation attestation
+
+Payload `1bb0dc5b69b5ea241629352ce8866df0ff4d1dac` (tree `3d41418b11d0375a86fda7370ac26884d857bc98`) is identity-bound to `github:Apeloff1`. The Wave 2B object check covers 20/20 mappings and 148 mirrored files with zero source/destination object drift. This does not replace the required full 150-map audit or independent verification.
