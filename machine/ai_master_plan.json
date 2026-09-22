@@ -10929,7 +10929,12 @@
       "hardened",
       "production"
     ],
-    "closure_rule": "Applicable interface, invariant, failure/recovery, budget, compatibility, observability, reproducibility and release obligations require concrete evidence before strong maturity claims."
+    "closure_rule": "Applicable interface, invariant, failure/recovery, budget, compatibility, observability, reproducibility and release obligations require concrete evidence before strong maturity claims.",
+    "task_matrix": "machine/ai_engineering_task_matrix.json",
+    "task_matrix_human": "docs/plan/ENGINEERING_TASK_MATRIX.md",
+    "task_matrix_validator": "scripts/check_ai_engineering_task_matrix.py",
+    "task_matrix_test": "skeleton/testing/test_ai_engineering_task_matrix.py",
+    "task_propagation_rule": "Every AIQ task inherits engineering obligations from all work_package_refs; task done state cannot substitute for strong capability promotion evidence."
   },
   "adversarial_closure": {
     "status": "active",
