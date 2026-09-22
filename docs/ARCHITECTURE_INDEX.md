@@ -26,9 +26,10 @@ When documents overlap, resolve them in this order:
 14. **Research program scorecard** — [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md).
 15. **Research control-plane internals** — [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md).
 16. **Research control-plane build backlog** — [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md).
-17. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-18. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-19. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+17. **Research control-plane adversarial gap audit** — [architecture/research-control-plane-gap-audit-2026.md](architecture/research-control-plane-gap-audit-2026.md).
+18. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+19. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+20. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
