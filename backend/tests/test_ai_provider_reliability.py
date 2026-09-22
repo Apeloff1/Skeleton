@@ -13,6 +13,7 @@ from core.ai_provider import (
     ProviderRequest,
     ProviderUnavailableError,
 )
+from core.provider_architecture import ProviderArchitectureReceipt
 from routes import ai as ai_routes
 
 
@@ -146,7 +147,18 @@ def test_invalid_custom_base_url_marks_provider_unavailable(monkeypatch) -> None
 
 
 def test_route_boundary_hides_provider_failure_details(monkeypatch, caplog) -> None:
-    registry = ProviderRegistry([_FailingAdapter()], active="chaos")
+    registry = ProviderRegistry(
+        [_FailingAdapter()],
+        active="chaos",
+        architecture_loader=lambda provider_id: ProviderArchitectureReceipt(
+            provider_id=provider_id,
+            architecture_tag="arch-map/test",
+            construction_version="test",
+            contract_digest="0" * 64,
+            manual_path="docs/AI_APP_CONSTRUCTION_MANUAL.md",
+            required_documents=("machine/architecture.json",),
+        ),
+    )
     monkeypatch.setattr(ai_routes, "AI_REGISTRY", registry)
 
     result = asyncio.run(ai_routes.call_llm("rules", "hello"))

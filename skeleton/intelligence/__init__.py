@@ -52,6 +52,35 @@ from skeleton.intelligence.narrative import (
     DialogueState,
     NpcRelationship,
 )
+from skeleton.intelligence.admission import (
+    AdmissionDecision,
+    AdmissionError,
+    AdmissionRequest,
+    AdmissionStatus,
+    ResourceBudget,
+    RuntimePressure,
+    UsageEstimate,
+    evaluate_admission,
+    require_admission,
+)
+from skeleton.intelligence.admission_runtime import (
+    AdmissionCompletion,
+    AdmissionLease,
+    AdmissionRuntime,
+    AdmissionRuntimeConflict,
+    AdmissionRuntimeError,
+)
+from skeleton.intelligence.quota import (
+    QuotaCompletion,
+    QuotaConflict,
+    QuotaError,
+    QuotaExceeded,
+    QuotaReservation,
+    QuotaUsage,
+    TenantQuota,
+    TenantQuotaLedger,
+)
+from skeleton.intelligence.quota_sqlite import SqliteTenantQuotaLedger
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -101,4 +130,27 @@ __all__ = [
     "QuestProgress",
     "QuestTemplate",
     "rank_quest_candidates",
+    "AdmissionDecision",
+    "AdmissionError",
+    "AdmissionRequest",
+    "AdmissionStatus",
+    "ResourceBudget",
+    "RuntimePressure",
+    "UsageEstimate",
+    "evaluate_admission",
+    "require_admission",
+    "AdmissionCompletion",
+    "AdmissionLease",
+    "AdmissionRuntime",
+    "AdmissionRuntimeConflict",
+    "AdmissionRuntimeError",
+    "QuotaCompletion",
+    "QuotaConflict",
+    "QuotaError",
+    "QuotaExceeded",
+    "QuotaReservation",
+    "QuotaUsage",
+    "TenantQuota",
+    "TenantQuotaLedger",
+    "SqliteTenantQuotaLedger",
 ]

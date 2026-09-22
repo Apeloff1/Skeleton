@@ -1,0 +1,2227 @@
+{
+  "schema_version": 1,
+  "queue_version": "1.1.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "construction_version": "3.7.0",
+  "purpose": "Atomic implementation queue for the fully functional AI P0 closure program.",
+  "scheduling_policy": {
+    "closure_order": "functional_ai_dependency_graph",
+    "implementation_parallelism": "tasks may start early when their direct task dependencies are met, but gap closure remains blocked by closure_dependencies",
+    "stage_zero_parallel": true,
+    "max_rule": "capacity/admission and repository automation policy may further bound concurrent implementation work",
+    "mutation_rule": "builders update task status only with commit/test evidence; no speculative completion"
+  },
+  "status_values": [
+    "pending",
+    "in_progress",
+    "blocked",
+    "evidence_pending",
+    "done"
+  ],
+  "tasks": [
+    {
+      "task_id": "AIQ-S0-STATE-01",
+      "gap": "gap-state-authority-convergence",
+      "stage": 0,
+      "parallel_lane": "state-authority",
+      "objective": "Migrate canonical RAG/user progress, feedback and session ownership out of Chroma into Mongo repositories.",
+      "status": "evidence_pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/services/rag_service.py",
+        "backend/services/database.py",
+        "machine/state_topology.json",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py",
+        "machine/ai_app_construction.json",
+        "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+        ".github/workflows/app-assembly.yml",
+        "scripts/quality-gates.sh"
+      ],
+      "acceptance": [
+        "authoritative-versus-derived repository tests",
+        "RAG migration tests"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 43,
+        "critical": 0,
+        "high": 11,
+        "medium": 21,
+        "reference": 11
+      },
+      "accountability_id": "ACC-AIQ-S0-STATE-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": true,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-STATE-02",
+      "gap": "gap-state-authority-convergence",
+      "stage": 0,
+      "parallel_lane": "state-authority",
+      "objective": "Bind production orchestration to the durable OperationEnvelope repository and run the transactional outbox dispatcher.",
+      "status": "evidence_pending",
+      "task_dependencies": [
+        "AIQ-S0-STATE-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/operation.py",
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/persistence"
+      ],
+      "acceptance": [
+        "operation state/event fault test",
+        "restart recovery"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 43,
+        "critical": 0,
+        "high": 11,
+        "medium": 21,
+        "reference": 11
+      },
+      "accountability_id": "ACC-AIQ-S0-STATE-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": true,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-STATE-03",
+      "gap": "gap-state-authority-convergence",
+      "stage": 0,
+      "parallel_lane": "state-authority",
+      "objective": "Prove authoritative restore first and derived index/cache rebuild second.",
+      "status": "done",
+      "task_dependencies": [
+        "AIQ-S0-STATE-02"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "machine/state_topology.json",
+        "docker-compose.yml",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "docs/runbooks/STATE_RECOVERY.md",
+        "docs/AI_APP_CONSTRUCTION_MANUAL.md"
+      ],
+      "acceptance": [
+        "Mongo backup/restore drill",
+        "derived-store loss/rebuild",
+        "authoritative restore digest and index verification",
+        "derived rebuild ordering fail-closed",
+        "live isolated Mongo recovery workflow"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 43,
+        "critical": 0,
+        "high": 11,
+        "medium": 21,
+        "reference": 11
+      },
+      "accountability_id": "ACC-AIQ-S0-STATE-03",
+      "accountability_required": true,
+      "completion_checkbox": true,
+      "completion_checkbox_mark": "[x]",
+      "implementation_signed": true,
+      "verification_signed": true
+    },
+    {
+      "task_id": "AIQ-S0-GOV-01",
+      "gap": "gap-governance-registry",
+      "stage": 0,
+      "parallel_lane": "governance",
+      "objective": "Register canonical conversation, memory, retrieval and artifact writes in the governance lifecycle registry.",
+      "status": "evidence_pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/vault/data_governance.py",
+        "skeleton/memory",
+        "skeleton/retrieval",
+        "skeleton/artifact_plane"
+      ],
+      "acceptance": [
+        "registration/classification tests",
+        "cross-tenant denial"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 78,
+        "critical": 8,
+        "high": 12,
+        "medium": 34,
+        "reference": 24
+      },
+      "accountability_id": "ACC-AIQ-S0-GOV-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": true,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-GOV-02",
+      "gap": "gap-governance-registry",
+      "stage": 0,
+      "parallel_lane": "governance",
+      "objective": "Wire delete/export/retention decisions through real durable-store and projection adapters.",
+      "status": "evidence_pending",
+      "task_dependencies": [
+        "AIQ-S0-GOV-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/vault",
+        "backend/routes/governance.py"
+      ],
+      "acceptance": [
+        "delete propagation",
+        "export completeness",
+        "retention expiry"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 78,
+        "critical": 8,
+        "high": 12,
+        "medium": 34,
+        "reference": 24
+      },
+      "accountability_id": "ACC-AIQ-S0-GOV-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": true,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-GOV-03",
+      "gap": "gap-governance-registry",
+      "stage": 0,
+      "parallel_lane": "governance",
+      "objective": "Bind governance receipts and lifecycle actions into canonical observability/audit timelines.",
+      "status": "evidence_pending",
+      "task_dependencies": [
+        "AIQ-S0-GOV-02"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/observability",
+        "skeleton/vault"
+      ],
+      "acceptance": [
+        "audit receipt linkage",
+        "redaction tests"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 78,
+        "critical": 8,
+        "high": 12,
+        "medium": 34,
+        "reference": 24
+      },
+      "accountability_id": "ACC-AIQ-S0-GOV-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": true,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-COST-01",
+      "gap": "gap-cost-admission",
+      "stage": 0,
+      "parallel_lane": "cost-admission",
+      "objective": "Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption.",
+      "status": "evidence_pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/quota.py",
+        "skeleton/intelligence/admission_runtime.py"
+      ],
+      "acceptance": [
+        "durable quota restart",
+        "reservation race"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 51,
+        "critical": 2,
+        "high": 6,
+        "medium": 30,
+        "reference": 13
+      },
+      "accountability_id": "ACC-AIQ-S0-COST-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": true,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-COST-02",
+      "gap": "gap-cost-admission",
+      "stage": 0,
+      "parallel_lane": "cost-admission",
+      "objective": "Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
+      "status": "in_progress",
+      "task_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/admission.py",
+        "skeleton/skills",
+        "skeleton/artifact_plane"
+      ],
+      "acceptance": [
+        "actual-vs-estimated usage",
+        "unknown-usage behavior"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 51,
+        "critical": 2,
+        "high": 6,
+        "medium": 30,
+        "reference": 13
+      },
+      "accountability_id": "ACC-AIQ-S0-COST-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-COST-03",
+      "gap": "gap-cost-admission",
+      "stage": 0,
+      "parallel_lane": "cost-admission",
+      "objective": "Add shared cross-process pressure/concurrency coordination and overload shedding.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-COST-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/capacity_planner.py",
+        "skeleton/agents"
+      ],
+      "acceptance": [
+        "multi-worker saturation",
+        "noisy-neighbor fairness"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 51,
+        "critical": 2,
+        "high": 6,
+        "medium": 30,
+        "reference": 13
+      },
+      "accountability_id": "ACC-AIQ-S0-COST-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-PROV-01",
+      "gap": "gap-provider-surface-convergence",
+      "stage": 0,
+      "parallel_lane": "provider-surface",
+      "objective": "Run provider-surface discovery and classify every credential/network model edge.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "scripts/check_provider_bootstrap.py",
+        "machine/ai_app_construction.json"
+      ],
+      "acceptance": [
+        "provider-surface inventory",
+        "SDK isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 28,
+        "critical": 1,
+        "high": 2,
+        "medium": 17,
+        "reference": 8
+      },
+      "accountability_id": "ACC-AIQ-S0-PROV-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-PROV-02",
+      "gap": "gap-provider-surface-convergence",
+      "stage": 0,
+      "parallel_lane": "provider-surface",
+      "objective": "Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-PROV-01"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_runtime.py",
+        "backend/core/ai_provider.py",
+        "skeleton/jeeves/providers.py",
+        "backend/routes/image_generation.py",
+        "backend/core/expressive_tts.py"
+      ],
+      "acceptance": [
+        "shadow provider denial",
+        "text/image/speech regression"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 28,
+        "critical": 1,
+        "high": 2,
+        "medium": 17,
+        "reference": 8
+      },
+      "accountability_id": "ACC-AIQ-S0-PROV-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S0-PROV-03",
+      "gap": "gap-provider-surface-convergence",
+      "stage": 0,
+      "parallel_lane": "provider-surface",
+      "objective": "Produce current-head CI evidence that only declared source-level provider surfaces remain.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S0-PROV-02"
+      ],
+      "closure_dependencies": [],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "scripts/check_provider_bootstrap.py"
+      ],
+      "acceptance": [
+        "provider bootstrap gate",
+        "application credential-read isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 28,
+        "critical": 1,
+        "high": 2,
+        "medium": 17,
+        "reference": 8
+      },
+      "accountability_id": "ACC-AIQ-S0-PROV-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-CONV-01",
+      "gap": "gap-conversation-state-authority",
+      "stage": 1,
+      "parallel_lane": "conversation",
+      "objective": "Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/routes/ai.py",
+        "skeleton/persistence/conversation_repository.py"
+      ],
+      "acceptance": [
+        "client-history injection denial",
+        "message idempotency",
+        "concurrent append"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 9,
+        "high": 16,
+        "medium": 49,
+        "reference": 25
+      },
+      "accountability_id": "ACC-AIQ-S1-CONV-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-CONV-02",
+      "gap": "gap-conversation-state-authority",
+      "stage": 1,
+      "parallel_lane": "conversation",
+      "objective": "Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-CONV-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/core/conversations.py",
+        "skeleton/contracts/conversation.py"
+      ],
+      "acceptance": [
+        "operation/result binding",
+        "edit/regenerate branching"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 9,
+        "high": 16,
+        "medium": 49,
+        "reference": 25
+      },
+      "accountability_id": "ACC-AIQ-S1-CONV-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-CONV-03",
+      "gap": "gap-conversation-state-authority",
+      "stage": 1,
+      "parallel_lane": "conversation",
+      "objective": "Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-CONV-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "frontend/src/product/conversationClient.ts",
+        "backend/routes/conversations.py"
+      ],
+      "acceptance": [
+        "refresh reconstruction",
+        "delete/export"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 9,
+        "high": 16,
+        "medium": 49,
+        "reference": 25
+      },
+      "accountability_id": "ACC-AIQ-S1-CONV-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-MEM-01",
+      "gap": "gap-memory-durable-authority",
+      "stage": 1,
+      "parallel_lane": "memory",
+      "objective": "Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py"
+      ],
+      "acceptance": [
+        "durable restart",
+        "namespace isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 52,
+        "critical": 11,
+        "high": 3,
+        "medium": 22,
+        "reference": 16
+      },
+      "accountability_id": "ACC-AIQ-S1-MEM-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-MEM-02",
+      "gap": "gap-memory-durable-authority",
+      "stage": 1,
+      "parallel_lane": "memory",
+      "objective": "Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-MEM-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/memory/policy.py",
+        "skeleton/memory/writeback.py"
+      ],
+      "acceptance": [
+        "write policy/provenance",
+        "dedupe/version"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 52,
+        "critical": 11,
+        "high": 3,
+        "medium": 22,
+        "reference": 16
+      },
+      "accountability_id": "ACC-AIQ-S1-MEM-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-MEM-03",
+      "gap": "gap-memory-durable-authority",
+      "stage": 1,
+      "parallel_lane": "memory",
+      "objective": "Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-MEM-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/memory",
+        "skeleton/retrieval"
+      ],
+      "acceptance": [
+        "vector loss/rebuild",
+        "process-memory loss",
+        "delete/export/expiry"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 52,
+        "critical": 11,
+        "high": 3,
+        "medium": 22,
+        "reference": 16
+      },
+      "accountability_id": "ACC-AIQ-S1-MEM-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-01",
+      "gap": "gap-tool-runtime-convergence",
+      "stage": 1,
+      "parallel_lane": "tool-runtime",
+      "objective": "Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py"
+      ],
+      "acceptance": [
+        "manifest/schema fuzz",
+        "receipt lineage"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 29,
+        "high": 7,
+        "medium": 42,
+        "reference": 21
+      },
+      "accountability_id": "ACC-AIQ-S1-TOOL-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-02",
+      "gap": "gap-tool-runtime-convergence",
+      "stage": 1,
+      "parallel_lane": "tool-runtime",
+      "objective": "Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-TOOL-01"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/skills/tool_adapters/",
+        "backend/services/tool_registry.py"
+      ],
+      "acceptance": [
+        "sandbox escape/resource",
+        "database scope",
+        "network egress/result bounds"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 29,
+        "high": 7,
+        "medium": 42,
+        "reference": 21
+      },
+      "accountability_id": "ACC-AIQ-S1-TOOL-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-03",
+      "gap": "gap-tool-runtime-convergence",
+      "stage": 1,
+      "parallel_lane": "tool-runtime",
+      "objective": "Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S1-TOOL-02"
+      ],
+      "closure_dependencies": [
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/skills/tool_runtime.py",
+        "backend/services/tool_registry.py"
+      ],
+      "acceptance": [
+        "authority/approval",
+        "idempotency/replay",
+        "compatibility delegation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 99,
+        "critical": 29,
+        "high": 7,
+        "medium": 42,
+        "reference": 21
+      },
+      "accountability_id": "ACC-AIQ-S1-TOOL-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S2-CTX-01",
+      "gap": "gap-context-compiler-convergence",
+      "stage": 2,
+      "parallel_lane": "context",
+      "objective": "Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/context/compiler.py",
+        "skeleton/context/sources/",
+        "skeleton/context/policy.py"
+      ],
+      "acceptance": [
+        "deterministic packing",
+        "tenant/data authorization",
+        "oversized evidence"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 16,
+        "critical": 8,
+        "high": 0,
+        "medium": 4,
+        "reference": 4
+      },
+      "accountability_id": "ACC-AIQ-S2-CTX-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S2-CTX-02",
+      "gap": "gap-context-compiler-convergence",
+      "stage": 2,
+      "parallel_lane": "context",
+      "objective": "Converge legacy route/service system prompts onto versioned instruction-policy identities.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-CTX-01"
+      ],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/context/instruction_policy.py",
+        "backend/routes/ai.py",
+        "backend/services/ai_assistant_svc.py",
+        "backend/routes/image_generation.py"
+      ],
+      "acceptance": [
+        "instruction policy source ownership/parity",
+        "policy rollback/digest"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 16,
+        "critical": 8,
+        "high": 0,
+        "medium": 4,
+        "reference": 4
+      },
+      "accountability_id": "ACC-AIQ-S2-CTX-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S2-CTX-03",
+      "gap": "gap-context-compiler-convergence",
+      "stage": 2,
+      "parallel_lane": "context",
+      "objective": "Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-CTX-02"
+      ],
+      "closure_dependencies": [
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/context.py",
+        "skeleton/provider_runtime.py",
+        "backend/routes/ai.py"
+      ],
+      "acceptance": [
+        "context digest stability",
+        "legacy route delegation",
+        "prompt injection"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 16,
+        "critical": 8,
+        "high": 0,
+        "medium": 4,
+        "reference": 4
+      },
+      "accountability_id": "ACC-AIQ-S2-CTX-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-01",
+      "gap": "gap-provider-interaction-protocol",
+      "stage": 2,
+      "parallel_lane": "provider-protocol",
+      "objective": "Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_contract.py",
+        "machine/ai_runtime_schemas.json"
+      ],
+      "acceptance": [
+        "structured schema",
+        "native type isolation"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 44,
+        "critical": 5,
+        "high": 5,
+        "medium": 26,
+        "reference": 8
+      },
+      "accountability_id": "ACC-AIQ-S2-PROTO-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-02",
+      "gap": "gap-provider-interaction-protocol",
+      "stage": 2,
+      "parallel_lane": "provider-protocol",
+      "objective": "Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-PROTO-01"
+      ],
+      "closure_dependencies": [
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_runtime.py"
+      ],
+      "acceptance": [
+        "tool normalization",
+        "unoffered tool denial",
+        "usage/finish",
+        "cancel/deadline"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 44,
+        "critical": 5,
+        "high": 5,
+        "medium": 26,
+        "reference": 8
+      },
+      "accountability_id": "ACC-AIQ-S2-PROTO-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-03",
+      "gap": "gap-provider-interaction-protocol",
+      "stage": 2,
+      "parallel_lane": "provider-protocol",
+      "objective": "Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S2-PROTO-02"
+      ],
+      "closure_dependencies": [
+        "gap-provider-surface-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/provider_runtime.py"
+      ],
+      "acceptance": [
+        "stream finalization",
+        "text/media compatibility"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 44,
+        "critical": 5,
+        "high": 5,
+        "medium": 26,
+        "reference": 8
+      },
+      "accountability_id": "ACC-AIQ-S2-PROTO-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S3-VER-01",
+      "gap": "gap-verification-evidence-contract",
+      "stage": 3,
+      "parallel_lane": "verification",
+      "objective": "Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/verification.py",
+        "skeleton/intelligence/verification_policy.py"
+      ],
+      "acceptance": [
+        "structural verification",
+        "policy level selection"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 65,
+        "critical": 3,
+        "high": 7,
+        "medium": 37,
+        "reference": 18
+      },
+      "accountability_id": "ACC-AIQ-S3-VER-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S3-VER-02",
+      "gap": "gap-verification-evidence-contract",
+      "stage": 3,
+      "parallel_lane": "verification",
+      "objective": "Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S3-VER-01"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/retrieval",
+        "skeleton/skills"
+      ],
+      "acceptance": [
+        "claim grounding",
+        "citation integrity",
+        "tool postcondition"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 65,
+        "critical": 3,
+        "high": 7,
+        "medium": 37,
+        "reference": 18
+      },
+      "accountability_id": "ACC-AIQ-S3-VER-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S3-VER-03",
+      "gap": "gap-verification-evidence-contract",
+      "stage": 3,
+      "parallel_lane": "verification",
+      "objective": "Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S3-VER-02"
+      ],
+      "closure_dependencies": [
+        "gap-context-compiler-convergence",
+        "gap-tool-runtime-convergence",
+        "gap-provider-interaction-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/verification_runtime.py"
+      ],
+      "acceptance": [
+        "model verifier routing",
+        "repair lineage",
+        "high-impact block",
+        "self-confidence non-authority"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 65,
+        "critical": 3,
+        "high": 7,
+        "medium": 37,
+        "reference": 18
+      },
+      "accountability_id": "ACC-AIQ-S3-VER-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-01",
+      "gap": "gap-cognitive-execution-loop",
+      "stage": 4,
+      "parallel_lane": "cognitive-runtime",
+      "objective": "Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py"
+      ],
+      "acceptance": [
+        "contract serialization",
+        "checkpoint compare-and-set"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 42,
+        "critical": 1,
+        "high": 5,
+        "medium": 26,
+        "reference": 10
+      },
+      "accountability_id": "ACC-AIQ-S4-EXEC-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-02",
+      "gap": "gap-cognitive-execution-loop",
+      "stage": 4,
+      "parallel_lane": "cognitive-runtime",
+      "objective": "Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S4-EXEC-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/execution_runtime.py"
+      ],
+      "acceptance": [
+        "prompt-only loop",
+        "tool loop",
+        "approval wait/resume",
+        "budget/deadline/cancel"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 42,
+        "critical": 1,
+        "high": 5,
+        "medium": 26,
+        "reference": 10
+      },
+      "accountability_id": "ACC-AIQ-S4-EXEC-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-03",
+      "gap": "gap-cognitive-execution-loop",
+      "stage": 4,
+      "parallel_lane": "cognitive-runtime",
+      "objective": "Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S4-EXEC-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/persistence/execution_repository.py"
+      ],
+      "acceptance": [
+        "crash/replay",
+        "no duplicate side effect",
+        "full evidence binding"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 42,
+        "critical": 1,
+        "high": 5,
+        "medium": 26,
+        "reference": 10
+      },
+      "accountability_id": "ACC-AIQ-S4-EXEC-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S5-ENG-01",
+      "gap": "gap-engine-application-execution-boundary",
+      "stage": 5,
+      "parallel_lane": "engine-boundary",
+      "objective": "Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "skeleton/api",
+        "machine/ai_runtime_schemas.json"
+      ],
+      "acceptance": [
+        "service/delegated auth",
+        "submit idempotency"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 93,
+        "critical": 5,
+        "high": 7,
+        "medium": 60,
+        "reference": 21
+      },
+      "accountability_id": "ACC-AIQ-S5-ENG-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S5-ENG-02",
+      "gap": "gap-engine-application-execution-boundary",
+      "stage": 5,
+      "parallel_lane": "engine-boundary",
+      "objective": "Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S5-ENG-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/core/engine_client.py",
+        "backend/routes"
+      ],
+      "acceptance": [
+        "trace/deadline/budget propagation",
+        "engine outage",
+        "status/result"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 93,
+        "critical": 5,
+        "high": 7,
+        "medium": 60,
+        "reference": 21
+      },
+      "accountability_id": "ACC-AIQ-S5-ENG-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S5-ENG-03",
+      "gap": "gap-engine-application-execution-boundary",
+      "stage": 5,
+      "parallel_lane": "engine-boundary",
+      "objective": "Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S5-ENG-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-state-authority-convergence",
+        "gap-provider-surface-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "docker-compose.yml",
+        "backend/core/ai_provider.py",
+        "skeleton/app/manifest.json"
+      ],
+      "acceptance": [
+        "process credential isolation",
+        "no local fallback",
+        "cross-service golden trace"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 93,
+        "critical": 5,
+        "high": 7,
+        "medium": 60,
+        "reference": 21
+      },
+      "accountability_id": "ACC-AIQ-S5-ENG-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-01",
+      "gap": "gap-streaming-protocol",
+      "stage": 6,
+      "parallel_lane": "realtime",
+      "objective": "Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "frontend"
+      ],
+      "acceptance": [
+        "ordered/duplicate/out-of-order reducer tests"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 82,
+        "critical": 3,
+        "high": 7,
+        "medium": 54,
+        "reference": 18
+      },
+      "accountability_id": "ACC-AIQ-S6-STREAM-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-02",
+      "gap": "gap-streaming-protocol",
+      "stage": 6,
+      "parallel_lane": "realtime",
+      "objective": "Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S6-STREAM-01"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "frontend",
+        "backend/core/operation_stream_transport.py"
+      ],
+      "acceptance": [
+        "disconnect/reconnect",
+        "cursor compaction resync",
+        "multi-client cursors"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 82,
+        "critical": 3,
+        "high": 7,
+        "medium": 54,
+        "reference": 18
+      },
+      "accountability_id": "ACC-AIQ-S6-STREAM-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-03",
+      "gap": "gap-streaming-protocol",
+      "stage": 6,
+      "parallel_lane": "realtime",
+      "objective": "Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S6-STREAM-02"
+      ],
+      "closure_dependencies": [
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-state-authority-convergence"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "backend/routes/operation_stream.py",
+        "frontend"
+      ],
+      "acceptance": [
+        "slow client",
+        "cancel race",
+        "terminal finality"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 82,
+        "critical": 3,
+        "high": 7,
+        "medium": 54,
+        "reference": 18
+      },
+      "accountability_id": "ACC-AIQ-S6-STREAM-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S7-E2E-01",
+      "gap": "gap-e2e-golden-journeys",
+      "stage": 7,
+      "parallel_lane": "golden-journeys",
+      "objective": "Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
+      "status": "pending",
+      "task_dependencies": [],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "tests",
+        "frontend",
+        "backend",
+        "skeleton"
+      ],
+      "acceptance": [
+        "deterministic assembled topology smoke"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 173,
+        "critical": 18,
+        "high": 20,
+        "medium": 91,
+        "reference": 44
+      },
+      "accountability_id": "ACC-AIQ-S7-E2E-01",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S7-E2E-02",
+      "gap": "gap-e2e-golden-journeys",
+      "stage": 7,
+      "parallel_lane": "golden-journeys",
+      "objective": "Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S7-E2E-01"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "tests"
+      ],
+      "acceptance": [
+        "browser E2E",
+        "API contract",
+        "trace/receipt assertions"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 173,
+        "critical": 18,
+        "high": 20,
+        "medium": 91,
+        "reference": 44
+      },
+      "accountability_id": "ACC-AIQ-S7-E2E-02",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    },
+    {
+      "task_id": "AIQ-S7-E2E-03",
+      "gap": "gap-e2e-golden-journeys",
+      "stage": 7,
+      "parallel_lane": "golden-journeys",
+      "objective": "Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
+      "status": "pending",
+      "task_dependencies": [
+        "AIQ-S7-E2E-02"
+      ],
+      "closure_dependencies": [
+        "gap-state-authority-convergence",
+        "gap-governance-registry",
+        "gap-cost-admission",
+        "gap-provider-surface-convergence",
+        "gap-conversation-state-authority",
+        "gap-memory-durable-authority",
+        "gap-tool-runtime-convergence",
+        "gap-context-compiler-convergence",
+        "gap-provider-interaction-protocol",
+        "gap-verification-evidence-contract",
+        "gap-cognitive-execution-loop",
+        "gap-engine-application-execution-boundary",
+        "gap-streaming-protocol"
+      ],
+      "can_start_before_closure_dependencies_close": true,
+      "target_paths": [
+        "tests",
+        "machine/ai_closure_evidence.json"
+      ],
+      "acceptance": [
+        "fault injection",
+        "no duplicate side effect",
+        "release evidence completeness"
+      ],
+      "failure_rule": "do not bypass canonical owner/authority/state contracts to make the task pass",
+      "done_when": "target behavior exists with focused tests/evidence and all changed machine/manual contracts remain validator-clean",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "acceptance_overlay": "p0_edge_case_matrix",
+      "acceptance_overlays": [
+        "p0_edge_case_matrix",
+        "full_program_edge_case_matrix"
+      ],
+      "edge_case_inheritance": {
+        "source": "machine/ai_full_edge_case_matrix.json",
+        "catalog_total": 173,
+        "critical": 18,
+        "high": 20,
+        "medium": 91,
+        "reference": 44
+      },
+      "accountability_id": "ACC-AIQ-S7-E2E-03",
+      "accountability_required": true,
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "implementation_signed": false,
+      "verification_signed": false
+    }
+  ],
+  "queue_invariants": [
+    "every task belongs to exactly one required P0 gap",
+    "within-gap task dependencies are acyclic",
+    "no task can mark its gap closed directly",
+    "gap closure remains controlled by machine/ai_closure_evidence.json",
+    "tasks changing canonical contracts must update dependent validators/manual/typed schemas in the same lane"
+  ],
+  "acceptance_overlays": {
+    "p0_edge_case_matrix": {
+      "contract": "machine/ai_p0_edge_case_matrix.json",
+      "human": "docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md",
+      "inheritance_rule": "Each task inherits relevant edge/historical obligations from work_package_refs. Non-applicable items require explicit disposition; planned tests are not completion evidence.",
+      "hardening_rule": "A task may implement before all inherited cases close, but its owning capability cannot be hardened/production while high-impact inherited cases lack evidence or accepted-risk disposition."
+    },
+    "full_program_edge_case_matrix": {
+      "contract": "machine/ai_full_edge_case_matrix.json",
+      "human": "docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md",
+      "inheritance_rule": "Each task inherits the union of catalogue cases mapped to its work_package_refs. Critical/high cases require executable evidence or explicit accepted-risk disposition before hardened/production status.",
+      "source_catalog": "machine/ai_edge_case_catalog.json"
+    }
+  },
+  "accountability": {
+    "contract": "machine/ai_build_accountability.json",
+    "human_ledger": "docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md",
+    "policy": "Every task starts unchecked. Starting work requires a UTC timestamped history event. Completion requires implementation + independent verification signoff, git SHA, evidence, and a derived [x] checkbox."
+  }
+}

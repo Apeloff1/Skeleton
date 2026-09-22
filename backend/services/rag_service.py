@@ -13,8 +13,10 @@
 import hashlib
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+from .rag_state_repository import RAGStateConflict, RAGStateRepository
 
 # Lazy import ChromaDB to handle missing dependency gracefully
 _chroma_client = None
@@ -134,36 +136,97 @@ class RAGService:
     - feedback: User feedback and ratings
     """
     
-    COLLECTIONS = [
+    # Chroma collections are retrieval projections only. Structured user
+    # progress is intentionally absent: it is canonical Mongo state.
+    PROJECTION_COLLECTIONS = [
         "learning_sessions",
         "concepts",
-        "user_progress",
         "cocoding_context",
-        "feedback"
+        "feedback",
     ]
-    
-    def __init__(self):
+    COLLECTIONS = PROJECTION_COLLECTIONS
+
+    def __init__(self, state_repository: RAGStateRepository | None = None):
         self.client = get_chroma_client()
+        self.state = state_repository or RAGStateRepository()
+        self._projection_failures = 0
         self._init_collections()
     
     def _init_collections(self):
         """Initialize all collections."""
         global _collections
         for name in self.COLLECTIONS:
-            _collections[name] = self.client.get_or_create_collection(
-                name=f"jeeves_{name}",
-                metadata={"description": f"Jeeves {name} memory"}
+            full_name = f"jeeves_{name}"
+            _collections[full_name] = self.client.get_or_create_collection(
+                name=full_name,
+                metadata={"description": f"Jeeves {name} projection"}
             )
     
     def _get_collection(self, name: str):
-        """Get a collection by name."""
+        """Get a rebuildable projection collection by name."""
         full_name = f"jeeves_{name}"
         if full_name not in _collections:
             _collections[full_name] = self.client.get_or_create_collection(
                 name=full_name,
-                metadata={"description": f"Jeeves {name} memory"}
+                metadata={"description": f"Jeeves {name} projection"}
             )
         return _collections[full_name]
+
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _projection_metadata(values: Dict[str, Any]) -> Dict[str, Any]:
+        """Keep Chroma metadata projection-safe and payload-light."""
+        allowed = (str, int, float, bool)
+        projected: Dict[str, Any] = {}
+        for key, value in values.items():
+            if value is None:
+                continue
+            if isinstance(value, allowed):
+                projected[str(key)] = value
+            else:
+                projected[str(key)] = json.dumps(
+                    value,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    default=str,
+                )
+        return projected
+
+    def _project_add(
+        self,
+        collection_name: str,
+        *,
+        document: str,
+        metadata: Dict[str, Any],
+        record_id: str,
+    ) -> bool:
+        """Best-effort projection after canonical state has committed."""
+        try:
+            collection = self._get_collection(collection_name)
+            try:
+                collection.delete(ids=[record_id])
+            except Exception:
+                pass
+            collection.add(
+                documents=[document],
+                metadatas=[self._projection_metadata(metadata)],
+                ids=[record_id],
+            )
+            return True
+        except Exception:
+            self._projection_failures += 1
+            return False
+
+    @staticmethod
+    def _canonical_cocoding_content(row: Dict[str, Any]) -> str:
+        content = f"Context: {row.get('context', '')}\n\nCode:\n"
+        content += "\n---\n".join(str(item) for item in row.get("code_snippets", []))
+        content += "\n\nDecisions:\n"
+        content += "\n".join(f"- {item}" for item in row.get("decisions", []))
+        return content
     
     # =========================================================================
     # Learning Sessions
@@ -178,63 +241,85 @@ class RAGService:
         mastery_delta: float = 0.0,
         metadata: Optional[Dict] = None
     ) -> str:
-        """Store a learning session in memory."""
-        collection = self._get_collection("learning_sessions")
-        
+        """Commit a learning session to Mongo, then project it to Chroma."""
+        timestamp = self._utc_now()
         session_id = hashlib.sha256(
-            f"{user_id}:{topic}:{datetime.utcnow().isoformat()}".encode()
+            f"{user_id}:{topic}:{timestamp}".encode()
         ).hexdigest()[:16]
-        
-        full_metadata = {
-            "user_id": user_id,
-            "topic": topic,
-            "duration_minutes": duration_minutes,
-            "mastery_delta": mastery_delta,
-            "timestamp": datetime.utcnow().isoformat(),
-            **(metadata or {})
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[full_metadata],
-            ids=[session_id]
+
+        row = self.state.put_learning_session(
+            session_id=session_id,
+            user_id=user_id,
+            topic=topic,
+            content=content,
+            duration_minutes=duration_minutes,
+            mastery_delta=mastery_delta,
+            timestamp=timestamp,
+            metadata=metadata,
         )
-        
-        return session_id
-    
+        self._project_add(
+            "learning_sessions",
+            document=row["content"],
+            metadata={
+                "session_id": row["session_id"],
+                "user_id": row["user_id"],
+                "topic": row["topic"],
+                "duration_minutes": row["duration_minutes"],
+                "mastery_delta": row["mastery_delta"],
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["session_id"],
+        )
+        return row["session_id"]
+
     def get_user_sessions(
         self,
         user_id: str,
         topic: Optional[str] = None,
         limit: int = 10
     ) -> List[Dict]:
-        """Retrieve user's learning sessions."""
+        """Read canonical learning sessions from Mongo.
+
+        user_id='*' is retained only as a projection-search compatibility path
+        for the legacy generic memory search helper. It is retrieval, not an
+        ownership/authority read.
+        """
+        if user_id != "*":
+            rows = self.state.list_learning_sessions(
+                user_id,
+                topic=topic,
+                limit=limit,
+            )
+            return [
+                {
+                    "content": row["content"],
+                    "metadata": {
+                        "session_id": row["session_id"],
+                        "user_id": row["user_id"],
+                        "topic": row["topic"],
+                        "duration_minutes": row["duration_minutes"],
+                        "mastery_delta": row["mastery_delta"],
+                        "timestamp": row["timestamp"],
+                        "authority": "mongo",
+                        **dict(row.get("metadata") or {}),
+                    },
+                }
+                for row in rows
+            ]
+
         collection = self._get_collection("learning_sessions")
-        
-        where_filter = {"user_id": user_id}
-        if topic:
-            where_filter["topic"] = topic
-        
         results = collection.query(
             query_texts=["learning session"],
             n_results=limit,
-            where=where_filter
         )
-        
         sessions = []
-        if results["documents"]:
+        if results.get("documents"):
             for i, doc in enumerate(results["documents"][0]):
-                sessions.append({
-                    "content": doc,
-                    "metadata": results["metadatas"][0][i] if results["metadatas"] else {}
-                })
-        
+                meta = results.get("metadatas", [[]])[0][i] or {}
+                sessions.append({"content": doc, "metadata": meta})
         return sessions
-    
-    # =========================================================================
-    # Concepts
-    # =========================================================================
-    
+
     def store_concept(
         self,
         concept_id: str,
@@ -312,62 +397,41 @@ class RAGService:
         concepts_learned: List[str],
         total_hours: float
     ) -> str:
-        """Update user progress for a domain."""
-        collection = self._get_collection("user_progress")
-        
-        progress_id = f"{user_id}:{domain}"
-        
-        content = json.dumps({
-            "mastery_level": mastery_level,
-            "concepts_learned": concepts_learned,
-            "total_hours": total_hours
-        })
-        
-        metadata = {
-            "user_id": user_id,
-            "domain": domain,
-            "mastery_level": mastery_level,
-            "concept_count": len(concepts_learned),
-            "total_hours": total_hours,
-            "updated_at": datetime.utcnow().isoformat()
-        }
-        
-        # Delete existing and add new (upsert)
-        try:
-            collection.delete(ids=[progress_id])
-        except Exception:
-            pass
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[progress_id]
+        """Update authoritative user progress in Mongo only."""
+        row = self.state.upsert_user_progress(
+            user_id=user_id,
+            domain=domain,
+            mastery_level=mastery_level,
+            concepts_learned=concepts_learned,
+            total_hours=total_hours,
+            updated_at=self._utc_now(),
         )
-        
-        return progress_id
-    
+        return row["progress_id"]
+
     def get_user_progress(self, user_id: str) -> Dict[str, Any]:
-        """Get all progress for a user."""
-        collection = self._get_collection("user_progress")
-        
-        results = collection.get(where={"user_id": user_id})
-        
-        progress = {}
-        if results["documents"]:
-            for i, doc in enumerate(results["documents"]):
-                meta = results["metadatas"][i] if results["metadatas"] else {}
-                domain = meta.get("domain", "unknown")
-                progress[domain] = {
-                    "data": json.loads(doc) if doc.startswith("{") else {},
-                    "metadata": meta
-                }
-        
+        """Get authoritative user progress from Mongo."""
+        rows = self.state.get_user_progress(user_id)
+        progress: Dict[str, Any] = {}
+        for domain, row in rows.items():
+            progress[domain] = {
+                "data": {
+                    "mastery_level": row["mastery_level"],
+                    "concepts_learned": list(row["concepts_learned"]),
+                    "total_hours": row["total_hours"],
+                },
+                "metadata": {
+                    "progress_id": row["progress_id"],
+                    "user_id": row["user_id"],
+                    "domain": row["domain"],
+                    "mastery_level": row["mastery_level"],
+                    "concept_count": row["concept_count"],
+                    "total_hours": row["total_hours"],
+                    "updated_at": row["updated_at"],
+                    "authority": "mongo",
+                },
+            }
         return progress
-    
-    # =========================================================================
-    # Co-coding Context
-    # =========================================================================
-    
+
     def store_cocoding_context(
         self,
         session_id: str,
@@ -377,29 +441,32 @@ class RAGService:
         code_snippets: List[str],
         decisions: List[str]
     ) -> str:
-        """Store co-coding session context."""
-        collection = self._get_collection("cocoding_context")
-        
-        content = f"Context: {context}\n\nCode:\n" + "\n---\n".join(code_snippets)
-        content += "\n\nDecisions:\n" + "\n".join(f"- {d}" for d in decisions)
-        
-        metadata = {
-            "session_id": session_id,
-            "user_id": user_id,
-            "pipeline": pipeline,
-            "snippet_count": len(code_snippets),
-            "decision_count": len(decisions),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[session_id]
+        """Commit co-coding state to Mongo before semantic projection."""
+        row = self.state.put_cocoding_context(
+            session_id=session_id,
+            user_id=user_id,
+            pipeline=pipeline,
+            context=context,
+            code_snippets=code_snippets,
+            decisions=decisions,
+            timestamp=self._utc_now(),
         )
-        
-        return session_id
-    
+        self._project_add(
+            "cocoding_context",
+            document=self._canonical_cocoding_content(row),
+            metadata={
+                "session_id": row["session_id"],
+                "user_id": row["user_id"],
+                "pipeline": row["pipeline"],
+                "snippet_count": len(row["code_snippets"]),
+                "decision_count": len(row["decisions"]),
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["session_id"],
+        )
+        return row["session_id"]
+
     def get_relevant_context(
         self,
         user_id: str,
@@ -407,34 +474,69 @@ class RAGService:
         pipeline: Optional[str] = None,
         limit: int = 3
     ) -> List[Dict]:
-        """Get relevant co-coding context for a query."""
+        """Retrieve via Chroma but validate every hit against Mongo authority."""
         collection = self._get_collection("cocoding_context")
-        
         where_filter = {"user_id": user_id}
         if pipeline:
             where_filter["pipeline"] = pipeline
-        
-        results = collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where=where_filter
+
+        try:
+            results = collection.query(
+                query_texts=[query],
+                n_results=limit,
+                where=where_filter,
+            )
+        except Exception:
+            results = {}
+
+        contexts: List[Dict] = []
+        ids = (results.get("ids") or [[]])[0] if results else []
+        distances = (results.get("distances") or [[]])[0] if results else []
+
+        for i, projected_id in enumerate(ids):
+            canonical = self.state.get_cocoding_context(
+                str(projected_id),
+                user_id=user_id,
+            )
+            if canonical is None:
+                continue
+            if pipeline and canonical.get("pipeline") != pipeline:
+                continue
+            contexts.append({
+                "content": self._canonical_cocoding_content(canonical),
+                "metadata": {
+                    "session_id": canonical["session_id"],
+                    "user_id": canonical["user_id"],
+                    "pipeline": canonical["pipeline"],
+                    "timestamp": canonical["timestamp"],
+                    "authority": "mongo",
+                },
+                "relevance": 1 - (distances[i] if i < len(distances) else 0),
+            })
+
+        if contexts:
+            return contexts[:limit]
+
+        rows = self.state.list_cocoding_context(
+            user_id,
+            pipeline=pipeline,
+            limit=limit,
         )
-        
-        contexts = []
-        if results["documents"]:
-            for i, doc in enumerate(results["documents"][0]):
-                contexts.append({
-                    "content": doc,
-                    "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
-                    "relevance": 1 - (results["distances"][0][i] if results["distances"] else 0)
-                })
-        
-        return contexts
-    
-    # =========================================================================
-    # Feedback
-    # =========================================================================
-    
+        return [
+            {
+                "content": self._canonical_cocoding_content(row),
+                "metadata": {
+                    "session_id": row["session_id"],
+                    "user_id": row["user_id"],
+                    "pipeline": row["pipeline"],
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                "relevance": 0.0,
+            }
+            for row in rows
+        ]
+
     def store_feedback(
         self,
         user_id: str,
@@ -443,48 +545,247 @@ class RAGService:
         rating: Optional[int] = None,
         context: Optional[Dict] = None
     ) -> str:
-        """Store user feedback."""
-        collection = self._get_collection("feedback")
-        
+        """Commit feedback to Mongo before semantic projection."""
+        timestamp = self._utc_now()
         feedback_id = hashlib.sha256(
-            f"{user_id}:{feedback_type}:{datetime.utcnow().isoformat()}".encode()
+            f"{user_id}:{feedback_type}:{timestamp}".encode()
         ).hexdigest()[:16]
-        
-        metadata = {
-            "user_id": user_id,
-            "feedback_type": feedback_type,
-            "rating": rating,
-            "timestamp": datetime.utcnow().isoformat(),
-            **(context or {})
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[feedback_id]
+        row = self.state.put_feedback(
+            feedback_id=feedback_id,
+            user_id=user_id,
+            feedback_type=feedback_type,
+            content=content,
+            rating=rating,
+            context=context,
+            timestamp=timestamp,
         )
-        
-        return feedback_id
-    
-    # =========================================================================
-    # Statistics
-    # =========================================================================
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get RAG service statistics."""
-        stats = {
-            "collections": {},
-            "total_documents": 0,
-            "status": "healthy"
+        self._project_add(
+            "feedback",
+            document=row["content"],
+            metadata={
+                "feedback_id": row["feedback_id"],
+                "user_id": row["user_id"],
+                "feedback_type": row["feedback_type"],
+                "rating": row["rating"],
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["feedback_id"],
+        )
+        return row["feedback_id"]
+
+    def migrate_legacy_chroma_state(self) -> Dict[str, int]:
+        """Idempotently import legacy Chroma-owned product state into Mongo."""
+        migrated = {
+            "learning_sessions": 0,
+            "user_progress": 0,
+            "cocoding_context": 0,
+            "feedback": 0,
+            "conflicts": 0,
+            "skipped": 0,
         }
-        
-        for name in self.COLLECTIONS:
-            collection = self._get_collection(name)
-            count = collection.count()
-            stats["collections"][name] = count
-            stats["total_documents"] += count
-        
-        return stats
+
+        def legacy_rows(name: str):
+            try:
+                raw = self.client.get_or_create_collection(
+                    name=f"jeeves_{name}",
+                    metadata={"description": f"legacy Jeeves {name}"},
+                ).get()
+            except Exception:
+                return ()
+            ids = raw.get("ids") or []
+            docs = raw.get("documents") or []
+            metas = raw.get("metadatas") or []
+            return tuple(
+                (
+                    str(ids[i]),
+                    str(docs[i]) if i < len(docs) and docs[i] is not None else "",
+                    dict(metas[i] or {}) if i < len(metas) else {},
+                )
+                for i in range(len(ids))
+            )
+
+        for record_id, document, meta in legacy_rows("learning_sessions"):
+            try:
+                self.state.put_learning_session(
+                    session_id=record_id,
+                    user_id=str(meta.get("user_id") or "unknown"),
+                    topic=str(meta.get("topic") or "general"),
+                    content=document,
+                    duration_minutes=int(meta.get("duration_minutes") or 0),
+                    mastery_delta=float(meta.get("mastery_delta") or 0.0),
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                    metadata={"migrated_from": "chroma"},
+                )
+                migrated["learning_sessions"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for _, document, meta in legacy_rows("user_progress"):
+            try:
+                payload = json.loads(document) if document.startswith("{") else {}
+                user_id = str(meta.get("user_id") or "")
+                domain = str(meta.get("domain") or "")
+                if not user_id or not domain:
+                    migrated["skipped"] += 1
+                    continue
+                self.state.upsert_user_progress(
+                    user_id=user_id,
+                    domain=domain,
+                    mastery_level=float(
+                        payload.get("mastery_level", meta.get("mastery_level", 0.0))
+                    ),
+                    concepts_learned=list(payload.get("concepts_learned") or []),
+                    total_hours=float(
+                        payload.get("total_hours", meta.get("total_hours", 0.0))
+                    ),
+                    updated_at=str(meta.get("updated_at") or self._utc_now()),
+                )
+                migrated["user_progress"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for record_id, document, meta in legacy_rows("cocoding_context"):
+            try:
+                user_id = str(meta.get("user_id") or "")
+                pipeline = str(meta.get("pipeline") or "unknown")
+                if not user_id:
+                    migrated["skipped"] += 1
+                    continue
+                self.state.put_cocoding_context(
+                    session_id=record_id,
+                    user_id=user_id,
+                    pipeline=pipeline,
+                    context=document,
+                    code_snippets=[],
+                    decisions=[],
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                )
+                migrated["cocoding_context"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for record_id, document, meta in legacy_rows("feedback"):
+            try:
+                user_id = str(meta.get("user_id") or "")
+                feedback_type = str(meta.get("feedback_type") or "general")
+                if not user_id:
+                    migrated["skipped"] += 1
+                    continue
+                self.state.put_feedback(
+                    feedback_id=record_id,
+                    user_id=user_id,
+                    feedback_type=feedback_type,
+                    content=document,
+                    rating=meta.get("rating"),
+                    context={"migrated_from": "chroma"},
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                )
+                migrated["feedback"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        return migrated
+
+    def rebuild_projections_from_mongo(self) -> Dict[str, int]:
+        """Rebuild all user-owned semantic projections from canonical Mongo."""
+        inventory = self.state.projection_inventory()
+        rebuilt = {
+            "learning_sessions": 0,
+            "cocoding_context": 0,
+            "feedback": 0,
+            "failed": 0,
+        }
+
+        for row in inventory["learning_sessions"]:
+            ok = self._project_add(
+                "learning_sessions",
+                document=row["content"],
+                metadata={
+                    "session_id": row["session_id"],
+                    "user_id": row["user_id"],
+                    "topic": row["topic"],
+                    "duration_minutes": row["duration_minutes"],
+                    "mastery_delta": row["mastery_delta"],
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["session_id"],
+            )
+            rebuilt["learning_sessions" if ok else "failed"] += 1
+
+        for row in inventory["cocoding_context"]:
+            ok = self._project_add(
+                "cocoding_context",
+                document=self._canonical_cocoding_content(row),
+                metadata={
+                    "session_id": row["session_id"],
+                    "user_id": row["user_id"],
+                    "pipeline": row["pipeline"],
+                    "snippet_count": len(row.get("code_snippets") or []),
+                    "decision_count": len(row.get("decisions") or []),
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["session_id"],
+            )
+            rebuilt["cocoding_context" if ok else "failed"] += 1
+
+        for row in inventory["feedback"]:
+            ok = self._project_add(
+                "feedback",
+                document=row["content"],
+                metadata={
+                    "feedback_id": row["feedback_id"],
+                    "user_id": row["user_id"],
+                    "feedback_type": row["feedback_type"],
+                    "rating": row.get("rating"),
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["feedback_id"],
+            )
+            rebuilt["feedback" if ok else "failed"] += 1
+
+        return rebuilt
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Expose canonical authority and rebuildable projection statistics."""
+        projection_counts: Dict[str, int] = {}
+        total_projection_documents = 0
+        for name in self.PROJECTION_COLLECTIONS:
+            try:
+                count = int(self._get_collection(name).count())
+            except Exception:
+                count = -1
+            projection_counts[name] = count
+            if count > 0:
+                total_projection_documents += count
+
+        authority_counts = self.state.stats()
+        return {
+            "status": "healthy",
+            "authority": {
+                "store": "mongo",
+                "collections": authority_counts,
+                "total_records": sum(authority_counts.values()),
+            },
+            "projection": {
+                "store": "chroma",
+                "rebuildable": True,
+                "collections": projection_counts,
+                "total_documents": total_projection_documents,
+                "write_failures": self._projection_failures,
+            },
+            "collections": projection_counts,
+            "total_documents": total_projection_documents,
+        }
 
 
 # =============================================================================

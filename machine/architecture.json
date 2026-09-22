@@ -1,0 +1,1504 @@
+{
+  "schema_version": 1,
+  "architecture_version": "3.7.0",
+  "architecture_tag": "arch-map/v3.7",
+  "status": "active",
+  "scope": "assembled AI application, provider construction, machine control, and validation topology",
+  "sources": {
+    "runtime_contract": "skeleton/app/manifest.json",
+    "repository_contract": "machine/manifest.json",
+    "human_map": "docs/ARCHITECTURE_MAP.md",
+    "validator": "scripts/check_architecture_map.py",
+    "construction_contract": "machine/ai_app_construction.json",
+    "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "construction_validator": "scripts/check_ai_app_construction.py",
+    "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
+    "provider_contract": "skeleton/provider_contract.py",
+    "operation_contract": "skeleton/contracts/operation.py",
+    "stream_contract": "skeleton/frontier/operation_stream.py",
+    "stream_store": "skeleton/frontier/operation_stream_store.py",
+    "capability_interface_registry": "machine/capability_interfaces.json",
+    "capability_interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py",
+    "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+    "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
+    "ai_closure_evidence": "machine/ai_closure_evidence.json",
+    "ai_capability_registry": "machine/ai_capabilities.json"
+  },
+  "objectives": [
+    "one product shell",
+    "one application API boundary",
+    "one engine API boundary",
+    "explicit data and accelerator dependencies",
+    "machine-readable ownership and change routing",
+    "parallel validation lanes with a short critical path",
+    "no new top-level runtime island without architecture review",
+    "complete AI application capability map with construction and acceptance contracts",
+    "mandatory fail-closed architecture acknowledgement for runtime model providers",
+    "provider-specific development-agent bootstraps point to one canonical manual",
+    "one shared architecture receipt contract across product runtime and repository automation AI providers",
+    "machine-readable request lifecycle, data classes, trust zones, environment profiles, envelopes, work packages, and completion criteria",
+    "fail-closed data governance and resource admission before external provider I/O",
+    "shared ResourceBudget semantics between admission and model routing",
+    "one engine-owned provider runtime for text, image, speech, and synchronous compatibility execution",
+    "application routes contain no provider credentials or direct vendor SDK imports",
+    "one canonical operation identity/state machine across API, orchestration, provider, tool, and stream planes",
+    "one transport-neutral resumable event contract with explicit replay and fail-closed backpressure",
+    "every construction-plane relationship is materialized as an explicit capability interface contract",
+    "one machine-readable state authority topology separating authoritative, derived, scratch, recovery, and transitional stores",
+    "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections",
+    "one typed machine-readable schema catalog for cross-plane AI runtime envelopes"
+  ],
+  "principles": [
+    "runtime topology and repository topology are separate contracts linked by this map",
+    "canonical roots own behavior; support roots validate, document, automate, or accelerate it",
+    "cross-zone calls use declared interfaces instead of ad-hoc environment or path coupling",
+    "new long-running services must be declared in both the runtime manifest and this map",
+    "structural validation fails closed on unknown nodes, duplicate ownership, cycles, or missing paths",
+    "large reconciliation waves integrate by domain and file semantics rather than blind history merge",
+    "AI providers are edge adapters; provider SDKs never define application architecture",
+    "runtime model providers must load the active construction contract before activation",
+    "every capability plane has one owner, explicit dependencies, failure behavior, and acceptance evidence",
+    "credential-bearing AI provider surfaces are explicitly inventoried and receipt-gated",
+    "provider-neutral libraries may model provider behavior but cannot own undeclared credentials or network activation",
+    "storage technology never determines source-of-truth authority",
+    "durable derived stores remain projections unless the state authority contract explicitly promotes them"
+  ],
+  "canonical_roots": [
+    {
+      "id": "product-shell",
+      "path": "frontend",
+      "class": "runtime",
+      "owner": "human-interface",
+      "change_lane": "ui"
+    },
+    {
+      "id": "application-api",
+      "path": "backend",
+      "class": "runtime",
+      "owner": "application-api",
+      "change_lane": "api"
+    },
+    {
+      "id": "engine-runtime",
+      "path": "skeleton",
+      "class": "runtime",
+      "owner": "engine",
+      "change_lane": "engine"
+    },
+    {
+      "id": "java-accelerators",
+      "path": "java-accelerators",
+      "class": "accelerator",
+      "owner": "engine",
+      "change_lane": "accelerator"
+    },
+    {
+      "id": "machine-control",
+      "path": "machine",
+      "class": "control",
+      "owner": "repository-machine",
+      "change_lane": "machine"
+    },
+    {
+      "id": "automation",
+      "path": ".github",
+      "class": "control",
+      "owner": "repository-automation",
+      "change_lane": "automation"
+    },
+    {
+      "id": "operator-tooling",
+      "path": "scripts",
+      "class": "tooling",
+      "owner": "operators",
+      "change_lane": "tooling"
+    },
+    {
+      "id": "documentation",
+      "path": "docs",
+      "class": "documentation",
+      "owner": "architecture",
+      "change_lane": "docs"
+    }
+  ],
+  "zones": [
+    {
+      "id": "product",
+      "roots": [
+        "frontend"
+      ],
+      "responsibility": "browser/native product experience and ingress",
+      "may_depend_on": [
+        "application",
+        "engine"
+      ],
+      "must_not_own": [
+        "durable-state",
+        "engine-primitives",
+        "repository-write-authority"
+      ]
+    },
+    {
+      "id": "application",
+      "roots": [
+        "backend"
+      ],
+      "responsibility": "product API, product control, application workflows",
+      "may_depend_on": [
+        "engine",
+        "data"
+      ],
+      "must_not_own": [
+        "browser-routing",
+        "repository-write-authority"
+      ]
+    },
+    {
+      "id": "engine",
+      "roots": [
+        "skeleton"
+      ],
+      "responsibility": "AI engine, orchestration, memory, retrieval, resilience, APIs",
+      "may_depend_on": [
+        "acceleration",
+        "data"
+      ],
+      "must_not_own": [
+        "product-shell-routing"
+      ]
+    },
+    {
+      "id": "acceleration",
+      "roots": [
+        "skeleton/native",
+        "java-accelerators"
+      ],
+      "responsibility": "optional native/JVM acceleration with deterministic fallback",
+      "may_depend_on": [],
+      "must_not_own": [
+        "business-policy",
+        "public-routing"
+      ]
+    },
+    {
+      "id": "data",
+      "roots": [
+        "docker-compose.yml"
+      ],
+      "responsibility": "declared durable, derived, scratch and recovery stores under machine/state_topology.json authority semantics",
+      "may_depend_on": [],
+      "must_not_own": [
+        "application-policy"
+      ]
+    },
+    {
+      "id": "machine",
+      "roots": [
+        "machine",
+        ".machine"
+      ],
+      "responsibility": "repository structure, integration metadata, machine-facing policy",
+      "may_depend_on": [],
+      "must_not_own": [
+        "runtime-business-logic"
+      ]
+    },
+    {
+      "id": "tooling",
+      "roots": [
+        "scripts",
+        ".github"
+      ],
+      "responsibility": "validation, CI, operator and repository automation",
+      "may_depend_on": [
+        "product",
+        "application",
+        "engine",
+        "machine"
+      ],
+      "must_not_own": [
+        "runtime-state"
+      ]
+    },
+    {
+      "id": "knowledge",
+      "roots": [
+        "docs",
+        "tests",
+        "skeleton/testing",
+        "backend/tests"
+      ],
+      "responsibility": "documentation, regression evidence, fixtures and test harnesses",
+      "may_depend_on": [
+        "product",
+        "application",
+        "engine",
+        "machine",
+        "tooling"
+      ],
+      "must_not_own": [
+        "production-entrypoints"
+      ]
+    }
+  ],
+  "runtime_nodes": [
+    {
+      "id": "mongo",
+      "zone": "data",
+      "manifest_service": "mongo",
+      "path": "docker-compose.yml",
+      "kind": "database",
+      "canonical": true,
+      "depends_on": []
+    },
+    {
+      "id": "chroma",
+      "zone": "data",
+      "manifest_service": "chroma",
+      "path": "docker-compose.yml",
+      "kind": "database",
+      "canonical": false,
+      "depends_on": []
+    },
+    {
+      "id": "skeleton",
+      "zone": "engine",
+      "manifest_service": "skeleton",
+      "path": "skeleton",
+      "kind": "fastapi",
+      "canonical": true,
+      "depends_on": [
+        "mongo"
+      ]
+    },
+    {
+      "id": "backend",
+      "zone": "application",
+      "manifest_service": "backend",
+      "path": "backend",
+      "kind": "fastapi",
+      "canonical": true,
+      "depends_on": [
+        "mongo"
+      ]
+    },
+    {
+      "id": "frontend",
+      "zone": "product",
+      "manifest_service": "frontend",
+      "path": "frontend",
+      "kind": "expo",
+      "canonical": true,
+      "depends_on": [
+        "backend",
+        "skeleton"
+      ]
+    }
+  ],
+  "interfaces": [
+    {
+      "id": "frontend-backend",
+      "from": "frontend",
+      "to": "backend",
+      "transport": "http",
+      "contract": "frontend/utils/apiBase.ts -> /api/*"
+    },
+    {
+      "id": "frontend-engine",
+      "from": "frontend",
+      "to": "skeleton",
+      "transport": "http",
+      "contract": "frontend/utils/apiBase.ts -> /api/v1/*"
+    },
+    {
+      "id": "engine-health",
+      "from": "frontend",
+      "to": "skeleton",
+      "transport": "http",
+      "contract": "GET /api/v1/health/live"
+    },
+    {
+      "id": "application-health",
+      "from": "frontend",
+      "to": "backend",
+      "transport": "http",
+      "contract": "GET /api/health"
+    },
+    {
+      "id": "engine-native",
+      "from": "skeleton",
+      "to": "skeleton/native",
+      "transport": "abi",
+      "contract": "optional native ABI with Python fallback"
+    },
+    {
+      "id": "engine-java",
+      "from": "skeleton",
+      "to": "java-accelerators",
+      "transport": "process",
+      "contract": "optional Java 21 kernels with Python fallback"
+    }
+  ],
+  "change_routing": [
+    {
+      "lane": "ui",
+      "paths": [
+        "frontend/**"
+      ],
+      "minimum_checks": [
+        "frontend-typecheck",
+        "frontend-export",
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    },
+    {
+      "lane": "api",
+      "paths": [
+        "backend/**"
+      ],
+      "minimum_checks": [
+        "backend-quality",
+        "app-assembly",
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    },
+    {
+      "lane": "engine",
+      "paths": [
+        "skeleton/**"
+      ],
+      "minimum_checks": [
+        "backend-quality",
+        "app-assembly",
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    },
+    {
+      "lane": "accelerator",
+      "paths": [
+        "skeleton/native/**",
+        "java-accelerators/**"
+      ],
+      "minimum_checks": [
+        "native-or-java-contract",
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    },
+    {
+      "lane": "machine",
+      "paths": [
+        "machine/**",
+        ".machine/**"
+      ],
+      "minimum_checks": [
+        "repository-hygiene",
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    },
+    {
+      "lane": "automation",
+      "paths": [
+        ".github/**",
+        "scripts/**"
+      ],
+      "minimum_checks": [
+        "workflow-input-security",
+        "repository-hygiene",
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap"
+      ]
+    }
+  ],
+  "optimization": {
+    "parallel_validation_lanes": [
+      [
+        "ui"
+      ],
+      [
+        "api"
+      ],
+      [
+        "engine",
+        "accelerator"
+      ],
+      [
+        "machine",
+        "automation"
+      ]
+    ],
+    "critical_path": [
+      "architecture-map",
+      "construction-contract",
+      "provider-bootstrap",
+      "app-assembly",
+      "focused-domain-tests",
+      "merge-readiness"
+    ],
+    "validation_order": [
+      "static structure",
+      "focused compile/typecheck",
+      "domain tests",
+      "cross-service contract",
+      "compose/runtime topology",
+      "full merge readiness"
+    ],
+    "cache_boundaries": [
+      "frontend dependency cache keyed by frontend/yarn.lock",
+      "Python dependency cache keyed by packaging/requirements metadata",
+      "native/JVM build caches isolated from product shell validation"
+    ]
+  },
+  "top_level_policy": {
+    "new_runtime_root": "forbidden-unless-declared",
+    "runtime_roots": [
+      "frontend",
+      "backend",
+      "skeleton",
+      "java-accelerators"
+    ],
+    "control_roots": [
+      "machine",
+      ".machine",
+      ".github",
+      "scripts"
+    ],
+    "evidence_roots": [
+      "docs",
+      "tests"
+    ],
+    "legacy_or_support_roots_are_not_runtime_owners": true,
+    "transitional_roots": [
+      "core",
+      "eval",
+      "memory",
+      "satellites",
+      ".emergent"
+    ],
+    "legacy_root_entrypoints": [
+      "deploy.py"
+    ]
+  },
+  "migration": {
+    "strategy": "strangler-by-domain",
+    "rules": [
+      "preserve working runtime entrypoints while moving ownership behind canonical interfaces",
+      "prefer adapters and manifests before physical file moves",
+      "move files only when import, route, package, and CI ownership are explicit",
+      "archive superseded snapshots instead of leaving competing live roots",
+      "reconcile large branch families at file/domain level"
+    ],
+    "assembly_branch_family": "integration/*",
+    "current_stack": [
+      "main",
+      "integration/architecture-map-v1"
+    ],
+    "root_disposition": {
+      "core": "transitional compatibility/control root; converge by import ownership into canonical skeleton domains",
+      "eval": "evaluation fixtures/support; converge under repository test/evidence ownership",
+      "memory": "repository session/evidence and backup material; non-runtime, archive generated state",
+      "satellites": "branch snapshots and recovery material; archive-only, never runtime ownership",
+      ".emergent": "external integration metadata; non-runtime",
+      "deploy.py": "legacy root operator entrypoint; converge on python -m skeleton app"
+    },
+    "assembly_baseline": {
+      "ref": "main",
+      "pr": 1902,
+      "status": "landed",
+      "sha": "8f6da49d9c8391976de350169b9828a28eb7091f"
+    }
+  },
+  "invariants": [
+    "frontend is the only canonical human-interface root",
+    "backend and skeleton remain separate API processes until route and dependency ownership converge",
+    "browser clients resolve endpoints through frontend/utils/apiBase.ts",
+    "runtime service dependencies match skeleton/app/manifest.json",
+    "every architecture node and interface reference resolves to a declared node",
+    "zone dependency graph is acyclic",
+    "runtime dependency graph is acyclic",
+    "architecture source files must exist in the repository",
+    "architecture changes must preserve a single machine-readable map",
+    "runtime model providers cannot activate without a valid architecture/construction receipt",
+    "provider-specific development instruction files reference the same canonical construction documents",
+    "the AI construction contract enumerates every required capability plane and promotion gate",
+    "all credential-bearing AI provider surfaces are declared in the construction contract",
+    "runtime and automation provider families share skeleton/provider_contract.py receipt semantics",
+    "every open construction gap has exactly one work package and roadmap wave",
+    "external provider I/O follows validation -> governance -> admission -> architecture receipt -> client execution",
+    "model routing cannot widen ResourceBudget cost, output-token, or wall-time ceilings",
+    "runtime-model credentials are owned only by skeleton/provider_runtime.py",
+    "undeclared media providers fail closed instead of borrowing another provider credential",
+    "operation idempotency identity is distinct from tracing identity",
+    "operation terminal states are final",
+    "operation stream sequence is monotonic per operation",
+    "stream overflow backpressures instead of silently dropping retained events",
+    "replay gaps fail closed instead of pretending recovery succeeded",
+    "durable operation streams preserve exact-next monotonic sequence transactionally",
+    "stream compaction advances an explicit watermark and old cursors fail with replay-gap",
+    "durable stream terminal state fences all later writes",
+    "runtime dependency edges and acceptance-target edges are distinct relationship classes",
+    "model-routing is engine-owned; application routing surfaces are composition or compatibility layers",
+    "release validation of frontend/backend contracts does not create upward engine dependencies",
+    "every depends_on and validates relationship has exactly one capability interface registry entry",
+    "capability interface owners, zones, contract surfaces, failure semantics, and status match the canonical planes",
+    "state authority topology architecture tag matches the active architecture",
+    "derived and scratch state cannot become sole canonical authority",
+    "mixed-authority and unbound-authority state is transitional and attached to an open P0 gap",
+    "authoritative state recovery precedes derived projection rebuild",
+    "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest",
+    "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG.",
+    "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress.",
+    "Every user-visible AI capability must be declared in the concrete capability registry and resolve readiness from canonical plane/provider dependencies."
+  ],
+  "construction": {
+    "contract": "machine/ai_app_construction.json",
+    "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "validator": "scripts/check_ai_app_construction.py",
+    "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
+    "provider_runtime_loader": "skeleton/provider_contract.py",
+    "provider_runtime_boundary": "skeleton/provider_runtime.py",
+    "policy": "contract-before-implementation; undeclared providers, planes, services, roots, and interfaces fail closed",
+    "provider_runtime_compatibility_loader": "backend/core/provider_architecture.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py"
+  },
+  "external_interfaces": [
+    {
+      "id": "backend-model-provider",
+      "from": "backend/core/ai_provider.py",
+      "to": "declared runtime model provider",
+      "transport": "provider SDK/API",
+      "contract": "ProviderRequest -> governance receipt -> admission receipt -> mandatory architecture receipt -> ProviderAdapter -> ProviderResponse",
+      "security": "credentials stay inside adapter; data classification and budget are checked before client I/O; HTTPS/custom endpoint policy; bounded timeout/retry"
+    },
+    {
+      "id": "automation-model-provider",
+      "from": "skeleton/automation/free_model.py",
+      "to": "declared automation model provider",
+      "transport": "HTTPS chat-completions compatible API",
+      "contract": "sanitized repository context -> mandatory automation_model receipt -> bounded model call -> sanitized text",
+      "security": "HTTPS-only public endpoint; secrets redacted; bounded response; credentials remain in automation client"
+    },
+    {
+      "id": "operation-event-stream",
+      "from": "engine-runtime",
+      "to": "application/product transport adapters",
+      "transport": "transport-neutral ordered operation event envelope; SSE/WebSocket/polling adapters allowed",
+      "contract": "skeleton/frontier/operation_stream.py",
+      "security": "operation scoped; bounded JSON payload; no secret-bearing raw logs; replay cursor validated"
+    }
+  ],
+  "structural_blueprint": {
+    "schema_version": 1,
+    "structure_tag": "structure-map/v1.3",
+    "purpose": "Bind repository roots, runtime zones, capability planes, physical ownership, state authority, composition roots, and recovery domains into one validator-enforced structural model.",
+    "levels": [
+      {
+        "id": "L0",
+        "name": "repository-root",
+        "unit": "canonical root",
+        "rule": "A top-level live owner must be declared in canonical_roots before it can own runtime behavior."
+      },
+      {
+        "id": "L1",
+        "name": "runtime-zone",
+        "unit": "ownership zone",
+        "rule": "Zones define legal dependency direction and forbidden ownership."
+      },
+      {
+        "id": "L2",
+        "name": "capability-plane",
+        "unit": "AI construction plane",
+        "rule": "Every construction plane is placed exactly once in one runtime zone."
+      },
+      {
+        "id": "L3",
+        "name": "ownership-unit",
+        "unit": "package or module",
+        "rule": "Each plane has one materialized canonical owner inside its assigned zone."
+      },
+      {
+        "id": "L4",
+        "name": "contract-surface",
+        "unit": "interface, envelope, or state authority",
+        "rule": "Cross-boundary behavior is explicit, versionable, testable, and receipt-bearing where authority changes."
+      }
+    ],
+    "dependency_rules": {
+      "plane_owner_must_materialize": true,
+      "plane_owner_must_be_inside_assigned_zone": true,
+      "construction_plane_must_be_placed_exactly_once": true,
+      "cross_zone_plane_dependency_must_follow_zone_dag": true,
+      "transitional_root_may_not_own_plane": true,
+      "composition_roots_may_wire_but_not_redefine_capability_ownership": true,
+      "state_class_has_single_authority": true,
+      "acceptance_targets_do_not_create_zone_dependencies": true,
+      "every_plane_relationship_has_interface_registry_entry": true
+    },
+    "plane_placements": [
+      {
+        "plane": "foundation",
+        "zone": "engine",
+        "owner": "skeleton/kernel",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "identity",
+        "zone": "engine",
+        "owner": "skeleton/api",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "configuration-secrets",
+        "zone": "engine",
+        "owner": "skeleton/config",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "model-provider",
+        "zone": "engine",
+        "owner": "skeleton/provider_runtime.py",
+        "unit_type": "module",
+        "boundary_class": "provider-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "model-routing",
+        "zone": "engine",
+        "owner": "skeleton/frontier/model_routing.py",
+        "unit_type": "module",
+        "boundary_class": "policy-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "prompt-context",
+        "zone": "engine",
+        "owner": "skeleton/context",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "orchestration",
+        "zone": "engine",
+        "owner": "skeleton/intelligence",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "reasoning-verification",
+        "zone": "engine",
+        "owner": "skeleton/intelligence",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "tool-runtime",
+        "zone": "engine",
+        "owner": "skeleton/skills",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "memory",
+        "zone": "engine",
+        "owner": "skeleton/memory",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "retrieval",
+        "zone": "engine",
+        "owner": "skeleton/retrieval",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "data-persistence",
+        "zone": "engine",
+        "owner": "skeleton/persistence",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "jobs-durability",
+        "zone": "engine",
+        "owner": "skeleton/agents",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "artifact-files",
+        "zone": "engine",
+        "owner": "skeleton/artifact_plane",
+        "unit_type": "package",
+        "boundary_class": "state-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "application-api",
+        "zone": "application",
+        "owner": "backend",
+        "unit_type": "package",
+        "boundary_class": "service-boundary",
+        "exposure": "externally-reachable"
+      },
+      {
+        "plane": "engine-api",
+        "zone": "engine",
+        "owner": "skeleton/api",
+        "unit_type": "package",
+        "boundary_class": "service-boundary",
+        "exposure": "externally-reachable"
+      },
+      {
+        "plane": "product-experience",
+        "zone": "product",
+        "owner": "frontend",
+        "unit_type": "package",
+        "boundary_class": "product-shell",
+        "exposure": "externally-reachable"
+      },
+      {
+        "plane": "streaming-realtime",
+        "zone": "application",
+        "owner": "backend",
+        "unit_type": "package",
+        "boundary_class": "transport-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "security-safety",
+        "zone": "engine",
+        "owner": "skeleton/security",
+        "unit_type": "package",
+        "boundary_class": "security-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "governance",
+        "zone": "engine",
+        "owner": "skeleton/vault",
+        "unit_type": "package",
+        "boundary_class": "governance-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "resilience",
+        "zone": "engine",
+        "owner": "skeleton/reliability",
+        "unit_type": "package",
+        "boundary_class": "internal-capability",
+        "exposure": "internal"
+      },
+      {
+        "plane": "observability",
+        "zone": "engine",
+        "owner": "skeleton/observability",
+        "unit_type": "package",
+        "boundary_class": "telemetry-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "evaluation",
+        "zone": "engine",
+        "owner": "skeleton/eval",
+        "unit_type": "package",
+        "boundary_class": "evidence-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "feedback-learning",
+        "zone": "engine",
+        "owner": "skeleton/learning",
+        "unit_type": "package",
+        "boundary_class": "promotion-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "cost-capacity",
+        "zone": "engine",
+        "owner": "skeleton/intelligence",
+        "unit_type": "package",
+        "boundary_class": "admission-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "operator-control",
+        "zone": "application",
+        "owner": "backend/core/product_control_runtime.py",
+        "unit_type": "module",
+        "boundary_class": "control-boundary",
+        "exposure": "internal"
+      },
+      {
+        "plane": "deployment-release",
+        "zone": "engine",
+        "owner": "skeleton/deploy",
+        "unit_type": "package",
+        "boundary_class": "release-boundary",
+        "exposure": "internal"
+      }
+    ],
+    "composition_roots": [
+      {
+        "id": "whole-app-assembly",
+        "path": "skeleton/app/assembly.py",
+        "zone": "engine",
+        "responsibility": "Compose declared runtime services and operator topology; never absorb domain business logic."
+      },
+      {
+        "id": "engine-cli",
+        "path": "skeleton/__main__.py",
+        "zone": "engine",
+        "responsibility": "Dispatch operator commands into owned engine/application surfaces without creating alternate runtimes."
+      },
+      {
+        "id": "application-api-bootstrap",
+        "path": "backend/server.py",
+        "zone": "application",
+        "responsibility": "Mount application routes, middleware, and shared application dependencies; feature logic remains in owned modules."
+      },
+      {
+        "id": "product-shell-bootstrap",
+        "path": "frontend/app/_layout.tsx",
+        "zone": "product",
+        "responsibility": "Mount product providers, guards, and navigation shell; service ownership remains behind canonical API clients."
+      },
+      {
+        "id": "provider-runtime-composition",
+        "path": "skeleton/provider_runtime.py",
+        "zone": "engine",
+        "responsibility": "Construct credential-bearing runtime provider adapters after governance, admission, and architecture receipt checks."
+      },
+      {
+        "id": "model-routing-policy",
+        "path": "skeleton/frontier/model_routing.py",
+        "zone": "engine",
+        "responsibility": "Own canonical provider capability/budget routing below the application boundary; no provider credentials."
+      },
+      {
+        "id": "backend-model-routing-compatibility",
+        "path": "backend/core/model_router.py",
+        "zone": "application",
+        "responsibility": "Application compatibility and telemetry-policy surface during routing convergence; it may consume engine routing contracts but cannot own canonical model-routing state."
+      }
+    ],
+    "state_authorities": [
+      {
+        "state": "identity-and-principal",
+        "plane": "identity",
+        "owner": "skeleton/api"
+      },
+      {
+        "state": "runtime-configuration-and-secrets",
+        "plane": "configuration-secrets",
+        "owner": "skeleton/config"
+      },
+      {
+        "state": "provider-activation",
+        "plane": "model-provider",
+        "owner": "skeleton/provider_runtime.py"
+      },
+      {
+        "state": "conversation-and-working-memory",
+        "plane": "memory",
+        "owner": "skeleton/memory"
+      },
+      {
+        "state": "retrieval-index-and-ranking-state",
+        "plane": "retrieval",
+        "owner": "skeleton/retrieval"
+      },
+      {
+        "state": "durable-application-records",
+        "plane": "data-persistence",
+        "owner": "skeleton/persistence"
+      },
+      {
+        "state": "job-checkpoints-and-resume",
+        "plane": "jobs-durability",
+        "owner": "skeleton/agents"
+      },
+      {
+        "state": "artifact-bytes-and-metadata",
+        "plane": "artifact-files",
+        "owner": "skeleton/artifact_plane"
+      },
+      {
+        "state": "governance-policy-and-retention",
+        "plane": "governance",
+        "owner": "skeleton/vault"
+      },
+      {
+        "state": "evaluation-evidence",
+        "plane": "evaluation",
+        "owner": "skeleton/eval"
+      },
+      {
+        "state": "feedback-experiments-and-promotion",
+        "plane": "feedback-learning",
+        "owner": "skeleton/learning"
+      },
+      {
+        "state": "quota-budget-and-admission",
+        "plane": "cost-capacity",
+        "owner": "skeleton/intelligence"
+      },
+      {
+        "state": "release-and-rollback-evidence",
+        "plane": "deployment-release",
+        "owner": "skeleton/deploy"
+      }
+    ],
+    "recovery_domains": [
+      {
+        "id": "bootstrap-authority",
+        "planes": [
+          "foundation",
+          "identity",
+          "configuration-secrets"
+        ],
+        "restart_scope": "engine bootstrap/configuration",
+        "degraded_mode": "fail closed for authority-bearing work; health may remain diagnostic-only"
+      },
+      {
+        "id": "provider-execution",
+        "planes": [
+          "model-provider",
+          "model-routing",
+          "cost-capacity"
+        ],
+        "restart_scope": "provider/routing workers",
+        "degraded_mode": "deny or route only to already-declared healthy capacity; never bypass receipts or budgets"
+      },
+      {
+        "id": "knowledge-state",
+        "planes": [
+          "memory",
+          "retrieval",
+          "data-persistence",
+          "prompt-context"
+        ],
+        "restart_scope": "knowledge and persistence adapters",
+        "degraded_mode": "bounded stateless mode only where the request contract permits it; never cross tenant boundaries"
+      },
+      {
+        "id": "cognition-action",
+        "planes": [
+          "orchestration",
+          "reasoning-verification",
+          "jobs-durability",
+          "tool-runtime",
+          "artifact-files"
+        ],
+        "restart_scope": "operation/job execution",
+        "degraded_mode": "checkpoint, cancel, or return partial evidence; never silently repeat side effects"
+      },
+      {
+        "id": "service-transport",
+        "planes": [
+          "application-api",
+          "engine-api",
+          "streaming-realtime",
+          "operator-control"
+        ],
+        "restart_scope": "API/transport process",
+        "degraded_mode": "health and explicit unavailable responses; resumable operations preserve identity and terminal state"
+      },
+      {
+        "id": "product-shell",
+        "planes": [
+          "product-experience"
+        ],
+        "restart_scope": "frontend process/session",
+        "degraded_mode": "preserve local UI state and surface backend/engine degradation without fabricating completion"
+      },
+      {
+        "id": "security-governance",
+        "planes": [
+          "security-safety",
+          "governance"
+        ],
+        "restart_scope": "policy/security boundary",
+        "degraded_mode": "fail closed for protected actions and external transfers"
+      },
+      {
+        "id": "quality-release",
+        "planes": [
+          "observability",
+          "resilience",
+          "evaluation",
+          "feedback-learning",
+          "deployment-release"
+        ],
+        "restart_scope": "evidence/promotion control",
+        "degraded_mode": "freeze promotion and learning mutation while preserving current known-good release"
+      }
+    ],
+    "invariants": [
+      "acceptance edges are explicit and never participate in the runtime zone DAG",
+      "every construction plane is placed exactly once",
+      "plane owner equals the construction contract owner",
+      "plane owner is physically contained by its assigned zone",
+      "no transitional root owns a construction plane",
+      "every declared composition root exists and belongs to its declared zone",
+      "every state class has exactly one authority plane and matching owner",
+      "every construction plane belongs to exactly one recovery domain",
+      "cross-zone plane dependencies follow the zone DAG unless an exact bounded dependency exception is declared",
+      "dependency exceptions never widen zone may_depend_on policy and carry a removal condition",
+      "every construction plane has exactly one execution profile and host",
+      "execution host zone allowance matches physical plane placement",
+      "execution profiles define lifecycle, state, scale, shutdown, failure, and side-effect semantics",
+      "runtime startup/shutdown groups cover every runtime node exactly once and respect the runtime dependency DAG",
+      "runtime readiness is dependency-aware and distinct from liveness",
+      "upgrade and crash recovery preserve state authority and recovery-domain boundaries"
+    ],
+    "dependency_exceptions": [],
+    "acceptance_edges": [
+      {
+        "id": "release-validates-application-api",
+        "source_plane": "deployment-release",
+        "target_plane": "application-api",
+        "kind": "release-evidence",
+        "rationale": "Release orchestration validates application readiness and evidence without importing application implementation."
+      },
+      {
+        "id": "release-validates-engine-api",
+        "source_plane": "deployment-release",
+        "target_plane": "engine-api",
+        "kind": "release-evidence",
+        "rationale": "Release orchestration validates the engine API contract as a promotion target."
+      },
+      {
+        "id": "release-validates-product-experience",
+        "source_plane": "deployment-release",
+        "target_plane": "product-experience",
+        "kind": "release-evidence",
+        "rationale": "Release orchestration validates product build and E2E evidence without an engine-to-product runtime dependency."
+      }
+    ],
+    "execution_hosts": [
+      {
+        "id": "skeleton-service",
+        "kind": "runtime-service",
+        "runtime_node": "skeleton",
+        "allowed_zones": [
+          "engine"
+        ],
+        "lifecycle": "compose-managed",
+        "responsibility": "Host engine-owned request, policy, state-adapter, worker, and evidence planes without changing their ownership."
+      },
+      {
+        "id": "backend-service",
+        "kind": "runtime-service",
+        "runtime_node": "backend",
+        "allowed_zones": [
+          "application"
+        ],
+        "lifecycle": "compose-managed",
+        "responsibility": "Host application API, product control, and realtime transport adapters."
+      },
+      {
+        "id": "frontend-client",
+        "kind": "client-runtime",
+        "runtime_node": "frontend",
+        "allowed_zones": [
+          "product"
+        ],
+        "lifecycle": "session-managed",
+        "responsibility": "Host the human product shell and session-local presentation state."
+      },
+      {
+        "id": "operator-ci",
+        "kind": "control-execution",
+        "runtime_node": null,
+        "allowed_zones": [
+          "engine"
+        ],
+        "lifecycle": "run-scoped",
+        "responsibility": "Execute release/build/promotion control from CLI or CI without becoming a long-running product service."
+      }
+    ],
+    "execution_profiles": [
+      {
+        "id": "library",
+        "lifecycle": "consumer-scoped",
+        "state_mode": "none-or-ephemeral",
+        "scale_unit": "consumer-process",
+        "shutdown": "consumer-managed",
+        "failure_policy": "propagate-to-owning-plane",
+        "side_effect_policy": "none-unless-declared"
+      },
+      {
+        "id": "request-service",
+        "lifecycle": "long-lived",
+        "state_mode": "externalized",
+        "scale_unit": "service-replica",
+        "shutdown": "drain-inflight-then-stop",
+        "failure_policy": "fail-health-and-reject-new-work",
+        "side_effect_policy": "idempotency-required-for-mutations"
+      },
+      {
+        "id": "provider-edge",
+        "lifecycle": "request-scoped-io",
+        "state_mode": "external-provider",
+        "scale_unit": "consumer-process",
+        "shutdown": "cancel-bounded-io",
+        "failure_policy": "fail-closed-or-explicit-router-degrade",
+        "side_effect_policy": "receipt-before-external-io"
+      },
+      {
+        "id": "durable-state",
+        "lifecycle": "long-lived",
+        "state_mode": "authoritative-durable",
+        "scale_unit": "partition-or-replica",
+        "shutdown": "flush-and-fence-writes",
+        "failure_policy": "reject-ambiguous-writes",
+        "side_effect_policy": "single-authority-writer"
+      },
+      {
+        "id": "durable-worker",
+        "lifecycle": "long-lived-worker",
+        "state_mode": "checkpointed",
+        "scale_unit": "worker-replica",
+        "shutdown": "checkpoint-or-terminalize",
+        "failure_policy": "retry-idempotently-or-terminalize",
+        "side_effect_policy": "operation-idempotency-and-receipts"
+      },
+      {
+        "id": "policy-control",
+        "lifecycle": "consumer-scoped",
+        "state_mode": "policy-or-ledger",
+        "scale_unit": "consumer-process",
+        "shutdown": "no-special-drain",
+        "failure_policy": "fail-closed-for-authority-bearing-decisions",
+        "side_effect_policy": "decision-receipt-before-effect"
+      },
+      {
+        "id": "realtime-transport",
+        "lifecycle": "long-lived",
+        "state_mode": "durable-cursor-plus-bounded-buffer",
+        "scale_unit": "transport-replica",
+        "shutdown": "preserve-resume-state-and-stop-accepting",
+        "failure_policy": "reconnect-resume-or-explicit-resync",
+        "side_effect_policy": "transport-never-owns-operation-truth"
+      },
+      {
+        "id": "product-client",
+        "lifecycle": "user-session",
+        "state_mode": "ephemeral-session",
+        "scale_unit": "client-session",
+        "shutdown": "persist-bounded-resume-state",
+        "failure_policy": "surface-degraded-mode-and-reconnect",
+        "side_effect_policy": "mutations-through-canonical-service-contracts"
+      },
+      {
+        "id": "evidence-control",
+        "lifecycle": "continuous-or-run-scoped",
+        "state_mode": "append-only-evidence",
+        "scale_unit": "observer-or-worker",
+        "shutdown": "flush-evidence",
+        "failure_policy": "do-not-fabricate-evidence; freeze-dependent-promotion",
+        "side_effect_policy": "observation-cannot-mutate-runtime-policy-directly"
+      },
+      {
+        "id": "release-control",
+        "lifecycle": "release-run",
+        "state_mode": "release-evidence-and-rollback-pointer",
+        "scale_unit": "operator-or-ci-run",
+        "shutdown": "atomic-complete-or-fail",
+        "failure_policy": "no-promotion-on-incomplete-evidence",
+        "side_effect_policy": "promotion-and-rollback-require-auditable-receipts"
+      }
+    ],
+    "plane_execution": [
+      {
+        "plane": "foundation",
+        "profile": "library",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "identity",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "configuration-secrets",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "model-provider",
+        "profile": "provider-edge",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "model-routing",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "prompt-context",
+        "profile": "library",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "orchestration",
+        "profile": "durable-worker",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "reasoning-verification",
+        "profile": "library",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "tool-runtime",
+        "profile": "provider-edge",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "memory",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "retrieval",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "data-persistence",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "jobs-durability",
+        "profile": "durable-worker",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "artifact-files",
+        "profile": "durable-state",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "application-api",
+        "profile": "request-service",
+        "host": "backend-service",
+        "zone": "application"
+      },
+      {
+        "plane": "engine-api",
+        "profile": "request-service",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "product-experience",
+        "profile": "product-client",
+        "host": "frontend-client",
+        "zone": "product"
+      },
+      {
+        "plane": "streaming-realtime",
+        "profile": "realtime-transport",
+        "host": "backend-service",
+        "zone": "application"
+      },
+      {
+        "plane": "security-safety",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "governance",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "resilience",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "observability",
+        "profile": "evidence-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "evaluation",
+        "profile": "evidence-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "feedback-learning",
+        "profile": "evidence-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "cost-capacity",
+        "profile": "policy-control",
+        "host": "skeleton-service",
+        "zone": "engine"
+      },
+      {
+        "plane": "operator-control",
+        "profile": "policy-control",
+        "host": "backend-service",
+        "zone": "application"
+      },
+      {
+        "plane": "deployment-release",
+        "profile": "release-control",
+        "host": "operator-ci",
+        "zone": "engine"
+      }
+    ],
+    "runtime_lifecycle": {
+      "derivation": "service lifecycle follows the runtime DAG; explicit groups are validated against dependency order and must not create hidden service dependencies",
+      "preflight_gates": [
+        "architecture-map",
+        "construction-contract",
+        "provider-bootstrap",
+        "app-assembly"
+      ],
+      "startup_groups": [
+        {
+          "order": 0,
+          "id": "data-foundation",
+          "nodes": [
+            "mongo",
+            "chroma"
+          ],
+          "mode": "parallel",
+          "barrier": "started-and-health-probe-eligible"
+        },
+        {
+          "order": 1,
+          "id": "core-services",
+          "nodes": [
+            "skeleton",
+            "backend"
+          ],
+          "mode": "parallel",
+          "barrier": "ready-before-dependent-product-start"
+        },
+        {
+          "order": 2,
+          "id": "product-shell",
+          "nodes": [
+            "frontend"
+          ],
+          "mode": "serial",
+          "barrier": "ready-after-backend-and-engine"
+        }
+      ],
+      "readiness_rules": [
+        "a runtime node is not ready until every declared dependency is ready",
+        "liveness proves process survival; readiness proves dependency-safe request admission",
+        "degraded readiness must be explicit and cannot claim unavailable capability as healthy",
+        "provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed",
+        "product readiness requires both application and engine endpoints used by the shell"
+      ],
+      "shutdown_groups": [
+        {
+          "order": 0,
+          "id": "stop-product-admission",
+          "nodes": [
+            "frontend"
+          ],
+          "mode": "parallel",
+          "action": "stop new user mutations and preserve bounded resume state"
+        },
+        {
+          "order": 1,
+          "id": "drain-core-services",
+          "nodes": [
+            "backend",
+            "skeleton"
+          ],
+          "mode": "parallel",
+          "action": "stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence"
+        },
+        {
+          "order": 2,
+          "id": "stop-data-foundation",
+          "nodes": [
+            "chroma",
+            "mongo"
+          ],
+          "mode": "parallel",
+          "action": "fence writers, flush durable state, then stop stores"
+        }
+      ],
+      "shutdown_rule": "reverse runtime dependency order; consumers drain before dependencies stop",
+      "upgrade_rules": [
+        "validate architecture/construction/provider/app contracts before mutating installed runtime",
+        "run persistence migrations before starting code that requires the new schema and retain rollback compatibility evidence",
+        "replace stateless service replicas only after readiness of replacement capacity",
+        "drain durable workers before incompatible code replacement",
+        "never upgrade a dependency underneath a consumer that has not been drained or proven compatible",
+        "rollback uses the last release evidence pointer and must preserve durable state compatibility"
+      ],
+      "crash_rules": [
+        "restart only within the owning recovery domain unless a dependency health failure requires broader restart",
+        "terminal operation state is never reopened by process restart",
+        "realtime reconnect resumes from durable cursor or returns explicit resync",
+        "ambiguous durable writes fail closed and require recovery evidence",
+        "policy/security/governance failure blocks protected work rather than bypassing the plane"
+      ]
+    }
+  },
+  "relationship_semantics": {
+    "runtime_dependency": "Implementation dependency that participates in the zone DAG and topological construction order.",
+    "acceptance_target": "Evidence/contract target observed by a validator or release plane without an implementation dependency.",
+    "composition": "Assembly-time wiring between already-owned capabilities; never transfers ownership."
+  }
+}

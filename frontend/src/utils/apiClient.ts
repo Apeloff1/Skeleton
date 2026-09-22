@@ -319,7 +319,9 @@ const api = {
   get:  <T = any>(path: string, opts: RequestOpts = {}) => _doFetch<T>('GET', path, null, opts),
   post: <T = any>(path: string, body?: any, opts: RequestOpts = {}) => _doFetch<T>('POST', path, body, opts),
   put:  <T = any>(path: string, body?: any, opts: RequestOpts = {}) => _doFetch<T>('PUT', path, body, opts),
+  patch: <T = any>(path: string, body?: any, opts: RequestOpts = {}) => _doFetch<T>('PATCH', path, body, opts),
   del:  <T = any>(path: string, opts: RequestOpts = {}) => _doFetch<T>('DELETE', path, null, opts),
+  delete: <T = any>(path: string, opts: RequestOpts = {}) => _doFetch<T>('DELETE', path, null, opts),
 };
 
 /** Inspector helper — returns the current breaker state (used by /api/health surfaces). */

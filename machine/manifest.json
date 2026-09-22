@@ -10,13 +10,40 @@
     "server": "uvicorn"
   },
   "assembly": {
-    "branch": "integration/app-consolidation",
+    "branch": "integration/architecture-map-v1",
     "base": "main",
     "policy": "integrate distinct application capabilities by domain; do not blindly merge branch history",
-    "current_status": "application_contract_active",
-    "pull_request": 1883,
+    "current_status": "app_assembly_landed_architecture_ready",
+    "pull_request": 1904,
     "contract": "skeleton/app/manifest.json",
-    "operator": "python -m skeleton app"
+    "operator": "python -m skeleton app",
+    "architecture_contract": "machine/architecture.json",
+    "architecture_branch": "integration/architecture-map-v1",
+    "layers": [
+      {
+        "name": "core-runtime-control-plane",
+        "state": "landed",
+        "ref": "main",
+        "pr": 1901
+      },
+      {
+        "name": "product-shell-deployment",
+        "state": "landed",
+        "ref": "main",
+        "pr": 1902
+      },
+      {
+        "name": "architecture-map",
+        "state": "ready",
+        "ref": "integration/architecture-map-v1",
+        "pr": 1904,
+        "tag": "arch-map/v3.7",
+        "structure_tag": "structure-map/v1.3"
+      }
+    ],
+    "product_shell_pr": 1902,
+    "architecture_pr": 1904,
+    "structure_tag": "structure-map/v1.3"
   },
   "entrypoints": {
     "tests": "python -m pytest skeleton/testing -v",
@@ -641,10 +668,14 @@
     "explicit development/hot/production runtime modes"
   ],
   "machine_rules": [
+    "Do not add a provider SDK import outside the canonical provider boundary.",
+    "All credential-bearing AI provider families must obtain a valid receipt from skeleton/provider_contract.py before network I/O; product runtime models additionally activate through backend/core/ai_provider.py.",
+    "Read machine/ai_app_construction.json and docs/AI_APP_CONSTRUCTION_MANUAL.md before implementing or assembling AI capabilities.",
+    "Read machine/architecture.json before modifying runtime structure.",
     "Read this manifest before modifying the repository.",
     "Prefer package-local imports over root-level coupling.",
     "Keep heavy subsystems out of skeleton/__init__.py.",
-    "Use integration/app-consolidation as the assembly workspace.",
+    "Use main as the landed application baseline; use bounded integration/* branches for reconciliation and architecture work.",
     "Integrate behavior and files, not branch names.",
     "Record structural integration decisions here and in machine/README.md.",
     "Do not discard branches with unique commits without reviewing their file-level changes.",
@@ -652,7 +683,12 @@
     "Use skeleton/app/manifest.json as the canonical runtime topology contract.",
     "Frontend network clients must resolve application endpoints through frontend/utils/apiBase.ts.",
     "Normal, first-run, and recovery launch paths must converge on /product.",
-    "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based."
+    "Keep source bind mounts in docker-compose.hot.yml; canonical docker-compose.yml is image-based.",
+    "Read machine/state_topology.json before changing authoritative or derived state ownership.",
+    "Read machine/ai_runtime_schemas.json before changing cross-plane AI envelopes or persisted/wire record fields.",
+    "Read machine/ai_capabilities.json before adding or exposing a user-visible AI capability.",
+    "Read machine/ai_implementation_handoff.json before implementing a functional-AI P0 work package.",
+    "Update machine/ai_closure_evidence.json only from executable evidence; do not infer closure from file existence."
   ],
   "application_assembly": {
     "contract": "skeleton/app/manifest.json",
@@ -670,6 +706,67 @@
       "development",
       "hot",
       "production"
+    ]
+  },
+  "architecture": {
+    "contract": "machine/architecture.json",
+    "documentation": "docs/ARCHITECTURE_MAP.md",
+    "validator": "scripts/check_architecture_map.py",
+    "tag": "arch-map/v3.7",
+    "strategy": "logical-boundaries-first; physical moves only after interface and CI ownership are explicit",
+    "zone_policy": "acyclic dependency graph; tooling may consume machine metadata, machine metadata does not depend on tooling",
+    "construction_contract": "machine/ai_app_construction.json",
+    "construction_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "provider_bootstrap": "fail-closed",
+    "provider_contract": "skeleton/provider_contract.py",
+    "capability_interface_registry": "machine/capability_interfaces.json",
+    "capability_interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py",
+    "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+    "capability_registry": "machine/ai_capabilities.json",
+    "implementation_handoff": "machine/ai_implementation_handoff.json",
+    "closure_evidence_ledger": "machine/ai_closure_evidence.json"
+  },
+  "ai_app_construction": {
+    "contract": "machine/ai_app_construction.json",
+    "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+    "validator": "scripts/check_ai_app_construction.py",
+    "provider_validator": "scripts/check_provider_bootstrap.py",
+    "construction_version": "3.7.0",
+    "provider_rule": "all credential-bearing AI provider families must load and acknowledge the active contracts through skeleton/provider_contract.py before activation; undeclared providers are denied",
+    "shared_provider_contract": "skeleton/provider_contract.py",
+    "provider_families": [
+      "runtime_model",
+      "automation_model"
+    ],
+    "operation_contract": "skeleton/contracts/operation.py",
+    "stream_contract": "skeleton/frontier/operation_stream.py",
+    "stream_store": "skeleton/frontier/operation_stream_store.py",
+    "relationship_semantics": {
+      "runtime_dependency": "depends_on",
+      "acceptance_target": "validates"
+    },
+    "model_routing_owner": "skeleton/frontier/model_routing.py",
+    "interface_registry": "machine/capability_interfaces.json",
+    "interface_validator": "scripts/check_capability_interfaces.py",
+    "state_topology": "machine/state_topology.json",
+    "state_topology_validator": "scripts/check_state_topology.py",
+    "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
+    "capability_registry": "machine/ai_capabilities.json",
+    "implementation_handoff": "machine/ai_implementation_handoff.json",
+    "closure_evidence_ledger": "machine/ai_closure_evidence.json",
+    "provider_bootstrap_documents": [
+      "machine/manifest.json",
+      "machine/architecture.json",
+      "machine/ai_app_construction.json",
+      "machine/capability_interfaces.json",
+      "machine/state_topology.json",
+      "machine/ai_runtime_schemas.json",
+      "machine/ai_capabilities.json",
+      "machine/ai_implementation_handoff.json",
+      "machine/ai_closure_evidence.json",
+      "docs/AI_APP_CONSTRUCTION_MANUAL.md"
     ]
   }
 }

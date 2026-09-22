@@ -1,0 +1,678 @@
+{
+  "schema_version": 1,
+  "sequence_version": "1.1.0",
+  "status": "active",
+  "architecture_lane": "PR-1904",
+  "architecture_branch": "integration/architecture-map-v1",
+  "purpose": "Canonical middle layer between the 421-volume master plan and the 42-task AI build queue. It defines construction-wave ownership, dependency gates, evidence requirements, stop conditions, and promotion rules without creating new top-level architecture.",
+  "sources": {
+    "master_plan": "machine/ai_master_plan.json",
+    "build_queue": "machine/ai_build_queue.json",
+    "full_edge_case_matrix": "machine/ai_full_edge_case_matrix.json",
+    "edge_priority_queue": "machine/ai_edge_case_priority_queue.json",
+    "accountability": "machine/ai_build_accountability.json",
+    "human": "docs/plan/MASTER_BUILD_SEQUENCE.md"
+  },
+  "scope_policy": {
+    "breadth_frozen_at_volume": 420,
+    "new_top_level_architecture_forbidden_without_adr": true,
+    "wave_is_aggregate_view": true,
+    "wave_does_not_create_new_completion_authority": true
+  },
+  "completion_semantics": {
+    "mode": "derived_from_existing_accountability",
+    "rule": "A wave is complete only when its constituent completion-bearing work packages/tasks/slices/priority obligations satisfy the existing signed accountability and evidence contracts. Wave prose or a manual checkbox can never complete work.",
+    "required_signoffs": [
+      "implementation_signoff",
+      "independent_verification_signoff"
+    ],
+    "timestamp_policy": "RFC3339 UTC",
+    "evidence_required": true
+  },
+  "global_entry_gates": [
+    "master-plan and architecture validators pass",
+    "breadth freeze remains enabled at VOL-420",
+    "current-runtime authority contracts remain authoritative where target and implementation differ",
+    "every started completion-bearing item has a signed UTC accountability start event"
+  ],
+  "global_promotion_gates": [
+    "no affected critical edge case is silently unresolved",
+    "high-impact cases have executable evidence or explicit accepted-risk disposition before hardened/production",
+    "planned test names do not count as passing evidence",
+    "changed contracts update producers, consumers, validators, docs and migration behavior together",
+    "every externally visible side effect is governed, idempotent or compensatable, observable and replay-safe",
+    "all production promotions have independent verification"
+  ],
+  "waves": [
+    {
+      "id": "MBW-00",
+      "name": "Authority, Contracts & Semantic Bedrock",
+      "work_packages": [
+        "WP-W00",
+        "WP-W01"
+      ],
+      "aiq_stage_refs": [],
+      "hard_dependencies": [],
+      "overlap_allowed_with": [
+        "MBW-01"
+      ],
+      "objective": "Freeze meaning before implementation fan-out: architecture authority, canonical contracts, identifiers, serialization, time, authority, budgets, cancellation and provenance.",
+      "entry_criteria": [
+        "PR-1904 architecture lane is the active planning authority",
+        "VOL-000 through VOL-420 remain contiguous and breadth-frozen",
+        "all canonical machine planning artifacts validate"
+      ],
+      "deliverables": [
+        "single canonical contract identity/version scheme",
+        "strict security-sensitive serialization rules",
+        "monotonic duration/deadline semantics and explicit UTC persistence semantics",
+        "canonical signing/hash representation",
+        "bidirectional human-machine traceability for plan authority"
+      ],
+      "required_evidence_modes": [
+        "unit",
+        "property",
+        "fuzz",
+        "negative_test",
+        "design_review"
+      ],
+      "exit_criteria": [
+        "W00/W01 acceptance invariants are executable where testable",
+        "duplicate-key, Unicode/confusable, null/absent, numeric and canonicalization cases have concrete evidence plans or tests",
+        "contract evolution cannot silently produce privileged defaults"
+      ],
+      "stop_conditions": [
+        "human and machine plan disagree on identity or breadth",
+        "security-sensitive parsing remains permissive or ambiguous",
+        "a contract change lacks compatibility/migration semantics"
+      ],
+      "gating_vertical_slices": [],
+      "definition_of_ready": [
+        "plan authority files are validator-clean",
+        "affected contract owners and consumers are inventoried",
+        "compatibility surface is known before schema edits"
+      ],
+      "definition_of_done": [
+        "canonical contracts have explicit version/compatibility semantics",
+        "security-sensitive encodings fail closed",
+        "W00/W01 evidence is linked from the signed ledger"
+      ],
+      "handoff_outputs": [
+        "stable contract/schema set for persistence/runtime consumers",
+        "serialization/time/signing invariants",
+        "traceability map from requirement to contract/test"
+      ],
+      "review_questions": [
+        "Can two runtimes interpret the same payload differently?",
+        "Can an unknown value become a privileged default?",
+        "Can identity, time or canonicalization change across serialization?"
+      ]
+    },
+    {
+      "id": "MBW-01",
+      "name": "Runtime Spine, Durable State & Recovery",
+      "work_packages": [
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W19"
+      ],
+      "aiq_stage_refs": [
+        0
+      ],
+      "hard_dependencies": [
+        "MBW-00"
+      ],
+      "overlap_allowed_with": [
+        "MBW-02",
+        "MBW-03"
+      ],
+      "objective": "Establish deterministic boot/lifecycle, authoritative durable state, eventing/outbox semantics and recovery before higher cognition depends on them.",
+      "entry_criteria": [
+        "MBW-00 contract semantics are stable enough for persistence",
+        "state owners and derived projections are explicitly classified"
+      ],
+      "deliverables": [
+        "durable OperationEnvelope ownership",
+        "transactional outbox/inbox and idempotent consumers",
+        "authoritative-first restore followed by derived rebuild",
+        "cancellation/shutdown propagation and runtime identity",
+        "recovery drills for restart, partial failure and projection loss"
+      ],
+      "required_evidence_modes": [
+        "integration",
+        "fault_injection",
+        "recovery_drill",
+        "property",
+        "restart_test"
+      ],
+      "exit_criteria": [
+        "authoritative state survives restart without semantic loss",
+        "duplicate/out-of-order event handling is deterministic",
+        "restore order is proven rather than documented only",
+        "unknown timeout outcomes are recoverable without duplicate side effects"
+      ],
+      "stop_conditions": [
+        "derived stores become authoritative by convenience",
+        "retries can duplicate committed effects",
+        "backup exists without a verified restore path"
+      ],
+      "gating_vertical_slices": [
+        "VS-000"
+      ],
+      "definition_of_ready": [
+        "MBW-00 contract identities are stable",
+        "authoritative vs derived state is declared",
+        "failure domains and restart boundaries are known"
+      ],
+      "definition_of_done": [
+        "boot/shutdown/restart are deterministic",
+        "authoritative restore and projection rebuild are proven",
+        "event replay is idempotent and side-effect safe"
+      ],
+      "handoff_outputs": [
+        "durable operation/event substrate",
+        "recovery-tested state repositories",
+        "checkpoint/replay semantics for downstream cognition"
+      ],
+      "review_questions": [
+        "What happens if the process dies after side effect but before acknowledgement?",
+        "Which store wins after disagreement?",
+        "Can restore resurrect deleted or stale state?"
+      ]
+    },
+    {
+      "id": "MBW-02",
+      "name": "Model, Memory, Retrieval, Knowledge & Context",
+      "work_packages": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "aiq_stage_refs": [
+        0,
+        1,
+        2
+      ],
+      "hard_dependencies": [
+        "MBW-00",
+        "MBW-01"
+      ],
+      "overlap_allowed_with": [
+        "MBW-03"
+      ],
+      "objective": "Build the evidence-aware intelligence data plane: provider-neutral inference, routing, governed memory, retrieval, knowledge and trust-preserving context compilation.",
+      "entry_criteria": [
+        "durable state and event semantics are available",
+        "provider-native types terminate at adapter boundaries"
+      ],
+      "deliverables": [
+        "provider-neutral model request/result protocol",
+        "budget-aware routing and fallback policy",
+        "durable memory promotion/deduplication/contradiction rules",
+        "hybrid retrieval with provenance and authorization",
+        "claim/evidence representation with scope/time",
+        "context compiler preserving trust labels through truncation/compression"
+      ],
+      "required_evidence_modes": [
+        "contract",
+        "integration",
+        "adversarial",
+        "retrieval_eval",
+        "regression",
+        "privacy_test"
+      ],
+      "exit_criteria": [
+        "fallback cannot silently widen privacy boundary",
+        "retrieved/tool/model text cannot self-promote instruction authority",
+        "policy survives context pressure and compression",
+        "memory/retrieval poisoning has explicit defenses and tests"
+      ],
+      "stop_conditions": [
+        "provider SDK objects leak into durable core state",
+        "context truncation can remove immutable policy before untrusted content",
+        "memory writes bypass governance or provenance"
+      ],
+      "gating_vertical_slices": [
+        "VS-001"
+      ],
+      "definition_of_ready": [
+        "durable state/event substrate is usable",
+        "provider boundary contracts are stable",
+        "data classification and provenance fields are available"
+      ],
+      "definition_of_done": [
+        "provider routing preserves policy/privacy constraints",
+        "memory and retrieval writes are governed",
+        "context compilation preserves trust under pressure"
+      ],
+      "handoff_outputs": [
+        "provider-neutral inference surface",
+        "governed memory/retrieval/knowledge services",
+        "compiled-context contract with provenance and trust labels"
+      ],
+      "review_questions": [
+        "Can fallback change data residency/privacy?",
+        "Can retrieved content override policy?",
+        "Can stale/poisoned memory silently become trusted context?"
+      ]
+    },
+    {
+      "id": "MBW-03",
+      "name": "Privileged Action, Policy, Verification & Security",
+      "work_packages": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "aiq_stage_refs": [
+        1,
+        2,
+        3
+      ],
+      "hard_dependencies": [
+        "MBW-00",
+        "MBW-01"
+      ],
+      "overlap_allowed_with": [
+        "MBW-02"
+      ],
+      "objective": "Make actions safe before autonomy: tools, authority, policy, verification and adversarial security become independent deterministic gates around model proposals.",
+      "entry_criteria": [
+        "canonical authority and operation contracts exist",
+        "tool execution surfaces are inventoried"
+      ],
+      "deliverables": [
+        "tool transaction with lookup/schema/classification/authorization/admission/idempotency/sandbox/postcondition/receipt",
+        "least-authority delegation and child-authority subset enforcement",
+        "filesystem/archive/network/process boundary defenses",
+        "verification records separated from generator confidence",
+        "explicit block/abstain/repair/qualified-result semantics"
+      ],
+      "required_evidence_modes": [
+        "adversarial",
+        "negative_test",
+        "fuzz",
+        "platform_test",
+        "integration",
+        "postcondition_test"
+      ],
+      "exit_criteria": [
+        "hallucinated authorization cannot cause action",
+        "tool descriptions/results cannot grant privilege",
+        "path/archive/SSRF/DNS/process edge cases have executable coverage",
+        "high-impact operations require independent acceptance evidence"
+      ],
+      "stop_conditions": [
+        "model output directly authorizes a privileged action",
+        "tool execution lacks idempotency/compensation semantics",
+        "network/filesystem normalization happens after authorization"
+      ],
+      "gating_vertical_slices": [
+        "VS-001",
+        "VS-002"
+      ],
+      "definition_of_ready": [
+        "authority/budget/deadline contracts exist",
+        "tool inventory and side-effect classes are known",
+        "sandbox/egress/filesystem boundaries are specified"
+      ],
+      "definition_of_done": [
+        "privileged actions require deterministic authorization",
+        "postconditions and receipts bind effects to operations",
+        "critical filesystem/network/process cases have executable evidence"
+      ],
+      "handoff_outputs": [
+        "governed tool transaction surface",
+        "policy/approval engine",
+        "verification records usable by cognitive runtime"
+      ],
+      "review_questions": [
+        "Could model text manufacture permission?",
+        "Is authorization performed on the exact normalized resource executed?",
+        "Can retries or compensation create a second effect?"
+      ]
+    },
+    {
+      "id": "MBW-04",
+      "name": "Cognition, Planning, Agents & Swarms",
+      "work_packages": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "aiq_stage_refs": [
+        3,
+        4
+      ],
+      "hard_dependencies": [
+        "MBW-02",
+        "MBW-03"
+      ],
+      "overlap_allowed_with": [
+        "MBW-06"
+      ],
+      "objective": "Build bounded cognition on top of safe state/context/action primitives: strategy selection, plan DAGs, agent identity/delegation, leases, handoffs and multi-agent conflict control.",
+      "entry_criteria": [
+        "context compiler, tools/policy and verification paths are usable",
+        "operation budgets/deadlines/cancellation are durable"
+      ],
+      "deliverables": [
+        "bounded model-tool-model execution loop",
+        "plan DAG with pre/postconditions and static analysis",
+        "agent identity/objective/authority/capability envelopes",
+        "leases/fencing and conflict domains",
+        "bounded fan-out and evidence-based disagreement handling",
+        "crash-safe checkpoint/resume semantics"
+      ],
+      "required_evidence_modes": [
+        "simulation",
+        "property",
+        "fault_injection",
+        "integration",
+        "adversarial_eval",
+        "long_horizon_eval"
+      ],
+      "exit_criteria": [
+        "no unbounded cognitive/retry/delegation loop exists",
+        "child authority is mechanically subset-checked",
+        "stale lease holders cannot resume writes",
+        "deadlock/livelock/starvation scenarios are represented in acceptance"
+      ],
+      "stop_conditions": [
+        "agent role text is treated as authority",
+        "plan executor can bypass tool/policy gates",
+        "checkpoint replay can repeat external side effects"
+      ],
+      "gating_vertical_slices": [
+        "VS-001",
+        "VS-002",
+        "VS-004"
+      ],
+      "definition_of_ready": [
+        "context, tool/policy and verification paths are callable",
+        "durable checkpoint semantics exist",
+        "budgets/deadlines/cancellation propagate end-to-end"
+      ],
+      "definition_of_done": [
+        "cognitive loops are bounded and recoverable",
+        "plan DAGs enforce pre/postconditions",
+        "agent delegation, leases and conflicts are mechanically constrained"
+      ],
+      "handoff_outputs": [
+        "AI execution runtime",
+        "plan/agent/swam execution contracts",
+        "checkpoint/resume and handoff packets"
+      ],
+      "review_questions": [
+        "What terminates every loop?",
+        "Can a child acquire authority not present in the parent?",
+        "What prevents stale workers or agents from committing?"
+      ]
+    },
+    {
+      "id": "MBW-05",
+      "name": "Observability, API, Product & Desktop",
+      "work_packages": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24"
+      ],
+      "aiq_stage_refs": [
+        5,
+        6
+      ],
+      "hard_dependencies": [
+        "MBW-01",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "overlap_allowed_with": [
+        "MBW-06"
+      ],
+      "objective": "Expose the runtime honestly through traceable APIs, streaming, product state and desktop surfaces without inventing authority in presentation layers.",
+      "entry_criteria": [
+        "operation/execution state machines expose durable status",
+        "terminal results and receipts are replayable"
+      ],
+      "deliverables": [
+        "authenticated submit/status/cancel/events boundary",
+        "cursor/replay/reconciliation streaming protocol",
+        "operation-correlated logs/metrics/traces and cost",
+        "product UI exposing plan/progress/blockers/evidence/cancel",
+        "desktop lifecycle with safe local permissions"
+      ],
+      "required_evidence_modes": [
+        "api_contract",
+        "e2e",
+        "reconnect_test",
+        "accessibility",
+        "platform_test",
+        "load_test"
+      ],
+      "exit_criteria": [
+        "duplicate/out-of-order events reconcile deterministically",
+        "slow clients cannot exhaust unbounded server memory",
+        "cancel/complete races preserve terminal finality",
+        "UI state is always a projection of durable runtime truth"
+      ],
+      "stop_conditions": [
+        "frontend optimistic state becomes canonical",
+        "stream replay lacks gap detection/resync",
+        "desktop path/process behavior is only tested on one platform"
+      ],
+      "gating_vertical_slices": [
+        "VS-001",
+        "VS-007"
+      ],
+      "definition_of_ready": [
+        "execution states and terminal receipts are durable",
+        "API auth/delegation contracts are stable",
+        "stream events have stable identity/order semantics"
+      ],
+      "definition_of_done": [
+        "reconnect/replay/resync is deterministic",
+        "UI is projection-only",
+        "operator-visible progress, cost, evidence and cancellation match durable state"
+      ],
+      "handoff_outputs": [
+        "authenticated engine/application boundary",
+        "reliable streaming protocol",
+        "observable web/desktop operator surfaces"
+      ],
+      "review_questions": [
+        "What happens after browser refresh at every state?",
+        "Can slow clients cause unbounded buffering?",
+        "Can UI optimism contradict a terminal durable result?"
+      ]
+    },
+    {
+      "id": "MBW-06",
+      "name": "Evaluation, Research, Forge & Controlled Learning",
+      "work_packages": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28"
+      ],
+      "aiq_stage_refs": [
+        7
+      ],
+      "hard_dependencies": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "overlap_allowed_with": [
+        "MBW-05"
+      ],
+      "objective": "Create the evidence and controlled-evolution plane: reproducible evals, scientific research, candidate generation and learning signals that cannot directly mutate production.",
+      "entry_criteria": [
+        "capabilities expose measurable contracts and traces",
+        "verification/evidence records are available"
+      ],
+      "deliverables": [
+        "benchmark/eval registry with versions and contamination metadata",
+        "research ingestion/replication/negative-result lineage",
+        "candidate sandbox and champion/challenger comparison",
+        "promotion gates with rollback and canary evidence",
+        "learning signals separated from direct production mutation"
+      ],
+      "required_evidence_modes": [
+        "benchmark",
+        "replication",
+        "statistical_test",
+        "adversarial_eval",
+        "canary",
+        "rollback_drill"
+      ],
+      "exit_criteria": [
+        "SOTA labels require reproducible comparative evidence",
+        "generator and verifier independence is measurable for high-impact cases",
+        "research candidates cannot self-promote",
+        "benchmark leakage and reward/specification gaming are tested"
+      ],
+      "stop_conditions": [
+        "production policy/model/config can be mutated directly by an experiment",
+        "benchmark result lacks environment/version/budget provenance",
+        "learning signal is treated as ground truth without validation"
+      ],
+      "gating_vertical_slices": [
+        "VS-003",
+        "VS-005"
+      ],
+      "definition_of_ready": [
+        "capabilities expose measurable contracts",
+        "evidence/provenance records exist",
+        "candidate sandbox cannot write production directly"
+      ],
+      "definition_of_done": [
+        "benchmarks are versioned and contamination-aware",
+        "research claims preserve replication/negative-result lineage",
+        "candidate promotion requires champion/challenger, canary and rollback evidence"
+      ],
+      "handoff_outputs": [
+        "evaluation/benchmark registry",
+        "research evidence graph",
+        "controlled forge/learning promotion pipeline"
+      ],
+      "review_questions": [
+        "Could the benchmark have leaked into training or tuning?",
+        "Can the candidate or evaluator self-promote?",
+        "Is improvement still present after cost/latency/security constraints?"
+      ]
+    },
+    {
+      "id": "MBW-07",
+      "name": "Installer, Distributed Runtime & Production Hardening",
+      "work_packages": [
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_stage_refs": [
+        7
+      ],
+      "hard_dependencies": [
+        "MBW-05",
+        "MBW-06"
+      ],
+      "overlap_allowed_with": [],
+      "objective": "Qualify the complete system for clean-machine installation, topology-aware distributed execution, upgrade/rollback and production operation under failure.",
+      "entry_criteria": [
+        "VS-001-class full AI operation is functionally demonstrable",
+        "security/evaluation/recovery evidence exists for affected capabilities"
+      ],
+      "deliverables": [
+        "verified install/update/repair/rollback lifecycle",
+        "distributed worker/inference placement with leases/fencing/backpressure",
+        "resource/topology-aware scheduling and load shedding",
+        "release evidence bundle, SBOM/provenance and rollback qualification",
+        "golden journeys and fault-injected production-readiness drills"
+      ],
+      "required_evidence_modes": [
+        "clean_machine_e2e",
+        "chaos",
+        "recovery_drill",
+        "load_test",
+        "security_review",
+        "release_rehearsal"
+      ],
+      "exit_criteria": [
+        "VS-000 through VS-007 acceptance evidence is assembled as applicable",
+        "all affected critical/high edge obligations are passing or explicitly accepted with signed disposition",
+        "install/update/rollback is proven on supported platforms",
+        "production SLO/cost/capacity and incident/recovery paths are characterized"
+      ],
+      "stop_conditions": [
+        "release depends on undocumented machine state",
+        "rollback cannot read the post-upgrade data shape",
+        "distributed placement ignores fencing/backpressure or hard resource limits",
+        "critical unresolved risk is hidden by aggregate green status"
+      ],
+      "gating_vertical_slices": [
+        "VS-000",
+        "VS-001",
+        "VS-002",
+        "VS-003",
+        "VS-004",
+        "VS-005",
+        "VS-006",
+        "VS-007"
+      ],
+      "definition_of_ready": [
+        "functional vertical slices have evidence",
+        "critical/high obligations have owners and dispositions",
+        "supported deployment/install targets are enumerated"
+      ],
+      "definition_of_done": [
+        "clean-machine install/update/rollback is proven",
+        "distributed execution survives failover/congestion/resource pressure",
+        "release evidence, provenance, SLO/capacity and recovery artifacts are complete"
+      ],
+      "handoff_outputs": [
+        "release-qualified installer/update chain",
+        "distributed production runtime",
+        "signed production evidence bundle and runbooks"
+      ],
+      "review_questions": [
+        "Can rollback read every durable shape produced by the upgrade?",
+        "What happens when capacity is exhausted rather than merely slow?",
+        "Can one hidden critical risk be masked by aggregate green checks?"
+      ]
+    }
+  ],
+  "sequence_invariants": [
+    "Every WP-W00 through WP-W30 has exactly one primary master-build-wave owner.",
+    "Wave hard-dependency graph is acyclic.",
+    "AIQ stages 0 through 7 are represented by at least one wave.",
+    "Every critical/high edge obligation maps to at least one wave through work-package ownership.",
+    "Wave completion is derived from existing signed accountability; no wave-local manual completion flag exists.",
+    "A later wave may prototype early only when direct dependencies permit, but promotion cannot bypass hard dependencies or evidence gates."
+  ],
+  "build_packet_standard": {
+    "required_fields": [
+      "objective_and_non_goals",
+      "requirement_and_volume_refs",
+      "work_package_and_aiq_refs",
+      "canonical_contracts_and_state_owners",
+      "exact_implementation_paths",
+      "authority_security_privacy_notes",
+      "migration_and_compatibility",
+      "failure_recovery_and_rollback",
+      "test_and_eval_plan",
+      "observability_and_cost_signals",
+      "edge_case_obligations",
+      "evidence_refs",
+      "implementation_signoff",
+      "independent_verification_signoff"
+    ],
+    "rule": "A builder may split a packet, but may not omit a required field by moving it to undocumented context."
+  }
+}

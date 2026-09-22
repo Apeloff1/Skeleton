@@ -18,13 +18,14 @@ LIVE_EXAMPLES = (
     ("skeleton/kernel/capabilities.py", "canonical"),
     ("backend/server.py", "canonical"),
     ("frontend/package.json", "canonical"),
-    ("core/activation_security.py", "canonical"),
+    ("core/activation_security.py", "first-party"),
     ("skeleton/testing/test_backlog_reader.py", "first-party"),
     ("backend/tests/test_architecture_boundaries.py", "first-party"),
     ("scripts/check_architecture_boundaries.py", "first-party"),
     ("tests/test_architecture_boundaries.py", "first-party"),
     ("docs/CANONICAL_MODULE_BOUNDARIES.md", "first-party"),
     (".github/workflows/provenance-policy.yml", "first-party"),
+    (".cursor/rules/architecture.mdc", "first-party"),
     (".machine/README.md", "first-party"),
     (".machine/repository.toml", "first-party"),
     ("machine/README.md", "first-party"),
@@ -128,7 +129,6 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("skeleton/kernel/capabilities.py"), "canonical")
         self.assertEqual(policy.classify_path("backend/server.py"), "canonical")
         self.assertEqual(policy.classify_path("frontend/src/app.tsx"), "canonical")
-        self.assertEqual(policy.classify_path("core/runtime.py"), "canonical")
 
     def test_first_party_excludes_canonical_production_and_archive(self) -> None:
         self.assertEqual(policy.classify_path("skeleton/testing/fixtures.py"), "first-party")
@@ -137,6 +137,7 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("tests/test_provenance_source_path_inventory.py"), "first-party")
         self.assertEqual(policy.classify_path("docs/CANONICAL_MODULE_BOUNDARIES.md"), "first-party")
         self.assertEqual(policy.classify_path(".github/workflows/ci.yml"), "first-party")
+        self.assertEqual(policy.classify_path(".cursor/rules/architecture.mdc"), "first-party")
         self.assertEqual(policy.classify_path(".machine/README.md"), "first-party")
         self.assertEqual(policy.classify_path(".machine/repository.toml"), "first-party")
         self.assertEqual(policy.classify_path("machine/README.md"), "first-party")
@@ -146,6 +147,7 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path("satellites/gameforge-middleware/README.md"), "first-party")
         self.assertEqual(policy.classify_path("README.md"), "first-party")
         self.assertEqual(policy.classify_path("memory/PRD.md"), "first-party")
+        self.assertEqual(policy.classify_path("core/runtime.py"), "first-party")
 
     def test_invalid_paths_are_unknown_not_canonical(self) -> None:
         for path in (

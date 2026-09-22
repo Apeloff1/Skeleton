@@ -54,6 +54,17 @@ jeeves_eq_profiles_collection = db.jeeves_eq_profiles
 ai_toolkit_sessions_collection = db.ai_toolkit_sessions
 
 # ============================================================================
+# CANONICAL JEEVES RAG PRODUCT STATE
+# ============================================================================
+# These collections are authoritative user/product state. Chroma stores only
+# rebuildable semantic projections of selected content and must never be the
+# sole authority for these records.
+rag_learning_sessions_collection = db.rag_learning_sessions
+rag_user_progress_collection = db.rag_user_progress
+rag_cocoding_context_collection = db.rag_cocoding_context
+rag_feedback_collection = db.rag_feedback
+
+# ============================================================================
 # USER & PROGRESS COLLECTIONS (v12.0)
 # ============================================================================
 user_profiles_collection = db.user_profiles
@@ -243,6 +254,15 @@ async def create_indexes():
         await user_profiles_collection.create_index("user_id", unique=True)
         await reading_progress_collection.create_index([("user_id", 1), ("module_id", 1)])
         await ai_interactions_collection.create_index([("user_id", 1), ("timestamp", -1)])
+
+        # Canonical Jeeves RAG product-state indexes
+        await rag_learning_sessions_collection.create_index("session_id", unique=True)
+        await rag_learning_sessions_collection.create_index([("user_id", 1), ("timestamp", -1)])
+        await rag_user_progress_collection.create_index([("user_id", 1), ("domain", 1)], unique=True)
+        await rag_cocoding_context_collection.create_index("session_id", unique=True)
+        await rag_cocoding_context_collection.create_index([("user_id", 1), ("timestamp", -1)])
+        await rag_feedback_collection.create_index("feedback_id", unique=True)
+        await rag_feedback_collection.create_index([("user_id", 1), ("timestamp", -1)])
         
         # Curriculum indexes
         await curriculum_collection.create_index("module_id", unique=True)

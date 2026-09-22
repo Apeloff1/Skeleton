@@ -17,6 +17,9 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Iterable, Mapping
 
+from skeleton.intelligence.admission import ResourceBudget
+from skeleton.vault.governance_registry import GovernanceContext
+
 
 class RoutingError(RuntimeError):
     """Base routing failure."""
@@ -139,6 +142,88 @@ class RouteRequest:
     excluded_endpoints: frozenset[str] = field(default_factory=frozenset)
     minimum_reliability: float = 0.0
     minimum_quality: float = 0.0
+    governance_record_ids: tuple[str, ...] = field(default_factory=tuple)
+    governance_tenant_id: str | None = None
+    governance_purpose: str | None = None
+
+    @classmethod
+    def from_governance_context(
+        cls,
+        task_type: str,
+        governance: GovernanceContext,
+        *,
+        budget: ResourceBudget | None = None,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Build a route request whose privacy is derived from governed records.
+
+        Callers cannot supply or weaken privacy when governed data is present.
+        When a resource budget is supplied, cost/latency/output bounds and
+        governance privacy are composed into the same hard route request.
+        """
+
+        if not isinstance(governance, GovernanceContext):
+            raise TypeError("governance must be a GovernanceContext")
+        if "privacy" in kwargs:
+            raise ValueError("governance context owns privacy")
+        governed = {
+            "privacy": governance.routing_privacy,
+            "governance_record_ids": governance.record_ids,
+            "governance_tenant_id": governance.tenant_id,
+            "governance_purpose": governance.purpose,
+        }
+        if budget is not None:
+            return cls.from_resource_budget(
+                task_type,
+                budget,
+                context_tokens=context_tokens,
+                expected_output_tokens=expected_output_tokens,
+                **governed,
+                **kwargs,
+            )
+        return cls(
+            task_type=task_type,
+            context_tokens=context_tokens,
+            expected_output_tokens=(
+                0 if expected_output_tokens is None else expected_output_tokens
+            ),
+            **governed,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_resource_budget(
+        cls,
+        task_type: str,
+        budget: ResourceBudget,
+        *,
+        context_tokens: int = 0,
+        expected_output_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> "RouteRequest":
+        """Project one admission budget into hard model-routing constraints."""
+
+        if not isinstance(budget, ResourceBudget):
+            raise TypeError("budget must be a ResourceBudget")
+        output_tokens = (
+            budget.max_output_tokens
+            if expected_output_tokens is None
+            else min(expected_output_tokens, budget.max_output_tokens)
+        )
+        if "latency_budget_ms" in kwargs or "cost_budget" in kwargs:
+            raise ValueError(
+                "resource budget owns latency_budget_ms and cost_budget"
+            )
+        return cls(
+            task_type=task_type,
+            context_tokens=context_tokens,
+            expected_output_tokens=output_tokens,
+            latency_budget_ms=budget.max_wall_seconds * 1000.0,
+            cost_budget=budget.max_cost_usd,
+            **kwargs,
+        )
 
     def __post_init__(self) -> None:
         task_type = self.task_type.strip().lower()
@@ -187,6 +272,31 @@ class RouteRequest:
             "minimum_quality",
             _unit_interval(self.minimum_quality, "minimum_quality"),
         )
+        governed_ids = tuple(
+            dict.fromkeys(
+                str(value).strip()
+                for value in self.governance_record_ids
+                if str(value).strip()
+            )
+        )
+        object.__setattr__(self, "governance_record_ids", governed_ids)
+        if governed_ids:
+            tenant = str(self.governance_tenant_id or "").strip()
+            purpose = str(self.governance_purpose or "").strip().lower()
+            if not tenant:
+                raise ValueError(
+                    "governance_tenant_id is required for governed route requests"
+                )
+            if not purpose:
+                raise ValueError(
+                    "governance_purpose is required for governed route requests"
+                )
+            object.__setattr__(self, "governance_tenant_id", tenant)
+            object.__setattr__(self, "governance_purpose", purpose)
+        elif self.governance_tenant_id is not None or self.governance_purpose is not None:
+            raise ValueError(
+                "governance metadata requires governance_record_ids"
+            )
 
 
 @dataclass(frozen=True)
@@ -305,6 +415,16 @@ class RouteDecision:
             "candidates": [candidate.as_dict() for candidate in self.candidates],
             "rejected": {key: list(value) for key, value in self.rejected.items()},
             "routed_at": self.routed_at,
+            "governance": (
+                {
+                    "record_ids": list(self.request.governance_record_ids),
+                    "tenant_id": self.request.governance_tenant_id,
+                    "purpose": self.request.governance_purpose,
+                    "privacy": self.request.privacy.name.lower(),
+                }
+                if self.request.governance_record_ids
+                else None
+            ),
         }
 
 

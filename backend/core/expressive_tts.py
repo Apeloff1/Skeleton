@@ -16,7 +16,7 @@
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
-import os
+import base64
 import re
 from typing import Dict, List, Optional
 
@@ -166,15 +166,20 @@ async def generate_expressive_tts(
     if not spoken:
         raise ValueError("No text to speak")
 
-    from emergentintegrations.llm.openai import OpenAITextToSpeech
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
-    if not api_key:
-        raise RuntimeError("EMERGENT_LLM_KEY not configured")
+    from core.ai_provider import ProviderRegistry, ProviderSpeechRequest
 
-    tts = OpenAITextToSpeech(api_key=api_key)
-    audio_b64 = await tts.generate_speech_base64(
-        text=spoken, model="tts-1-hd", voice=voice, speed=speed,
+    adapter = ProviderRegistry.from_env().require_active()
+    response = await adapter.synthesize_speech(
+        ProviderSpeechRequest(
+            text=spoken,
+            model="tts-1-hd",
+            voice=voice,
+            speed=speed,
+            response_format="mp3",
+            purpose="expressive-speech-synthesis",
+        )
     )
+    audio_b64 = base64.b64encode(response.audio).decode("ascii")
     return {
         "audio_base64": audio_b64,
         "format": "mp3",

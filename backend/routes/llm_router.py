@@ -26,25 +26,23 @@ import time
 import json
 import hashlib
 import asyncio
-import uuid
 from collections import OrderedDict
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from core.databases import client as _SHARED_MONGO_CLIENT
+from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
 
 router = APIRouter(prefix="/api/llm-router", tags=["llm-router"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "codedock")]
 PROJ = {"_id": 0}
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
+AI_REGISTRY = ProviderRegistry.from_env()
 
-# ─── Model catalog (only models proven against the Emergent universal key) ──
-# cost_in / cost_out = USD per 1K tokens (approx 2026 list prices, for the
-# dashboard's spend estimate — not billing-grade).
-# ─── VAST multi-provider catalog (all run on the Emergent universal key) ────
-# cost_in / cost_out = USD per 1K tokens (approx 2026 list prices, for the
-# dashboard spend estimate). provider ∈ {openai, anthropic, gemini}.
+# ─── Legacy planning catalog ────────────────────────────────────────────────
+# Entries may describe providers that are not currently declared for runtime
+# execution. The executable ensemble is always filtered through AI_REGISTRY.
+# cost_in / cost_out are legacy planning estimates only, never billing truth.
 MODEL_CATALOG = {
     # ── OpenAI ──
     "gpt-5.5":              {"provider": "openai", "cost_in": 0.012, "cost_out": 0.060, "tier": "flagship"},
@@ -69,10 +67,10 @@ MODEL_CATALOG = {
     "gemini-3-flash-preview": {"provider": "gemini", "cost_in": 0.0002, "cost_out": 0.001, "tier": "bulk"},
 }
 
-# ─── Routing policy: task → PROVIDER-DIVERSE ensemble (primary, then cross-
-# provider fallbacks). Diversity is deliberate — if one provider degrades, the
-# fallback is a DIFFERENT vendor, so a single outage never fails a task. This
-# is how we "maximise usage of multiple AI": every task spreads across vendors.
+# ─── Routing policy: task → ordered planning candidates ────────────────────
+# Cross-provider names remain useful as a future routing plan, but only models
+# owned by the active declared provider are executable. Adding another provider
+# requires a declared adapter + architecture receipt before it becomes eligible.
 ROUTING_POLICY = {
     "code":            ["claude-sonnet-4-6", "gpt-5.4", "gemini-3.1-pro-preview"],
     "reasoning":       ["o3", "claude-opus-4-7", "gpt-5.5", "gemini-3.1-pro-preview"],
@@ -130,6 +128,45 @@ GAME_TASKS = {
 DEFAULT_TIMEOUT_S = float(os.environ.get("LLM_ROUTER_TIMEOUT_S", "60"))
 CACHE_TTL_S = int(os.environ.get("LLM_ROUTER_CACHE_TTL_S", "3600"))
 CACHE_MAX = int(os.environ.get("LLM_ROUTER_CACHE_MAX", "512"))
+
+
+def _active_provider_id() -> str:
+    return AI_REGISTRY.active_id
+
+
+def _provider_status() -> dict:
+    return {
+        "active": AI_REGISTRY.active_id,
+        "available": AI_REGISTRY.available,
+        "providers": AI_REGISTRY.statuses(),
+    }
+
+
+def _model_is_executable(model: str) -> bool:
+    meta = MODEL_CATALOG.get(model)
+    return bool(meta and meta.get("provider") == _active_provider_id())
+
+
+def _executable_ensemble(task: str, pinned_model: str = "") -> list[str]:
+    if pinned_model:
+        if pinned_model not in MODEL_CATALOG:
+            return []
+        candidates = [pinned_model]
+    else:
+        candidates = list(ROUTING_POLICY.get(task, ROUTING_POLICY["default"]))
+    return [model for model in candidates if _model_is_executable(model)]
+
+
+def _catalog_view() -> dict[str, dict]:
+    active = _active_provider_id()
+    return {
+        model: {
+            **meta,
+            "declared": meta.get("provider") == active,
+            "executable": meta.get("provider") == active and AI_REGISTRY.available,
+        }
+        for model, meta in MODEL_CATALOG.items()
+    }
 
 
 # ════════════════════ Normalised semantic cache ════════════════════
@@ -213,10 +250,7 @@ async def route_complete(task: str, prompt: str, system: str = "",
     latency_ms, est_cost_usd, attempts, task}. Never raises for routing/provider
     issues — returns an `error` field so the pipeline degrades gracefully."""
     task = (task or "default").lower()
-    if model and model in MODEL_CATALOG:
-        ensemble = [model]
-    else:
-        ensemble = ROUTING_POLICY.get(task, ROUTING_POLICY["default"])
+    ensemble = _executable_ensemble(task, model)
     timeout_s = timeout_s or DEFAULT_TIMEOUT_S
     _STATS["calls"] += 1
 
@@ -229,40 +263,114 @@ async def route_complete(task: str, prompt: str, system: str = "",
                              "latency_ms": 0, "est_cost_usd": 0.0})
             return {**hit, "cached": True, "latency_ms": 0, "est_cost_usd": 0.0}
 
-    if not EMERGENT_LLM_KEY:
+    if model and model in MODEL_CATALOG and not ensemble:
         _STATS["errors"] += 1
-        return {"content": "", "error": "EMERGENT_LLM_KEY not configured",
-                "model": None, "provider": None, "cached": False, "task": task}
+        return {
+            "content": "",
+            "error": "requested model belongs to an undeclared provider",
+            "error_code": "provider_not_declared",
+            "model": model,
+            "provider": MODEL_CATALOG[model].get("provider"),
+            "cached": False,
+            "task": task,
+        }
 
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    sid = session_id or f"router-{uuid.uuid4().hex[:8]}"
-    for i, model in enumerate(ensemble):
-        provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
+    if not ensemble:
+        _STATS["errors"] += 1
+        return {
+            "content": "",
+            "error": "no executable model for active provider",
+            "error_code": "no_executable_model",
+            "model": None,
+            "provider": _active_provider_id(),
+            "cached": False,
+            "task": task,
+        }
+
+    try:
+        adapter = AI_REGISTRY.require_active()
+    except ProviderError:
+        _STATS["errors"] += 1
+        return {
+            "content": "",
+            "error": "AI provider unavailable",
+            "error_code": "provider_unavailable",
+            "model": None,
+            "provider": _active_provider_id(),
+            "cached": False,
+            "task": task,
+        }
+
+    del session_id  # retained only for API compatibility; provider sessions are request-scoped
+    for i, candidate_model in enumerate(ensemble):
         t0 = time.time()
         try:
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
-                           system_message=system or "You are a helpful assistant.").with_model(provider, model)
-            resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=timeout_s)
-            content = resp.content if hasattr(resp, "content") else str(resp)
+            resp = await asyncio.wait_for(
+                adapter.generate(
+                    ProviderRequest(
+                        instructions=system or "You are a helpful assistant.",
+                        prompt=prompt,
+                        model=candidate_model,
+                    )
+                ),
+                timeout=timeout_s,
+            )
+            content = resp.text
+            actual_model = resp.model
+            actual_provider = resp.provider
             latency_ms = int((time.time() - t0) * 1000)
-            cost = _estimate_cost(model, len(prompt) + len(system), len(content))
+            cost = _estimate_cost(candidate_model, len(prompt) + len(system), len(content))
             if i > 0:
                 _STATS["fallbacks"] += 1
-            result = {"content": content, "model": model, "provider": provider,
-                      "cached": False, "latency_ms": latency_ms, "est_cost_usd": cost,
-                      "attempts": i + 1, "task": task}
+            result = {
+                "content": content,
+                "model": actual_model,
+                "provider": actual_provider,
+                "cached": False,
+                "latency_ms": latency_ms,
+                "est_cost_usd": cost,
+                "attempts": i + 1,
+                "task": task,
+            }
             if use_cache:
-                _CACHE.set(key, {"content": content, "model": model, "provider": provider, "task": task})
-            await _log_call({"task": task, "model": model, "provider": provider, "cached": False,
-                             "latency_ms": latency_ms, "est_cost_usd": cost, "fallback": i > 0})
+                _CACHE.set(
+                    key,
+                    {
+                        "content": content,
+                        "model": actual_model,
+                        "provider": actual_provider,
+                        "task": task,
+                    },
+                )
+            await _log_call(
+                {
+                    "task": task,
+                    "model": actual_model,
+                    "provider": actual_provider,
+                    "cached": False,
+                    "latency_ms": latency_ms,
+                    "est_cost_usd": cost,
+                    "fallback": i > 0,
+                }
+            )
             return result
-        except Exception:  # timeout or provider error → try next in ensemble
-            pass
+        except (ProviderError, TimeoutError, asyncio.TimeoutError):
+            continue
+        except Exception:
+            continue
 
     _STATS["errors"] += 1
     await _log_call({"task": task, "model": None, "cached": False, "error": "llm_request_failed"})
-    return {"content": "", "error": "llm_request_failed", "model": None,
-            "provider": None, "cached": False, "task": task, "attempts": len(ensemble)}
+    return {
+        "content": "",
+        "error": "llm_request_failed",
+        "error_code": "provider_attempts_exhausted",
+        "model": None,
+        "provider": _active_provider_id(),
+        "cached": False,
+        "task": task,
+        "attempts": len(ensemble),
+    }
 
 
 # ════════════════════════════ API surface ════════════════════════════
@@ -279,10 +387,14 @@ class CompleteBody(BaseModel):
 async def get_policy():
     """Routing policy + model catalog (for the dashboard + transparency)."""
     return {
-        "policy": ROUTING_POLICY,
-        "models": MODEL_CATALOG,
+        "policy": {
+            task: _executable_ensemble(task)
+            for task in ROUTING_POLICY
+        },
+        "planning_policy": ROUTING_POLICY,
+        "models": _catalog_view(),
+        "provider": _provider_status(),
         "cache": {"ttl_s": CACHE_TTL_S, "max": CACHE_MAX, "size": len(_CACHE._d)},
-        "key_configured": bool(EMERGENT_LLM_KEY),
     }
 
 
@@ -351,7 +463,12 @@ async def game_tasks():
     """Catalog of game-dev AI routes + the model ensemble each one dispatches to."""
     return {
         "tasks": [
-            {"task": k, **meta, "ensemble": ROUTING_POLICY.get(k, [])}
+            {
+                "task": k,
+                **meta,
+                "ensemble": _executable_ensemble(k),
+                "planning_ensemble": ROUTING_POLICY.get(k, []),
+            }
             for k, meta in GAME_TASKS.items()
         ],
         "count": len(GAME_TASKS),
@@ -360,11 +477,11 @@ async def game_tasks():
 
 @router.post("/game/generate")
 async def game_generate(body: GameGenBody):
-    """Dispatch a game-dev concern to its tuned, provider-diverse AI ensemble.
+    """Dispatch a game-dev concern through the declared provider ensemble.
 
-    The Galaxy Studio pipeline calls this so every concern (gameplay code,
-    narrative, NPC AI, balance, shaders…) is generated by the model best at it,
-    with cross-vendor fallback + the shared semantic cache + cost telemetry."""
+    Planning metadata may include future providers, but execution is restricted
+    to providers declared by the active construction contract. The shared cache
+    and telemetry record the provider/model that actually answered."""
     task = (body.game_task or "").lower()
     if task not in GAME_TASKS:
         return {"error": f"unknown game_task '{task}'", "valid_tasks": list(GAME_TASKS.keys())}

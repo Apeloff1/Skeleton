@@ -1,173 +1,272 @@
-"""
-services/ai_hub_svc.py — AIHub service.
+"""AIHub service routed through the canonical model-provider boundary.
 
-Extracted from server.py (Feb 2026 Phase-7). The class needs the
-``LLMProvider`` enum from server.py, but to avoid a circular import we
-defer the lookup until first instantiation via a small bootstrap
-function. Server.py keeps a back-compat shim so existing callers continue
-to work.
+This module preserves the historical AIHub API while eliminating its former
+"universal key" and provider-specific execution assumptions. Runtime model I/O
+must pass through :class:`core.ai_provider.ProviderRegistry`, which in turn
+requires a valid architecture/construction receipt before any provider can
+activate.
 
-LLM keys are read from ``EMERGENT_LLM_KEY`` (universal Emergent key),
-which is the same source the original implementation used.
+Provider names retained in the legacy enum are descriptive compatibility values,
+not declarations of runtime support. Only providers declared in
+`machine/ai_app_construction.json` may report as available.
 """
+
 from __future__ import annotations
 
-import os
+from datetime import datetime, timezone
+import json
 import re
-import uuid
-from datetime import datetime
-from typing import List
+from typing import Any, List
+
+from core.ai_provider import (
+    ProviderError,
+    ProviderRegistry,
+    ProviderRequest,
+)
 
 
 def _llm_provider_enum():
-    """Lazy import of the LLMProvider enum from server.py.
+    """Lazy import of the compatibility LLMProvider enum from server.py."""
 
-    Required because the enum is currently still owned by server.py.
-    Calling this at request time avoids any boot-order issues.
-    """
-    from server import LLMProvider  # lazy
+    from server import LLMProvider  # noqa: PLC0415
+
     return LLMProvider
 
 
-def _llm_chat():
-    """Lazy import of LlmChat / UserMessage from emergentintegrations.
-
-    Same lazy-import pattern keeps the module load fast even if the
-    integrations library isn't yet on the path during tests.
-    """
-    from emergentintegrations.llm.chat import LlmChat, UserMessage  # lazy
-    return LlmChat, UserMessage
-
-
 class AIHubService:
-    """Self-evolving AI hub for state-of-the-art expansion suggestions."""
+    """AI planning/suggestion hub backed by the canonical provider registry."""
 
-    def __init__(self):
-        self.api_key = os.environ.get("EMERGENT_LLM_KEY")
-        LLMProvider  = _llm_provider_enum()
-        self.providers = {
-            LLMProvider.OPENAI:    {"model": "gpt-4o",                    "available": True},
-            LLMProvider.ANTHROPIC: {"model": "claude-sonnet-4-20250514",  "available": True},
-            LLMProvider.GOOGLE:    {"model": "gemini-2.0-flash",          "available": True},
-            LLMProvider.GROK:      {"model": "grok-3",                   "available": False},
+    def __init__(self, *, registry: ProviderRegistry | None = None) -> None:
+        self._registry = registry or ProviderRegistry.from_env()
+        self.providers = self._provider_snapshot()
+
+    @property
+    def api_key(self) -> str:
+        """Legacy compatibility flag without returning secret material."""
+
+        return "configured" if self._registry.available else ""
+
+    @property
+    def available(self) -> bool:
+        return self._registry.available
+
+    def _provider_snapshot(self) -> dict[Any, dict[str, Any]]:
+        LLMProvider = _llm_provider_enum()
+        statuses = {
+            row["id"]: row
+            for row in self._registry.statuses()
+            if isinstance(row, dict) and isinstance(row.get("id"), str)
+        }
+        active = self._registry.active
+        active_model = active.model if active is not None else "unavailable"
+
+        def row(provider_id: str, model: str) -> dict[str, Any]:
+            status = statuses.get(provider_id)
+            return {
+                "model": model,
+                "available": bool(status and status.get("available")),
+                "declared": status is not None,
+                "architecture_acknowledged": bool(
+                    status and status.get("architecture_acknowledged")
+                ),
+            }
+
+        return {
+            LLMProvider.OPENAI: row("openai", active_model),
+            LLMProvider.ANTHROPIC: row("anthropic", "undeclared"),
+            LLMProvider.GOOGLE: row("google", "undeclared"),
+            LLMProvider.GROK: row("grok", "undeclared"),
         }
 
-    async def suggest_features(self, context: dict) -> List[dict]:
-        """AI-powered feature suggestions based on usage patterns."""
-        if not self.api_key:
-            return self._get_default_suggestions()
-        try:
-            LlmChat, UserMessage = _llm_chat()
-            chat = LlmChat(
-                api_key    = self.api_key,
-                session_id = f"codedock-suggest-{uuid.uuid4().hex[:8]}",
-                system_message=(
-                    "You are an expert compiler and IDE feature analyst. "
-                    "Based on the user's coding patterns and current feature set, "
-                    "suggest innovative features that would enhance their development experience. "
-                    "Focus on: 1) Productivity improvements 2) Code quality enhancements "
-                    "3) Learning opportunities 4) Advanced compilation features 5) Integration possibilities. "
-                    "Return suggestions as JSON array with: id, name, description, category, impact, implementation_difficulty"
-                ),
-            ).with_model("openai", "gpt-4o")
-            response = await chat.send_message(UserMessage(text=(
-                f"User context:\n"
-                f"- Languages used: {context.get('languages', ['python'])}\n"
-                f"- Features used: {context.get('features_used', [])}\n"
-                f"- Skill level: {context.get('skill_level', 'intermediate')}\n"
-                f"- Current installed packs: {context.get('installed_packs', [])}\n\n"
-                "Suggest 5 innovative features they should add to their CodeDock IDE."
-            )))
+    def provider_status(self) -> dict[str, Any]:
+        """Return non-secret provider readiness and receipt metadata."""
+
+        return {
+            "active": self._registry.active_id,
+            "available": self._registry.available,
+            "providers": self._registry.statuses(),
+        }
+
+    async def _generate(
+        self,
+        *,
+        instructions: str,
+        prompt: str,
+        max_output_tokens: int | None = None,
+    ) -> str:
+        adapter = self._registry.require_active()
+        response = await adapter.generate(
+            ProviderRequest(
+                instructions=instructions,
+                prompt=prompt,
+                max_output_tokens=max_output_tokens,
+            )
+        )
+        return response.text
+
+    @staticmethod
+    def _extract_json_array(text: str) -> list[dict[str, Any]] | None:
+        for match in re.finditer(r"\[[\s\S]*?\]", text):
             try:
-                import json
-                matches = re.findall(r"\[[\s\S]*?\]", response)
-                if matches:
-                    return json.loads(matches[0])
-            except Exception:
-                pass
+                decoded = json.loads(match.group(0))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(decoded, list) and all(
+                isinstance(item, dict) for item in decoded
+            ):
+                return decoded
+        return None
+
+    async def suggest_features(self, context: dict) -> List[dict]:
+        """Generate feature suggestions, falling back deterministically."""
+
+        instructions = (
+            "You are an expert compiler and IDE feature analyst. "
+            "Suggest concrete improvements based on the supplied usage context. "
+            "Return a JSON array whose objects contain id, name, description, "
+            "category, impact, and implementation_difficulty."
+        )
+        prompt = (
+            "User context:\n"
+            f"- Languages used: {context.get('languages', ['python'])}\n"
+            f"- Features used: {context.get('features_used', [])}\n"
+            f"- Skill level: {context.get('skill_level', 'intermediate')}\n"
+            f"- Current installed packs: {context.get('installed_packs', [])}\n\n"
+            "Suggest five innovative but implementable CodeDock IDE features."
+        )
+        try:
+            response = await self._generate(
+                instructions=instructions,
+                prompt=prompt,
+                max_output_tokens=1800,
+            )
+        except ProviderError:
             return self._get_default_suggestions()
-        except Exception:
-            return self._get_default_suggestions()
+
+        parsed = self._extract_json_array(response)
+        return parsed if parsed is not None else self._get_default_suggestions()
 
     def _get_default_suggestions(self) -> List[dict]:
         return [
-            {"id": "smart_completion",       "name": "AI Smart Completion",      "description": "Context-aware code completion powered by multiple LLMs",            "category": "productivity",  "impact": "high",     "implementation_difficulty": "medium"},
-            {"id": "code_review_bot",        "name": "Automated Code Review",    "description": "AI-powered code review with security and performance insights",     "category": "quality",       "impact": "high",     "implementation_difficulty": "medium"},
-            {"id": "interactive_debugger",   "name": "Visual Debugger",          "description": "Step-through debugging with variable inspection",                  "category": "debugging",     "impact": "critical", "implementation_difficulty": "high"},
-            {"id": "performance_profiler",   "name": "Real-time Profiler",       "description": "CPU and memory profiling with flame graphs",                       "category": "performance",   "impact": "high",     "implementation_difficulty": "high"},
-            {"id": "collaborative_editing",  "name": "Enhanced Collaboration",   "description": "Video chat and screen sharing during pair programming",            "category": "collaboration", "impact": "medium",   "implementation_difficulty": "high"},
+            {
+                "id": "smart_completion",
+                "name": "AI Smart Completion",
+                "description": "Context-aware code completion through the canonical provider boundary",
+                "category": "productivity",
+                "impact": "high",
+                "implementation_difficulty": "medium",
+            },
+            {
+                "id": "code_review_bot",
+                "name": "Automated Code Review",
+                "description": "AI-assisted code review with security and performance evidence",
+                "category": "quality",
+                "impact": "high",
+                "implementation_difficulty": "medium",
+            },
+            {
+                "id": "interactive_debugger",
+                "name": "Visual Debugger",
+                "description": "Step-through debugging with variable inspection",
+                "category": "debugging",
+                "impact": "critical",
+                "implementation_difficulty": "high",
+            },
+            {
+                "id": "performance_profiler",
+                "name": "Real-time Profiler",
+                "description": "CPU and memory profiling with traceable bottleneck evidence",
+                "category": "performance",
+                "impact": "high",
+                "implementation_difficulty": "high",
+            },
+            {
+                "id": "collaborative_editing",
+                "name": "Enhanced Collaboration",
+                "description": "Shared development sessions with explicit authority boundaries",
+                "category": "collaboration",
+                "impact": "medium",
+                "implementation_difficulty": "high",
+            },
         ]
 
     async def query_sota(self, domain: str) -> dict:
-        """Query for state-of-the-art developments in a domain."""
-        if not self.api_key:
-            return {"status": "offline", "suggestions": []}
+        """Generate a bounded technology-analysis response for one domain."""
+
+        instructions = (
+            "You are a technology analyst specializing in programming languages, "
+            "compilers, AI systems, and developer tooling. Distinguish current "
+            "evidence from assumptions and avoid claiming unsupported freshness."
+        )
+        prompt = (
+            f"Analyze state-of-the-art developments relevant to {domain}. "
+            "Cover technologies/frameworks, current best practices, emerging "
+            "directions, useful tools, and measurable performance techniques. "
+            "Be specific and actionable."
+        )
         try:
-            LlmChat, UserMessage = _llm_chat()
-            chat = LlmChat(
-                api_key    = self.api_key,
-                session_id = f"codedock-sota-{uuid.uuid4().hex[:8]}",
-                system_message=(
-                    "You are a cutting-edge technology analyst specializing in programming languages, "
-                    "compilers, and developer tools. Provide the latest state-of-the-art developments "
-                    "and recommendations."
-                ),
-            ).with_model("openai", "gpt-4o")
-            response = await chat.send_message(UserMessage(text=(
-                f"What are the latest state-of-the-art developments in {domain}?\n"
-                "Include: 1) Latest technologies and frameworks 2) Best practices in 2025/2026 "
-                "3) Emerging trends 4) Recommended tools and libraries 5) Performance optimization techniques. "
-                "Be specific and actionable."
-            )))
+            response = await self._generate(
+                instructions=instructions,
+                prompt=prompt,
+                max_output_tokens=2200,
+            )
+        except ProviderError:
             return {
-                "status":    "success",
-                "domain":    domain,
-                "analysis":  response,
-                "timestamp": datetime.utcnow().isoformat(),
+                "status": "offline",
+                "domain": domain,
+                "message": "provider_unavailable",
             }
-        except Exception:
-            return {"status": "error", "message": "sota_analysis_failed"}
+
+        return {
+            "status": "success",
+            "domain": domain,
+            "analysis": response,
+            "provider": self._registry.active_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
 
     async def auto_implement_feature(self, feature_spec: dict) -> dict:
-        """Generate implementation plan for a new feature."""
-        if not self.api_key:
-            return {"status": "offline"}
+        """Generate a construction plan; execution remains separately governed."""
+
+        instructions = (
+            "You are a software architect. Produce implementation plans, not "
+            "unguarded side effects. Include architecture boundaries, APIs, UI, "
+            "data, security, observability, failure modes, tests, evaluation, "
+            "deployment, and rollback."
+        )
+        prompt = (
+            "Generate an implementation plan for this feature:\n\n"
+            f"Name: {feature_spec.get('name')}\n"
+            f"Description: {feature_spec.get('description')}\n"
+            f"Category: {feature_spec.get('category')}\n\n"
+            "Align the plan with the repository construction contract."
+        )
         try:
-            LlmChat, UserMessage = _llm_chat()
-            chat = LlmChat(
-                api_key    = self.api_key,
-                session_id = f"codedock-impl-{uuid.uuid4().hex[:8]}",
-                system_message=(
-                    "You are an expert software architect. Generate detailed implementation plans "
-                    "for new IDE features including: 1) Architecture design 2) API endpoints needed "
-                    "3) UI components 4) Data models 5) Integration points 6) Testing strategy."
-                ),
-            ).with_model("openai", "gpt-4o")
-            response = await chat.send_message(UserMessage(text=(
-                f"Generate an implementation plan for this feature:\n\n"
-                f"Name: {feature_spec.get('name')}\n"
-                f"Description: {feature_spec.get('description')}\n"
-                f"Category: {feature_spec.get('category')}\n\n"
-                "Provide a complete implementation roadmap."
-            )))
-            return {
-                "status":                "success",
-                "feature":               feature_spec.get("name"),
-                "implementation_plan":   response,
-                "estimated_complexity":  feature_spec.get("implementation_difficulty", "medium"),
-            }
-        except Exception:
-            return {"status": "error", "message": "feature_plan_failed"}
+            response = await self._generate(
+                instructions=instructions,
+                prompt=prompt,
+                max_output_tokens=2600,
+            )
+        except ProviderError:
+            return {"status": "offline", "message": "provider_unavailable"}
+
+        return {
+            "status": "success",
+            "feature": feature_spec.get("name"),
+            "implementation_plan": response,
+            "estimated_complexity": feature_spec.get(
+                "implementation_difficulty", "medium"
+            ),
+            "provider": self._registry.active_id,
+        }
 
 
-# We can't construct the singleton at import time because it needs
-# server.LLMProvider, which causes a circular import. Instead, expose a
-# lazy property that constructs on first access.
 _AI_HUB_SINGLETON: AIHubService | None = None
 
 
 def get_ai_hub() -> AIHubService:
     """Return the lazily-instantiated AIHub singleton."""
+
     global _AI_HUB_SINGLETON
     if _AI_HUB_SINGLETON is None:
         _AI_HUB_SINGLETON = AIHubService()

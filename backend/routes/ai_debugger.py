@@ -21,18 +21,15 @@ from dotenv import load_dotenv
 import logging
 import uuid
 import re
-import os
 
 # Load environment
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
 
 logger = logging.getLogger("CodeDock.AIDebugger")
 router = APIRouter(prefix="/debugger", tags=["AI Debugger"])
-
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # ============================================================================
 # REQUEST/RESPONSE MODELS
@@ -85,18 +82,23 @@ def _debugger_http_error(operation: str, exc: Exception) -> HTTPException:
 
 async def call_debugger_ai(prompt: str, system_prompt: str) -> str:
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"debugger-{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt
-        ).with_model("openai", "gpt-4o")
-        
-        response = await chat.send_message(UserMessage(text=prompt))
-        return response.content if hasattr(response, 'content') else str(response)
+        adapter = ProviderRegistry.from_env().require_active()
+        response = await adapter.generate(
+            ProviderRequest(
+                instructions=system_prompt,
+                prompt=prompt,
+                model="gpt-4o" if adapter.provider_id == "openai" else None,
+                purpose="code-debugging",
+            )
+        )
+        return response.text
+    except ProviderError as exc:
+        logger.warning("AI debugger provider failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="AI debugger provider failed") from None
     except HTTPException:
         raise
     except Exception as exc:
-        logger.warning("AI debugger provider failed: %s", type(exc).__name__)
+        logger.warning("AI debugger boundary failed: %s", type(exc).__name__)
         raise HTTPException(status_code=500, detail="AI debugger provider failed") from None
 
 # ============================================================================

@@ -29,6 +29,45 @@ from skeleton.vault.audit import (
     verify_chain_or_refuse,
 )
 from skeleton.vault.shamir import ShamirSeal
+from skeleton.vault.data_lifecycle import (
+    DataLifecycleRegistry,
+    DeletionAction,
+    DeletionPlan,
+    DeletionReceipt,
+    GovernedDataRecord,
+    LifecycleConflict,
+    LifecycleError,
+    LifecycleState,
+)
+from skeleton.vault.data_governance import (
+    DataClass,
+    DataGovernanceDenied,
+    DataGovernanceError,
+    ProviderTransferDecision,
+    ProviderTransferRequest,
+    evaluate_provider_transfer,
+    require_provider_transfer,
+)
+from skeleton.vault.governance_registry import (
+    CanonicalDataPlane,
+    CanonicalWritePolicy,
+    GovernanceContext,
+    GovernanceRegistry,
+    RegisteredProviderTransferDecision,
+)
+from skeleton.vault.governance_audit import GovernanceAuditTimeline
+from skeleton.vault.lifecycle_adapters import (
+    DeletionExecutionResult,
+    GovernedExport,
+    LifecycleAdapterError,
+    LifecycleAdapterMissing,
+    LifecycleAdapterRegistry,
+    LifecycleExecutionError,
+    LifecycleExecutor,
+    MemoryDeletionAdapter,
+    MongoCollectionLifecycleAdapter,
+    RetrievalIndexDeletionAdapter,
+)
 
 __all__ = [
     "AccessPolicy",
@@ -45,4 +84,35 @@ __all__ = [
     "AuditLog",
     "verify_chain_or_refuse",
     "ShamirSeal",
+    "DataClass",
+    "DataGovernanceDenied",
+    "DataGovernanceError",
+    "ProviderTransferDecision",
+    "ProviderTransferRequest",
+    "evaluate_provider_transfer",
+    "require_provider_transfer",
+    "DataLifecycleRegistry",
+    "DeletionAction",
+    "DeletionPlan",
+    "DeletionReceipt",
+    "GovernedDataRecord",
+    "LifecycleConflict",
+    "LifecycleError",
+    "LifecycleState",
+    "CanonicalDataPlane",
+    "CanonicalWritePolicy",
+    "GovernanceContext",
+    "GovernanceRegistry",
+    "GovernanceAuditTimeline",
+    "RegisteredProviderTransferDecision",
+    "DeletionExecutionResult",
+    "GovernedExport",
+    "LifecycleAdapterError",
+    "LifecycleAdapterMissing",
+    "LifecycleAdapterRegistry",
+    "LifecycleExecutionError",
+    "LifecycleExecutor",
+    "MemoryDeletionAdapter",
+    "MongoCollectionLifecycleAdapter",
+    "RetrievalIndexDeletionAdapter",
 ]

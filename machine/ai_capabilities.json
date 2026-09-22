@@ -1,0 +1,535 @@
+{
+  "schema_version": 1,
+  "registry_version": "1.0.0",
+  "status": "active",
+  "architecture_tag": "arch-map/v3.7",
+  "purpose": "Concrete assembled-product AI capability inventory. Capability enabled state is declarative; runtime availability is resolved from readiness requirements and does not follow provider credential presence alone.",
+  "capabilities": [
+    {
+      "capability_id": "assistant.text",
+      "version": "1.0.0",
+      "owner_plane": "application-api",
+      "enabled": true,
+      "implementation_state": "partial",
+      "risk_class": "low",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "text"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "orchestration",
+        "prompt-context",
+        "model-routing",
+        "model-provider",
+        "reasoning-verification"
+      ],
+      "required_provider_capabilities": [
+        "text-generation"
+      ],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "optional"
+      },
+      "retrieval_policy": {
+        "mode": "optional"
+      },
+      "verification_level": "structural",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "interactive-default"
+      },
+      "instruction_policy_ref": "policy://assistant.text/default@1",
+      "readiness_requirements": [
+        "canonical conversation ingress or explicitly stateless request",
+        "engine execution boundary ready",
+        "context compiler ready",
+        "text provider route ready",
+        "structural finalization ready"
+      ],
+      "degraded_behavior": {
+        "provider_unavailable": "unavailable",
+        "memory_unavailable": "continue_without_long_term_memory",
+        "retrieval_unavailable": "continue_without_retrieval_when_request_does_not_require_grounding"
+      },
+      "golden_journeys": [
+        "prompt-only",
+        "multi-turn"
+      ]
+    },
+    {
+      "capability_id": "assistant.retrieval_grounded",
+      "version": "1.0.0",
+      "owner_plane": "application-api",
+      "enabled": true,
+      "implementation_state": "partial",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "text",
+        "citations"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "orchestration",
+        "prompt-context",
+        "retrieval",
+        "model-routing",
+        "model-provider",
+        "reasoning-verification"
+      ],
+      "required_provider_capabilities": [
+        "text-generation"
+      ],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "optional"
+      },
+      "retrieval_policy": {
+        "mode": "required",
+        "grounding_required": true
+      },
+      "verification_level": "evidence",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "interactive-grounded"
+      },
+      "instruction_policy_ref": "policy://assistant.retrieval_grounded/default@1",
+      "readiness_requirements": [
+        "authorized retrieval source available",
+        "context compiler preserves EvidenceReference provenance",
+        "claim/citation verification ready",
+        "text provider route ready"
+      ],
+      "degraded_behavior": {
+        "retrieval_unavailable": "abstain_or_offer_non_grounded_mode_only_as_distinct_capability",
+        "insufficient_evidence": "qualified_or_abstain",
+        "provider_unavailable": "unavailable"
+      },
+      "golden_journeys": [
+        "retrieval-grounded"
+      ]
+    },
+    {
+      "capability_id": "assistant.tool_read",
+      "version": "1.0.0",
+      "owner_plane": "tool-runtime",
+      "enabled": true,
+      "implementation_state": "partial",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "text",
+        "tool-results"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "orchestration",
+        "prompt-context",
+        "tool-runtime",
+        "model-routing",
+        "model-provider",
+        "reasoning-verification"
+      ],
+      "required_provider_capabilities": [
+        "text-generation"
+      ],
+      "tool_policy": {
+        "mode": "allow_profile",
+        "profile": "read-only"
+      },
+      "memory_policy": {
+        "mode": "optional"
+      },
+      "retrieval_policy": {
+        "mode": "optional"
+      },
+      "verification_level": "action",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "interactive-tool-read"
+      },
+      "instruction_policy_ref": "policy://assistant.tool_read/default@1",
+      "readiness_requirements": [
+        "provider interaction protocol supports tool calls",
+        "canonical tool runtime ready",
+        "at least one authorized read tool admitted",
+        "tool receipt/postcondition verification ready"
+      ],
+      "degraded_behavior": {
+        "tool_runtime_unavailable": "return_tool_unavailable_without_claiming_action",
+        "no_authorized_tools": "continue_as_text_only_only_if_request_semantics_allow",
+        "provider_unavailable": "unavailable"
+      },
+      "golden_journeys": [
+        "read-tool"
+      ]
+    },
+    {
+      "capability_id": "assistant.tool_write",
+      "version": "1.0.0",
+      "owner_plane": "tool-runtime",
+      "enabled": true,
+      "implementation_state": "partial",
+      "risk_class": "high",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "text",
+        "action-status"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "identity",
+        "orchestration",
+        "tool-runtime",
+        "governance",
+        "cost-capacity",
+        "reasoning-verification",
+        "streaming-realtime"
+      ],
+      "required_provider_capabilities": [
+        "text-generation"
+      ],
+      "tool_policy": {
+        "mode": "allow_profile",
+        "profile": "write-with-approval",
+        "approval_floor": "policy"
+      },
+      "memory_policy": {
+        "mode": "optional"
+      },
+      "retrieval_policy": {
+        "mode": "optional"
+      },
+      "verification_level": "action",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "interactive-tool-write"
+      },
+      "instruction_policy_ref": "policy://assistant.tool_write/default@1",
+      "readiness_requirements": [
+        "canonical tool runtime ready",
+        "write authority/approval ledger ready",
+        "idempotency reservation ready",
+        "waiting_for_user resume ready",
+        "postcondition verification ready",
+        "realtime approval/cancel UX ready"
+      ],
+      "degraded_behavior": {
+        "approval_transport_unavailable": "unavailable_for_new_write_action",
+        "tool_runtime_unavailable": "unavailable",
+        "ambiguous_side_effect": "report_ambiguous_and_reconcile_never_claim_success"
+      },
+      "golden_journeys": [
+        "write-tool-with-approval",
+        "cancel"
+      ]
+    },
+    {
+      "capability_id": "assistant.artifact_qa",
+      "version": "1.0.0",
+      "owner_plane": "artifact-files",
+      "enabled": true,
+      "implementation_state": "partial",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text",
+        "document",
+        "image"
+      ],
+      "output_modalities": [
+        "text",
+        "citations"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "artifact-files",
+        "prompt-context",
+        "retrieval",
+        "model-provider",
+        "reasoning-verification",
+        "governance"
+      ],
+      "required_provider_capabilities": [
+        "text-generation"
+      ],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "optional"
+      },
+      "retrieval_policy": {
+        "mode": "required_for_large_artifacts"
+      },
+      "verification_level": "evidence",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "interactive-artifact"
+      },
+      "instruction_policy_ref": "policy://assistant.artifact_qa/default@1",
+      "readiness_requirements": [
+        "artifact ingestion/scan ready",
+        "bounded extraction ready",
+        "context artifact projection ready",
+        "evidence verification ready"
+      ],
+      "degraded_behavior": {
+        "artifact_quarantined": "deny_use",
+        "extractor_unavailable": "unavailable_for_unsupported_artifact",
+        "vector_unavailable": "use_authorized_bounded_extraction_when_possible"
+      },
+      "golden_journeys": [
+        "artifact",
+        "retrieval-grounded"
+      ]
+    },
+    {
+      "capability_id": "media.image_generate",
+      "version": "1.0.0",
+      "owner_plane": "model-provider",
+      "enabled": true,
+      "implementation_state": "present_transport_partial_product",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "image"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "model-provider",
+        "artifact-files",
+        "governance",
+        "cost-capacity",
+        "security-safety"
+      ],
+      "required_provider_capabilities": [
+        "image-generation"
+      ],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "prohibited"
+      },
+      "retrieval_policy": {
+        "mode": "prohibited"
+      },
+      "verification_level": "structural",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "media-image"
+      },
+      "instruction_policy_ref": "policy://media.image_generate/default@1",
+      "readiness_requirements": [
+        "image provider route ready",
+        "media governance/admission ready",
+        "generated artifact lifecycle ready"
+      ],
+      "degraded_behavior": {
+        "provider_unavailable": "unavailable",
+        "artifact_store_unavailable": "unavailable"
+      },
+      "golden_journeys": [
+        "media-capability"
+      ]
+    },
+    {
+      "capability_id": "media.image_edit",
+      "version": "1.0.0",
+      "owner_plane": "model-provider",
+      "enabled": true,
+      "implementation_state": "present_transport_partial_product",
+      "risk_class": "medium",
+      "input_modalities": [
+        "text",
+        "image"
+      ],
+      "output_modalities": [
+        "image"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "model-provider",
+        "artifact-files",
+        "governance",
+        "cost-capacity",
+        "security-safety"
+      ],
+      "required_provider_capabilities": [
+        "image-editing"
+      ],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "prohibited"
+      },
+      "retrieval_policy": {
+        "mode": "prohibited"
+      },
+      "verification_level": "structural",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "media-image"
+      },
+      "instruction_policy_ref": "policy://media.image_edit/default@1",
+      "readiness_requirements": [
+        "source artifact authorized and ready",
+        "image-edit provider route ready",
+        "generated artifact lifecycle ready"
+      ],
+      "degraded_behavior": {
+        "provider_unavailable": "unavailable",
+        "source_artifact_unavailable": "unavailable"
+      },
+      "golden_journeys": [
+        "media-capability"
+      ]
+    },
+    {
+      "capability_id": "media.speech_synthesis",
+      "version": "1.0.0",
+      "owner_plane": "model-provider",
+      "enabled": true,
+      "implementation_state": "present_transport_partial_product",
+      "risk_class": "low",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "audio"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "model-provider",
+        "artifact-files",
+        "governance",
+        "cost-capacity"
+      ],
+      "required_provider_capabilities": [
+        "speech-synthesis"
+      ],
+      "tool_policy": {
+        "mode": "none"
+      },
+      "memory_policy": {
+        "mode": "prohibited"
+      },
+      "retrieval_policy": {
+        "mode": "prohibited"
+      },
+      "verification_level": "structural",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "media-speech"
+      },
+      "instruction_policy_ref": "policy://media.speech_synthesis/default@1",
+      "readiness_requirements": [
+        "speech provider route ready",
+        "media governance/admission ready",
+        "audio artifact lifecycle ready"
+      ],
+      "degraded_behavior": {
+        "provider_unavailable": "unavailable",
+        "artifact_store_unavailable": "unavailable"
+      },
+      "golden_journeys": [
+        "media-capability"
+      ]
+    },
+    {
+      "capability_id": "assistant.background_agent",
+      "version": "1.0.0",
+      "owner_plane": "orchestration",
+      "enabled": true,
+      "implementation_state": "planned_target",
+      "risk_class": "high",
+      "input_modalities": [
+        "text"
+      ],
+      "output_modalities": [
+        "text",
+        "artifacts",
+        "action-status"
+      ],
+      "required_planes": [
+        "application-api",
+        "engine-api",
+        "orchestration",
+        "jobs-durability",
+        "tool-runtime",
+        "memory",
+        "retrieval",
+        "streaming-realtime",
+        "governance",
+        "cost-capacity",
+        "reasoning-verification"
+      ],
+      "required_provider_capabilities": [
+        "text-generation"
+      ],
+      "tool_policy": {
+        "mode": "allow_profile",
+        "profile": "bounded-agentic"
+      },
+      "memory_policy": {
+        "mode": "policy"
+      },
+      "retrieval_policy": {
+        "mode": "policy"
+      },
+      "verification_level": "action",
+      "data_class_ceiling": "confidential",
+      "budget_profile": {
+        "class": "background-agent"
+      },
+      "instruction_policy_ref": "policy://assistant.background_agent/default@1",
+      "readiness_requirements": [
+        "cognitive execution loop ready",
+        "child execution/fanout bounds ready",
+        "durable jobs/checkpoints ready",
+        "governed tool runtime ready",
+        "realtime status/reconnect ready"
+      ],
+      "degraded_behavior": {
+        "missing_required_dependency": "unavailable",
+        "provider_outage": "pause_or_fail_per_job_policy"
+      },
+      "golden_journeys": [
+        "write-tool-with-approval",
+        "reconnect",
+        "provider-outage"
+      ]
+    }
+  ],
+  "invariants": [
+    "capability availability is evaluated from dependencies; enabled never means implicitly ready",
+    "product UI/API may not expose an undeclared capability id",
+    "capability version and instruction policy reference are recorded in execution/context evidence",
+    "capability policy may be tightened by tenant/user/request constraints but never widened by model output",
+    "provider capability names are vendor-neutral semantics"
+  ]
+}

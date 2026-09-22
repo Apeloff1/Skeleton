@@ -41,6 +41,8 @@ python -m skeleton test
 ```
 
 The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
+Canonical ownership, topology, change lanes, and migration boundaries are mapped in [`docs/ARCHITECTURE_MAP.md`](docs/ARCHITECTURE_MAP.md).
+The complete AI build sequence, provider rules, capability planes, acceptance gates, and open construction gaps are the mandatory manual in [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](docs/AI_APP_CONSTRUCTION_MANUAL.md).
 
 ### Windows installer
 

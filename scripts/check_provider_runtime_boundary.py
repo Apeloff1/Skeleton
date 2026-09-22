@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Fail closed when unaudited provider SDKs bypass maintained runtimes.
 
-Issue #116 keeps frontier/agent model execution behind
-``skeleton.frontier.model_runtime`` and backend provider execution behind the
-maintained backend adapter boundary.
+Runtime model execution is owned by ``skeleton/provider_runtime.py``.
+Application, frontier, agent, and compatibility code may consume provider-neutral
+contracts, but direct vendor SDK imports are allowed only in that canonical
+credential-bearing runtime.
 
 The old third-party Emergent SDK is no longer installed.  The repository owns a
 source-compatible module at ``backend/emergentintegrations/llm/chat.py`` that
@@ -13,9 +14,9 @@ migration surface, not vendor SDK imports. Dynamic loading of the legacy name is
 still rejected because it bypasses normal import review, and non-backend code
 must not depend on the compatibility namespace.
 
-Direct Google model SDK imports remain forbidden until a deliberate canonical
-adapter and shared contract tests are added. The frontier/agent core is also
-kept free of all direct provider SDK imports.
+Direct vendor model SDK imports outside the canonical runtime are forbidden.
+Google model SDK imports remain forbidden everywhere until a deliberate declared
+adapter and shared contract tests are added.
 """
 from __future__ import annotations
 
@@ -29,8 +30,16 @@ RUNTIME_ROOTS = ("backend", "skeleton")
 SKIP_PARTS = {"tests", "test", "__pycache__", ".venv", "venv", "node_modules"}
 GOOGLE_MODULES = ("google.genai", "google.generativeai")
 LOCAL_EMERGENT_COMPAT_MODULE = "emergentintegrations.llm.chat"
-CORE_PROVIDER_ROOTS = {"openai", "litellm", "google", "emergentintegrations"}
-CORE_PREFIXES = (Path("skeleton/frontier"), Path("skeleton/agents"))
+CANONICAL_PROVIDER_RUNTIME = Path("skeleton/provider_runtime.py")
+VENDOR_PROVIDER_ROOTS = {
+    "openai",
+    "anthropic",
+    "litellm",
+    "mistralai",
+    "cohere",
+    "groq",
+    "google",
+}
 
 
 def _runtime_python_files(root: Path) -> Iterable[Path]:
@@ -51,8 +60,8 @@ def _matches_prefix(module: str | None, prefixes: tuple[str, ...]) -> bool:
     return any(module == prefix or module.startswith(prefix + ".") for prefix in prefixes)
 
 
-def _is_core_path(rel: Path) -> bool:
-    return any(rel == prefix or prefix in rel.parents for prefix in CORE_PREFIXES)
+def _is_canonical_provider_runtime(rel: Path) -> bool:
+    return rel == CANONICAL_PROVIDER_RUNTIME
 
 
 def _is_backend_path(rel: Path) -> bool:
@@ -101,9 +110,13 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
                     violations.append(
                         f"{rel}:{node.lineno}: backend-only provider compatibility import"
                     )
-                if _is_core_path(rel) and module.split(".")[0] in CORE_PROVIDER_ROOTS:
+                root_name = module.split(".")[0]
+                if (
+                    root_name in VENDOR_PROVIDER_ROOTS
+                    and not _is_canonical_provider_runtime(rel)
+                ):
                     violations.append(
-                        f"{rel}:{node.lineno}: provider SDK import {module!r} in core runtime"
+                        f"{rel}:{node.lineno}: provider SDK import {module!r} outside canonical runtime"
                     )
 
         elif isinstance(node, ast.ImportFrom):
@@ -123,9 +136,12 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
                 )
 
             root_name = module.split(".")[0] if module else ""
-            if _is_core_path(rel) and root_name in CORE_PROVIDER_ROOTS:
+            if (
+                root_name in VENDOR_PROVIDER_ROOTS
+                and not _is_canonical_provider_runtime(rel)
+            ):
                 violations.append(
-                    f"{rel}:{node.lineno}: provider SDK import from {module!r} in core runtime"
+                    f"{rel}:{node.lineno}: provider SDK import from {module!r} outside canonical runtime"
                 )
 
         elif isinstance(node, ast.Call):
@@ -142,9 +158,12 @@ def audit_file(path: Path, *, root: Path = ROOT) -> list[str]:
                 violations.append(
                     f"{rel}:{node.lineno}: dynamic provider compatibility import"
                 )
-            if _is_core_path(rel) and target.split(".")[0] in CORE_PROVIDER_ROOTS:
+            if (
+                target.split(".")[0] in VENDOR_PROVIDER_ROOTS
+                and not _is_canonical_provider_runtime(rel)
+            ):
                 violations.append(
-                    f"{rel}:{node.lineno}: dynamic provider import {target!r} in core runtime"
+                    f"{rel}:{node.lineno}: dynamic provider import {target!r} outside canonical runtime"
                 )
 
     return violations

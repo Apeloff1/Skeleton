@@ -2,6 +2,10 @@ import math
 
 import pytest
 
+from skeleton.intelligence.admission import ResourceBudget
+from skeleton.vault.data_lifecycle import GovernedDataRecord
+from skeleton.vault.governance_registry import GovernanceRegistry
+
 from core.model_router import (
     ModelEndpoint,
     ModelRouter,
@@ -203,3 +207,168 @@ def test_decision_serialization_exposes_explicit_fallbacks_and_rejections():
     assert payload["fallbacks"] == ["fallback"]
     assert payload["candidates"][0]["endpoint_id"] == "primary"
     assert payload["rejected"]["disabled"] == ["disabled"]
+
+
+def test_route_request_projects_resource_budget_into_hard_constraints():
+    budget = ResourceBudget(
+        max_output_tokens=2048,
+        max_cost_usd=0.25,
+        max_wall_seconds=3.5,
+    )
+
+    request = RouteRequest.from_resource_budget(
+        "analysis",
+        budget,
+        context_tokens=1200,
+        expected_output_tokens=4096,
+        privacy="sensitive",
+    )
+
+    assert request.context_tokens == 1200
+    assert request.expected_output_tokens == 2048
+    assert request.cost_budget == 0.25
+    assert request.latency_budget_ms == 3500.0
+    assert request.privacy is PrivacyLevel.SENSITIVE
+
+
+def test_resource_budget_constraints_cannot_be_overridden_by_caller():
+    budget = ResourceBudget(max_cost_usd=1.0)
+
+    with pytest.raises(ValueError, match="resource budget owns"):
+        RouteRequest.from_resource_budget(
+            "analysis",
+            budget,
+            cost_budget=999.0,
+        )
+
+
+def test_resource_budget_can_make_expensive_route_ineligible():
+    budget = ResourceBudget(
+        max_output_tokens=1000,
+        max_cost_usd=0.0001,
+        max_wall_seconds=1.0,
+    )
+    router = ModelRouter()
+    router.register(
+        _endpoint(
+            "expensive",
+            input_cost=100.0,
+            output_cost=100.0,
+            latency=100,
+        )
+    )
+
+    request = RouteRequest.from_resource_budget(
+        "analysis",
+        budget,
+        context_tokens=1000,
+        expected_output_tokens=1000,
+    )
+
+    with pytest.raises(NoRoute, match="cost"):
+        router.route(request)
+
+
+def _governance_context(data_class: str):
+    registry = GovernanceRegistry()
+    registry.register(
+        GovernedDataRecord(
+            record_id="context-record",
+            tenant_id="tenant-a",
+            owner_plane="retrieval",
+            source_ref="retrieval:context-record",
+            data_class=data_class,
+            purposes=("model-inference",),
+            deletion_targets=("retrieval",),
+            created_at=10.0,
+        )
+    )
+    return registry.context_for(
+        ("context-record",),
+        tenant_id="tenant-a",
+        purpose="model-inference",
+    )
+
+
+def test_route_request_derives_privacy_from_governance_registry() -> None:
+    context = _governance_context("confidential")
+
+    request = RouteRequest.from_governance_context(
+        "analysis",
+        context,
+        context_tokens=1000,
+        expected_output_tokens=500,
+    )
+
+    assert request.privacy is PrivacyLevel.SENSITIVE
+    assert request.governance_record_ids == ("context-record",)
+    assert request.governance_tenant_id == "tenant-a"
+    assert request.governance_purpose == "model-inference"
+
+
+def test_governed_route_privacy_cannot_be_weakened_by_caller() -> None:
+    context = _governance_context("confidential")
+
+    with pytest.raises(ValueError, match="governance context owns privacy"):
+        RouteRequest.from_governance_context(
+            "analysis",
+            context,
+            privacy="public",
+        )
+
+
+def test_governance_and_resource_budget_compose_as_hard_constraints() -> None:
+    context = _governance_context("confidential")
+    budget = ResourceBudget(
+        max_output_tokens=300,
+        max_cost_usd=0.01,
+        max_wall_seconds=2.0,
+    )
+
+    request = RouteRequest.from_governance_context(
+        "analysis",
+        context,
+        budget=budget,
+        context_tokens=800,
+        expected_output_tokens=1000,
+    )
+
+    assert request.privacy is PrivacyLevel.SENSITIVE
+    assert request.expected_output_tokens == 300
+    assert request.cost_budget == 0.01
+    assert request.latency_budget_ms == 2000.0
+
+
+def test_registry_derived_privacy_filters_public_endpoint() -> None:
+    context = _governance_context("confidential")
+    router = ModelRouter()
+    router.register(_endpoint("public", privacy=PrivacyLevel.PUBLIC))
+    router.register(_endpoint("sensitive", privacy=PrivacyLevel.SENSITIVE))
+
+    decision = router.route(
+        RouteRequest.from_governance_context("analysis", context)
+    )
+
+    assert decision.selected.endpoint_id == "sensitive"
+    assert "public" in decision.rejected
+    payload = decision.as_dict()
+    assert payload["governance"] == {
+        "record_ids": ["context-record"],
+        "tenant_id": "tenant-a",
+        "purpose": "model-inference",
+        "privacy": "sensitive",
+    }
+
+
+def test_restricted_governed_data_routes_local_only() -> None:
+    context = _governance_context("restricted")
+    router = ModelRouter()
+    router.register(_endpoint("hosted", privacy=PrivacyLevel.SENSITIVE))
+    router.register(_endpoint("local", local=True))
+
+    decision = router.route(
+        RouteRequest.from_governance_context("analysis", context)
+    )
+
+    assert decision.selected.endpoint_id == "local"
+    assert "hosted" in decision.rejected

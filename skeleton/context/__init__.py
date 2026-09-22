@@ -1,6 +1,18 @@
 """Context substrate — tensor cube, dodeca oracle, DNA helix, ledger, snowball, cockpit."""
 
+from skeleton.context.compiler import (
+    COMPILER_VERSION,
+    ContextCompilationError,
+    ContextCompiler,
+    ProviderContextProjection,
+    project_provider_context,
+)
 from skeleton.context.cockpit import Cockpit, CockpitError
+from skeleton.context.policy import (
+    ContextAdmissionDecision,
+    ContextCompilePolicy,
+    ContextPolicyError,
+)
 from skeleton.context.dodeca import Dodecahedron, FACES
 from skeleton.context.helix import DNAHelix, BasePair
 from skeleton.context.ledger import ContextLedger, LedgerError
@@ -21,6 +33,14 @@ from skeleton.context.snowball import Snowball, STAGES as SNOWBALL_STAGES
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 
 __all__ = [
+    "COMPILER_VERSION",
+    "ContextAdmissionDecision",
+    "ContextCompilationError",
+    "ContextCompilePolicy",
+    "ContextCompiler",
+    "ContextPolicyError",
+    "ProviderContextProjection",
+    "project_provider_context",
     "AXES",
     "ContextTensor",
     "detect_era",

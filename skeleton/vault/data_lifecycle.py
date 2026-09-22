@@ -1,0 +1,566 @@
+"""Governed data lifecycle metadata and deletion propagation receipts.
+
+The registry stores governance metadata only, never user payloads. It gives
+memory, retrieval, artifact, and durable-store owners one common contract for:
+* tenant-scoped inventory/export;
+* retention deadlines;
+* deletion planning across declared storage targets;
+* acknowledgement of deletion propagation;
+* fail-closed state transitions.
+
+It is intentionally storage-agnostic. A store adapter consumes deletion actions
+and acknowledges them only after the underlying data has actually been removed.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from enum import Enum
+import hashlib
+import math
+import threading
+import time
+from typing import Any, Iterable
+
+from skeleton.vault.data_governance import DataClass, DataGovernanceDenied
+
+
+class LifecycleError(RuntimeError):
+    """Base lifecycle metadata failure."""
+
+
+class LifecycleConflict(LifecycleError):
+    """Requested transition conflicts with existing lifecycle state."""
+
+
+class LifecycleState(str, Enum):
+    ACTIVE = "active"
+    DELETE_PENDING = "delete_pending"
+    DELETED = "deleted"
+
+
+def _required_id(value: str, field_name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise LifecycleError(f"{field_name} is required")
+    normalized = value.strip()
+    if len(normalized) > 512:
+        raise LifecycleError(f"{field_name} is too long")
+    return normalized
+
+
+def _normalize_targets(values: Iterable[str]) -> tuple[str, ...]:
+    targets = tuple(
+        dict.fromkeys(_required_id(value, "deletion target") for value in values)
+    )
+    if not targets:
+        raise LifecycleError("at least one deletion target is required")
+    return targets
+
+
+def _finite_timestamp(value: float, field_name: str) -> float:
+    if isinstance(value, bool):
+        raise LifecycleError(f"{field_name} must be finite")
+    number = float(value)
+    if not math.isfinite(number) or number < 0:
+        raise LifecycleError(f"{field_name} must be finite and non-negative")
+    return number
+
+
+@dataclass(frozen=True, slots=True)
+class GovernedDataRecord:
+    record_id: str
+    tenant_id: str
+    owner_plane: str
+    source_ref: str
+    data_class: DataClass | str | int
+    purposes: tuple[str, ...]
+    deletion_targets: tuple[str, ...]
+    created_at: float = field(default_factory=time.time)
+    retention_until: float | None = None
+    exportable: bool = True
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "record_id",
+            _required_id(self.record_id, "record_id"),
+        )
+        object.__setattr__(
+            self,
+            "tenant_id",
+            _required_id(self.tenant_id, "tenant_id"),
+        )
+        object.__setattr__(
+            self,
+            "owner_plane",
+            _required_id(self.owner_plane, "owner_plane"),
+        )
+        object.__setattr__(
+            self,
+            "source_ref",
+            _required_id(self.source_ref, "source_ref"),
+        )
+        object.__setattr__(
+            self,
+            "data_class",
+            DataClass.parse(self.data_class),
+        )
+        purposes = tuple(
+            dict.fromkeys(
+                _required_id(value, "purpose").lower()
+                for value in self.purposes
+            )
+        )
+        if not purposes:
+            raise LifecycleError("at least one purpose is required")
+        object.__setattr__(self, "purposes", purposes)
+        object.__setattr__(
+            self,
+            "deletion_targets",
+            _normalize_targets(self.deletion_targets),
+        )
+        created = _finite_timestamp(self.created_at, "created_at")
+        object.__setattr__(self, "created_at", created)
+        if self.retention_until is not None:
+            retention = _finite_timestamp(
+                self.retention_until,
+                "retention_until",
+            )
+            if retention < created:
+                raise LifecycleError(
+                    "retention_until must not precede created_at"
+                )
+            object.__setattr__(self, "retention_until", retention)
+
+    def inventory_dict(self, *, state: LifecycleState) -> dict[str, Any]:
+        return {
+            "record_id": self.record_id,
+            "tenant_id": self.tenant_id,
+            "owner_plane": self.owner_plane,
+            "source_ref": self.source_ref,
+            "data_class": self.data_class.label,
+            "purposes": list(self.purposes),
+            "deletion_targets": list(self.deletion_targets),
+            "created_at": self.created_at,
+            "retention_until": self.retention_until,
+            "exportable": self.exportable,
+            "state": state.value,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionAction:
+    record_id: str
+    tenant_id: str
+    target: str
+    source_ref: str
+    reason: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "record_id": self.record_id,
+            "tenant_id": self.tenant_id,
+            "target": self.target,
+            "source_ref": self.source_ref,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionPlan:
+    plan_id: str
+    tenant_id: str
+    reason: str
+    actions: tuple[DeletionAction, ...]
+    created_at: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "plan_id": self.plan_id,
+            "tenant_id": self.tenant_id,
+            "reason": self.reason,
+            "actions": [action.as_dict() for action in self.actions],
+            "created_at": self.created_at,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionReceipt:
+    receipt_id: str
+    plan_id: str
+    record_id: str
+    target: str
+    state: LifecycleState
+    completed_at: float
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "receipt_id": self.receipt_id,
+            "plan_id": self.plan_id,
+            "record_id": self.record_id,
+            "target": self.target,
+            "state": self.state.value,
+            "completed_at": self.completed_at,
+        }
+
+
+@dataclass(slots=True)
+class _Entry:
+    record: GovernedDataRecord
+    state: LifecycleState = LifecycleState.ACTIVE
+    active_plan_id: str | None = None
+    deletion_reason: str | None = None
+    acknowledged_targets: set[str] = field(default_factory=set)
+
+
+def _digest(prefix: str, *values: object) -> str:
+    digest = hashlib.sha256()
+    for value in values:
+        digest.update(str(value).encode("utf-8"))
+        digest.update(b"\x1f")
+    return prefix + digest.hexdigest()[:24]
+
+
+class DataLifecycleRegistry:
+    """Thread-safe governance metadata registry and deletion coordinator."""
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._entries: dict[str, _Entry] = {}
+        self._plans: dict[str, DeletionPlan] = {}
+        self._receipts: list[DeletionReceipt] = []
+
+    def register(self, record: GovernedDataRecord) -> GovernedDataRecord:
+        with self._lock:
+            if record.record_id in self._entries:
+                raise LifecycleConflict(
+                    f"record already registered: {record.record_id}"
+                )
+            self._entries[record.record_id] = _Entry(record=record)
+        return record
+
+    def ensure_registered(self, record: GovernedDataRecord) -> GovernedDataRecord:
+        """Idempotently register an identical record or fail on identity reuse.
+
+        This is the retry-safe boundary for durable write reconciliation. A
+        caller replaying the same governed write receives the original record;
+        reusing a record_id with different lifecycle metadata fails closed.
+        """
+
+        if not isinstance(record, GovernedDataRecord):
+            raise TypeError("record must be a GovernedDataRecord")
+        with self._lock:
+            existing = self._entries.get(record.record_id)
+            if existing is None:
+                self._entries[record.record_id] = _Entry(record=record)
+                return record
+            if existing.record == record:
+                return existing.record
+            raise LifecycleConflict(
+                f"record identity conflicts with existing governance metadata: {record.record_id}"
+            )
+
+    def get(self, record_id: str) -> dict[str, Any]:
+        key = _required_id(record_id, "record_id")
+        with self._lock:
+            try:
+                entry = self._entries[key]
+            except KeyError as exc:
+                raise LifecycleError("unknown lifecycle record") from exc
+            return entry.record.inventory_dict(state=entry.state)
+
+    def inventory(
+        self,
+        tenant_id: str,
+        *,
+        include_deleted: bool = False,
+        export_only: bool = False,
+    ) -> tuple[dict[str, Any], ...]:
+        tenant = _required_id(tenant_id, "tenant_id")
+        with self._lock:
+            rows = []
+            for entry in self._entries.values():
+                record = entry.record
+                if record.tenant_id != tenant:
+                    continue
+                if not include_deleted and entry.state is LifecycleState.DELETED:
+                    continue
+                if export_only and not record.exportable:
+                    continue
+                rows.append(record.inventory_dict(state=entry.state))
+        rows.sort(key=lambda row: row["record_id"])
+        return tuple(rows)
+
+    def export_inventory(self, tenant_id: str) -> dict[str, Any]:
+        """Return payload-free tenant export metadata."""
+
+        rows = self.inventory(tenant_id, export_only=True)
+        return {
+            "tenant_id": _required_id(tenant_id, "tenant_id"),
+            "records": list(rows),
+            "count": len(rows),
+        }
+
+    def _plan(
+        self,
+        entries: list[_Entry],
+        *,
+        tenant_id: str,
+        reason: str,
+        now: float,
+    ) -> DeletionPlan:
+        actions: list[DeletionAction] = []
+        ids = sorted(entry.record.record_id for entry in entries)
+        plan_id = _digest(
+            "del-",
+            tenant_id,
+            reason,
+            ",".join(ids),
+            f"{now:.6f}",
+        )
+
+        for entry in entries:
+            if entry.state is LifecycleState.DELETED:
+                continue
+            if (
+                entry.state is LifecycleState.DELETE_PENDING
+                and entry.active_plan_id != plan_id
+            ):
+                raise LifecycleConflict(
+                    f"record already pending deletion: {entry.record.record_id}"
+                )
+            entry.state = LifecycleState.DELETE_PENDING
+            entry.active_plan_id = plan_id
+            entry.deletion_reason = reason
+            for target in entry.record.deletion_targets:
+                if target in entry.acknowledged_targets:
+                    continue
+                actions.append(
+                    DeletionAction(
+                        record_id=entry.record.record_id,
+                        tenant_id=tenant_id,
+                        target=target,
+                        source_ref=entry.record.source_ref,
+                        reason=reason,
+                    )
+                )
+
+        plan = DeletionPlan(
+            plan_id=plan_id,
+            tenant_id=tenant_id,
+            reason=reason,
+            actions=tuple(
+                sorted(
+                    actions,
+                    key=lambda action: (action.record_id, action.target),
+                )
+            ),
+            created_at=now,
+        )
+        self._plans[plan.plan_id] = plan
+        return plan
+
+    def request_deletion(
+        self,
+        tenant_id: str,
+        *,
+        record_ids: Iterable[str] | None = None,
+        reason: str = "tenant-request",
+        now: float | None = None,
+    ) -> DeletionPlan:
+        tenant = _required_id(tenant_id, "tenant_id")
+        normalized_reason = _required_id(reason, "reason")
+        timestamp = time.time() if now is None else _finite_timestamp(now, "now")
+
+        selected_ids = (
+            None
+            if record_ids is None
+            else tuple(dict.fromkeys(_required_id(v, "record_id") for v in record_ids))
+        )
+
+        with self._lock:
+            if selected_ids is None:
+                entries = [
+                    entry
+                    for entry in self._entries.values()
+                    if entry.record.tenant_id == tenant
+                    and entry.state is not LifecycleState.DELETED
+                ]
+            else:
+                entries = []
+                for record_id in selected_ids:
+                    try:
+                        entry = self._entries[record_id]
+                    except KeyError as exc:
+                        raise LifecycleError(
+                            f"unknown lifecycle record: {record_id}"
+                        ) from exc
+                    if entry.record.tenant_id != tenant:
+                        raise DataGovernanceDenied(
+                            "cross-tenant deletion request denied"
+                        )
+                    if entry.state is not LifecycleState.DELETED:
+                        entries.append(entry)
+
+            active_plan_ids = {
+                entry.active_plan_id
+                for entry in entries
+                if entry.state is LifecycleState.DELETE_PENDING
+                and entry.active_plan_id is not None
+            }
+            if active_plan_ids:
+                if len(active_plan_ids) != 1:
+                    raise LifecycleConflict(
+                        "selected records belong to multiple active deletion plans"
+                    )
+                active_plan_id = next(iter(active_plan_ids))
+                if any(
+                    entry.state is LifecycleState.ACTIVE
+                    for entry in entries
+                ):
+                    raise LifecycleConflict(
+                        "cannot merge active records into an existing deletion plan"
+                    )
+                existing = self._plans[active_plan_id]
+                outstanding = []
+                by_record = {
+                    entry.record.record_id: entry
+                    for entry in entries
+                }
+                for action in existing.actions:
+                    entry = by_record.get(action.record_id)
+                    if entry is None:
+                        continue
+                    if action.target in entry.acknowledged_targets:
+                        continue
+                    outstanding.append(action)
+                return DeletionPlan(
+                    plan_id=existing.plan_id,
+                    tenant_id=existing.tenant_id,
+                    reason=existing.reason,
+                    actions=tuple(outstanding),
+                    created_at=existing.created_at,
+                )
+
+            return self._plan(
+                entries,
+                tenant_id=tenant,
+                reason=normalized_reason,
+                now=timestamp,
+            )
+
+    def plan_retention_expiry(
+        self,
+        *,
+        now: float | None = None,
+    ) -> tuple[DeletionPlan, ...]:
+        timestamp = time.time() if now is None else _finite_timestamp(now, "now")
+        with self._lock:
+            by_tenant: dict[str, list[_Entry]] = {}
+            for entry in self._entries.values():
+                record = entry.record
+                if entry.state is not LifecycleState.ACTIVE:
+                    continue
+                if record.retention_until is None or record.retention_until > timestamp:
+                    continue
+                by_tenant.setdefault(record.tenant_id, []).append(entry)
+
+            plans = [
+                self._plan(
+                    entries,
+                    tenant_id=tenant,
+                    reason="retention-expired",
+                    now=timestamp,
+                )
+                for tenant, entries in sorted(by_tenant.items())
+            ]
+        return tuple(plans)
+
+    def acknowledge_deletion(
+        self,
+        plan_id: str,
+        record_id: str,
+        target: str,
+        *,
+        now: float | None = None,
+    ) -> DeletionReceipt:
+        plan_key = _required_id(plan_id, "plan_id")
+        record_key = _required_id(record_id, "record_id")
+        target_key = _required_id(target, "target")
+        timestamp = time.time() if now is None else _finite_timestamp(now, "now")
+
+        with self._lock:
+            try:
+                plan = self._plans[plan_key]
+            except KeyError as exc:
+                raise LifecycleError("unknown deletion plan") from exc
+            try:
+                entry = self._entries[record_key]
+            except KeyError as exc:
+                raise LifecycleError("unknown lifecycle record") from exc
+
+            if entry.active_plan_id != plan.plan_id:
+                raise LifecycleConflict(
+                    "deletion acknowledgement does not match active plan"
+                )
+            if target_key not in entry.record.deletion_targets:
+                raise LifecycleError(
+                    "deletion acknowledgement target is not declared"
+                )
+            if target_key in entry.acknowledged_targets:
+                raise LifecycleConflict(
+                    "deletion target already acknowledged"
+                )
+
+            entry.acknowledged_targets.add(target_key)
+            if entry.acknowledged_targets == set(entry.record.deletion_targets):
+                entry.state = LifecycleState.DELETED
+
+            receipt = DeletionReceipt(
+                receipt_id=_digest(
+                    "delr-",
+                    plan.plan_id,
+                    record_key,
+                    target_key,
+                    f"{timestamp:.6f}",
+                ),
+                plan_id=plan.plan_id,
+                record_id=record_key,
+                target=target_key,
+                state=entry.state,
+                completed_at=timestamp,
+            )
+            self._receipts.append(receipt)
+            return receipt
+
+    def receipts(
+        self,
+        *,
+        tenant_id: str | None = None,
+    ) -> tuple[DeletionReceipt, ...]:
+        with self._lock:
+            if tenant_id is None:
+                return tuple(self._receipts)
+            tenant = _required_id(tenant_id, "tenant_id")
+            record_ids = {
+                record_id
+                for record_id, entry in self._entries.items()
+                if entry.record.tenant_id == tenant
+            }
+            return tuple(
+                receipt
+                for receipt in self._receipts
+                if receipt.record_id in record_ids
+            )
+
+
+__all__ = [
+    "DataLifecycleRegistry",
+    "DeletionAction",
+    "DeletionPlan",
+    "DeletionReceipt",
+    "GovernedDataRecord",
+    "LifecycleConflict",
+    "LifecycleError",
+    "LifecycleState",
+]

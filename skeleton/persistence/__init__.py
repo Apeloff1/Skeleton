@@ -7,6 +7,26 @@ Exports:
 - Plane serializers for VectorStore, MAGStore, KnowledgeGraph, matrices
 """
 
+from skeleton.persistence.conversation_repository import (
+    ConversationAuthorizationError,
+    ConversationConflict,
+    ConversationNotFound,
+    ConversationRepositoryCorruption,
+    ConversationRepositoryError,
+    SQLiteConversationRepository,
+)
+from skeleton.persistence.operation_store import (
+    OperationOutboxEvent,
+    OperationStoreConflict,
+    OperationStoreCorruptionError,
+    OperationStoreError,
+    SQLiteOperationStore,
+    StoredOperation,
+)
+from skeleton.persistence.operation_runtime import (
+    DurableOperationRuntime,
+    OutboxDispatchReport,
+)
 from skeleton.persistence.snapshots import (
     SnapshotStore,
     restore_genesis_state,
@@ -22,6 +42,20 @@ from skeleton.persistence.snapshots import (
 )
 
 __all__ = [
+    "ConversationAuthorizationError",
+    "ConversationConflict",
+    "ConversationNotFound",
+    "ConversationRepositoryCorruption",
+    "ConversationRepositoryError",
+    "SQLiteConversationRepository",
+    "OperationOutboxEvent",
+    "OperationStoreConflict",
+    "OperationStoreCorruptionError",
+    "OperationStoreError",
+    "SQLiteOperationStore",
+    "StoredOperation",
+    "DurableOperationRuntime",
+    "OutboxDispatchReport",
     "SnapshotStore",
     "snapshot_genesis_state",
     "restore_genesis_state",

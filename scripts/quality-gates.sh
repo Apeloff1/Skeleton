@@ -18,6 +18,69 @@ python scripts/check_architecture_boundaries.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_architecture_boundaries.py
 
+printf '\n== AI master plan ==\n'
+python scripts/check_ai_master_plan.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_master_plan.py
+
+printf '\n== AI edge/historical catalogue ==\n'
+python scripts/check_ai_edge_case_catalog.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_edge_case_catalog.py
+
+printf '\n== P0 edge-case construction matrix ==\n'
+python scripts/check_ai_p0_edge_case_matrix.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_p0_edge_case_matrix.py
+
+printf '\n== Full edge-case construction matrix ==\n'
+python scripts/check_ai_full_edge_case_matrix.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_full_edge_case_matrix.py
+
+printf '\n== Master build sequence ==\n'
+python scripts/check_ai_master_build_sequence.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_master_build_sequence.py
+
+printf '\n== Signed build accountability ==\n'
+python scripts/check_ai_build_accountability.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_build_accountability.py \
+  skeleton/testing/test_ai_accountability_cli.py
+
+printf '\n== Governance lifecycle accountability ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_data_governance.py \
+  skeleton/testing/test_data_lifecycle.py \
+  skeleton/testing/test_governance_registry.py \
+  skeleton/testing/test_lifecycle_adapters.py \
+  skeleton/testing/test_governance_audit.py
+
+printf '\n== RAG state authority convergence ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH="$ROOT/backend:$ROOT${PYTHONPATH:+:$PYTHONPATH}" python -m pytest -q --noconftest \
+  backend/tests/test_rag_state_repository.py \
+  backend/tests/test_rag_state_authority.py
+
+printf '\n== Durable tenant quota persistence ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_tenant_quota.py \
+  skeleton/testing/test_tenant_quota_sqlite.py \
+  skeleton/testing/test_admission_runtime.py
+
+printf '\n== Authoritative-first recovery contract ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_state_recovery_drill.py
+
+printf '\n== Durable operation authority and outbox ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_operation_contract.py \
+  skeleton/testing/test_operation_store.py \
+  skeleton/testing/test_operation_runtime.py \
+  skeleton/testing/test_operation_server_binding.py \
+  skeleton/testing/test_operation_stream.py \
+  skeleton/testing/test_operation_stream_store.py
+
 printf '\n== Skeleton core syntax ==\n'
 python -m compileall -q skeleton
 
@@ -41,7 +104,9 @@ python -m compileall -q backend
 printf '\n== Provider timeout/failure chaos ==\n'
 (
   cd backend
-  PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" \
+    PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+    python -m pytest -q --noconftest \
     tests/test_ai_provider_reliability.py
 )
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -79,6 +79,8 @@ class AssemblyManifest:
     optional_env: tuple[str, ...]
     required_paths: tuple[str, ...]
     services: tuple[ServiceSpec, ...]
+    architecture: dict[str, str] = field(default_factory=dict)
+    construction: dict[str, str] = field(default_factory=dict)
 
     @property
     def service_names(self) -> tuple[str, ...]:
@@ -135,8 +137,25 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
 
     app = payload.get("app")
     runtime = payload.get("runtime")
+    architecture = payload.get("architecture")
+    construction = payload.get("construction")
     if not isinstance(app, dict) or not isinstance(runtime, dict):
         raise ValueError("manifest requires app and runtime objects")
+    if not isinstance(architecture, dict) or not architecture:
+        raise ValueError("manifest requires architecture contract metadata")
+    if not isinstance(construction, dict) or not construction:
+        raise ValueError("manifest requires AI construction contract metadata")
+
+    def _string_map(name: str, value: dict[str, object]) -> dict[str, str]:
+        result: dict[str, str] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or not key or not isinstance(item, str) or not item:
+                raise ValueError(f"{name} metadata must contain non-empty string values")
+            result[key] = item
+        return result
+
+    architecture_metadata = _string_map("architecture", architecture)
+    construction_metadata = _string_map("construction", construction)
 
     raw_services = payload.get("services")
     if not isinstance(raw_services, list) or not raw_services:
@@ -266,6 +285,8 @@ def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
         optional_env=tuple(str(item) for item in optional_env),
         required_paths=tuple(str(item) for item in required_paths),
         services=services,
+        architecture=architecture_metadata,
+        construction=construction_metadata,
     )
 
 
@@ -499,6 +520,8 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
         "default_services": list(manifest.default_services),
         "full_services": list(manifest.full_services),
         "required_env": list(manifest.required_env),
+        "architecture": dict(manifest.architecture),
+        "construction": dict(manifest.construction),
         "services": [
             {
                 "name": service.name,

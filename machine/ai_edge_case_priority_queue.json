@@ -1,0 +1,1657 @@
+{
+  "schema_version": 1,
+  "queue_version": "1.0.0",
+  "status": "active",
+  "source_catalog": "machine/ai_edge_case_catalog.json",
+  "source_matrix": "machine/ai_full_edge_case_matrix.json",
+  "policy": {
+    "P0": "Critical cases: executable evidence or explicit accepted-risk disposition before affected capability hardening.",
+    "P1": "High cases: executable evidence or explicit accepted-risk disposition before affected capability production promotion.",
+    "evidence_rule": "A planned test name is not passing evidence."
+  },
+  "status_values": [
+    "planned",
+    "in_progress",
+    "evidence_pending",
+    "passing",
+    "accepted_risk",
+    "closed"
+  ],
+  "counts": {
+    "total": 57,
+    "P0": 36,
+    "P1": 21
+  },
+  "items": [
+    {
+      "rank": 1,
+      "id": "HIST-SYS-019",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Capability security",
+      "domain": "security",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "design_review",
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-019",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 2,
+      "id": "OBSCURE-018",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Compression changes trust geometry",
+      "domain": "context security",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W10",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-018",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 3,
+      "id": "EDGE-CONTRACT-010",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Zero-width and confusable characters",
+      "domain": "text/security",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W10",
+        "WP-W14",
+        "WP-W20",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 4,
+      "id": "EDGE-CONTRACT-009",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Bidirectional control characters",
+      "domain": "text/security",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W10",
+        "WP-W18",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-009",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 5,
+      "id": "EDGE-DATA-010",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Backup retains deleted sensitive data",
+      "domain": "privacy/recovery",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W14",
+        "WP-W19",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 6,
+      "id": "EDGE-SEC-008",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Windows reserved device names",
+      "domain": "portability/security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20",
+        "WP-W23",
+        "WP-W24",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "e2e"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-008",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 7,
+      "id": "EDGE-SEC-009",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Alternate data streams",
+      "domain": "filesystem security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20",
+        "WP-W22",
+        "WP-W24",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-009",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 8,
+      "id": "EDGE-AI-001",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Indirect prompt injection in retrieved document",
+      "domain": "AI security",
+      "work_package_refs": [
+        "WP-W10",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 9,
+      "id": "EDGE-AI-002",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Instruction laundering through tool output",
+      "domain": "AI security",
+      "work_package_refs": [
+        "WP-W10",
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 10,
+      "id": "EDGE-AI-013",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Policy trimmed from long context",
+      "domain": "context/security",
+      "work_package_refs": [
+        "WP-W10",
+        "WP-W14",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-013",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 11,
+      "id": "EDGE-AI-030",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Hallucinated authorization",
+      "domain": "authority",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W14",
+        "WP-W20",
+        "WP-W26"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-030",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 12,
+      "id": "EDGE-CONTRACT-001",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Duplicate JSON object keys",
+      "domain": "serialization",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W18",
+        "WP-W20",
+        "WP-W22"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 13,
+      "id": "EDGE-CONTRACT-020",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Canonicalization before signing",
+      "domain": "provenance/security",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-020",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 14,
+      "id": "EDGE-SEC-005",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Zip Slip",
+      "domain": "artifact security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "recovery_drill",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-005",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 15,
+      "id": "EDGE-SEC-006",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Tarbomb / decompression bomb",
+      "domain": "artifact security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-006",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 16,
+      "id": "EDGE-SEC-007",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Archive symlink chain",
+      "domain": "artifact security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 17,
+      "id": "OBSCURE-024",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Tool description is attacker-controlled context unless curated",
+      "domain": "tool security",
+      "work_package_refs": [
+        "WP-W10",
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-024",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 18,
+      "id": "EDGE-AI-021",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Fallback changes privacy boundary",
+      "domain": "routing/privacy",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 19,
+      "id": "EDGE-DATA-009",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Data retention applies to source but not derived embedding",
+      "domain": "privacy",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "regression"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-009",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 20,
+      "id": "EDGE-SEC-001",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "TOCTOU authorization race",
+      "domain": "security",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 21,
+      "id": "EDGE-SEC-011",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "DNS rebinding",
+      "domain": "network security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-011",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 22,
+      "id": "EDGE-SEC-015",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Secret in exception/log payload",
+      "domain": "secrets/observability",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W20",
+        "WP-W21"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-015",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 23,
+      "id": "EDGE-SEC-016",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Environment-variable inheritance",
+      "domain": "process security",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-016",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 24,
+      "id": "EDGE-SEC-018",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Shell quoting divergence",
+      "domain": "process security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20",
+        "WP-W24"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "platform_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-018",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 25,
+      "id": "HIST-SYS-020",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Saltzer–Schroeder principles",
+      "domain": "security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "design_review",
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-020",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 26,
+      "id": "OBSCURE-025",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Capability discovery can become privilege discovery",
+      "domain": "tool security",
+      "work_package_refs": [
+        "WP-W10",
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-025",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 27,
+      "id": "EDGE-AI-003",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Memory poisoning",
+      "domain": "memory security",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-AI-003",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 28,
+      "id": "EDGE-SEC-002",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Symlink escape",
+      "domain": "filesystem security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "platform_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 29,
+      "id": "EDGE-SEC-003",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Hardlink aliasing",
+      "domain": "filesystem security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "platform_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-003",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 30,
+      "id": "EDGE-SEC-004",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Path traversal after decoding",
+      "domain": "filesystem/web security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "adversarial",
+        "negative_test",
+        "platform_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-004",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 31,
+      "id": "EDGE-SEC-012",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Redirect crosses egress boundary",
+      "domain": "network security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-012",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 32,
+      "id": "EDGE-SEC-013",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Metadata-service SSRF",
+      "domain": "network security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-013",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 33,
+      "id": "EDGE-SEC-014",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "IPv4-mapped IPv6 bypass",
+      "domain": "network security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-014",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 34,
+      "id": "EDGE-SEC-017",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Temporary-file race",
+      "domain": "filesystem security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "platform_test"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-017",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 35,
+      "id": "EDGE-SEC-019",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Executable shadowing via PATH",
+      "domain": "process security",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "adversarial",
+        "negative_test",
+        "fault_injection",
+        "property"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-SEC-019",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 36,
+      "id": "HIST-SYS-021",
+      "priority": "P0",
+      "criticality": "critical",
+      "title": "Bell-LaPadula / Biba",
+      "domain": "information security",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "design_review",
+        "adversarial",
+        "negative_test",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 37,
+      "id": "HIST-AI-002",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "STRIPS planning",
+      "domain": "planning",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W11",
+        "WP-W12",
+        "WP-W13",
+        "WP-W17",
+        "WP-W25",
+        "WP-W26",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "design_review",
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-AI-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 38,
+      "id": "EDGE-DIST-020",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Livelock",
+      "domain": "autonomy/reliability",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16",
+        "WP-W19",
+        "WP-W28",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-020",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 39,
+      "id": "EDGE-DIST-021",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Deadlock",
+      "domain": "concurrency",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W13",
+        "WP-W16",
+        "WP-W18",
+        "WP-W19",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 40,
+      "id": "HIST-SYS-003",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Petri nets",
+      "domain": "formal workflow",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W11",
+        "WP-W12",
+        "WP-W18",
+        "WP-W19",
+        "WP-W26"
+      ],
+      "recommended_test_modes": [
+        "design_review",
+        "fault_injection",
+        "property"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-003",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 41,
+      "id": "EDGE-DATA-002",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Orphaned blob after metadata rollback",
+      "domain": "artifact lifecycle",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W20",
+        "WP-W25",
+        "WP-W27",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-002",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 42,
+      "id": "EDGE-DATA-007",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Rollback code cannot read new data shape",
+      "domain": "migration/release",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W16",
+        "WP-W25",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 43,
+      "id": "EDGE-DIST-010",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Split brain",
+      "domain": "distributed failure",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W14",
+        "WP-W18",
+        "WP-W19",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 44,
+      "id": "EDGE-DIST-027",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Consumer commits side effect before inbox marker",
+      "domain": "eventing",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W13",
+        "WP-W19",
+        "WP-W22",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-027",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 45,
+      "id": "OBSCURE-005",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Timeout means unknown, not failed",
+      "domain": "distributed operations",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W11",
+        "WP-W13",
+        "WP-W19",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "adversarial_eval",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-005",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 46,
+      "id": "OBSCURE-010",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Read repair can resurrect stale data",
+      "domain": "distributed data",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W08",
+        "WP-W20",
+        "WP-W25",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-010",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 47,
+      "id": "OBSCURE-029",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Hash-based CAS still needs metadata migrations",
+      "domain": "artifacts",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W25",
+        "WP-W27",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-029",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 48,
+      "id": "EDGE-DATA-005",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Corrupt backup discovered only during restore",
+      "domain": "recovery",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W17",
+        "WP-W19",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-005",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 49,
+      "id": "HIST-SYS-025",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Smalltalk image persistence",
+      "domain": "runtime state",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W18",
+        "WP-W25",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "design_review",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-HIST-SYS-025",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 50,
+      "id": "OBSCURE-014",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Backups are write-only until restoration is proven",
+      "domain": "operations",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W17",
+        "WP-W19",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property",
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-014",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 51,
+      "id": "OBSCURE-021",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Unknown usage must stay unknown",
+      "domain": "economics",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W21",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "regression"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-021",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 52,
+      "id": "EDGE-CONTRACT-013",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Locale-sensitive casing",
+      "domain": "internationalization",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W23",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "e2e"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-CONTRACT-013",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 53,
+      "id": "EDGE-DATA-001",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Tombstone resurrection",
+      "domain": "data lifecycle",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W07",
+        "WP-W20"
+      ],
+      "recommended_test_modes": [
+        "recovery_drill",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-001",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 54,
+      "id": "EDGE-DATA-006",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Migration partially applied",
+      "domain": "migration",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W25",
+        "WP-W30"
+      ],
+      "recommended_test_modes": [
+        "property",
+        "fuzz",
+        "recovery_drill",
+        "integration"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DATA-006",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 55,
+      "id": "EDGE-DIST-007",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Stale lease holder resumes",
+      "domain": "leases",
+      "work_package_refs": [
+        "WP-W16",
+        "WP-W22",
+        "WP-W29"
+      ],
+      "recommended_test_modes": [
+        "fault_injection",
+        "property"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 56,
+      "id": "EDGE-DIST-024",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Write skew under snapshot isolation",
+      "domain": "database",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W18"
+      ],
+      "recommended_test_modes": [
+        "regression"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-EDGE-DIST-024",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    },
+    {
+      "rank": 57,
+      "id": "OBSCURE-007",
+      "priority": "P1",
+      "criticality": "high",
+      "title": "Garbage collection is part of data architecture",
+      "domain": "data lifecycle",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W27"
+      ],
+      "recommended_test_modes": [
+        "recovery_drill",
+        "integration",
+        "adversarial_eval"
+      ],
+      "status": "planned",
+      "disposition": null,
+      "evidence": [],
+      "accepted_risk": null,
+      "accountability_id": "ACC-OBSCURE-007",
+      "completion_checkbox": false,
+      "completion_checkbox_mark": "[ ]",
+      "signing_required": true,
+      "accountability_status": "planned"
+    }
+  ]
+}

@@ -59,6 +59,18 @@ class PipelineSettings(BaseSettings):
     retry_attempts: int = Field(default=2, ge=0)
 
 
+class OperationSettings(BaseSettings):
+    """Durable operation-state and resumable stream persistence."""
+
+    model_config = SettingsConfigDict(env_prefix="SKL_OPERATION_")
+
+    state_path: str = ":memory:"
+    stream_path: str = ":memory:"
+    outbox_batch_size: int = Field(default=256, ge=1, le=10_000)
+    outbox_dispatch_interval_s: float = Field(default=0.5, ge=0.05, le=60.0)
+    default_deadline_s: float = Field(default=120.0, gt=0.0, le=86_400.0)
+
+
 class ObservabilitySettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SKL_OBS_")
 
@@ -87,6 +99,7 @@ class Settings(BaseSettings):
     chroma: ChromaSettings = Field(default_factory=ChromaSettings)
     jeeves: JeevesSettings = Field(default_factory=JeevesSettings)
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
+    operation: OperationSettings = Field(default_factory=OperationSettings)
     observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
 
     @field_validator("environment")
@@ -109,6 +122,8 @@ class Settings(BaseSettings):
             "mongo_database": self.mongo.database,
             "chroma_collection": self.chroma.collection,
             "jeeves_model": self.jeeves.model,
+            "operation_state_path": self.operation.state_path,
+            "operation_stream_path": self.operation.stream_path,
         }
 
 

@@ -12,7 +12,6 @@
 from datetime import datetime
 from enum import Enum
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 import uuid
@@ -21,7 +20,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
 
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -29,8 +28,6 @@ load_dotenv(ROOT_DIR / ".env")
 
 log = logging.getLogger("codedock.ai_pipeline")
 router = APIRouter(prefix="/pipeline", tags=["AI Pipeline"])
-EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY", "")
-
 
 class AIProvider(str, Enum):
     OPENAI = "openai"
@@ -107,24 +104,26 @@ async def call_gpt4o(
     system_prompt: str | None = None,
     max_tokens: int = 4096,
 ) -> str:
-    """Call GPT-4o without exposing provider exception details."""
+    """Generate text through the declared provider runtime."""
     try:
         default_system = (
             "You are an expert programmer and software architect. Provide helpful, "
             "accurate, and well-documented code and explanations."
         )
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"codedock-pipeline-{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt or default_system,
-        ).with_model("openai", "gpt-4o")
-        response = await chat.send_message(UserMessage(text=prompt))
-        return response.content if hasattr(response, "content") else str(response)
-    except HTTPException:
-        raise
-    except Exception as exc:
+        adapter = ProviderRegistry.from_env().require_active()
+        response = await adapter.generate(
+            ProviderRequest(
+                instructions=system_prompt or default_system,
+                prompt=prompt,
+                max_output_tokens=max_tokens,
+                model="gpt-4o" if adapter.provider_id == "openai" else None,
+                purpose="ai-pipeline-text-generation",
+            )
+        )
+        return response.text
+    except ProviderError as exc:
         log.warning("AI pipeline text provider failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=500, detail="AI text generation failed") from None
+        raise HTTPException(status_code=503, detail="AI text generation failed") from None
 
 
 async def generate_image_openai(prompt: str, size: str = "1024x1024") -> Dict[str, Any]:
@@ -174,29 +173,13 @@ async def generate_image_gemini(prompt: str) -> Dict[str, Any]:
 
 
 async def call_grok(prompt: str, task_type: str = "general") -> str:
-    """Call Grok, falling back to the same sanitized GPT boundary."""
-    try:
-        from openai import OpenAI
+    """Reject undeclared Grok execution instead of borrowing another provider key."""
+    del prompt, task_type
+    raise HTTPException(
+        status_code=409,
+        detail="Grok is not declared by the active AI construction contract",
+    )
 
-        client = OpenAI(api_key=EMERGENT_LLM_KEY, base_url="https://api.x.ai/v1")
-        system_prompts = {
-            "code": "You are Grok, an expert programmer. Generate clean, efficient, well-documented code.",
-            "image": "You are Grok with image generation capabilities. Describe images in vivid detail.",
-            "analysis": "You are Grok, a code analysis expert. Provide thorough, insightful analysis.",
-            "general": "You are Grok, a helpful AI assistant created by xAI.",
-        }
-        response = client.chat.completions.create(
-            model="grok-beta",
-            messages=[
-                {"role": "system", "content": system_prompts.get(task_type, system_prompts["general"])},
-                {"role": "user", "content": prompt},
-            ],
-            max_tokens=4096,
-        )
-        return response.choices[0].message.content
-    except Exception as exc:
-        log.warning("AI pipeline Grok provider failed: %s", type(exc).__name__)
-        return await call_gpt4o(prompt)
 
 
 @router.get("/info")
@@ -207,8 +190,8 @@ async def get_pipeline_info():
         "version": "11.0.0",
         "providers": [
             {"id": "openai", "name": "OpenAI GPT-4o & gpt-image-1", "status": "active"},
-            {"id": "gemini", "name": "Gemini 2.0 Flash & Nano Banana", "status": "active"},
-            {"id": "grok", "name": "xAI Grok Imagine", "status": "active"},
+            {"id": "gemini", "name": "Gemini 2.0 Flash & Nano Banana", "status": "undeclared"},
+            {"id": "grok", "name": "xAI Grok Imagine", "status": "undeclared"},
         ],
         "pipelines": [
             {"id": "text_to_code", "name": "Text → Code", "description": "Generate code from natural language"},
@@ -265,7 +248,8 @@ Provide complete, working code with explanations."""
             status="success",
             result={"code": code, "language": request.language, "framework": request.framework},
             metadata={
-                "provider": request.provider.value,
+                "provider": "openai",
+                "requested_provider": request.provider.value,
                 "tokens_estimated": len(code.split()) * 1.3,
             },
             timestamp=datetime.utcnow().isoformat(),
@@ -525,14 +509,14 @@ async def get_providers():
                 "name": "Google Gemini",
                 "models": {"text": "gemini-2.0-flash", "image": "nano-banana"},
                 "capabilities": ["text_generation", "image_generation", "multimodal"],
-                "status": "active",
+                "status": "undeclared",
             },
             {
                 "id": "grok",
                 "name": "xAI Grok",
                 "models": {"text": "grok-beta", "image": "grok-imagine"},
                 "capabilities": ["text_generation", "image_generation", "reasoning"],
-                "status": "active",
+                "status": "undeclared",
             },
         ]
     }

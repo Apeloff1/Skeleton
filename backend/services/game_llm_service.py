@@ -16,7 +16,6 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 
 import os
 import json
-import uuid
 from typing import Optional, Dict, Any, List
 from dotenv import load_dotenv
 from core.outcall_manager import outcalls
@@ -24,13 +23,11 @@ from loguru import logger
 
 load_dotenv()
 
-# Import emergent integrations
-try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    LLM_AVAILABLE = True
-except ImportError:
-    LLM_AVAILABLE = False
-    logger.warning("emergentintegrations not available - LLM features disabled")
+from core.ai_provider import (
+    ProviderError,
+    ProviderRegistry,
+    ProviderRequest,
+)
 
 
 class GameLLMService:
@@ -39,30 +36,58 @@ class GameLLMService:
     Provides specialized prompts and generation for various game systems.
     """
     
-    def __init__(self, model: str = "gpt-4o", provider: str = "openai"):
-        self.api_key = os.getenv("EMERGENT_LLM_KEY", "")
+    def __init__(
+        self,
+        model: str = "gpt-4o",
+        provider: str = "openai",
+        *,
+        registry: ProviderRegistry | None = None,
+    ) -> None:
         self.model = model
-        self.provider = provider
-        self.available = LLM_AVAILABLE and bool(self.api_key)
-        
-        if not self.available:
-            logger.warning("GameLLMService: LLM not available (missing key or library)")
-    
-    def _create_chat(self, system_message: str, session_id: Optional[str] = None) -> Optional[LlmChat]:
-        """Create a new LLM chat instance with the specified system message."""
-        if not self.available:
-            return None
-        
-        try:
-            chat = LlmChat(
-                api_key=self.api_key,
-                session_id=session_id or str(uuid.uuid4()),
-                system_message=system_message
-            ).with_model(self.provider, self.model)
-            return chat
-        except Exception as e:
-            logger.error(f"Failed to create LLM chat: {e}")
-            return None
+        self.provider = (provider or "openai").strip().lower()
+        self._registry = registry or ProviderRegistry.from_env()
+
+    @property
+    def available(self) -> bool:
+        active = self._registry.active
+        return bool(
+            self._registry.available
+            and active is not None
+            and active.provider_id == self.provider
+        )
+
+    @property
+    def api_key(self) -> str:
+        """Legacy compatibility flag; never expose provider credential material."""
+        return "configured" if self.available else ""
+
+    def provider_status(self) -> dict[str, Any]:
+        return {
+            "requested_provider": self.provider,
+            "active_provider": self._registry.active_id,
+            "available": self.available,
+            "providers": self._registry.statuses(),
+        }
+
+    async def _provider_generate(
+        self,
+        *,
+        system_message: str,
+        prompt: str,
+    ) -> str:
+        adapter = self._registry.require_active()
+        if adapter.provider_id != self.provider:
+            raise ProviderError(
+                f"requested provider is not active: {self.provider}"
+            )
+        response = await adapter.generate(
+            ProviderRequest(
+                instructions=system_message,
+                prompt=prompt,
+                model=self.model,
+            )
+        )
+        return response.text
     
     async def generate(self, system_prompt: str, user_prompt: str, session_id: Optional[str] = None,
                        rag_topic: Optional[str] = None, rag_language: Optional[str] = None,
@@ -156,18 +181,48 @@ class GameLLMService:
             return {"success": True, "response": simulated, "fallback": False, "rag_chars": len(rag_block)}
 
         if not self.available:
-            return {"success": False, "error": "LLM not available", "fallback": True}
-        
+            return {
+                "success": False,
+                "error": "LLM provider unavailable",
+                "error_code": "provider_unavailable",
+                "provider": self.provider,
+                "fallback": True,
+            }
+
         try:
-            chat = self._create_chat(system_prompt, session_id)
-            if not chat:
-                return {"success": False, "error": "Failed to create chat", "fallback": True}
-            
-            response = await chat.send_message(UserMessage(text=user_prompt))
-            return {"success": True, "response": response, "fallback": False, "rag_chars": len(rag_block)}
-        except Exception as e:
-            logger.error("LLM generation error: {}", type(e).__name__)
-            return {"success": False, "error": "llm_request_failed", "fallback": True}
+            response = await self._provider_generate(
+                system_message=system_prompt,
+                prompt=user_prompt,
+            )
+            return {
+                "success": True,
+                "response": response,
+                "provider": self.provider,
+                "model": self.model,
+                "fallback": False,
+                "rag_chars": len(rag_block),
+            }
+        except ProviderError as exc:
+            logger.warning(
+                "GameLLMService provider failure: {}",
+                type(exc).__name__,
+            )
+            return {
+                "success": False,
+                "error": "llm_request_failed",
+                "error_code": "provider_failure",
+                "provider": self.provider,
+                "fallback": True,
+            }
+        except Exception as exc:
+            logger.error("LLM generation boundary error: {}", type(exc).__name__)
+            return {
+                "success": False,
+                "error": "llm_request_failed",
+                "error_code": "provider_boundary_failure",
+                "provider": self.provider,
+                "fallback": True,
+            }
     
     # =========================================================================
     # NPC & CHARACTER GENERATION

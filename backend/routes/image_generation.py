@@ -16,6 +16,12 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from core.http_errors import internal_http_error
+from core.ai_provider import (
+    ProviderError,
+    ProviderImageRequest,
+    ProviderRegistry,
+    ProviderRequest,
+)
 import uuid
 import base64
 import asyncio
@@ -26,8 +32,6 @@ ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
 router = APIRouter(prefix="/imagine", tags=["Image Generation"])
-
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # ── Style presets for one-tap, on-brand cover/key-art generation ──────────────
 STYLE_PRESETS = {
@@ -109,142 +113,64 @@ class ImageEditRequest(BaseModel):
 # ============================================================================
 
 async def generate_with_openai(prompt: str, size: str, quality: str, count: int) -> dict:
-    """Generate images using OpenAI gpt-image-1"""
+    """Generate images through the declared canonical OpenAI provider."""
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
-        
-        response = await client.images.generate(
-            model="gpt-image-1",
-            prompt=prompt,
-            size=size,
-            quality=quality,
-            n=count,
-            response_format="b64_json"
+        adapter = ProviderRegistry.from_env().require_active()
+        if adapter.provider_id != "openai":
+            return {
+                "provider": adapter.provider_id,
+                "error": "OpenAI image provider is not active",
+                "error_code": "provider_not_active",
+                "status": "failed",
+            }
+        response = await adapter.generate_image(
+            ProviderImageRequest(
+                prompt=prompt,
+                size=size,
+                quality=quality,
+                count=count,
+                model="gpt-image-1",
+                purpose="image-generation",
+            )
         )
-        
-        images = []
-        for img_data in response.data:
-            images.append({
-                "data": img_data.b64_json,
-                "format": "base64_png",
-                "revised_prompt": getattr(img_data, 'revised_prompt', prompt)
-            })
-        
+        return {
+            "provider": response.provider,
+            "model": response.model,
+            "images": list(response.images),
+            "status": "success",
+            "governance_decision_id": response.governance_decision_id,
+            "admission_decision_id": response.admission_decision_id,
+        }
+    except ProviderError:
         return {
             "provider": "openai",
-            "model": "gpt-image-1",
-            "images": images,
-            "status": "success"
+            "error": "image generation failed",
+            "error_code": "provider_failure",
+            "status": "failed",
         }
-    except Exception:
-        return {"provider": "openai", "error": "image generation failed", "status": "failed"}
+
 
 async def generate_with_gemini(prompt: str, style: Optional[str] = None) -> dict:
-    """Generate REAL images using Gemini Nano Banana (gemini-3.1-flash-image-preview)
-    via the Emergent universal key + emergentintegrations multimodal response."""
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+    """Gemini remains unavailable until a declared provider adapter exists."""
+    del prompt, style
+    return {
+        "provider": "gemini",
+        "error": "provider is not declared by the active construction contract",
+        "error_code": "provider_not_declared",
+        "status": "failed",
+    }
 
-        full_prompt = f"{prompt}. Style: {style}." if style else prompt
-
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=f"nano-banana-{uuid.uuid4().hex[:8]}",
-            system_message="You are an expert visual artist that generates striking, detailed images.",
-        ).with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
-
-        text, images = await chat.send_message_multimodal_response(
-            UserMessage(text=full_prompt)
-        )
-
-        out_images = []
-        for img in (images or []):
-            data = img.get("data") if isinstance(img, dict) else None
-            if data:
-                out_images.append({
-                    "data": data,
-                    "format": "base64_png",
-                    "mime_type": img.get("mime_type", "image/png"),
-                })
-
-        if out_images:
-            return {
-                "provider": "gemini",
-                "model": "nano-banana/gemini-3.1-flash-image-preview",
-                "images": out_images,
-                "status": "success",
-            }
-        # No image came back — surface as failed so callers can fall back.
-        return {"provider": "gemini", "status": "failed",
-                "error": "no image returned", "note": (text or "")[:200]}
-    except Exception:
-        return {"provider": "gemini", "error": "image generation failed", "status": "failed"}
 
 async def generate_with_grok(prompt: str, style: Optional[str] = None) -> dict:
-    """Generate images using Grok Imagine API"""
-    try:
-        from openai import AsyncOpenAI
-        
-        # Grok via xAI API
-        client = AsyncOpenAI(
-            api_key=EMERGENT_LLM_KEY,
-            base_url="https://api.x.ai/v1"
-        )
-        
-        full_prompt = f"{prompt}\n\nStyle: {style}" if style else prompt
-        
-        # Grok Imagine endpoint
-        response = await client.images.generate(
-            model="grok-2-vision-1212",  # Grok's image model
-            prompt=full_prompt,
-            n=1,
-            response_format="b64_json"
-        )
-        
-        images = []
-        for img_data in response.data:
-            images.append({
-                "data": img_data.b64_json,
-                "format": "base64_png"
-            })
-        
-        return {
-            "provider": "grok",
-            "model": "grok-imagine",
-            "images": images,
-            "status": "success"
-        }
-    except Exception:
-        # Fallback: Use Grok for prompt enhancement, then OpenAI for generation
-        try:
-            from openai import AsyncOpenAI
-            xai_client = AsyncOpenAI(
-                api_key=EMERGENT_LLM_KEY,
-                base_url="https://api.x.ai/v1"
-            )
-            
-            # Get Grok to enhance the prompt
-            chat_response = await xai_client.chat.completions.create(
-                model="grok-beta",
-                messages=[
-                    {"role": "system", "content": "You are Grok. Create vivid, detailed image prompts."},
-                    {"role": "user", "content": f"Create a detailed image generation prompt for: {prompt}"}
-                ]
-            )
-            enhanced = chat_response.choices[0].message.content
-            
-            # Generate with OpenAI using Grok's enhanced prompt
-            openai_result = await generate_with_openai(enhanced, "1024x1024", "standard", 1)
-            if openai_result.get("status") == "success":
-                openai_result["provider"] = "grok+openai"
-                openai_result["grok_enhanced_prompt"] = enhanced
-                return openai_result
-                
-        except Exception:
-            pass
+    """Grok remains unavailable until a declared provider adapter exists."""
+    del prompt, style
+    return {
+        "provider": "grok",
+        "error": "provider is not declared by the active construction contract",
+        "error_code": "provider_not_declared",
+        "status": "failed",
+    }
 
-        return {"provider": "grok", "error": "image generation failed", "status": "failed"}
 
 # ============================================================================
 # API ENDPOINTS
@@ -270,14 +196,14 @@ async def get_imagine_info():
                 "name": "Gemini Nano Banana",
                 "capabilities": ["generation", "prompt_enhancement"],
                 "sizes": ["1024x1024"],
-                "status": "active"
+                "status": "undeclared"
             },
             {
                 "id": "grok",
                 "name": "Grok Imagine",
                 "capabilities": ["generation", "prompt_enhancement"],
                 "sizes": ["1024x1024"],
-                "status": "active"
+                "status": "undeclared"
             }
         ],
         "styles": [
@@ -318,11 +244,9 @@ async def generate_images(request: ImageGenerationRequest):
 
     # Auto-select provider or use specified
     if request.provider == "auto":
-        # Gemini Nano Banana + OpenAI gpt-image-1 both work on the Emergent key.
-        # (Grok needs a separate xAI key, so it's excluded from the auto chain.)
-        result = await generate_with_gemini(full_prompt, request.style)
-        if result.get("status") == "failed":
-            result = await generate_with_openai(full_prompt, request.size, request.quality, request.count)
+        result = await generate_with_openai(
+            full_prompt, request.size, request.quality, request.count
+        )
     elif request.provider == "openai":
         result = await generate_with_openai(full_prompt, request.size, request.quality, request.count)
     elif request.provider == "gemini":
@@ -400,9 +324,7 @@ async def generate_cover(request: CoverRequest):
                       "images": [{"data": hit["image"], "format": "base64_png"}]}
 
     if result is None:
-        result = await generate_with_gemini(full_prompt, request.style)
-        if result.get("status") == "failed":
-            result = await generate_with_openai(full_prompt, "1024x1792", "hd", 1)
+        result = await generate_with_openai(full_prompt, "1024x1792", "hd", 1)
 
     images = result.get("images", []) if isinstance(result, dict) else []
     cover_b64 = None
@@ -435,83 +357,79 @@ async def generate_cover(request: CoverRequest):
 
 @router.post("/variation")
 async def create_variation(request: ImageVariationRequest):
-    """Create variations of an existing image"""
+    """Create variations through the canonical provider runtime."""
+    if request.provider != "openai":
+        raise HTTPException(status_code=409, detail="Requested image provider is not declared")
     request_id = str(uuid.uuid4())
-    
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
-        
-        # Decode base64 image
-        image_bytes = base64.b64decode(request.image_base64)
-        
-        response = await client.images.create_variation(
-            image=image_bytes,
-            n=request.count,
+        image_bytes = base64.b64decode(request.image_base64, validate=True)
+        adapter = ProviderRegistry.from_env().require_active()
+        response = await adapter.create_image_variation(
+            image_bytes,
+            count=request.count,
             size="1024x1024",
-            response_format="b64_json"
+            operation_id=request_id,
         )
-        
-        variations = []
-        for img_data in response.data:
-            variations.append({
-                "data": img_data.b64_json,
-                "format": "base64_png"
-            })
-        
         return {
             "id": request_id,
             "status": "success",
-            "provider": "openai",
-            "variations": variations,
-            "timestamp": datetime.utcnow().isoformat()
+            "provider": response.provider,
+            "model": response.model,
+            "variations": list(response.images),
+            "governance_decision_id": response.governance_decision_id,
+            "admission_decision_id": response.admission_decision_id,
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise internal_http_error("Image generation failed", e) from None
+    except (ValueError, ProviderError) as exc:
+        raise internal_http_error("Image generation failed", exc) from None
+
 
 @router.post("/edit")
 async def edit_image(request: ImageEditRequest):
-    """Edit an image with a mask and prompt"""
+    """Edit an image through the canonical provider runtime."""
+    if request.provider != "openai":
+        raise HTTPException(status_code=409, detail="Requested image provider is not declared")
     request_id = str(uuid.uuid4())
-    
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY)
-        
-        image_bytes = base64.b64decode(request.image_base64)
-        mask_bytes = base64.b64decode(request.mask_base64) if request.mask_base64 else None
-        
-        kwargs = {
-            "image": image_bytes,
-            "prompt": request.prompt,
-            "n": 1,
-            "size": "1024x1024",
-            "response_format": "b64_json"
-        }
-        if mask_bytes:
-            kwargs["mask"] = mask_bytes
-        
-        response = await client.images.edit(**kwargs)
-        
+        image_bytes = base64.b64decode(request.image_base64, validate=True)
+        mask_bytes = (
+            base64.b64decode(request.mask_base64, validate=True)
+            if request.mask_base64
+            else None
+        )
+        adapter = ProviderRegistry.from_env().require_active()
+        response = await adapter.edit_image(
+            image_bytes,
+            prompt=request.prompt,
+            mask=mask_bytes,
+            size="1024x1024",
+            operation_id=request_id,
+        )
         return {
             "id": request_id,
             "status": "success",
-            "provider": "openai",
-            "edited_image": {
-                "data": response.data[0].b64_json,
-                "format": "base64_png"
-            },
+            "provider": response.provider,
+            "model": response.model,
+            "edited_image": response.images[0],
             "prompt": request.prompt,
-            "timestamp": datetime.utcnow().isoformat()
+            "governance_decision_id": response.governance_decision_id,
+            "admission_decision_id": response.admission_decision_id,
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise internal_http_error("Image generation failed", e) from None
+    except (ValueError, ProviderError) as exc:
+        raise internal_http_error("Image generation failed", exc) from None
+
 
 @router.post("/enhance-prompt")
-async def enhance_prompt(prompt: str, style: Optional[str] = None, provider: str = "grok"):
-    """Enhance a prompt for better image generation"""
+async def enhance_prompt(
+    prompt: str,
+    style: Optional[str] = None,
+    provider: str = "openai",
+):
+    """Enhance an image prompt using the declared text provider."""
+    if provider not in {"openai", "auto"}:
+        raise HTTPException(status_code=409, detail="Requested provider is not declared")
     request_id = str(uuid.uuid4())
-    
     enhancement_prompt = f"""Create an enhanced, detailed image generation prompt based on:
 
 Original: {prompt}
@@ -529,34 +447,22 @@ Create a vivid, specific prompt that includes:
 Output only the enhanced prompt, no explanations."""
 
     try:
-        if provider == "grok":
-            from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=EMERGENT_LLM_KEY, base_url="https://api.x.ai/v1")
-            response = await client.chat.completions.create(
-                model="grok-beta",
-                messages=[
-                    {"role": "system", "content": "You are an expert at creating detailed image prompts."},
-                    {"role": "user", "content": enhancement_prompt}
-                ]
+        adapter = ProviderRegistry.from_env().require_active()
+        response = await adapter.generate(
+            ProviderRequest(
+                instructions="You are an expert at creating detailed image prompts.",
+                prompt=enhancement_prompt,
+                purpose="image-prompt-enhancement",
             )
-            enhanced = response.choices[0].message.content
-        else:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
-                session_id=f"enhance-{uuid.uuid4().hex[:8]}",
-                system_message="You are an expert at creating detailed image prompts."
-            ).with_model("openai", "gpt-4o")
-            response = await chat.send_message(UserMessage(text=enhancement_prompt))
-            enhanced = response.content if hasattr(response, 'content') else str(response)
-        
+        )
         return {
             "id": request_id,
             "original_prompt": prompt,
-            "enhanced_prompt": enhanced,
+            "enhanced_prompt": response.text,
             "style": style,
-            "provider": provider,
-            "timestamp": datetime.utcnow().isoformat()
+            "provider": response.provider,
+            "model": response.model,
+            "timestamp": datetime.utcnow().isoformat(),
         }
-    except Exception as e:
-        raise internal_http_error("Image generation failed", e) from None
+    except ProviderError as exc:
+        raise internal_http_error("Image generation failed", exc) from None

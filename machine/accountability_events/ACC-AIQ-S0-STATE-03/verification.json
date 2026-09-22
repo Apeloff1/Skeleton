@@ -1,0 +1,22 @@
+{
+  "accountability_id": "ACC-AIQ-S0-STATE-03",
+  "event_type": "verification_signed",
+  "actor_id": "github-actions:State Recovery Drill",
+  "actor_type": "ci",
+  "role": "independent-verifier",
+  "signed_at_utc": "2026-09-21T19:14:11Z",
+  "git_sha": "541e64e2016a13fb5ae677231e32f4cfefae5df5",
+  "signature_method": "github_identity",
+  "signature_ref": "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147",
+  "statement": "Independent GitHub Actions recovery drill passed on the signed head: authoritative Mongo backup/restore digest verification completed before deterministic derived rebuild, and pure recovery-order contract tests passed.",
+  "evidence_refs": [
+    "https://github.com/Apeloff1/Skeleton/actions/runs/35643369147",
+    "github-actions-job:106478069613",
+    "state-recovery-drill:backup_restore_digest=5d341ec0e455b74fb295621098be33e0f2991014d91076b4e5eccfbdd15c4ab1",
+    "state-recovery-drill:derived_digest=1be92375ecda43900c76a802ff81cfeeb6dd718c55bbfab36d4312c4b19f445d",
+    "state-recovery-drill:phases=seed_authority>backup_authority>destroy_restore_target>restore_authority>verify_authority>rebuild_derived>verify_derived>ready"
+  ],
+  "from_status": "evidence_pending",
+  "to_status": "verified",
+  "human_signature": false
+}

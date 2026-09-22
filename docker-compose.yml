@@ -38,6 +38,8 @@ services:
       - SKL_MONGO_DATABASE=skeleton
       - SKL_CHROMA_HOST=chroma
       - SKL_CHROMA_PORT=8000
+      - SKL_OPERATION_STATE_PATH=/app/data/operation_state.sqlite
+      - SKL_OPERATION_STREAM_PATH=/app/data/operation_stream.sqlite
     depends_on:
       mongo:
         condition: service_healthy
@@ -47,6 +49,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    volumes:
+      - skeleton_data:/app/data
     networks:
       - tutolage
 
@@ -183,9 +187,26 @@ networks:
 volumes:
   mongo_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "authoritative"
+      com.skeleton.recovery.order: "10"
   mongo_config:
     driver: local
+    labels:
+      com.skeleton.state.role: "authoritative-support"
+      com.skeleton.recovery.order: "10"
   backend_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "derived"
+      com.skeleton.recovery.order: "90"
+  skeleton_data:
+    driver: local
+    labels:
+      com.skeleton.state.role: "declared-mixed-operation-authority-and-stream-projection"
+      com.skeleton.recovery.order: "40"
   chroma_data:
     driver: local
+    labels:
+      com.skeleton.state.role: "derived"
+      com.skeleton.recovery.order: "90"

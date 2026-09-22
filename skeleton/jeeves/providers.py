@@ -1,28 +1,36 @@
-"""
-Skeleton Jeeves — LLM provider abstraction
+"""Jeeves provider compatibility and deterministic offline fallback.
 
-Provides:
-- LLMProvider: Interface for language model backends
-- LocalEchoProvider: Dependency-free fallback (extractive, uses memory planes)
-- OpenAIProvider / AnthropicProvider: Stubs wired for real API keys
-- get_provider: Factory honoring SKELETON_LLM_PROVIDER env var
+Credential-bearing model transport is owned exclusively by
+`skeleton.provider_runtime`. Jeeves keeps its historical synchronous provider
+protocol so old call sites continue to work, but network providers here are
+wrappers only: they do not read credentials, construct HTTP requests, import
+vendor SDKs, or define provider policy.
 
-Providers return plain text; JeevesCore handles session state,
-tool dispatch, and event emission around them.
+`LocalEchoProvider` remains a dependency-free offline fallback and therefore
+is not an external provider surface.
 """
 
 from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, List, Optional, Protocol
 
+from skeleton.provider_runtime import (
+    OpenAISyncProviderAdapter,
+    ProviderError,
+    ProviderRequest,
+    _MAX_PROVIDER_RESPONSE_BYTES as _RUNTIME_MAX_PROVIDER_RESPONSE_BYTES,
+    _read_provider_json,
+)
 
-_MAX_PROVIDER_RESPONSE_BYTES = 2 * 1024 * 1024
+# Historical test/caller compatibility. Network transport now lives in the
+# canonical runtime, but the old module-level safety constant remains stable.
+_MAX_PROVIDER_RESPONSE_BYTES = _RUNTIME_MAX_PROVIDER_RESPONSE_BYTES
 
 
 class LLMProvider(Protocol):
-    """Interface all LLM backends must satisfy."""
+    """Interface all Jeeves-compatible backends must satisfy."""
 
     name: str
     supports_system_prompt: bool
@@ -41,14 +49,8 @@ class LLMProvider(Protocol):
 
 
 def _user_message(prompt: str, context: Optional[List[str]]) -> str:
-    """Compose prior conversational text as explicitly untrusted user data.
+    """Compose legacy prior-context strings as explicitly untrusted user data."""
 
-    The legacy Jeeves context surface contains strings without role metadata.
-    History is serialized as JSON and tag-significant characters are emitted as
-    JSON unicode escapes so attacker-controlled values cannot reproduce the raw
-    structural delimiters used around the history envelope. JSON decoding still
-    recovers the exact prior text.
-    """
     prior = (context or [])[-6:]
     if not prior:
         return prompt
@@ -68,51 +70,8 @@ def _user_message(prompt: str, context: Optional[List[str]]) -> str:
     )
 
 
-def _read_provider_json(response: Any) -> Any:
-    """Decode a provider response under a hard byte budget.
-
-    The requested token limit is advisory; an endpoint can still send an
-    unexpectedly large body. Read at most one byte beyond the budget so an
-    oversized response fails closed before an unbounded allocation or JSON
-    decode. Raw response text is never copied into raised exceptions.
-    """
-    raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
-    if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
-        raise RuntimeError("LLM provider response exceeded size limit")
-    try:
-        return json.loads(raw)
-    except (json.JSONDecodeError, UnicodeDecodeError, TypeError) as exc:
-        raise RuntimeError("LLM provider returned malformed JSON") from exc
-
-
-def _extract_openai_text(data: Any) -> str:
-    try:
-        content = data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError("OpenAI provider returned malformed response") from exc
-    if not isinstance(content, str):
-        raise RuntimeError("OpenAI provider returned non-text response")
-    return content
-
-
-def _extract_anthropic_text(data: Any) -> str:
-    try:
-        content = data["content"][0]["text"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError("Anthropic provider returned malformed response") from exc
-    if not isinstance(content, str):
-        raise RuntimeError("Anthropic provider returned non-text response")
-    return content
-
-
 class LocalEchoProvider:
-    """Dependency-free fallback provider.
-
-    Extractive responder: pulls the most relevant memory-plane chunks
-    for the query and composes an answer from them. No network, no
-    keys — always available. Quality is limited but the pipeline
-    (context → provider → response) is fully exercised.
-    """
+    """Dependency-free extractive fallback backed by local memory/retrieval."""
 
     name = "local-echo"
     supports_system_prompt = False
@@ -136,14 +95,17 @@ class LocalEchoProvider:
             try:
                 if hasattr(self._retriever, "retrieve"):
                     results = self._retriever.retrieve(prompt, k=3)
-                    fragments = [getattr(r, "content", "") for r in results]
+                    fragments = [getattr(result, "content", "") for result in results]
                 elif hasattr(self._retriever, "query_unified"):
-                    result = self._retriever.query_unified(prompt, top_k_per_tier=3)
-                    fragments = [c.chunk.text for c in result.facts]
+                    result = self._retriever.query_unified(
+                        prompt,
+                        top_k_per_tier=3,
+                    )
+                    fragments = [candidate.chunk.text for candidate in result.facts]
             except Exception:
                 fragments = []
 
-        fragments = [f for f in fragments if f.strip()]
+        fragments = [fragment for fragment in fragments if fragment.strip()]
         if fragments:
             body = " ".join(fragments)
             return f"Based on what I know: {body[:max_tokens]}"
@@ -151,21 +113,35 @@ class LocalEchoProvider:
         if context:
             return f"Following on from earlier: {context[-1][:max_tokens]}"
 
-        return f"I don't have relevant context for that yet. (prompt: {prompt[:80]})"
+        return (
+            "I don't have relevant context for that yet. "
+            f"(prompt: {prompt[:80]})"
+        )
 
 
 class OpenAIProvider:
-    """OpenAI chat-completions backend. Requires SKELETON_OPENAI_API_KEY."""
+    """Legacy synchronous Jeeves facade over the canonical provider runtime."""
 
     name = "openai"
     supports_system_prompt = True
 
-    def __init__(self, model: str = "gpt-4o-mini"):
+    def __init__(
+        self,
+        model: str = "gpt-4o-mini",
+        *,
+        adapter: OpenAISyncProviderAdapter | None = None,
+    ) -> None:
         self.model = model
-        self._key = os.getenv("SKELETON_OPENAI_API_KEY", "").strip()
+        self._adapter = adapter or OpenAISyncProviderAdapter(model=model)
+
+    @property
+    def _architecture_receipt(self):
+        """Compatibility view used by historical diagnostics/tests."""
+
+        return self._adapter._provider_architecture_receipt
 
     def available(self) -> bool:
-        return bool(self._key)
+        return self._adapter.available
 
     def complete(
         self,
@@ -174,35 +150,37 @@ class OpenAIProvider:
         max_tokens: int = 512,
         system: Optional[str] = None,
     ) -> str:
-        import urllib.request
-
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": _user_message(prompt, context)})
-
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
-            data=json.dumps({"model": self.model, "messages": messages, "max_tokens": max_tokens}).encode(),
-            headers={"Authorization": f"Bearer {self._key}", "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = _read_provider_json(resp)
-        return _extract_openai_text(data)
+        try:
+            response = self._adapter.generate_sync(
+                ProviderRequest(
+                    instructions=system or "",
+                    prompt=_user_message(prompt, context),
+                    max_output_tokens=max_tokens,
+                    model=self.model,
+                )
+            )
+        except ProviderError as exc:
+            raise RuntimeError("configured LLM provider is unavailable") from exc
+        return response.text
 
 
 class AnthropicProvider:
-    """Anthropic messages backend. Requires SKELETON_ANTHROPIC_API_KEY."""
+    """Compatibility shim for an undeclared provider.
+
+    The class remains importable so historical configuration fails explicitly
+    rather than breaking module imports. It owns no credential and performs no
+    network I/O. Anthropic can become executable only after a declared adapter
+    is added to `skeleton.provider_runtime` and the construction contract.
+    """
 
     name = "anthropic"
     supports_system_prompt = True
 
-    def __init__(self, model: str = "claude-haiku-4-5"):
+    def __init__(self, model: str = "claude-haiku-4-5") -> None:
         self.model = model
-        self._key = os.getenv("SKELETON_ANTHROPIC_API_KEY", "").strip()
 
     def available(self) -> bool:
-        return bool(self._key)
+        return False
 
     def complete(
         self,
@@ -211,37 +189,18 @@ class AnthropicProvider:
         max_tokens: int = 512,
         system: Optional[str] = None,
     ) -> str:
-        import urllib.request
-
-        payload: Dict[str, Any] = {
-            "model": self.model,
-            "messages": [{"role": "user", "content": _user_message(prompt, context)}],
-            "max_tokens": max_tokens,
-        }
-        if system:
-            payload["system"] = system
-
-        req = urllib.request.Request(
-            "https://api.anthropic.com/v1/messages",
-            data=json.dumps(payload).encode(),
-            headers={
-                "x-api-key": self._key,
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
+        del prompt, context, max_tokens, system
+        raise RuntimeError(
+            "Anthropic provider is not declared by the active construction contract"
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            data = _read_provider_json(resp)
-        return _extract_anthropic_text(data)
 
 
-def get_provider(retriever: Optional[Any] = None, preferred: Optional[str] = None) -> LLMProvider:
-    """Pick a provider by explicit policy or automatic availability.
+def get_provider(
+    retriever: Optional[Any] = None,
+    preferred: Optional[str] = None,
+) -> LLMProvider:
+    """Select a Jeeves provider under explicit fail-closed operator policy."""
 
-    An explicit ``preferred`` value or SKELETON_LLM_PROVIDER setting is an
-    operator policy boundary and therefore fails closed when unknown, empty,
-    or unavailable. Automatic fallback is used only when no provider was selected.
-    """
     env_configured = os.environ.get("SKELETON_LLM_PROVIDER")
     if preferred is not None:
         configured = preferred
@@ -254,8 +213,7 @@ def get_provider(retriever: Optional[Any] = None, preferred: Optional[str] = Non
         explicit = False
 
     choice = configured.strip().lower()
-
-    candidates: Dict[str, Any] = {
+    candidates: dict[str, LLMProvider] = {
         "openai": OpenAIProvider(),
         "anthropic": AnthropicProvider(),
         "local": LocalEchoProvider(retriever),
@@ -272,8 +230,16 @@ def get_provider(retriever: Optional[Any] = None, preferred: Optional[str] = Non
             raise RuntimeError("configured LLM provider is unavailable")
         return provider
 
-    for name in ("openai", "anthropic"):
-        if candidates[name].available():
-            return candidates[name]
+    if candidates["openai"].available():
+        return candidates["openai"]
 
     return candidates["local"]
+
+
+__all__ = [
+    "AnthropicProvider",
+    "LLMProvider",
+    "LocalEchoProvider",
+    "OpenAIProvider",
+    "get_provider",
+]

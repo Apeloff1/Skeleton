@@ -1,0 +1,28 @@
+# Mandatory AI Construction Bootstrap
+
+Before modifying, generating, reviewing, repairing, or assembling repository code, read these canonical documents in order:
+
+1. `machine/manifest.json`
+2. `machine/architecture.json`
+3. `machine/ai_app_construction.json`
+4. `machine/capability_interfaces.json`
+5. `machine/state_topology.json`
+6. `machine/ai_runtime_schemas.json`
+7. `machine/ai_capabilities.json`
+8. `machine/ai_implementation_handoff.json`
+9. `machine/ai_closure_evidence.json`
+10. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+
+The machine contracts are authoritative. Do not create a new runtime root, provider boundary, service, capability owner, or cross-plane dependency unless it is declared there first.
+
+Required construction behavior:
+
+- use the canonical owner for each capability plane;
+- route credential-bearing runtime model calls through `skeleton/provider_runtime.py`; treat `backend/core/ai_provider.py` as compatibility-only;
+- never import provider SDKs from feature/application code;
+- preserve fail-closed provider architecture acknowledgement through `skeleton/provider_contract.py`;
+- add tests, failure behavior, observability, evaluation, and rollback implications with the implementation;
+- run `python scripts/check_architecture_map.py`, `python scripts/check_ai_app_construction.py`, `python scripts/check_capability_interfaces.py`, `python scripts/check_provider_bootstrap.py`, and relevant domain tests before declaring work complete;
+- update the construction contract when the architecture changes rather than bypassing a validator.
+
+If a required plane, provider, interface, authority rule, failure mode, or acceptance gate is missing, treat it as a construction gap and close the canonical gap instead of creating a parallel subsystem.

@@ -80,3 +80,24 @@ def test_frontier_and_agent_core_reject_provider_sdk_imports(tmp_path: Path) -> 
     violations = audit_repository(tmp_path)
 
     assert sum("provider SDK import" in item for item in violations) == 2
+
+
+def test_backend_openai_sdk_import_is_rejected(tmp_path: Path) -> None:
+    _write(tmp_path, "backend/routes/feature.py", "from openai import AsyncOpenAI\n")
+
+    violations = audit_repository(tmp_path)
+
+    assert any(
+        "provider SDK import from 'openai' outside canonical runtime" in item
+        for item in violations
+    )
+
+
+def test_canonical_provider_runtime_may_import_declared_vendor_sdk(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "skeleton/provider_runtime.py",
+        "from openai import AsyncOpenAI\n",
+    )
+
+    assert audit_repository(tmp_path) == []

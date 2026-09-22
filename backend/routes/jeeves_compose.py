@@ -11,16 +11,22 @@ routes/jeeves_compose.py — Jeeves SOTA composer + chat (/api/jeeves).
 """
 from __future__ import annotations
 
+import hashlib
 import time
 import uuid
 from typing import Annotated, Any, Dict, List, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from gameforge.jeeves.free_tier import free_tier
 from gameforge.jeeves import artifacts as ART
-from gameforge.jeeves.chat_contract import ChatReq, conversation_prompt, retrieval_query
+from gameforge.jeeves.chat_contract import (
+    ChatReq,
+    HistoryMessage,
+    conversation_prompt,
+    retrieval_query,
+)
 
 router = APIRouter(prefix="/api/jeeves", tags=["jeeves"])
 
@@ -162,48 +168,299 @@ def _chat_col():
     return core_db["jeeves_chat"]
 
 
+_MAX_SERVER_HISTORY_MESSAGES = 20
+
+
+def _turn_id(session_id: str, client_message_id: str) -> str:
+    material = f"{session_id}\x1f{client_message_id}".encode("utf-8")
+    return "jeeves-turn-" + hashlib.sha256(material).hexdigest()[:32]
+
+
+def _history_from_turn_rows(
+    rows: List[Dict[str, Any]],
+    legacy_history: List[Dict[str, str]] | None = None,
+) -> List[HistoryMessage]:
+    messages: List[HistoryMessage] = []
+    for item in legacy_history or []:
+        try:
+            messages.append(HistoryMessage.model_validate(item))
+        except Exception:
+            continue
+    for row in rows:
+        user = row.get("role_user")
+        assistant = row.get("role_jeeves")
+        if isinstance(user, str) and user.strip():
+            messages.append(HistoryMessage(role="user", content=user[:4000]))
+        if isinstance(assistant, str) and assistant.strip():
+            messages.append(HistoryMessage(role="assistant", content=assistant[:4000]))
+    return messages[-_MAX_SERVER_HISTORY_MESSAGES:]
+
+
+async def _load_server_history(
+    session_id: str,
+) -> tuple[List[HistoryMessage], bool]:
+    """Load the canonical transcript projection for one session.
+
+    The availability flag distinguishes an empty server-owned thread from a
+    storage outage. Caller history may bootstrap an empty legacy thread, but it
+    never overrides an existing durable transcript.
+    """
+
+    try:
+        collection = _chat_col()
+        cursor = collection.find(
+            {
+                "session_id": session_id,
+                "$or": [
+                    {"status": "complete"},
+                    {"status": {"$exists": False}},
+                ],
+            },
+            {
+                "_id": 0,
+                "role_user": 1,
+                "role_jeeves": 1,
+                "ts": 1,
+            },
+        ).sort("ts", -1)
+        rows = await cursor.to_list(_MAX_SERVER_HISTORY_MESSAGES // 2)
+        rows.reverse()
+
+        legacy_history: List[Dict[str, str]] = []
+        try:
+            seed = await collection.find_one(
+                {
+                    "session_id": session_id,
+                    "legacy_history.0": {"$exists": True},
+                },
+                {"_id": 0, "legacy_history": 1},
+            )
+            raw_seed = seed.get("legacy_history") if isinstance(seed, dict) else None
+            if isinstance(raw_seed, list):
+                legacy_history = [
+                    item for item in raw_seed if isinstance(item, dict)
+                ][-_MAX_SERVER_HISTORY_MESSAGES:]
+        except Exception:
+            legacy_history = []
+
+        return _history_from_turn_rows(rows, legacy_history), True
+    except Exception:
+        return [], False
+
+
+async def _existing_idempotent_turn(
+    session_id: str,
+    client_message_id: str,
+    user_message: str,
+) -> Dict[str, Any] | None:
+    turn_key = _turn_id(session_id, client_message_id)
+    try:
+        existing = await _chat_col().find_one({"_id": turn_key})
+    except Exception:
+        return None
+    if not isinstance(existing, dict):
+        return None
+    if existing.get("role_user") != user_message:
+        raise HTTPException(
+            status_code=409,
+            detail="client_message_id was already used for different content",
+        )
+    return existing
+
+
+def _replay_turn(turn: Dict[str, Any]) -> Dict[str, Any]:
+    if turn.get("status") != "complete" or not isinstance(turn.get("role_jeeves"), str):
+        raise HTTPException(
+            status_code=409,
+            detail="this message is already being processed; retry after it completes",
+        )
+    return {
+        "ok": True,
+        "session_id": str(turn.get("session_id") or ""),
+        "reply": turn["role_jeeves"],
+        "forms": list(turn.get("forms") or ["text"]),
+        "tier": str(turn.get("tier") or "unknown"),
+        "model": str(turn.get("model") or "unknown"),
+        "modalities": list(turn.get("modalities") or ["text"]),
+        "artifacts": [],
+        "artifact_count": int(turn.get("artifact_count") or 0),
+        "grounded_in": int(turn.get("grounded_in") or 0),
+        "persisted": True,
+        "history_messages_used": int(turn.get("history_messages_used") or 0),
+        "history_source": str(turn.get("history_source") or "server"),
+        "replayed": True,
+    }
+
+
+async def _claim_idempotent_turn(
+    req: ChatReq,
+    session_id: str,
+) -> tuple[str | None, Dict[str, Any] | None]:
+    if req.client_message_id is None:
+        return None, None
+
+    existing = await _existing_idempotent_turn(
+        session_id,
+        req.client_message_id,
+        req.message,
+    )
+    if existing is not None:
+        return None, _replay_turn(existing)
+
+    turn_key = _turn_id(session_id, req.client_message_id)
+    pending = {
+        "_id": turn_key,
+        "session_id": session_id,
+        "client_message_id": req.client_message_id,
+        "role_user": req.message,
+        "status": "pending",
+        "ts": time.time(),
+    }
+    try:
+        await _chat_col().insert_one(dict(pending))
+        return turn_key, None
+    except Exception as exc:
+        existing = await _existing_idempotent_turn(
+            session_id,
+            req.client_message_id,
+            req.message,
+        )
+        if existing is not None:
+            return None, _replay_turn(existing)
+        raise HTTPException(
+            status_code=503,
+            detail="conversation storage is unavailable; retry later",
+        ) from exc
+
+
+async def _finalize_claim(
+    turn_key: str,
+    turn: Dict[str, Any],
+) -> None:
+    try:
+        result = await _chat_col().update_one(
+            {"_id": turn_key, "status": "pending"},
+            {"$set": dict(turn)},
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="conversation result could not be committed; retry later",
+        ) from exc
+    if int(getattr(result, "matched_count", 0)) != 1:
+        raise HTTPException(
+            status_code=409,
+            detail="conversation turn changed before completion",
+        )
+
+
 @router.post("/chat")
 async def chat(req: ChatReq):
-    """SOTA 2026 Jeeves chat — free-tier cascade + inline multi-format artifacts
-    in a single parse. Detects requested forms from the message."""
+    """Execute one server-authoritative Jeeves conversation turn."""
     sid = req.session_id or uuid.uuid4().hex[:16]
-    forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
-    recalled = _canon_context(retrieval_query(req))
 
-    # fold attachments into multimodal memory (free/local)
+    claim_key, replay = await _claim_idempotent_turn(req, sid)
+    if replay is not None:
+        return replay
+
+    server_history, history_available = await _load_server_history(sid)
+    if history_available and server_history:
+        effective_history = server_history
+        history_source = "server"
+        legacy_seed: List[Dict[str, str]] = []
+    elif history_available:
+        effective_history = list(req.history)
+        history_source = "legacy-bootstrap" if req.history else "server-empty"
+        legacy_seed = [item.model_dump() for item in req.history]
+    else:
+        effective_history = list(req.history)
+        history_source = "client-degraded" if req.history else "unavailable"
+        legacy_seed = []
+
+    context_req = req.model_copy(update={"history": effective_history})
+    forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
+    recalled = _canon_context(retrieval_query(context_req))
+
     modalities = ["text"]
     try:
         from gameforge.omega import delta_memory as _dm
         if req.image_base64:
-            _dm.write(f"chat:{sid}", req.image_base64, modality="image"); modalities.append("image")
+            _dm.write(f"chat:{sid}", req.image_base64, modality="image")
+            modalities.append("image")
         if req.pdf_base64:
-            _dm.write(f"chat:{sid}", req.pdf_base64, modality="pdf"); modalities.append("pdf")
-    except Exception:  # noqa: BLE001
+            _dm.write(f"chat:{sid}", req.pdf_base64, modality="pdf")
+            modalities.append("pdf")
+    except Exception:
         pass
 
     needs_reasoning = len(req.message.split()) > 4 or bool(req.image_base64)
-    if req.context or req.history:
-        gen = await _generate_text(req.message, recalled, needs_reasoning,
-                                   conversation_prompt(req.message, req.context, req.history))
+    if req.context or effective_history:
+        gen = await _generate_text(
+            req.message,
+            recalled,
+            needs_reasoning,
+            conversation_prompt(req.message, req.context, effective_history),
+        )
     else:
         gen = await _generate_text(req.message, recalled, needs_reasoning)
+
     ds = _derive_dataset(recalled)
     artifact_forms = [f for f in forms if f != "text"]
-    art = _build_artifacts(artifact_forms, req.message[:60], gen["text"], ds, recalled) if artifact_forms else []
+    art = (
+        _build_artifacts(
+            artifact_forms,
+            req.message[:60],
+            gen["text"],
+            ds,
+            recalled,
+        )
+        if artifact_forms else []
+    )
 
-    turn = {"session_id": sid, "role_user": req.message, "role_jeeves": gen["text"],
-            "forms": forms, "artifact_count": len(art), "tier": gen["tier"],
-            "modalities": modalities, "ts": time.time()}
+    turn = {
+        "session_id": sid,
+        "client_message_id": req.client_message_id,
+        "role_user": req.message,
+        "role_jeeves": gen["text"],
+        "forms": forms,
+        "artifact_count": len(art),
+        "tier": gen["tier"],
+        "model": gen["model"],
+        "modalities": modalities,
+        "grounded_in": len(recalled),
+        "history_messages_used": len(effective_history),
+        "history_source": history_source,
+        "status": "complete",
+        "ts": time.time(),
+    }
+    if legacy_seed:
+        turn["legacy_history"] = legacy_seed
+
     persisted = True
-    try:
-        await _chat_col().insert_one(dict(turn))
-    except Exception:  # noqa: BLE001
-        persisted = False
+    if claim_key is not None:
+        await _finalize_claim(claim_key, turn)
+    else:
+        try:
+            await _chat_col().insert_one(dict(turn))
+        except Exception:
+            persisted = False
 
-    return {"ok": True, "session_id": sid, "reply": gen["text"], "forms": forms,
-            "tier": gen["tier"], "model": gen["model"], "modalities": modalities,
-            "artifacts": art, "artifact_count": len(art), "grounded_in": len(recalled),
-            "persisted": persisted, "history_messages_used": len(req.history)}
+    return {
+        "ok": True,
+        "session_id": sid,
+        "reply": gen["text"],
+        "forms": forms,
+        "tier": gen["tier"],
+        "model": gen["model"],
+        "modalities": modalities,
+        "artifacts": art,
+        "artifact_count": len(art),
+        "grounded_in": len(recalled),
+        "persisted": persisted,
+        "history_messages_used": len(effective_history),
+        "history_source": history_source,
+        "replayed": False,
+    }
 
 
 @router.get("/chat/{session_id}")

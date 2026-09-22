@@ -1,0 +1,3494 @@
+# Skeleton AI Application Construction Manual
+
+Architecture tag: `arch-map/v3.6`
+
+Machine contract: `machine/ai_app_construction.json`
+
+Construction version: `3.6.0`
+
+Architecture contract: `machine/architecture.json`
+
+Runtime contract: `skeleton/app/manifest.json`
+
+This document is the mandatory human construction manual for building, assembling, validating, operating, and evolving the complete Skeleton AI application. The machine-readable construction contract is authoritative for automation; this manual explains how to use it.
+
+## Mandatory bootstrap
+
+Before an AI coding agent, human contributor, runtime provider adapter, automation, or integration changes or activates the system, it must load the active contracts in this order:
+
+1. `machine/manifest.json`
+2. `machine/architecture.json`
+3. `machine/ai_app_construction.json`
+4. `machine/capability_interfaces.json`
+5. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+
+Do not infer architecture from branch names, historical files, or provider-specific conventions when these contracts answer the question. An undeclared runtime provider, runtime service, top-level runtime root, capability plane, or ownership boundary is rejected until the contracts are updated and validated.
+
+The mandatory provider rule does **not** mean sending this manual to an external model with every product request. Runtime adapters load and acknowledge the local construction contract before activation. Development AI providers are instructed to read the construction manual before repository work.
+
+## 1. Target system
+
+The finished application has five external runtime services and a larger set of internal capability planes.
+
+```text
+Human
+  |
+  v
+frontend  ------------------------------+
+  |                                     |
+  | /api/*                              | /api/v1/*
+  v                                     v
+backend ---------------------------> skeleton
+  |                                     |
+  |                                     +--> provider adapters --> external model provider
+  |                                     +--> tools / skills
+  |                                     +--> memory / retrieval
+  |                                     +--> jobs / agents
+  |                                     +--> native / JVM acceleration
+  |
+  +--------------------+
+                       v
+                     Mongo
+                       |
+                  optional Chroma
+```
+
+The runtime service topology stays intentionally small. Complex AI behavior belongs inside canonical process boundaries, not in a growing collection of independent services.
+
+## 2. Canonical ownership
+
+| Capability | Canonical owner | Rule |
+| --- | --- | --- |
+| Product shell | `frontend/` | Only human-interface root |
+| Application API | `backend/` | Product/business routes and control plane |
+| Engine runtime/API | `skeleton/` | AI engine, orchestration, memory, retrieval, agents |
+| Runtime model provider boundary | `backend/core/ai_provider.py` | Provider-neutral contract and concrete adapters |
+| Model routing | `skeleton/frontier/model_routing.py` | Canonical capability/privacy/cost/quality routing; backend router is compatibility/composition |
+| Native acceleration | `skeleton/native/` | Optional, fallback-safe |
+| JVM acceleration | `java-accelerators/` | Optional, fallback-safe |
+| Repository machine contract | `machine/` | Machine-readable structure and construction policy |
+| CI/operator tooling | `scripts/`, `.github/` | Validation and repository automation |
+| Human construction knowledge | `docs/` | Manual and architecture explanation |
+
+Transitional roots such as `core/`, `eval/`, `memory/`, `satellites/`, and `.emergent/` are not allowed to become competing production owners.
+
+## 3. Construction doctrine
+
+Use the following order for every capability:
+
+```text
+contract
+  -> owner
+  -> data model
+  -> interface
+  -> security boundary
+  -> implementation
+  -> observability
+  -> focused tests
+  -> integration tests
+  -> failure-mode tests
+  -> evaluation
+  -> release gate
+```
+
+Skipping a step creates hidden architectural debt. Feature code is not considered complete merely because its happy path works.
+
+A production-capable plane must answer all of these questions:
+
+- What owns it?
+- What can it depend on?
+- What data does it read and write?
+- What authority is required?
+- What external input is untrusted?
+- What is its timeout and resource budget?
+- How does it fail?
+- How does it recover?
+- How is it observed?
+- How is it evaluated?
+- How is it rolled back?
+- Which executable gate proves the contract?
+
+If any answer is unknown, the plane remains partial.
+
+## 4. Construction phases
+
+### Phase 0 — Contracts first
+
+Build no new runtime behavior until the architecture, construction, provider, and runtime contracts describe the intended change.
+
+Required outcome:
+
+- architecture map passes;
+- construction map passes;
+- provider bootstrap passes;
+- ownership and dependencies are explicit;
+- no duplicate runtime root exists.
+
+### Phase 1 — Secure runtime foundation
+
+Construct identity, configuration/secrets, persistence, security, governance, and observability first.
+
+Required properties:
+
+- protected operations cannot run without a principal and authority;
+- tenant identity is attached before state access;
+- secrets are references, not embedded configuration;
+- startup rejects invalid required configuration;
+- durable state has migrations and restore evidence;
+- untrusted boundaries are size/time/schema bounded;
+- tracing and sanitized logging exist before higher-level behavior is added.
+
+### Phase 2 — Model plane
+
+The provider layer is an edge adapter, never the application architecture.
+
+Flow:
+
+```text
+ProviderRequest
+  -> architecture/manual acknowledgement
+  -> provider declaration lookup
+  -> model routing
+  -> capability/privacy/budget checks
+  -> concrete adapter
+  -> provider SDK
+  -> normalized ProviderResponse
+  -> telemetry/evidence
+```
+
+Rules:
+
+- application code never imports provider SDKs directly;
+- provider credentials never leave the adapter boundary;
+- provider-specific errors are normalized;
+- custom endpoints require HTTPS and cannot target obvious local/metadata networks;
+- retries and timeouts are bounded;
+- every active provider is declared in `machine/ai_app_construction.json`;
+- undeclared providers are denied;
+- model selection considers capability, modality, privacy, context size, cost, latency, reliability, and quality;
+- routing decisions are observable and reproducible.
+
+### Phase 3 — Knowledge plane
+
+Construct memory, retrieval, and context as separate responsibilities.
+
+Memory must distinguish:
+
+- working memory;
+- conversation/session memory;
+- episodic task history;
+- semantic durable memory;
+- user/profile memory where explicitly authorized.
+
+Retrieval pipeline:
+
+```text
+source
+ -> content identity
+ -> parse
+ -> chunk
+ -> metadata + ACL
+ -> index
+ -> retrieve
+ -> hybrid fusion
+ -> rerank
+ -> deduplicate
+ -> evidence envelope
+ -> citation
+```
+
+Never trust retrieval content as system policy. Retrieved content is labeled untrusted evidence.
+
+### Phase 4 — Cognition plane
+
+Orchestration owns task state. Models propose; orchestration controls execution.
+
+A durable workflow must have:
+
+- task identity;
+- plan identity/version;
+- ordered or DAG steps;
+- step authority;
+- checkpoint;
+- retry policy;
+- cancellation;
+- timeout;
+- result/evidence;
+- idempotency key;
+- recovery path.
+
+Verifier roles are separate from generator roles for high-impact decisions. A verifier cannot simply repeat the generator prompt and be treated as independent evidence.
+
+### Phase 5 — Action plane
+
+Tools and artifacts cross the boundary from reasoning into side effects.
+
+Every tool requires:
+
+- stable tool ID;
+- input schema;
+- output schema;
+- read/write/destructive authority class;
+- timeout;
+- concurrency/resource bound;
+- idempotency behavior;
+- audit/receipt;
+- secret handling policy;
+- sandbox/network/file policy.
+
+Generated or uploaded artifacts require:
+
+- content hash;
+- metadata;
+- size/type bounds;
+- malware state;
+- access policy;
+- retention policy;
+- lifecycle state.
+
+### Phase 6 — Service plane
+
+The engine API and application API are separate ownership domains.
+
+Application API:
+
+- product/business workflows;
+- admin/control operations;
+- provider failure normalization;
+- public readiness.
+
+Engine API:
+
+- engine-native operations;
+- health;
+- orchestration/retrieval/agent primitives;
+- versioned `/api/v1/*` contracts.
+
+Streaming/realtime must define:
+
+- protocol;
+- event IDs;
+- event sequence;
+- heartbeat;
+- cancellation;
+- reconnect;
+- resume cursor;
+- backpressure;
+- terminal event semantics.
+
+Do not implement streaming as an unstructured series of strings.
+
+### Phase 7 — Product plane
+
+The product UI is an application state machine, not a collection of API buttons.
+
+Every async operation must expose:
+
+- idle;
+- validating;
+- submitted;
+- running/streaming;
+- completed;
+- failed;
+- cancelled;
+- reconnecting when applicable.
+
+The UI uses `frontend/utils/apiBase.ts` for endpoint resolution. No feature may invent its own environment-based service URL.
+
+### Phase 8 — Quality plane
+
+A feature cannot be production-ready without evaluation and failure testing.
+
+Evaluation dimensions:
+
+- task success;
+- correctness;
+- evidence/citation quality;
+- safety;
+- privacy;
+- latency;
+- cost;
+- provider reliability;
+- tool correctness;
+- recovery behavior;
+- user feedback where applicable.
+
+For model behavior changes, record:
+
+- provider;
+- model;
+- relevant configuration;
+- prompt/context contract version;
+- dataset/eval version;
+- before/after metrics;
+- promotion verdict.
+
+### Phase 9 — Release plane
+
+Release order:
+
+```text
+source gates
+ -> tests
+ -> eval gates
+ -> immutable build
+ -> provenance/SBOM
+ -> migration preflight
+ -> deploy candidate
+ -> readiness
+ -> canary/smoke
+ -> promotion
+ -> SLO watch
+ -> rollback if thresholds fail
+```
+
+A release is incomplete until rollback is possible and its evidence is known.
+
+### Phase 10 — Continuous evolution
+
+Production feedback may propose changes but cannot bypass the normal promotion path.
+
+```text
+observation
+ -> hypothesis
+ -> bounded change
+ -> tests
+ -> evaluation
+ -> review/gate
+ -> promotion
+ -> monitored outcome
+```
+
+No uncontrolled online mutation of production policy, prompts, tools, or model routing is allowed.
+
+## 5. Complete functional planes
+
+The machine contract enumerates the required planes. Builders should use it as the checklist.
+
+### Foundation
+
+Purpose: stable primitives and invariants.
+
+Do not allow large feature modules to become foundational dependencies. Foundation code should have low dependency fan-in cost and minimal side effects.
+
+### Identity and authority
+
+Authentication answers "who is this?" Authorization answers "may this principal do this action on this resource now?"
+
+Every state mutation, tool action, admin operation, artifact access, provider transfer, and cross-tenant query must have an authority decision.
+
+### Configuration and secrets
+
+Use typed settings. A configuration snapshot may contain redacted metadata, never raw secret material.
+
+Provider keys must be loaded only at the provider boundary.
+
+### Model providers
+
+Current canonical runtime provider: OpenAI through `OpenAIProviderAdapter`.
+
+Adding a provider requires all of the following in one coherent change:
+
+1. add the provider declaration to `runtime_model_providers`;
+2. implement an adapter under the canonical provider boundary;
+3. load the architecture/construction receipt before provider I/O;
+4. declare capability/modalities/privacy characteristics;
+5. configure credentials by secret reference;
+6. add provider-specific tests;
+7. add failover/routing evidence if it participates in routing;
+8. add observability for latency, failures, token usage, and cost;
+9. run the construction/provider gates;
+10. update this manual only when the general construction contract changes.
+
+A provider-specific application route is prohibited.
+
+### Model routing
+
+Hard constraints are evaluated before soft preferences.
+
+Hard constraints include:
+
+- enabled/declared;
+- capability;
+- modality;
+- context window;
+- privacy ceiling;
+- explicit exclusion;
+- reliability floor;
+- latency budget when mandatory;
+- cost budget when mandatory.
+
+Soft scoring can then compare reliability, quality, latency, cost, and preference.
+
+### Prompt and context
+
+System/developer policy, user input, retrieved evidence, tool output, memory, and external content are distinct trust domains.
+
+Do not concatenate them and lose provenance.
+
+### Orchestration and agents
+
+Prefer deterministic workflow control around nondeterministic model calls.
+
+Bound:
+
+- recursion;
+- agent fan-out;
+- tool calls;
+- tokens;
+- wall-clock duration;
+- concurrency;
+- retries;
+- memory growth.
+
+### Tools
+
+Tool execution is privileged. Tool descriptions are not authority.
+
+The authorization decision is external to model output.
+
+### Memory
+
+Memory writes should be explicit and observable. A model suggestion to "remember" something is not itself permission to persist it.
+
+### Retrieval
+
+Retrieval must enforce authorization at query time, not only ingestion time.
+
+### Reasoning verification
+
+Confidence without evidence is metadata, not proof. For factual/high-impact tasks, verification should operate on explicit claims and evidence.
+
+### Jobs and durability
+
+Persist intent before side effects when recovery semantics require it. Use fencing/leases to prevent stale workers from completing abandoned work.
+
+### Artifacts
+
+Untrusted files are data, not executable code. Quarantine before trust.
+
+### APIs
+
+Keep route handlers thin and version contracts. Normalize internal/provider errors before they cross the public boundary.
+
+### Realtime
+
+Design for reconnect from the start. Mobile/browser networks are transient.
+
+### Security and safety
+
+Security controls belong at boundaries:
+
+- request;
+- provider;
+- retrieval;
+- tool;
+- artifact;
+- network;
+- persistence;
+- deployment.
+
+### Governance
+
+A data item should have a data class, owner/tenant, allowed purposes, retention, deletion behavior, and provider-transfer policy.
+
+### Resilience
+
+Retries are a load multiplier. Retry budgets must be bounded and combined with concurrency control and circuit breaking.
+
+### Observability
+
+Minimum useful trace:
+
+```text
+user action
+ -> frontend operation
+ -> API request
+ -> task/plan
+ -> provider route
+ -> provider call
+ -> tool/retrieval calls
+ -> result/verdict
+ -> artifact/state write
+```
+
+### Evaluation
+
+Keep fast deterministic smoke evaluations separate from expensive model-based evaluations. Required merge gates must be deterministic enough to be operationally reliable.
+
+### Feedback and learning
+
+User feedback can inform experiments and proposals. It should not silently rewrite production behavior.
+
+### Cost and capacity
+
+A request that cannot fit resource, latency, privacy, or cost budgets should be rejected, deferred, or routed differently before consuming expensive resources.
+
+### Operator control
+
+Administrative action uses preflight, explicit admission, execution, and immutable receipt.
+
+### Deployment
+
+Production images are immutable. Hot source mounts stay in the hot development overlay.
+
+## 6. Gap classification
+
+A gap is one of:
+
+- **missing plane** — required capability has no owner;
+- **partial plane** — owner exists but one or more required interfaces/gates are not complete;
+- **shadow owner** — another path duplicates canonical behavior;
+- **unowned edge** — two planes communicate without a declared contract;
+- **provider gap** — provider/model is used without declaration/receipt;
+- **evidence gap** — behavior exists but no executable acceptance proof;
+- **failure gap** — happy path exists but failure/recovery behavior is undefined;
+- **observability gap** — behavior cannot be traced or measured;
+- **governance gap** — data movement lacks classification/retention/authority;
+- **release gap** — change can deploy but cannot be rolled back or proven.
+
+The correct response to a gap is to add the smallest canonical contract/implementation/test set that closes it. Do not create another parallel subsystem.
+
+## 7. Mandatory provider bootstrap
+
+Development AI providers must read the full mandatory bootstrap set before repository work. Provider-specific instruction files point to the same source of truth:
+
+Provider-specific instruction entrypoints remain:
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `.github/copilot-instructions.md`
+- `.cursor/rules/architecture.mdc`
+- `GEMINI.md`
+
+Each entrypoint must instruct the provider to read these canonical artifacts:
+
+1. `machine/manifest.json`
+2. `machine/architecture.json`
+3. `machine/ai_app_construction.json`
+4. `machine/capability_interfaces.json`
+5. `machine/state_topology.json`
+6. `machine/ai_runtime_schemas.json`
+7. `machine/ai_capabilities.json`
+8. `machine/ai_implementation_handoff.json`
+9. `machine/ai_closure_evidence.json`
+10. `docs/AI_APP_CONSTRUCTION_MANUAL.md`
+
+Both backend compatibility and standalone Skeleton engine images materialize the same set. `skeleton/provider_contract.py` reads and hashes every required document into the provider activation receipt, so a missing or stale runtime artifact fails closed before provider I/O.
+
+Grok and other coding agents without a dedicated repository instruction format use
+`AGENTS.md` as the generic bootstrap entrypoint.
+
+These files are pointers, not independent architecture manuals. Duplicating architectural rules across provider files would create drift.
+
+All credential-bearing AI provider families use a local activation receipt from
+`skeleton/provider_contract.py`. Product runtime providers use the
+`runtime_model` family; repository automation uses the `automation_model`
+family. `backend/core/provider_architecture.py` is only a compatibility
+re-export.
+
+The shared loader verifies:
+
+- construction status is active;
+- construction version is supported;
+- architecture tag matches;
+- provider bootstrap is mandatory/fail-closed;
+- provider is declared;
+- provider requires architecture/manual read;
+- human manual exists;
+- activation receipt is required.
+
+The receipt is local metadata. It does not contain credentials and does not require sending the manual to the external model.
+
+## 8. Current functional-AI execution roadmap
+
+The current repository is beyond generic plane mapping. Functional-AI closure now follows the machine-enforced `functional_ai_dependency_graph` in `machine/ai_app_construction.json`.
+
+Dependencies are **closure prerequisites**, not a ban on starting independent implementation earlier behind stable contracts.
+
+### State-authority checkpoint — Jeeves RAG product state
+
+The RAG product-state slice of `gap-state-authority-convergence` is now implemented
+as Mongo-first authority:
+
+- learning-session ownership/content, user progress, co-coding ownership/state,
+  and feedback commit to core Mongo through
+  `backend/services/rag_state_repository.py`;
+- local Chroma collections are rebuildable semantic projections only;
+- a Chroma projection failure does not roll back an accepted Mongo write;
+- co-coding retrieval hits are checked against canonical Mongo ownership before
+  they can re-enter product context;
+- legacy Chroma product-state records have an idempotent import path;
+- user-owned Chroma projections can be rebuilt after total projection loss from
+  canonical Mongo state.
+
+This does **not** close the full state-authority P0 gap. Production operation
+authority/outbox dispatch and restore-first recovery are now separate implemented
+checkpoints below; production backup/retention policy for operation SQLite and
+future authoritative cognitive ledgers remain open.
+
+Evidence:
+`backend/services/rag_service.py`,
+`backend/services/rag_state_repository.py`,
+`backend/tests/test_rag_state_repository.py`,
+`backend/tests/test_rag_state_authority.py`, and
+`machine/state_topology.json`.
+
+### State-authority checkpoint — durable operation runtime
+
+The production Skeleton intelligence surface is bound through `DurableOperationRuntime`, not directly to the in-memory orchestrator.
+
+- `SQLiteOperationStore` is the canonical OperationEnvelope authority;
+- each accepted create/transition commits state and a deterministic outbox event in the same transaction;
+- `SQLiteOperationEventStore` is a resumable durable projection, not operation truth;
+- startup drains pending outbox rows before serving normal work;
+- foreground state transitions trigger immediate best-effort dispatch;
+- a bounded background dispatcher retries unpublished rows during idle process time;
+- crash-after-stream-append-before-outbox-ACK is reconciled by deterministic event identity;
+- shutdown stops the dispatcher, flushes pending rows, then closes durable stores.
+
+A stream outage therefore cannot roll back an accepted operation transition, and an idle process no longer requires a new request or restart to retry pending publication. STATE-02 remains verification-pending until the focused operation store/runtime/server-binding tests pass under independent CI.
+
+
+
+### State-authority checkpoint — restore-first recovery
+
+STATE-03 makes recovery ordering executable instead of advisory.
+
+The dedicated `State Recovery Drill` workflow starts an isolated Mongo 7
+service, seeds representative canonical RAG product records, captures a logical
+backup including user index metadata, restores into a separate scratch
+database, and verifies collection sets, record counts, canonical document
+digests and index digests.
+
+Only after `verify_authority` passes may the drill enter
+`rebuild_derived`. The recovery journal enforces this sequence and fails
+closed on an ordering violation. Derived reconstruction is then checked for
+determinism. The RAG authority regression suite separately proves total Chroma
+projection loss can be rebuilt from Mongo.
+
+Deployment volumes are labeled by declared state role, and
+`machine/state_topology.json` is the canonical recovery order. The operator
+procedure is documented in `docs/runbooks/STATE_RECOVERY.md`.
+
+This closes the STATE-03 implementation slice without claiming that every
+future authoritative cognitive ledger already has a production backup policy.
+
+
+### Cost-admission checkpoint — durable tenant quotas
+
+The durable-quota slice of `gap-cost-admission` now has a reference backend at
+`skeleton/intelligence/quota_sqlite.py`.
+
+It preserves quota windows, active reservations, committed usage, completed
+operation identities, and actual-usage reconciliation across process restart.
+Mutations use SQLite WAL plus `BEGIN IMMEDIATE`, so workers sharing the same
+durable database file cannot independently overbook the same tenant quota or
+double-reserve the same operation.
+
+This closes **AIQ-S0-COST-01**, not the whole cost-admission gap. Cross-host
+pressure coordination and overload shedding remain in COST-03; tool/artifact/
+storage actual-usage accounting and unified telemetry remain in COST-02.
+
+Evidence:
+`skeleton/testing/test_tenant_quota_sqlite.py`,
+`skeleton/testing/test_tenant_quota.py`, and
+`skeleton/testing/test_admission_runtime.py`.
+
+### Stage 0 — authority-policy-foundations
+
+- `gap-state-authority-convergence`
+- `gap-governance-registry`
+- `gap-cost-admission`
+- `gap-provider-surface-convergence`
+
+**Exit:** state, privacy/policy, budget and credential ownership are deterministic before higher autonomy
+
+### Stage 1 — durable-user-and-action-foundations
+
+- `gap-conversation-state-authority`
+- `gap-memory-durable-authority`
+- `gap-tool-runtime-convergence`
+
+**Exit:** canonical user continuity and governed action primitives are durable
+
+### Stage 2 — model-input-output-contracts
+
+- `gap-context-compiler-convergence`
+- `gap-provider-interaction-protocol`
+
+**Exit:** the runtime can compile one canonical model turn and receive normalized structured/tool output
+
+### Stage 3 — evidence-verification
+
+- `gap-verification-evidence-contract`
+
+**Exit:** finalization can distinguish verified/qualified/abstain/repair/block from observable evidence
+
+### Stage 4 — cognitive-transaction
+
+- `gap-cognitive-execution-loop`
+
+**Exit:** one durable bounded AI transaction composes model/context/tool/memory/verification correctly
+
+### Stage 5 — process-boundary-cutover
+
+- `gap-engine-application-execution-boundary`
+
+**Exit:** backend product state and engine execution are separated by authenticated idempotent contracts
+
+### Stage 6 — realtime-product-delivery
+
+- `gap-streaming-protocol`
+
+**Exit:** the client can disconnect/reconnect/cancel and converge on canonical terminal state
+
+### Stage 7 — assembled-proof
+
+- `gap-e2e-golden-journeys`
+
+**Exit:** cross-plane golden journeys and injected failures prove the complete AI product
+
+A P0 gap may not be marked closed until every declared dependency is closed, its associated blueprint is marked `implemented` or `complete`, focused closure evidence exists, and the closure-evidence ledger is updated. Breaking a lower-stage contract invalidates dependent evidence and requires revalidation.
+
+The file-level implementation source is `machine/ai_implementation_handoff.json`; closure evidence is tracked separately in `machine/ai_closure_evidence.json`.
+
+## 9. Current P0 functional-AI gap register
+
+All P0 gaps below are mandatory for the fully functional AI claim. The table is a human projection of the machine contract; machine JSON remains authoritative.
+
+| Stage | Plane | P0 gap | Closure gate |
+| ---: | --- | --- | --- |
+| 1 | `application-api` | `gap-conversation-state-authority` | the server can reconstruct and authorize every model-visible prior message from canonical state without trusting client-supplied transcript history |
+| 1 | `tool-runtime` | `gap-tool-runtime-convergence` | every model-callable tool is declared, minimally projected, policy-admitted, idempotency-aware and receipt-backed, with no executable shadow registry or nested provider credential path |
+| 2 | `prompt-context` | `gap-context-compiler-convergence` | no canonical AI execution constructs provider prompt/history directly outside the ContextCompiler + provider projection boundary |
+| 3 | `reasoning-verification` | `gap-verification-evidence-contract` | every final result that claims verification carries an immutable observable VerificationReceipt whose required claims/actions are supported by declared evidence/checks |
+| 2 | `model-provider` | `gap-provider-interaction-protocol` | the cognitive runtime can perform a model turn with structured result or tool proposals entirely through provider-neutral contracts |
+| 5 | `engine-api` | `gap-engine-application-execution-boundary` | production AI requests entering backend execute provider/model/tool cognition only in the Skeleton engine process with authenticated idempotent cross-service contracts and no local provider fallback |
+| 4 | `orchestration` | `gap-cognitive-execution-loop` | one operation can deterministically retrieve, reason, call governed tools, wait/resume, verify, persist and stream a terminal answer without bypassing any canonical plane |
+| 6 | `streaming-realtime` | `gap-streaming-protocol` | frontend can lose transport and resume without duplicating side effects or losing terminal state |
+| 0 | `governance` | `gap-governance-registry` | every provider transfer and durable write has a data-class/governance decision |
+| 1 | `memory` | `gap-memory-durable-authority` | long-term memory is durable, governed, tenant-scoped and recoverable; no vector/MAG/CAG/process store is the sole source of canonical user memory |
+| 0 | `data-persistence` | `gap-state-authority-convergence` | every logical state domain has one declared authority; authoritative state restores without depending on derived stores; operation state and stream event durability are reconciled |
+| 0 | `cost-capacity` | `gap-cost-admission` | all expensive operations carry an admission receipt |
+| 7 | `product-experience` | `gap-e2e-golden-journeys` | canonical journeys pass against assembled topology |
+| 0 | `model-provider` | `gap-provider-surface-convergence` | no credential-bearing model edge exists outside a declared receipt-governed surface |
+
+There are currently **14 P0 functional-AI gaps** in the closure set. Every one must appear exactly once in the dependency DAG, work-package schedule, detailed blueprint set, implementation handoff, and closure-evidence ledger.
+
+P1 work such as provider redundancy, feedback/promotion, and release-SLO automation remains important but does not replace missing P0 closure evidence.
+
+## 10. Assembly checklist
+
+Before merging a new AI capability, confirm:
+
+- canonical plane and owner selected;
+- dependency direction valid;
+- runtime service count unchanged unless explicitly approved;
+- provider usage goes through canonical adapter;
+- provider declaration/receipt exists;
+- authority defined;
+- input/output bounds defined;
+- state/durability defined;
+- timeout/retry/cancellation defined;
+- observability defined;
+- privacy/data class defined;
+- tests cover happy path and failure path;
+- evaluation exists where model behavior changes;
+- frontend state/recovery exists if user-facing;
+- deployment and rollback impact understood;
+- architecture, construction, provider-bootstrap, assembly, and relevant domain gates pass.
+
+## 11. Definition of done
+
+A functional AI application is not "done" because it can answer a prompt. It is construction-complete when the complete request lifecycle is governed:
+
+```text
+identity
+ -> authority
+ -> request validation
+ -> orchestration
+ -> context/retrieval/memory
+ -> route/model/provider
+ -> verify
+ -> tools/actions
+ -> persistence/artifacts
+ -> response/stream
+ -> telemetry
+ -> evaluation
+ -> recoverability
+```
+
+Every edge in that chain must have an owner, a contract, a failure mode, and executable evidence.
+
+## 12. Canonical commands
+
+```bash
+python scripts/check_architecture_map.py
+python scripts/check_ai_app_construction.py
+python scripts/check_provider_bootstrap.py
+python scripts/check_app_assembly.py
+python -m pytest -q skeleton/testing/test_architecture_map.py skeleton/testing/test_ai_app_construction.py skeleton/testing/test_provider_contract.py
+python -m skeleton app check
+python -m skeleton app status --json
+docker compose -f docker-compose.yml config --quiet
+```
+
+When these contracts disagree, construction stops until the disagreement is resolved. The solution is to repair the canonical contract or implementation, not weaken the gate.
+
+
+## 13. End-to-end request lifecycle
+
+Every non-trivial AI operation follows the same logical lifecycle even when an
+implementation optimizes away internal hops. The machine-readable source is
+`request_lifecycle` in the construction contract.
+
+```text
+0 ingress
+  -> 1 identity + authority
+  -> 2 admission / budgets
+  -> 3 orchestration + durable identity
+  -> 4 context / retrieval / memory
+  -> 5 routing
+  -> 6 provider execution
+  -> 7 verification
+  -> 8 tools / side effects
+  -> 9 state + artifacts
+  -> 10 response / resumable stream
+  -> 11 telemetry + evaluation hooks
+```
+
+### 13.1 Ingress
+
+Ingress performs cheap rejection before expensive work. Validate schema, size,
+content type, supported operation, explicit user input limits, and request
+metadata. A malformed request must never consume a provider call merely to learn
+that it was malformed.
+
+The ingress result is a validated request envelope. It is not yet authorized.
+
+### 13.2 Identity and authority
+
+Attach principal, tenant, session, and capability scope before reading protected
+memory or data. Authentication and authorization remain separate decisions.
+
+Authority is evaluated against the concrete resource and action, not a model's
+natural-language claim that an action is needed.
+
+### 13.3 Admission
+
+Admission decides whether the operation fits current cost, latency, token,
+concurrency, storage, and queue budgets. This decision occurs before spawning
+large agent graphs, provider calls, or privileged tools.
+
+The long-term contract is an admission receipt containing the budget class,
+estimated consumption, decision, and reason.
+
+### 13.4 Orchestration
+
+Create an operation ID, task/plan identity, idempotency key, deadline, and trace
+ID. Durable workflows persist enough intent to recover without repeating
+non-idempotent work.
+
+The orchestrator owns state transitions. A provider response cannot directly
+declare an operation complete.
+
+### 13.5 Context
+
+Build context from separately typed sources:
+
+```text
+system/developer instructions
+user request
+authorized session history
+authorized memory
+retrieved evidence + provenance
+tool results
+explicit product state
+```
+
+Preserve the source and trust level of each section. Do not flatten untrusted
+retrieval or tool output into system instructions.
+
+### 13.6 Routing
+
+Apply hard constraints before scoring preferences. If privacy, capability,
+context, cost, reliability, or latency constraints eliminate every endpoint,
+return a sanitized no-route decision rather than silently using an incompatible
+provider.
+
+### 13.7 Provider execution
+
+A provider adapter may execute only after a valid architecture receipt exists.
+Credentials stay at the provider edge. Timeout, retry, output-size, endpoint,
+and error-normalization rules are part of the adapter contract.
+
+### 13.8 Verification
+
+Verification converts raw candidate output into a qualified result. Depending on
+risk this may be structural validation, deterministic checks, retrieval-backed
+claim verification, policy checks, or a separate verifier.
+
+Verification failure can produce retry, abstention, escalation, or a partial
+result. It must not be silently converted into confidence.
+
+### 13.9 Actions
+
+A model can propose an action. The tool runtime decides whether that action is
+authorized, valid, affordable, safe, and idempotent.
+
+Write/destructive actions require stronger authority and receipts than reads.
+
+### 13.10 State and artifacts
+
+Persist only under the declared data lifecycle. State writes and artifacts need
+tenant ownership, hashes/versions where relevant, retention, and rollback or
+compensation behavior.
+
+### 13.11 Response and stream
+
+The response plane converts internal state into an API result or ordered event
+stream. A transient transport loss must not imply task loss.
+
+### 13.12 Telemetry and evaluation
+
+Close the trace with the route, provider/model actually used, tool receipts,
+artifact/state references, latency/cost, terminal status, and evaluation hooks.
+Operational telemetry must not contain secrets or unrestricted user payloads.
+
+## 14. Canonical envelopes
+
+The machine contract defines minimum fields; implementations may add fields but
+may not remove required semantics.
+
+### 14.1 Operation envelope
+
+Required semantic fields:
+
+- `operation_id`
+- `tenant_id`
+- `actor_id`
+- `capability`
+- `created_at`
+- `deadline`
+- `idempotency_key`
+- `trace_id`
+
+The operation ID identifies the user-visible unit of work. The trace ID can span
+multiple internal operations but must never replace idempotency identity.
+
+### 14.2 Provider request
+
+The provider-neutral boundary carries instructions, prompt, history, requested
+model, and output budget. Provider-specific optional knobs belong in a carefully
+bounded extension layer, not feature routes.
+
+### 14.3 Route decision
+
+Record selected endpoint, candidates, hard rejections, applicable budgets, and
+routing timestamp. This allows later explanation of why a provider/model was
+used without exposing credentials.
+
+### 14.4 Evidence envelope
+
+Evidence requires source, hash, retrieval time, authority/ACL context, and
+provenance. A citation without retrievable provenance is presentation metadata,
+not evidence.
+
+### 14.5 Tool receipt
+
+A tool receipt binds operation, tool, authority, normalized input hash, start/end
+time, status, and result reference. The raw secret input must not be stored just
+because a receipt exists.
+
+### 14.6 Artifact envelope
+
+Artifacts require content identity, media type, size, owner/tenant, malware
+state, and retention state. Generated artifacts and uploaded artifacts share the
+same lifecycle after creation.
+
+### 14.7 Stream event
+
+A resumable event must include operation ID, globally or operation-unique event
+ID, monotonically ordered sequence, type, timestamp, and payload.
+
+### 14.8 Release evidence
+
+A release evidence envelope binds source SHA, architecture tag, construction
+version, tests, evaluations, security evidence, provenance, and rollback target.
+
+## 15. Data classification and movement
+
+The four baseline classes are hierarchical.
+
+| Class | Typical content | Provider transfer | Logging |
+| --- | --- | --- | --- |
+| public | published docs, public examples | allowed for declared purpose | allowed |
+| internal | repository/product internals | declared provider + purpose | sanitized |
+| confidential | tenant/user/business-sensitive | explicit policy, minimization, tenant and purpose | metadata only |
+| restricted | credentials, prohibited transfer data, high-risk private material | deny by default | never raw |
+
+Classification travels with data. Copying confidential text into a prompt does
+not downgrade it to "prompt data."
+
+Every cross-boundary movement answers:
+
+1. what data class is this?
+2. which tenant/owner controls it?
+3. what purpose authorizes movement?
+4. which destination receives it?
+5. is the destination allowed for this class?
+6. what minimum subset is required?
+7. how long may it remain?
+8. how is deletion/export propagated?
+9. what receipt records the decision?
+
+Provider routing therefore consumes privacy classification as a hard constraint,
+not merely a preference score.
+
+## 16. Trust-zone topology
+
+### 16.1 Human client
+
+Treat all client input as untrusted. The frontend may improve UX validation but
+server boundaries repeat authoritative validation.
+
+### 16.2 Application API
+
+The backend can hold secret references and credentials at approved edges, but
+request payloads remain untrusted after authentication.
+
+### 16.3 Engine runtime
+
+Skeleton code is trusted executable code; task payloads, model output, memory,
+retrieved evidence, and tool results remain typed data with their own trust
+levels.
+
+### 16.4 Data plane
+
+Mongo, Chroma, and artifact storage contain durable governed state. Durable does
+not mean trusted: content may originate from users, models, or external sources.
+
+### 16.5 External provider
+
+External providers are processors at a trust boundary. Only declared providers
+receive approved data classes. Provider output is untrusted until normalized
+and, where required, verified.
+
+### 16.6 Tool sandbox
+
+Tools receive least privilege. File, network, credential, and subprocess access
+are capabilities, never defaults.
+
+### 16.7 Accelerators
+
+Native/JVM accelerators can implement compute primitives but cannot become
+policy owners. A correct fallback path must exist unless the capability is
+explicitly declared accelerator-required.
+
+### 16.8 Repository automation
+
+Repository automation is a privileged control plane. It can modify source and
+may possess scoped GitHub/provider credentials, so its model client uses the
+separate `automation_model` provider family and the same mandatory manual
+receipt.
+
+## 17. Provider surface inventory
+
+The repository currently recognizes six provider-related surfaces.
+
+| Surface | Role | Credential-bearing | Status |
+| --- | --- | ---: | --- |
+| `backend/core/ai_provider.py` | canonical product runtime provider execution | yes | canonical |
+| `backend/core/ai_provider_compat.py` | legacy backend source compatibility | no | compatibility |
+| `skeleton/jeeves/providers.py` | synchronous Jeeves network compatibility | yes | transitional |
+| `skeleton/automation/free_model.py` | repository automation model execution | yes | canonical automation |
+| `skeleton/frontier/model_runtime.py` | provider-neutral runtime protocols/adapters | no | library |
+| `skeleton/jeeves/agent/provider.py` | provider-neutral retry/cache/circuit logic | no | library |
+
+The transitional Jeeves surface is an explicit P0 convergence gap. It is now
+receipt-gated, and undeclared Anthropic activation is denied even if a legacy
+key exists. The remaining closure step is transport convergence so credential
+ownership no longer exists in two product-runtime locations.
+
+A provider-neutral library may model provider concepts without an activation
+receipt only when it does not own credentials or network activation. The moment
+it becomes credential-bearing, it must become a declared provider surface.
+
+## 18. Provider onboarding protocol
+
+Adding a runtime provider is a construction change, not a configuration toggle.
+
+1. Add a declaration to `runtime_model_providers`.
+2. Specify state, protocol, credentials, optional configuration, capabilities,
+   undeclared-capability policy, and network policy.
+3. Add a concrete adapter behind the canonical product provider boundary.
+4. Ensure the adapter cannot activate before
+   `load_provider_architecture(provider_id, provider_family="runtime_model")`.
+5. Add endpoint validation appropriate to the provider.
+6. Add bounded timeout/retry/output behavior.
+7. Normalize response and error types.
+8. Add provider metadata to routing.
+9. Add privacy ceiling and cost/latency characteristics.
+10. Add contract, malformed-output, timeout, unavailable, secret-redaction, and
+    outage tests.
+11. Add failure/fallback evaluation.
+12. Update provider-surface inventory only if a new credential-bearing owner is
+    truly necessary; normally it is not.
+13. Run all architecture/construction/provider gates.
+14. Do not advertise the provider as available until the declaration and receipt
+    path are green.
+
+Repository automation follows the same protocol under
+`automation_model_providers`; it must not be conflated with the product model
+plane.
+
+## 19. Environment profiles
+
+### Development
+
+Development may use local source mounts and disposable state. Secrets remain
+external to source. Provider declarations still apply: development is not a
+permission to bypass provider policy.
+
+### CI
+
+CI favors deterministic fakes and contract tests. Live provider access is not a
+required merge gate. CI secrets are narrowly scoped and should be unnecessary
+for static architecture validation.
+
+### Staging
+
+Staging rehearses production network policy, migrations, persistence,
+governance, budgets, and rollback. Staging budgets may be smaller but semantics
+should match production.
+
+### Production
+
+Production uses immutable images, explicit egress, managed secret references,
+durable migration/backup/restore, provider privacy/cost/SLO admission, canary
+promotion, and proven rollback.
+
+A behavior that only works under a development hot mount is not production
+functionality.
+
+## 20. Operation state machines
+
+### 20.1 Generic operation
+
+```text
+created
+ -> validated
+ -> authorized
+ -> admitted
+ -> running
+ -> {completed | failed | cancelled}
+```
+
+Optional states may include queued, waiting-for-tool, waiting-for-user,
+reconnecting, retrying, or degraded. Every state transition has one owner.
+
+### 20.2 Durable job
+
+```text
+queued
+ -> leased
+ -> running
+ -> checkpointed*
+ -> terminal
+```
+
+A lease requires expiry/fencing. A stale worker must not commit after ownership
+moves to another worker.
+
+### 20.3 Tool action
+
+```text
+proposed
+ -> validated
+ -> authorized
+ -> admitted
+ -> executing
+ -> {committed | compensated | failed | cancelled}
+```
+
+### 20.4 Artifact
+
+```text
+created/uploaded
+ -> quarantined
+ -> scanned/validated
+ -> trusted-or-rejected
+ -> retained
+ -> expired/deleted
+```
+
+### 20.5 Release
+
+```text
+source
+ -> candidate
+ -> built
+ -> verified
+ -> staged
+ -> canary
+ -> {promoted | rolled-back | rejected}
+```
+
+## 21. Failure and degradation matrix
+
+| Failure | Required behavior |
+| --- | --- |
+| provider credentials absent | report unavailable; do not fabricate model output |
+| provider undeclared | fail closed even if credentials exist |
+| provider timeout | bounded retry/fallback; sanitized error |
+| provider malformed output | reject/normalize; never trust shape implicitly |
+| no route fits privacy/cost/capability | explicit no-route result |
+| retrieval unavailable | degrade only if product contract allows context-free execution |
+| tool denied | operation records denial; no attempted side effect |
+| tool timeout | bounded cancellation/compensation policy |
+| storage unavailable | do not claim durable completion |
+| duplicate request | idempotency returns prior/in-progress result instead of duplicating side effect |
+| stale worker | fencing rejects commit |
+| stream disconnect | task continues according to operation policy; client can resume |
+| event duplicate/out-of-order | client reducer deduplicates/orders by sequence |
+| artifact scan failure | remain quarantined/rejected |
+| telemetry sink unavailable | product may degrade, but security/audit-critical evidence can block protected operations or promotion |
+| migration failure | do not route production traffic |
+| canary SLO breach | stop promotion and rollback |
+| architecture/manual mismatch | provider/build activation fails closed |
+
+## 22. Resource budget hierarchy
+
+Budgets exist at multiple scopes and are composed, not overwritten:
+
+```text
+deployment
+  -> tenant
+     -> user/session
+        -> operation
+           -> model call / tool call / retrieval / artifact
+```
+
+Budget dimensions include:
+
+- input tokens;
+- output tokens;
+- provider monetary estimate;
+- wall-clock deadline;
+- provider timeout;
+- tool timeout;
+- total retries;
+- agent fan-out;
+- concurrent operations;
+- queued operations;
+- retrieval documents/chunks;
+- memory/context characters or tokens;
+- artifact bytes;
+- storage retention;
+- network response bytes.
+
+A child operation cannot grant itself a larger budget than its parent.
+
+## 23. Concurrency, retries, and idempotency
+
+Retries multiply load and cost. Combine them with deadlines, idempotency, circuit
+breaking, queue bounds, and concurrency caps.
+
+Rules:
+
+- one layer owns retries for a given failure;
+- nested retry loops require an explicit total-attempt bound;
+- retry only errors classified as retryable;
+- preserve the operation deadline across attempts;
+- jitter backoff for shared upstream failures;
+- writes use idempotency keys or explicit compensation;
+- a timed-out caller does not automatically mean a timed-out side effect;
+- cancellation propagation is explicit.
+
+## 24. Observability contract
+
+Every significant operation should be reconstructable without exposing secrets.
+
+Minimum correlation keys:
+
+- trace ID;
+- operation ID;
+- tenant ID or privacy-safe tenant reference;
+- route/provider/model IDs;
+- tool IDs;
+- artifact/state references;
+- release/build ID where applicable.
+
+Minimum metrics:
+
+- request success/failure/cancellation;
+- p50/p95/p99 latency where volume supports it;
+- provider latency and failure class;
+- token/usage/cost estimate;
+- route rejection reasons;
+- retrieval hit/quality metrics;
+- tool success/timeout/denial;
+- queue depth and admission denial;
+- stream disconnect/resume;
+- artifact scan/rejection;
+- eval/regression result;
+- canary/rollback result.
+
+Logs are structured and redacted. Metrics should avoid cardinality explosions from
+raw user IDs, prompts, or arbitrary model text.
+
+## 25. Evaluation ladder
+
+Use the cheapest trustworthy evidence first.
+
+```text
+static/schema checks
+ -> deterministic unit tests
+ -> contract tests
+ -> integration tests
+ -> golden journeys
+ -> deterministic offline eval
+ -> model-based eval where justified
+ -> chaos/fault injection
+ -> canary production evidence
+```
+
+Model-based evaluation does not replace deterministic assertions when expected
+behavior can be encoded directly.
+
+Promotion compares against a baseline and records the dataset/eval version,
+provider/model/configuration, significant prompt/context contract version, and
+metrics.
+
+## 26. Release evidence bundle
+
+Every production candidate should be able to produce or reference:
+
+1. source SHA;
+2. architecture tag and construction version;
+3. architecture validator output;
+4. construction validator output;
+5. provider bootstrap output;
+6. app assembly output;
+7. focused and broad test evidence;
+8. security/dependency/malware/provenance evidence;
+9. behavior evaluation evidence where relevant;
+10. migration/preflight evidence when state changes;
+11. build artifact identity and SBOM/provenance;
+12. smoke/canary evidence;
+13. explicit rollback target and triggers.
+
+"CI was green earlier" is not a release evidence bundle unless it is bound to
+the exact source/artifact being promoted.
+
+## 27. Current construction work packages
+
+### WP-P0-PROVIDER-SURFACES
+
+**Objective:** one mandatory receipt semantics and ultimately one product-runtime
+credential/transport owner.
+
+Current construction already completed in this lane:
+
+- shared receipt loader: `skeleton/provider_contract.py`;
+- backend loader converted to compatibility re-export;
+- direct backend provider registry/adapter receipt enforcement;
+- AI Assistant, AI Hub, game LLM service, and legacy LLM router converged on the
+  canonical registry semantics;
+- repository automation declared as a separate provider family and receipt-gated;
+- Jeeves OpenAI/Anthropic network adapters receipt-gated;
+- Anthropic remains denied because it is undeclared;
+- provider-surface inventory and validator enforcement added.
+
+Remaining closure:
+
+- retain `LocalEchoProvider` as offline deterministic fallback;
+- prove on the current head that repository-wide provider discovery reports only
+  the declared credential-bearing owners;
+- prove SDK isolation across backend and engine source;
+- close the gap only after those CI receipts are green.
+
+The canonical runtime now owns text generation, image generation, image
+variation, image editing, and speech synthesis. Application routes and
+`core/expressive_tts.py` consume provider-neutral media contracts and do not
+own runtime-model credentials. Gemini and Grok remain explicit undeclared states
+until their adapters are formally onboarded through the provider protocol.
+
+### WP-P0-GOVERNANCE
+
+**Status: in progress.** Baseline provider-transfer classification and pre-I/O
+enforcement are implemented; broader lifecycle governance remains open.
+
+Owners are materialized in `skeleton/kernel/governance.py`,
+`skeleton/shells/ai/governance.py`, `backend/routes/governance.py`,
+`backend/core/model_router.py`, context, and memory surfaces.
+
+Construction sequence:
+
+1. define one data-class enum/registry matching this manual;
+2. add a governance decision object with tenant, purpose, source class,
+   destination, decision, and reason;
+3. attach classification to memory and retrieval evidence;
+4. require provider-transfer decision before provider invocation;
+5. require artifact/write classification;
+6. implement retention/deletion/export hooks;
+7. emit privacy-safe decision telemetry;
+8. add denial-first tests.
+
+### WP-P0-COST-ADMISSION
+
+**Status: in progress.** Deterministic admission contracts, provider pre-I/O
+gating, and model-routing budget projection are implemented. Durable tenant
+quotas, live pressure, and actual-usage accounting remain open.
+
+Construction sequence:
+
+1. define hierarchical budget object;
+2. estimate provider input/output cost before route execution;
+3. combine tenant quota, request budget, queue pressure, and deadline;
+4. produce admit/defer/reject receipt;
+5. pass residual budget to routing;
+6. meter actual provider/tool/storage use;
+7. close the estimate/actual loop;
+8. test saturation and graceful shedding.
+
+### WP-P0-STREAM
+
+Construction sequence:
+
+1. freeze stream event schema;
+2. assign monotonic per-operation sequence;
+3. persist or reconstruct replay state;
+4. define heartbeat and idle policy;
+5. define cancellation race semantics;
+6. define terminal events;
+7. implement frontend reducer with event-ID dedupe;
+8. implement resume cursor;
+9. bound per-client buffers/backpressure;
+10. test disconnects at every transition.
+
+### WP-P1-PROVIDER-REDUNDANCY
+
+Do not recreate the old "catalog says three providers" behavior. Either add a
+real declared second provider or explicitly approve a single-provider
+availability objective.
+
+A real second provider must pass the complete onboarding protocol in section 18.
+
+### WP-P0-GOLDEN-JOURNEYS
+
+The E2E suite must prove at least:
+
+- simple prompt -> result;
+- retrieval -> evidence/citation -> result;
+- tool proposal -> authority -> receipt -> result;
+- artifact creation -> validation -> reference;
+- provider unavailable -> truthful degraded state;
+- cancel while running;
+- disconnect -> reconnect -> resume;
+- duplicate submission -> idempotent behavior;
+- trace continuity across frontend/backend/engine/provider/tool.
+
+### WP-P1-FEEDBACK
+
+Feedback collection and behavior mutation are separate systems. Promotion
+requires an experiment/evaluation receipt and rollback baseline.
+
+### WP-P1-RELEASE-SLO
+
+Canary promotion consumes the same error/latency/provider-quality signals that
+operators observe. Rollback is automated for objective breach with an auditable
+override path.
+
+## 27A. Wave 1 implementation ledger
+
+### Governance slice implemented
+
+The provider edge now performs a baseline governance decision before constructing
+or invoking the external provider client.
+
+Implemented code:
+
+- `skeleton/vault/data_governance.py` defines `DataClass`,
+  `ProviderTransferRequest`, `ProviderTransferDecision`, and fail-closed
+  evaluation;
+- `backend/core/ai_provider.py` requires a transfer decision before provider
+  I/O;
+- restricted data is denied by the generic external-provider path;
+- confidential data requires a tenant identity;
+- transfer purpose is allowlisted;
+- successful calls return a non-secret `gov-*` decision ID and the effective
+  data class;
+- the decision receipt never contains prompt or payload content.
+
+This does **not** close the governance P0 gap. Still required:
+
+- classification propagation through memory, retrieval, artifacts and durable
+  state;
+- a single provider privacy-ceiling bridge across every route;
+- deletion propagation;
+- export inventory;
+- retention expiry enforcement;
+- durable governance/audit evidence at all required boundaries.
+
+### Cost/admission slice implemented
+
+`skeleton/intelligence/admission.py` now defines the shared pre-allocation
+budget vocabulary:
+
+- `ResourceBudget`;
+- `UsageEstimate`;
+- `RuntimePressure`;
+- `AdmissionRequest`;
+- `AdmissionDecision`;
+- admit/defer/reject semantics.
+
+The deterministic gate currently covers:
+
+- input token ceiling;
+- output token ceiling;
+- estimated provider cost;
+- wall-time estimate;
+- provider attempt count;
+- tool-call estimate;
+- artifact-byte estimate;
+- concurrency saturation;
+- queue saturation;
+- operation deadline.
+
+Provider execution now receives an admission receipt before the SDK client is
+used. `RouteRequest.from_resource_budget(...)` projects the same cost,
+output-token, and wall-time ceiling into model routing, preventing downstream
+routing code from silently widening the caller's resource envelope.
+
+Successful provider responses therefore carry two independent non-secret
+control receipts:
+
+```text
+governance_decision_id = gov-...
+admission_decision_id  = adm-...
+```
+
+This does **not** close the cost/capacity P0 gap. Still required:
+
+- durable/per-tenant quota accounting;
+- live concurrency and queue pressure feed;
+- actual token/cost/tool/storage usage accounting;
+- estimate-versus-actual feedback;
+- admission integration at expensive tool/artifact/non-provider operations.
+
+### Required ordering at the provider edge
+
+The enforced order is:
+
+```text
+validate ProviderRequest
+  -> governance decision
+  -> resource admission
+  -> architecture/provider receipt
+  -> provider client
+  -> external I/O
+  -> normalized ProviderResponse
+```
+
+No denied request should increment the provider-call counter. Regression tests
+explicitly assert that property.
+
+## 28. Work-package execution protocol
+
+When a builder takes a work package:
+
+1. read the five mandatory bootstrap documents;
+2. locate its gap and work package in the machine contract;
+3. inspect every declared owner/evidence path;
+4. confirm the gap still exists on the current base;
+5. write or refine the interface contract first;
+6. implement the smallest vertical slice that can produce closure evidence;
+7. add unit and failure tests with the slice;
+8. update observability with the behavior, not afterward;
+9. run architecture/construction/provider gates immediately;
+10. run focused domain tests;
+11. run integration/golden tests appropriate to the package;
+12. update gap status only when closure evidence exists;
+13. if architecture changed, update the machine contract and manual in the same
+    lane;
+14. never delete a gap merely because work moved to another branch.
+
+## 29. Architecture-change protocol
+
+A change is architectural when it adds or moves any of:
+
+- runtime root;
+- runtime service;
+- canonical capability owner;
+- provider family or credential-bearing provider surface;
+- cross-plane dependency;
+- durable store;
+- external trust boundary;
+- public API version;
+- authority model;
+- release/promotion mechanism.
+
+For architectural changes:
+
+```text
+proposal
+ -> machine contract update
+ -> dependency/cycle validation
+ -> implementation
+ -> migration/compatibility layer
+ -> evidence
+ -> architecture tag bump
+ -> release
+ -> compatibility retirement
+```
+
+Do not perform physical directory moves first. Establish ownership, adapters,
+imports, routes, tests, packaging, and rollback before relocating implementation.
+
+## 30. Testing matrix
+
+Each capability should be tested across these dimensions where applicable:
+
+| Dimension | Examples |
+| --- | --- |
+| happy path | valid request, valid provider response |
+| malformed input | schema/type/size violation |
+| authorization | unauthenticated, unauthorized, wrong tenant |
+| dependency unavailable | provider/storage/retrieval/tool down |
+| timeout | provider/tool/job deadline |
+| cancellation | before start, during I/O, during side effect |
+| retry | retryable vs non-retryable |
+| idempotency | duplicate submit, duplicate delivery |
+| concurrency | saturation, lease race, stale worker |
+| security | injection, SSRF, secret leakage, unsafe file |
+| privacy | prohibited provider transfer, cross-tenant retrieval |
+| observability | trace/receipt emitted and sanitized |
+| recovery | restart, reconnect, resume, restore |
+| performance | budget and backpressure |
+| compatibility | old client/manifest/schema where supported |
+| rollback | release or migration reversal |
+
+## 31. Production-readiness decision tree
+
+A capability may be marked structurally present when its owner, interfaces,
+dependencies, failure behavior, and acceptance evidence exist.
+
+It may be marked production-ready only when:
+
+```text
+declared?
+  no -> stop
+owned?
+  no -> stop
+authorized?
+  no -> stop
+bounded?
+  no -> stop
+observable?
+  no -> stop
+tested happy + failure paths?
+  no -> stop
+evaluated where nondeterministic?
+  no -> stop
+deployable and rollback-capable?
+  no -> stop
+P0 gap for this capability still open?
+  yes -> stop
+otherwise -> eligible for production promotion
+```
+
+This distinction prevents "code exists" from being confused with "system is
+operationally complete."
+
+## 32. Provider-readable construction guarantee
+
+The mandatory provider rule is enforced at three different layers:
+
+1. **Development-provider layer.** Provider-specific repository instruction
+   files point every coding agent to the same five bootstrap documents.
+2. **Runtime/automation activation layer.** Credential-bearing AI provider
+   clients call `skeleton/provider_contract.py` and receive a digest-bound
+   receipt before external I/O.
+3. **CI layer.** `scripts/check_provider_bootstrap.py` verifies instruction
+   entrypoints, shared loader semantics, provider-family declarations, provider
+   surface inventory, image materialization, SDK isolation, and receipt tokens.
+
+This is deliberately redundant. The goal is not to trust that a provider
+"probably saw" the architecture; the goal is to make architecture
+acknowledgement a condition of activation or repository work.
+
+
+## 33. Canonical operation and stream construction
+
+The first transport-independent portion of `WP-P0-STREAM` is now materialized.
+
+### 33.1 Operation identity
+
+Use `skeleton/contracts/operation.py` for operation identity and state. Do not
+create route-local or provider-local operation state machines.
+
+The required path is:
+
+```text
+created
+ -> validated
+ -> authorized
+ -> admitted
+ -> {queued ->} running
+ -> optional waiting/retrying/degraded states
+ -> {completed | failed | cancelled}
+```
+
+Terminal states are final. Skipping validation/authorization/admission is an
+architecture violation for governed expensive work.
+
+`operation_id` is the durable unit-of-work identity. `trace_id` is only
+correlation. `idempotency_key` participates in duplicate identity and must not
+be replaced by the trace identifier.
+
+### 33.2 Durable operation authority and transactional outbox
+
+Use `skeleton/persistence/operation_store.py` as the reference durable binding
+for the canonical operation state machine. The store persists operation identity,
+state, optimistic version, and update time. A repeated idempotency identity
+returns the original operation instead of creating parallel work; a reused
+operation ID with different immutable identity fails closed.
+
+Every accepted create or transition writes an outbox event intent in the same
+SQLite transaction as the operation state change. The outbox event ID is
+deterministic for `namespace + operation_id + operation_version`, so dispatch
+into `SQLiteOperationEventStore` can retry the exact event safely. The
+dispatcher acknowledges an outbox row only after durable stream acceptance.
+
+The authority rule is:
+
+```text
+OperationEnvelope durable state
+        |
+        | same transaction
+        v
+transactional outbox intent
+        |
+        | retry-stable dispatch
+        v
+canonical operation event stream
+        |
+        v
+SSE / WebSocket / polling projection
+```
+
+The stream never advances operation truth. If dispatch fails, the unpublished
+outbox row remains recovery work. A process restart reloads the durable
+operation state and resumes pending outbox delivery; terminal operation state is
+never reopened to make transport recovery easier.
+
+The SQLite repository is the reference/conformance implementation. Production
+may replace it only with a backend that preserves the same identity, version,
+terminal-state, transaction/outbox, backup, restore, and migration semantics.
+
+### 33.3 Event protocol
+
+Use `skeleton/frontier/operation_stream.py` as the protocol oracle.
+
+Every event has:
+
+- schema version;
+- operation ID;
+- unique event ID;
+- positive monotonic sequence;
+- normalized event type;
+- timezone-aware timestamp;
+- strict JSON bounded payload.
+
+The reference log intentionally fails on overflow. Dropping retained events to
+make room is prohibited because it can turn a reconnect into silent state loss.
+
+### 33.4 Replay
+
+A reconnect presents the operation ID plus last acknowledged sequence. Replay
+returns later events in sequence. If requested history was compacted, return an
+explicit replay-gap failure and reconstruct from durable operation state or force
+a state resync; never pretend that no events occurred.
+
+### 33.5 Duplicate and ordering semantics
+
+The same event ID may be accepted twice only when its full canonical content is
+identical. Reusing an event ID for different content is corruption.
+
+Pre-built events from durable producers must arrive at exactly the next
+sequence. Out-of-order delivery is rejected at the protocol boundary and may be
+buffered only by a higher-level adapter with explicit bounded policy.
+
+### 33.6 Terminal events
+
+`operation.completed`, `operation.failed`, and `operation.cancelled` are
+terminal. No later progress/result event may be appended for that operation.
+
+### 33.7 Backpressure and consumer acknowledgement
+
+The reference log backpressures publishers when its retained window is full.
+Production adapters may use bounded queues, durable streams, credits or consumer
+acks, but may not silently drop unacknowledged operation events.
+
+The SQLite reference store implements leased consumer acknowledgements. Every
+live client registers a bounded `consumer_id` lease and advances a monotonic
+`acknowledged_through` sequence only after applying and durably recording its
+local resume cursor. Safe compaction is the minimum acknowledgement across all
+active consumers. If no active consumer exists, compaction does not advance
+implicitly.
+
+Consumer leases expire deliberately. An abandoned client must not block
+retention forever; after expiry it no longer constrains compaction and must
+perform explicit resync if its persisted cursor predates retained history.
+Consumer identity is transport/session identity, not authorization. Tenant
+authorization is checked separately before replay, acknowledgement, status, or
+cancellation.
+
+For the assembled frontend, event payloads remain memory-only. Only the
+operation replay cursor is persisted. The app session receives a non-secret
+consumer lease identity, registers it on replay, persists the cursor after
+successful reducer application, and then acknowledges that sequence.
+
+### 33.8 Current backend/frontend transport
+
+The backend exposes one canonical transport surface under
+`/api/operations/{operation_id}`:
+
+- status from durable `OperationEnvelope` authority;
+- authenticated JSON cursor replay for Expo/native clients;
+- authenticated SSE replay/follow with `Last-Event-ID`;
+- explicit consumer acknowledgement;
+- cancellation through the canonical operation state machine;
+- heartbeat and idle-close behavior;
+- explicit replay-gap/resync signaling.
+
+The frontend uses `frontend/services/operationStreamReducer.ts` as the pure
+state transition contract and `frontend/services/operationStream.ts` as the
+authenticated cursor/replay client. Duplicate IDs, out-of-order events,
+sequence gaps, cross-operation events, unsupported schema versions, and
+post-terminal events fail closed into `resync_required`.
+
+### 33.9 Remaining stream closure work
+
+The local/reference streaming stack is substantially implemented. Remaining
+required work is:
+
+1. bind production orchestration to the durable operation/outbox/stream stores;
+2. define distributed single-writer or partition ownership for multi-worker deployment;
+3. automate acknowledgement-safe retention/compaction policy;
+4. add user-visible reconnect/resync UX to the screens consuming long operations;
+5. prove slow-client, process-restart, disconnect/reconnect and cancel-race behavior in browser/device E2E;
+6. prove equivalent semantics for any future non-SQLite production stream backend.
+
+
+## 34. Durable stream store
+
+`SQLiteOperationEventStore` is now the durable reference implementation for
+the canonical stream protocol.
+
+It provides transactional exact-next sequence enforcement, operation-scoped
+unique event IDs, durable terminal fencing, replay from an explicit cursor,
+explicit compaction watermarks, replay-gap failure, strict corruption rejection,
+and bounded retained-event capacity with backpressure.
+
+SQLite is a portable conformance backend, not an architectural mandate. Another
+durable substrate may replace it only if the same protocol invariants and tests
+remain green.
+
+The P0 stream gap remains open only for transport/client integration: backend
+SSE or WebSocket, heartbeat/idle policy, cancellation bridge, frontend
+reducer/resume, multi-client acknowledgement, and end-to-end recovery evidence.
+
+## 35. Physical structure and assembly law
+
+This section is mandatory for implementation work. Logical capability design is
+not sufficient; every change must land in the physical structure declared by
+`machine/architecture.json -> structural_blueprint`.
+
+The structural checkpoint is `structure-map/v1.3`.
+
+### 35.1 Construction decision sequence
+
+Before creating or moving code, resolve the change in this order:
+
+1. **Capability plane** — identify the existing plane in
+   `machine/ai_app_construction.json`. If no plane owns the capability, the
+   contract must be extended before implementation.
+2. **Runtime zone** — use the plane's structural placement. Do not choose a
+   convenient neighboring root.
+3. **Physical owner** — extend the declared package/module owner unless the
+   architecture change intentionally transfers ownership.
+4. **Composition point** — wire the capability only from an approved
+   composition root when multiple owners must be assembled.
+5. **Cross-zone contract** — if execution crosses a zone boundary, preserve an
+   existing declared interface or add the interface to the architecture first.
+6. **State authority** — determine which plane owns durable truth. Caches,
+   projections and transport buffers remain subordinate.
+7. **Recovery domain** — define failure, restart, retry and degraded behavior
+   according to the plane's recovery domain.
+8. **Evidence** — add focused tests proving placement, contract behavior,
+   authority, failure behavior and any state transition.
+9. **Manifest linkage** — keep architecture, repository and runtime tags aligned.
+10. **Validation** — run architecture validation before dependency-heavy test
+    suites so structural drift fails early.
+
+### 35.2 Plane placement registry
+
+The following registry is generated from the machine contract and is the
+physical destination map for implementation:
+
+| Plane | Zone | Canonical owner | Structural role |
+| --- | --- | --- | --- |
+| `foundation` | `engine` | `skeleton/kernel` | internal-capability |
+| `identity` | `engine` | `skeleton/api` | internal-capability |
+| `configuration-secrets` | `engine` | `skeleton/config` | internal-capability |
+| `model-provider` | `engine` | `skeleton/provider_runtime.py` | provider-boundary |
+| `model-routing` | `engine` | `skeleton/frontier/model_routing.py` | policy-boundary |
+| `prompt-context` | `engine` | `skeleton/context` | internal-capability |
+| `orchestration` | `engine` | `skeleton/intelligence` | internal-capability |
+| `reasoning-verification` | `engine` | `skeleton/intelligence` | internal-capability |
+| `tool-runtime` | `engine` | `skeleton/skills` | internal-capability |
+| `memory` | `engine` | `skeleton/memory` | state-boundary |
+| `retrieval` | `engine` | `skeleton/retrieval` | internal-capability |
+| `data-persistence` | `engine` | `skeleton/persistence` | state-boundary |
+| `jobs-durability` | `engine` | `skeleton/agents` | state-boundary |
+| `artifact-files` | `engine` | `skeleton/artifact_plane` | state-boundary |
+| `application-api` | `application` | `backend` | service-boundary |
+| `engine-api` | `engine` | `skeleton/api` | service-boundary |
+| `product-experience` | `product` | `frontend` | product-shell |
+| `streaming-realtime` | `application` | `backend` | transport-boundary |
+| `security-safety` | `engine` | `skeleton/security` | security-boundary |
+| `governance` | `engine` | `skeleton/vault` | governance-boundary |
+| `resilience` | `engine` | `skeleton/reliability` | internal-capability |
+| `observability` | `engine` | `skeleton/observability` | telemetry-boundary |
+| `evaluation` | `engine` | `skeleton/eval` | evidence-boundary |
+| `feedback-learning` | `engine` | `skeleton/learning` | promotion-boundary |
+| `cost-capacity` | `engine` | `skeleton/intelligence` | admission-boundary |
+| `operator-control` | `application` | `backend/core/product_control_runtime.py` | control-boundary |
+| `deployment-release` | `engine` | `skeleton/deploy` | release-boundary |
+
+Do not create a second owner because an existing owner is large. Split the
+existing owner internally first, then transfer ownership through an explicit
+architecture change if the split deserves a new plane.
+
+### 35.3 Composition discipline
+
+Approved composition roots are:
+
+- `skeleton/app/assembly.py` — Compose declared runtime services and operator topology; never absorb domain business logic.
+- `skeleton/__main__.py` — Dispatch operator commands into owned engine/application surfaces without creating alternate runtimes.
+- `backend/server.py` — Mount application routes, middleware, and shared application dependencies; feature logic remains in owned modules.
+- `frontend/app/_layout.tsx` — Mount product providers, guards, and navigation shell; service ownership remains behind canonical API clients.
+- `skeleton/provider_runtime.py` — Construct credential-bearing runtime provider adapters after governance, admission, and architecture receipt checks.
+- `backend/core/model_router.py` — Select among declared provider capabilities using bounded evidence and budgets without performing provider network I/O.
+
+Composition code should be shallow. It may instantiate, inject, mount, select or
+sequence owned components. It should not contain durable business rules,
+provider-specific transport, cross-tenant state, or hidden fallback behavior.
+
+When a composition root starts accumulating domain behavior, move that behavior
+back into the plane owner and leave only wiring in the composition root.
+
+### 35.4 State ownership discipline
+
+Canonical state authorities are:
+
+- **identity-and-principal** → `identity` → `skeleton/api`
+- **runtime-configuration-and-secrets** → `configuration-secrets` → `skeleton/config`
+- **provider-activation** → `model-provider` → `skeleton/provider_runtime.py`
+- **conversation-and-working-memory** → `memory` → `skeleton/memory`
+- **retrieval-index-and-ranking-state** → `retrieval` → `skeleton/retrieval`
+- **durable-application-records** → `data-persistence` → `skeleton/persistence`
+- **job-checkpoints-and-resume** → `jobs-durability` → `skeleton/agents`
+- **artifact-bytes-and-metadata** → `artifact-files` → `skeleton/artifact_plane`
+- **governance-policy-and-retention** → `governance` → `skeleton/vault`
+- **evaluation-evidence** → `evaluation` → `skeleton/eval`
+- **feedback-experiments-and-promotion** → `feedback-learning` → `skeleton/learning`
+- **quota-budget-and-admission** → `cost-capacity` → `skeleton/intelligence`
+- **release-and-rollback-evidence** → `deployment-release` → `skeleton/deploy`
+
+Rules:
+
+- one state class has one canonical writer-of-record authority;
+- read models may duplicate representation but not authority;
+- caches must be disposable and reconstructable;
+- transport buffers do not become durable operation truth;
+- provider responses become application state only after the owning plane
+  accepts them through its contract;
+- deletion, retention, export and tenant isolation follow the authority owner,
+  not whichever adapter happens to store a copy.
+
+### 35.5 Recovery-domain discipline
+
+#### bootstrap-authority
+
+Planes: `foundation`, `identity`, `configuration-secrets`
+
+Restart scope: engine bootstrap/configuration
+
+Degraded mode: fail closed for authority-bearing work; health may remain diagnostic-only
+
+#### provider-execution
+
+Planes: `model-provider`, `model-routing`, `cost-capacity`
+
+Restart scope: provider/routing workers
+
+Degraded mode: deny or route only to already-declared healthy capacity; never bypass receipts or budgets
+
+#### knowledge-state
+
+Planes: `memory`, `retrieval`, `data-persistence`, `prompt-context`
+
+Restart scope: knowledge and persistence adapters
+
+Degraded mode: bounded stateless mode only where the request contract permits it; never cross tenant boundaries
+
+#### cognition-action
+
+Planes: `orchestration`, `reasoning-verification`, `jobs-durability`, `tool-runtime`, `artifact-files`
+
+Restart scope: operation/job execution
+
+Degraded mode: checkpoint, cancel, or return partial evidence; never silently repeat side effects
+
+#### service-transport
+
+Planes: `application-api`, `engine-api`, `streaming-realtime`, `operator-control`
+
+Restart scope: API/transport process
+
+Degraded mode: health and explicit unavailable responses; resumable operations preserve identity and terminal state
+
+#### product-shell
+
+Planes: `product-experience`
+
+Restart scope: frontend process/session
+
+Degraded mode: preserve local UI state and surface backend/engine degradation without fabricating completion
+
+#### security-governance
+
+Planes: `security-safety`, `governance`
+
+Restart scope: policy/security boundary
+
+Degraded mode: fail closed for protected actions and external transfers
+
+#### quality-release
+
+Planes: `observability`, `resilience`, `evaluation`, `feedback-learning`, `deployment-release`
+
+Restart scope: evidence/promotion control
+
+Degraded mode: freeze promotion and learning mutation while preserving current known-good release
+
+
+A retry or restart policy that crosses one of these domains needs explicit
+evidence that it cannot duplicate side effects, widen authority, lose terminal
+operation state, or bypass a fail-closed policy.
+
+### 35.6 Adding a new capability without creating an island
+
+Use this assembly recipe:
+
+```text
+user/product need
+      ↓
+existing plane? ── no ──> declare plane + dependencies + owner
+      │ yes
+      ↓
+structural placement
+      ↓
+extend canonical owner
+      ↓
+state authority / interface / recovery classification
+      ↓
+composition wiring
+      ↓
+focused tests
+      ↓
+architecture + construction validators
+      ↓
+cross-plane integration evidence
+```
+
+The prohibited shortcut is "temporary parallel ownership." Temporary adapters
+are allowed; temporary second authorities are not.
+
+### 35.7 Moving an existing capability
+
+Physical migration is a controlled ownership transfer:
+
+1. declare the destination owner;
+2. keep the old public contract stable through an adapter;
+3. move one bounded behavior slice;
+4. prove equivalent behavior and failure semantics;
+5. move state authority only after migration and rollback are explicit;
+6. update imports, manifests, package data and CI ownership;
+7. remove the old implementation path;
+8. leave a compatibility facade only when consumers still require it;
+9. remove the facade when all callers have converged.
+
+Never bulk-move a capability merely to make the tree look cleaner. Structure is
+an execution contract, not a cosmetic directory layout.
+
+### 35.8 Structural definition of done
+
+A structural change is complete only when:
+
+- every affected plane still has exactly one owner and one placement;
+- every owner path exists inside its declared zone;
+- cross-zone dependencies are legal in the zone DAG;
+- state authority remains singular;
+- composition roots contain wiring rather than domain ownership;
+- every plane remains assigned to one recovery domain;
+- architecture, repository and runtime manifests report the same structure tag;
+- `python scripts/check_architecture_map.py` passes;
+- focused behavioral tests for the changed plane pass;
+- no transitional root has become a new runtime authority.
+
+### 35.9 Dependency and acceptance-edge procedure
+
+The production dependency graph is exception-free. Do not use a reverse runtime
+dependency to express that one plane merely checks another plane's output.
+
+Use `depends_on` only when the source plane requires the target implementation
+at runtime or construction time. That edge participates in the topological
+order and must follow the zone DAG.
+
+Use `validates` when the source consumes readiness, test, evaluation, build,
+or release evidence from another plane without importing or owning that plane.
+Every `validates` relation is mirrored by an exact
+`structural_blueprint.acceptance_edges` entry.
+
+For a proposed cross-zone relationship:
+
+1. decide whether implementation is actually required;
+2. if yes, place the dependency in `depends_on` and verify the zone DAG allows
+   it;
+3. if the zone DAG would cycle, move the capability owner downward or introduce
+   a stable interface rather than widening the graph;
+4. if only evidence is consumed, use `validates`;
+5. bind the acceptance edge to a named evidence contract and regression test;
+6. never use an acceptance edge to call implementation code or acquire state
+   authority.
+
+`structural_blueprint.dependency_exceptions` is currently empty. A future
+exception would require an explicit temporary migration case and should be
+treated as a blocker to architectural closure, not normal operating structure.
+
+
+
+### 35.10 Model-routing ownership convergence
+
+Canonical model routing is now engine-owned by
+`skeleton/frontier/model_routing.py`. This is the layer orchestration may
+depend on for capability matching, routing plans, provider ordering, budget
+projection, fallback semantics, provenance, and routing evaluation.
+
+`backend/core/model_router.py` remains materialized because application routes
+and compatibility call sites still consume its API. Treat it as a convergence
+surface, not a second routing authority. New engine code must not depend on the
+backend module.
+
+The convergence target is:
+
+```text
+application request
+  -> application facade / request shaping
+  -> engine model-routing contract
+  -> provider runtime
+  -> declared provider
+```
+
+The reverse direction is prohibited. Engine orchestration, resilience,
+verification, and cost admission do not import application routing code.
+
+## 36. Execution topology and runtime assembly
+
+The structural contract now separates four questions that must not be conflated:
+
+1. **Who owns the capability?** — `plane_placements.owner`.
+2. **Which architectural zone contains it?** — `plane_placements.zone`.
+3. **Where does it execute?** — `plane_execution.host`.
+4. **How must it behave operationally?** — `plane_execution.profile`.
+
+This distinction prevents two opposite failure modes: exploding every package
+into a service, and collapsing every capability into one process with no
+independent lifecycle semantics.
+
+### 36.1 Execution hosts
+
+#### skeleton-service
+
+- Kind: `runtime-service`
+- Runtime node: `skeleton`
+- Allowed zones: `engine`
+- Lifecycle: `compose-managed`
+- Responsibility: Host engine-owned request, policy, state-adapter, worker, and evidence planes without changing their ownership.
+
+#### backend-service
+
+- Kind: `runtime-service`
+- Runtime node: `backend`
+- Allowed zones: `application`
+- Lifecycle: `compose-managed`
+- Responsibility: Host application API, product control, and realtime transport adapters.
+
+#### frontend-client
+
+- Kind: `client-runtime`
+- Runtime node: `frontend`
+- Allowed zones: `product`
+- Lifecycle: `session-managed`
+- Responsibility: Host the human product shell and session-local presentation state.
+
+#### operator-ci
+
+- Kind: `control-execution`
+- Runtime node: none; run-scoped control execution
+- Allowed zones: `engine`
+- Lifecycle: `run-scoped`
+- Responsibility: Execute release/build/promotion control from CLI or CI without becoming a long-running product service.
+
+
+A host is a deployment/runtime container, not a domain owner. Moving a plane
+between hosts is therefore a deployment change unless its physical owner or
+zone also changes.
+
+### 36.2 Execution profiles
+
+#### library
+
+- Lifecycle: `consumer-scoped`
+- State mode: `none-or-ephemeral`
+- Scale unit: `consumer-process`
+- Shutdown: `consumer-managed`
+- Failure policy: `propagate-to-owning-plane`
+- Side-effect policy: `none-unless-declared`
+
+#### request-service
+
+- Lifecycle: `long-lived`
+- State mode: `externalized`
+- Scale unit: `service-replica`
+- Shutdown: `drain-inflight-then-stop`
+- Failure policy: `fail-health-and-reject-new-work`
+- Side-effect policy: `idempotency-required-for-mutations`
+
+#### provider-edge
+
+- Lifecycle: `request-scoped-io`
+- State mode: `external-provider`
+- Scale unit: `consumer-process`
+- Shutdown: `cancel-bounded-io`
+- Failure policy: `fail-closed-or-explicit-router-degrade`
+- Side-effect policy: `receipt-before-external-io`
+
+#### durable-state
+
+- Lifecycle: `long-lived`
+- State mode: `authoritative-durable`
+- Scale unit: `partition-or-replica`
+- Shutdown: `flush-and-fence-writes`
+- Failure policy: `reject-ambiguous-writes`
+- Side-effect policy: `single-authority-writer`
+
+#### durable-worker
+
+- Lifecycle: `long-lived-worker`
+- State mode: `checkpointed`
+- Scale unit: `worker-replica`
+- Shutdown: `checkpoint-or-terminalize`
+- Failure policy: `retry-idempotently-or-terminalize`
+- Side-effect policy: `operation-idempotency-and-receipts`
+
+#### policy-control
+
+- Lifecycle: `consumer-scoped`
+- State mode: `policy-or-ledger`
+- Scale unit: `consumer-process`
+- Shutdown: `no-special-drain`
+- Failure policy: `fail-closed-for-authority-bearing-decisions`
+- Side-effect policy: `decision-receipt-before-effect`
+
+#### realtime-transport
+
+- Lifecycle: `long-lived`
+- State mode: `durable-cursor-plus-bounded-buffer`
+- Scale unit: `transport-replica`
+- Shutdown: `preserve-resume-state-and-stop-accepting`
+- Failure policy: `reconnect-resume-or-explicit-resync`
+- Side-effect policy: `transport-never-owns-operation-truth`
+
+#### product-client
+
+- Lifecycle: `user-session`
+- State mode: `ephemeral-session`
+- Scale unit: `client-session`
+- Shutdown: `persist-bounded-resume-state`
+- Failure policy: `surface-degraded-mode-and-reconnect`
+- Side-effect policy: `mutations-through-canonical-service-contracts`
+
+#### evidence-control
+
+- Lifecycle: `continuous-or-run-scoped`
+- State mode: `append-only-evidence`
+- Scale unit: `observer-or-worker`
+- Shutdown: `flush-evidence`
+- Failure policy: `do-not-fabricate-evidence; freeze-dependent-promotion`
+- Side-effect policy: `observation-cannot-mutate-runtime-policy-directly`
+
+#### release-control
+
+- Lifecycle: `release-run`
+- State mode: `release-evidence-and-rollback-pointer`
+- Scale unit: `operator-or-ci-run`
+- Shutdown: `atomic-complete-or-fail`
+- Failure policy: `no-promotion-on-incomplete-evidence`
+- Side-effect policy: `promotion-and-rollback-require-auditable-receipts`
+
+
+### 36.3 Plane execution registry
+
+| Plane | Execution host | Profile | Zone |
+| --- | --- | --- | --- |
+| `foundation` | `skeleton-service` | `library` | `engine` |
+| `identity` | `skeleton-service` | `policy-control` | `engine` |
+| `configuration-secrets` | `skeleton-service` | `policy-control` | `engine` |
+| `model-provider` | `skeleton-service` | `provider-edge` | `engine` |
+| `model-routing` | `skeleton-service` | `policy-control` | `engine` |
+| `prompt-context` | `skeleton-service` | `library` | `engine` |
+| `orchestration` | `skeleton-service` | `durable-worker` | `engine` |
+| `reasoning-verification` | `skeleton-service` | `library` | `engine` |
+| `tool-runtime` | `skeleton-service` | `provider-edge` | `engine` |
+| `memory` | `skeleton-service` | `durable-state` | `engine` |
+| `retrieval` | `skeleton-service` | `durable-state` | `engine` |
+| `data-persistence` | `skeleton-service` | `durable-state` | `engine` |
+| `jobs-durability` | `skeleton-service` | `durable-worker` | `engine` |
+| `artifact-files` | `skeleton-service` | `durable-state` | `engine` |
+| `application-api` | `backend-service` | `request-service` | `application` |
+| `engine-api` | `skeleton-service` | `request-service` | `engine` |
+| `product-experience` | `frontend-client` | `product-client` | `product` |
+| `streaming-realtime` | `backend-service` | `realtime-transport` | `application` |
+| `security-safety` | `skeleton-service` | `policy-control` | `engine` |
+| `governance` | `skeleton-service` | `policy-control` | `engine` |
+| `resilience` | `skeleton-service` | `policy-control` | `engine` |
+| `observability` | `skeleton-service` | `evidence-control` | `engine` |
+| `evaluation` | `skeleton-service` | `evidence-control` | `engine` |
+| `feedback-learning` | `skeleton-service` | `evidence-control` | `engine` |
+| `cost-capacity` | `skeleton-service` | `policy-control` | `engine` |
+| `operator-control` | `backend-service` | `policy-control` | `application` |
+| `deployment-release` | `operator-ci` | `release-control` | `engine` |
+
+### 36.4 Runtime construction rules
+
+When implementing a plane, its execution profile supplies the default operational
+rules:
+
+- **library** code does not invent durable state or hidden side effects;
+- **request-service** work drains in-flight requests and externalizes durable
+  state before horizontal scale;
+- **provider-edge** work must obtain governance/admission/architecture receipts
+  before external I/O;
+- **durable-state** work rejects ambiguous writes and preserves one writer of
+  record;
+- **durable-worker** work checkpoints or reaches a terminal state before
+  shutdown and retries only through idempotent operation identity;
+- **policy-control** work fails closed when an authority-bearing decision cannot
+  be made;
+- **realtime-transport** preserves resume semantics and never becomes the owner
+  of operation truth;
+- **product-client** state is session-local and all mutations cross canonical
+  service contracts;
+- **evidence-control** may observe broadly but cannot directly mutate runtime
+  policy; missing evidence freezes dependent promotion;
+- **release-control** never promotes on incomplete evidence and always retains a
+  rollback pointer.
+
+### 36.5 Scaling rule
+
+Scale the execution host only after checking the profiles it contains. Horizontal
+replication of a host is legal only when each hosted plane either externalizes
+authoritative state, partitions it explicitly, or has a single-authority
+coordination mechanism.
+
+Do not infer that an engine package needs another daemon merely because it has a
+distinct capability plane. Add a long-running runtime node only when process
+isolation, independent scaling, security boundary, or failure containment
+justifies the operational cost and the runtime manifest is updated in the same
+change.
+
+### 36.6 Shutdown rule
+
+Shutdown proceeds from admission to transport to execution to state:
+
+```text
+stop accepting new work
+  -> freeze authority-changing control operations
+  -> drain request services / stop new stream subscriptions
+  -> checkpoint or terminalize durable operations
+  -> cancel bounded external I/O
+  -> flush evidence and durable state
+  -> release runtime resources
+```
+
+A plane-specific shutdown implementation may be stricter, but it may not skip
+the guarantees encoded by its execution profile.
+
+## 37. Boot, readiness, shutdown, upgrade, and crash assembly
+
+The installer, preloader, local runtime, Compose runtime, CI smoke path, and
+future service supervisor must all derive lifecycle order from
+`machine/architecture.json -> structural_blueprint.runtime_lifecycle`.
+
+### 37.1 Preflight
+
+Before starting or upgrading the runtime, execute these gates:
+
+- `architecture-map`
+- `construction-contract`
+- `provider-bootstrap`
+- `app-assembly`
+
+A failed preflight blocks mutation/startup. Do not start a partially understood
+topology and hope later health checks repair it.
+
+### 37.2 Startup
+
+#### 0. data-foundation
+
+Nodes: `mongo`, `chroma`
+
+Mode: `parallel`
+
+Barrier: started-and-health-probe-eligible
+
+#### 1. core-services
+
+Nodes: `skeleton`, `backend`
+
+Mode: `parallel`
+
+Barrier: ready-before-dependent-product-start
+
+#### 2. product-shell
+
+Nodes: `frontend`
+
+Mode: `serial`
+
+Barrier: ready-after-backend-and-engine
+
+
+The startup sequence is not a fixed sleep schedule. A group crosses its barrier
+only through declared readiness. A fast process that is not dependency-ready
+does not unblock its consumers.
+
+### 37.3 Readiness law
+
+- a runtime node is not ready until every declared dependency is ready
+- liveness proves process survival; readiness proves dependency-safe request admission
+- degraded readiness must be explicit and cannot claim unavailable capability as healthy
+- provider credentials do not make provider-backed capabilities ready unless architecture receipt and provider preflight succeed
+- product readiness requires both application and engine endpoints used by the shell
+
+Implementation consequence: installers and preloaders should present separate
+states for **starting**, **live**, **ready**, **degraded**, and **blocked**
+instead of one ambiguous "running" flag.
+
+### 37.4 Shutdown
+
+#### 0. stop-product-admission
+
+Nodes: `frontend`
+
+Action: stop new user mutations and preserve bounded resume state
+
+#### 1. drain-core-services
+
+Nodes: `backend`, `skeleton`
+
+Action: stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence
+
+#### 2. stop-data-foundation
+
+Nodes: `chroma`, `mongo`
+
+Action: fence writers, flush durable state, then stop stores
+
+
+Global rule: reverse runtime dependency order; consumers drain before dependencies stop.
+
+The goal is deterministic preservation of user-visible terminal state and
+durable authority, not merely process termination.
+
+### 37.5 Upgrade
+
+- validate architecture/construction/provider/app contracts before mutating installed runtime
+- run persistence migrations before starting code that requires the new schema and retain rollback compatibility evidence
+- replace stateless service replicas only after readiness of replacement capacity
+- drain durable workers before incompatible code replacement
+- never upgrade a dependency underneath a consumer that has not been drained or proven compatible
+- rollback uses the last release evidence pointer and must preserve durable state compatibility
+
+For the Windows installer this means upgrade is a transaction with preflight,
+drain, migration, replacement, readiness proof, and rollback evidence. Copying
+new files over a live process is not an upgrade strategy.
+
+### 37.6 Crash recovery
+
+- restart only within the owning recovery domain unless a dependency health failure requires broader restart
+- terminal operation state is never reopened by process restart
+- realtime reconnect resumes from durable cursor or returns explicit resync
+- ambiguous durable writes fail closed and require recovery evidence
+- policy/security/governance failure blocks protected work rather than bypassing the plane
+
+Recovery automation must reason in terms of recovery domains and operation
+identity. A restart may reconstruct execution, but it may not reopen a terminal
+operation, duplicate a side effect, or treat an uncertain write as successful.
+
+### 37.7 Installer/preloader state machine
+
+A compatible setup/runtime controller should expose at least:
+
+```text
+discovered
+ -> contract_validated
+ -> environment_validated
+ -> prerequisites_ready
+ -> data_foundation_starting
+ -> core_services_starting
+ -> product_starting
+ -> readiness_converging
+ -> ready
+
+ready
+ -> draining
+ -> checkpointing
+ -> stopping_consumers
+ -> stopping_dependencies
+ -> stopped
+
+ready
+ -> upgrade_preflight
+ -> drain
+ -> migrate
+ -> replace
+ -> restart
+ -> verify
+ -> {ready | rollback}
+```
+
+Every transition should emit an operation/event receipt so setup failures are
+diagnosable and resumable rather than opaque.
+
+## 36. Capability interface construction ledger
+
+The complete plane graph is materialized in `machine/capability_interfaces.json`.
+This registry is mandatory construction input, not optional documentation.
+
+At v3.6 the registry contains 86 relationships. Each one is generated from one
+of two source relations:
+
+- `depends_on` becomes `runtime_dependency`;
+- `validates` becomes `acceptance_target`.
+
+The registry exists because a graph edge alone is insufficient for safe
+construction. A builder needs to know the contract surface being consumed, its
+physical owner, its zone, expected failure behavior, and the evidence required
+to prove the connection.
+
+### 36.1 Interface entry anatomy
+
+A registry entry contains:
+
+```text
+id
+relation
+source_plane
+target_plane
+source_owner
+target_owner
+source_zone
+target_zone
+boundary
+binding
+ownership_rule
+target_contract_surface
+target_failure_contract
+source_acceptance
+target_acceptance
+status
+```
+
+The `id` is deterministic:
+
+```text
+runtime_dependency:<source>-><target>
+acceptance_target:<source>-><target>
+```
+
+This means an edge cannot be renamed casually. A source/target or relationship
+change is an architecture change.
+
+### 36.2 Relationship classes
+
+#### Runtime dependency
+
+A runtime dependency means the source plane needs the target capability as part
+of construction or execution. It participates in the construction DAG, must
+resolve to a declared target plane, must follow the zone DAG when cross-zone,
+and consumes the target's declared contract and failure semantics.
+
+#### Acceptance target
+
+An acceptance target means the source validates evidence about the target but
+does not import the target implementation. Its boundary is `evidence-only`, its
+binding is `evidence-contract`, it never alters runtime topological order, and it
+cannot transfer state authority.
+
+This is how `deployment-release` validates application API, engine API, and
+product experience without introducing upward engine dependencies.
+
+### 36.3 Boundary classes
+
+`intra-zone` is the cheapest relationship. It still needs a contract.
+
+`cross-zone` is an architectural boundary. Prefer stable typed envelopes,
+serialization-safe values, narrow interfaces, explicit timeout/cancellation
+behavior, explicit authority/data classification, observable identity, and no
+shared mutable global state.
+
+`evidence-only` carries readiness, test, evaluation, build, or release evidence.
+It must never become a disguised implementation call.
+
+### 36.4 Maturity propagation
+
+Interface maturity is derived from its endpoints. Current v3.6 state is 71
+`present` relationships and 15 `partial` relationships. If either connected
+plane remains partial, the interface remains partial until that plane's gap
+closes.
+
+### 36.5 Consumer construction procedure
+
+When adding a dependency from plane A to plane B:
+
+1. confirm B is the canonical owner;
+2. inspect B's `required_interfaces`;
+3. select or define the exact consumed contract;
+4. add B to A's `depends_on`;
+5. confirm the zone DAG permits the edge;
+6. create/update the exact capability-interface entry;
+7. define target failure behavior visible to A;
+8. decide timeout, cancellation, retry and idempotency semantics;
+9. bind authority/data classification across trust boundaries;
+10. add target contract tests;
+11. add consumer contract tests;
+12. add failure/degraded-path tests;
+13. run architecture, construction and interface validators;
+14. run assembly integration.
+
+If the zone edge is illegal, reconsider ownership, introduce a lower stable
+interface, or determine whether the relationship is acceptance-only.
+
+### 36.6 Provider-readable edge discipline
+
+AI development providers must not infer relationship semantics from imports
+alone. Before changing dependencies they read `machine/architecture.json`,
+`machine/ai_app_construction.json`, `machine/capability_interfaces.json`, and
+this manual.
+
+If code appears to contradict the registry, investigate and repair drift rather
+than silently adding another path.
+
+### 36.7 Interface versioning
+
+Classify observable contract changes as compatible additive, compatible
+behavioral, migration-required, or breaking. For migration-required/breaking
+changes record old/new contracts, affected interface IDs, affected consumers,
+migration order, compatibility window, rollback behavior, and removal criteria.
+
+Never rely on a monorepo to substitute for interface compatibility.
+
+### 36.8 Failure-contract propagation
+
+The target plane's `failure_mode` is part of the interface contract. A consumer
+must not transform provider unavailable into fabricated content, governance
+denial into an illegal fallback, storage unavailable into durable success, tool
+denial into an ungoverned second path, no-route into an undeclared provider, or
+verification failure into an unqualified high-impact result.
+
+### 36.9 Interface evidence bundle
+
+For a changed interface collect the interface ID, source/target owner and zone,
+before/after contract, compatibility classification, target tests, consumer
+tests, failure tests, authority/privacy tests, performance/resource evidence
+where relevant, and all architecture/construction/interface/assembly gates.
+
+### 36.10 Interface closure rule
+
+A relationship is construction-complete only when the edge is declared, the
+target owner materializes, the target contract and failure semantics are
+explicit, the zone relationship is legal, consumer/failure integration is
+tested, required authority/privacy behavior is tested, registry parity passes,
+and assembly remains valid.
+
+A working import is not sufficient.
+
+## 37. Architectural build order after v3.6
+
+Use a monotonic build order:
+
+- Layer A: foundation, identity, configuration, governance, security.
+- Layer B: cost admission, provider receipt/runtime, model routing, provider telemetry.
+- Layer C: persistence, memory, retrieval, context, artifact lifecycle.
+- Layer D: orchestration, verification, durable jobs, tools, operation state.
+- Layer E: engine API, application API, realtime protocol/store, cancellation/resume.
+- Layer F: frontend/product control/readiness/operator receipts.
+- Layer G: observability, evaluation, resilience, feedback/promotion, release/rollback.
+
+Upper layers may consume lower capabilities. Lower layers do not reach upward
+for policy or UI behavior.
+
+## 38. Construction commands for architecture work
+
+Run the cheap architecture path first:
+
+```bash
+python scripts/check_architecture_map.py
+python scripts/check_ai_app_construction.py
+python scripts/check_capability_interfaces.py
+python scripts/check_state_topology.py
+python scripts/check_provider_bootstrap.py
+python scripts/check_app_assembly.py
+```
+
+Then run focused architecture tests:
+
+```bash
+python -m pytest -q \
+  skeleton/testing/test_architecture_map.py \
+  skeleton/testing/test_ai_app_construction.py \
+  skeleton/testing/test_capability_interfaces.py \
+  skeleton/testing/test_provider_contract.py \
+  skeleton/testing/test_app_assembly.py
+```
+
+Only after these pass should dependency-heavy frontend, broad backend, Compose,
+packaging, security, or release checks diagnose higher-level failures.
+
+
+## Fully Functional AI Closure: Canonical Cognitive Execution Loop
+
+The architecture is not considered functionally complete merely because model providers, routing, memory, retrieval, tools, streaming, and evaluation exist independently. A complete AI application requires one orchestration-owned, durable cognitive execution transaction that binds those planes together under a single `OperationEnvelope`.
+
+### Canonical loop
+
+Every admitted interactive or agentic AI operation must follow this bounded loop:
+
+1. Load the durable operation and current checkpoint.
+2. Assemble governed context from instructions, conversation state, memory, retrieval evidence, artifacts, and approved user data.
+3. Route the model using capability, privacy, quality, latency, and budget constraints.
+4. Execute one provider-neutral model turn.
+5. Normalize provider-native structured output and tool-call proposals at the provider boundary.
+6. Validate proposed tool arguments against the canonical tool schema.
+7. Apply security, governance, identity/authority, approval, and cost/capacity admission before any tool side effect.
+8. Execute permitted tools with idempotency and bounded parallelism.
+9. Persist tool receipts/results and append them to the next-turn context.
+10. Checkpoint the operation before the next external boundary.
+11. Repeat only while the stop policy and remaining resource budget permit.
+12. Verify the candidate final result against available evidence and policy.
+13. Persist the final result, memory writes, artifacts, actual usage, and all linked receipts.
+14. Commit the terminal operation state.
+15. Emit the terminal stream event from committed state.
+
+### Required execution envelopes
+
+The machine contract defines four mandatory envelopes:
+
+- `ai_execution`: objective, operation binding, policies, budgets, and checkpoint identity.
+- `agent_turn`: stable turn lineage plus context digest, route/provider/tool/verification evidence, usage delta, checkpoint, and status.
+- `tool_call_proposal`: normalized call identity, schema-bound arguments, required authority, and approval requirement.
+- `ai_execution_result`: one terminal evidence bundle tying the final output to routing, provider, tools, verification, memory/artifacts, actual usage, and terminal stream state.
+
+Provider SDK objects must never become these contracts. Provider-specific tool-call or structured-output payloads are normalized inside `skeleton/provider_runtime.py` before the orchestration or tool planes consume them.
+
+### Hard loop bounds
+
+Every cognitive execution carries monotonic limits for model turns, tool calls, parallel tools, input/output/total tokens, provider cost, tool cost, wall-clock duration, and the operation deadline. A model response cannot reset or enlarge these limits. Exhaustion produces a deterministic terminal or degraded state and prevents further provider/tool allocation.
+
+### Human approval and suspend/resume
+
+The existing `waiting_for_user` operation state is the canonical suspension point for approval-required actions or genuinely missing information. Suspension must persist the exact execution and turn checkpoint. Resume continues the same operation identity; it must not create a fresh operation merely to avoid checkpoint recovery.
+
+### Crash and replay semantics
+
+A checkpoint is required before and after provider or tool boundaries. Any external side effect must have either an idempotency key or an explicit compensation policy before retry is legal. After restart, the runtime reconstructs the latest committed turn and never assumes that a client stream is the source of truth. Durable operation state is authoritative; streaming is a projection.
+
+### Functional-completion evidence
+
+The P0 cognitive-loop gap closes only when executable tests prove all of the following: prompt-only completion; single- and multi-tool execution; structured-output validation and bounded repair; tool authority denial; deterministic loop-budget exhaustion; crash/replay without duplicate side effects; approval wait/resume; cancellation races; provider fallback with preserved turn lineage; and a final result receipt that binds trace, route, provider, tool, verification, usage, memory/artifact, and stream evidence.
+
+The cross-plane golden journey must then prove that one real request can retrieve evidence, reason, call a governed tool, suspend/resume when required, verify its answer, persist resulting state, and stream the same terminal result to the product without bypassing a canonical plane.
+
+## P0 edge-case acceptance overlay
+
+The canonical W00–W11 edge/historical construction matrix is `machine/ai_p0_edge_case_matrix.json`, explained by `docs/plan/P0_EDGE_CASE_BUILD_MATRIX.md`.
+
+Builders working on W00–W11 must consult the mapped catalog cases before declaring hardening complete. Relevant entries become executable regression/property/fuzz/fault tests, observability checks, recovery drills, or explicit accepted risks. A planned test name in the matrix is a required construction deliverable and is not itself completion evidence.
+
+The matrix deliberately reuses the frozen Volume 000–420 architecture and the existing functional-AI dependency graph. It does not create a parallel runtime or change canonical owners.
+
+### Full W00–W30 edge ownership
+
+The full-program acceptance overlay is `machine/ai_full_edge_case_matrix.json` with human guidance in `docs/plan/FULL_EDGE_CASE_BUILD_MATRIX.md`.
+
+It assigns all 240 historical/edge/obscure catalogue entries across W00–W30 and records recommended evidence modes such as property testing, fuzzing, adversarial evaluation, negative testing, fault injection, recovery drills, platform testing, integration and E2E validation.
+
+Atomic queue tasks inherit risk counts from their `work_package_refs`. Builders must not interpret a low line-count change as low risk when the inherited catalog contains critical/high cases. Conversely, multiple mapped cases may be discharged by one strong invariant or failure-injection test when the evidence genuinely covers them.
+
+Critical/high obligations are also extracted into `machine/ai_edge_case_priority_queue.json`. Builders touching an owning work package should treat unresolved P0/P1 entries as explicit hardening debt and attach evidence or accepted-risk disposition rather than relying on implicit coverage.
+
+## Mandatory construction accountability
+
+The build accountability source of truth is `machine/ai_build_accountability.json`; its visible projection is `docs/plan/BUILD_ACCOUNTABILITY_LEDGER.md`.
+
+The ledger currently tracks **742 accountability units**: 421 volumes, 31 work packages, 42 AIQ tasks, 8 vertical slices, and 240 historical/edge/obscure obligations.
+
+Every implementation unit must follow this sequence:
+
+```text
+[ ] planned
+ -> timestamped start event
+ -> implementation + evidence
+ -> implementation sign-off
+ -> independent verification
+ -> verification sign-off
+ -> validator
+ -> [x] complete
+```
+
+All timestamps are UTC RFC3339. Sign-offs bind to a full git SHA and non-empty evidence references. Only identity-bound signing methods (`github_identity`, GPG, SSH, Sigstore, CI OIDC) are valid; unbound/manual attestations do not count. A checkbox is not completion evidence by itself and may not be manually checked. CI rejects checked-but-unsigned items, unsigned completed states, missing timestamps, partial sign-offs, stale queue/volume mirrors, malformed history ordering and non-independent verification without an explicit signed exception.
+
+The ledger is append-oriented: corrections supersede earlier events instead of rewriting history.
+
+## Fully Functional AI Closure: Detailed Runtime Assembly
+
+The machine-readable source for this section is `cognitive_runtime_blueprint` in `machine/ai_app_construction.json`. It fixes implementation ownership and recovery semantics before code is added.
+
+### Concrete module ownership
+
+The implementation extends existing canonical planes; it must not create a second agent framework.
+
+| Concern | Canonical target | Rule |
+| --- | --- | --- |
+| immutable execution contracts | `skeleton/contracts/ai_execution.py` | value contracts only; no provider SDK, HTTP, database, or tool implementation imports |
+| cognitive loop | `skeleton/intelligence/execution_runtime.py` | only owner of repeated model -> tool -> model execution for product operations |
+| durable execution repository | `skeleton/persistence/execution_repository.py` | execution, turns, checkpoints, approval, idempotency, usage, final result |
+| model normalization | `skeleton/provider_runtime.py` | provider-native structured/tool output terminates at this boundary |
+| tool execution | `skeleton/skills` | schema, authority, approval, idempotency, sandbox/resource policy |
+| realtime transport | `backend` | projects committed events; never owns operation truth |
+| product reducer | `frontend` | cursor/dedupe/gap/approval/cancel UX; rebuildable from server authority |
+
+These target files are planned outputs. Until they materialize, the cognitive-loop P0 gap remains open even if individual lower-level primitives already exist.
+
+### Execution substate and turn lineage
+
+`OperationState` remains the user-visible lifecycle authority. The cognitive runtime adds durable substate for loading, context assembly, routing, provider execution, output classification, tool authorization, human wait, tool execution, checkpointing, verification, repair, finalization, degradation, completion, failure and cancellation.
+
+Each model turn has a stable `turn_id`, monotonic `turn_index`, immutable parent lineage, context digest, route/provider identities, tool-call/result references, verification reference, usage delta and checkpoint. Sensitive raw content may remain in governed stores; the turn ledger keeps stable IDs/digests sufficient for replay and explanation.
+
+### Provider output normalization
+
+Normalize model output into final text, structured result, tool calls, mixed text/tool calls, or refusal/abstention. Provider-native tool-call objects never cross the provider boundary. Unknown or duplicate call IDs fail closed.
+
+Structured output is schema-validated. Repair is bounded to syntax/schema failures that remain policy-safe, defaults to at most two repair turns, consumes the same execution budget, and never overrides authority denial, restricted transfer, unknown tools, exhausted budgets, cancellation or expired deadlines.
+
+### Context assembly
+
+Context precedence is fixed: immutable policy; operation objective/user request; durable conversation summary; recent turns; authorized memory; authorized retrieval evidence; authorized artifacts; current execution tool results.
+
+Trust is explicit, not positional. User, retrieval, memory, artifact and tool content remains untrusted evidence. Output and tool-result headroom is reserved before packing. Mandatory policy, authority, stop policy and operation identity are never trimmed. Compaction is derived state and keeps source provenance.
+
+### Tool transaction
+
+Every proposal follows: normalization -> lookup -> argument schema validation -> data classification -> identity/scope authorization -> risk classification -> approval decision -> resource admission -> idempotency reservation -> execution -> durable receipt -> result governance -> next-turn context projection.
+
+Tool manifests declare side-effect behavior as none, intrinsically idempotent, idempotency-key protected, or compensatable. Unknown semantics fail closed. A completed `call_id` reuses the durable prior receipt; an in-progress reservation uses lease/fencing semantics.
+
+Parallel tools are allowed only without ordering dependencies, share one budget, obey `max_parallel_tools`, and join deterministically by proposal order/call ID.
+
+### Human approval
+
+Approval is durable state bound to operation, execution, turn, call, tool, exact arguments digest, risk class, expiry and deciding principal. Edited arguments require a new approval. Resume revalidates identity, policy, budget and deadline. Approval cannot override restricted transfer or missing capability authority.
+
+### Memory writeback
+
+Model text alone never causes durable memory. Eligible writes are explicit user preferences/instructions, verified outcomes, authoritative tool facts, continuity summaries, and user-approved long-term notes.
+
+Every write proposal includes namespace, data class, purpose, provenance, confidence/authority source, retention, dedupe key, and deletion/export behavior. Credentials, unverified speculation, cross-tenant data, provider-private metadata and unauthorized tool output are prohibited.
+
+### Verification ladder
+
+Verification levels are none, structural, evidence, action and high-impact. Policy selects the level; the model does not. Outcomes are `verified`, `qualified`, `abstain`, `repair`, or `block`. High-impact blocks cannot be converted to success by a plain generator retry.
+
+### Finalization transaction
+
+Finalization order is: persist final candidate/verification -> actual usage -> required tool receipts/postconditions -> governed memory writes -> artifact refs -> CAS checkpoint to finalizing -> commit `AIExecutionResult` -> terminal `OperationState` -> terminal operation event -> client acknowledgement.
+
+The target is one transaction where supported; otherwise use transactional outbox or deterministic reconciliation with terminal fencing. A client may never observe `completed` while the canonical `AIExecutionResult` is absent.
+
+### Cancellation and crash recovery
+
+Cancellation can come from user, operator, deadline, policy, budget or shutdown and is checked before each expensive/side-effecting boundary. Committed external side effects remain recorded and may require compensation; cancellation never rewrites history.
+
+| Crash point | Required recovery |
+| --- | --- |
+| before provider dispatch | resume same committed turn |
+| provider outcome unknown | use provider request/idempotency identity where available; otherwise bounded ambiguity policy |
+| provider result before checkpoint | recover receipt or issue a new bounded turn; never duplicate tools |
+| tool reserved before execution | lease/fence and execute once |
+| side effect before receipt commit | reconcile by idempotency key/postcondition; blind replay forbidden |
+| tool receipt committed | reuse receipt/result |
+| waiting for user | reload exact approval/checkpoint and revalidate |
+| finalization interrupted | terminal fence + transaction/outbox reconciliation creates one final result/event |
+
+### Usage and observability
+
+Admission begins with estimates; actual normalized usage is appended after provider/tool/artifact boundaries. Consumed budget is monotonic and unknown usage is explicit rather than zero.
+
+Required spans include `ai.execution`, `ai.context.assemble`, `ai.route`, `ai.provider.turn`, `ai.output.normalize`, `ai.tool.authorize`, `ai.tool.execute`, `ai.checkpoint`, `ai.verify`, `ai.memory.writeback`, `ai.finalize`, and `ai.stream.append`.
+
+### Cognitive state authority
+
+The state topology now reserves authoritative-unbound domains for the cognitive execution/checkpoint ledger, tool idempotency ledger, human approval ledger, execution usage ledger, and final AI result ledger. This deliberately prevents process memory, the browser, or the event stream from silently becoming authority before the production repository is materialized.
+
+### P0 build order
+
+1. Materialize immutable execution contracts and durable repository interfaces.
+2. Extend provider normalization for structured output, tool proposals, usage and finish reason.
+3. Bind tool schemas, authority, approval, resource admission and idempotency.
+4. Implement the bounded cognitive loop plus durable turn/checkpoint state.
+5. Bind verification, memory writeback, actual usage and atomic finalization.
+6. Bind backend realtime transport and frontend reducer/approval/cancel UX.
+7. Run crash injection, duplicate-side-effect protection, reconnect/slow-client tests and cross-plane golden journeys.
+
+The P0 gap remains open until the final stage has executable evidence.
+
+## Fully Functional AI Closure: Canonical Conversation State
+
+Multi-turn AI is not functionally complete if the browser supplies the transcript on every request. Canonical conversation continuity is server-owned product state.
+
+### Authority model
+
+The backend owns `ConversationThread` and `ConversationMessage`. The client submits a `thread_id`, the new user message, and an idempotency key. The server authorizes the thread, loads the canonical message projection, assembles context, launches the cognitive execution, and commits the assistant message from the resulting `AIExecutionResult`.
+
+Legacy `/ai/chat` `conversation_history` is compatibility-only after the canonical APIs land. It may be displayed or imported through a governed workflow, but it cannot silently become authoritative history merely because a caller sends it.
+
+### Thread/message invariants
+
+- thread identity is bound to tenant and owning principal;
+- messages are immutable after commit;
+- edits create a new message that supersedes the old message;
+- regeneration creates a sibling assistant branch rather than overwriting history;
+- message ordering is monotonic and fenced by thread version/exact-next sequence;
+- duplicate client retries reuse the same idempotency result;
+- assistant messages reference the causal operation and terminal/qualified execution result;
+- tool messages reference durable tool receipts/results;
+- system/product policy is injected separately and is never user-editable transcript content.
+
+### Context projection
+
+Prompt context is derived from the active authorized branch, durable summaries, relevant recent messages, authorized attachments/artifacts, memory, retrieval evidence, and current execution tool results. Token trimming affects only the projection; it never mutates the stored transcript.
+
+Conversation summaries are derived state with source message IDs and a source version. A stale summary is regenerated or ignored, never used to rewrite canonical messages.
+
+### Branching
+
+Edit and regenerate are causal branches. The active branch is a projection choice, not a destructive rewrite. Historical tool/action receipts remain immutable across branch selection so audit and replay retain the truth of what actually happened.
+
+### Governance
+
+Conversation deletion, export and retention are first-class governance operations. Delete propagates to message content references, derived summaries, permitted indexes and memory proposals according to policy. Export preserves ordered canonical messages, branch lineage and referenced artifacts/receipts that the requester is authorized to receive.
+
+### API target
+
+The canonical surface is versioned under `/api/v1/conversations`: create/read thread, append/read messages, edit, regenerate and delete. The frontend thread cache is rebuildable from these APIs plus replayable operation events.
+
+### Closure evidence
+
+P0 closure requires multi-turn continuation, tenant/thread isolation, duplicate-submit idempotency, concurrent append ordering, edit/regenerate lineage, operation/result binding, deletion/export propagation, context-provenance preservation, and browser refresh/reconnect reconstruction tests.
+
+## Fully Functional AI Closure: Governed Tool Runtime
+
+The repository currently has two different concepts that must remain distinct: declarative skills and executable tools.
+
+`SkillManifest` is context guidance. It intentionally forbids executable entrypoints. A `ToolManifest` is a separate execution contract exposed to the cognitive loop only after policy admission.
+
+### Canonical target
+
+- skill guidance stays in `skeleton/skills/manifest.py` and `skeleton/skills/registry.py`;
+- executable tool contracts materialize under `skeleton/skills/tool_contract.py`;
+- execution/admission/idempotency materializes under `skeleton/skills/tool_runtime.py`;
+- `backend/services/tool_registry.py` becomes a bounded compatibility facade.
+
+### Required ToolManifest
+
+Every executable tool declares identity/version, description, bounded input/output schema, capabilities, authority class, risk class, side-effect class, idempotency mode, approval policy, timeout, concurrency, network policy, data policy, cost model, result-size limit and enabled state.
+
+The provider only receives the minimal callable projection: tool ID, description and input schema. Credentials, implementation entrypoints, authority tokens, database handles and operator-only metadata never enter model context.
+
+### Execution law
+
+A model proposes a call. The runtime then performs schema validation, data classification, principal/tenant authorization, risk/approval evaluation, security/network/sandbox policy, resource admission, idempotency reservation, adapter execution, output validation, postcondition verification, durable receipt commit and result governance.
+
+Unknown side-effect or idempotency behavior fails closed.
+
+### Legacy convergence findings
+
+`backend/services/tool_registry.py` currently contains several surfaces that cannot become canonical unchanged:
+
+- `llm_chat` owns `EMERGENT_LLM_KEY` and raw model transport; this must be retired as a credential-bearing tool path. Recursive/submodel work belongs to orchestration plus `model-provider`.
+- `compile_code` spawns compiler subprocesses from the backend; canonical execution moves behind a sandbox/executor adapter.
+- `run_code` is already disabled inline but needs a real sandbox ToolManifest/adapter.
+- `package_build` mixes execution and artifact persistence; canonical form requires idempotency plus artifact receipts.
+- `mongo_query` accepts arbitrary collection/filter input; replace it with scoped repository/query tools and explicit allowlists.
+- `web_search` performs direct external I/O; canonical form needs egress policy, timeout, result bounds, provenance and governance.
+
+### Tool receipt
+
+Every proposed action receives a `ToolExecutionReceipt`, including denied and failed calls. It binds operation, execution, turn, call, tool/version, argument digest, authority decision, approval, idempotency key, timing, status, result/postcondition references, usage, stable error code and compensation reference.
+
+A completed `call_id` replays the receipt; it does not repeat the action.
+
+### Nested model rule
+
+A model invocation is not treated as a normal tool adapter. Nested model work is scheduled by orchestration and executed through the canonical provider boundary so routing, privacy, cost, provider availability and receipts remain enforceable.
+
+### Closure
+
+The tool-runtime plane stays `partial` until tool inventory convergence, credential isolation, schema fuzzing, authority/approval, idempotency replay, sandbox, database-scope, network-policy, compatibility-delegation and receipt-lineage tests pass.
+
+## Fully Functional AI Closure: Canonical Context Compiler
+
+The repository already contains rich context, planning, retrieval and memory subsystems, but those do not by themselves define the exact provider input for a generic AI turn. The canonical runtime therefore requires one `ContextEnvelope` compiler.
+
+### Contract
+
+`ContextEnvelope` is immutable per turn and contains operation/execution/turn identity, trusted instruction segments, untrusted evidence segments, admitted tool schemas, token budget, omitted segment IDs/reasons, source snapshot and a context digest.
+
+Each `ContextSegment` carries kind, source type/id, content reference/digest, trust level, data class, tenant, purpose, priority, relevance, timestamp, token estimate, provenance and retention.
+
+### Source order
+
+The compiler reads from canonical conversation state, governed memory, retrieval evidence, artifacts, current tool results, declarative skills and admitted ToolManifest projections. Domain-specific context pipelines remain valid capabilities, but they feed typed segments into the compiler rather than owning provider prompts.
+
+### Trust hierarchy
+
+Trusted system/product policy is structurally separate from user/retrieved/tool/artifact/model content. Text inside untrusted evidence cannot elevate itself to policy. Prior assistant output is conversation data, never system authority.
+
+### Budgeting
+
+Reserve output tokens before selecting context. Reserve bounded tool-result headroom when tools are enabled. Mandatory control segments either fit or the request fails before provider I/O. Candidate ordering is deterministic under a fixed source snapshot and compiler version.
+
+### Compaction
+
+Conversation, retrieval, artifact and tool-result summaries are derived/untrusted projections. They preserve source IDs/digests, data class, tenant, summarizer/compiler version and provenance. Tool receipts, approvals, citations and action postconditions required for audit cannot be summarized away.
+
+### Provider projection
+
+Only the provider boundary formats the envelope into provider-specific messages. Feature routes and services stop constructing authoritative provider history directly. `backend/routes/ai.py` and `backend/services/ai_assistant_svc.py` become compatibility delegates into conversation + cognitive runtime + context compiler.
+
+### Closure
+
+The prompt-context plane remains `partial` until deterministic packing, policy-reserve, injection, tenant/data authorization, budget headroom, oversized evidence, compaction provenance, context-digest and legacy-delegation tests pass.
+
+## Fully Functional AI Closure: Evidence-Bound Verification
+
+Verification is not a confidence score. The canonical runtime verifies observable claims, source support, schemas, tool receipts and action postconditions under a policy-selected verification level.
+
+### Durable contract
+
+`VerificationRequest` binds operation/execution/turn, capability, risk, candidate result, context snapshot, evidence/tool/artifact refs, budget and deadline. `VerificationReceipt` records level, outcome, reason codes, claim checks, postcondition checks, evidence refs, optional verifier route refs, repair directive and calibrated confidence band.
+
+The durable audit record contains observable claims, evidence IDs/digests, checks and outcomes. Hidden chain-of-thought is neither required nor persisted.
+
+### Verification levels
+
+- `none`: low-risk creative output with no factual/action guarantee;
+- `structural`: schemas, types, bounds and invariants;
+- `evidence`: material claims must map to authorized source evidence;
+- `action`: tool receipts, exact arguments and postconditions must prove the action result;
+- `high-impact`: policy-selected stronger verifier and/or human approval in addition to required checks.
+
+### Evidence support
+
+For evidence-required output, material claims receive stable claim IDs and statuses such as supported, partially supported, unsupported, contradicted or insufficient evidence. A citation marker alone is not evidence of support; source identity, authorization, recorded digest/version and relevance must be checked.
+
+### Tool/action verification
+
+Action completion checks the terminal tool receipt, operation/execution/turn/call lineage, authorized argument digest, declared postcondition, result/artifact references and compensation state. An ambiguous external side effect cannot be presented as completed.
+
+### Model-based verifier
+
+A semantic verifier may be used, but it is another bounded provider turn through canonical routing, governance and admission. It receives the candidate and evidence—not hidden generator reasoning—and returns a structurally validated verdict.
+
+Candidate agreement or self-reported confidence can trigger escalation or lower a confidence band, but cannot independently verify a fact or action that requires evidence.
+
+### Repair
+
+Repair receives observable failed check IDs/reason codes plus an allowed remediation instruction. It creates a new `AgentTurn` and a new immutable verification receipt. Authority/policy/high-impact blocks cannot be bypassed by generic self-revision.
+
+### Closure
+
+The reasoning-verification plane remains `partial` until claim grounding, citation integrity, unsupported-claim handling, tool postconditions, canonical model-verifier routing, self-confidence non-authority, repair lineage, high-impact block and receipt-privacy tests pass.
+
+## Fully Functional AI Closure: Provider Interaction Protocol
+
+The provider boundary is not complete when it only supports prompt/history -> text. The cognitive runtime requires provider-neutral structured output and tool calling while preserving the same single credential/transport owner.
+
+### Request
+
+Provider requests bind operation, execution, turn and context identity and may include admitted tool definitions, a structured-output schema, tool-choice policy, deadline and resource budget.
+
+Only minimal admitted ToolManifest projections are translated into provider-native tools. Provider-specific schema/message objects stay inside `skeleton/provider_runtime.py`.
+
+### Response
+
+The neutral response carries normalized text, optional structured value, normalized tool calls, finish reason, usage, provider/model/request/response identity, policy receipts and latency.
+
+Tool call IDs are unique, tool IDs must have been offered, arguments are bounded JSON, and argument digests use canonical serialization. Unknown or provider-only metadata is discarded unless explicitly mapped.
+
+### Usage and finish reason
+
+Usage normalizes input/output/cached/reasoning tokens plus estimated/billed cost where available. Unsupported values remain unknown/null; they are never invented as zero. Finish reasons normalize to completed, tool calls, length, filtered, refusal, cancelled, deadline, provider error or unknown.
+
+### Optional provider streaming
+
+Provider streaming uses a separate normalized delta protocol for text/tool/structured/usage/terminal events. Partial provider tool-call arguments do not become executable proposals until normalized and validated. Provider stream events are not the durable operation event stream.
+
+### Cancellation
+
+Deadline/cancellation propagates into provider I/O. A late response may be recorded for telemetry but cannot reopen a cancelled or terminal operation.
+
+### Closure
+
+The model-provider plane remains `partial` until text compatibility, structured schema, tool-call normalization, unoffered-tool denial, argument bounds, usage/finish normalization, cancellation/deadline, optional stream finalization and native-type isolation tests pass.
+
+## Fully Functional AI Closure: Application-to-Engine Execution Boundary
+
+The assembled runtime currently has a source/process ownership mismatch: Skeleton owns the provider/orchestration code contract, but backend can execute copied Skeleton code in-process and currently receives runtime model credentials. The final architecture separates product state from engine execution across an authenticated internal service boundary.
+
+### Target ownership
+
+Backend owns user/product authentication ingress, conversation/thread/message state, product workflows, application rate limits and product-facing realtime projection. Skeleton owns cognitive execution, model routing/provider transport, context compilation, governed tools, verification and execution/turn/checkpoint/result authority.
+
+After cutover, backend must not own runtime model credentials or a local provider fallback.
+
+### Internal execution API
+
+The initial transport is versioned HTTP/JSON on the private runtime network, but network privacy alone is not authorization. Backend authenticates as a service principal and delegates a bounded user/tenant/capability authority envelope.
+
+Canonical commands:
+
+- `POST /api/v1/executions` — idempotent create-or-return-existing; returns quickly with operation/execution identity;
+- `GET /api/v1/executions/{operation_id}` — authoritative status/result projection;
+- `POST /api/v1/executions/{operation_id}/cancel` — idempotent authority-bound cancellation;
+- `GET /api/v1/executions/{operation_id}/events` — replayable operation-event projection.
+
+Long-running work is never tied to the lifetime of the submit HTTP request.
+
+### Delegated authority
+
+Service identity and end-user identity are distinct. The engine validates the backend service principal plus actor, tenant, scopes, capability, expiry and request binding. Backend cannot grant scopes outside its declared delegation policy. The raw user JWT does not become the engine service credential.
+
+### Retry and failure law
+
+Submit retries use stable operation/idempotency identity; uncertain submit outcome is resolved by querying that identity before creating anything new. Status is safe to retry. Event replay uses cursor semantics. Cancel is idempotent and cannot reopen terminal state.
+
+Engine unavailability produces explicit degraded backend AI readiness; it never triggers an undeclared local provider fallback.
+
+### Credential/process cutover
+
+1. Keep current compatibility execution while engine contracts are built.
+2. Add engine submit/status/cancel/events plus service/delegated auth.
+3. Migrate backend AI/conversation routes to the engine client and block shadow local provider calls in tests.
+4. Prove cross-service golden journeys, cancellation, replay and degraded behavior.
+5. Move runtime provider credentials to the Skeleton service only and remove them from backend deployment.
+6. Convert `backend/core/ai_provider.py` into a remote compatibility client or retire it after callers migrate.
+
+Do not remove the backend credential before delegation parity is proven. Do not claim process convergence while backend still requires runtime provider credentials.
+
+### Frontend rule
+
+Canonical product conversation/assistant actions enter through backend because backend owns product/conversation authority. Direct frontend-to-engine access remains limited to explicitly declared engine-native surfaces such as health or separately authorized future capabilities.
+
+### Closure
+
+The engine-api plane remains `partial` until service/delegated auth, submit idempotency, trace/deadline/budget propagation, status/result, cancellation fencing, engine-outage behavior, cross-service replay and process credential-isolation tests pass.
+
+## Fully Functional AI Closure: Realtime Delivery
+
+Realtime delivery is a projection of durable operation state, not an alternate source of truth.
+
+### Transport
+
+SSE is the default product transport. WebSocket may be added later without changing the event contract. Mutating commands such as cancel or approval remain authenticated HTTP operations; the stream is server-to-client state delivery.
+
+Backend authorizes the product subscriber and projects Skeleton engine operation events while preserving operation/event identity and sequence. The frontend reduces events idempotently.
+
+### Cursor and replay
+
+Cursor identity is operation + sequence + event ID. The cursor advances only after the reducer accepts the event. Exact duplicates are idempotent; a duplicate ID with different content is corruption. Sequence gaps trigger replay and are never skipped silently.
+
+When compaction makes a cursor too old, the server returns an explicit resync requirement. The client fetches canonical conversation/operation/result state and resumes from the current cursor.
+
+### Content streaming
+
+Provider token deltas are not treated as durable product truth. They are coalesced into bounded `assistant_content` operation events. On terminal completion the product reconciles provisional display content against the canonical assistant message and `AIExecutionResult`.
+
+### Backpressure and multi-client
+
+Each subscriber has a bounded transport queue. A slow client can be disconnected with its last accepted cursor; it cannot block unrelated operations or cause silent loss. Each client keeps an independent cursor. Compaction is governed by bounded retention/terminal policy, not by waiting forever for every old client.
+
+### Heartbeat and cancellation
+
+Default heartbeat is 15 seconds, configurable from 10–60 seconds. Heartbeats prove transport liveness only. Disconnect does not imply cancellation unless an explicit request policy says so. Cancel/complete races are resolved by terminal operation fencing.
+
+### Event classes
+
+Canonical product events include operation/execution state, assistant content, tool proposal/authorization/start/completion, approval required, usage update, verification update, artifact ready, degraded state and terminal.
+
+### Closure
+
+Realtime P0 closure requires ordered delivery, duplicate/corruption/gap handling, reconnect replay, compacted-cursor resync, heartbeat timeout, slow-client behavior, multi-client cursors, cancel/complete race, terminal finality and tenant authorization tests.
+
+
+## Fully Functional AI Closure: Golden Journeys
+
+Component tests do not prove a functional AI product. The golden-journey suite exercises the assembled topology from frontend through backend, authenticated engine execution, provider/tool/memory/retrieval/artifact planes, durable state and realtime delivery back to the product.
+
+### Mandatory journeys
+
+The suite covers prompt-only response, canonical multi-turn conversation, retrieval-grounded answer, read-only tool loop, write tool with human approval, artifact flow, cancellation, reconnect/replay, provider outage, engine outage and governance delete/export. Media generation/speech journeys run whenever those provider capabilities are declared enabled.
+
+### Test modes
+
+CI uses deterministic fake provider/tool adapters and requires no live provider secret. Integration runs the assembled services with Mongo and deterministic harnesses. Staging may perform tightly budgeted live-provider smoke tests. Production uses only bounded post-deploy synthetic smoke checks.
+
+### Global assertions
+
+Every journey asserts one consistent tenant/user identity, one operation/execution lineage, one canonical final result, assistant-message/result binding, trace continuity, admission/usage evidence, governance/authority receipts, no duplicate side effects during retry/reconnect, no completed client state before durable final result, and no credential leakage.
+
+### Fault injection
+
+Fault journeys inject provider timeout, crash after provider response, crash around tool reservation/side effect/receipt, stream disconnect, slow client, transient Mongo failure, engine restart, backend restart and expired approval. Recovery must follow the same canonical operation and side-effect evidence rather than creating a replacement history.
+
+### Closure
+
+The product-experience P0 gap closes only when all mandatory and applicable conditional journeys pass against the assembled topology, while deterministic CI remains green without live provider credentials.
+
+## Fully Functional AI Closure: Durable Memory Authority
+
+The repository already has a canonical storage-neutral `MemoryContract` and retrieval boundary. The missing production guarantee is durable authority: process-local MAG/CAG/vector stores cannot be the only place long-term user memory exists.
+
+### Canonical authority
+
+Long-term AI memory is stored as durable canonical records in Mongo through a repository implementing the existing Frontier memory contract. Each record binds memory ID, tenant/user/namespace, kind, content reference/digest, data class, purpose, provenance, authority class, confidence band, retention, dedupe key, version and lifecycle status.
+
+Vector, MAG, CAG and in-process stores are reference implementations, caches, specialized projections or compatibility adapters unless explicitly backed by those canonical records.
+
+### Writeback
+
+Memory writeback is staged from cognitive finalization. Eligible sources are explicit user preferences/instructions, verified task outcomes, authoritative tool facts, governed conversation summaries and user-approved long-term imports.
+
+Raw secrets, unverified model speculation, cross-tenant data, provider-private metadata and unauthorized tool output are never promoted to canonical memory.
+
+The commit path is normalize -> authorize namespace -> classify/govern -> validate provenance/authority -> retention policy -> dedupe/version resolution -> durable record commit -> derived index intent -> MemoryWriteReceipt.
+
+### Retrieval
+
+Reads enforce tenant, user and namespace at the repository/retrieval boundary. Similarity is ranking only; vector similarity can never widen authority. Retrieval hits preserve canonical memory identity and provenance so the ContextCompiler can cite where remembered information came from.
+
+### Lifecycle
+
+Deletion and expiry originate from canonical records and propagate to vector/index/cache projections. Export returns authorized canonical records and lifecycle/provenance metadata; embeddings are not the canonical export.
+
+Restore order is canonical memory first, then vector/search/MAG/CAG/process projections.
+
+### Degraded behavior
+
+If the durable memory repository is unavailable, writes fail or defer explicitly and continuity degrades. If vector search is unavailable, bounded canonical/lexical retrieval may be used when policy permits. Loss of a process cache causes a cold rebuild, never apparent memory deletion.
+
+### Closure
+
+The memory plane remains `partial` until restart-safe durable memory, namespace isolation, write-policy provenance, dedupe/version, delete/export/expiry propagation, vector-loss rebuild, process-memory-loss recovery and memory-outage degradation tests pass.
+
+## Fully Functional AI Closure: Foundational P0 Authority Planes
+
+Four lower-level P0s must close before higher autonomy can be considered complete: state authority, governance, cost admission, and provider-surface ownership. Their machine-readable blueprints are `state_authority_blueprint`, `governance_runtime_blueprint`, `cost_admission_blueprint`, and `provider_surface_convergence_blueprint`.
+
+### State authority
+
+Every logical domain has one declared durable authority. Mongo/document repositories own canonical application/user/memory state; vector stores, Chroma, process caches, summaries, browser caches and snapshots remain derived unless explicitly promoted in `machine/state_topology.json`.
+
+Canonical repositories must support idempotent identity, optimistic versioning or compare-and-set, typed conflict/corruption failure, schema/index migration, health, backup/restore metadata, and transaction/outbox semantics where state changes emit events.
+
+A write cannot silently fall back to a derived store when its authority is unavailable. Restore authoritative stores and AI ledgers first, then rebuild vector/search/cache projections.
+
+### Governance
+
+One governance registry classifies resource, tenant/subject, purpose, provenance, retention, deletion/export state and provider-transfer policy. Provider/tool transfer and canonical durable writes carry a governance decision receipt.
+
+Unknown classification, purpose mismatch, cross-tenant resource mixing, expired/deleting records, or a provider privacy ceiling violation fails closed. Deletion/export/retention workflows enumerate canonical records first and propagate to projections second.
+
+### Cost and capacity admission
+
+Every expensive boundary is admitted against one monotonic request/tenant budget before allocation. Provider tokens/cost, tool cost, artifact/storage bytes, wall time, queue/concurrency, retry and repair counts are budget dimensions.
+
+Production multi-worker quota state is durable/shared rather than process-local. Reservations are idempotent by operation/execution identity, actual usage never decreases, and restart cannot erase already-consumed quota. Unknown usage remains unknown and is handled conservatively rather than normalized to zero.
+
+Routing, context packing, tools and artifacts consume the same remaining budget contract.
+
+### Provider-surface ownership
+
+`skeleton/provider_runtime.py` is the only product runtime provider transport/credential owner. Routes, services, Jeeves modules and tools may be compatibility facades or declarations but do not construct SDK clients, own provider credentials or perform raw model-provider network transport.
+
+Provider-surface discovery scans backend and Skeleton code for provider keys, SDK imports, base URLs and transport patterns. Unexplained credential-bearing surfaces fail CI. Text, image, edit/variation and speech share the same governance/admission/receipt boundary.
+
+After application-to-engine cutover, runtime provider credentials are injected only into the Skeleton engine service.
+
+## Fully Functional AI Closure: Dependency DAG
+
+`functional_ai_dependency_graph` is the enforceable P0 closure order. It is a DAG of closure prerequisites, not a prohibition on starting independent implementation early.
+
+Stage 0 establishes state authority, governance, cost admission and provider-surface ownership. Stage 1 adds durable conversation/memory plus governed tools. Stage 2 fixes canonical context compilation and provider interaction. Stage 3 binds evidence verification. Stage 4 assembles the cognitive transaction. Stage 5 cuts product/application execution over to the authenticated engine boundary. Stage 6 proves realtime delivery/recovery. Stage 7 proves the assembled product through golden journeys.
+
+A gap cannot be marked closed before all declared dependencies are closed. Breaking a lower-stage contract invalidates dependent evidence and requires revalidation. Every declared P0 gap must appear exactly once in the closure ledger, dependency DAG, work-package schedule and required-blueprint set.
+
+## Fully Functional AI Closure: Runtime Bootstrap and Readiness
+
+Liveness and AI readiness are separate. A process can be alive while provider execution, tools, memory, realtime, or canonical writes are degraded.
+
+The Skeleton engine boot order is: configuration validation -> architecture/provider receipts -> secrets -> authoritative stores/migrations -> governance -> durable quota/admission -> AI execution repositories -> canonical memory -> provider declarations -> governed tools -> context/retrieval -> verification -> cognitive runtime/recovery -> event delivery -> capability readiness.
+
+Recovery and reconciliation of incomplete durable work happens before full write readiness. Required workers include transactional-outbox dispatch, execution/checkpoint reconciliation, ambiguous tool-side-effect reconciliation, expired approval cleanup, memory/index projection repair, retention/deletion propagation, and stale quota-lease reconciliation.
+
+Backend boots product/conversation state, service identity, the engine client and event projection. It reports AI capability from the combined backend + engine state; backend HTTP health alone never means AI is ready.
+
+Readiness is capability-scoped: live, canonical-read, text AI, tool AI, memory, realtime, and full. Optional vector/index outages may degrade retrieval while liveness remains healthy. Governance or authoritative-state failure blocks affected protected work.
+
+Shutdown enters draining state, stops new expensive work, gives in-flight work a bounded checkpoint/receipt commit window, preserves non-interruptible side-effect history, flushes durable state/outbox/usage as allowed, and releases leases only after canonical state is consistent.
+
+## Fully Functional AI Closure: Configuration and Errors
+
+Configuration ownership follows process ownership. After the engine cutover, runtime model credentials, provider endpoints/defaults, tool egress policy and execution limits belong to the Skeleton engine. Backend owns product auth/session config, application storage, engine endpoint and service-delegation identity. Frontend receives only public URLs and non-secret flags.
+
+Public/browser-prefixed environment values are never secrets. Tools receive an allowlisted environment and never inherit the complete parent secret environment.
+
+Cross-plane errors use stable codes and fields for category, retryability, HTTP projection, operation/trace identity, safe message, protected detail reference and retry delay. Raw provider, tool or database exceptions never become public API responses. Policy/governance/authorization failures are not retried as if transient. Replay gaps route to resynchronization; insufficient verification routes to qualified/abstain behavior; approval-required routes to explicit approval UX.
+
+Persisted and cross-service contracts are versioned. Rolling deployment must tolerate the declared one-version skew where applicable, with additive evolution preferred and explicit migrations/adapters for breaking semantics.
+
+## Fully Functional AI Closure: AI Threat Model
+
+Core assets are provider/service credentials, tenant conversation/memory, tool write authority, artifacts, canonical operation/results, and governance/approval receipts.
+
+The architecture treats prompt injection, confused-deputy tool use, cross-tenant leakage, credential exfiltration, SSRF/egress abuse, arbitrary code execution, replay/duplicate side effects, stream-state confusion, approval spoofing and untrusted semantic verifiers as explicit threat classes.
+
+Hard laws:
+
+- model output is never authorization;
+- retrieved, tool and artifact text is never trusted control data;
+- client-provided state is never durable authority;
+- network location alone is never authentication;
+- credentials never enter model-visible context;
+- security/governance denials cannot become success through a model retry;
+- code/build execution occurs only through sandboxed adapters, not the long-lived backend/engine process;
+- similarity search cannot bypass tenant/ACL filtering.
+
+The machine threat model maps each threat to the concrete contracts that prevent or contain it.
+
+## Fully Functional AI Closure: Retrieval and Artifacts
+
+Retrieval returns evidence records, not raw prompt strings. Authorization and source scope filtering happen before model-visible fusion/ranking. Every selected result carries canonical source/fragment identity, content digest, source version, tenant/data class, provenance and citation metadata. Vector indexes remain derived where declared and orphan hits are rejected.
+
+Time-sensitive capabilities can impose freshness ceilings. Stale evidence is marked explicitly. A citation is valid only when it resolves to authorized recorded evidence; a model-generated URL string is not a citation receipt.
+
+Artifacts follow one lifecycle: bounded authenticated ingress -> digest/type detection -> governance -> scan/quarantine -> durable ready record -> bounded extraction/provenance -> context/tool eligibility. The original artifact remains authoritative while extracted text/thumbnails/indexes are projections.
+
+Context receives authorized artifact references/excerpts, never unrestricted filesystem paths. Large files are sliced or summarized under explicit byte/token budgets. Generated artifacts are committed and linked to the producing operation/tool/provider receipt before being presented as durable output.
+
+## Fully Functional AI Closure: Routing, Degradation, and Fairness
+
+Model routing filters candidates before scoring: declared capability -> privacy/governance -> required tool/structured/media protocol -> remaining budget -> deadline/readiness -> policy. Fallback cannot widen privacy, cost or deadline ceilings and cannot silently drop required tool/structured/media semantics.
+
+Degraded behavior is explicit. Provider loss does not produce a fake AI answer. Engine loss leaves product/conversation reads available where safe but never activates a shadow backend provider. Memory loss degrades continuity without crossing tenant boundaries. Vector loss may use authorized canonical/lexical fallback. Tool loss cannot be reported as completed action. Governance loss blocks governed transfer. Quota uncertainty is conservative, never unlimited. Stream loss does not imply operation failure.
+
+Scheduling distinguishes interactive, approval-resume, background, maintenance and recovery classes. Tenant and operation concurrency limits prevent noisy neighbors. Capacity needed to reconcile/finalize already-committed external effects is protected from ordinary overload shedding; priority never bypasses governance, authority or budget.
+
+## Fully Functional AI Closure: Observability and Release Evidence
+
+A single user-visible operation is traceable across product request, conversation append, engine submit, cognitive execution, context, route, provider, tool, verification, memory writeback, finalization and stream projection.
+
+Ordinary logs use IDs, digests and allowlisted metadata instead of raw prompts/tool arguments. Credentials are never logged. Critical security/governance/approval/terminal/failure receipts are not lost through ordinary telemetry sampling.
+
+Evaluation has layered evidence: deterministic contract tests, scenario tests with fake providers/tools, full golden journeys on assembled services, tightly budgeted live-provider staging smoke where configured, and canary/release gates. Baselines are capability- and version-specific and include runtime/model/routing-policy identity.
+
+Release evidence includes architecture/construction validation, P0 focused tests, golden journeys, security/provider-surface scans, migration/restore proof, eval regression reports, and build/artifact provenance. Rollback may revert deployment, routing/model policy or feature enablement, but never by discarding canonical user or operation state.
+
+## Fully Functional AI Closure: Typed Runtime Schema Catalog
+
+The field-name envelopes in the construction contract are refined by `machine/ai_runtime_schemas.json`. That catalog is a mandatory architecture source linked from the runtime manifest and validated against every canonical envelope.
+
+It defines common ID/timestamp/digest conventions, enums, nullability, size/bounds, typed records and cross-record invariants for operation, resource budget, conversation, context, provider/tool interaction, memory, verification, final results, delegated authority, engine commands, stream events and stable errors.
+
+Every canonical envelope has exactly one `envelope_record_map` entry. CI rejects a missing typed record, missing required field, owner-plane mismatch, schema/version drift, or architecture-tag mismatch.
+
+Implementations in Python, API/OpenAPI, Mongo repositories and frontend types should be generated from or checked against the same semantics rather than independently guessing field meaning.
+
+## Fully Functional AI Closure: Authority and Child Execution
+
+Authentication establishes identity; it does not grant model/tool authority. `AuthorityContext` binds principal type, tenant, scopes/capabilities, resource constraints, authentication strength, issue/expiry time and source.
+
+Tool read/write/destructive/external-commit/privileged actions require explicit action/resource authority. Human approval is additional authorization for the exact action digest; it cannot manufacture authority that the principal did not possess.
+
+Child/sub-agent work stays inside the same orchestration runtime. A child inherits immutable tenant/actor lineage, an explicit subset of parent authority, a reserved subset of parent budget, and a deadline no later than the parent. Fanout, recursion depth and total child count are hard bounded.
+
+Child results return by durable result reference. Child agents do not exchange hidden chain-of-thought as runtime state. Parent cancellation propagates to interruptible children, while already committed child side effects remain receipt-backed.
+
+## Fully Functional AI Closure: Interactive Steering
+
+User interaction during a running operation is modeled as commands rather than implicit prompt mutation.
+
+Supported semantics include cancel, approve, deny, provide required input, interrupt-and-replace, and queue follow-up. A waiting operation can resume from the same checkpoint when the pending wait contract is satisfied. A normal new conversational message creates a new causal operation; it does not invisibly alter an already-dispatched provider request.
+
+Interrupt-and-replace requests cancellation of the active operation, commits the new user message/branch, and starts replacement execution under defined side-effect ordering/fencing. Terminal state wins over late cancel/approval. Duplicate steering commands are idempotent.
+
+## Fully Functional AI Closure: Safety and Safe Rendering
+
+Safety decisions occur at request ingress, provider transfer, tool proposal/action, provider output normalization, final rendering and artifact boundaries. Decisions are versioned receipts with risk class, outcome and stable reason codes.
+
+The generator is not the safety authority. A model refusal is not a substitute for tool authorization; a model request cannot override a tool/security block; unsafe provider output can be quarantined before product exposure.
+
+Assistant text, Markdown and HTML are untrusted display content. Product rendering uses a safe renderer, safe link-protocol policy, inert code blocks, authorized artifact links and canonical citation metadata. Tool/action status comes from durable receipts rather than prose.
+
+Qualified, abstained, blocked and degraded results remain visually distinguishable from verified completion. Provisional streamed text is reconciled to the canonical assistant message/result on terminal commit. Rendering and approval controls meet accessibility requirements.
+
+
+## Fully Functional AI Closure: Concrete Capability and Handoff Control
+
+`machine/ai_capabilities.json` is the concrete assembled-product capability registry. It declares user-visible capability IDs, version, risk, input/output modalities, required planes, provider capabilities, tool/memory/retrieval policy, verification floor, data-class ceiling, budget profile, instruction-policy reference, readiness requirements, degraded behavior and golden-journey coverage.
+
+An enabled capability is not automatically ready. Readiness is resolved from its declared dependencies. Provider credential presence alone is never enough.
+
+`machine/ai_implementation_handoff.json` translates every P0 closure gap into exact contract/runtime/persistence/integration/test targets plus migration/cutover rules. Planned paths may not exist yet; the handoff is a build target, not evidence that implementation is complete.
+
+`machine/ai_closure_evidence.json` separately tracks closure proof. Implementation progress and closure decision are intentionally different concepts. A P0 closes only after dependency closure, executable evidence, blueprint promotion, focused tests, and canonical gap-state update. A regression in a lower-stage contract can reopen dependent evidence.
+
+These three files are mandatory provider-bootstrap material and are linked from the architecture and runtime manifests.

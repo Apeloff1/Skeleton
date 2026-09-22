@@ -5,8 +5,10 @@ Extracted from server.py (Feb 2026 Phase-9). Self-contained except for
 ``AIAssistantMode`` enum (still in server.py) and ``AIAssistRequest`` /
 ``AIAssistResponse`` Pydantic models (now in models/code_runtime.py).
 
-Provider execution is routed through ``skeleton.frontier.model_runtime`` so
-backend feature code does not depend on retired provider-specific chat shims.
+Provider execution is routed through ``core.ai_provider.ProviderRegistry``.
+The registry enforces the mandatory architecture/construction receipt before
+provider activation, so this legacy API surface cannot become a second provider
+runtime.
 """
 from __future__ import annotations
 
@@ -15,12 +17,11 @@ import os
 import re
 
 from fastapi import HTTPException
-from openai import AsyncOpenAI
-from skeleton.frontier.model_runtime import (
-    ChatRequest,
-    ModelMessage,
-    ModelRuntime,
-    OpenAIChatCompletionsAdapter,
+
+from core.ai_provider import (
+    ProviderError,
+    ProviderRegistry,
+    ProviderRequest,
 )
 
 
@@ -40,28 +41,39 @@ logger = logging.getLogger("CodeDock.AIAssistant")
 
 
 class AIAssistantService:
-    """Code-assistance service backed by the canonical provider runtime."""
+    """Legacy code-assistance surface backed by the canonical provider registry."""
 
-    def __init__(self, *, runtime: ModelRuntime | None = None):
-        self.api_key = os.environ.get("OPENAI_API_KEY")
-        self.model = os.environ.get("AI_ASSISTANT_MODEL", "gpt-4o")
-        self._runtime = runtime
+    def __init__(
+        self,
+        *,
+        registry: ProviderRegistry | None = None,
+        runtime: object | None = None,
+    ) -> None:
+        if runtime is not None:
+            raise ValueError(
+                "alternate model runtimes are disabled; inject ProviderRegistry instead"
+            )
+        self._registry = registry or ProviderRegistry.from_env()
+        self.model = os.environ.get("AI_ASSISTANT_MODEL", "gpt-4o").strip() or "gpt-4o"
 
-    def _get_runtime(self) -> ModelRuntime:
-        if self._runtime is not None:
-            return self._runtime
-        if not self.api_key:
-            raise HTTPException(status_code=503, detail="AI service not configured")
+    @property
+    def api_key(self) -> str:
+        """Legacy health compatibility without exposing credential material."""
+        return "configured" if self.available else ""
 
-        runtime = ModelRuntime()
-        runtime.register(OpenAIChatCompletionsAdapter(AsyncOpenAI(api_key=self.api_key)))
-        self._runtime = runtime
-        return runtime
+    @property
+    def available(self) -> bool:
+        return self._registry.available
+
+    def provider_status(self) -> dict:
+        """Return non-secret provider and construction acknowledgement metadata."""
+        return {
+            "active": self._registry.active_id,
+            "available": self._registry.available,
+            "providers": self._registry.statuses(),
+        }
 
     async def assist(self, request: AIAssistRequest) -> AIAssistResponse:
-        if self._runtime is None and not self.api_key:
-            raise HTTPException(status_code=503, detail="AI service not configured")
-
         prompts = {
             AIAssistantMode.EXPLAIN: """You are an elite code explanation expert. Your task is to:
 1. Provide a clear, comprehensive explanation of what this code does
@@ -161,19 +173,18 @@ Code:
 
 Please provide a detailed, well-structured response."""
 
-        chat_request = ChatRequest(
-            model=self.model,
-            messages=(
-                ModelMessage(
-                    role="system",
-                    content=prompts.get(request.mode, prompts[AIAssistantMode.EXPLAIN]),
-                ),
-                ModelMessage(role="user", content=user_message),
-            ),
-        )
-
         try:
-            response = await self._get_runtime().chat("openai", chat_request)
+            adapter = self._registry.require_active()
+            response = await adapter.generate(
+                ProviderRequest(
+                    instructions=prompts.get(
+                        request.mode,
+                        prompts[AIAssistantMode.EXPLAIN],
+                    ),
+                    prompt=user_message,
+                    model=self.model,
+                )
+            )
             suggestion = response.text
             code_blocks = [
                 {"language": match[0] or language, "code": match[1].strip()}
@@ -186,10 +197,16 @@ Please provide a detailed, well-structured response."""
                 confidence=0.92,
                 model=response.model or self.model,
             )
+        except ProviderError as exc:
+            logger.warning(
+                "AI Assistant provider unavailable or failed: %s",
+                exc.__class__.__name__,
+            )
+            raise HTTPException(status_code=503, detail="AI service unavailable") from exc
         except HTTPException:
             raise
         except Exception as exc:
-            logger.exception("AI Assistant provider execution failed")
+            logger.exception("AI Assistant provider boundary failed")
             raise HTTPException(status_code=500, detail="AI service error") from exc
 
 

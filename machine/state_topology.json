@@ -1,0 +1,940 @@
+{
+  "schema_version": 1,
+  "topology_version": "1.6.0",
+  "architecture_tag": "arch-map/v3.7",
+  "status": "active",
+  "title": "Skeleton State Authority and Persistence Topology",
+  "purpose": "Define which physical stores exist, which logical state domains they host, which state is authoritative versus derived/scratch/recovery-only, and the migration/backup/rebuild rules for each.",
+  "architecture_contract": "machine/architecture.json",
+  "construction_contract": "machine/ai_app_construction.json",
+  "human_manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
+  "validator": "scripts/check_state_topology.py",
+  "principles": [
+    "storage technology does not define authority",
+    "durable does not imply authoritative",
+    "derived indexes are rebuildable projections and never the only source of canonical state",
+    "scratch state can be discarded without corrupting canonical user or engine state",
+    "authoritative durable state has an explicit migration, backup, restore, retention, and consistency contract",
+    "recovery snapshots are evidence or recovery aids unless explicitly promoted by contract",
+    "one logical state domain has one canonical authority at a time",
+    "mixed-authority stores are transitional and require an explicit open construction gap"
+  ],
+  "physical_stores": [
+    {
+      "id": "mongo",
+      "technology": "MongoDB 7",
+      "runtime_service": "mongo",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "mongo_data",
+        "mongo_config"
+      ],
+      "durability": "persistent-volume",
+      "production_role": "primary-document-store",
+      "network": "internal application network; host binding is loopback-only",
+      "authentication": "required by compose contract",
+      "backup": "required for authoritative databases; live logical scratch backup is exercised by State Recovery Drill",
+      "restore": "authoritative logical restore is verified by digest/count/index metadata before any derived rebuild",
+      "migration": "logical databases have independent migration/rebuild policy",
+      "evidence": [
+        "docker-compose.yml",
+        "backend/core/databases.py",
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "id": "backend-data-volume",
+      "technology": "Docker named volume / filesystem",
+      "runtime_service": "backend",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "backend_data"
+      ],
+      "durability": "persistent-volume",
+      "production_role": "application-local support data; local Chroma is rebuildable retrieval projection only",
+      "network": "not directly network-addressable",
+      "authentication": "process boundary",
+      "backup": "optional for local Chroma projection; authoritative product state is backed up through Mongo",
+      "restore": "rebuild local Chroma projections from canonical Mongo/content sources",
+      "migration": "canonical Jeeves RAG product state migrated to Mongo; legacy Chroma state imports through RAGService.migrate_legacy_chroma_state",
+      "evidence": [
+        "docker-compose.yml",
+        "backend/services/rag_service.py",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "id": "chroma-service",
+      "technology": "ChromaDB",
+      "runtime_service": "chroma",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "chroma_data"
+      ],
+      "durability": "persistent-volume",
+      "production_role": "optional vector/retrieval projection",
+      "network": "internal network; host binding loopback-only; optional full profile",
+      "authentication": "no application auth boundary in compose; never public",
+      "backup": "optional when fully derived; rebuild is preferred",
+      "restore": "re-index from authoritative content/memory sources",
+      "migration": "index schema/version changes rebuild projection",
+      "evidence": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "backend/tests/test_rag_state_authority.py"
+      ]
+    },
+    {
+      "id": "operation-stream-sqlite",
+      "technology": "SQLite",
+      "runtime_service": "skeleton",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "skeleton_data"
+      ],
+      "durability": "persistent named volume in Compose via /app/data; in-memory only when explicitly left at local/test defaults",
+      "production_role": "durable resumable operation-event transport/projection driven from canonical operation transactional outbox",
+      "network": "in-process only",
+      "authentication": "inherits owning process authority",
+      "backup": "preserve with skeleton_data when resume history is required; operation state remains the authoritative lifecycle owner",
+      "restore": "reopen operation_stream.sqlite, preserve sequence/terminal/consumer watermarks, then reconcile any unpublished operation outbox rows",
+      "migration": "schema migration must preserve event identity, sequence, terminal fences, consumer acknowledgements and replay-gap semantics",
+      "evidence": [
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/testing/test_operation_stream_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py"
+      ]
+    },
+    {
+      "id": "operation-state-sqlite",
+      "technology": "SQLite canonical operation repository plus transactional outbox",
+      "runtime_service": "skeleton",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "skeleton_data"
+      ],
+      "durability": "persistent named volume in Compose via /app/data; in-memory only when explicitly left at local/test defaults",
+      "production_role": "authoritative Skeleton operation-state repository with transactional event-intent outbox",
+      "network": "in-process only",
+      "authentication": "inherits orchestrator authority",
+      "backup": "required with skeleton_data when this binding is used for production; formal restore rehearsal remains open",
+      "restore": "reopen operation_state.sqlite, validate operation identity/state/version, then drain unpublished outbox rows before serving dependent operation traffic",
+      "migration": "schema migration must preserve operation identity, state/version monotonicity, terminal fences and deterministic unpublished outbox identity",
+      "evidence": [
+        "skeleton/contracts/operation.py",
+        "skeleton/persistence/operation_store.py",
+        "skeleton/testing/test_operation_contract.py",
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py"
+      ]
+    },
+    {
+      "id": "process-memory",
+      "technology": "process memory",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "volatile",
+      "production_role": "cache, working memory, deterministic local index, reference implementation",
+      "network": "in-process only",
+      "authentication": "inherits process",
+      "backup": "forbidden-as-backup-strategy",
+      "restore": "rebuild from authoritative sources or start empty",
+      "migration": "none; data is disposable",
+      "evidence": [
+        "skeleton/memory/vector.py",
+        "skeleton/retrieval/index.py",
+        "skeleton/frontier/operation_stream.py"
+      ]
+    },
+    {
+      "id": "snapshot-files",
+      "technology": "JSON files",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "operator-local-opt-in",
+      "production_role": "manual recovery/debug snapshot aid",
+      "network": "filesystem only",
+      "authentication": "filesystem/process boundary",
+      "backup": "not a substitute for authoritative store backup",
+      "restore": "explicit opt-in restore into memory planes",
+      "migration": "snapshot format compatibility required before durable operational use",
+      "evidence": [
+        "skeleton/persistence/snapshots.py"
+      ]
+    },
+    {
+      "id": "cognitive-execution-unbound",
+      "technology": "planned durable execution repository; production binding not yet materialized",
+      "runtime_service": null,
+      "compose_file": null,
+      "volumes": [],
+      "durability": "unbound",
+      "production_role": "future authoritative storage boundary for AI execution, turn/checkpoint, approval, idempotency, usage and final-result state",
+      "network": "in-process repository contract until production adapter is selected",
+      "authentication": "inherits orchestration/tool authority and tenant binding",
+      "backup": "unimplemented until production repository binding",
+      "restore": "unimplemented until production repository binding; recovery semantics are defined in the cognitive runtime blueprint",
+      "migration": "future repository schema must preserve execution/turn identity, checkpoint fencing, approval binding, idempotency reservations, usage monotonicity and final-result terminality",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
+    }
+  ],
+  "state_domains": [
+    {
+      "id": "backend-core-app-state",
+      "owner_plane": "data-persistence",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME / DB_NAME",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "present",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Mongo document/transaction boundary as implemented by domain repositories",
+      "consistency": "primary application state; writes must not be acknowledged as durable if Mongo commit fails",
+      "retention": "domain/governance controlled",
+      "backup_restore": "live scratch logical backup/restore rehearsal verifies document counts, canonical document digests and user index digests before derived rebuild; production backup policy remains operator/deployment controlled",
+      "migration": "migrated production application state",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "backend/core/databases.py",
+        "backend/services/database.py",
+        "backend/services/rag_state_repository.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "skeleton/testing/test_state_recovery_drill.py"
+      ]
+    },
+    {
+      "id": "backend-seeded-content",
+      "owner_plane": "data-persistence",
+      "physical_store": "mongo",
+      "logical_location": "CONTENT_DB_NAME = DB_NAME + _content",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "public",
+        "internal"
+      ],
+      "transaction_scope": "collection/document writes",
+      "consistency": "eventual regeneration acceptable; must not be required as sole user-state authority",
+      "retention": "replaceable/regenerable",
+      "backup_restore": "optional; code/seed source is authority",
+      "migration": "skip application-state migration and rebuild from reviewed seed/content sources",
+      "derived_from": [
+        "repository seed/content definitions"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "backend/core/databases.py"
+      ]
+    },
+    {
+      "id": "backend-swarm-scratch",
+      "owner_plane": "jobs-durability",
+      "physical_store": "mongo",
+      "logical_location": "SWARM_DB_NAME = DB_NAME + _swarm",
+      "authority": "scratch",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "internal"
+      ],
+      "transaction_scope": "worker/agent scratch collections",
+      "consistency": "loss may cancel/recompute work but must not corrupt canonical app state",
+      "retention": "bounded/evictable target",
+      "backup_restore": "not required for canonical recovery",
+      "migration": "skip canonical app migration; rebuild/recompute",
+      "derived_from": [
+        "canonical-operation-state"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "backend/core/databases.py"
+      ]
+    },
+    {
+      "id": "engine-mongo-state",
+      "owner_plane": "data-persistence",
+      "physical_store": "mongo",
+      "logical_location": "SKL_MONGO_DATABASE / skeleton",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "declared-partial",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "engine repository/document boundary",
+      "consistency": "engine durable writes require Mongo acknowledgement",
+      "retention": "governance controlled",
+      "backup_restore": "required before relying on engine Mongo state in production",
+      "migration": "explicit engine schema/repository migrations",
+      "derived_from": [],
+      "rebuildable": false,
+      "evidence": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py"
+      ]
+    },
+    {
+      "id": "backend-rag-local-chroma",
+      "owner_plane": "retrieval",
+      "physical_store": "backend-data-volume",
+      "logical_location": "CHROMA_PERSIST_DIR=/app/data/chroma",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "Chroma collection operation",
+      "consistency": "eventually consistent rebuildable projection; canonical learning sessions, user progress, co-coding state and feedback commit to Mongo first",
+      "retention": "projection lifetime; canonical retention is governed in Mongo",
+      "backup_restore": "discard/rebuild after the authoritative Mongo restore has passed digest/count/index verification; tested for total projection loss",
+      "migration": "legacy user_progress, feedback, learning-session and co-coding records import idempotently to Mongo; new writes are Mongo-first",
+      "derived_from": [
+        "backend-core-app-state",
+        "backend-seeded-content"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "backend/services/rag_service.py",
+        "docker-compose.yml",
+        "backend/services/rag_state_repository.py",
+        "backend/tests/test_rag_state_repository.py",
+        "backend/tests/test_rag_state_authority.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "id": "optional-vector-index",
+      "owner_plane": "retrieval",
+      "physical_store": "chroma-service",
+      "logical_location": "SKL_CHROMA_HOST/SKL_CHROMA_PORT; skeleton_memory collection by default",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present-optional",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "vector collection operation",
+      "consistency": "eventually consistent projection; absence must degrade retrieval, not canonical state",
+      "retention": "rebuildable projection",
+      "backup_restore": "rebuild only after authoritative source restore verification passes; backup optional when fully derived",
+      "migration": "re-index from authoritative sources",
+      "derived_from": [
+        "engine-mongo-state",
+        "backend-core-app-state",
+        "backend-seeded-content",
+        "canonical-ai-memory-records"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "docker-compose.yml",
+        "skeleton/config/settings.py",
+        "scripts/state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
+      ]
+    },
+    {
+      "id": "canonical-operation-state",
+      "owner_plane": "orchestration",
+      "physical_store": "operation-state-sqlite",
+      "logical_location": "SQLite namespace operation_state / OperationEnvelope contract",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "production-bound",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "BEGIN IMMEDIATE operation transition plus transactional outbox intent",
+      "consistency": "legal monotonic OperationEnvelope transitions with optimistic version fencing, terminal finality, idempotency identity and same-transaction outbox intent; live /intelligence/reason uses DurableOperationRuntime with bounded background outbox reconciliation",
+      "retention": "operation/governance lifecycle controlled; mounted persistence exists while formal backup/retention rehearsal remains STATE-03 work",
+      "backup_restore": "persistent Compose binding and SQLite reopen/restart reconciliation are implemented; full operator backup/restore rehearsal remains required",
+      "migration": "preserve operation identity digest, state/version monotonicity, terminal status and unpublished outbox rows",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-state-authority-convergence",
+      "evidence": [
+        "skeleton/contracts/operation.py",
+        "skeleton/persistence/operation_store.py",
+        "skeleton/testing/test_operation_contract.py",
+        "skeleton/testing/test_operation_store.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
+      ]
+    },
+    {
+      "id": "operation-event-stream",
+      "owner_plane": "streaming-realtime",
+      "physical_store": "operation-stream-sqlite",
+      "logical_location": "SQLite namespace operation_stream",
+      "authority": "durable-projection",
+      "source_of_truth": false,
+      "status": "production-bound",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "BEGIN IMMEDIATE append/head/compaction transaction",
+      "consistency": "durable exact-next resumable projection of committed operation outbox intents; stream delivery never advances canonical operation state; bounded background dispatch retries unpublished rows during idle process time",
+      "retention": "consumer-watermark/compaction controlled; retain to satisfy resume policy",
+      "backup_restore": "persistent Compose binding is implemented; reopen preserves replay semantics and startup reconciliation drains unpublished operation outbox rows",
+      "migration": "preserve event IDs, sequence, terminal fence, replay watermark and consumer acknowledgements",
+      "derived_from": [
+        "canonical-operation-state"
+      ],
+      "rebuildable": false,
+      "evidence": [
+        "skeleton/frontier/operation_stream_store.py",
+        "skeleton/frontier/operation_stream.py",
+        "skeleton/persistence/operation_runtime.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_operation_runtime.py",
+        "skeleton/testing/test_operation_server_binding.py"
+      ]
+    },
+    {
+      "id": "in-process-retrieval-memory",
+      "owner_plane": "retrieval",
+      "physical_store": "process-memory",
+      "logical_location": "InvertedIndex / VectorStore / reference event log",
+      "authority": "derived",
+      "source_of_truth": false,
+      "status": "present",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "single-process object mutation",
+      "consistency": "best-effort local projection/cache",
+      "retention": "process lifetime",
+      "backup_restore": "none",
+      "migration": "rebuild after restart",
+      "derived_from": [
+        "backend-core-app-state",
+        "backend-seeded-content",
+        "engine-mongo-state",
+        "canonical-ai-memory-records"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/retrieval/index.py",
+        "skeleton/memory/vector.py",
+        "skeleton/frontier/operation_stream.py"
+      ]
+    },
+    {
+      "id": "manual-memory-snapshots",
+      "owner_plane": "data-persistence",
+      "physical_store": "snapshot-files",
+      "logical_location": ".skeleton/snapshots/*.json",
+      "authority": "recovery-aid",
+      "source_of_truth": false,
+      "status": "present-optional",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "single snapshot file write",
+      "consistency": "point-in-time best-effort capture of selected in-memory planes",
+      "retention": "operator controlled",
+      "backup_restore": "debug/manual recovery only",
+      "migration": "format compatibility required for restore",
+      "derived_from": [
+        "in-process-retrieval-memory"
+      ],
+      "rebuildable": true,
+      "evidence": [
+        "skeleton/persistence/snapshots.py"
+      ]
+    },
+    {
+      "id": "cognitive-execution-ledger",
+      "owner_plane": "orchestration",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "AIExecutionRequest / AgentTurn / ExecutionCheckpoint",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "execution/turn/checkpoint compare-and-set boundary",
+      "consistency": "turn index and checkpoint version are monotonic; only one resumable canonical checkpoint may be current for an execution",
+      "retention": "operation/governance lifecycle controlled",
+      "backup_restore": "required after durable repository binding; restore must recreate exact latest committed checkpoint and turn lineage",
+      "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
+    },
+    {
+      "id": "tool-idempotency-ledger",
+      "owner_plane": "tool-runtime",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "tool call reservation / execution receipt by operation_id + call_id",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "reserve/fence/complete one tool call identity",
+      "consistency": "one call_id has one canonical reservation and terminal receipt; a completed side effect is never executed again during replay",
+      "retention": "at least as long as the operation/result remains replayable or auditable",
+      "backup_restore": "required after durable repository binding",
+      "migration": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-tool-runtime-convergence",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/skills/manifest.py"
+      ]
+    },
+    {
+      "id": "human-approval-ledger",
+      "owner_plane": "tool-runtime",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "approval record bound to operation/execution/turn/call and arguments digest",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "request/decision/expiry transition for one approval identity",
+      "consistency": "approval applies only to the exact arguments digest and authority context; edited or expired requests require a new approval",
+      "retention": "auditable through operation lifecycle and applicable governance retention",
+      "backup_restore": "required after durable repository binding",
+      "migration": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-tool-runtime-convergence",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
+    },
+    {
+      "id": "execution-usage-ledger",
+      "owner_plane": "cost-capacity",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "per-operation/per-turn estimated and actual resource consumption",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal"
+      ],
+      "transaction_scope": "monotonic append/update of normalized usage deltas",
+      "consistency": "consumed budget cannot decrease; unknown actual usage is explicit and never normalized to zero",
+      "retention": "billing/telemetry policy controlled; aggregate retention may exceed raw execution-detail retention",
+      "backup_restore": "required when used for quota/billing/release evidence",
+      "migration": "preserve normalized units, provider/tool source, estimate-versus-actual distinction and monotonic cumulative totals",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/intelligence/admission.py"
+      ]
+    },
+    {
+      "id": "final-ai-result-ledger",
+      "owner_plane": "orchestration",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "AIExecutionResult terminal record",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "terminal result + verification/receipt references committed with execution terminal fence",
+      "consistency": "at most one canonical final result per execution; OperationState may not become completed before the final result exists",
+      "retention": "operation/governance lifecycle controlled; artifacts/memory have their own referenced retention policies",
+      "backup_restore": "required after durable repository binding",
+      "migration": "preserve final status/output reference, verification, route/provider/tool receipts, usage, memory/artifact refs and terminal event identity",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-cognitive-execution-loop",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/operation.py"
+      ]
+    },
+    {
+      "id": "conversation-thread-state",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.conversation_threads",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "authoritative-mongo-binding-added",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "atomic thread version/sequence/active-branch commit point with recoverable prepared-message intent",
+      "consistency": "thread tenant/owner/status/version and committed message_sequence are authoritative; prepared messages beyond committed sequence are invisible recovery intents; client caches cannot advance state",
+      "retention": "governance controlled by thread retention class",
+      "backup_restore": "required with backend core application state",
+      "migration": "preserve thread_id, tenant/owner identity, status, active branch, version and retention metadata",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-conversation-state-authority",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/databases.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/tests/test_conversations_api.py",
+        "frontend/src/product/conversationClient.ts"
+      ]
+    },
+    {
+      "id": "conversation-message-state",
+      "owner_plane": "application-api",
+      "physical_store": "mongo",
+      "logical_location": "CORE_DB_NAME.conversation_messages",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "authoritative-mongo-binding-added",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "write-ahead immutable message prepare followed by atomic exact-next thread sequence/version commit; operational commit marker is recoverable",
+      "consistency": "message identity/idempotency are immutable; only messages at or below committed thread sequence are visible; branch sequence is monotonic; edit/regenerate creates lineage rather than overwriting history",
+      "retention": "inherits/strengthens thread governance policy; referenced artifacts/memory have independent retention",
+      "backup_restore": "required with backend core application state",
+      "migration": "preserve message_id, thread/tenant/author identity, sequence, branch/supersedes lineage, operation/result refs and content/provenance refs",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-conversation-state-authority",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/contracts/conversation.py",
+        "skeleton/persistence/conversation_repository.py",
+        "skeleton/testing/test_conversation_repository.py",
+        "backend/core/conversations.py",
+        "backend/routes/conversations.py",
+        "backend/gameforge/jeeves/chat_contract.py",
+        "backend/routes/jeeves_compose.py",
+        "backend/tests/test_conversations_api.py",
+        "tests/test_jeeves_chat_workspace.py",
+        "frontend/src/product/conversationClient.ts"
+      ]
+    },
+    {
+      "id": "verification-receipt-ledger",
+      "owner_plane": "reasoning-verification",
+      "physical_store": "cognitive-execution-unbound",
+      "logical_location": "VerificationReceipt / ClaimRecord / PostconditionCheck",
+      "authority": "authoritative-unbound",
+      "source_of_truth": true,
+      "status": "planned-contract",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "immutable verification receipt commit per candidate/turn with bounded repair lineage",
+      "consistency": "one receipt version is immutable; later repair creates a new turn/receipt; final result references the selected terminal receipt",
+      "retention": "operation/evaluation/governance policy controlled; raw hidden reasoning is not retained",
+      "backup_restore": "required after durable repository binding because finalization/evaluation can depend on receipt identity",
+      "migration": "preserve verification id, operation/execution/turn/candidate lineage, outcome/reason codes, claim/postcondition checks and evidence refs",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-verification-evidence-contract",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/intelligence/verification.py",
+        "skeleton/intelligence/verifier.py"
+      ]
+    },
+    {
+      "id": "canonical-ai-memory-records",
+      "owner_plane": "memory",
+      "physical_store": "mongo",
+      "logical_location": "SKL_MONGO_DATABASE.memory_records via canonical memory repository",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "planned-canonical",
+      "data_classes": [
+        "internal",
+        "confidential"
+      ],
+      "transaction_scope": "single canonical memory record/version plus lifecycle metadata; repository transaction where multi-record lifecycle updates require it",
+      "consistency": "durable writes require Mongo acknowledgement; tenant/user/namespace/version/provenance remain canonical independently of vector/cache projections",
+      "retention": "governance-controlled by retention_class and expiry; deletion/export are first-class lifecycle operations",
+      "backup_restore": "required; restore canonical memory before rebuilding vector, MAG/CAG compatibility, or process-local projections",
+      "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe key, version and status",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-memory-durable-authority",
+      "evidence": [
+        "machine/ai_app_construction.json",
+        "skeleton/frontier/memory.py",
+        "skeleton/frontier/retrieval_context.py",
+        "skeleton/memory/frontier_adapter.py"
+      ]
+    }
+  ],
+  "state_flows": [
+    {
+      "id": "core-to-rag-projection",
+      "from": "backend-core-app-state",
+      "to": "backend-rag-local-chroma",
+      "mode": "projection",
+      "rule": "Chroma receives indexable/minimized projection only after canonical Mongo commit; retrieval hits are validated against canonical ownership where required",
+      "failure": "projection failure or staleness degrades retrieval only; it cannot roll back or resurrect canonical product state"
+    },
+    {
+      "id": "content-to-rag-projection",
+      "from": "backend-seeded-content",
+      "to": "backend-rag-local-chroma",
+      "mode": "projection",
+      "rule": "seed/content data may be re-indexed at any time",
+      "failure": "rebuild projection"
+    },
+    {
+      "id": "authoritative-to-vector-service",
+      "from": "backend-core-app-state",
+      "to": "optional-vector-index",
+      "mode": "projection",
+      "rule": "vector service stores retrievable projection with provenance/ACL metadata",
+      "failure": "degrade retrieval; never mutate canonical source to match index"
+    },
+    {
+      "id": "engine-to-vector-service",
+      "from": "engine-mongo-state",
+      "to": "optional-vector-index",
+      "mode": "projection",
+      "rule": "engine vector index is derived from governed engine memory/content",
+      "failure": "re-index"
+    },
+    {
+      "id": "operation-to-event-stream",
+      "from": "canonical-operation-state",
+      "to": "operation-event-stream",
+      "mode": "event-log",
+      "rule": "production Skeleton reasoning commits OperationEnvelope state plus deterministic outbox intent atomically; DurableOperationRuntime publishes the retry-stable event, acknowledges only after durable stream acceptance, and runs a bounded background dispatcher for idle-period reconciliation",
+      "failure": "stream publication failure leaves canonical state committed and the outbox pending; background/startup/foreground dispatch reconciles idempotently, including crash-after-append-before-ack"
+    },
+    {
+      "id": "authoritative-to-in-memory",
+      "from": "backend-core-app-state",
+      "to": "in-process-retrieval-memory",
+      "mode": "cache-projection",
+      "rule": "process-local indexes/caches are discardable",
+      "failure": "rebuild/empty cache"
+    },
+    {
+      "id": "memory-to-snapshot",
+      "from": "in-process-retrieval-memory",
+      "to": "manual-memory-snapshots",
+      "mode": "manual-snapshot",
+      "rule": "snapshot is an explicit operator aid and never silently promoted to production authority",
+      "failure": "ignore/repair snapshot; authoritative state remains elsewhere"
+    },
+    {
+      "id": "operation-to-swarm-scratch",
+      "from": "canonical-operation-state",
+      "to": "backend-swarm-scratch",
+      "mode": "scratch-materialization",
+      "rule": "swarm scratch is materialized from admitted/running operation inputs and worker decomposition; it never becomes canonical operation or product state",
+      "failure": "discard or recompute scratch from the canonical operation/work request; never promote scratch after an ambiguous worker failure"
+    },
+    {
+      "id": "operation-to-cognitive-execution",
+      "from": "canonical-operation-state",
+      "to": "cognitive-execution-ledger",
+      "mode": "authority-binding",
+      "rule": "one admitted OperationEnvelope binds to the canonical execution identity and checkpoint lineage; execution substate may refine but never contradict operation lifecycle state",
+      "failure": "checkpoint conflict or missing binding fails closed and the operation cannot advance to provider/tool execution"
+    },
+    {
+      "id": "cognitive-to-tool-idempotency",
+      "from": "cognitive-execution-ledger",
+      "to": "tool-idempotency-ledger",
+      "mode": "side-effect-fence",
+      "rule": "every side-effecting tool proposal obtains a durable call_id reservation before execution and commits a terminal receipt before the cognitive loop can reuse the result",
+      "failure": "ambiguous side effect enters reconciliation; blind replay is forbidden"
+    },
+    {
+      "id": "cognitive-to-human-approval",
+      "from": "cognitive-execution-ledger",
+      "to": "human-approval-ledger",
+      "mode": "suspension-decision",
+      "rule": "approval-required actions persist an exact arguments digest and move the operation to waiting_for_user until a valid decision is committed",
+      "failure": "expired, mismatched or unauthorized approval leaves the action denied and resumable checkpoint intact"
+    },
+    {
+      "id": "cognitive-to-usage-ledger",
+      "from": "cognitive-execution-ledger",
+      "to": "execution-usage-ledger",
+      "mode": "metering",
+      "rule": "provider/tool/artifact boundaries append normalized actual usage deltas against the original execution budget without resetting consumed resources",
+      "failure": "unknown usage is recorded explicitly; policy may degrade or block further expensive work"
+    },
+    {
+      "id": "cognitive-to-final-result",
+      "from": "cognitive-execution-ledger",
+      "to": "final-ai-result-ledger",
+      "mode": "terminal-finalization",
+      "rule": "verified final output and evidence references are committed before the enclosing operation transitions to completed",
+      "failure": "incomplete finalization remains recoverable and cannot emit a completed terminal event"
+    },
+    {
+      "id": "thread-to-message-authority",
+      "from": "conversation-thread-state",
+      "to": "conversation-message-state",
+      "mode": "recoverable-write-ahead-exact-next-ledger",
+      "rule": "message append authorizes against thread tenant/owner/status, prepares an immutable idempotent message intent, then atomically advances exact-next thread sequence/version as the commit point; only committed-sequence messages are visible",
+      "failure": "unauthorized, archived/deleting, stale-version or duplicate-conflict appends fail closed; interrupted prepared intents are completed or discarded deterministically before later appends"
+    },
+    {
+      "id": "conversation-to-cognitive-execution",
+      "from": "conversation-message-state",
+      "to": "cognitive-execution-ledger",
+      "mode": "causal-operation-input",
+      "rule": "a committed user message may create one or more explicitly identified execution branches; every assistant result binds back to the causal user message and thread",
+      "failure": "execution without a valid authorized causal message cannot be committed as a canonical conversation assistant response"
+    },
+    {
+      "id": "final-result-to-conversation",
+      "from": "final-ai-result-ledger",
+      "to": "conversation-message-state",
+      "mode": "assistant-message-projection",
+      "rule": "a verified/qualified AIExecutionResult becomes an assistant message by immutable result reference plus allowed rendered content; message commit never fabricates a result identity",
+      "failure": "if assistant-message projection fails, the execution result remains authoritative and projection is retried idempotently"
+    },
+    {
+      "id": "cognitive-to-verification",
+      "from": "cognitive-execution-ledger",
+      "to": "verification-receipt-ledger",
+      "mode": "candidate-verification",
+      "rule": "a candidate result enters policy-selected verification and commits an immutable receipt before repair/finalization decisions",
+      "failure": "missing/failed required verification prevents completed finalization; result may be qualified/abstained/blocked according to policy"
+    },
+    {
+      "id": "verification-to-final-result",
+      "from": "verification-receipt-ledger",
+      "to": "final-ai-result-ledger",
+      "mode": "finalization-evidence",
+      "rule": "AIExecutionResult references the exact terminal verification receipt selected for the final candidate",
+      "failure": "final result cannot claim verified status without the required receipt/check coverage"
+    },
+    {
+      "id": "canonical-memory-to-vector",
+      "from": "canonical-ai-memory-records",
+      "to": "optional-vector-index",
+      "mode": "derived-semantic-index",
+      "rule": "only active authorized canonical memory records are projected with memory_id, tenant/user namespace and provenance metadata; vector similarity never grants authority",
+      "failure": "degrade semantic recall and rebuild projection from canonical memory; never mutate canonical memory to match a lost/stale index"
+    },
+    {
+      "id": "canonical-memory-to-process-cache",
+      "from": "canonical-ai-memory-records",
+      "to": "in-process-retrieval-memory",
+      "mode": "cache-projection",
+      "rule": "process-local MAG/CAG/vector/reference state may warm from canonical memory records but remains discardable",
+      "failure": "restart cold and rebuild; canonical memory remains durable"
+    }
+  ],
+  "recovery_order": [
+    "restore/authenticate Mongo physical service",
+    "restore backend-core-app-state and any materialized engine authoritative state",
+    "restore conversation thread/message authority and verify branch/message ordering before accepting AI chat traffic",
+    "restore canonical AI memory records before rebuilding memory/vector/process-local projections",
+    "verify schema/index/migration compatibility",
+    "verify authoritative document counts, canonical document digests and user index digests before any derived rebuild",
+    "restore or reconstruct canonical operation state",
+    "restore cognitive execution, turn and checkpoint authority before resuming AI work",
+    "restore tool idempotency and human approval ledgers before allowing side-effect replay",
+    "restore execution usage and final AI result ledgers before terminal reconciliation",
+    "restore operation-event-stream only when it is configured as production authority",
+    "regenerate backend-seeded-content and swarm scratch as needed",
+    "rebuild Chroma/vector and process-memory projections from authoritative sources",
+    "treat snapshot files as optional recovery aids only",
+    "run consistency/reconciliation checks before readiness",
+    "enable traffic only after authoritative stores are healthy and derived-store lag is within declared tolerance"
+  ],
+  "invariants": [
+    "authoritative and conditional-authoritative domains never use process-memory as their physical store",
+    "derived domains declare at least one upstream source and are rebuildable",
+    "scratch domains are never source_of_truth",
+    "mixed-transitional domains reference an open construction gap",
+    "authoritative durable domains require backup_restore and migration semantics",
+    "Chroma and in-process indexes are not the sole authority for canonical user, tenant, operation, or governance state",
+    "content and swarm logical databases are not included in canonical user-state migration merely because they share Mongo",
+    "operation-stream storage cannot claim production durability when running in-memory",
+    "snapshot-files never replace canonical backup/restore",
+    "authoritative-unbound domains are transitional only, production-ineligible, and must reference an open P0 gap",
+    "cognitive execution checkpoints, tool idempotency reservations, approvals, usage and final AI results cannot rely on process memory or client stream state",
+    "a completed operation requires an authoritative final AI result record when the operation used the cognitive runtime",
+    "approval decisions are bound to exact tool argument digests and cannot be replayed across edited calls",
+    "tool side-effect recovery consults the idempotency ledger before any retry",
+    "usage consumption is monotonic across retries, repairs and resumed turns",
+    "conversation thread/message authority is server-side durable state; client-submitted history never becomes authoritative by being sent to a model",
+    "assistant conversation messages reference canonical operation/execution results rather than treating provider text as standalone durable truth",
+    "conversation edit/regenerate preserves immutable branch lineage and never silently rewrites historical tool/action receipts",
+    "verification receipts persist observable claims, evidence references, checks and outcomes but never require hidden chain-of-thought",
+    "a final AI result that claims verification references an immutable verification receipt with policy-required check coverage",
+    "canonical user/tenant AI memory is durable document state; vector, MAG, CAG and process-memory representations are never its sole authority",
+    "memory restore precedes semantic/vector/cache projection rebuild",
+    "vector similarity never widens tenant/user/namespace memory authority",
+    "Jeeves learning sessions, user progress, co-coding ownership/state and feedback are Mongo-authoritative; Chroma is projection-only",
+    "production Skeleton reasoning persists OperationEnvelope state before executing/advancing work and never treats the event stream as operation-state authority",
+    "stream delivery failure leaves a durable unpublished outbox row; startup and later dispatch reconcile it using retry-stable event identity",
+    "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage",
+    "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes"
+  ]
+}

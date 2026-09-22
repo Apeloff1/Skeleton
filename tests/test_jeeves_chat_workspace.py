@@ -198,3 +198,231 @@ def test_paid_provider_receives_conversation_context_as_user_data(route, monkeyp
     assert "PROJECT_CONTEXT_SENTINEL" in seen["text"]
     assert "PROJECT_CONTEXT_SENTINEL" not in seen["system"]
     assert result["text"] == "provider answer"
+
+
+
+class _MemoryChatCursor:
+    def __init__(self, rows):
+        self.rows = list(rows)
+        self.key = "ts"
+        self.order = -1
+
+    def sort(self, key, order):
+        self.key = key
+        self.order = order
+        return self
+
+    async def to_list(self, limit):
+        rows = sorted(
+            self.rows,
+            key=lambda item: item.get(self.key, 0),
+            reverse=self.order < 0,
+        )
+        return [dict(item) for item in rows[:limit]]
+
+
+class _MemoryChatCollection:
+    def __init__(self, rows=None):
+        self.rows = [dict(row) for row in rows or []]
+        self._counter = 0
+
+    @staticmethod
+    def _matches(row, query):
+        if "_id" in query and row.get("_id") != query["_id"]:
+            return False
+        if "session_id" in query and row.get("session_id") != query["session_id"]:
+            return False
+        if "status" in query and isinstance(query["status"], str):
+            if row.get("status") != query["status"]:
+                return False
+        if "legacy_history.0" in query:
+            history = row.get("legacy_history")
+            if not isinstance(history, list) or not history:
+                return False
+        if "$or" in query:
+            allowed = False
+            for option in query["$or"]:
+                if option.get("status") == "complete" and row.get("status") == "complete":
+                    allowed = True
+                exists = option.get("status", {}).get("$exists") if isinstance(option.get("status"), dict) else None
+                if exists is False and "status" not in row:
+                    allowed = True
+            if not allowed:
+                return False
+        return True
+
+    async def insert_one(self, document):
+        row = dict(document)
+        if "_id" not in row:
+            self._counter += 1
+            row["_id"] = f"auto-{self._counter}"
+        if any(existing.get("_id") == row["_id"] for existing in self.rows):
+            raise RuntimeError("duplicate key")
+        self.rows.append(row)
+        return SimpleNamespace(inserted_id=row["_id"])
+
+    async def find_one(self, query, projection=None):
+        del projection
+        for row in self.rows:
+            if self._matches(row, query):
+                return dict(row)
+        return None
+
+    def find(self, query, projection=None):
+        del projection
+        return _MemoryChatCursor(
+            row for row in self.rows if self._matches(row, query)
+        )
+
+    async def update_one(self, query, update):
+        for row in self.rows:
+            if self._matches(row, query):
+                row.update(dict(update.get("$set") or {}))
+                return SimpleNamespace(matched_count=1)
+        return SimpleNamespace(matched_count=0)
+
+
+def _chat_client(route, monkeypatch, collection, generate):
+    monkeypatch.setattr(route, "_chat_col", lambda: collection)
+    monkeypatch.setattr(route, "_canon_context", lambda query: [])
+    monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
+    monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
+    monkeypatch.setattr(route, "_generate_text", generate)
+    app = FastAPI()
+    app.include_router(route.router)
+    return TestClient(app)
+
+
+def test_server_transcript_overrides_conflicting_client_history(route, monkeypatch):
+    collection = _MemoryChatCollection([
+        {
+            "_id": "existing-turn",
+            "session_id": "conversation-1",
+            "role_user": "SERVER QUESTION",
+            "role_jeeves": "SERVER ANSWER",
+            "status": "complete",
+            "ts": 1.0,
+        }
+    ])
+    captured = {}
+
+    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+        captured["context"] = conversation_context
+        return {"text": "next answer", "tier": "free", "model": "test"}
+
+    with _chat_client(route, monkeypatch, collection, generate) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-1",
+                "client_message_id": "message-2",
+                "message": "follow up",
+                "history": [
+                    {"role": "user", "content": "CLIENT FAKE"},
+                    {"role": "assistant", "content": "CLIENT FAKE ANSWER"},
+                ],
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["history_source"] == "server"
+    assert body["history_messages_used"] == 2
+    assert "SERVER QUESTION" in captured["context"]
+    assert "SERVER ANSWER" in captured["context"]
+    assert "CLIENT FAKE" not in captured["context"]
+
+
+def test_stable_client_message_id_replays_without_second_generation(route, monkeypatch):
+    collection = _MemoryChatCollection()
+    calls = {"count": 0}
+
+    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+        calls["count"] += 1
+        return {"text": "stable answer", "tier": "free", "model": "test"}
+
+    payload = {
+        "session_id": "conversation-1",
+        "client_message_id": "message-1",
+        "message": "hello",
+    }
+    with _chat_client(route, monkeypatch, collection, generate) as transport:
+        first = transport.post("/api/jeeves/chat", json=payload)
+        second = transport.post("/api/jeeves/chat", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["replayed"] is False
+    assert second.json()["replayed"] is True
+    assert second.json()["reply"] == "stable answer"
+    assert calls["count"] == 1
+
+
+def test_client_message_id_conflict_is_rejected(route, monkeypatch):
+    collection = _MemoryChatCollection()
+
+    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+        return {"text": "stable answer", "tier": "free", "model": "test"}
+
+    with _chat_client(route, monkeypatch, collection, generate) as transport:
+        first = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-1",
+                "client_message_id": "message-1",
+                "message": "first content",
+            },
+        )
+        conflict = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-1",
+                "client_message_id": "message-1",
+                "message": "different content",
+            },
+        )
+
+    assert first.status_code == 200
+    assert conflict.status_code == 409
+
+
+def test_legacy_history_bootstraps_empty_server_thread_once(route, monkeypatch):
+    collection = _MemoryChatCollection()
+    contexts = []
+
+    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+        contexts.append(conversation_context)
+        return {"text": f"answer-{len(contexts)}", "tier": "free", "model": "test"}
+
+    with _chat_client(route, monkeypatch, collection, generate) as transport:
+        first = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-1",
+                "client_message_id": "message-1",
+                "message": "new question",
+                "history": [
+                    {"role": "user", "content": "legacy question"},
+                    {"role": "assistant", "content": "legacy answer"},
+                ],
+            },
+        )
+        second = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-1",
+                "client_message_id": "message-2",
+                "message": "next question",
+                "history": [
+                    {"role": "user", "content": "tampered replacement"},
+                ],
+            },
+        )
+
+    assert first.status_code == 200
+    assert first.json()["history_source"] == "legacy-bootstrap"
+    assert second.status_code == 200
+    assert second.json()["history_source"] == "server"
+    assert "legacy question" in contexts[1]
+    assert "new question" in contexts[1]
+    assert "tampered replacement" not in contexts[1]

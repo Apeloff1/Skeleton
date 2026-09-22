@@ -6,7 +6,6 @@
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
 import logging
-import os
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Query, HTTPException
@@ -20,6 +19,7 @@ router = APIRouter(prefix="/api/reader", tags=["ai-reader"])
 
 # reading_library now lives in content_db (regenerable). Use centralized handles.
 from core.databases import core_db as _db, content_db as _cdb
+from core.expressive_tts import generate_expressive_tts
 PROJ = {"_id": 0}
 
 # Voice options for the reader
@@ -68,33 +68,17 @@ async def speak_text(
         raise HTTPException(400, f"Voice '{voice}' not available. Choose from: {list(VOICE_OPTIONS.keys())}")
 
     try:
-        from emergentintegrations.llm.openai import OpenAITextToSpeech
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        if not api_key:
-            raise HTTPException(500, "TTS API key not configured")
-
-        model = "tts-1-hd"  # top-scale TTS — always HD
-        tts = OpenAITextToSpeech(api_key=api_key)
-        audio_base64 = await tts.generate_speech_base64(
+        out = await generate_expressive_tts(
             text=text,
-            model=model,
-            voice=voice,
-            speed=speed,
+            voice_override=voice,
+            speed_override=speed,
+            shape=False,
         )
-        return {
-            "audio_base64": audio_base64,
-            "format": "mp3",
-            "voice": voice,
-            "model": model,
-            "text_length": len(text),
-        }
-    except HTTPException:
-        raise
-    except ImportError:
-        raise HTTPException(500, "TTS library not installed") from None
+        out["status"] = "success"
+        return out
     except Exception as exc:
         log.warning("TTS generation failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=500, detail="TTS generation failed") from None
+        raise HTTPException(status_code=503, detail="TTS generation failed") from None
 
 
 @router.post("/read-chapter")
@@ -131,34 +115,22 @@ async def read_book_chapter(
         reading_text = reading_text[:4000] + "..."
 
     try:
-        from emergentintegrations.llm.openai import OpenAITextToSpeech
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        if not api_key:
-            raise HTTPException(500, "TTS API key not configured")
-
-        tts = OpenAITextToSpeech(api_key=api_key)
-        audio_base64 = await tts.generate_speech_base64(
+        out = await generate_expressive_tts(
             text=reading_text,
-            model="tts-1-hd",
-            voice=voice,
-            speed=speed,
+            voice_override=voice,
+            speed_override=speed,
+            shape=False,
         )
         return {
-            "audio_base64": audio_base64,
-            "format": "mp3",
+            **out,
             "book_title": book.get("title", ""),
             "chapter_name": chapter.get("name", ""),
             "lesson_title": title,
             "text_length": len(reading_text),
-            "voice": voice,
         }
-    except HTTPException:
-        raise
-    except ImportError:
-        raise HTTPException(500, "TTS library not installed") from None
     except Exception as exc:
         log.warning("TTS generation failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=500, detail="TTS generation failed") from None
+        raise HTTPException(status_code=503, detail="TTS generation failed") from None
 
 
 @router.post("/read-knowledge")
@@ -185,29 +157,17 @@ async def read_knowledge_entry(
         reading_text = reading_text[:4000] + "..."
 
     try:
-        from emergentintegrations.llm.openai import OpenAITextToSpeech
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        if not api_key:
-            raise HTTPException(500, "TTS API key not configured")
-
-        tts = OpenAITextToSpeech(api_key=api_key)
-        audio_base64 = await tts.generate_speech_base64(
+        out = await generate_expressive_tts(
             text=reading_text,
-            model="tts-1-hd",
-            voice=voice,
-            speed=speed,
+            voice_override=voice,
+            speed_override=speed,
+            shape=False,
         )
         return {
-            "audio_base64": audio_base64,
-            "format": "mp3",
+            **out,
             "entry_name": name,
             "text_length": len(reading_text),
-            "voice": voice,
         }
-    except HTTPException:
-        raise
-    except ImportError:
-        raise HTTPException(500, "TTS library not installed") from None
     except Exception as exc:
         log.warning("TTS generation failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=500, detail="TTS generation failed") from None
+        raise HTTPException(status_code=503, detail="TTS generation failed") from None
