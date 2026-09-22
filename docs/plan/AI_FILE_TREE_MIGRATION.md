@@ -107,3 +107,20 @@ Two existing main-tree implementations were already named by the masterplan but 
 - `VOL-023 Forge` -> `skeleton/ai/forge` with primary Forge ownership (`WP-W27`).
 
 Moving them into the governed tree does **not** mark either volume complete. Their existing accountability checkboxes remain open until the planned tests/evaluations and independent evidence exist.
+
+
+## Planned-path closure
+
+The migration now includes the native acceleration core from `skeleton/native`
+under `skeleton/ai/runtime/native`, preserving VOL-032's ABI, fallback, memory
+safety, and deterministic error-translation obligations.
+
+`machine/ai_file_tree.json` also carries a fail-closed planned-path audit.
+Application/assets, shared configuration, deployment/release, repository tests,
+and shell compatibility surfaces remain outside AI engine ownership by design.
+Planned engine roots that do not yet exist are recorded explicitly; if one of
+those roots appears later, validation fails until it is moved into the canonical
+AI tree or given an architecture-approved external owner. Existing naming
+aliases such as `skeleton/evaluation` -> `skeleton/eval` and
+`skeleton/runtime/resilience` -> `skeleton/resilience` are recorded rather
+than treated as missing code.
