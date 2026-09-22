@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate engineering obligation propagation from W00-W30 into AIQ tasks."""
+"""Validate engineering and adversarial obligation propagation into AIQ tasks."""
 from __future__ import annotations
 
 import json
@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MATRIX = ROOT / "machine" / "ai_engineering_task_matrix.json"
 QUEUE = ROOT / "machine" / "ai_build_queue.json"
 ENGINEERING = ROOT / "machine" / "ai_engineering_pass.json"
+ADVERSARIAL = ROOT / "machine" / "ai_adversarial_closure.json"
 SEQUENCE = ROOT / "machine" / "ai_master_build_sequence.json"
 HUMAN = ROOT / "docs" / "plan" / "ENGINEERING_TASK_MATRIX.md"
 MASTER = ROOT / "machine" / "ai_master_plan.json"
@@ -45,7 +46,11 @@ def _ordered_union(values: list[list[str]], order: list[str] | None = None) -> l
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for path in (MATRIX, QUEUE, ENGINEERING, SEQUENCE, HUMAN, MASTER, PLAN, INDEX):
+    required_paths = (
+        MATRIX, QUEUE, ENGINEERING, ADVERSARIAL, SEQUENCE,
+        HUMAN, MASTER, PLAN, INDEX,
+    )
+    for path in required_paths:
         if not path.is_file():
             errors.append(f"missing {path.relative_to(ROOT)}")
     if errors:
@@ -55,6 +60,7 @@ def validate() -> list[str]:
         matrix = _load(MATRIX)
         queue = _load(QUEUE)
         engineering = _load(ENGINEERING)
+        adversarial = _load(ADVERSARIAL)
         sequence = _load(SEQUENCE)
         master = _load(MASTER)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
@@ -64,6 +70,8 @@ def validate() -> list[str]:
         errors.append("task engineering matrix schema_version must equal 1")
     if matrix.get("status") != "active":
         errors.append("task engineering matrix status must be active")
+    if matrix.get("sources", {}).get("adversarial_closure") != "machine/ai_adversarial_closure.json":
+        errors.append("task matrix must bind the adversarial closure source")
 
     profiles = engineering.get("work_package_profiles", [])
     profile_by = {
@@ -75,6 +83,21 @@ def validate() -> list[str]:
         d.get("id")
         for d in engineering.get("engineering_dimensions", [])
         if isinstance(d, dict) and isinstance(d.get("id"), str)
+    ]
+
+    axes = adversarial.get("closure_axes", [])
+    axis_by = {
+        a.get("id"): a
+        for a in axes
+        if isinstance(a, dict) and isinstance(a.get("id"), str)
+    }
+    axis_order = [a.get("id") for a in axes if isinstance(a, dict)]
+    wp_axis_coverage = adversarial.get("work_package_coverage", {})
+    campaigns = adversarial.get("compound_campaigns", [])
+    promotion_gate_ids = [
+        g.get("id")
+        for g in adversarial.get("promotion_gates", [])
+        if isinstance(g, dict) and isinstance(g.get("id"), str)
     ]
 
     wave_by_wp: dict[str, str] = {}
@@ -102,14 +125,19 @@ def validate() -> list[str]:
         if isinstance(t, dict) and isinstance(t.get("task_id"), str)
     }
 
-    overlay = queue.get("acceptance_overlays", {}).get("engineering_task_matrix")
-    if not isinstance(overlay, dict):
+    overlays = queue.get("acceptance_overlays", {})
+    engineering_overlay = overlays.get("engineering_task_matrix")
+    adversarial_overlay = overlays.get("adversarial_closure")
+    if not isinstance(engineering_overlay, dict):
         errors.append("build queue must declare engineering_task_matrix acceptance overlay")
     else:
-        if overlay.get("contract") != "machine/ai_engineering_task_matrix.json":
+        if engineering_overlay.get("contract") != "machine/ai_engineering_task_matrix.json":
             errors.append("engineering task overlay contract path drifted")
-        if overlay.get("human") != "docs/plan/ENGINEERING_TASK_MATRIX.md":
-            errors.append("engineering task overlay human path drifted")
+    if not isinstance(adversarial_overlay, dict):
+        errors.append("build queue must declare adversarial_closure acceptance overlay")
+    else:
+        if adversarial_overlay.get("contract") != "machine/ai_adversarial_closure.json":
+            errors.append("adversarial closure overlay contract path drifted")
 
     for task in queue_tasks:
         if not isinstance(task, dict):
@@ -152,6 +180,30 @@ def validate() -> list[str]:
         )
         expected_waves = sorted({wave_by_wp[wp] for wp in wp_refs if wp in wave_by_wp})
 
+        expected_axes = _ordered_union(
+            [wp_axis_coverage.get(wp, []) for wp in wp_refs],
+            axis_order,
+        )
+        expected_adv_evidence = _ordered_union(
+            [
+                axis_by[axis_id].get("required_evidence_modes", [])
+                for axis_id in expected_axes
+                if axis_id in axis_by
+            ]
+        )
+        expected_stop_conditions = [
+            f"{axis_id}: {axis_by[axis_id].get('stop_condition', '')}"
+            for axis_id in expected_axes
+            if axis_id in axis_by
+        ]
+        expected_campaigns = [
+            campaign.get("id")
+            for campaign in campaigns
+            if isinstance(campaign, dict)
+            and isinstance(campaign.get("id"), str)
+            and any(wp in wp_refs for wp in campaign.get("work_packages", []))
+        ]
+
         exact_fields = {
             "engineering_profile_refs": wp_refs,
             "construction_wave_refs": expected_waves,
@@ -161,6 +213,11 @@ def validate() -> list[str]:
             "principal_failure_modes": expected_failures,
             "recovery_requirements": expected_recovery,
             "change_impact_triggers": expected_triggers,
+            "adversarial_closure_axis_refs": expected_axes,
+            "adversarial_evidence_modes": expected_adv_evidence,
+            "adversarial_stop_conditions": expected_stop_conditions,
+            "compound_campaign_refs": expected_campaigns,
+            "adversarial_promotion_gate_refs": promotion_gate_ids,
         }
         for field, expected in exact_fields.items():
             actual = row.get(field)
@@ -172,9 +229,11 @@ def validate() -> list[str]:
         if row.get("accountability_id") != task.get("accountability_id"):
             errors.append(f"{tid}: accountability id drift")
 
-        overlays = task.get("acceptance_overlays", [])
-        if "engineering_task_matrix" not in overlays:
-            errors.append(f"{tid}: queue task does not enable engineering_task_matrix overlay")
+        task_overlays = task.get("acceptance_overlays", [])
+        for required_overlay in ("engineering_task_matrix", "adversarial_closure"):
+            if required_overlay not in task_overlays:
+                errors.append(f"{tid}: queue task does not enable {required_overlay} overlay")
+
         inheritance = task.get("engineering_inheritance")
         if not isinstance(inheritance, dict):
             errors.append(f"{tid}: missing engineering_inheritance")
@@ -183,27 +242,28 @@ def validate() -> list[str]:
                 errors.append(f"{tid}: engineering inheritance source drift")
             if inheritance.get("engineering_profile_refs") != wp_refs:
                 errors.append(f"{tid}: engineering inheritance profiles drift")
+            if inheritance.get("adversarial_closure_source") != "machine/ai_adversarial_closure.json":
+                errors.append(f"{tid}: adversarial inheritance source drift")
 
         gate = row.get("engineering_gate_state")
         if gate not in ALLOWED_GATE_STATES:
             errors.append(f"{tid}: invalid engineering_gate_state")
         evidence_refs = row.get("engineering_evidence_refs")
         budget_refs = row.get("budget_binding_refs")
-        if not isinstance(evidence_refs, list) or not isinstance(budget_refs, list):
-            errors.append(f"{tid}: evidence/budget refs must be lists")
-        elif gate == "evidence_complete" and (not evidence_refs or not budget_refs):
-            errors.append(f"{tid}: evidence_complete requires evidence and budget bindings")
-        elif gate == "obligations_bound_evidence_pending" and (evidence_refs or budget_refs):
+        adv_refs = row.get("adversarial_evidence_refs")
+        if not isinstance(evidence_refs, list) or not isinstance(budget_refs, list) or not isinstance(adv_refs, list):
+            errors.append(f"{tid}: engineering/adversarial evidence refs must be lists")
+        elif gate == "evidence_complete" and (not evidence_refs or not budget_refs or not adv_refs):
+            errors.append(f"{tid}: evidence_complete requires engineering, budget and adversarial bindings")
+        elif gate == "obligations_bound_evidence_pending" and (evidence_refs or budget_refs or adv_refs):
             errors.append(f"{tid}: pending gate must not claim evidence or budget bindings")
 
-    eng_task = engineering.get("task_propagation")
-    if not isinstance(eng_task, dict):
+    task_propagation = engineering.get("task_propagation")
+    if not isinstance(task_propagation, dict):
         errors.append("engineering pass must declare task_propagation")
     else:
-        if eng_task.get("machine_contract") != "machine/ai_engineering_task_matrix.json":
+        if task_propagation.get("machine_contract") != "machine/ai_engineering_task_matrix.json":
             errors.append("engineering task propagation machine path drifted")
-        if eng_task.get("human_contract") != "docs/plan/ENGINEERING_TASK_MATRIX.md":
-            errors.append("engineering task propagation human path drifted")
 
     master_task = master.get("engineering_pass", {}).get("task_matrix")
     if master_task != "machine/ai_engineering_task_matrix.json":
@@ -215,12 +275,13 @@ def validate() -> list[str]:
         "Task ledger",
         "Required implementation packet",
         "Fail-closed rules",
+        "Adversarial source",
     ):
         if marker not in human:
             errors.append(f"engineering task document missing marker: {marker}")
 
     plan_text = PLAN.read_text(encoding="utf-8")
-    if "## 21.6 Atomic task engineering propagation" not in plan_text:
+    if "## 21.7 Atomic task engineering propagation" not in plan_text:
         errors.append("master plan must explain atomic task engineering propagation")
     index_text = INDEX.read_text(encoding="utf-8")
     if "ENGINEERING_TASK_MATRIX.md" not in index_text or "ai_engineering_task_matrix.json" not in index_text:
@@ -232,12 +293,12 @@ def validate() -> list[str]:
 def main() -> int:
     errors = validate()
     if errors:
-        print("AIQ engineering propagation: FAIL")
+        print("AIQ engineering/adversarial propagation: FAIL")
         for error in errors:
             print(f" - {error}")
         return 1
     data = _load(MATRIX)
-    print(f"AIQ engineering propagation: OK ({len(data['tasks'])} atomic tasks)")
+    print(f"AIQ engineering/adversarial propagation: OK ({len(data['tasks'])} atomic tasks)")
     return 0
 
 
