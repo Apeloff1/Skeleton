@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.8.0",
+  "tree_version": "1.2.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
