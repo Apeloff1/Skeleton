@@ -203,7 +203,7 @@ export function PipelineVisualizer({
 }: PipelineVisualizerProps) {
   const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null);
   const [viewMode, setViewMode] = useState<'linear' | 'graph' | 'detail'>('linear');
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   
   const handleStagePress = useCallback((stage: PipelineStage) => {
     setSelectedStage(stage);
