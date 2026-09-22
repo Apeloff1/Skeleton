@@ -150,7 +150,7 @@ class QualityState:
         """Summarize quality metrics."""
         if not self._metrics:
             return {"count": 0}
-        
+
         by_kind: Dict[str, List[Dict[str, Any]]] = {}
         for m in self._metrics:
             kind = m.get("kind", "unknown")
