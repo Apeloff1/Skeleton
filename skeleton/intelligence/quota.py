@@ -34,6 +34,7 @@ class QuotaConflict(QuotaError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_UNKNOWN_USAGE_PREFIX = "unknown:"
 
 
 def _required_id(value: str, field: str) -> str:
@@ -533,6 +534,132 @@ class TenantQuotaLedger:
             matched_state.usage_events[event] = usage_event
             return usage_event
 
+    def mark_usage_unknown(
+        self,
+        reservation_id: str,
+        event_id: str,
+        category: str,
+        *,
+        now: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Persist an unresolved actual-usage marker for one side effect."""
+
+        key = _required_id(reservation_id, "reservation_id")
+        event = _required_id(event_id, "event_id")
+        normalized_category = str(category).strip().lower()
+        if normalized_category not in _USAGE_CATEGORIES:
+            raise QuotaError("unsupported usage category")
+        timestamp = time.time() if now is None else _finite_nonnegative(now, "now")
+        unknown_category = _UNKNOWN_USAGE_PREFIX + normalized_category
+
+        with self._lock:
+            matched_state: _TenantState | None = None
+            reservation: QuotaReservation | None = None
+            for state in self._states.values():
+                candidate = state.reservations.get(key)
+                if candidate is not None:
+                    matched_state = state
+                    reservation = candidate
+                    break
+            if matched_state is None or reservation is None:
+                for state in self._states.values():
+                    if any(item.reservation_id == key for item in state.completions):
+                        raise QuotaConflict("cannot meter a completed quota reservation")
+                raise QuotaError("unknown active quota reservation")
+
+            for state in self._states.values():
+                existing = state.usage_events.get(event)
+                if existing is None:
+                    continue
+                if (
+                    existing.reservation_id != key
+                    or existing.category != unknown_category
+                    or existing.delta != QuotaUsage()
+                ):
+                    raise QuotaConflict("usage event id replayed with different inputs")
+                return existing
+
+            marker = QuotaUsageEvent(
+                event_id=event,
+                reservation_id=reservation.reservation_id,
+                tenant_id=reservation.tenant_id,
+                window_id=reservation.window_id,
+                operation_id=reservation.operation_id,
+                category=unknown_category,
+                delta=QuotaUsage(),
+                recorded_at=timestamp,
+            )
+            matched_state.usage_events[event] = marker
+            return marker
+
+    def resolve_unknown_usage(
+        self,
+        reservation_id: str,
+        event_id: str,
+        delta: UsageEstimate,
+        *,
+        max_tool_calls: int | None = None,
+        max_artifact_bytes: int | None = None,
+        now: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Replace a durable unknown marker with a conservative measured charge."""
+
+        key = _required_id(reservation_id, "reservation_id")
+        event = _required_id(event_id, "event_id")
+        if not isinstance(delta, UsageEstimate):
+            raise QuotaError("delta must be UsageEstimate")
+
+        with self._lock:
+            matched_state: _TenantState | None = None
+            marker: QuotaUsageEvent | None = None
+            for state in self._states.values():
+                candidate = state.usage_events.get(event)
+                if candidate is not None:
+                    matched_state = state
+                    marker = candidate
+                    break
+            if matched_state is None or marker is None:
+                raise QuotaError("unknown usage marker does not exist")
+            if marker.reservation_id != key:
+                raise QuotaConflict("usage event belongs to a different reservation")
+            if not marker.category.startswith(_UNKNOWN_USAGE_PREFIX):
+                raise QuotaConflict("usage event is not unresolved")
+
+            matched_state.usage_events.pop(event)
+            try:
+                return self.record_usage_event(
+                    key,
+                    event,
+                    marker.category[len(_UNKNOWN_USAGE_PREFIX):],
+                    delta,
+                    max_tool_calls=max_tool_calls,
+                    max_artifact_bytes=max_artifact_bytes,
+                    now=now,
+                )
+            except Exception:
+                matched_state.usage_events[event] = marker
+                raise
+
+    def unresolved_usage(self, reservation_id: str) -> tuple[QuotaUsageEvent, ...]:
+        key = _required_id(reservation_id, "reservation_id")
+        with self._lock:
+            for state in self._states.values():
+                active = key in state.reservations
+                completed = any(item.reservation_id == key for item in state.completions)
+                if active or completed:
+                    return tuple(
+                        sorted(
+                            (
+                                event
+                                for event in state.usage_events.values()
+                                if event.reservation_id == key
+                                and event.category.startswith(_UNKNOWN_USAGE_PREFIX)
+                            ),
+                            key=lambda item: item.event_id,
+                        )
+                    )
+        raise QuotaError("unknown quota reservation")
+
     def metered_usage(self, reservation_id: str) -> QuotaUsage:
         key = _required_id(reservation_id, "reservation_id")
         with self._lock:
@@ -587,6 +714,20 @@ class TenantQuotaLedger:
             if matched_state is None or reservation is None:
                 raise QuotaError("unknown active quota reservation")
 
+            unresolved = [
+                event
+                for event in matched_state.usage_events.values()
+                if event.reservation_id == key
+                and event.category.startswith(_UNKNOWN_USAGE_PREFIX)
+            ]
+            if unresolved:
+                categories = sorted(
+                    {event.category[len(_UNKNOWN_USAGE_PREFIX):] for event in unresolved}
+                )
+                raise QuotaConflict(
+                    "actual_usage_unknown:" + ",".join(categories)
+                )
+
             observed_usage = self._metered_usage(matched_state, key)
             actual_usage = self._usage_max(reported_usage, observed_usage)
             projected = matched_state.committed.plus(actual_usage)
@@ -630,6 +771,11 @@ class TenantQuotaLedger:
                 "active_reservations": len(state.reservations),
                 "completions": len(state.completions),
                 "usage_events": len(state.usage_events),
+                "unknown_usage_events": sum(
+                    1
+                    for event in state.usage_events.values()
+                    if event.category.startswith(_UNKNOWN_USAGE_PREFIX)
+                ),
                 "metered_by_category": {
                     category: {
                         "tool_calls": sum(
