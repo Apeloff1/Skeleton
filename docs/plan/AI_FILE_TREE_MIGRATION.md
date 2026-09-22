@@ -146,8 +146,8 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **78 governed source -> destination mappings**
-- **1,810 changed files under `skeleton/ai`** in this migration PR
+- **80 governed source -> destination mappings**
+- **1,975 changed files under `skeleton/ai`** in this migration PR
 - only six AI-tree scaffolding files are not source-derived mappings:
   `skeleton/ai/README.md`, the root `__init__.py`, and package
   `__init__.py` files for agents, build, providers, and runtime
@@ -167,7 +167,7 @@ inversion, or independent verification.
 
 The prepared units are divided into four deterministic batches:
 
-- **B1-core-runtime (52 mappings):** core runtime, provider-neutral surfaces,
+- **B1-core-runtime (54 mappings):** core runtime, provider-neutral surfaces,
   agents, cognition, learning, evaluation, reliability, state, and supporting
   engine capabilities.
 - **B2-domain-build (12 mappings):** repository/build engineering, simulation,
@@ -219,3 +219,13 @@ checks may create untracked runtime/generated directories such as
 `skeleton/telemetry` or `skeleton/turn`; those are not source roots and must
 not force false move classifications. Failure to enumerate the Git index is
 itself fail-closed.
+
+
+### Latest extension audit status
+
+The current governed set contains **80 mappings**. The prior direct Git-object audit covered the first 78 mappings; the two newest additions are:
+
+- `AIFT-CONFIG`: `skeleton/config` -> `skeleton/ai/runtime/config`
+- `AIFT-AI-SHELL`: `skeleton/shells/ai` -> `skeleton/ai/shell`
+
+Both are tagged `ai-tree:mapped`, `migration:staged-mirror`, and `cutover:parity-ready` in `B1-core-runtime`. Their implementation payload is identity-bound, but fresh parity/object-audit and CI evidence are still required before any import inversion or source retirement.
