@@ -1605,12 +1605,7 @@ def _require_digest(value: Any) -> str:
 def _validate_packet_envelope(packet: Packet) -> None:
     if not isinstance(packet.kind, str) or packet.kind not in {"snapshot", "delta", "ack"}:
         raise SerializationError("unknown packet kind", context={"kind": packet.kind})
-    schema_version = _require_int("schema_version", packet.schema_version, minimum=1)
-    if schema_version != SCHEMA_VERSION:
-        raise SchemaCompatibilityError(
-            "incompatible replication schema",
-            context={"schema_version": schema_version, "supported": SCHEMA_VERSION},
-        )
+    _require_int("schema_version", packet.schema_version, minimum=1)
     _require_int("sequence", packet.sequence, minimum=0)
     if not isinstance(packet.payload, dict):
         raise SerializationError("payload must be an object")
