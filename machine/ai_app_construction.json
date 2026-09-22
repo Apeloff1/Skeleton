@@ -6374,7 +6374,7 @@
   "memory_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "implementation_in_progress",
     "gap": "gap-memory-durable-authority",
     "canonical_contracts": {
       "storage": "skeleton/frontier/contracts.py:MemoryContract",
@@ -6383,8 +6383,8 @@
       "legacy_adapter": "skeleton/memory/frontier_adapter.py"
     },
     "planned_modules": {
-      "contracts": "skeleton/contracts/memory_record.py",
-      "repository": "skeleton/persistence/memory_repository.py",
+      "contracts": "skeleton/contracts/memory_record.py (staged mirror: skeleton/ai/runtime/contracts/memory_record.py)",
+      "repository": "skeleton/persistence/memory_repository.py (staged mirror: skeleton/ai/runtime/persistence/memory_repository.py)",
       "policy": "skeleton/memory/policy.py",
       "writeback": "skeleton/memory/writeback.py"
     },
@@ -6569,6 +6569,13 @@
         "current": "process-local vector store",
         "target": "derived retrieval projection/reference implementation"
       }
+    ],
+    "implementation_evidence": [
+      "skeleton/contracts/memory_record.py",
+      "skeleton/ai/runtime/contracts/memory_record.py",
+      "skeleton/persistence/memory_repository.py",
+      "skeleton/ai/runtime/persistence/memory_repository.py",
+      "skeleton/testing/test_memory_repository.py"
     ]
   },
   "functional_ai_dependency_graph": {
@@ -8398,7 +8405,10 @@
       "engine_execution_command": "EngineExecutionCommand",
       "engine_execution_ack": "EngineExecutionAck",
       "engine_execution_status": "EngineExecutionStatus",
-      "engine_cancel_command": "EngineCancelCommand"
+      "engine_cancel_command": "EngineCancelCommand",
+      "memory_record": "MemoryRecord",
+      "memory_write_proposal": "MemoryWriteProposal",
+      "memory_write_receipt": "MemoryWriteReceipt"
     }
   },
   "ai_authority_model": {
