@@ -302,12 +302,14 @@ No import inversion, source retirement, AIQ completion, work-package completion,
 
 ### Transfer v2 clean-audit evidence
 
-The latest bridge-rebased payload is intentionally created before its final identity can be written into the manifest. The following attestation commit must bind the actual payload SHA/tree after a fresh recursive 130-mapping audit confirms:
+Payload `72c24753330d5dccdd5f985a1c212b9f63bf10ee` (tree `466912afe019434034986ca940634c7d5d52ff32`) is rebuilt directly on baseline-bridge head `97e91cf64b1edae4f28efaaf935d24a46b8acbab` and was audited across all **130 governed mappings** before implementation attestation:
 - 0 stale source Git-object identities
 - 0 missing source/destination mappings
 - 0 tree-membership drift
 - 0 exact mirror blob drift
-- all 16 compatibility facades satisfy their required non-owning import contracts
+- 16 compatibility facades validated
 - 0 forbidden provider credential/network markers in those facades
+- 26 transfer-v2 mappings / 89 new mirror files
+- 5 automation parity refreshes inherited from the baseline bridge rather than duplicated in the PR delta
 
-Independent verification remains unsigned and final bridge-based CI/App Assembly must still pass.
+The implementation attestation is bound to the payload SHA above. Independent verification remains unsigned and final bridge-based CI/App Assembly must still pass.
