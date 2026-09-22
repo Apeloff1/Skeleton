@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.5.0",
+  "tree_version": "1.3.2",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -359,6 +359,42 @@
           "mode": "compatibility_facade",
           "facade_required_import": "from skeleton.automation.free_model import",
           "note": "Repository-automation provider credential/network ownership remains singular at skeleton/automation/free_model.py until cutover."
+        },
+        {
+          "path": "chatgpt_adapter.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.chatgpt_adapter import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "idle_studio.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.idle_studio import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "idle_studio_publisher.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.idle_studio_publisher import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "idle_studio_v2.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.idle_studio_v2 import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "specialist_bots.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.specialist_bots import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "supervisor.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.supervisor import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
         }
       ]
     },
@@ -463,6 +499,20 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "activation_security.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.security.activation_security import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "injection_corpus.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.security.injection_corpus import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        }
       ]
     },
     {
@@ -745,6 +795,12 @@
           "mode": "compatibility_facade",
           "facade_required_import": "from skeleton.cortex.gates import *",
           "note": "Provider gate environment/key discovery remains singular at skeleton/cortex/gates.py until provider-boundary cutover."
+        },
+        {
+          "path": "catalog.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.cortex.catalog import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
         }
       ]
     },
@@ -1339,5 +1395,6 @@
         "retain compatibility facade until zero required callers"
       ]
     }
-  ]
+  ],
+  "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files."
 }
