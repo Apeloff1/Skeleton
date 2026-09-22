@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.0",
+  "tree_version": "1.7.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -588,6 +588,9 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "acquired_guard.py"
       ]
     },
     {
@@ -613,6 +616,10 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "acquired.py",
+        "school"
       ]
     },
     {
@@ -731,6 +738,13 @@
       ],
       "volume_refs": [
         "VOL-019"
+      ],
+      "overlay_children": [
+        "content",
+        "economy",
+        "game",
+        "platform",
+        "world"
       ]
     },
     {
@@ -748,6 +762,9 @@
       ],
       "volume_refs": [
         "VOL-023"
+      ],
+      "overlay_children": [
+        "creator"
       ]
     },
     {
@@ -767,6 +784,9 @@
       "work_package_linkage_basis": "VOL-032 is a runtime/native-core implementation path whose stable ABI belongs to kernel lifecycle and whose promotion/fallback obligations belong to production hardening.",
       "aiq_refs": [
         "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "jvm_registry.py"
       ]
     },
     {
@@ -1345,6 +1365,9 @@
         "preserve schema/migration semantics",
         "prove checkpoint/restart parity",
         "keep legacy import facade until callers invert"
+      ],
+      "overlay_children": [
+        "resilient_cache.py"
       ]
     },
     {
@@ -1371,6 +1394,9 @@
         "preserve bounded fan-out",
         "preserve handoff/lease semantics",
         "verify no authority escalation"
+      ],
+      "overlay_children": [
+        "hive"
       ]
     },
     {
@@ -1501,6 +1527,312 @@
         "preserve retrieval trust labeling",
         "keep loading bounded and recoverable",
         "avoid creating a second context or retrieval authority"
+      ]
+    },
+    {
+      "id": "AIFT-ACQUIRED-LEARNING",
+      "source": "skeleton/acquired/learning.py",
+      "destination": "skeleton/ai/learning/acquired.py",
+      "kind": "file",
+      "source_git_object_sha": "cfcf021de5b7ff3cfe9a9d5bdd2dc144b4dc6a7f",
+      "role": "Adaptive learning/progression logic is useful but currently shares a quarantine namespace; move only the learning slice into the controlled learning plane.",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-074"
+      ],
+      "migration_action": "split_then_mirror",
+      "cutover_preconditions": [
+        "retain provenance that code was acquired",
+        "keep candidate status until evaluated",
+        "do not promote from quarantine by relocation"
+      ],
+      "source_provenance": "acquired_quarantine",
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority."
+    },
+    {
+      "id": "AIFT-ACQUIRED-CACHE",
+      "source": "skeleton/acquired/resilient_cache.py",
+      "destination": "skeleton/ai/runtime/state/resilient_cache.py",
+      "kind": "file",
+      "source_git_object_sha": "6022e05f00457ebfc76ae5affe5dddfb07767bdd",
+      "role": "Resilient TTL cache is state/reliability support and should be separated from the mixed acquired namespace.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W19"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-029",
+        "VOL-135"
+      ],
+      "migration_action": "split_then_mirror",
+      "cutover_preconditions": [
+        "cache remains derived/non-authoritative",
+        "test expiry and stale-read behavior",
+        "retain source provenance"
+      ],
+      "source_provenance": "acquired_quarantine",
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority."
+    },
+    {
+      "id": "AIFT-ACQUIRED-GUARD",
+      "source": "skeleton/acquired/runtime_guard.py",
+      "destination": "skeleton/ai/runtime/reliability/acquired_guard.py",
+      "kind": "file",
+      "source_git_object_sha": "4f4eca085d595d4be2192d9ae162dc9d9032e104",
+      "role": "Admission/degradation/chaos guard behavior belongs with reliability and policy, not a mixed quarantine namespace.",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W19",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-025",
+        "VOL-029"
+      ],
+      "migration_action": "split_then_mirror",
+      "cutover_preconditions": [
+        "fail closed on unknown policy",
+        "prove degradation never widens authority",
+        "retain quarantine provenance"
+      ],
+      "source_provenance": "acquired_quarantine",
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority."
+    },
+    {
+      "id": "AIFT-CONTENT",
+      "source": "skeleton/content",
+      "destination": "skeleton/ai/simulation/content",
+      "kind": "tree",
+      "source_git_object_sha": "b858b6bce8d39570ee94e12ac73251a7495d5327",
+      "role": "Lorebuffa-derived NPC/dialogue domain knowledge belongs beneath the governed simulation/world-model owner.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "retain source lineage",
+        "keep domain knowledge separate from system instruction authority",
+        "deduplicate with existing simulation knowledge before cutover"
+      ]
+    },
+    {
+      "id": "AIFT-CREATOR",
+      "source": "skeleton/creator",
+      "destination": "skeleton/ai/forge/creator",
+      "kind": "tree",
+      "source_git_object_sha": "7debd95822e3b7694bfdc668db945a6c94a19145",
+      "role": "Intent compilation and reversible design edits are candidate-generation/planning primitives for Forge.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-014",
+        "VOL-023"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "retain provenance links",
+        "retain reversible edit semantics",
+        "forbid direct production mutation"
+      ]
+    },
+    {
+      "id": "AIFT-ECONOMY",
+      "source": "skeleton/economy",
+      "destination": "skeleton/ai/simulation/economy",
+      "kind": "tree",
+      "source_git_object_sha": "51a53f830e3223bc72520fe65a3e6451ad7c5eb1",
+      "role": "The GameForge-derived treasury/economy model is simulation-domain state and belongs under simulation rather than a parallel runtime root.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve double-entry invariants",
+        "retain provenance requirements for minting",
+        "keep simulation economy isolated from real financial authority"
+      ]
+    },
+    {
+      "id": "AIFT-GAME",
+      "source": "skeleton/game",
+      "destination": "skeleton/ai/simulation/game",
+      "kind": "tree",
+      "source_git_object_sha": "b3643c67b7547e82ccd4231684a10afeb39532d3",
+      "role": "Game mechanics, replay, AI FSM, economy simulation, progression, and tick-clock code is simulation/world-model substrate.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve deterministic replay",
+        "keep game-domain state out of global AI authority",
+        "merge only after overlap analysis with skeleton/simulation"
+      ]
+    },
+    {
+      "id": "AIFT-HIVE",
+      "source": "skeleton/hive",
+      "destination": "skeleton/ai/agents/swarm/hive",
+      "kind": "tree",
+      "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788",
+      "role": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W16"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-017"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "compare overlap with skeleton/swarm before cutover",
+        "retain canonical capability contract",
+        "avoid duplicate scheduler ownership"
+      ]
+    },
+    {
+      "id": "AIFT-JVM-REGISTRY",
+      "source": "skeleton/jvm_accelerators.py",
+      "destination": "skeleton/ai/runtime/native/jvm_registry.py",
+      "kind": "file",
+      "source_git_object_sha": "fc62b6b66d45c6d0d9c9a2ecaf2e260ce3833764",
+      "role": "The optional JVM accelerator registry is engine runtime support and should live beside native/JVM acceleration ownership while java-accelerators remains its separate accelerator root.",
+      "work_package_refs": [
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-032",
+        "VOL-033"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep JVM helpers optional and fallback-safe",
+        "preserve process lifecycle/timeout accounting",
+        "do not absorb the java-accelerators top-level owner"
+      ]
+    },
+    {
+      "id": "AIFT-PLATFORM",
+      "source": "skeleton/platform",
+      "destination": "skeleton/ai/simulation/platform",
+      "kind": "tree",
+      "source_git_object_sha": "3d1c2ef9c429dbf09363fcb8fb82e6f23754f43a",
+      "role": "The engine-neutral Godot adapter translates simulation/game documents and should sit with simulation/forge integration.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-023",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve engine-neutral schemas",
+        "do not move backend/Godot product ownership",
+        "retain unsupported-feature fail-closed behavior"
+      ]
+    },
+    {
+      "id": "AIFT-SCHOOL",
+      "source": "skeleton/school",
+      "destination": "skeleton/ai/learning/school",
+      "kind": "tree",
+      "source_git_object_sha": "2dfa6897682f678abb1ce9191a192a2c94682bee",
+      "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-074"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "deduplicate overlap with skeleton/learning",
+        "retain learner-state provenance and privacy boundaries",
+        "evaluate adaptive policies before promotion"
+      ]
+    },
+    {
+      "id": "AIFT-WORLD",
+      "source": "skeleton/world",
+      "destination": "skeleton/ai/simulation/world",
+      "kind": "tree",
+      "source_git_object_sha": "965d35c8a027bfd77688ecf7bd8eec2e70724e71",
+      "role": "Scene/world state is canonical simulation input and should converge under the already governed simulation tree.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve world/scene schema identity",
+        "deduplicate with frontier world representations",
+        "retain deterministic serialization and replay"
       ]
     }
   ],
@@ -1640,270 +1972,6 @@
     "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline."
   },
   "next_move_assignments": [
-    {
-      "id": "AIFT-NEXT-ACQUIRED-LEARNING",
-      "priority": 2,
-      "source": "skeleton/acquired/learning.py",
-      "destination": "skeleton/ai/learning/acquired.py",
-      "action": "split_then_mirror",
-      "work_package_refs": [
-        "WP-W28"
-      ],
-      "volume_refs": [
-        "VOL-024",
-        "VOL-074"
-      ],
-      "rationale": "Adaptive learning/progression logic is useful but currently shares a quarantine namespace; move only the learning slice into the controlled learning plane.",
-      "preconditions": [
-        "retain provenance that code was acquired",
-        "keep candidate status until evaluated",
-        "do not promote from quarantine by relocation"
-      ],
-      "source_git_object_sha": "cfcf021de5b7ff3cfe9a9d5bdd2dc144b4dc6a7f"
-    },
-    {
-      "id": "AIFT-NEXT-ACQUIRED-CACHE",
-      "priority": 2,
-      "source": "skeleton/acquired/resilient_cache.py",
-      "destination": "skeleton/ai/runtime/state/resilient_cache.py",
-      "action": "split_then_mirror",
-      "work_package_refs": [
-        "WP-W03",
-        "WP-W19"
-      ],
-      "volume_refs": [
-        "VOL-005",
-        "VOL-029",
-        "VOL-135"
-      ],
-      "rationale": "Resilient TTL cache is state/reliability support and should be separated from the mixed acquired namespace.",
-      "preconditions": [
-        "cache remains derived/non-authoritative",
-        "test expiry and stale-read behavior",
-        "retain source provenance"
-      ],
-      "source_git_object_sha": "6022e05f00457ebfc76ae5affe5dddfb07767bdd"
-    },
-    {
-      "id": "AIFT-NEXT-ACQUIRED-GUARD",
-      "priority": 2,
-      "source": "skeleton/acquired/runtime_guard.py",
-      "destination": "skeleton/ai/runtime/reliability/acquired_guard.py",
-      "action": "split_then_mirror",
-      "work_package_refs": [
-        "WP-W14",
-        "WP-W19",
-        "WP-W20"
-      ],
-      "volume_refs": [
-        "VOL-025",
-        "VOL-029"
-      ],
-      "rationale": "Admission/degradation/chaos guard behavior belongs with reliability and policy, not a mixed quarantine namespace.",
-      "preconditions": [
-        "fail closed on unknown policy",
-        "prove degradation never widens authority",
-        "retain quarantine provenance"
-      ],
-      "source_git_object_sha": "4f4eca085d595d4be2192d9ae162dc9d9032e104"
-    },
-    {
-      "id": "AIFT-NEXT-CONTENT",
-      "priority": 2,
-      "source": "skeleton/content",
-      "destination": "skeleton/ai/simulation/content",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W09",
-        "WP-W11"
-      ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
-      "rationale": "Lorebuffa-derived NPC/dialogue domain knowledge belongs beneath the governed simulation/world-model owner.",
-      "preconditions": [
-        "retain source lineage",
-        "keep domain knowledge separate from system instruction authority",
-        "deduplicate with existing simulation knowledge before cutover"
-      ],
-      "source_git_object_sha": "b858b6bce8d39570ee94e12ac73251a7495d5327"
-    },
-    {
-      "id": "AIFT-NEXT-CREATOR",
-      "priority": 2,
-      "source": "skeleton/creator",
-      "destination": "skeleton/ai/forge/creator",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W12",
-        "WP-W27"
-      ],
-      "volume_refs": [
-        "VOL-014",
-        "VOL-023"
-      ],
-      "rationale": "Intent compilation and reversible design edits are candidate-generation/planning primitives for Forge.",
-      "preconditions": [
-        "retain provenance links",
-        "retain reversible edit semantics",
-        "forbid direct production mutation"
-      ],
-      "source_git_object_sha": "7debd95822e3b7694bfdc668db945a6c94a19145"
-    },
-    {
-      "id": "AIFT-NEXT-ECONOMY",
-      "priority": 2,
-      "source": "skeleton/economy",
-      "destination": "skeleton/ai/simulation/economy",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W11",
-        "WP-W12"
-      ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
-      "rationale": "The GameForge-derived treasury/economy model is simulation-domain state and belongs under simulation rather than a parallel runtime root.",
-      "preconditions": [
-        "preserve double-entry invariants",
-        "retain provenance requirements for minting",
-        "keep simulation economy isolated from real financial authority"
-      ],
-      "source_git_object_sha": "51a53f830e3223bc72520fe65a3e6451ad7c5eb1"
-    },
-    {
-      "id": "AIFT-NEXT-GAME",
-      "priority": 2,
-      "source": "skeleton/game",
-      "destination": "skeleton/ai/simulation/game",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W11",
-        "WP-W12"
-      ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
-      "rationale": "Game mechanics, replay, AI FSM, economy simulation, progression, and tick-clock code is simulation/world-model substrate.",
-      "preconditions": [
-        "preserve deterministic replay",
-        "keep game-domain state out of global AI authority",
-        "merge only after overlap analysis with skeleton/simulation"
-      ],
-      "source_git_object_sha": "b3643c67b7547e82ccd4231684a10afeb39532d3"
-    },
-    {
-      "id": "AIFT-NEXT-HIVE",
-      "priority": 2,
-      "source": "skeleton/hive",
-      "destination": "skeleton/ai/agents/swarm/hive",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W15",
-        "WP-W16"
-      ],
-      "volume_refs": [
-        "VOL-017"
-      ],
-      "rationale": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
-      "preconditions": [
-        "compare overlap with skeleton/swarm before cutover",
-        "retain canonical capability contract",
-        "avoid duplicate scheduler ownership"
-      ],
-      "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788"
-    },
-    {
-      "id": "AIFT-NEXT-JVM-REGISTRY",
-      "priority": 2,
-      "source": "skeleton/jvm_accelerators.py",
-      "destination": "skeleton/ai/runtime/native/jvm_registry.py",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W29",
-        "WP-W30"
-      ],
-      "volume_refs": [
-        "VOL-032",
-        "VOL-033"
-      ],
-      "rationale": "The optional JVM accelerator registry is engine runtime support and should live beside native/JVM acceleration ownership while java-accelerators remains its separate accelerator root.",
-      "preconditions": [
-        "keep JVM helpers optional and fallback-safe",
-        "preserve process lifecycle/timeout accounting",
-        "do not absorb the java-accelerators top-level owner"
-      ],
-      "source_git_object_sha": "fc62b6b66d45c6d0d9c9a2ecaf2e260ce3833764"
-    },
-    {
-      "id": "AIFT-NEXT-PLATFORM",
-      "priority": 2,
-      "source": "skeleton/platform",
-      "destination": "skeleton/ai/simulation/platform",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W11",
-        "WP-W27"
-      ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-023",
-        "VOL-073"
-      ],
-      "rationale": "The engine-neutral Godot adapter translates simulation/game documents and should sit with simulation/forge integration.",
-      "preconditions": [
-        "preserve engine-neutral schemas",
-        "do not move backend/Godot product ownership",
-        "retain unsupported-feature fail-closed behavior"
-      ],
-      "source_git_object_sha": "3d1c2ef9c429dbf09363fcb8fb82e6f23754f43a"
-    },
-    {
-      "id": "AIFT-NEXT-SCHOOL",
-      "priority": 2,
-      "source": "skeleton/school",
-      "destination": "skeleton/ai/learning/school",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W28"
-      ],
-      "volume_refs": [
-        "VOL-024",
-        "VOL-074"
-      ],
-      "rationale": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
-      "preconditions": [
-        "deduplicate overlap with skeleton/learning",
-        "retain learner-state provenance and privacy boundaries",
-        "evaluate adaptive policies before promotion"
-      ],
-      "source_git_object_sha": "2dfa6897682f678abb1ce9191a192a2c94682bee"
-    },
-    {
-      "id": "AIFT-NEXT-WORLD",
-      "priority": 2,
-      "source": "skeleton/world",
-      "destination": "skeleton/ai/simulation/world",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W11",
-        "WP-W12"
-      ],
-      "volume_refs": [
-        "VOL-019",
-        "VOL-073"
-      ],
-      "rationale": "Scene/world state is canonical simulation input and should converge under the already governed simulation tree.",
-      "preconditions": [
-        "preserve world/scene schema identity",
-        "deduplicate with frontier world representations",
-        "retain deterministic serialization and replay"
-      ],
-      "source_git_object_sha": "965d35c8a027bfd77688ecf7bd8eec2e70724e71"
-    },
     {
       "id": "AIFT-NEXT-CIRCULATION",
       "priority": 3,
@@ -2083,7 +2151,7 @@
     }
   ],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "priority_two_standalone_mirrored_validation_pending",
+  "validation_state": "priority_two_overlays_mirrored_validation_pending",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -2340,5 +2408,19 @@
       "skeleton/social",
       "skeleton/support"
     ]
+  },
+  "priority_two_overlay_migration": {
+    "status": "mirrored_governed_cutover_pending",
+    "overlay_mapping_count": 12,
+    "parent_overlay_owners": [
+      "AIFT-LEARNING",
+      "AIFT-STATE",
+      "AIFT-RELIABILITY",
+      "AIFT-SIMULATION",
+      "AIFT-FORGE",
+      "AIFT-SWARM",
+      "AIFT-NATIVE"
+    ],
+    "policy": "Parent exact mirrors ignore only explicitly declared overlay children, and every overlay child must be a separately governed mapping."
   }
 }

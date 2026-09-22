@@ -142,3 +142,17 @@ def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
     assert retained["skeleton/release"]["owner"] == "release engineering"
     assert retained["skeleton/ubuntu"]["owner"] == "deployment/platform support"
     assert retained["skeleton/__main__.py"]["owner"] == "package CLI shell"
+
+
+def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mappings = manifest["mappings"]
+    destinations = {item["destination"] for item in mappings}
+    overlay_count = 0
+    for item in mappings:
+        for child in item.get("overlay_children", []):
+            overlay_count += 1
+            assert f"{item['destination']}/{child}" in destinations
+    assert overlay_count >= 12
