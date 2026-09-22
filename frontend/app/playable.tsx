@@ -172,7 +172,7 @@ export default function PlayableScreen() {
   const params = useLocalSearchParams<{ id?: string; remix?: string; brief?: string; autopolish?: string }>();
   const autopolishedRef = React.useRef(false);
   const haptics = useHaptics();
-  const tweakRef = React.useRef<TextInput>(null);
+  const tweakRef = React.useRef<React.ElementRef<typeof TextInput>>(null);
   const [brief, setBrief] = React.useState('A one-thumb arcade game where you tap to make a glowing orb hop between rising platforms — go as high as you can without falling.');
   const [busy, setBusy] = React.useState(false);
   const [busyLabel, setBusyLabel] = React.useState('Building your game…');
