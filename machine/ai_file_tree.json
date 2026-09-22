@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.4.0",
+  "tree_version": "1.3.7",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -3659,7 +3659,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "latest_80_mapping_extension_pending_fresh_migration_validation",
+  "validation_state": "82_mapping_compat_contract_reconciled_pending_fresh_ci",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -3970,13 +3970,15 @@
     "cutover_tags": {
       "cutover:parity-ready": "Exact mirror is structurally prepared for import inversion after global gates and focused regression validation.",
       "cutover:owner-sensitive": "One or more provider/credential/network owner surfaces remain compatibility facades and require explicit ownership/import cutover.",
-      "cutover:quarantine": "Historical/model-internals/research lineage remains characterization-gated and is not a production cutover candidate."
+      "cutover:quarantine": "Historical/model-internals/research lineage remains characterization-gated and is not a production cutover candidate.",
+      "cutover:merge-required": "Compatibility/convergence mirror overlaps an existing canonical owner and must be merged into that owner before legacy source retirement."
     },
     "batches": {
       "B1-core-runtime": "Core runtime, provider-neutral, agent, cognition, learning, evaluation, reliability and state surfaces.",
       "B2-domain-build": "Build/repository engineering, simulation and Forge surfaces.",
       "B3-owner-sensitive": "Mappings containing compatibility facades or explicit parity exceptions; cut over only after authority-owner review.",
-      "B4-research-quarantine": "Historical or model-internals research lineage; characterize before any production promotion."
+      "B4-research-quarantine": "Historical or model-internals research lineage; characterize before any production promotion.",
+      "B3-compat-convergence": "Compatibility mirrors staged only for convergence into an existing canonical runtime owner; never promoted as independent production authorities."
     }
   }
 }
