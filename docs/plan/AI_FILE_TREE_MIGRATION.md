@@ -279,3 +279,14 @@ against later designs. They are explicitly **non-authoritative**:
 No historical module can become a production owner through relocation alone;
 promotion requires an explicit masterplan adoption, evaluation evidence, and
 the normal signed-accountability process.
+
+
+## Transfer v2 — bridge-rebased clean payload
+
+The hardened baseline bridge now owns the inherited automation parity refreshes. Transfer v2 therefore contains only:
+- 89 new AI-tree mirror files
+- 26 new governed mappings
+- 2 governance-file updates
+- expected delta: 91 files
+
+The six GameForge trees remain research quarantine. Twenty backend-core modules remain compatibility-convergence inputs. No import inversion, source retirement, runtime-authority transfer, AIQ completion, work-package completion, or production-readiness claim is created by relocation.
