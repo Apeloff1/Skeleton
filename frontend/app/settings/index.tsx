@@ -178,7 +178,7 @@ export default function SettingsHome() {
               colors={[m.color + '14', 'transparent'] as any}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0.6 }}
-              style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}
+              style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
             />
             <View style={[s.iconBubble, { backgroundColor: m.color + '22', borderColor: m.color + '44' }]}>
               <Ionicons name={m.icon as any} size={22} color={m.color} />
