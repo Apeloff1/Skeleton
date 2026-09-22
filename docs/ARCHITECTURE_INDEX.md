@@ -24,9 +24,10 @@ When documents overlap, resolve them in this order:
 12. **Research dependency map** — [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md).
 13. **Research execution program** — [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md).
 14. **Research program scorecard** — [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md).
-15. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-16. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-17. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+15. **Research control-plane internals** — [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md).
+16. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+17. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+18. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
