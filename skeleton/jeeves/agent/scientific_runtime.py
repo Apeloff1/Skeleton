@@ -24,15 +24,21 @@ from .relational_memory import RelationalMemoryIndex
 from .context_pipeline import ContextSourceAdapter, LayeredContextResolver, ResolutionPolicy
 from .context_repository import ContextRepository
 from .interpretive_science import ScientificLensLab
+from .lens_governance import LensScienceRegistry
 from .memory import MemoryManager, MemoryNamespace
 from .memory_game import InteractionCard, MemoryGameIndex, MemoryGamePolicy
 from .nuance_runtime import (
-    NuanceRuntimePolicy,
     ScientificContextCompiler,
     ScientificNuanceRuntime,
 )
-from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
 from .runtime import JeevesAgentRuntime, RunCheckpoint, RunInputs, _RunState
+from .semantic_governance_bridge import SemanticGovernanceBridge
+from .semantic_lenses import SemanticFinding, SemanticObservation
+from .semantic_plane import (
+    SemanticLensPlane,
+    SemanticPlaneLearningUpdate,
+    SemanticPlaneSnapshot,
+)
 from .types import AgentResult, EvidenceRef, MemoryKind, json_safe
 
 
@@ -52,8 +58,8 @@ class _ScientificRuntimeMixin:
         context_adapters: Sequence[ContextSourceAdapter] = (),
         scientific_context: ScientificContextCompiler | None = None,
         nuance_runtime: ScientificNuanceRuntime | None = None,
+        semantic_plane: SemanticLensPlane | None = None,
         lens_lab: ScientificLensLab | None = None,
-        maximal_semantics: bool = False,
         memory_game_policy: MemoryGamePolicy | None = None,
         resolution_policy: ResolutionPolicy | None = None,
         wall_clock: Callable[[], float] = time.time,
@@ -63,20 +69,13 @@ class _ScientificRuntimeMixin:
             raise TypeError(
                 "scientific runtimes own context_compiler; pass scientific_context instead"
             )
-        if not isinstance(maximal_semantics, bool):
-            raise TypeError("maximal_semantics must be boolean")
-        if maximal_semantics and (scientific_context is not None or nuance_runtime is not None):
-            raise ValueError(
-                "maximal_semantics owns semantic runtime construction; "
-                "do not combine it with scientific_context or nuance_runtime"
-            )
         if (
-            lens_lab is not None
-            and nuance_runtime is not None
-            and nuance_runtime.lens_lab is not lens_lab
+            semantic_plane is not None
+            and lens_lab is not None
+            and semantic_plane.governance.registry.lab is not lens_lab
         ):
             raise ValueError(
-                "lens_lab and nuance_runtime must share one ScientificLensLab"
+                "semantic_plane and lens_lab must share one ScientificLensLab"
             )
         shared_memory = memory or MemoryManager(clock=wall_clock)
         cards = memory_cards or MemoryGameIndex(
@@ -127,25 +126,36 @@ class _ScientificRuntimeMixin:
             else:
                 relations = resolver.relations
 
-        if scientific_context is None:
-            if nuance_runtime is not None:
-                nuance = nuance_runtime
-            elif maximal_semantics:
-                registry = MaximalSemanticRegistry()
-                nuance = ScientificNuanceRuntime(
-                    resolver,
-                    semantic_registry=registry,
-                    semantic_router=MaximalLensRouter(registry),
-                    lens_lab=lens_lab,
-                    policy=NuanceRuntimePolicy(
-                        max_lenses=28,
-                        max_lenses_per_family=5,
-                        minimum_rare_lenses_when_supported=3,
-                    ),
+        if semantic_plane is not None:
+            plane = semantic_plane
+        elif (
+            scientific_context is not None
+            and scientific_context.semantic_plane is not None
+        ):
+            plane = scientific_context.semantic_plane
+        elif lens_lab is None:
+            plane = SemanticLensPlane()
+        else:
+            plane = SemanticLensPlane(
+                governance=SemanticGovernanceBridge(
+                    LensScienceRegistry(lab=lens_lab)
                 )
-            else:
-                nuance = ScientificNuanceRuntime(resolver, lens_lab=lens_lab)
-            compiler = ScientificContextCompiler(resolver, nuance=nuance)
+            )
+        if (
+            lens_lab is not None
+            and plane.governance.registry.lab is not lens_lab
+        ):
+            raise ValueError(
+                "semantic plane and lens_lab must share one ScientificLensLab"
+            )
+
+        if scientific_context is None:
+            nuance = nuance_runtime or ScientificNuanceRuntime(resolver)
+            compiler = ScientificContextCompiler(
+                resolver,
+                nuance=nuance,
+                semantic_plane=plane,
+            )
         else:
             compiler = scientific_context
             if compiler.resolver is not resolver:
@@ -156,9 +166,11 @@ class _ScientificRuntimeMixin:
                 raise ValueError(
                     "scientific_context and nuance_runtime refer to different nuance planes"
                 )
-            if lens_lab is not None and compiler.nuance.lens_lab is not lens_lab:
+            if compiler.semantic_plane is None:
+                compiler.semantic_plane = plane
+            elif compiler.semantic_plane is not plane:
                 raise ValueError(
-                    "scientific_context and lens_lab refer to different lens-science planes"
+                    "scientific_context and semantic_plane refer to different semantic planes"
                 )
 
         self.memory_cards = cards
@@ -166,7 +178,8 @@ class _ScientificRuntimeMixin:
         self.context_resolver = resolver
         self.scientific_context = compiler
         self.nuance_runtime = compiler.nuance
-        self.lens_lab = compiler.nuance.lens_lab
+        self.semantic_plane = plane
+        self.lens_lab = plane.governance.registry.lab
         self._scientific_capture_lock = threading.RLock()
         self._scientific_captured_runs: set[str] = set()
 
@@ -247,7 +260,10 @@ class _ScientificRuntimeMixin:
                     "goal_id": state.inputs.goal.goal_id,
                     "domain": (
                         state.inputs.goal.metadata.get("domain")
-                        if isinstance(state.inputs.goal.metadata.get("domain"), str)
+                        if isinstance(
+                            state.inputs.goal.metadata.get("domain"),
+                            str,
+                        )
                         else None
                     ),
                     "semantic_scope": "user_intent",
@@ -287,28 +303,51 @@ class _ScientificRuntimeMixin:
             self._capture_run_interaction(state)
         return state
 
-    def scientific_frame_diagnostics(self, frame_id: str) -> Mapping[str, Any]:
-        return self.nuance_runtime.frame_diagnostics(frame_id)
+    def analyze_semantics(
+        self,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+        sequence: int = 0,
+        domain: str | None = None,
+    ) -> SemanticPlaneSnapshot:
+        return self.semantic_plane.analyze(
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+            sequence=sequence,
+            domain=domain,
+        )
+
+    def resolve_semantic_forecast(
+        self,
+        forecast_id: str,
+        *,
+        outcome: bool,
+        domain: str,
+        independent_run: str,
+        observed_at: float | None = None,
+        observation_id: str | None = None,
+        negative_control: bool = False,
+    ) -> SemanticPlaneLearningUpdate:
+        return self.semantic_plane.resolve_forecast(
+            forecast_id,
+            outcome=outcome,
+            domain=domain,
+            independent_run=independent_run,
+            observed_at=observed_at,
+            observation_id=observation_id,
+            negative_control=negative_control,
+        )
 
     def _decorate_scientific_result(self, result: AgentResult) -> AgentResult:
         if not isinstance(result, AgentResult):
             raise TypeError("result must be AgentResult")
-        summary = self.scientific_summary()
         metadata = dict(result.metadata)
-        metadata["jeeves_scientific"] = {
-            "context_compiler_fingerprint": summary[
-                "context_compiler_fingerprint"
-            ],
-            "nuance_runtime_fingerprint": summary[
-                "nuance_runtime_fingerprint"
-            ],
-            "maximal_semantics_enabled": summary[
-                "maximal_semantics_enabled"
-            ],
-            "semantic_lens_count": summary["semantic_lens_count"],
-            "lens_science": summary["lens_science"],
-            "invariants": summary["invariants"],
-        }
+        metadata["jeeves_scientific"] = self.scientific_summary()
         return replace(result, metadata=json_safe(metadata))
 
     def run(self, inputs: RunInputs) -> AgentResult:
@@ -320,23 +359,35 @@ class _ScientificRuntimeMixin:
         )
 
     def scientific_summary(self) -> Mapping[str, Any]:
+        statuses = {
+            key: value.value
+            for key, value in self.lens_lab.status_map().items()
+        }
         return {
             "context_compiler_fingerprint": self.scientific_context.fingerprint,
             "nuance_runtime_fingerprint": self.nuance_runtime.fingerprint,
+            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_lens_count": len(self.semantic_plane.registry.all()),
+            "semantic_forecasts_open": len(
+                self.semantic_plane.prediction_ledger.open()
+            ),
+            "semantic_forecasts_resolved": len(
+                self.semantic_plane.prediction_ledger.resolved()
+            ),
+            "semantic_calibrated_lens_count": len(statuses),
+            "semantic_lens_statuses": statuses,
+            "lens_lab_fingerprint": self.lens_lab.fingerprint,
             "relational_memory_count": self.relational_memory.store.count(),
             "captured_runs": tuple(sorted(self._scientific_captured_runs)),
-            "lens_science": self.nuance_runtime.lens_science_summary(),
-            "maximal_semantics_enabled": isinstance(
-                self.nuance_runtime.semantic_registry,
-                MaximalSemanticRegistry,
-            ),
-            "semantic_lens_count": len(self.nuance_runtime.semantic_registry.all()),
             "invariants": {
                 "run_goal_memory_deferred_until_after_first_retrieval": True,
                 "capture_after_initial_resolution": True,
                 "resume_requires_accepted_plan_before_capture": True,
                 "relational_memory_never_promotes_factual_trust": True,
                 "semantic_interpretation_is_not_evidence": True,
+                "semantic_plane_is_governed": True,
+                "semantic_target_fusions_are_target_bounded": True,
+                "semantic_calibration_retains_forecast_custody": True,
             },
         }
 
@@ -347,23 +398,3 @@ class ScientificJeevesRuntime(_ScientificRuntimeMixin, JeevesAgentRuntime):
 
 class ScientificAdaptiveJeevesRuntime(_ScientificRuntimeMixin, AdaptiveJeevesRuntime):
     """Adaptive Jeeves runtime with the same evidence-safe scientific context."""
-
-
-class MaximalScientificJeevesRuntime(ScientificJeevesRuntime):
-    """Deterministic scientific runtime with the complete rare-lens catalog."""
-
-    def __init__(self, **kwargs: Any) -> None:
-        if "maximal_semantics" in kwargs:
-            raise TypeError("MaximalScientificJeevesRuntime owns maximal_semantics")
-        super().__init__(maximal_semantics=True, **kwargs)
-
-
-class MaximalScientificAdaptiveJeevesRuntime(ScientificAdaptiveJeevesRuntime):
-    """Adaptive scientific runtime with the complete rare-lens catalog."""
-
-    def __init__(self, **kwargs: Any) -> None:
-        if "maximal_semantics" in kwargs:
-            raise TypeError(
-                "MaximalScientificAdaptiveJeevesRuntime owns maximal_semantics"
-            )
-        super().__init__(maximal_semantics=True, **kwargs)

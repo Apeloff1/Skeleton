@@ -29,11 +29,9 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
-from dataclasses import replace
 from typing import Any, Callable, Mapping, Sequence
 
 from .audit_assurance import FrontierExecutionReplayVerifier
-from .cortex import JeevesCortex
 from .execution_audit import (
     AuditEventKind,
     AuditSeverity,
@@ -59,7 +57,7 @@ from .semantic_plane import (
     SemanticPlaneSnapshot,
 )
 from .strict_runtime import StrictJeevesAgentRuntime
-from .types import AgentResult, RiskTier, StepStatus, TerminationReason, stable_fingerprint
+from .types import AgentResult, RiskTier, TerminationReason, stable_fingerprint
 
 
 class ScopedGeneralizingRuntimeEpistemicGuard(GeneralizingRuntimeEpistemicGuard):
@@ -234,15 +232,6 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         RiskTier.EXTERNAL.value,
         RiskTier.HIGH_IMPACT.value,
     }
-    _CORTEX_ASSESSMENT_KEY = "cortex:assessment"
-    _CORTEX_ERROR_KEY = "cortex:error"
-    _RISK_ORDER = {
-        RiskTier.READ_ONLY: 0,
-        RiskTier.REVERSIBLE: 1,
-        RiskTier.MUTATING: 2,
-        RiskTier.EXTERNAL: 3,
-        RiskTier.HIGH_IMPACT: 4,
-    }
 
     def __init__(
         self,
@@ -250,22 +239,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         argument_abstractor: ArgumentAbstractor | None = None,
         runtime_guard: RuntimeEpistemicGuard | None = None,
         semantic_plane: SemanticLensPlane | None = None,
-        cortex: JeevesCortex | None = None,
-        cortex_enabled: bool = True,
-        cortex_required: bool = False,
         wall_clock: Callable[[], float] = time.time,
         **kwargs: Any,
     ) -> None:
-        if not isinstance(cortex_enabled, bool):
-            raise TypeError("cortex_enabled must be boolean")
-        if not isinstance(cortex_required, bool):
-            raise TypeError("cortex_required must be boolean")
-        if cortex_required and not cortex_enabled:
-            raise ValueError("cortex_required cannot be true when cortex is disabled")
-        if cortex is not None and not isinstance(cortex, JeevesCortex):
-            raise TypeError("cortex must be JeevesCortex or None")
-        if not cortex_enabled and cortex is not None:
-            raise ValueError("cortex cannot be supplied when cortex_enabled is false")
         # A caller supplying a complete guard owns its exact semantics. For the
         # default construction path, let Strict build validated components and
         # then re-compose those same objects under the scoped generalizing guard
@@ -297,15 +273,6 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 )
 
         self.semantic_plane = semantic_plane or SemanticLensPlane()
-        self.cortex_required = cortex_required
-        self.cortex = cortex if cortex_enabled else None
-        if cortex_enabled and self.cortex is None:
-            self.cortex = JeevesCortex(
-                clock=wall_clock,
-                monotonic=self._monotonic,
-            )
-        self._cortex_lock = threading.RLock()
-        self._cortex_assessments: dict[str, Mapping[str, Any]] = {}
 
     def analyze_semantics(
         self,
@@ -315,6 +282,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         requested: Sequence[str] = (),
         base_rate: float | None = None,
         sequence: int = 0,
+        domain: str | None = None,
     ) -> SemanticPlaneSnapshot:
         """Run the governed semantic plane without bypassing runtime evidence rules."""
         return self.semantic_plane.analyze(
@@ -323,6 +291,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             requested=requested,
             base_rate=base_rate,
             sequence=sequence,
+            domain=domain,
         )
 
     def resolve_semantic_forecast(
@@ -378,7 +347,6 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             state.last_error = (
                 "recovery quarantine: ambiguous side effect(s) require external reconciliation"
             )
-        self._restore_cortex_advisory(state, checkpoint)
         return state
 
     def _drive(self, state: _RunState) -> AgentResult:
@@ -389,7 +357,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "run.recovery_quarantined",
                 dict(quarantine),
             )
-            result = self._finish_failure(
+            return self._finish_failure(
                 state,
                 TerminationReason.CONFIRMATION_REQUIRED,
                 "A prior consequential tool call may already have taken effect; autonomous replanning is blocked until external state is reconciled.",
@@ -398,9 +366,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                     "required_action": "reconcile_external_state_before_new_execution",
                 },
             )
-        else:
-            result = super()._drive(state)
-        return self._observe_cortex_result(state, result)
+        return super()._drive(state)
 
     def _checkpoint(self, state: _RunState) -> RunCheckpoint:
         """Persist after reciprocally binding checkpoint, audit, and model roots."""
@@ -489,287 +455,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         self.checkpointer.save(checkpoint)
         self.metrics.increment("agent.checkpoints.saved")
         self.metrics.increment("agent.checkpoints.audit_bound")
-        self._observe_cortex_checkpoint(state, checkpoint)
         return checkpoint
-
-    def _ensure_cortex_run(
-        self,
-        state: _RunState,
-        checkpoint_sequence: int,
-    ) -> bool:
-        if self.cortex is None:
-            return False
-        try:
-            self.cortex.begin(
-                state.inputs,
-                run_id=state.run_id,
-                evidence_ledger=state.ledger,
-            )
-            return True
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception as exc:
-            self.metrics.increment("agent.cortex.checkpoint_errors")
-            error = {
-                "stage": "bind_run",
-                "error_type": type(exc).__name__,
-                "message": str(exc)[:512],
-                "checkpoint_sequence": checkpoint_sequence,
-                "authority": "advisory_only",
-            }
-            state.scratch.set(self._CORTEX_ERROR_KEY, error, importance=0.90)
-            state.trace.emit("cortex.error", error)
-            if self.cortex_required:
-                raise
-            return False
-
-    def _restore_cortex_advisory(
-        self,
-        state: _RunState,
-        checkpoint: RunCheckpoint,
-    ) -> None:
-        if self.cortex is None:
-            return
-        if not self._ensure_cortex_run(state, checkpoint.sequence):
-            return
-        with self._cortex_lock:
-            cached = self._cortex_assessments.get(state.run_id)
-        if cached is not None and cached.get("checkpoint_sequence") == checkpoint.sequence:
-            state.scratch.set(
-                self._CORTEX_ASSESSMENT_KEY,
-                cached,
-                importance=0.95,
-            )
-            state.scratch.delete(self._CORTEX_ERROR_KEY)
-            return
-        self._observe_cortex_checkpoint(state, checkpoint)
-
-    def _observe_cortex_checkpoint(
-        self,
-        state: _RunState,
-        checkpoint: RunCheckpoint,
-    ) -> Mapping[str, Any] | None:
-        if self.cortex is None:
-            return None
-        if not self._ensure_cortex_run(state, checkpoint.sequence):
-            return None
-        try:
-            assessment = self.cortex.observe_checkpoint(
-                state.inputs,
-                checkpoint,
-                current_risk=self._cortex_current_risk(state),
-            )
-            payload = {
-                "schema_version": 1,
-                "authority": "advisory_only",
-                "checkpoint_sequence": checkpoint.sequence,
-                "checkpoint_fingerprint": checkpoint.fingerprint,
-                "decision_id": assessment.decision.decision_id,
-                "mode": assessment.decision.mode.value,
-                "score": assessment.decision.score,
-                "directive": assessment.decision.directive,
-                "hard_stop": assessment.decision.hard_stop,
-                "requires_confirmation": assessment.decision.requires_confirmation,
-                "reasons": [reason.value for reason in assessment.decision.reasons],
-                "recommended_skill_id": assessment.recommended_skill_id,
-                "world_fingerprint": assessment.world_fingerprint,
-                "probes": [
-                    {
-                        "probe_id": probe.probe_id,
-                        "proposition_id": probe.proposition_id,
-                        "expected_information_gain_bits": probe.expected_information_gain_bits,
-                        "priority": probe.priority,
-                    }
-                    for probe in assessment.probes[:4]
-                ],
-                "notes": list(assessment.notes[:8]),
-            }
-            with self._cortex_lock:
-                self._cortex_assessments[state.run_id] = payload
-            state.scratch.set(
-                self._CORTEX_ASSESSMENT_KEY,
-                payload,
-                importance=0.95,
-            )
-            state.scratch.delete(self._CORTEX_ERROR_KEY)
-            state.trace.emit(
-                "cortex.checkpoint_assessed",
-                {
-                    "checkpoint_sequence": checkpoint.sequence,
-                    "decision_id": assessment.decision.decision_id,
-                    "mode": assessment.decision.mode.value,
-                    "score": assessment.decision.score,
-                    "hard_stop": assessment.decision.hard_stop,
-                    "recommended_skill_id": assessment.recommended_skill_id,
-                    "probe_count": len(assessment.probes),
-                    "authority": "advisory_only",
-                },
-            )
-            self.metrics.increment("agent.cortex.checkpoints_assessed")
-            return payload
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception as exc:
-            self.metrics.increment("agent.cortex.checkpoint_errors")
-            error = {
-                "stage": "checkpoint",
-                "error_type": type(exc).__name__,
-                "message": str(exc)[:512],
-                "checkpoint_sequence": checkpoint.sequence,
-                "authority": "advisory_only",
-            }
-            state.scratch.set(self._CORTEX_ERROR_KEY, error, importance=0.90)
-            state.trace.emit("cortex.error", error)
-            if self.cortex_required:
-                raise
-            return None
-
-    def _observe_cortex_result(
-        self,
-        state: _RunState,
-        result: AgentResult,
-    ) -> AgentResult:
-        if self.cortex is None:
-            return result
-        try:
-            verification_scores, action_costs, action_risks = self._cortex_learning_signals(
-                state.run_id
-            )
-            report = self.cortex.observe_result(
-                state.inputs,
-                result,
-                verification_scores=verification_scores,
-                action_costs=action_costs,
-                action_risks=action_risks,
-            )
-            metadata = dict(result.metadata)
-            metadata["cortex"] = {
-                "status": "observed",
-                "authority": "advisory_only",
-                "report_fingerprint": report.report_fingerprint,
-                "world_fingerprint": report.world_fingerprint,
-                "belief_count": report.belief_count,
-                "hypothesis_count": report.hypothesis_count,
-                "world_entropy_bits": report.world_entropy_bits,
-                "decision_count": len(report.decisions),
-                "learned_skill_ids": list(report.learned_skill_ids),
-                "verified_tool_signal_count": len(verification_scores),
-                "cost_bound_tool_signal_count": len(action_costs),
-                "risk_bound_tool_signal_count": len(action_risks),
-                "anomalies": list(report.anomalies),
-            }
-            self.metrics.increment("agent.cortex.results_observed")
-            return replace(result, metadata=metadata)
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception as exc:
-            self.metrics.increment("agent.cortex.result_errors")
-            if self.cortex_required:
-                raise
-            metadata = dict(result.metadata)
-            metadata["cortex"] = {
-                "status": "degraded",
-                "authority": "advisory_only",
-                "error_type": type(exc).__name__,
-                "message": str(exc)[:512],
-            }
-            return replace(result, metadata=metadata)
-
-    def _cortex_learning_signals(
-        self,
-        run_id: str,
-    ) -> tuple[dict[str, float], dict[str, float], dict[str, RiskTier]]:
-        ledger = self.runtime_guard.audit_store.get(run_id)
-        if ledger is None:
-            return {}, {}, {}
-
-        by_operation: dict[str, dict[str, Any]] = {}
-        for entry in ledger.entries():
-            if entry.operation_id is None:
-                continue
-            record = by_operation.setdefault(entry.operation_id, {})
-            if entry.kind is AuditEventKind.INTENT_BOUND:
-                call_id = entry.payload.get("call_id")
-                risk = entry.payload.get("risk")
-                if isinstance(call_id, str) and call_id:
-                    record["call_id"] = call_id
-                try:
-                    if risk is not None:
-                        record["risk"] = (
-                            risk
-                            if isinstance(risk, RiskTier)
-                            else RiskTier(str(risk))
-                        )
-                except ValueError:
-                    pass
-            elif entry.kind is AuditEventKind.EXECUTION_FINALIZED:
-                score = entry.payload.get("verification_score")
-                try:
-                    normalized = float(score)
-                except (TypeError, ValueError):
-                    continue
-                if 0.0 <= normalized <= 1.0:
-                    record["verification_score"] = normalized
-
-        finalization_costs = {
-            item.operation_id: item.experience.cost
-            for item in self.runtime_guard.finalizations(run_id)
-        }
-        verification_scores: dict[str, float] = {}
-        action_costs: dict[str, float] = {}
-        action_risks: dict[str, RiskTier] = {}
-        for operation_id, record in by_operation.items():
-            call_id = record.get("call_id")
-            if not isinstance(call_id, str) or not call_id:
-                continue
-            score = record.get("verification_score")
-            if isinstance(score, float):
-                verification_scores[call_id] = score
-            cost = finalization_costs.get(operation_id)
-            if isinstance(cost, (int, float)) and not isinstance(cost, bool):
-                action_costs[call_id] = max(0.0, float(cost))
-            risk = record.get("risk")
-            if isinstance(risk, RiskTier):
-                action_risks[call_id] = risk
-        return verification_scores, action_costs, action_risks
-
-    def _cortex_current_risk(self, state: _RunState) -> RiskTier:
-        if state.plan is None:
-            return RiskTier.READ_ONLY
-        running = [
-            step for step in state.plan.steps
-            if step.status is StepStatus.RUNNING
-        ]
-        candidates = running or list(state.plan.ready_steps())
-        if not candidates:
-            return RiskTier.READ_ONLY
-        risks: list[RiskTier] = []
-        for step in candidates:
-            risk = step.risk
-            if step.tool is not None:
-                registered = self.tools.get(step.tool)
-                if registered is not None:
-                    host_risk = registered.spec.risk
-                    if self._RISK_ORDER[host_risk] > self._RISK_ORDER[risk]:
-                        risk = host_risk
-            risks.append(risk)
-        return max(risks, key=lambda risk: self._RISK_ORDER[risk])
-
-    def cortex_summary(self) -> Mapping[str, Any]:
-        if self.cortex is None:
-            return {
-                "enabled": False,
-                "required": self.cortex_required,
-            }
-        summary = dict(self.cortex.global_summary())
-        summary.update(
-            {
-                "enabled": True,
-                "required": self.cortex_required,
-                "authority": "advisory_only",
-            }
-        )
-        return summary
 
     @staticmethod
     def _verify_resume_identity(inputs: RunInputs, checkpoint: RunCheckpoint) -> None:
