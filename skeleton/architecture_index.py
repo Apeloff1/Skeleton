@@ -95,6 +95,7 @@ CANONICAL_DOCUMENTS = {
     "research_program_scorecard": "docs/architecture/research-program-scorecard-2026.md",
     "research_control_plane_internals": "docs/architecture/research-control-plane-internals-2026.md",
     "research_control_plane_backlog": "docs/architecture/research-control-plane-build-backlog-2026.md",
+    "research_control_plane_gap_audit": "docs/architecture/research-control-plane-gap-audit-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -193,6 +194,13 @@ PLAN_CHECKPOINTS = {
         "experiment_protocol_range": ("RXP001", "RXP062"),
         "production_authority_granted": False,
         "research_refresh_required": True,
+    },
+    "PLAN-20260922-RESEARCH-CONTROL-PLANE-GAP-AUDIT": {
+        "created_at": "2026-09-22",
+        "tracks": ("AD",),
+        "gap_range": ("RCG001", "RCG100"),
+        "open_p0_blocks_research_authority_expansion": True,
+        "production_authority_granted": False,
     },
     "PLAN-20260922-RESEARCH-CONTROL-PLANE-BACKLOG": {
         "created_at": "2026-09-22",
@@ -446,6 +454,7 @@ RESEARCH_EXPERIMENT_PROTOCOL_IDS = tuple(f"RXP{number:03d}" for number in range(
 HISTORICAL_RESEARCH_LINEAGE_IDS = tuple(f"HL{number:03d}" for number in range(1, 111))
 RESEARCH_SOURCE_FAMILY_IDS = tuple(f"RS{number:03d}" for number in range(1, 56))
 RESEARCH_CONTROL_PLANE_BACKLOG_IDS = tuple(f"RCB{number:03d}" for number in range(1, 121))
+RESEARCH_CONTROL_PLANE_GAP_IDS = tuple(f"RCG{number:03d}" for number in range(1, 101))
 
 RESEARCH_SOURCE_STATUS_STATES = (
     "accepted_peer_reviewed",
@@ -615,6 +624,7 @@ def full_summary() -> Dict[str, Any]:
         "historical_research_lineage_ids": list(HISTORICAL_RESEARCH_LINEAGE_IDS),
         "research_source_family_ids": list(RESEARCH_SOURCE_FAMILY_IDS),
         "research_control_plane_backlog_ids": list(RESEARCH_CONTROL_PLANE_BACKLOG_IDS),
+        "research_control_plane_gap_ids": list(RESEARCH_CONTROL_PLANE_GAP_IDS),
         "research_source_status_states": list(RESEARCH_SOURCE_STATUS_STATES),
         "reproduction_classes": list(REPRODUCTION_CLASSES),
         "research_debt_states": list(RESEARCH_DEBT_STATES),
