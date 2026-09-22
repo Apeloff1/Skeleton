@@ -100,6 +100,14 @@ jobs:
         with:
           python-version: '3.11.16'
 
+      - name: Install shift-supervisor runtime dependencies
+        if: steps.fallback.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input \
+            'pydantic>=2,<3'
+
       - name: Snapshot planning, staffing, and research evidence
         if: steps.fallback.outputs.run == 'true'
         env:

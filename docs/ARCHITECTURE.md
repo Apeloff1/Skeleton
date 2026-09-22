@@ -199,3 +199,118 @@ Hive `bundle`/`pull`/`consensus` interchange both neos and both LoRA banks.
 Sleep replay SGD both neos. Dodecahedron seal has twelve faces; `number == 12` is complete.
 Birth is closed-world. HuggingFace and Kimi bind as teachers (`bind_hf`, `bind_kimi`);
 neo distills their text. No import-time download.
+
+---
+
+## 10. Scientific evidence and architecture evolution
+
+Skeleton separates **knowledge absorption**, **research evaluation**, and **production
+promotion**. Papers, preprints, benchmarks, model reports, and external implementations are
+evidence inputs; none are production authority by themselves.
+
+The canonical research path is:
+
+```text
+source -> versioned evidence -> claim/provenance graph -> local experiment
+       -> benchmark + ablation + challenge -> architecture decision
+       -> shadow -> canary -> promoted version -> monitoring / rollback
+```
+
+Serving continues to consume only promoted state. Research workers, ingestion workers,
+challenger policies, and training jobs cannot directly mutate serving-visible knowledge,
+deployed weights, privileged tool policy, or runtime authority.
+
+The model substrate is intentionally replaceable. Dense Transformer, sparse, state-space,
+hybrid, mixture-of-experts, adapters, and future model families must sit behind stable model
+and runtime contracts rather than leak family-specific assumptions into the kernel.
+
+Reasoning is also a budgeted runtime policy. Direct generation, self-consistency,
+decomposition, search, verifier-guided reasoning, and tool-assisted investigation are modes
+selected by task difficulty, uncertainty, consequence, latency, cost, and measured marginal
+benefit. No reasoning mode receives unbounded compute.
+
+Memory is split conceptually into working, episodic, semantic, and procedural classes, each
+with different write/promotion semantics. Retrieved or remembered content retains provenance
+and trust metadata and cannot elevate its own instruction authority.
+
+Tool side effects follow the canonical sequence:
+
+```text
+ToolIntent -> capability/policy checks -> validation -> approval/risk gate
+           -> ValidatedToolCall -> execution -> ToolExecutionReceipt
+           -> observation -> verification
+```
+
+Verification is plural: deterministic checks, tests, properties, fuzzing, source validation,
+learned critics, process/outcome verifiers, and formal techniques may all contribute. No
+single learned judge is treated as truth.
+
+Canonical navigation for this layer:
+
+- [ARCHITECTURE_INDEX.md](ARCHITECTURE_INDEX.md) — master human index and authority order;
+- [BUILD_PLAN.md](BUILD_PLAN.md) — Tracks Q–AD construction sequence;
+- [architecture/research-evidence-evolution.md](architecture/research-evidence-evolution.md) — scientific evidence, experiment, and promotion contract;
+- [architecture/research-source-catalog.md](architecture/research-source-catalog.md) — historical/frontier research canon and anti-canon;
+- [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) — durable evidence/knowledge absorption;
+- [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md) — challenge, champion/challenger evolution, and snapshot promotion;
+- [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md) — hostile cross-cutting gap audit, P0 production-readiness blockers, and combined fault campaigns;
+- [architecture/exotic-architecture-lab.md](architecture/exotic-architecture-lab.md) — quarantined architecture-changing experiments, falsification batteries, state-containment and graduation rules;
+- [architecture/frontier-research-atlas-2026.md](architecture/frontier-research-atlas-2026.md) — current frontier findings, contradictions, source-status audit, research questions, reproduction queue, and September 2026 research delta;
+- [architecture/frontier-research-experiment-protocols-2026.md](architecture/frontier-research-experiment-protocols-2026.md) — RXP001–RXP035 controlled experiment designs, falsification conditions, evidence outputs, and research-debt targets;
+- [architecture/research-saturation-checklist-2026.md](architecture/research-saturation-checklist-2026.md) — 24-domain accountability record separating planning coverage from local reproduction and production evidence;
+- [architecture/research-historical-lineage.md](architecture/research-historical-lineage.md) — HL001–HL110 cross-disciplinary historical foundations;
+- [architecture/research-source-topology.md](architecture/research-source-topology.md) — RS001–RS055 archives, proceedings, artifacts, standards, operational evidence, and source-ingestion policy;
+- [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md) — explicit RQ→RDE→RXP→ADR→promotion dependencies and cross-domain blockers;
+- [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md) — wave-based ordering, compute classes, stop/fast/slow-track rules, and result-to-plan reconciliation;
+- [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md) — multidimensional planning/reproduction/readiness, debt, freshness, validity, and information-yield reporting;
+- [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md) — concrete package/module layout, state machines, transactional stores, scheduler, custody, leases, agent capabilities, APIs, recovery, and M0–M8 implementation;
+- [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md) — RCB001–RCB120 ticket-level construction tasks plus RCB-A01–A10 acceptance campaigns;
+- [architecture/research-control-plane-gap-audit-2026.md](architecture/research-control-plane-gap-audit-2026.md) — RCG001–RCG100 adversarial gaps and compound fault campaigns for the research control plane.
+
+The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
+numbered architecture round. A future architecture round that is not indexed is incomplete.
+
+
+### Adversarial production-readiness layer
+
+The scientific/optimizer plan is subordinate to the frontier hardening invariants.
+
+A subsystem may be a useful research prototype while an applicable P0 hostile-audit gap is open, but it cannot claim production-grade status. Production claims require representation identity, data lineage, unified artifact identity, state-compatible rollback, eval isolation, authenticated principals, execution containment, supply-chain verification, declared storage semantics, stale-writer rejection, secret containment, verified recovery, protected control-plane capacity, immutable config identity, safe unknown-outcome reconciliation, deletion propagation, poisoning resistance, safe artifact loading, tamper-evident authority history, and a tested safe mode.
+
+This rule exists to prevent capability work from outrunning the substrate required to operate it safely and reproducibly.
+
+
+### Exotic architecture laboratory
+
+Track AC is a quarantined research plane for architecture families that challenge current assumptions rather than merely optimize them.
+
+Current candidate classes include test-time neural memory, dynamic byte-latent modeling, diffusion/non-autoregressive generation, recurrent latent depth, fixed-point/equilibrium computation, conditional depth, differential attention, native ternary weights, fully sparse activations, cross-layer shared sparse routing, latent multimodal modeling, reversible blocks, fast weights, generated adapters, world-model planning, graph-native computation, event-driven/neuromorphic substrates and bounded architecture synthesis.
+
+This plane does not weaken authority boundaries:
+
+- mutable inference-time neural state is not durable trusted memory;
+- tentative diffusion/revision/speculative generations are not committed outputs;
+- exotic candidates cannot execute privileged side effects from uncommitted states;
+- architecture-search results cannot self-promote;
+- compound architectures require component ablation;
+- Track AB P0 invariants remain binding;
+- a candidate must graduate through the Track AA full-stack promotion path before production consideration.
+
+
+### Research saturation and source-status discipline
+
+Track AD turns research intake into an explicit scientific workload.
+
+The architecture distinguishes accepted peer-reviewed work, preprints, conference/ARR submissions, withdrawn work, official first-party deployment/research evidence, and unresolved source status.
+
+Research status is part of evidence identity. A source becoming accepted later is a new evidence event; it does not rewrite what was known when an earlier architecture decision was made.
+
+Research conclusions are scoped to the tested population, model, data, hardware, inference protocol, and evaluator. The system retains contradictory and negative evidence and discounts consensus when sources share models, data, benchmarks, code, evaluators, or authors.
+
+For reasoning and agent research, the evaluated object is the complete inference/workflow system, not only base model weights. For research agents, experiment manifests, code execution, hidden evaluation access, generated training data, and result validation remain independently governed. A research agent cannot certify its own result as reproduced or promotion-ready.
+
+Monitorability is a measured, versioned property that can drift with model scale, post-training, reasoning method, and monitor capability. It is therefore re-evaluated rather than assumed to improve monotonically with capability.
+
+The research domain map also explicitly covers compression/distillation/pruning, privacy-preserving learning/inference, software-engineering/code agents, human–AI/operator science, and causal/counterfactual modeling rather than treating those as incidental subtopics.
+
+The canonical research snapshot is docs/architecture/frontier-research-atlas-2026.md, with executable research designs in docs/architecture/frontier-research-experiment-protocols-2026.md, historical/source context in the lineage/topology maps, and blocking relationships in docs/architecture/research-dependency-map-2026.md. FR, RQ, SV, FD, CX, RDE, RXP, HL, and RS identifiers are research/evidence references, not runtime authorities.

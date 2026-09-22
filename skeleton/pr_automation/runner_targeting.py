@@ -154,14 +154,14 @@ def admission_for_identity(
         if firewall.dropped:
             return AdmissionDecision(
                 state=AdmissionState.DROP,
-                reasons=tuple(firewall.reasons) or ("event_firewall_drop",),
+                reasons=(firewall.reason,) if firewall.reason else ("event_firewall_drop",),
                 mutation_authorized=False,
                 priority=priority,
                 identity_fingerprint=identity.fingerprint(),
             )
         if not firewall.mutation_authorized:
             mutation_authorized = False
-            reasons.extend(firewall.reasons or ("event_observe_only",))
+            reasons.append(firewall.reason or "event_observe_only")
 
     if identity.trigger is RunTrigger.SCHEDULED_SWEEP:
         # Scheduled sweeps can discover and publish status but are deliberately

@@ -185,6 +185,53 @@ def test_observe_mode_admission_never_mutates():
     assert decision.state is AdmissionState.OBSERVE_ONLY
 
 
+def _workflow_completion_identity():
+    return identity(
+        trigger=RunTrigger.WORKFLOW_COMPLETION,
+        explicit_pr=None,
+        workflow_name="Merge Readiness",
+        workflow_run_id=999,
+        head_sha=SHA_B,
+        head_ref="feature/runner-v2",
+        event_name="workflow_run",
+    )
+
+
+def _workflow_completion_env(*, conclusion: str) -> dict[str, str]:
+    return {
+        "WORKFLOW_RUN_NAME": "Merge Readiness",
+        "WORKFLOW_RUN_ID": "999",
+        "WORKFLOW_RUN_ATTEMPT": "1",
+        "WORKFLOW_RUN_WORKFLOW_ID": "123",
+        "WORKFLOW_RUN_STATUS": "completed",
+        "WORKFLOW_RUN_CONCLUSION": conclusion,
+        "WORKFLOW_RUN_EVENT": "pull_request",
+        "WORKFLOW_RUN_HEAD_REPOSITORY": "Apeloff1/Skeleton",
+    }
+
+
+def test_workflow_completion_observe_reason_is_preserved():
+    decision = admission_for_identity(
+        _workflow_completion_identity(),
+        runner_policy(),
+        _workflow_completion_env(conclusion="failure"),
+    )
+    assert decision.state is AdmissionState.OBSERVE_ONLY
+    assert not decision.mutation_authorized
+    assert any("non-success" in reason for reason in decision.reasons)
+
+
+def test_workflow_completion_drop_reason_is_preserved():
+    decision = admission_for_identity(
+        _workflow_completion_identity(),
+        runner_policy(),
+        _workflow_completion_env(conclusion="cancelled"),
+    )
+    assert decision.state is AdmissionState.DROP
+    assert decision.dropped
+    assert any("tombstone" in reason for reason in decision.reasons)
+
+
 def test_target_resolver_explicit_validates_pr():
     transport = ScriptedTransport()
     transport.get_map["/repos/Apeloff1/Skeleton/pulls/42"] = pr_payload()

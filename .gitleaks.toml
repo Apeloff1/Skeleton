@@ -22,3 +22,18 @@ entropy = 4.2
 [allowlist]
 description = "Deterministic GameForge replay token used only in artifact tests"
 stopwords = ["operation-123"]
+
+
+# Narrow false-positive exception for one historical architecture sentence in
+# docs/BUILD_PLAN.md. The default generic-api-key rule mistakes the prose phrase
+# around distributed fencing/causation metadata for an opaque credential.
+[[rules]]
+id = "generic-api-key"
+description = "Inherited generic API key rule with Skeleton documentation false-positive allowlist"
+
+  [[rules.allowlists]]
+  description = "Architecture prose about fencing and causation metadata is not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''fencing tokens, sequence/correlation/causation IDs and explicit dedupe windows''']
+  paths = ['''^docs/BUILD_PLAN\.md$''']

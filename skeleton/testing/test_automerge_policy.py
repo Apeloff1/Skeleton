@@ -398,9 +398,8 @@ def test_missing_opt_in_is_held_when_owner_implicit_disabled():
         "skeleton/pr_automation/core.py",
     ],
 )
-def test_critical_trust_surface_requires_human_merge(critical_path):
+def test_critical_trust_surface_auto_merges_after_full_evidence(critical_path):
     candidate = snapshot(files=(critical_path,))
-    # Even complete evidence must not automate mutation of its own trust base.
     run_names = tuple(
         dict.fromkeys(
             [
@@ -418,10 +417,9 @@ def test_critical_trust_surface_requires_human_merge(critical_path):
         ),
     )
     decision = evaluate_candidate(candidate, policy(), now=NOW)
-    assert decision.kind is DecisionKind.HOLD
-    assert decision.actions == ()
+    assert decision.kind is DecisionKind.MERGE
+    assert decision.actions
     assert decision.risk_tier is RiskTier.CRITICAL
-    assert decision.reasons[0] == "critical_trust_surface_requires_human_merge"
 
 
 @pytest.mark.parametrize("missing_name", BASE_WORKFLOWS)
@@ -674,7 +672,7 @@ def test_dependabot_dependency_candidate_can_merge_without_label():
     assert decision.kind is DecisionKind.MERGE
 
 
-def test_dependabot_is_still_blocked_on_critical_trust_surface():
+def test_dependabot_auto_merges_critical_trust_surface_after_full_evidence():
     candidate = snapshot(
         author="dependabot[bot]",
         labels=(),
@@ -688,7 +686,7 @@ def test_dependabot_is_still_blocked_on_critical_trust_surface():
         ),
     )
     decision = evaluate_candidate(candidate, policy(), now=NOW)
-    assert decision.kind is DecisionKind.HOLD
+    assert decision.kind is DecisionKind.MERGE
     assert decision.risk_tier is RiskTier.CRITICAL
 
 

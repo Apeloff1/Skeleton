@@ -30,6 +30,8 @@ LIVE_EXAMPLES = (
     (".machine/repository.toml", "first-party"),
     ("machine/README.md", "first-party"),
     ("machine/manifest.json", "first-party"),
+    ("packaging/windows/SkeletonSetup.iss", "first-party"),
+    ("packaging/windows/launcher_entry.py", "first-party"),
     ("README.md", "first-party"),
     ("satellites/gameforge-middleware/README.md", "first-party"),
     ("skeleton/testing/data/frontier_npc_source_fixture.json", "fixture"),
@@ -140,6 +142,8 @@ class SourcePathInventoryTests(unittest.TestCase):
         self.assertEqual(policy.classify_path(".machine/repository.toml"), "first-party")
         self.assertEqual(policy.classify_path("machine/README.md"), "first-party")
         self.assertEqual(policy.classify_path("machine/manifest.json"), "first-party")
+        self.assertEqual(policy.classify_path("packaging/windows/SkeletonSetup.iss"), "first-party")
+        self.assertEqual(policy.classify_path("packaging/windows/launcher_entry.py"), "first-party")
         self.assertEqual(policy.classify_path("satellites/gameforge-middleware/README.md"), "first-party")
         self.assertEqual(policy.classify_path("README.md"), "first-party")
         self.assertEqual(policy.classify_path("memory/PRD.md"), "first-party")

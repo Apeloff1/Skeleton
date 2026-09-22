@@ -1,12 +1,9 @@
-"""
-Skeleton Swarm — Multi-agent mesh with negotiation and stigmergy
+"""Swarm mesh contracts.
 
-Provides:
-- SwarmMesh: Route tasks to capable agents
-- PheromoneField: Stigmergic communication layer
-- HiveMind: Collective reasoning and consensus
-- CapabilityNegotiator: Dynamic capability discovery
-- Platoons: Pre-configured agent groups
+GB-29's bounded handoff :class:`Mesh` is the current canonical mesh surface.
+The legacy routing classes remain compatibility exports because Genesis,
+negotiation/platoon/stigmergy shims, and public regression contracts still
+consume them. New code should prefer the focused GB-29 and AgentMesh APIs.
 """
 
 from __future__ import annotations
@@ -16,8 +13,57 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
-from skeleton.kernel.events import DomainEvent, EventBus
+from skeleton.kernel.events import EventBus
+from skeleton.swarm.law import N_CAP
 
+
+class Mesh:
+    def __init__(self) -> None:
+        self.offers: dict[str, str] = {}
+        self.accepted: list[tuple[str, str]] = []
+        self.refused: list[str] = []
+        self.expired: list[str] = []
+
+    def offer(self, agent: str, task: str) -> str:
+        if len(self.offers) >= N_CAP:
+            raise ValueError("n-cap")
+        self.offers[agent] = task
+        return "offer"
+
+    def accept(self, agent: str, peer: str) -> str:
+        if agent not in self.offers:
+            return "refuse"
+        self.accepted.append((agent, peer))
+        return "accept"
+
+    def refuse(self, agent: str) -> str:
+        self.refused.append(agent)
+        self.offers.pop(agent, None)
+        return "refuse"
+
+    def expire(self, agent: str) -> str:
+        self.expired.append(agent)
+        self.offers.pop(agent, None)
+        return "expire"
+
+    def handoff(self, a: str, b: str, task: str) -> dict:
+        self.offer(a, task)
+        state = self.accept(a, b)
+        return {
+            "kind": "handoff",
+            "state": state,
+            "from": a,
+            "to": b,
+            "task": task,
+            "stored_prose": 0,
+        }
+
+
+# Compatibility surface -----------------------------------------------------
+#
+# These types predate GB-29 and are intentionally kept until all live callers
+# have migrated. Keeping them here makes the refactor additive instead of
+# breaking Genesis and the package's documented public API.
 
 @dataclass
 class Agent:
@@ -57,36 +103,36 @@ class SwarmMesh:
         )
         self._agents[agent.agent_id] = agent
         self._stats["registered"] += 1
-        
+
         if self._bus:
             self._bus.emit("swarm.agent.joined", {
                 "agent_id": agent.agent_id,
                 "specialisations": list(specialisations),
             })
-        
+
         return agent
 
     def route(self, capability: str) -> Optional[Agent]:
         """Find the best agent for a given capability."""
         candidates = [(a.score(capability), a) for a in self._agents.values()]
         candidates = [(s, a) for s, a in candidates if s > 0]
-        
+
         if not candidates:
             self._stats["failed"] += 1
             return None
-        
+
         candidates.sort(key=lambda x: x[0], reverse=True)
         best = candidates[0][1]
         best.load += 1.0
         best.last_seen = time.time()
         self._stats["routed"] += 1
-        
+
         if self._bus:
             self._bus.emit("swarm.task.routed", {
                 "capability": capability,
                 "agent_id": best.agent_id,
             })
-        
+
         return best
 
     def heartbeat(self, agent_id: str) -> None:
@@ -152,17 +198,17 @@ class StigmergicRouter:
         # Get base agent candidates
         candidates = [(a.score(capability), a) for a in mesh._agents.values()]
         candidates = [(s, a) for s, a in candidates if s > 0]
-        
+
         if not candidates:
             return None
-        
+
         # Boost scores based on positive pheromones at location
         pheromones = self._field.sense(location)
         boosted = []
         for score, agent in candidates:
             boost = sum(pheromones.get(spec, 0) for spec in agent.specialisations) * 0.1
             boosted.append((score + boost, agent))
-        
+
         boosted.sort(key=lambda x: x[0], reverse=True)
         return boosted[0][1]
 
@@ -188,7 +234,7 @@ class HiveMind:
         opinions = self._opinions.get(topic, [])
         if not opinions:
             return None
-        
+
         # Weighted voting for scalar values
         try:
             values = [o["value"] for o in opinions if isinstance(o["value"], (int, float))]
@@ -199,14 +245,14 @@ class HiveMind:
                 return weighted_sum / total_weight if total_weight > 0 else None
         except (TypeError, ValueError):
             pass
-        
+
         # Majority vote for categorical
         from collections import Counter
         votes = Counter(str(o["value"]) for o in opinions)
         most_common, count = votes.most_common(1)[0]
         if count / len(opinions) >= threshold:
             return most_common
-        
+
         return None  # No consensus
 
     def stats(self) -> Dict[str, Any]:
@@ -259,20 +305,20 @@ class Platoons:
         """Deploy a platoon from a template."""
         spec = self.TEMPLATES.get(template, {"specialisations": {"general"}, "count": 1})
         n = count or spec["count"]
-        
+
         agents = []
         for _ in range(n):
             agent = mesh.join(spec["specialisations"])
             agents.append(agent)
-        
+
         self._platoons[template] = agents
-        
+
         if self._bus:
             self._bus.emit("swarm.platoon.deployed", {
                 "template": template,
                 "count": len(agents),
             })
-        
+
         return agents
 
     def stats(self) -> Dict[str, Any]:

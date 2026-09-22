@@ -85,6 +85,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
+      - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
     volumes:
       - backend_data:/app/data
     depends_on:
@@ -117,8 +118,10 @@ services:
       - EXPO_PUBLIC_SKELETON_URL=${EXPO_PUBLIC_SKELETON_URL:-http://localhost:8010}
       - NODE_ENV=${NODE_ENV:-development}
     depends_on:
-      - backend
-      - skeleton
+      backend:
+        condition: service_healthy
+      skeleton:
+        condition: service_healthy
     networks:
       - tutolage
 

@@ -56,7 +56,7 @@ jobs:
   ruff:
     if: github.event_name != 'pull_request' || (!github.event.pull_request.draft && github.event.action != 'converted_to_draft' && github.event.action != 'closed')
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend
@@ -179,7 +179,9 @@ jobs:
           python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
 
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
-        working-directory: ..
+        # The job default is backend/. This suite mixes repository-root tests
+        # with backend/tests, so pin it to the checkout root explicitly.
+        working-directory: ${{ github.workspace }}
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-

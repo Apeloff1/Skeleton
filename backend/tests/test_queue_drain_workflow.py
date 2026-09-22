@@ -205,3 +205,5 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "branch == 'main'" in helper
     assert "number_text.isdigit()" in helper
     assert "str(payload.get('state') or '') == 'closed'" in helper
+    assert "and head_repo == repo" in helper
+    assert "and head_ref == branch" in helper

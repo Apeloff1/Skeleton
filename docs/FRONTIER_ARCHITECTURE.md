@@ -70,10 +70,144 @@ The frontier build must not hard-code one model provider into the kernel. Provid
 
 ## Runtime profiles
 
-`minimal` — kernel + runtime only.  
-`ai` — intelligence + memory + tools.  
-`game` — AI + game + simulation.  
-`learning` — AI + memory + tutoring.  
+`minimal` — kernel + runtime only.
+`ai` — intelligence + memory + tools.
+`game` — AI + game + simulation.
+`learning` — AI + memory + tutoring.
 `studio` — all application planes + cockpit.
 
 The default developer environment should remain lightweight; optional profiles prevent the full multi-GB asset plane from becoming a prerequisite for ordinary source development.
+
+
+## Adversarial cross-cutting invariants
+
+The frontier contract inherits the hostile audit in architecture/masterplan-gap-audit.md.
+
+These are higher-order constraints across every runtime profile:
+
+1. Representation identity — every model binds immutable tokenizer/representation identity.
+2. Artifact identity — architecture, representation, weights, adapters, quantization, runtime ABI, data/eval roots and provenance are one loadable manifest.
+3. Data lineage — weight-changing training binds a reconstructable dataset/mixture lineage root.
+4. State-compatible rollback — no rollback claim is valid if old code cannot safely read state written by the candidate.
+5. Evaluation firewall — blind promotion evidence is isolated from training and repeated adaptive optimization.
+6. Principal identity — meaningful actions bind authenticated principal, tenant, delegation, policy and expiry.
+7. Containment — authorization is necessary but insufficient; high-risk execution is sandboxed.
+8. Supply-chain integrity — privileged artifacts are digest/provenance verified and subject to revocation/quarantine.
+9. Declared storage semantics — authoritative stores expose consistency, transaction, corruption and restore guarantees.
+10. Stale-writer rejection — distributed mutations use lease/fencing/ordering semantics.
+11. Secret containment — raw secrets are not ordinary prompt, log, trace, config or artifact content.
+12. Verified recovery — backups/checkpoints count only after restore verification.
+13. Control-plane reserve — ordinary workload cannot starve revoke, rollback, kill or recovery authority.
+14. Immutable config identity — consequential evidence binds exact runtime/policy configuration.
+15. Unknown-outcome safety — non-idempotent side effects are reconciled/compensated rather than blindly retried.
+16. Deletion propagation — deletion reaches derived indexes, caches, memory and future training inputs where policy requires.
+17. Poisoning resistance — training/retrieval/synthetic inputs remain untrusted until validated.
+18. Safe loading — untrusted artifacts are resource bounded and cannot implicitly execute code.
+19. Tamper-evident authority history — meaningful mutations carry ordered actor/causation/integrity evidence.
+20. Safe mode — production has one known degraded/read-only state for containment and recovery.
+
+A lower-level implementation or historical architecture round cannot waive these invariants.
+
+## Durable contract primitives
+
+The frontier architecture reserves the following canonical primitive families:
+
+RepresentationSpec
+DatasetManifest / MixtureManifest / HoldoutBoundary
+ModelArtifactManifest
+ConfigSnapshot
+Principal / DelegationChain
+ToolIntent / ValidatedToolCall / ToolExecutionReceipt
+LeaseEpoch / FencingToken
+SchemaVersion / MigrationPlan
+DeletionTombstone
+AuditEvent
+RecoveryManifest
+
+Exact implementation types may evolve, but their authority boundaries may not disappear.
+
+## Production-readiness rule
+
+A subsystem may be experimentally useful while P0 audit gaps remain open, but it may not be described as production-grade unless all applicable P0 findings in the hostile audit are closed with tests, fault injection, observability, recovery evidence and signoff.
+
+
+## Research authority boundary
+
+Research is a distinct control plane.
+
+Canonical research objects include:
+
+```text
+ResearchEvidence
+ResearchClaim
+ResearchQuestion
+ResearchContradiction
+ResearchDebt
+ReproductionRecord
+ExperimentManifest
+SourceStatusAttestation
+ArchitectureDecisionRecord
+```
+
+Research objects can:
+
+- propose candidates;
+- update confidence;
+- create experiments;
+- record negative evidence;
+- open or retire scoped research debt;
+- recommend an ADR;
+- trigger review.
+
+Research objects cannot directly:
+
+- change deployed model weights;
+- modify tool authority;
+- alter runtime capability policy;
+- overwrite durable user memory;
+- expose blind promotion answers;
+- mark their own experiment as independently reproduced;
+- promote themselves.
+
+### Source-status invariant
+
+Accepted/peer-reviewed, preprint, submission, withdrawn, official-organization evidence, and unresolved status are distinct evidence states.
+
+A title, citation count, recency, organization name, or fluent summary cannot upgrade source status.
+
+### Research-agent invariant
+
+An AI research worker is a principal operating under normal sandbox, capability, provenance, resource, evaluation, and audit rules.
+
+It may author code, experiments, analyses, hypotheses, and reports inside its authorized workspace. It may not certify its own result as independent replication or production-ready evidence.
+
+### Research-debt invariant
+
+A production or architecture claim that depends materially on unretired research debt must disclose that debt.
+
+A literature claim alone cannot retire local research debt.
+
+### Monitorability invariant
+
+Monitorability is a measured property of a specific:
+
+```text
+model + training recipe + reasoning protocol + monitor + observation channel + threat/task population
+```
+
+It is not assumed to improve monotonically with model capability and does not replace deterministic authorization.
+
+### Experimental-rigor invariant
+
+Consequential research comparisons retain:
+
+- tuning/search budget;
+- failed/diverged runs;
+- baseline parity;
+- variance/uncertainty;
+- multiple-comparison pressure;
+- lifecycle cost;
+- untested scope;
+- exact inference protocol.
+
+Research evidence that omits a material field is downgraded in scope rather than silently completed by assumption.

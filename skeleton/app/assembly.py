@@ -28,6 +28,7 @@ class ServiceSpec:
     depends_on: tuple[str, ...] = ()
     public_url: str = ""
     health_path: str = ""
+    ingress_prefix: str = ""
     entrypoint: str = ""
     container_port: int | None = None
     canonical: bool = True
@@ -53,6 +54,7 @@ class ServiceSpec:
             depends_on=tuple(str(item) for item in raw_deps),
             public_url=str(value.get("public_url", "") or ""),
             health_path=str(value.get("health_path", "") or ""),
+            ingress_prefix=str(value.get("ingress_prefix", "") or ""),
             entrypoint=str(value.get("entrypoint", "") or ""),
             container_port=int(port) if port is not None else None,
             canonical=bool(value.get("canonical", True)),
@@ -69,6 +71,7 @@ class AssemblyManifest:
     version: str
     compose_file: str
     hot_compose_file: str
+    public_contract: dict[str, str]
     modes: dict[str, dict[str, str]]
     default_services: tuple[str, ...]
     full_services: tuple[str, ...]
@@ -95,6 +98,14 @@ class AssemblyManifest:
         except KeyError as exc:
             raise KeyError(f"unknown application mode: {name}") from exc
 
+    def contract_path(self, name: str) -> str:
+        try:
+            suffix = self.public_contract[name]
+            prefix = self.public_contract["prefix"]
+        except KeyError as exc:
+            raise KeyError(f"unknown public application contract route: {name}") from exc
+        return prefix.rstrip("/") + "/" + suffix.lstrip("/")
+
 
 @dataclass(frozen=True)
 class AssemblyCheck:
@@ -118,10 +129,9 @@ def _manifest_bytes() -> bytes:
     return resources.files("skeleton.app").joinpath("manifest.json").read_bytes()
 
 
-def load_manifest() -> AssemblyManifest:
-    """Load and validate the packaged application assembly manifest."""
+def parse_manifest(payload: Mapping[str, object]) -> AssemblyManifest:
+    """Validate a decoded application manifest payload."""
 
-    payload = json.loads(_manifest_bytes().decode("utf-8"))
     if payload.get("schema_version") != 1:
         raise ValueError("unsupported application assembly manifest schema")
 
@@ -150,10 +160,34 @@ def load_manifest() -> AssemblyManifest:
     raw_services = payload.get("services")
     if not isinstance(raw_services, list) or not raw_services:
         raise ValueError("manifest requires at least one service")
+    if not all(isinstance(item, Mapping) for item in raw_services):
+        raise ValueError("manifest services must contain objects")
     services = tuple(ServiceSpec.from_mapping(item) for item in raw_services)
     names = tuple(service.name for service in services)
     if len(set(names)) != len(names):
         raise ValueError("service names must be unique")
+
+    app_name = app.get("name")
+    app_version = app.get("version")
+    if not isinstance(app_name, str) or not app_name.strip():
+        raise ValueError("app name must be a non-empty string")
+    if not isinstance(app_version, str) or not app_version.strip():
+        raise ValueError("app version must be a non-empty string")
+
+    raw_contract = app.get("public_contract")
+    if not isinstance(raw_contract, dict):
+        raise ValueError("app public_contract must be an object")
+    required_contract_keys = ("prefix", "bootstrap", "status", "ready")
+    public_contract: dict[str, str] = {}
+    for key in required_contract_keys:
+        value = raw_contract.get(key)
+        if not isinstance(value, str) or not value.startswith("/"):
+            raise ValueError(f"public_contract {key!r} must be an absolute path fragment")
+        if value != "/" and value.endswith("/"):
+            raise ValueError(f"public_contract {key!r} must not end with '/'")
+        public_contract[key] = value
+    if len({public_contract[key] for key in ("bootstrap", "status", "ready")}) != 3:
+        raise ValueError("public_contract routes must be unique")
 
     raw_modes = app.get("modes", {"development": {}})
     if not isinstance(raw_modes, dict) or not raw_modes:
@@ -178,13 +212,55 @@ def load_manifest() -> AssemblyManifest:
     unknown = (set(default_services) | set(full_services)) - set(names)
     if unknown:
         raise ValueError(f"manifest references unknown services: {sorted(unknown)}")
+    if not default_services:
+        raise ValueError("default_services must not be empty")
+    if not full_services:
+        raise ValueError("full_services must not be empty")
+    if not set(default_services).issubset(set(full_services)):
+        raise ValueError("full_services must contain every default service")
 
+    ingress_prefixes: dict[str, str] = {}
     for service in services:
         missing = set(service.depends_on) - set(names)
         if missing:
             raise ValueError(
                 f"service {service.name!r} depends on unknown services: {sorted(missing)}"
             )
+
+        if service.name in service.depends_on:
+            raise ValueError(f"service {service.name!r} cannot depend on itself")
+        if service.health_path and not service.health_path.startswith("/"):
+            raise ValueError(f"service {service.name!r} health_path must start with '/'")
+
+        prefix = service.ingress_prefix
+        if prefix:
+            if not prefix.startswith("/"):
+                raise ValueError(f"service {service.name!r} ingress_prefix must start with '/'")
+            if prefix != "/" and prefix.endswith("/"):
+                raise ValueError(f"service {service.name!r} ingress_prefix must not end with '/'")
+            owner = ingress_prefixes.get(prefix)
+            if owner is not None:
+                raise ValueError(
+                    f"ingress_prefix {prefix!r} is shared by {owner!r} and {service.name!r}"
+                )
+            ingress_prefixes[prefix] = service.name
+            if service.health_path and prefix != "/" and not service.health_path.startswith(prefix + "/"):
+                raise ValueError(
+                    f"service {service.name!r} health_path must live under ingress_prefix {prefix!r}"
+                )
+
+    backend = next((service for service in services if service.name == "backend"), None)
+    if backend is None:
+        raise ValueError("manifest requires canonical backend service")
+    contract_prefix = public_contract["prefix"]
+    backend_prefix = backend.ingress_prefix
+    if not backend_prefix or (
+        contract_prefix != backend_prefix
+        and not contract_prefix.startswith(backend_prefix.rstrip("/") + "/")
+    ):
+        raise ValueError(
+            "public application contract must live inside backend ingress prefix"
+        )
 
     required_paths = payload.get("required_paths", ())
     if not isinstance(required_paths, list):
@@ -197,10 +273,11 @@ def load_manifest() -> AssemblyManifest:
 
     return AssemblyManifest(
         schema_version=1,
-        name=str(app.get("name", "Skeleton")),
-        version=str(app.get("version", "")),
+        name=app_name.strip(),
+        version=app_version.strip(),
         compose_file=str(app.get("compose_file", "docker-compose.yml")),
         hot_compose_file=str(app.get("hot_compose_file", "docker-compose.hot.yml")),
+        public_contract=public_contract,
         modes=modes,
         default_services=default_services,
         full_services=full_services,
@@ -212,6 +289,15 @@ def load_manifest() -> AssemblyManifest:
         construction=construction_metadata,
     )
 
+
+
+def load_manifest() -> AssemblyManifest:
+    """Load and validate the packaged application assembly manifest."""
+
+    payload = json.loads(_manifest_bytes().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("application assembly manifest root must be an object")
+    return parse_manifest(payload)
 
 def find_repo_root(start: Path | None = None) -> Path:
     """Find the checkout root without depending on the current working directory."""
@@ -308,6 +394,31 @@ def preflight(
             )
         )
 
+    try:
+        from skeleton.app.plan import validate_manifest_topology
+
+        default_plan, full_plan = validate_manifest_topology(manifest)
+    except ValueError as exc:
+        checks.append(
+            AssemblyCheck(
+                code="topology:graph",
+                ok=False,
+                message=f"application topology invalid: {exc}",
+            )
+        )
+    else:
+        checks.append(
+            AssemblyCheck(
+                code="topology:graph",
+                ok=True,
+                message=(
+                    "application topology valid: "
+                    f"default={len(default_plan.services)} services, "
+                    f"full={len(full_plan.services)} services"
+                ),
+            )
+        )
+
     if runtime:
         docker = shutil.which("docker")
         checks.append(
@@ -360,12 +471,20 @@ def compose_command(
         base.extend(["-f", manifest.hot_compose_file])
 
     if action == "up":
-        if full:
-            base.extend(["--profile", "full"])
+        from skeleton.app.plan import build_plan
+
+        plan = build_plan(manifest=manifest, full=full)
+        profiles: list[str] = []
+        for service_name in plan.services:
+            profile = manifest.service(service_name).profile
+            if profile and profile not in profiles:
+                profiles.append(profile)
+        for profile in profiles:
+            base.extend(["--profile", profile])
         command = [*base, "up", "-d"]
         if build:
             command.append("--build")
-        command.extend(manifest.full_services if full else manifest.default_services)
+        command.extend(plan.services)
         return tuple(command)
     if action == "down":
         return tuple([*base, "down", "--remove-orphans"])
@@ -396,6 +515,7 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
         "version": manifest.version,
         "compose_file": manifest.compose_file,
         "hot_compose_file": manifest.hot_compose_file,
+        "public_contract": dict(manifest.public_contract),
         "modes": {name: dict(values) for name, values in manifest.modes.items()},
         "default_services": list(manifest.default_services),
         "full_services": list(manifest.full_services),
@@ -411,6 +531,7 @@ def manifest_payload(manifest: AssemblyManifest | None = None) -> dict[str, obje
                 "entrypoint": service.entrypoint,
                 "public_url": service.public_url,
                 "health_path": service.health_path,
+                "ingress_prefix": service.ingress_prefix,
                 "container_port": service.container_port,
                 "depends_on": list(service.depends_on),
                 "canonical": service.canonical,
