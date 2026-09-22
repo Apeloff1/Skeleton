@@ -15,14 +15,15 @@ def test_exotic_candidates_are_breadth_frozen_and_fallback_safe() -> None:
     valid_volumes = {v["id"] for v in master["volumes"]}
     valid_wps = set(master["p0_work_packages"])
 
-    assert len(data["entries"]) >= 60
-    assert len({e["category"] for e in data["entries"]}) >= 12
+    assert len(data["entries"]) >= 73
+    assert len({e["category"] for e in data["entries"]}) >= 13
     assert data["breadth_freeze_compatible"] is True
     assert all(e["production_authority"] is False for e in data["entries"])
     assert all(e["mapped_volumes"] for e in data["entries"])
     assert all(set(e["mapped_volumes"]) <= valid_volumes for e in data["entries"])
     assert all(e["work_package_refs"] for e in data["entries"])
     assert all(set(e["work_package_refs"]) <= valid_wps for e in data["entries"])
+    assert {wp for e in data["entries"] for wp in e["work_package_refs"]} == valid_wps
     assert all(e["kill_switch"].strip() for e in data["entries"])
     assert all(e["fallback"].strip() for e in data["entries"])
     assert all(len(e["required_evidence"]) >= 2 for e in data["entries"])
