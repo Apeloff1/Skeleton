@@ -224,7 +224,8 @@ def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
     assert package["progress"]["state"] == "in_progress"
     assert "durable SQLite operation event store" in package["progress"]["completed"]
     assert "durable stream storage adapter" not in package["progress"]["remaining"]
-    assert "backend SSE or WebSocket transport" in package["progress"]["remaining"]
+    assert "tenant-bound backend operation transport service" in package["progress"]["completed"]
+    assert "backend SSE or WebSocket transport" not in package["progress"]["remaining"]
     assert "frontend reconnect/resume cursor" in package["progress"]["remaining"]
 
 
