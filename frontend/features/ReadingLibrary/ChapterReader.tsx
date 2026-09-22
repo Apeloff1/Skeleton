@@ -44,7 +44,7 @@ export const ChapterReader: React.FC<Props> = ({
   const [tick, setTick] = useState(0);          // forces re-render for tts state
   const [progress, setProgress] = useState({ cur: 0, total: 0, text: '' });
   const pulse = useRef(new Animated.Value(0.6)).current;
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
 
   // ═══ 2026-05 — READING TIME TRACKER ════════════════════════════════
   // Heartbeat every 15 s while the reader is mounted + visible. The
