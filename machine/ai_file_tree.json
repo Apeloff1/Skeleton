@@ -248,15 +248,21 @@
     ]
   },
   "implementation_signoff": {
-    "signed": false,
-    "signer_id": null,
-    "signer_type": "agent",
+    "signed": true,
+    "signer_id": "github:Apeloff1",
+    "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": null,
-    "git_sha": null,
-    "evidence_refs": [],
-    "statement": "Pending payload commit verification.",
-    "signature_method": null
+    "signed_at_utc": "2026-09-22T12:29:49Z",
+    "git_sha": "f3053efe38b06820bc1b6188a7c0175b3ea6ceef",
+    "evidence_refs": [
+      "git:f3053efe38b06820bc1b6188a7c0175b3ea6ceef",
+      "git-tree:8a7c0ab04ab4d907b2c84d00038cb59f73380bac",
+      "machine/ai_file_tree.json",
+      "scripts/check_ai_file_tree.py",
+      "skeleton/testing/test_ai_file_tree.py"
+    ],
+    "statement": "Implementation payload assembled through the authorized GitHub connection and bound to GitHub identity Apeloff1 at the cited full SHA. GitHub reports that payload commit itself as unsigned, so this uses the plan-permitted github_identity method and is not a GPG/SSH/Sigstore attestation or independent verification.",
+    "signature_method": "github_identity"
   },
   "verification_signoff": {
     "signed": false,
