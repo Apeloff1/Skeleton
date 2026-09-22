@@ -132,7 +132,49 @@ function patchImageSizeDoS() {
   );
 }
 
+function patchWorkletsStaticRendering() {
+  const pkgPath = path.join(ROOT, 'node_modules/react-native-worklets/package.json');
+  if (!fs.existsSync(pkgPath)) {
+    return;
+  }
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  const version = String(pkg.version || '');
+  if (version !== '0.13.0') {
+    throw new Error(`[patch-node-modules] react-native-worklets ${version} requires static-render patch review`);
+  }
+
+  const rel = 'node_modules/react-native-worklets/lib/module/threads.js';
+  const abs = path.join(ROOT, rel);
+  if (!fs.existsSync(abs)) {
+    throw new Error(`[patch-node-modules] worklets static-render target missing: ${rel}`);
+  }
+
+  const src = fs.readFileSync(abs, 'utf8');
+  const hardenedPattern = /typeof requestAnimationFrame === ['"]function['"]/;
+  if (hardenedPattern.test(src)) {
+    skipped++;
+    return;
+  }
+
+  const vulnerablePattern = /requestAnimationFrame\(\(\) => \{/;
+  if (!vulnerablePattern.test(src)) {
+    throw new Error(`[patch-node-modules] worklets static-render target changed shape; review required: ${rel}`);
+  }
+
+  const replacement =
+    "(typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (callback) => setTimeout(callback, 0))(() => {";
+  const out = src.replace(vulnerablePattern, replacement);
+  if (out === src || !hardenedPattern.test(out)) {
+    throw new Error(`[patch-node-modules] failed to harden static rendering: ${rel}`);
+  }
+
+  fs.writeFileSync(abs, out, 'utf8');
+  patched++;
+  console.log(`[patch-node-modules] ✓ static-render ${rel}`);
+}
+
 patchImageSizeDoS();
+patchWorkletsStaticRendering();
 
 console.log(
   `[patch-node-modules] done: ${patched} patched, ${skipped} already-clean, ${missing} missing`,
