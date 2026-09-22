@@ -106,6 +106,7 @@ class InMemoryPlanStore:
                 and item.owner is None
                 and "squad_size" not in item.metadata
                 and self._dependencies_satisfied(item)
+                and self._conflict_domain_available(item)
             ]
             if not eligible:
                 return None
@@ -244,6 +245,28 @@ class InMemoryPlanStore:
             self._items = items
             self._workers = workers
             self._revisions = revisions
+
+    def _conflict_domain_available(self, item: PlanItem) -> bool:
+        requested = self._conflict_domain(item)
+        if requested is None:
+            return True
+        for active in self._items.values():
+            if active.id == item.id or active.status not in {"assigned", "working", "blocked"}:
+                continue
+            held = self._conflict_domain(active)
+            if held is None:
+                continue
+            if requested == "*" or held == "*" or requested == held:
+                return False
+        return True
+
+    @staticmethod
+    def _conflict_domain(item: PlanItem) -> str | None:
+        raw = item.metadata.get("conflict_domain")
+        if not isinstance(raw, str):
+            return None
+        domain = raw.strip().casefold()
+        return domain or None
 
     def _dependencies_satisfied(self, item: PlanItem) -> bool:
         for dependency_id in item.dependencies:
