@@ -51,6 +51,10 @@ def validate(data: dict) -> list[str]:
         required_promotions = engineering.get("required_for_promotion")
         if required_promotions != ["verified", "hardened", "production"]:
             errors.append("engineering_pass required_for_promotion must be verified/hardened/production")
+        if engineering.get("task_matrix") != "machine/ai_engineering_task_matrix.json":
+            errors.append("engineering_pass task_matrix must equal machine/ai_engineering_task_matrix.json")
+        if engineering.get("task_matrix_human") != "docs/plan/ENGINEERING_TASK_MATRIX.md":
+            errors.append("engineering_pass task_matrix_human path drifted")
     freeze = data.get("breadth_freeze")
     if not isinstance(freeze, dict) or freeze.get("enabled") is not True:
         errors.append("breadth_freeze.enabled must be true")
@@ -141,7 +145,7 @@ def validate(data: dict) -> list[str]:
 
     if PLAN.is_file():
         text = PLAN.read_text(encoding="utf-8")
-        for marker in ("## 21. P0 build program", "## 21.5 Systems-engineering closure overlay", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 24.3 Volume depth passes", "## 25. Scope freeze"):
+        for marker in ("## 21. P0 build program", "## 21.5 Systems-engineering closure overlay", "## 21.6 Atomic task engineering propagation", "## 22. Vertical-slice acceptance ladder", "## 24.2 Volume maturity promotion contract", "## 24.3 Volume depth passes", "## 25. Scope freeze"):
             if marker not in text:
                 errors.append(f"master plan missing required section: {marker}")
 
