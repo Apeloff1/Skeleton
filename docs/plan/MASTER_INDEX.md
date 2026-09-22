@@ -621,8 +621,8 @@ The architecture breadth freeze at Volume 420 is deliberate: the next phase is c
 
 ## Cross-cutting exotic systems depth
 
-The frozen volume structure also carries a machine-validated exotic-systems reservoir. It currently holds **60 research candidates across 12 categories**, ranging from active-inference and vector-symbolic memory through formal verification, CRDT/differential-dataflow experiments, sparse inference, unusual hardware, continual-learning controls and adversarial research mechanisms.
+The frozen volume structure also carries a machine-validated exotic-systems reservoir. It currently holds **73 research candidates across 13 categories**, ranging from active-inference and vector-symbolic memory through formal verification, CRDT/differential-dataflow experiments, sparse inference, unusual hardware, continual-learning controls and adversarial research mechanisms.
 
-Exotics are depth, not breadth: each candidate must map to existing volumes and work packages, default to no production authority, preserve a canonical fallback, expose an independent kill switch, and earn promotion through reproducible comparative evidence plus ordinary maturity/accountability gates.
+Exotics are depth, not breadth: each candidate must map to existing volumes and collectively cover all W00–W30 work packages, default to no production authority, preserve a canonical fallback, expose an independent kill switch, and earn promotion through reproducible comparative evidence plus ordinary maturity/accountability gates.
 
 See [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) and [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json).
