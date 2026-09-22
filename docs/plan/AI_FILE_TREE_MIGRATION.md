@@ -137,75 +137,57 @@ Three sensitive surfaces are intentionally **not duplicated as owners**. `cortex
 This remains a staged mirror. The batch does not mark model-runtime, cognition, learning, security, resilience, or observability work packages complete.
 
 
-## Assigned next migration batch
+## Move-preparation tagging and batch map
 
-The manifest now carries a plan-derived `next_move_assignments` queue. These are assignments, not completed moves. Each item remains pending until its source is mirrored or merged into the canonical owner, parity/evidence is produced, imports are inverted where applicable, and the assignment is promoted into the governed `mappings` set.
+The former plan-derived `next_move_assignments` queue has now been promoted
+into the governed mapping set. The queue is intentionally empty: an item is no
+longer described as merely assigned once its reviewed source Git object has an
+actual destination mirror under `skeleton/ai`.
 
-Priority 1 assignments are the structural/runtime spine:
+Current preparation state:
 
-- `skeleton/state` -> `skeleton/ai/runtime/state`
-- `skeleton/network` -> `skeleton/ai/runtime/distributed/network`
-- `skeleton/kv` -> `skeleton/ai/runtime/inference/kv`
-- `skeleton/swarm` -> `skeleton/ai/agents/swarm`
-- `skeleton/telemetry` -> `skeleton/ai/runtime/observability/telemetry`
-- `skeleton/quality` -> `skeleton/ai/evaluation/quality`
-- `skeleton/foundation` -> `skeleton/ai/runtime/foundation`
-- `skeleton/gate_plane` -> `skeleton/ai/runtime/policy/gate_plane`
-- `skeleton/build` -> `skeleton/ai/build/core`
-- `skeleton/repo_machine` -> `skeleton/ai/build/repo_machine`
+- **78 governed source -> destination mappings**
+- **1,810 changed files under `skeleton/ai`** in this migration PR
+- only six AI-tree scaffolding files are not source-derived mappings:
+  `skeleton/ai/README.md`, the root `__init__.py`, and package
+  `__init__.py` files for agents, build, providers, and runtime
+- `next_move_assignments` is empty because all previously assigned extant
+  sources have been promoted into `mappings`
 
-Priority 2 assignments deepen governed subsystems without creating new owners:
+Every governed mapping now carries three machine-enforced tags:
 
-- `skeleton/hive` -> `skeleton/ai/agents/swarm/hive`
-- `skeleton/integrations` -> `skeleton/ai/runtime/tools/integrations`
-- `skeleton/inventory` -> `skeleton/ai/runtime/capabilities/inventory`
-- `skeleton/graphs` -> `skeleton/ai/runtime/knowledge/graphs`
-- `skeleton/creator` -> `skeleton/ai/forge/creator`
-- split `skeleton/acquired/learning.py`, `resilient_cache.py`, and `runtime_guard.py` into learning/state/reliability owners while preserving acquired-source provenance.
+- `ai-tree:mapped`
+- `migration:staged-mirror`
+- exactly one of `cutover:parity-ready`, `cutover:owner-sensitive`, or
+  `cutover:quarantine`
 
-Priority 3 assignments require overlap/domain comparison before cutover:
+The cutover tag is structural migration metadata only. It does **not** claim
+AIQ/work-package completion, production maturity, source deletion, import
+inversion, or independent verification.
 
-- `skeleton/pipelines` -> `skeleton/ai/forge/pipelines` with game-domain scope retained.
-- `skeleton/persist` -> merge useful behavior into `skeleton/ai/runtime/persistence/legacy_persist` under the existing persistence owner rather than establishing another state authority.
+The prepared units are divided into four deterministic batches:
 
-The validator fails if required assignments disappear, point outside `skeleton/ai`, duplicate an occupied destination, lose work-package ownership, reference malformed volume IDs, or lose their migration preconditions. Assignment does not satisfy implementation, verification, maturity, or signed-accountability requirements.
+- **B1-core-runtime (52 mappings):** core runtime, provider-neutral surfaces,
+  agents, cognition, learning, evaluation, reliability, state, and supporting
+  engine capabilities.
+- **B2-domain-build (12 mappings):** repository/build engineering, simulation,
+  and Forge-owned domains.
+- **B3-owner-sensitive (7 mappings):** mappings with compatibility facades or
+  parity exceptions. Provider credentials, network ownership, or other
+  authority-bearing implementation stays at the legacy owner until an explicit
+  owner/import cutover is approved.
+- **B4-research-quarantine (7 mappings):** historical and model-internals
+  research lineage. These units remain characterization-gated and are not
+  production cutover candidates.
 
+Exact-parity sources remain in place until import inversion and affected-domain
+regression gates are green. Owner-sensitive sources remain until explicit
+authority-owner cutover. Quarantine sources remain until characterization and
+independent evidence justify promotion.
 
-## Masterplan assignment expansion — runtime, build, research, simulation
-
-This pass binds the pending move queue to Git object identities from
-`2291e57f40c55b4aa705faa64a5e5c1ae34e437a` and expands assignment coverage without claiming implementation
-completion.
-
-New priority-1 engine/build assignments include:
-
-- `skeleton/application` -> `skeleton/ai/runtime/application`
-- `skeleton/core` -> `skeleton/ai/runtime/core`
-- `skeleton/data` -> `skeleton/ai/runtime/data`
-- `skeleton/genesis.py` -> `skeleton/ai/runtime/bootstrap/genesis.py`
-- `skeleton/galaxy`, `skeleton/mesh`, and `skeleton/overseer` -> governed distributed-runtime subtrees
-- `skeleton/kv_cache.py` -> `skeleton/ai/runtime/inference/kv_cache.py`
-- `skeleton/chronicle` -> `skeleton/ai/runtime/provenance/chronicle`
-- `skeleton/developer` and `skeleton/pr_automation` -> governed AI build/repository-engineering subtrees.
-
-Priority-2 assignments converge support, learning, research intake, simulation,
-and optional JVM runtime support:
-
-- `skeleton/support` -> runtime support
-- `skeleton/school` -> controlled learning
-- `skeleton/social` -> research intake
-- `skeleton/content`, `skeleton/game`, `skeleton/economy`, `skeleton/platform`, and `skeleton/world` -> simulation/world-model ownership
-- `skeleton/jvm_accelerators.py` -> the AI runtime native/JVM registry while the separate `java-accelerators/` architecture root remains external.
-
-Priority-3 historical/model-internals code is assigned with
-`quarantine_then_characterize`, not production cutover:
-
-- `skeleton/viscera` -> model-internals research
-- `skeleton/spine`, `skeleton/sheaf`, `skeleton/motive`, `skeleton/circulation`, and `skeleton/hoag` -> historical research lineage.
-
-Every pending assignment now records `source_git_object_sha`. If the source
-tree/blob changes before migration, the assignment must be refreshed rather
-than silently treating a different object as the reviewed source.
+The validator recomputes the expected cutover tag and batch from each mapping's
+destination and parity/facade contract, so manual relabeling cannot silently
+turn a sensitive or quarantined unit into a parity-ready one.
 
 
 ## Explicit non-move classification
