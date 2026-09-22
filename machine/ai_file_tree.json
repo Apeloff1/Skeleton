@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.1.0",
+  "tree_version": "1.2.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -17,7 +17,7 @@
     "validator": "scripts/check_ai_file_tree.py"
   },
   "promotion_policy": {
-    "current_state": "destination tree is canonical assembly destination; non-credential code is mirrored while credential-bearing surfaces are represented by non-owning compatibility facades",
+    "current_state": "destination tree is canonical assembly destination; non-credential Python code is semantic-parity mirrored, non-Python content remains byte-parity mirrored, and credential-bearing surfaces are non-owning compatibility facades",
     "cutover_requires": [
       "affected imports and package entrypoints point to skeleton/ai or an explicit compatibility facade",
       "source/destination parity validator is green before source removal",
@@ -664,6 +664,41 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ]
+    },
+    {
+      "id": "AIFT-SIMULATION",
+      "source": "skeleton/simulation",
+      "destination": "skeleton/ai/simulation",
+      "kind": "tree",
+      "source_git_object_sha": "d7f2bce60e4333095ea911d6272afce25d233b61",
+      "role": "world-model and simulation plane kept separate from real-world authority",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019"
+      ]
+    },
+    {
+      "id": "AIFT-FORGE",
+      "source": "skeleton/forge",
+      "destination": "skeleton/ai/forge",
+      "kind": "tree",
+      "source_git_object_sha": "a8176afc2a76fc999e3e36564291ad15d271bc37",
+      "role": "bounded candidate generation and champion/challenger forge plane",
+      "work_package_refs": [
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-023"
+      ]
     }
   ],
   "ci_enforcement": {
@@ -702,5 +737,10 @@
     "evidence_refs": [],
     "statement": "Independent verification is required before cutover completion or source deletion.",
     "signature_method": null
+  },
+  "parity_policy": {
+    "python": "AST-equivalent to the compatibility source unless the mapping declares a compatibility_facade exception",
+    "non_python": "byte-identical to the compatibility source unless the mapping declares an explicit exception",
+    "rationale": "Formatting-only Python normalization must not create false migration drift, while semantic code changes and non-Python content drift still fail closed."
   }
 }
