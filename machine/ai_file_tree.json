@@ -17,7 +17,7 @@
     "validator": "scripts/check_ai_file_tree.py"
   },
   "promotion_policy": {
-    "current_state": "destination tree is canonical assembly destination; existing source paths remain compatibility mirrors",
+    "current_state": "destination tree is canonical assembly destination; non-credential code is mirrored while credential-bearing surfaces are represented by non-owning compatibility facades",
     "cutover_requires": [
       "affected imports and package entrypoints point to skeleton/ai or an explicit compatibility facade",
       "source/destination parity validator is green before source removal",
@@ -67,7 +67,10 @@
         "AIQ-S2-PROTO-02",
         "AIQ-S2-PROTO-03",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "parity_mode": "compatibility_facade",
+      "facade_required_import": "from skeleton.provider_runtime import",
+      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover."
     },
     {
       "id": "AIFT-CONTRACTS",
@@ -235,7 +238,15 @@
         "WP-W15",
         "WP-W16"
       ],
-      "aiq_refs": []
+      "aiq_refs": [],
+      "parity_exceptions": [
+        {
+          "path": "model_gateway.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from core.shift_supervisor.model_gateway import",
+          "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
+        }
+      ]
     }
   ],
   "ci_enforcement": {
