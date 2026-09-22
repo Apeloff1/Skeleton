@@ -30,7 +30,40 @@ def _tree_files(root: Path) -> dict[str, Path]:
     }
 
 
-def _compare(source: Path, destination: Path) -> list[str]:
+def _validate_facade(
+    destination: Path,
+    *,
+    required_import: str,
+    label: str,
+) -> list[str]:
+    errors: list[str] = []
+    try:
+        source = destination.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return [f"{label}: cannot read compatibility facade: {exc}"]
+    if required_import not in source:
+        errors.append(f"{label}: compatibility facade missing required import {required_import!r}")
+    forbidden_markers = (
+        "OPENAI_API_KEY",
+        "SKELETON_OPENAI_API_KEY",
+        "api.openai.com",
+        "from openai import",
+        "import openai",
+    )
+    hits = [marker for marker in forbidden_markers if marker in source]
+    if hits:
+        errors.append(
+            f"{label}: compatibility facade owns credential/provider markers: {', '.join(hits)}"
+        )
+    return errors
+
+
+def _compare(
+    source: Path,
+    destination: Path,
+    *,
+    parity_exceptions: dict[str, dict[str, object]] | None = None,
+) -> list[str]:
     if source.is_symlink() or destination.is_symlink():
         return [f"symlink mapping forbidden: {source} -> {destination}"]
     if source.is_file() != destination.is_file():
@@ -39,6 +72,8 @@ def _compare(source: Path, destination: Path) -> list[str]:
         return [] if _digest(source) == _digest(destination) else [
             f"file drift: {source.relative_to(ROOT)} != {destination.relative_to(ROOT)}"
         ]
+
+    exceptions = parity_exceptions or {}
     src = _tree_files(source)
     dst = _tree_files(destination)
     if set(src) != set(dst):
@@ -48,11 +83,29 @@ def _compare(source: Path, destination: Path) -> list[str]:
             f"tree membership drift: {source.relative_to(ROOT)} -> {destination.relative_to(ROOT)} "
             f"missing={missing[:10]} extra={extra[:10]}"
         ]
-    return [
-        f"tree content drift: {source.relative_to(ROOT)}/{rel}"
-        for rel in sorted(src)
-        if _digest(src[rel]) != _digest(dst[rel])
-    ]
+
+    errors: list[str] = []
+    for rel in sorted(src):
+        exception = exceptions.get(rel)
+        if exception:
+            if exception.get("mode") != "compatibility_facade":
+                errors.append(f"{source.relative_to(ROOT)}/{rel}: unknown parity exception mode")
+                continue
+            required_import = exception.get("facade_required_import")
+            if not isinstance(required_import, str) or not required_import:
+                errors.append(f"{source.relative_to(ROOT)}/{rel}: facade exception missing required import")
+                continue
+            errors.extend(
+                _validate_facade(
+                    dst[rel],
+                    required_import=required_import,
+                    label=f"{source.relative_to(ROOT)}/{rel}",
+                )
+            )
+            continue
+        if _digest(src[rel]) != _digest(dst[rel]):
+            errors.append(f"tree content drift: {source.relative_to(ROOT)}/{rel}")
+    return errors
 
 
 def validate() -> list[str]:
@@ -125,7 +178,42 @@ def validate() -> list[str]:
             errors.append(f"{mid}: missing destination {dst}")
             continue
         if data.get("status") in MIRROR_STATES:
-            errors.extend(_compare(source, destination))
+            parity_mode = item.get("parity_mode", "exact")
+            if parity_mode == "compatibility_facade":
+                required_import = item.get("facade_required_import")
+                if not isinstance(required_import, str) or not required_import:
+                    errors.append(f"{mid}: compatibility facade missing required import contract")
+                elif not destination.is_file():
+                    errors.append(f"{mid}: compatibility facade destination must be a file")
+                else:
+                    errors.extend(
+                        _validate_facade(
+                            destination,
+                            required_import=required_import,
+                            label=mid,
+                        )
+                    )
+            elif parity_mode == "exact":
+                raw_exceptions = item.get("parity_exceptions", [])
+                exceptions: dict[str, dict[str, object]] = {}
+                if not isinstance(raw_exceptions, list):
+                    errors.append(f"{mid}: parity_exceptions must be a list")
+                else:
+                    for exception in raw_exceptions:
+                        if not isinstance(exception, dict):
+                            errors.append(f"{mid}: parity exception must be an object")
+                            continue
+                        rel = exception.get("path")
+                        if not isinstance(rel, str) or not rel or rel.startswith("/") or ".." in Path(rel).parts:
+                            errors.append(f"{mid}: invalid parity exception path")
+                            continue
+                        if rel in exceptions:
+                            errors.append(f"{mid}: duplicate parity exception {rel}")
+                            continue
+                        exceptions[rel] = exception
+                errors.extend(_compare(source, destination, parity_exceptions=exceptions))
+            else:
+                errors.append(f"{mid}: unknown parity_mode {parity_mode!r}")
 
         has_jeeves |= src == "skeleton/jeeves" and dst == "skeleton/ai/agents/jeeves"
         has_build |= src == "core/shift_supervisor" and dst == "skeleton/ai/build/shift_supervisor"
