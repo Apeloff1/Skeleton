@@ -272,7 +272,7 @@ jobs:
         run: >-
           PYTHONPATH=. python -m pytest -q --noconftest
           tests/test_architecture_boundaries.py
-          tests/test_ai_provider_reliability.py
+          backend/tests/test_ai_provider_reliability.py
           tests/test_exec_guard.py
           tests/test_auth_security.py
           tests/test_process_safety_gate.py
