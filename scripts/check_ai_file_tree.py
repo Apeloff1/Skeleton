@@ -355,6 +355,87 @@ def validate() -> list[str]:
                 + ", ".join(unclassified)
             )
 
+    assignments = data.get("next_move_assignments")
+    if not isinstance(assignments, list) or len(assignments) < 10:
+        errors.append("next_move_assignments must contain the plan-derived pending migration batch")
+        assignments = []
+
+    allowed_actions = {"mirror_then_cutover", "split_then_mirror", "merge_into_existing_owner"}
+    mapped_sources = {
+        item.get("source")
+        for item in mappings
+        if isinstance(item, dict) and isinstance(item.get("source"), str)
+    }
+    pending_ids: set[str] = set()
+    pending_sources: set[str] = set()
+    pending_destinations: set[str] = set()
+    required_pending_sources = {
+        "skeleton/state",
+        "skeleton/network",
+        "skeleton/kv",
+        "skeleton/swarm",
+        "skeleton/telemetry",
+        "skeleton/foundation",
+        "skeleton/build",
+        "skeleton/repo_machine",
+    }
+    for item in assignments:
+        if not isinstance(item, dict):
+            errors.append("pending move assignment must be an object")
+            continue
+        aid = item.get("id")
+        source = item.get("source")
+        destination = item.get("destination")
+        action = item.get("action")
+        priority = item.get("priority")
+        if not isinstance(aid, str) or not aid.startswith("AIFT-NEXT-"):
+            errors.append(f"pending move has invalid id: {aid!r}")
+            continue
+        if aid in pending_ids:
+            errors.append(f"duplicate pending move id: {aid}")
+        pending_ids.add(aid)
+        if not isinstance(source, str) or not source:
+            errors.append(f"{aid}: pending source must be a non-empty string")
+            continue
+        if source in pending_sources:
+            errors.append(f"{aid}: duplicate pending source {source}")
+        pending_sources.add(source)
+        if source in mapped_sources:
+            errors.append(f"{aid}: source is already a governed mirror and must leave the pending queue: {source}")
+        if not (ROOT / source).exists():
+            errors.append(f"{aid}: pending source missing: {source}")
+        if not isinstance(destination, str) or not destination.startswith("skeleton/ai/"):
+            errors.append(f"{aid}: pending destination must stay under skeleton/ai")
+        elif destination in pending_destinations or destination in seen_destinations:
+            errors.append(f"{aid}: duplicate/occupied pending destination {destination}")
+        else:
+            pending_destinations.add(destination)
+        if action not in allowed_actions:
+            errors.append(f"{aid}: unsupported pending action {action!r}")
+        if priority not in {1, 2, 3}:
+            errors.append(f"{aid}: priority must be 1, 2, or 3")
+        refs = item.get("work_package_refs")
+        if not isinstance(refs, list) or not refs:
+            errors.append(f"{aid}: pending assignment missing work_package_refs")
+        elif any(not isinstance(ref, str) or not re.fullmatch(r"WP-W(?:0[0-9]|[12][0-9]|30)", ref) for ref in refs):
+            errors.append(f"{aid}: invalid work_package_refs")
+        volume_refs = item.get("volume_refs", [])
+        if not isinstance(volume_refs, list) or any(
+            not isinstance(ref, str) or not re.fullmatch(r"VOL-\\d{3}", ref) for ref in volume_refs
+        ):
+            errors.append(f"{aid}: invalid volume_refs")
+        if not isinstance(item.get("rationale"), str) or not item.get("rationale"):
+            errors.append(f"{aid}: missing rationale")
+        preconditions = item.get("preconditions")
+        if not isinstance(preconditions, list) or not preconditions:
+            errors.append(f"{aid}: missing migration preconditions")
+
+    missing_required_pending = sorted(required_pending_sources - pending_sources)
+    if missing_required_pending:
+        errors.append(
+            "required plan-derived pending AI moves missing: " + ", ".join(missing_required_pending)
+        )
+
     forbidden = data.get("promotion_policy", {}).get("forbidden", [])
     if "marking AIQ/work-package completion from file relocation alone" not in forbidden:
         errors.append("relocation must not create completion authority")
