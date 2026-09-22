@@ -83,7 +83,7 @@ def _staged_api_mirror_prefixes(repo_root: Path) -> tuple[str, ...]:
         if (
             source == "skeleton/api"
             and isinstance(destination, str)
-            and destination.startswith("skeleton/ai/")
+            and destination == "skeleton/ai/runtime/api"
             and parity_mode == "exact"
         ):
             prefixes.append(destination.rstrip("/"))

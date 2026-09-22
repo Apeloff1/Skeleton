@@ -197,3 +197,28 @@ def test_completed_or_nonexact_api_mirror_does_not_bypass_boundary(tmp_path: Pat
     violations = collect_violations(root)
     assert len(violations) == 1
     assert "must not depend upward on skeleton.api" in violations[0].message
+
+
+def test_manifest_cannot_forge_api_mirror_exemption_for_other_ai_path(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/api/routes.py", "VALUE = 1\n")
+    _write(root, "skeleton/ai/runtime/other/routes.py", "from skeleton.api import routes\n")
+    _write(
+        root,
+        "machine/ai_file_tree.json",
+        """{
+  "status": "staged_mirror",
+  "mappings": [
+    {
+      "source": "skeleton/api",
+      "destination": "skeleton/ai/runtime/other",
+      "parity_mode": "exact"
+    }
+  ]
+}
+""",
+    )
+
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
