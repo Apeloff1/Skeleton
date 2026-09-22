@@ -165,6 +165,22 @@ def test_sequential_depth_doc_exists_and_spans_281_320() -> None:
     assert "VOL-320" in text
 
 
+def test_sequential_depth_pass_321_360_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-321-360")
+    assert depth["volume_range"] == [321, 360]
+    for volume in data["volumes"][321:361]:
+        assert volume["depth_pass"] == "DP-321-360"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_sequential_depth_doc_exists_and_spans_321_360() -> None:
+    text = checker.DEPTH_321_360.read_text(encoding="utf-8")
+    assert "VOL-321" in text
+    assert "VOL-360" in text
+
+
 def test_master_plan_references_engineering_pass() -> None:
     data = checker.load_plan()
     engineering = data["engineering_pass"]
