@@ -279,3 +279,27 @@ against later designs. They are explicitly **non-authoritative**:
 No historical module can become a production owner through relocation alone;
 promotion requires an explicit masterplan adoption, evaluation evidence, and
 the normal signed-accountability process.
+
+
+## Transfer v2 clean rebuild
+
+Transfer v2 is rebuilt directly on the hardened baseline bridge to eliminate unrelated reconciliation history.
+
+Scope:
+- 26 new governed mappings
+- 89 new mirrored files
+- 5 inherited `skeleton/automation` exact-parity mirrors refreshed after post-#1930 source changes
+- 2 governance files updated (`machine/ai_file_tree.json`, this migration packet)
+- expected PR delta: 96 files
+
+New research-quarantine mappings:
+- `backend/gameforge/exocortex/agentic`
+- `backend/gameforge/exocortex/zaibatsu`
+- `backend/gameforge/reasoning`
+- `backend/gameforge/rag`
+- `backend/gameforge/math_exocortex`
+- `backend/gameforge/personal/neuro`
+
+Twenty selected `backend/core` Jeeves/model/memory/swarm/world modules are staged under `skeleton/ai/compat/backend_core` as convergence inputs only. They do not become independent authorities by relocation.
+
+No import inversion, source retirement, AIQ completion, work-package completion, or production-readiness claim is made by this transfer.
