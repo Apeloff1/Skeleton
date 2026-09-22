@@ -92,6 +92,7 @@ on:
       - "scripts/check_ai_app_construction.py"
       - "scripts/check_ai_master_plan.py"
       - "scripts/check_ai_edge_case_catalog.py"
+      - "scripts/check_ai_exotic_systems_catalog.py"
       - "scripts/check_ai_p0_edge_case_matrix.py"
       - "scripts/check_ai_full_edge_case_matrix.py"
       - "scripts/check_ai_master_build_sequence.py"
@@ -109,6 +110,7 @@ on:
       - "machine/ai_build_queue.json"
       - "machine/ai_master_plan.json"
       - "machine/ai_edge_case_catalog.json"
+      - "machine/ai_exotic_systems_catalog.json"
       - "machine/ai_p0_edge_case_matrix.json"
       - "machine/ai_full_edge_case_matrix.json"
       - "machine/ai_master_build_sequence.json"
@@ -168,6 +170,9 @@ jobs:
 
       - name: Validate AI edge/historical catalogue
         run: python scripts/check_ai_edge_case_catalog.py
+
+      - name: Validate AI exotic systems catalogue
+        run: python scripts/check_ai_exotic_systems_catalog.py
 
       - name: Validate P0 edge-case construction matrix
         run: python scripts/check_ai_p0_edge_case_matrix.py
@@ -259,7 +264,7 @@ jobs:
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
-          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
+          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
@@ -274,6 +279,7 @@ jobs:
           skeleton/testing/test_ai_app_construction.py
           skeleton/testing/test_ai_master_plan.py
           skeleton/testing/test_ai_edge_case_catalog.py
+          skeleton/testing/test_ai_exotic_systems_catalog.py
           skeleton/testing/test_ai_p0_edge_case_matrix.py
           skeleton/testing/test_ai_full_edge_case_matrix.py
           skeleton/testing/test_ai_engineering_pass.py

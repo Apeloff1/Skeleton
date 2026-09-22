@@ -1,0 +1,2630 @@
+{
+  "schema_version": 1,
+  "catalog_version": "1.0.0",
+  "status": "active",
+  "architecture_lane": "masterplan-exotic-depth",
+  "breadth_freeze_compatible": true,
+  "master_plan": "machine/ai_master_plan.json",
+  "human_catalog": "docs/plan/EXOTIC_SYSTEMS_DEPTH.md",
+  "policy": {
+    "default_status": "candidate",
+    "production_authority_default": false,
+    "promotion_rule": "An exotic mechanism may move beyond research_sandbox only after named ownership, reproducible evidence, explicit fallback/kill-switch behavior, adversarial evaluation, and mapping into existing contracts/tests/evidence. Exotic status never bypasses normal maturity or signed accountability.",
+    "retirement_rule": "Candidates without maintained evidence or a current owner revert to watchlist/retired and must not remain on production critical paths."
+  },
+  "required_minimums": {
+    "total": 73,
+    "categories": 13,
+    "mapped_work_packages": 31
+  },
+  "categories": [
+    "cognitive_architecture",
+    "optimization_search",
+    "memory_knowledge",
+    "model_inference",
+    "formal_methods",
+    "distributed_runtime",
+    "hardware_compute",
+    "adaptive_learning",
+    "security_resilience",
+    "dataflow_storage",
+    "multimodal_interface",
+    "research_methodology",
+    "deployment_product"
+  ],
+  "entries": [
+    {
+      "id": "EXO-001",
+      "category": "cognitive_architecture",
+      "title": "Active-inference control loop",
+      "mechanism": "Treat perception, action and model selection as bounded belief/goal mismatch minimization rather than a single prompt-response loop.",
+      "mapped_volumes": [
+        13,
+        18,
+        19,
+        317
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W18"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-002",
+      "category": "cognitive_architecture",
+      "title": "Predictive-processing hierarchy",
+      "mechanism": "Maintain layered predictions and residuals so expensive cognition is allocated where model/world mismatch is largest.",
+      "mapped_volumes": [
+        9,
+        13,
+        19,
+        366
+      ],
+      "work_package_refs": [
+        "WP-W10",
+        "WP-W11",
+        "WP-W28"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-003",
+      "category": "cognitive_architecture",
+      "title": "Global-workspace arbitration",
+      "mechanism": "Use a narrow broadcast workspace that admits only high-salience state from specialist processes, with deterministic admission rules.",
+      "mapped_volumes": [
+        13,
+        16,
+        17,
+        300
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-004",
+      "category": "cognitive_architecture",
+      "title": "Blackboard-with-leases reasoning",
+      "mechanism": "Specialists post hypotheses to a shared blackboard while write leases and provenance prevent unbounded overwrite races.",
+      "mapped_volumes": [
+        13,
+        17,
+        39,
+        299
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W16",
+        "WP-W04"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-005",
+      "category": "cognitive_architecture",
+      "title": "Stigmergic coordination",
+      "mechanism": "Coordinate agents through constrained artifact/environment traces instead of direct chatter when low-coupling collaboration is preferable.",
+      "mapped_volumes": [
+        17,
+        334,
+        378
+      ],
+      "work_package_refs": [
+        "WP-W16",
+        "WP-W13",
+        "WP-W03"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-006",
+      "category": "optimization_search",
+      "title": "Monte-Carlo tree search for tool plans",
+      "mechanism": "Search bounded action trees with explicit simulation budgets, deterministic terminal conditions and verifier-backed rollouts.",
+      "mapped_volumes": [
+        14,
+        19,
+        251,
+        253
+      ],
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W17"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-007",
+      "category": "optimization_search",
+      "title": "CMA-ES policy/config search",
+      "mechanism": "Use covariance-matrix adaptation for non-differentiable routing, scheduler or policy parameters inside sandboxed evaluation.",
+      "mapped_volumes": [
+        27,
+        35,
+        405,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W18",
+        "WP-W29"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-008",
+      "category": "optimization_search",
+      "title": "Quality-diversity MAP-Elites",
+      "mechanism": "Maintain diverse high-performing candidate behaviors across measurable niches instead of collapsing to one global optimum.",
+      "mapped_volumes": [
+        27,
+        35,
+        415,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-009",
+      "category": "optimization_search",
+      "title": "Novelty-search escape hatch",
+      "mechanism": "Reward behavioral novelty only in bounded research runs to escape deceptive local optima, never as a production objective.",
+      "mapped_volumes": [
+        27,
+        35,
+        416,
+        419
+      ],
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W18"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-010",
+      "category": "optimization_search",
+      "title": "Population-based training controller",
+      "mechanism": "Jointly evolve hyperparameters and checkpoints with reproducible lineage, promotion gates and rollback.",
+      "mapped_volumes": [
+        6,
+        143,
+        147,
+        149
+      ],
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W28",
+        "WP-W30"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-011",
+      "category": "optimization_search",
+      "title": "Bandit-based strategy allocation",
+      "mechanism": "Allocate test-time compute among reasoning/retrieval/tool strategies with regret tracking and hard per-operation budgets.",
+      "mapped_volumes": [
+        8,
+        13,
+        186,
+        366
+      ],
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-012",
+      "category": "optimization_search",
+      "title": "Value-of-information scheduler",
+      "mechanism": "Estimate whether another retrieval, tool call, simulation or verifier pass is worth its latency and cost.",
+      "mapped_volumes": [
+        14,
+        252,
+        253,
+        405
+      ],
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W17",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-013",
+      "category": "memory_knowledge",
+      "title": "Modern Hopfield associative memory",
+      "mechanism": "Explore energy-based associative retrieval for compact pattern completion with explicit collision and interference evaluation.",
+      "mapped_volumes": [
+        10,
+        12,
+        361,
+        363
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W09",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-014",
+      "category": "memory_knowledge",
+      "title": "Sparse distributed memory",
+      "mechanism": "Store high-dimensional sparse patterns for robust approximate recall under corruption, with deterministic fallbacks.",
+      "mapped_volumes": [
+        10,
+        136,
+        361,
+        363
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W03"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-015",
+      "category": "memory_knowledge",
+      "title": "Hyperdimensional / vector-symbolic memory",
+      "mechanism": "Represent compositional symbols in high-dimensional vectors for cheap binding, superposition and similarity operations.",
+      "mapped_volumes": [
+        10,
+        12,
+        13,
+        350
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W09",
+        "WP-W11"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-016",
+      "category": "memory_knowledge",
+      "title": "Bitemporal knowledge ledger",
+      "mechanism": "Track both valid-time and transaction-time so historical truth, corrections and late arrivals remain queryable.",
+      "mapped_volumes": [
+        12,
+        247,
+        297,
+        299
+      ],
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W03"
+      ],
+      "risk_level": "low",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-017",
+      "category": "memory_knowledge",
+      "title": "Truth-maintenance contradiction sets",
+      "mechanism": "Keep alternative claims and dependency justifications rather than forcing eager overwrite when evidence conflicts.",
+      "mapped_volumes": [
+        12,
+        248,
+        359,
+        419
+      ],
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W17"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-018",
+      "category": "memory_knowledge",
+      "title": "Datalog rule slice",
+      "mechanism": "Use a bounded declarative rule engine for provenance-preserving recursive relationships that are awkward in prompt logic.",
+      "mapped_volumes": [
+        12,
+        128,
+        250,
+        359
+      ],
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W01"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-019",
+      "category": "model_inference",
+      "title": "Mixture-of-experts sparse routing",
+      "mechanism": "Explore sparse expert activation with load-balancing, expert-capacity limits and explicit fallback to dense paths.",
+      "mapped_volumes": [
+        6,
+        7,
+        8,
+        381
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W29"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-020",
+      "category": "model_inference",
+      "title": "Adaptive-computation early exit",
+      "mechanism": "Permit early transformer/layer exit when calibrated confidence and verifier checks meet policy, with full-path fallback.",
+      "mapped_volumes": [
+        7,
+        185,
+        186,
+        391
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-021",
+      "category": "model_inference",
+      "title": "Speculative decoding cascades",
+      "mechanism": "Use draft models or n-gram/speculator paths to accelerate decoding while the authority model verifies tokens.",
+      "mapped_volumes": [
+        7,
+        389,
+        391,
+        415
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W29"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-022",
+      "category": "model_inference",
+      "title": "Medusa / multi-head token speculation",
+      "mechanism": "Evaluate multi-token candidate heads for parallel verification under strict compatibility and regression gates.",
+      "mapped_volumes": [
+        7,
+        389,
+        391,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W29",
+        "WP-W27"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-023",
+      "category": "model_inference",
+      "title": "Recurrent-memory transformer variants",
+      "mechanism": "Evaluate recurrent state or memory-token architectures for long-horizon continuity without assuming infinite context.",
+      "mapped_volumes": [
+        6,
+        9,
+        10,
+        18
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W07",
+        "WP-W10"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-024",
+      "category": "model_inference",
+      "title": "State-space sequence models",
+      "mechanism": "Evaluate selective state-space or hybrid recurrent architectures for long sequences where attention cost dominates.",
+      "mapped_volumes": [
+        6,
+        7,
+        20,
+        31
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W29"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-025",
+      "category": "model_inference",
+      "title": "Energy-based verifier models",
+      "mechanism": "Score candidate outputs/plans with learned energy functions separated from generator authority.",
+      "mapped_volumes": [
+        37,
+        152,
+        207,
+        208
+      ],
+      "work_package_refs": [
+        "WP-W17",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-026",
+      "category": "model_inference",
+      "title": "Test-time compute scaling controller",
+      "mechanism": "Scale sampling, search, verifier depth and deliberation only when predicted quality gain justifies budget.",
+      "mapped_volumes": [
+        13,
+        186,
+        368,
+        405
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W21"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-027",
+      "category": "formal_methods",
+      "title": "TLA+ protocol model candidates",
+      "mechanism": "Model critical distributed state machines before implementation and translate invariants into executable tests.",
+      "mapped_volumes": [
+        29,
+        30,
+        127,
+        200
+      ],
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W17",
+        "WP-W01"
+      ],
+      "risk_level": "low",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-028",
+      "category": "formal_methods",
+      "title": "Alloy structural model checks",
+      "mechanism": "Use bounded relational model finding for authority, graph and schema invariants that are easy to violate compositionally.",
+      "mapped_volumes": [
+        28,
+        127,
+        128,
+        200
+      ],
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W17",
+        "WP-W01"
+      ],
+      "risk_level": "low",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-029",
+      "category": "formal_methods",
+      "title": "SMT-backed plan verifier",
+      "mechanism": "Encode plan preconditions, resource constraints and authority constraints as satisfiability checks for high-impact plans.",
+      "mapped_volumes": [
+        14,
+        200,
+        303,
+        370
+      ],
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W17",
+        "WP-W14"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-030",
+      "category": "formal_methods",
+      "title": "Temporal-logic runtime monitors",
+      "mechanism": "Compile safety/liveness properties into runtime monitors for critical workflows and autonomy state transitions.",
+      "mapped_volumes": [
+        18,
+        127,
+        183,
+        317
+      ],
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W17",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-031",
+      "category": "formal_methods",
+      "title": "Proof-carrying action proposals",
+      "mechanism": "Require selected high-impact tool proposals to include machine-checkable evidence that policy preconditions hold.",
+      "mapped_volumes": [
+        15,
+        28,
+        37,
+        378
+      ],
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W17"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-032",
+      "category": "distributed_runtime",
+      "title": "CRDT research plane",
+      "mechanism": "Use CRDTs only for explicitly commutative collaborative state, never silently for authoritative non-commutative records.",
+      "mapped_volumes": [
+        30,
+        132,
+        133,
+        331
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W19",
+        "WP-W23"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-033",
+      "category": "distributed_runtime",
+      "title": "Differential dataflow incrementality",
+      "mechanism": "Explore incremental fixed-point computation for continuously changing dependency, graph and analytics views.",
+      "mapped_volumes": [
+        30,
+        39,
+        139,
+        246
+      ],
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W09",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-034",
+      "category": "distributed_runtime",
+      "title": "Optimistic discrete-event simulation",
+      "mechanism": "Use Time-Warp-style speculative simulation only in isolated digital-twin/research environments with rollback logs.",
+      "mapped_volumes": [
+        19,
+        284,
+        316,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W27"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-035",
+      "category": "distributed_runtime",
+      "title": "Tuple-space coordination",
+      "mechanism": "Evaluate Linda-style tuple spaces for decoupled worker/agent coordination under typed schemas and lease expiry.",
+      "mapped_volumes": [
+        17,
+        30,
+        39,
+        398
+      ],
+      "work_package_refs": [
+        "WP-W16",
+        "WP-W29",
+        "WP-W04"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-036",
+      "category": "distributed_runtime",
+      "title": "Gossip membership / failure suspicion",
+      "mechanism": "Use bounded gossip-style membership for large research worker pools where centralized heartbeats become bottlenecks.",
+      "mapped_volumes": [
+        29,
+        30,
+        286,
+        390
+      ],
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W29"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-037",
+      "category": "distributed_runtime",
+      "title": "Work-stealing heterogeneous scheduler",
+      "mechanism": "Allow idle workers to steal compatible tasks while preserving data locality, authority and hardware constraints.",
+      "mapped_volumes": [
+        31,
+        286,
+        287,
+        392
+      ],
+      "work_package_refs": [
+        "WP-W29",
+        "WP-W19"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-038",
+      "category": "distributed_runtime",
+      "title": "Deterministic replay lane",
+      "mechanism": "Capture enough inputs, ordering and seeds to replay selected concurrency/inference failures inside a bounded envelope.",
+      "mapped_volumes": [
+        29,
+        295,
+        296,
+        299
+      ],
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W21",
+        "WP-W30"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-039",
+      "category": "hardware_compute",
+      "title": "Spiking-neural accelerator research",
+      "mechanism": "Evaluate event-driven spiking models on compatible hardware for ultra-low-power specialist workloads only.",
+      "mapped_volumes": [
+        6,
+        31,
+        32,
+        187
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W29",
+        "WP-W27"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-040",
+      "category": "hardware_compute",
+      "title": "Neuromorphic event pipeline",
+      "mechanism": "Represent sparse temporal sensor events without densifying them prematurely when hardware/source semantics benefit.",
+      "mapped_volumes": [
+        20,
+        31,
+        153,
+        187
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W29"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-041",
+      "category": "hardware_compute",
+      "title": "FPGA inference kernels",
+      "mechanism": "Prototype fixed-shape low-latency kernels for narrow hot paths with golden-reference and bit-level validation.",
+      "mapped_volumes": [
+        7,
+        31,
+        32,
+        392
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-042",
+      "category": "hardware_compute",
+      "title": "Photonic / optical inference watchlist",
+      "mechanism": "Track photonic matrix-multiply platforms as research candidates gated by reproducibility, tooling and deployment evidence.",
+      "mapped_volumes": [
+        31,
+        78,
+        392,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W29"
+      ],
+      "risk_level": "reference",
+      "status": "candidate",
+      "activation_tier": "watchlist",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-043",
+      "category": "hardware_compute",
+      "title": "Reversible-computing watchlist",
+      "mechanism": "Track reversible logic techniques for future energy-constrained compute without assuming near-term production viability.",
+      "mapped_volumes": [
+        31,
+        187,
+        410,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "risk_level": "reference",
+      "status": "candidate",
+      "activation_tier": "watchlist",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-044",
+      "category": "hardware_compute",
+      "title": "Approximate-computing kernels",
+      "mechanism": "Permit precision/approximation tradeoffs only where error bounds are explicit and verifier/fallback paths exist.",
+      "mapped_volumes": [
+        31,
+        32,
+        70,
+        187
+      ],
+      "work_package_refs": [
+        "WP-W29",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-045",
+      "category": "adaptive_learning",
+      "title": "Online conformal calibration",
+      "mechanism": "Maintain distribution-aware confidence sets/calibration with drift detection instead of treating raw model scores as probabilities.",
+      "mapped_volumes": [
+        35,
+        70,
+        248,
+        405
+      ],
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W21",
+        "WP-W28"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-046",
+      "category": "adaptive_learning",
+      "title": "Reservoir-computing adapters",
+      "mechanism": "Explore fixed recurrent reservoirs with trained readouts for cheap streaming adaptation on narrow temporal signals.",
+      "mapped_volumes": [
+        6,
+        20,
+        40,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-047",
+      "category": "adaptive_learning",
+      "title": "Liquid time-constant networks",
+      "mechanism": "Evaluate continuous-time adaptive dynamics for irregular sensor streams and control tasks inside simulation first.",
+      "mapped_volumes": [
+        6,
+        19,
+        20,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W20",
+        "WP-W27"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-048",
+      "category": "adaptive_learning",
+      "title": "Meta-learning fast adapters",
+      "mechanism": "Explore learned adaptation rules that produce bounded task-specific adapters without directly modifying production base weights.",
+      "mapped_volumes": [
+        6,
+        149,
+        411,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W28"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-049",
+      "category": "adaptive_learning",
+      "title": "Continual-learning rehearsal mix",
+      "mechanism": "Use replay, regularization and adapter isolation to reduce catastrophic forgetting during approved incremental learning.",
+      "mapped_volumes": [
+        6,
+        10,
+        149,
+        419
+      ],
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W28",
+        "WP-W18"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-050",
+      "category": "adaptive_learning",
+      "title": "Homeostatic resource controller",
+      "mechanism": "Apply control-theoretic target bands to queue depth, latency, cost and cognitive effort rather than maximizing any single signal.",
+      "mapped_volumes": [
+        29,
+        180,
+        186,
+        317
+      ],
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-051",
+      "category": "security_resilience",
+      "title": "Capability-machine style authority tokens",
+      "mechanism": "Represent executable authority as unforgeable scoped capabilities with attenuation rather than ambient privilege.",
+      "mapped_volumes": [
+        15,
+        26,
+        28,
+        170
+      ],
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-052",
+      "category": "security_resilience",
+      "title": "Information-flow label propagation",
+      "mechanism": "Propagate confidentiality/integrity labels through context, tools, artifacts and model routes with fail-closed joins.",
+      "mapped_volumes": [
+        26,
+        27,
+        28,
+        354
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W14",
+        "WP-W10"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-053",
+      "category": "security_resilience",
+      "title": "Moving-target sandbox identities",
+      "mechanism": "Rotate sandbox/process identities and ephemeral credentials for risky tool sessions to reduce persistence after compromise.",
+      "mapped_volumes": [
+        26,
+        164,
+        173,
+        399
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W13"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-054",
+      "category": "security_resilience",
+      "title": "N-version verifier diversity",
+      "mechanism": "For selected high-impact decisions, compare structurally different verifier implementations to reduce correlated failure.",
+      "mapped_volumes": [
+        36,
+        37,
+        208,
+        415
+      ],
+      "work_package_refs": [
+        "WP-W17",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-055",
+      "category": "security_resilience",
+      "title": "Byzantine-resilient research aggregation",
+      "mechanism": "Use robust statistics or quorum rules when aggregating untrusted/heterogeneous research workers, never naive averaging.",
+      "mapped_volumes": [
+        30,
+        35,
+        36,
+        210
+      ],
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W29"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-056",
+      "category": "security_resilience",
+      "title": "Honeytoken research canaries",
+      "mechanism": "Seed non-sensitive decoy markers in isolated evaluation environments to detect unexpected exfiltration paths.",
+      "mapped_volumes": [
+        26,
+        36,
+        167,
+        168
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-057",
+      "category": "dataflow_storage",
+      "title": "Content-addressed execution artifacts",
+      "mechanism": "Address immutable build/eval/research artifacts by digest so replay, deduplication and provenance become compositional.",
+      "mapped_volumes": [
+        5,
+        38,
+        136,
+        275
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W21",
+        "WP-W30"
+      ],
+      "risk_level": "low",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-058",
+      "category": "dataflow_storage",
+      "title": "Merkleized state snapshots",
+      "mechanism": "Use Merkle trees for large immutable snapshots to enable partial verification, deduplication and corruption localization.",
+      "mapped_volumes": [
+        5,
+        38,
+        136,
+        360
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W09"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-059",
+      "category": "dataflow_storage",
+      "title": "Incremental view maintenance",
+      "mechanism": "Update derived search/analytics/knowledge views from change sets instead of full recomputation where semantics permit.",
+      "mapped_volumes": [
+        5,
+        137,
+        246,
+        352
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-060",
+      "category": "dataflow_storage",
+      "title": "Erasure-coded cold evidence archive",
+      "mechanism": "Evaluate erasure coding for large immutable evidence/artifact archives when durability-cost math beats replication.",
+      "mapped_volumes": [
+        5,
+        29,
+        38,
+        395
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W19"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-061",
+      "category": "dataflow_storage",
+      "title": "Log-structured temporal feature store",
+      "mechanism": "Preserve append-only feature/event history for reproducible model/eval inputs with bounded compaction.",
+      "mapped_volumes": [
+        5,
+        39,
+        139,
+        297
+      ],
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-062",
+      "category": "multimodal_interface",
+      "title": "Event-camera perception lane",
+      "mechanism": "Support sparse asynchronous vision-event streams as a specialist modality without forcing frame-centric assumptions.",
+      "mapped_volumes": [
+        20,
+        153,
+        154,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W27"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-063",
+      "category": "multimodal_interface",
+      "title": "Spatial-audio scene graph",
+      "mechanism": "Represent sound-source identity/location over time and fuse it into multimodal evidence rather than flattening to transcript.",
+      "mapped_volumes": [
+        20,
+        156,
+        159,
+        250
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W09"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-064",
+      "category": "multimodal_interface",
+      "title": "Haptic / force-feedback simulator hooks",
+      "mechanism": "Model haptic observations/actions in simulation contracts for robotics-style research without granting real-world actuator authority.",
+      "mapped_volumes": [
+        19,
+        20,
+        164,
+        416
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W27",
+        "WP-W13"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-065",
+      "category": "multimodal_interface",
+      "title": "Cross-modal latent agreement checks",
+      "mechanism": "Use independent modality encoders/verifiers to flag cases where text, image, audio or structured evidence disagree.",
+      "mapped_volumes": [
+        20,
+        35,
+        37,
+        159
+      ],
+      "work_package_refs": [
+        "WP-W20",
+        "WP-W17",
+        "WP-W18"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-066",
+      "category": "research_methodology",
+      "title": "Negative-results registry",
+      "mechanism": "Preserve failed exotic experiments, preconditions and counterexamples so the platform does not repeatedly rediscover dead ends.",
+      "mapped_volumes": [
+        1,
+        78,
+        213,
+        419
+      ],
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W18"
+      ],
+      "risk_level": "low",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-067",
+      "category": "research_methodology",
+      "title": "Ablation-first promotion rule",
+      "mechanism": "Require exotic candidates to prove which mechanism produces gains, not merely that a large bundle scores better.",
+      "mapped_volumes": [
+        35,
+        78,
+        214,
+        415
+      ],
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W26",
+        "WP-W27"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-068",
+      "category": "research_methodology",
+      "title": "Mechanism transfer ledger",
+      "mechanism": "Track when an old/rare technique is reused in a modern subsystem, including changed assumptions and failure modes.",
+      "mapped_volumes": [
+        1,
+        38,
+        263,
+        419
+      ],
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "risk_level": "low",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-069",
+      "category": "research_methodology",
+      "title": "Sunset-by-default experiments",
+      "mechanism": "Every exotic candidate receives an expiry/review date and is removed unless evidence justifies continued maintenance.",
+      "mapped_volumes": [
+        118,
+        262,
+        411,
+        418
+      ],
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W27",
+        "WP-W30"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-070",
+      "category": "deployment_product",
+      "title": "Microreboot lifecycle islands",
+      "mechanism": "Partition runtime services into restartable lifecycle islands so selected faults can be recovered without restarting the whole application.",
+      "mapped_volumes": [
+        29,
+        120,
+        278
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W19",
+        "WP-W30"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-071",
+      "category": "deployment_product",
+      "title": "Semantic resumable streaming",
+      "mechanism": "Stream durable operation state as resumable snapshot-plus-delta sequences with monotonic cursors and replay-safe client recovery.",
+      "mapped_volumes": [
+        40,
+        183,
+        295
+      ],
+      "work_package_refs": [
+        "WP-W22",
+        "WP-W04",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-072",
+      "category": "deployment_product",
+      "title": "Local-first ambient desktop profile",
+      "mechanism": "Keep workspace continuity and selected inference/memory capabilities local-first, synchronizing opportunistically without making cloud reachability a correctness dependency.",
+      "mapped_volumes": [
+        229,
+        329,
+        331
+      ],
+      "work_package_refs": [
+        "WP-W24",
+        "WP-W23",
+        "WP-W07"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-073",
+      "category": "deployment_product",
+      "title": "Dual-slot atomic installer and updater",
+      "mechanism": "Use A/B installation slots with content verification, health-gated activation and deterministic rollback to the prior bootable application image.",
+      "mapped_volumes": [
+        193,
+        276,
+        277,
+        278
+      ],
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W30"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    }
+  ]
+}

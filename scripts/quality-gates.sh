@@ -32,6 +32,11 @@ python scripts/check_ai_edge_case_catalog.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_edge_case_catalog.py
 
+printf '\n== AI exotic systems catalogue ==\n'
+python scripts/check_ai_exotic_systems_catalog.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_exotic_systems_catalog.py
+
 printf '\n== P0 edge-case construction matrix ==\n'
 python scripts/check_ai_p0_edge_case_matrix.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
