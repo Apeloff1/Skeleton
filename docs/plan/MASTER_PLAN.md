@@ -617,9 +617,11 @@ The first enforced tranche is **DP-000-040**, documented in `docs/plan/VOLUME_DE
 
 The second enforced tranche is **DP-041-080**, documented in `docs/plan/VOLUME_DEPTH_041_080.md`. It continues the exact same non-empty traceability rule across API Architecture, product/web/desktop and long-running UX, multi-tenancy, install/update/repair/uninstall, repository and import architecture, machine manifests/linting, gap/risk/ADR control, CI/release/deployment/environment/configuration, backup/DR/incident response, performance/capacity/cost/quality, specialized intelligence including Jeeves, artifact/CAS/experimentation/reproducibility, and software/test architecture.
 
+The third enforced tranche is **DP-081-120**, documented in `docs/plan/VOLUME_DEPTH_081_120.md`. It deepens formal methods, benchmark/red-team/human-control disciplines, explainability/accessibility/i18n/compliance, documentation and operations, backlog/priority/build governance, VS-000 through VS-007, functional/autonomous/research/SOTA-candidate acceptance, anti-pattern/build-order/DoD/traceability/capability/debt/fitness controls, project metrics, roadmap/completion semantics, and final assembly qualification.
+
 The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
 
-Future depth passes should continue forward from **VOL-081** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+Future depth passes should continue forward from **VOL-121** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
 
 ## 24.4 Exotic systems depth layer
 
