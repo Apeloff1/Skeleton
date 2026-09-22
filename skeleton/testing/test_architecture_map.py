@@ -126,7 +126,8 @@ def test_architecture_sources_link_all_contract_layers() -> None:
             "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
             "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
             "ai_closure_evidence": "machine/ai_closure_evidence.json",
-            "ai_capability_registry": "machine/ai_capabilities.json"
+            "ai_capability_registry": "machine/ai_capabilities.json",
+            "ai_file_tree": "machine/ai_file_tree.json"
         }
 
 
