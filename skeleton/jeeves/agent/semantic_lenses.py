@@ -40,6 +40,12 @@ class LensFamily(str, Enum):
     SOCIAL = "social"
     TEMPORAL = "temporal"
     SYSTEM = "system"
+    CAUSAL = "causal"
+    INFORMATION = "information"
+    COMPUTATIONAL = "computational"
+    METACOGNITIVE = "metacognitive"
+    PROBABILITY = "probability"
+    PREDICTIVE = "predictive"
 
 
 class SemanticRole(str, Enum):
@@ -52,6 +58,9 @@ class SemanticRole(str, Enum):
     INTERPRETATION = "interpretation"
     ADVERSARIAL_READING = "adversarial_reading"
     PLAYER_MODEL = "player_model"
+    SYSTEM = "system"
+    SOCIAL = "social"
+    TEMPORAL = "temporal"
     META = "meta"
 
 

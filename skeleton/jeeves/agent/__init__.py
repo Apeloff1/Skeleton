@@ -169,7 +169,54 @@ from .execution_audit import (
     ReplayIssueKind,
     ReplayReport,
 )
+from .frontier_adjudication import (
+    CandidateAdjudication,
+    HostCandidateAdjudicator,
+)
 from .frontier_control_plane import FrontierCognitiveControlPlane
+from .frontier_consensus import (
+    ConsensusCluster,
+    ConsensusMember,
+    ConsensusPolicy,
+    ConsensusResult,
+    ConsensusSelector,
+    merge_search_results,
+    promote_consensus,
+)
+from .frontier_feedback import (
+    FrontierComputeEfficiency,
+    FrontierEvalComparison,
+    FrontierEvalFeedback,
+    FrontierEvalGate,
+    FrontierEvalReport,
+    FrontierFeedbackRecommendation,
+    FrontierFeedbackReport,
+    FrontierFeedbackSample,
+    FrontierReasoningFeedback,
+)
+from .frontier_policy_tuning import (
+    FrontierPolicyBounds,
+    FrontierPolicyProposal,
+    FrontierPolicyTuner,
+)
+from .frontier_reasoning import (
+    CandidateAssessment as FrontierCandidateAssessment,
+    EscalationCause as FrontierEscalationCause,
+    FrontierReasoningCoordinator,
+    FrontierReasoningDecision,
+    FrontierReasoningError,
+    FrontierReasoningPolicy,
+    InferenceDiagnostics as FrontierInferenceDiagnostics,
+    InferenceDisposition,
+)
+from .frontier_trials import (
+    FrontierPassAtKCase,
+    FrontierTrialComparison,
+    FrontierTrialEvaluator,
+    FrontierTrialGate,
+    FrontierTrialObservation,
+    FrontierTrialReport,
+)
 from .interpretive_science import (
     DomainCalibration,
     JuxtapositionTrial,
@@ -371,6 +418,19 @@ from .frontier_runtime import (
     FrontierJeevesAgentRuntime,
     HardenedJeevesAgentRuntime,
 )
+from .scientific_runtime import (
+    MaximalScientificAdaptiveJeevesRuntime,
+    MaximalScientificJeevesRuntime,
+    ScientificAdaptiveJeevesRuntime,
+    ScientificJeevesRuntime,
+)
+from .adaptive_runtime import (
+    AdaptiveConfig,
+    AdaptiveJeevesRuntime,
+    AdaptiveRunReport,
+    FrontierAdaptiveJeevesRuntime,
+    SpecialistSearchRecord,
+)
 from .semantic_extreme_lenses import (
     LensMaturity,
     RareLensDefinition,
@@ -378,6 +438,78 @@ from .semantic_extreme_lenses import (
     rare_semantic_definitions,
     rare_semantic_specs,
     register_rare_lenses,
+)
+from .semantic_depth_lenses import (
+    DEPTH_CATALOG_VERSION,
+    depth_catalog_fingerprint,
+    depth_definitions_by_family,
+    depth_semantic_definitions,
+    depth_semantic_specs,
+    register_depth_lenses,
+)
+from .semantic_research_lenses import (
+    CATALOG_VERSION as RESEARCH_LENS_CATALOG_VERSION,
+    register_research_lenses,
+    research_catalog_fingerprint,
+    research_definitions_by_family,
+    research_semantic_definitions,
+    research_semantic_specs,
+)
+from .semantic_plane_lenses import (
+    PLANE_CATALOG_VERSION,
+    plane_catalog_fingerprint,
+    plane_definitions_by_family,
+    plane_semantic_definitions,
+    plane_semantic_specs,
+    register_plane_lenses,
+)
+from .semantic_plane_interactions import (
+    plane_interaction_keys,
+    plane_interaction_rules,
+)
+from .semantic_depth_interactions import (
+    depth_interaction_keys,
+    depth_interaction_rules,
+)
+from .semantic_governance_bridge import (
+    SemanticGovernanceBridge,
+    SemanticGovernanceSnapshot,
+    governed_family,
+    semantic_maturity_index,
+    semantic_spec_to_definition,
+)
+
+from .semantic_lens_topology import (
+    LensBridgeCandidate,
+    LensTopologyEdge,
+    LensTopologyNode,
+    SemanticLensTopology,
+    SemanticTopologySnapshot,
+)
+
+from .semantic_research_bridge import (
+    SemanticTopologyResearchBridge,
+    SemanticTopologyResearchUpdate,
+)
+
+from .semantic_scope import (
+    ScopedSemanticPlanePool,
+    ScopedSemanticTopologyState,
+    SemanticLearningScope,
+    SemanticScopePoolSnapshot,
+)
+
+from .semantic_topology_learning import (
+    LearnedTopologyRule,
+    SemanticTopologyLearningLab,
+    SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
+    TopologyBridgeDomainReport,
+    TopologyBridgePolicy,
+    TopologyBridgePrediction,
+    TopologyBridgeReport,
+    TopologyBridgeStatus,
+    TopologyBridgeTrial,
 )
 
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
@@ -397,6 +529,26 @@ from .semantic_maximal import (
     MaximalSemanticRegistry,
     MaximalSemanticRuntime,
     MaximalSemanticSnapshot,
+)
+from .semantic_plane import (
+    FindingRejection,
+    LearnedCompanionActivation,
+    SemanticFindingAudit,
+    SemanticLensPlane,
+    SemanticPlaneCoverage,
+    SemanticPlaneLearningUpdate,
+    SemanticPlanePolicy,
+    SemanticPlaneSnapshot,
+)
+from .semantic_fusion_runtime import (
+    SemanticForecastFusion,
+    SemanticForecastFusionEngine,
+    SemanticForecastFusionSnapshot,
+)
+from .semantic_governance import (
+    SemanticLensGovernanceBridge,
+    SemanticLensGovernanceRecord,
+    SemanticLensGovernanceSnapshot,
 )
 from .semantic_lenses import (
     JuxtapositionAnalyzer,
@@ -501,6 +653,63 @@ from .verification import (
     VerificationPolicy,
     VerificationReport,
     parse_advisory_json,
+)
+from .epistemic_frontier import (
+    EpistemicFrontierEngine,
+    EpistemicFrontierPolicy,
+    EpistemicGap,
+    ForecastContract,
+    ForecastSettlement,
+    FrontierSnapshot,
+    GapKind,
+    GapStatus,
+    KnowledgeObligation,
+    ProbeCandidate,
+    ProbeKind,
+)
+from .hypothesis_tournament import (
+    CompetingHypothesis,
+    DiscriminatingProbe,
+    HypothesisPrediction,
+    HypothesisTournament,
+    ProbeEvaluation,
+    TournamentPolicy,
+    TournamentRound,
+    TournamentUpdate,
+)
+from .research_agenda import (
+    AgendaItem,
+    AgendaSnapshot,
+    AgendaStatus,
+    AttemptResult,
+    RankedAgendaItem,
+    ResearchAgenda,
+    ResearchAgendaPolicy,
+)
+from .research_assurance import (
+    AssuranceFinding,
+    AssuranceSeverity,
+    CompletionCertificate,
+    ResearchAssuranceGate,
+    ResearchEvidenceSummary,
+    ResearchResolution,
+    ResearchStopPolicy,
+)
+from .research_synthesis import (
+    HypothesisProposal,
+    HypothesisSynthesisGate,
+    HypothesisSynthesisPolicy,
+    ProbeSeparation,
+    SynthesisFinding,
+    SynthesisReport,
+    SynthesisSeverity,
+)
+from .unknown_unknowns import (
+    SurpriseObservation,
+    SurpriseScoutPolicy,
+    SurpriseScoutSnapshot,
+    UnknownUnknownCandidate,
+    UnknownUnknownScout,
 )
 from .world_model import (
     BeliefConflict,
