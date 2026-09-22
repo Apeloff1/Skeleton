@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.4.2",
+  "tree_version": "1.4.3",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -3949,8 +3949,8 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The last completed direct Git-object audit covered the first 78 mappings. The current 104-mapping prepared set preserves that evidence but requires a fresh full-object/parity audit before any cutover claim. Compatibility-convergence and historical architecture-registry additions are intentionally included in the pending refresh scope.",
-    "current_mapping_count": 105,
+    "note": "The last completed direct Git-object audit covered the first 78 mappings. The current 104-mapping prepared set preserves that evidence but requires a fresh full-object/parity audit before any cutover claim. Removed mappings are excluded from pending audit scope.",
+    "current_mapping_count": 104,
     "audit_scope_status": "prior_78_mapping_audit_valid_current_104_mapping_set_requires_full_refresh",
     "pending_mapping_ids": [
       "AIFT-CONFIG",
@@ -3978,8 +3978,7 @@
       "AIFT-ARCHITECTURE-R19",
       "AIFT-ARCHITECTURE-R20",
       "AIFT-ARCHITECTURE-R21",
-      "AIFT-ARCHITECTURE-R22",
-      "AIFT-PROJECT-MANIFEST-LEGACY"
+      "AIFT-ARCHITECTURE-R22"
     ]
   },
   "move_tag_contract": {
@@ -4003,5 +4002,23 @@
       "B4-research-quarantine": "Historical or model-internals research lineage; characterize before any production promotion.",
       "B3-compat-convergence": "Compatibility mirrors staged only for convergence into an existing canonical runtime owner; never promoted as independent production authorities."
     }
+  },
+  "pre_move_readiness": {
+    "status": "fully_classified_staged_mirror_cutover_not_authorized",
+    "governed_mapping_count": 104,
+    "pending_assignment_count": 0,
+    "retained_outside_ai_tree_count": 33,
+    "batch_counts": {
+      "B1-core-runtime": 54,
+      "B3-owner-sensitive": 7,
+      "B2-domain-build": 12,
+      "B4-research-quarantine": 29,
+      "B3-compat-convergence": 2
+    },
+    "fresh_object_audit_required": true,
+    "global_cutover_blockers": [
+      "BASE-FRONTEND-TSC-01"
+    ],
+    "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
   }
 }
