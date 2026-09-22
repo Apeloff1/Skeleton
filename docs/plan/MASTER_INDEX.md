@@ -42,13 +42,17 @@ Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
 Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
 
+Engineering task matrix: [`ENGINEERING_TASK_MATRIX.md`](ENGINEERING_TASK_MATRIX.md)
+
+Machine engineering task matrix: [`machine/ai_engineering_task_matrix.json`](../../machine/ai_engineering_task_matrix.json)
+
 Adversarial closure pass: [`ADVERSARIAL_CLOSURE_PASS.md`](ADVERSARIAL_CLOSURE_PASS.md)
 
 Machine adversarial closure contract: [`machine/ai_adversarial_closure.json`](../../machine/ai_adversarial_closure.json)
 
-Engineering task matrix: [`ENGINEERING_TASK_MATRIX.md`](ENGINEERING_TASK_MATRIX.md)
+Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md)
 
-Machine engineering task matrix: [`machine/ai_engineering_task_matrix.json`](../../machine/ai_engineering_task_matrix.json)
+Machine exotic catalogue: [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
 
 ## Purpose
 
@@ -86,10 +90,12 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 24. `machine/ai_engineering_pass.json`
 25. `docs/plan/ADVERSARIAL_CLOSURE_PASS.md`
 26. `machine/ai_adversarial_closure.json`
-27. `docs/plan/ENGINEERING_TASK_MATRIX.md`
-28. `machine/ai_engineering_task_matrix.json`
+27. `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`
+28. `machine/ai_exotic_systems_catalog.json`
+29. `docs/plan/ENGINEERING_TASK_MATRIX.md`
+30. `machine/ai_engineering_task_matrix.json`
 
-The first ten remain the present implementation/construction authority. Items 11–28 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
+The first ten remain the present implementation/construction authority. Items 11–30 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack.
 
 ## Index laws
 
@@ -136,6 +142,8 @@ The first ten remain the present implementation/construction authority. Items 11
 The master build sequence provides the canonical middle layer between frozen architecture breadth and atomic implementation. It assigns W00–W30 to MBW-00..07, preserves AIQ task authority, and makes dependency/promotion/stop conditions explicit without creating a second completion mechanism.
 
 The engineering pass then binds those packages to explicit interfaces, invariants, failure/recovery semantics, quantitative budgets, compatibility rules, evidence and release proof. It deepens the frozen plan; it does not expand it.
+
+The task matrix propagates those obligations into every atomic AIQ item, preserving queue completion semantics while preventing task-local acceptance from narrowing package-level engineering proof.
 
 Breadth is frozen. Future work should preferentially deepen the following chain:
 
@@ -625,3 +633,11 @@ At initial publication it contains **240 mapped entries**:
 Relevant catalogue entries should be converted into requirements, invariants, tests, fuzz/property suites, chaos cases, runbooks, or explicit accepted risks when their mapped capabilities enter implementation.
 
 The architecture breadth freeze at Volume 420 is deliberate: the next phase is construction depth, not additional top-level-box accumulation.
+
+## Cross-cutting exotic systems depth
+
+The frozen volume structure also carries a machine-validated exotic-systems reservoir. It currently holds **73 research candidates across 13 categories**, ranging from active-inference and vector-symbolic memory through formal verification, CRDT/differential-dataflow experiments, sparse inference, unusual hardware, continual-learning controls and adversarial research mechanisms.
+
+Exotics are depth, not breadth: each candidate must map to existing volumes and collectively cover all W00–W30 work packages, default to no production authority, preserve a canonical fallback, expose an independent kill switch, and earn promotion through reproducible comparative evidence plus ordinary maturity/accountability gates.
+
+See [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) and [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json).
