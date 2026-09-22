@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.7.0",
+  "tree_version": "1.8.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -105,6 +105,9 @@
         "AIQ-S0-STATE-02",
         "AIQ-S1-CONV-01",
         "AIQ-S4-EXEC-01"
+      ],
+      "overlay_children": [
+        "legacy_persist"
       ]
     },
     {
@@ -764,7 +767,8 @@
         "VOL-023"
       ],
       "overlay_children": [
-        "creator"
+        "creator",
+        "pipelines"
       ]
     },
     {
@@ -1834,6 +1838,225 @@
         "deduplicate with frontier world representations",
         "retain deterministic serialization and replay"
       ]
+    },
+    {
+      "id": "AIFT-CIRCULATION",
+      "source": "skeleton/circulation",
+      "destination": "skeleton/ai/research/historical/circulation",
+      "kind": "tree",
+      "source_git_object_sha": "0cd36fe180c83f247b5da39495b89a9e1856f57e",
+      "role": "Circulation is a historical wave facade; preserve it as research lineage without granting production ownership.",
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain original acceptance evidence",
+        "characterize reusable mechanism versus domain metaphor",
+        "no runtime cutover until a concrete masterplan capability adopts it"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+    },
+    {
+      "id": "AIFT-HOAG",
+      "source": "skeleton/hoag",
+      "destination": "skeleton/ai/research/historical/hoag",
+      "kind": "tree",
+      "source_git_object_sha": "01493041cc8c61fe7ccf5f84f0c2e0779cd3871c",
+      "role": "HOAG is a historical wave facade and belongs in lineage/research characterization rather than a top-level production owner.",
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain original acceptance evidence",
+        "identify reusable mechanisms explicitly",
+        "keep product/runtime ownership unchanged until promotion evidence exists"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+    },
+    {
+      "id": "AIFT-MOTIVE",
+      "source": "skeleton/motive",
+      "destination": "skeleton/ai/research/historical/motive",
+      "kind": "tree",
+      "source_git_object_sha": "8d9061eb40a8f79ca8bdfb22ed1e879d4f1ebed8",
+      "role": "Motive is a historical abstract-reasoning primitive; preserve and characterize it rather than granting runtime ownership.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain existing algebraic invariant tests",
+        "identify a concrete AI problem before promotion",
+        "keep research outputs isolated from serving state"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+    },
+    {
+      "id": "AIFT-PERSIST-LEGACY",
+      "source": "skeleton/persist",
+      "destination": "skeleton/ai/runtime/persistence/legacy_persist",
+      "kind": "tree",
+      "source_git_object_sha": "824401f1d5755a325a7438398794f7fac96d3072",
+      "role": "Legacy Persist facade overlaps canonical persistence; useful behavior should be merged behind the existing persistence owner rather than creating another state authority.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-039"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "compare against skeleton/persistence",
+        "deduplicate state ownership",
+        "retain compatibility facade until zero required callers"
+      ]
+    },
+    {
+      "id": "AIFT-PIPELINES",
+      "source": "skeleton/pipelines",
+      "destination": "skeleton/ai/forge/pipelines",
+      "kind": "tree",
+      "source_git_object_sha": "a1dff95046b9d6c9959142129061e3feaaed78fb",
+      "role": "Generation pipelines are Forge candidates; game-specific behavior stays scoped beneath Forge rather than becoming a core runtime dependency.",
+      "work_package_refs": [
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-023",
+        "VOL-073"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve domain scoping",
+        "no production authority from generated artifacts",
+        "benchmark against current canonical forge path"
+      ]
+    },
+    {
+      "id": "AIFT-SHEAF",
+      "source": "skeleton/sheaf",
+      "destination": "skeleton/ai/research/historical/sheaf",
+      "kind": "tree",
+      "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-012",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain mathematical invariant tests",
+        "preserve provenance to historical wave",
+        "require measured benefit before production integration"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+    },
+    {
+      "id": "AIFT-SPINE",
+      "source": "skeleton/spine",
+      "destination": "skeleton/ai/research/historical/spine",
+      "kind": "tree",
+      "source_git_object_sha": "02462d1e6f84d08b93a6cb735ba9d7122e630646",
+      "role": "Spine is a historically promoted kinematics/constraint primitive; preserve it under research lineage until a simulation owner adopts specific mechanisms.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-019",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain invariant/acceptance evidence",
+        "separate reusable mechanics from historical facade semantics",
+        "no production authority from relocation alone"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+    },
+    {
+      "id": "AIFT-VISCERA",
+      "source": "skeleton/viscera",
+      "destination": "skeleton/ai/research/model_internals/viscera",
+      "kind": "tree",
+      "source_git_object_sha": "9115c9f6d7c0e75ac102baac47bb202ed70d28a8",
+      "role": "QK normalization, speculative decoding, quantization, rematerialization, Muon, GQA, logit-lens, steering, and autodiff primitives are model-internals research candidates, not production defaults.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W26",
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-006",
+        "VOL-007",
+        "VOL-077"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "benchmark each primitive against a named baseline",
+        "retain experiment provenance and kill criteria",
+        "promote only through evaluation/canary evidence"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
     }
   ],
   "ci_enforcement": {
@@ -1971,187 +2194,9 @@
     "refreshed_mapping_count": 10,
     "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline."
   },
-  "next_move_assignments": [
-    {
-      "id": "AIFT-NEXT-CIRCULATION",
-      "priority": 3,
-      "source": "skeleton/circulation",
-      "destination": "skeleton/ai/research/historical/circulation",
-      "action": "quarantine_then_characterize",
-      "work_package_refs": [
-        "WP-W26"
-      ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
-      "rationale": "Circulation is a historical wave facade; preserve it as research lineage without granting production ownership.",
-      "preconditions": [
-        "retain original acceptance evidence",
-        "characterize reusable mechanism versus domain metaphor",
-        "no runtime cutover until a concrete masterplan capability adopts it"
-      ],
-      "source_git_object_sha": "0cd36fe180c83f247b5da39495b89a9e1856f57e"
-    },
-    {
-      "id": "AIFT-NEXT-HOAG",
-      "priority": 3,
-      "source": "skeleton/hoag",
-      "destination": "skeleton/ai/research/historical/hoag",
-      "action": "quarantine_then_characterize",
-      "work_package_refs": [
-        "WP-W26"
-      ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
-      "rationale": "HOAG is a historical wave facade and belongs in lineage/research characterization rather than a top-level production owner.",
-      "preconditions": [
-        "retain original acceptance evidence",
-        "identify reusable mechanisms explicitly",
-        "keep product/runtime ownership unchanged until promotion evidence exists"
-      ],
-      "source_git_object_sha": "01493041cc8c61fe7ccf5f84f0c2e0779cd3871c"
-    },
-    {
-      "id": "AIFT-NEXT-MOTIVE",
-      "priority": 3,
-      "source": "skeleton/motive",
-      "destination": "skeleton/ai/research/historical/motive",
-      "action": "quarantine_then_characterize",
-      "work_package_refs": [
-        "WP-W11",
-        "WP-W26"
-      ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-419"
-      ],
-      "rationale": "Motive is a historical abstract-reasoning primitive; preserve and characterize it rather than granting runtime ownership.",
-      "preconditions": [
-        "retain existing algebraic invariant tests",
-        "identify a concrete AI problem before promotion",
-        "keep research outputs isolated from serving state"
-      ],
-      "source_git_object_sha": "8d9061eb40a8f79ca8bdfb22ed1e879d4f1ebed8"
-    },
-    {
-      "id": "AIFT-NEXT-PERSIST-LEGACY",
-      "priority": 3,
-      "source": "skeleton/persist",
-      "destination": "skeleton/ai/runtime/persistence/legacy_persist",
-      "action": "merge_into_existing_owner",
-      "work_package_refs": [
-        "WP-W03",
-        "WP-W04"
-      ],
-      "volume_refs": [
-        "VOL-005",
-        "VOL-039"
-      ],
-      "rationale": "Legacy Persist facade overlaps canonical persistence; useful behavior should be merged behind the existing persistence owner rather than creating another state authority.",
-      "preconditions": [
-        "compare against skeleton/persistence",
-        "deduplicate state ownership",
-        "retain compatibility facade until zero required callers"
-      ],
-      "source_git_object_sha": "824401f1d5755a325a7438398794f7fac96d3072"
-    },
-    {
-      "id": "AIFT-NEXT-PIPELINES",
-      "priority": 3,
-      "source": "skeleton/pipelines",
-      "destination": "skeleton/ai/forge/pipelines",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W27"
-      ],
-      "volume_refs": [
-        "VOL-023",
-        "VOL-073"
-      ],
-      "rationale": "Generation pipelines are Forge candidates; game-specific behavior stays scoped beneath Forge rather than becoming a core runtime dependency.",
-      "preconditions": [
-        "preserve domain scoping",
-        "no production authority from generated artifacts",
-        "benchmark against current canonical forge path"
-      ],
-      "source_git_object_sha": "a1dff95046b9d6c9959142129061e3feaaed78fb"
-    },
-    {
-      "id": "AIFT-NEXT-SHEAF",
-      "priority": 3,
-      "source": "skeleton/sheaf",
-      "destination": "skeleton/ai/research/historical/sheaf",
-      "action": "quarantine_then_characterize",
-      "work_package_refs": [
-        "WP-W09",
-        "WP-W26"
-      ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-012",
-        "VOL-419"
-      ],
-      "rationale": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
-      "preconditions": [
-        "retain mathematical invariant tests",
-        "preserve provenance to historical wave",
-        "require measured benefit before production integration"
-      ],
-      "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68"
-    },
-    {
-      "id": "AIFT-NEXT-SPINE",
-      "priority": 3,
-      "source": "skeleton/spine",
-      "destination": "skeleton/ai/research/historical/spine",
-      "action": "quarantine_then_characterize",
-      "work_package_refs": [
-        "WP-W11",
-        "WP-W26"
-      ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-019",
-        "VOL-419"
-      ],
-      "rationale": "Spine is a historically promoted kinematics/constraint primitive; preserve it under research lineage until a simulation owner adopts specific mechanisms.",
-      "preconditions": [
-        "retain invariant/acceptance evidence",
-        "separate reusable mechanics from historical facade semantics",
-        "no production authority from relocation alone"
-      ],
-      "source_git_object_sha": "02462d1e6f84d08b93a6cb735ba9d7122e630646"
-    },
-    {
-      "id": "AIFT-NEXT-VISCERA",
-      "priority": 3,
-      "source": "skeleton/viscera",
-      "destination": "skeleton/ai/research/model_internals/viscera",
-      "action": "quarantine_then_characterize",
-      "work_package_refs": [
-        "WP-W05",
-        "WP-W26",
-        "WP-W28"
-      ],
-      "volume_refs": [
-        "VOL-006",
-        "VOL-007",
-        "VOL-077"
-      ],
-      "rationale": "QK normalization, speculative decoding, quantization, rematerialization, Muon, GQA, logit-lens, steering, and autodiff primitives are model-internals research candidates, not production defaults.",
-      "preconditions": [
-        "benchmark each primitive against a named baseline",
-        "retain experiment provenance and kill criteria",
-        "promote only through evaluation/canary evidence"
-      ],
-      "source_git_object_sha": "9115c9f6d7c0e75ac102baac47bb202ed70d28a8"
-    }
-  ],
+  "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "priority_two_overlays_mirrored_validation_pending",
+  "validation_state": "all_preclassified_moves_mirrored_validation_pending",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -2366,9 +2411,9 @@
     }
   ],
   "classification_coverage": {
-    "status": "closed_after_priority_one_migration",
+    "status": "closed_after_all_preclassified_moves",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "e7eabe27778d01cc4b6f44f6580b7bfa6506df90"
+    "source_head": "6abe7d71becbf36595eec1131dc1c65ae8bbfa66"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -2422,5 +2467,18 @@
       "AIFT-NATIVE"
     ],
     "policy": "Parent exact mirrors ignore only explicitly declared overlay children, and every overlay child must be a separately governed mapping."
+  },
+  "priority_three_migration": {
+    "status": "mirrored_governed_research_or_cutover_pending",
+    "migrated_assignment_count": 8,
+    "historical_quarantine_sources": [
+      "skeleton/circulation",
+      "skeleton/hoag",
+      "skeleton/motive",
+      "skeleton/sheaf",
+      "skeleton/spine",
+      "skeleton/viscera"
+    ],
+    "policy": "Historical/research mappings preserve lineage and do not gain production authority from relocation."
   }
 }
