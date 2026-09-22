@@ -4496,6 +4496,11 @@
       "path": "skeleton/turn",
       "owner": "package/compatibility boundary",
       "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/parse",
+      "owner": "package/parsing compatibility boundary",
+      "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
     }
   ],
   "classification_coverage": {
