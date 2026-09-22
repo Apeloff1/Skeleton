@@ -1,0 +1,272 @@
+{
+  "schema_version": 1,
+  "tree_version": "1.0.0",
+  "status": "staged_mirror",
+  "architecture_tag": "arch-map/v3.7",
+  "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
+  "canonical_root": "skeleton/ai",
+  "migration_mode": "strangler_mirror_then_explicit_cutover",
+  "purpose": "Consolidate build-plan-relevant AI engine code and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
+  "authorities": {
+    "architecture": "machine/architecture.json",
+    "master_plan": "machine/ai_master_plan.json",
+    "master_build_sequence": "machine/ai_master_build_sequence.json",
+    "build_queue": "machine/ai_build_queue.json",
+    "accountability": "machine/ai_build_accountability.json",
+    "human_packet": "docs/plan/AI_FILE_TREE_MIGRATION.md",
+    "validator": "scripts/check_ai_file_tree.py"
+  },
+  "promotion_policy": {
+    "current_state": "destination tree is canonical assembly destination; existing source paths remain compatibility mirrors",
+    "cutover_requires": [
+      "affected imports and package entrypoints point to skeleton/ai or an explicit compatibility facade",
+      "source/destination parity validator is green before source removal",
+      "focused affected-domain tests are green",
+      "App Assembly and canonical quality gates are green",
+      "rollback path is documented and tested",
+      "implementation signoff is bound to a full git SHA",
+      "independent verification signoff is bound to a validated full git SHA"
+    ],
+    "forbidden": [
+      "deleting compatibility sources before import inversion",
+      "allowing source and destination implementations to diverge",
+      "marking AIQ/work-package completion from file relocation alone",
+      "moving backend or frontend compatibility adapters into engine ownership without an architecture change"
+    ]
+  },
+  "mappings": [
+    {
+      "id": "AIFT-PROVIDER-CONTRACT",
+      "source": "skeleton/provider_contract.py",
+      "destination": "skeleton/ai/providers/contract.py",
+      "kind": "file",
+      "source_git_object_sha": "dd06c93cf39d6f4f12f58348aebd04c8084f36cc",
+      "role": "provider-neutral request/receipt contract",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W05"
+      ],
+      "aiq_refs": [
+        "AIQ-S2-PROTO-01",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-PROVIDER-RUNTIME",
+      "source": "skeleton/provider_runtime.py",
+      "destination": "skeleton/ai/providers/runtime.py",
+      "kind": "file",
+      "source_git_object_sha": "1e753fb40702a6bd420f16d79791d4ea6efd73da",
+      "role": "credential-bearing provider runtime",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-PROV-02",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S2-PROTO-03",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-CONTRACTS",
+      "source": "skeleton/contracts",
+      "destination": "skeleton/ai/runtime/contracts",
+      "kind": "tree",
+      "source_git_object_sha": "0513a269bd19d405de5a1e9f729843ea85b7373a",
+      "role": "canonical operation/conversation/context contracts",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S1-CONV-02",
+        "AIQ-S4-EXEC-01"
+      ]
+    },
+    {
+      "id": "AIFT-PERSISTENCE",
+      "source": "skeleton/persistence",
+      "destination": "skeleton/ai/runtime/persistence",
+      "kind": "tree",
+      "source_git_object_sha": "d808e2da42400ca8eae4ccd7a310b11a2954e058",
+      "role": "durable AI state and recovery",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S1-CONV-01",
+        "AIQ-S4-EXEC-01"
+      ]
+    },
+    {
+      "id": "AIFT-CONTEXT",
+      "source": "skeleton/context",
+      "destination": "skeleton/ai/runtime/context",
+      "kind": "tree",
+      "source_git_object_sha": "6e808777ce8fc27375ae5cedf7ddd969ccabc73b",
+      "role": "context compilation",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "aiq_refs": [
+        "AIQ-S2-CTX-01",
+        "AIQ-S2-CTX-02"
+      ]
+    },
+    {
+      "id": "AIFT-RETRIEVAL",
+      "source": "skeleton/retrieval",
+      "destination": "skeleton/ai/runtime/retrieval",
+      "kind": "tree",
+      "source_git_object_sha": "1f3156c531756cfe36c6fd649258b800378a260d",
+      "role": "retrieval and grounding",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W09"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-MEM-03",
+        "AIQ-S3-VER-02"
+      ]
+    },
+    {
+      "id": "AIFT-MEMORY",
+      "source": "skeleton/memory",
+      "destination": "skeleton/ai/runtime/memory",
+      "kind": "tree",
+      "source_git_object_sha": "9a93d6463d792b7ac421757d7d8b8fca58464aed",
+      "role": "memory authority and recall",
+      "work_package_refs": [
+        "WP-W07"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03"
+      ]
+    },
+    {
+      "id": "AIFT-INTELLIGENCE",
+      "source": "skeleton/intelligence",
+      "destination": "skeleton/ai/runtime/intelligence",
+      "kind": "tree",
+      "source_git_object_sha": "0f854a60c88c6b323c17502bcd8d1cf22a6ab6be",
+      "role": "admission verification and execution",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-COST-01",
+        "AIQ-S3-VER-01",
+        "AIQ-S4-EXEC-02"
+      ]
+    },
+    {
+      "id": "AIFT-FRONTIER",
+      "source": "skeleton/frontier",
+      "destination": "skeleton/ai/runtime/frontier",
+      "kind": "tree",
+      "source_git_object_sha": "50523f0a4aa82797c820f8163cd765da72be1900",
+      "role": "routing streams and frontier orchestration",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W05",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-SKILLS",
+      "source": "skeleton/skills",
+      "destination": "skeleton/ai/runtime/skills",
+      "kind": "tree",
+      "source_git_object_sha": "09d238958b9e446054165faecc3fed72360d6719",
+      "role": "tool and skill runtime",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-TOOL-01",
+        "AIQ-S1-TOOL-02",
+        "AIQ-S1-TOOL-03"
+      ]
+    },
+    {
+      "id": "AIFT-JEEVES",
+      "source": "skeleton/jeeves",
+      "destination": "skeleton/ai/agents/jeeves",
+      "kind": "tree",
+      "source_git_object_sha": "d7a9ea66dcf79e70fa9717cecccae1c88f196c3f",
+      "role": "Jeeves reasoning planning semantics verification and agent runtime",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-PROV-02",
+        "AIQ-S7-E2E-01"
+      ]
+    },
+    {
+      "id": "AIFT-BUILD-PLANNING",
+      "source": "core/shift_supervisor",
+      "destination": "skeleton/ai/build/shift_supervisor",
+      "kind": "tree",
+      "source_git_object_sha": "dc3300593b0049186fcce43f7921e947a829afd6",
+      "role": "transitional planning scheduling and build-control harness",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "aiq_refs": []
+    }
+  ],
+  "ci_enforcement": {
+    "local_quality_gate": "scripts/quality-gates.sh",
+    "app_assembly": ".github/workflows/app-assembly.yml",
+    "test": "skeleton/testing/test_ai_file_tree.py",
+    "exact_parity_required_while_status_is": [
+      "staged_mirror",
+      "cutover_pending"
+    ]
+  },
+  "implementation_signoff": {
+    "signed": false,
+    "signer_id": null,
+    "signer_type": "agent",
+    "role": "implementation",
+    "signed_at_utc": null,
+    "git_sha": null,
+    "evidence_refs": [],
+    "statement": "Pending payload commit verification.",
+    "signature_method": null
+  },
+  "verification_signoff": {
+    "signed": false,
+    "signer_id": null,
+    "signer_type": null,
+    "role": "independent_verification",
+    "signed_at_utc": null,
+    "git_sha": null,
+    "evidence_refs": [],
+    "statement": "Independent verification is required before cutover completion or source deletion.",
+    "signature_method": null
+  }
+}
