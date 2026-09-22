@@ -47,6 +47,11 @@ python scripts/check_ai_master_build_sequence.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_master_build_sequence.py
 
+printf '\n== Reverse-engineered end-state proof graph ==\n'
+python scripts/check_ai_reverse_engineering_pass.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \\
+  skeleton/testing/test_ai_reverse_engineering_pass.py
+
 printf '\n== Signed build accountability ==\n'
 python scripts/check_ai_build_accountability.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
