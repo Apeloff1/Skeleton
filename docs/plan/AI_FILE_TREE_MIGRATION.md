@@ -146,13 +146,13 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **80 governed source -> destination mappings**
-- **1,975 changed files under `skeleton/ai`** in this migration PR
-- only six AI-tree scaffolding files are not source-derived mappings:
-  `skeleton/ai/README.md`, the root `__init__.py`, and package
-  `__init__.py` files for agents, build, providers, and runtime
+- **104 governed source -> destination mappings**
+- **1,997 changed files under `skeleton/ai`** in this migration PR
+- package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
   sources have been promoted into `mappings`
+- **33 top-level/package/deployment/authority surfaces** are explicitly retained
+  outside the AI tree instead of being silently ignored
 
 Every governed mapping now carries three machine-enforced tags:
 
@@ -165,7 +165,7 @@ The cutover tag is structural migration metadata only. It does **not** claim
 AIQ/work-package completion, production maturity, source deletion, import
 inversion, or independent verification.
 
-The prepared units are divided into four deterministic batches:
+The prepared units are divided into five deterministic batches:
 
 - **B1-core-runtime (54 mappings):** core runtime, provider-neutral surfaces,
   agents, cognition, learning, evaluation, reliability, state, and supporting
@@ -176,9 +176,12 @@ The prepared units are divided into four deterministic batches:
   parity exceptions. Provider credentials, network ownership, or other
   authority-bearing implementation stays at the legacy owner until an explicit
   owner/import cutover is approved.
-- **B4-research-quarantine (7 mappings):** historical and model-internals
+- **B4-research-quarantine (29 mappings):** historical and model-internals
   research lineage. These units remain characterization-gated and are not
   production cutover candidates.
+- **B3-compat-convergence (2 mappings):** Turn and Telemetry compatibility
+  mirrors that must merge into existing canonical owners rather than become
+  independent production authorities.
 
 Exact-parity sources remain in place until import inversion and affected-domain
 regression gates are green. Owner-sensitive sources remain until explicit
@@ -223,12 +226,23 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **80 mappings**. The prior direct Git-object audit covered the first 78 mappings; the two newest additions are:
+The current governed set contains **104 mappings**. The prior direct Git-object
+audit covered the first **78 mappings**. The remaining **26 current mappings**
+are explicitly carried in the pending refresh scope; stale references to the
+removed legacy project-manifest mirror have been dropped.
 
-- `AIFT-CONFIG`: `skeleton/config` -> `skeleton/ai/runtime/config`
-- `AIFT-AI-SHELL`: `skeleton/shells/ai` -> `skeleton/ai/shell`
+The preparation ledger is now internally consistent:
 
-Both are tagged `ai-tree:mapped`, `migration:staged-mirror`, and `cutover:parity-ready` in `B1-core-runtime`. Their implementation payload is identity-bound, but fresh parity/object-audit and CI evidence are still required before any import inversion or source retirement.
+- 54 mappings in `B1-core-runtime`
+- 12 mappings in `B2-domain-build`
+- 7 mappings in `B3-owner-sensitive`
+- 2 mappings in `B3-compat-convergence`
+- 29 mappings in `B4-research-quarantine`
+- 0 pending move assignments
+- 33 retained-outside classifications
+
+Fresh full-object/parity audit and CI evidence are still required before import
+inversion, source retirement, or any cutover-complete claim.
 
 
 ## Compatibility convergence surfaces
