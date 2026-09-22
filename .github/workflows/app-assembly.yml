@@ -252,7 +252,20 @@ jobs:
         run: python scripts/check_state_topology.py
 
       - name: Validate mandatory provider bootstrap
-        run: python scripts/check_provider_bootstrap.py
+        env:
+          PROVIDER_SURFACE_EVIDENCE: ${{ runner.temp }}/provider-surface-evidence.json
+        run: |
+          python scripts/check_provider_bootstrap.py --evidence-out "$PROVIDER_SURFACE_EVIDENCE"
+          cat "$PROVIDER_SURFACE_EVIDENCE"
+          {
+            echo "### Provider surface evidence"
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo "~~~json"
+            cat "$PROVIDER_SURFACE_EVIDENCE"
+            echo "~~~"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install full assembly test runtime
         if: steps.scope.outputs.full == 'true'
