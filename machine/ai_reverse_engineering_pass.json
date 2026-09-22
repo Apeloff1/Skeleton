@@ -1,0 +1,603 @@
+{
+  "schema_version": 1,
+  "pass_version": "1.0.0",
+  "status": "active",
+  "purpose": "Reverse-engineer terminal masterplan outcomes into acyclic prerequisite/proof chains without adding top-level architecture or completion authority.",
+  "sources": {
+    "master_plan": "machine/ai_master_plan.json",
+    "build_sequence": "machine/ai_master_build_sequence.json",
+    "build_queue": "machine/ai_build_queue.json",
+    "accountability": "machine/ai_build_accountability.json",
+    "edge_priority_queue": "machine/ai_edge_case_priority_queue.json",
+    "human": "docs/plan/REVERSE_ENGINEERING_PASS.md"
+  },
+  "scope_policy": {
+    "breadth_frozen_at_volume": 420,
+    "adds_top_level_architecture": false,
+    "creates_completion_authority": false,
+    "completion_remains_derived_from_accountability": true,
+    "reverse_constraints_may_narrow_overlap_but_never_widen_authority": true
+  },
+  "required_chain_fields": [
+    "id",
+    "terminal_outcome",
+    "acceptance_witnesses",
+    "required_wave_refs",
+    "required_wp_refs",
+    "required_evidence_modes",
+    "failure_oracles",
+    "forbidden_shortcuts",
+    "minimum_proof_bundle"
+  ],
+  "global_reverse_constraints": [
+    {
+      "id": "RC-01",
+      "name": "bootstrap_closure",
+      "rule": "Later-stage services may not be the sole means of proving an early authority/runtime invariant."
+    },
+    {
+      "id": "RC-02",
+      "name": "independent_verifier_separation",
+      "rule": "A target that can mutate side effects, policy, promotion, or completion may not be its own sole verifier in the same transaction."
+    },
+    {
+      "id": "RC-03",
+      "name": "restart_equivalence",
+      "rule": "Durable workflow success before and after restart must converge to equivalent authoritative terminal state."
+    },
+    {
+      "id": "RC-04",
+      "name": "unknown_outcome_handling",
+      "rule": "Commit-before-ack external effects require idempotency, reconciliation, or explicit unknown/recovery semantics; blind retry is forbidden."
+    },
+    {
+      "id": "RC-05",
+      "name": "promotion_barrier",
+      "rule": "Construction overlap never implies promotion overlap; production promotion waits for the complete reverse proof chain."
+    },
+    {
+      "id": "RC-06",
+      "name": "migration_symmetry",
+      "rule": "State-changing migrations name forward, rollback and mixed-version behavior or a tested forward-recovery-only disposition."
+    },
+    {
+      "id": "RC-07",
+      "name": "projection_humility",
+      "rule": "Caches, indexes, vectors, streams, dashboards, UI state and model context are projections unless a canonical contract explicitly says otherwise."
+    },
+    {
+      "id": "RC-08",
+      "name": "negative_space_proof",
+      "rule": "Every high-impact capability proves at least one important forbidden outcome cannot occur."
+    }
+  ],
+  "terminal_chains": [
+    {
+      "id": "REV-00",
+      "terminal_outcome": "A user completes a useful AI operation end to end with durable attributable terminal state.",
+      "acceptance_witnesses": [
+        "product request resolves to durable operation identity",
+        "operation state survives restart and is reconstructable without UI/stream",
+        "context/model/tool-or-agent/verification/result provenance is attributable",
+        "cancellation and deadline behavior are observable and terminal"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_wp_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W05",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W13",
+        "WP-W14",
+        "WP-W17",
+        "WP-W22",
+        "WP-W23"
+      ],
+      "required_evidence_modes": [
+        "integration",
+        "restart_test",
+        "contract",
+        "postcondition_test",
+        "trace_reconstruction"
+      ],
+      "failure_oracles": [
+        "UI completion disagrees with durable operation",
+        "stream loss makes operation unknowable",
+        "restart loses objective/authority/result",
+        "cancellation returns while work continues"
+      ],
+      "forbidden_shortcuts": [
+        "ui_only_completion",
+        "ephemeral_authority",
+        "fake_progress",
+        "direct_provider_bypass"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "vertical_slice_result",
+        "restart_evidence",
+        "durable_operation_receipt",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-01",
+      "terminal_outcome": "A privileged model/agent-requested side effect occurs only under valid authority and has a verified durable receipt.",
+      "acceptance_witnesses": [
+        "proposal and authorization are distinct",
+        "authorization uses normalized current scope",
+        "retry/timeout exercises idempotency or compensation",
+        "postcondition verification is independent"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03"
+      ],
+      "required_wp_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W03",
+        "WP-W13",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "required_evidence_modes": [
+        "negative_test",
+        "fuzz",
+        "integration",
+        "postcondition_test",
+        "fault_injection"
+      ],
+      "failure_oracles": [
+        "duplicate external effect",
+        "authorization inferred from model/tool text",
+        "target meaning changes after authorization",
+        "blind retry after unknown outcome"
+      ],
+      "forbidden_shortcuts": [
+        "allow_all_policy",
+        "production_bypass_flag",
+        "verify_by_echo",
+        "non_durable_receipt"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "authorization_record",
+        "side_effect_receipt",
+        "retry_fault_evidence",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-02",
+      "terminal_outcome": "Durable conversation/project continuity and governed memory remain correct after restart, restore, deletion and stale projections.",
+      "acceptance_witnesses": [
+        "authoritative stores restore before projections",
+        "projection rebuild is deterministic",
+        "memory writes preserve provenance/scope/retention",
+        "restore-delete interaction is tested"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "required_wp_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W04",
+        "WP-W07",
+        "WP-W10",
+        "WP-W19"
+      ],
+      "required_evidence_modes": [
+        "restart_test",
+        "recovery_drill",
+        "property",
+        "integration",
+        "deletion_test"
+      ],
+      "failure_oracles": [
+        "deleted data resurrects",
+        "derived store becomes authority",
+        "memory has no provenance",
+        "event ordering changes final state"
+      ],
+      "forbidden_shortcuts": [
+        "cache_as_authority",
+        "restore_without_drill",
+        "model_direct_memory_write",
+        "migration_without_rollback"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "restore_drill",
+        "projection_rebuild_result",
+        "deletion_evidence",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-03",
+      "terminal_outcome": "Evidence-grounded reasoning remains bounded, attributable and policy-preserving under context pressure.",
+      "acceptance_witnesses": [
+        "sources retain scope/time/trust/provenance",
+        "policy survives truncation/compression",
+        "contradictions remain representable",
+        "search obeys budgets/stopping policy"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_wp_refs": [
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W12",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "required_evidence_modes": [
+        "retrieval_eval",
+        "adversarial",
+        "regression",
+        "budget_test",
+        "context_pressure_test"
+      ],
+      "failure_oracles": [
+        "retrieved text self-promotes",
+        "citation does not support claim",
+        "policy drops before untrusted text",
+        "search runs unbounded"
+      ],
+      "forbidden_shortcuts": [
+        "fabricated_citation",
+        "trust_by_source_name",
+        "unbounded_retry",
+        "self_verification_only"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "retrieval_eval_result",
+        "context_pressure_result",
+        "adversarial_result",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-04",
+      "terminal_outcome": "Multi-agent execution collaborates without authority escalation, unbounded delegation or silent mutation collisions.",
+      "acceptance_witnesses": [
+        "child authority is subset of parent",
+        "delegation depth/fanout/budget are bounded",
+        "shared mutation uses ownership/fencing",
+        "handoff packet carries objective/state/evidence/budget/acceptance"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_wp_refs": [
+        "WP-W12",
+        "WP-W13",
+        "WP-W14",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "required_evidence_modes": [
+        "property",
+        "concurrency_test",
+        "negative_test",
+        "fault_injection",
+        "integration"
+      ],
+      "failure_oracles": [
+        "child obtains broader scope",
+        "conflicting writes commit silently",
+        "agent crash loses ownership semantics",
+        "delegation expands without hard budget"
+      ],
+      "forbidden_shortcuts": [
+        "role_name_authorization",
+        "shared_scratch_authority",
+        "unlimited_delegation",
+        "privileged_last_writer_wins"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "delegation_property_result",
+        "collision_test",
+        "crash_recovery_result",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-05",
+      "terminal_outcome": "A signed release can install/update, prove provenance, pass real first-run health and roll back after partial failure.",
+      "acceptance_witnesses": [
+        "binary/artifact traces to source/build evidence",
+        "package integrity verified before activation",
+        "migration and rollback semantics are explicit",
+        "first-run health exercises runtime vertical slice"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03",
+        "MBW-04",
+        "MBW-05",
+        "MBW-06",
+        "MBW-07"
+      ],
+      "required_wp_refs": [
+        "WP-W18",
+        "WP-W19",
+        "WP-W20",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W24",
+        "WP-W25",
+        "WP-W30"
+      ],
+      "required_evidence_modes": [
+        "release_test",
+        "installer_test",
+        "migration_test",
+        "rollback_test",
+        "provenance_check",
+        "vertical_slice"
+      ],
+      "failure_oracles": [
+        "untrusted package activates",
+        "mixed incompatible versions remain after failure",
+        "installer passes but runtime slice fails",
+        "rollback restores binary but not compatible state"
+      ],
+      "forbidden_shortcuts": [
+        "package_exists_success",
+        "manual_version_edit",
+        "unsigned_emergency_activation",
+        "migration_without_recovery"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "signed_artifact",
+        "provenance_record",
+        "installer_vertical_slice",
+        "rollback_evidence",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-06",
+      "terminal_outcome": "Research/forge/learning candidates reach production only through reproducible comparative evaluation and explicit promotion.",
+      "acceptance_witnesses": [
+        "candidate and baseline identities are immutable",
+        "benchmark/data versions are recorded",
+        "comparison exposes regressions/uncertainty",
+        "production activation is separate authorized event"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03",
+        "MBW-04",
+        "MBW-06",
+        "MBW-07"
+      ],
+      "required_wp_refs": [
+        "WP-W17",
+        "WP-W18",
+        "WP-W20",
+        "WP-W26",
+        "WP-W27",
+        "WP-W28",
+        "WP-W30"
+      ],
+      "required_evidence_modes": [
+        "benchmark",
+        "reproduction",
+        "adversarial",
+        "regression",
+        "promotion_audit"
+      ],
+      "failure_oracles": [
+        "experiment mutates production directly",
+        "candidate uses mutable unversioned eval only",
+        "comparison cannot reproduce",
+        "aggregate score hides critical regression"
+      ],
+      "forbidden_shortcuts": [
+        "auto_promote_on_score",
+        "research_to_production_write",
+        "unverifiable_benchmark",
+        "silent_prompt_config_drift"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "candidate_manifest",
+        "baseline_manifest",
+        "comparative_eval",
+        "promotion_record",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-07",
+      "terminal_outcome": "Provider routing/fallback remains private, bounded and recoverable without corrupting canonical state.",
+      "acceptance_witnesses": [
+        "provider-native types terminate at adapters",
+        "routing records constraints",
+        "fallback preserves privacy/scope",
+        "provider outage degrades explicitly"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-03"
+      ],
+      "required_wp_refs": [
+        "WP-W03",
+        "WP-W05",
+        "WP-W06",
+        "WP-W14",
+        "WP-W19",
+        "WP-W20"
+      ],
+      "required_evidence_modes": [
+        "contract",
+        "privacy_test",
+        "failure_injection",
+        "budget_test",
+        "integration"
+      ],
+      "failure_oracles": [
+        "fallback widens data boundary",
+        "provider object persists into canonical state",
+        "retry duplicates action",
+        "provider failure fabricates success"
+      ],
+      "forbidden_shortcuts": [
+        "any_healthy_provider_fallback",
+        "provider_object_persistence",
+        "silent_privacy_downgrade"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "routing_record",
+        "privacy_failure_test",
+        "provider_outage_test",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-08",
+      "terminal_outcome": "Operators can trace, diagnose, repair and recover incidents from authoritative evidence without undocumented guesswork.",
+      "acceptance_witnesses": [
+        "correlation spans operation/model/tool/artifact/verification",
+        "health distinguishes dependency degradation",
+        "doctor/support evidence is secret-safe",
+        "repair/recovery paths are bounded and tested"
+      ],
+      "required_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-03",
+        "MBW-05",
+        "MBW-07"
+      ],
+      "required_wp_refs": [
+        "WP-W19",
+        "WP-W20",
+        "WP-W21",
+        "WP-W22",
+        "WP-W23",
+        "WP-W30"
+      ],
+      "required_evidence_modes": [
+        "incident_drill",
+        "observability_test",
+        "security_test",
+        "recovery_drill",
+        "repair_test"
+      ],
+      "failure_oracles": [
+        "request cannot map to durable operation",
+        "health green while core dependency unusable",
+        "repair mutates without receipt/rollback",
+        "support bundle leaks secrets"
+      ],
+      "forbidden_shortcuts": [
+        "process_up_equals_healthy",
+        "log_only_authority",
+        "destructive_untracked_repair",
+        "secret_rich_diagnostics"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "incident_trace",
+        "doctor_bundle_test",
+        "repair_or_recovery_drill",
+        "independent_verification"
+      ]
+    },
+    {
+      "id": "REV-09",
+      "terminal_outcome": "Masterplan completion claims are commit-bound, independently verified and impossible to satisfy by manual checkbox or prose alone.",
+      "acceptance_witnesses": [
+        "checkbox derives from signed implementation and verification",
+        "evidence binds full commit and concrete artifact",
+        "critical/high obligations have owner/disposition",
+        "human and machine plan agree"
+      ],
+      "required_wave_refs": [
+        "MBW-00"
+      ],
+      "required_wp_refs": [
+        "WP-W00"
+      ],
+      "required_evidence_modes": [
+        "validator",
+        "negative_test",
+        "signature_check",
+        "traceability_check"
+      ],
+      "failure_oracles": [
+        "manual checkbox can turn green",
+        "same signer verifies without signed exception",
+        "planned test counts as passing",
+        "breadth expands without ADR"
+      ],
+      "forbidden_shortcuts": [
+        "manual_completion",
+        "fabricated_retroactive_signature",
+        "prose_only_acceptance",
+        "loc_as_completion"
+      ],
+      "minimum_proof_bundle": [
+        "full_git_sha",
+        "signed_accountability_event",
+        "concrete_evidence_reference",
+        "independent_verification"
+      ]
+    }
+  ],
+  "assembly_order_corrections": [
+    "Treat MBW-00/01 as semantic substrate; downstream overlap is limited to stable contract slices and does not permit promotion.",
+    "Require verification/security acceptance before autonomous side effects are considered usable.",
+    "Treat evaluation as a release dependency for production promotion, not only an R&D capability.",
+    "Include restart/restore behavior in durable feature acceptance.",
+    "Make installer success depend on a real runtime vertical-slice smoke proof.",
+    "Separate provider fallback functionality from policy permission to fallback.",
+    "Keep observability explanatory; never promote telemetry/projections to authority.",
+    "Require explicit anti-counterfeit completion evidence for every terminal claim."
+  ]
+}
