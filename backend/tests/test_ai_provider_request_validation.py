@@ -470,6 +470,7 @@ async def test_provider_reconciles_returned_token_usage_into_tenant_quota() -> N
             prompt="hello",
             operation_id="provider-operation",
             tenant_id="tenant-a",
+            max_output_tokens=1_000,
             estimated_cost_usd=0.25,
         )
     )
