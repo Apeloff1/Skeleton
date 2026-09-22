@@ -62,6 +62,8 @@ stripe==15.6.1
 reportlab==5.0.1
 pillow==12.3.0
 numpy==2.4.6
+matplotlib==3.10.6
+networkx==3.5
 zstandard==0.25.0
 
 # --- Logging ---
