@@ -124,3 +124,15 @@ AI tree or given an architecture-approved external owner. Existing naming
 aliases such as `skeleton/evaluation` -> `skeleton/eval` and
 `skeleton/runtime/resilience` -> `skeleton/resilience` are recorded rather
 than treated as missing code.
+
+### Cortex and Organism engine recovery
+
+The next engine-owned recovery batch brings two long-lived AI/runtime domains under the governed tree without widening credential authority:
+
+- `skeleton/cortex` -> `skeleton/ai/runtime/cortex` for owned-model cognition, routing, interchange, multimodal, and learning support.
+- `skeleton/organism` -> `skeleton/ai/runtime/organism` for the engine runtime DAG, policy/health/quality, resilience, and operator-control support.
+
+Three sensitive surfaces are intentionally **not duplicated as owners**. `cortex/interchange.py` and `cortex/gates.py` remain the legacy owners of provider-key/network discovery, while `organism/secret_manager.py` remains the encrypted credential-store owner. Their AI-tree counterparts are pure compatibility re-export facades until an explicit owner/import cutover is approved.
+
+This remains a staged mirror. The batch does not mark model-runtime, cognition, learning, security, resilience, or observability work packages complete.
+

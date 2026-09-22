@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.3.0",
+  "tree_version": "1.4.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -718,6 +718,59 @@
       "aiq_refs": [
         "AIQ-S7-E2E-01"
       ]
+    },
+    {
+      "id": "AIFT-CORTEX",
+      "source": "skeleton/cortex",
+      "destination": "skeleton/ai/runtime/cortex",
+      "kind": "tree",
+      "source_git_object_sha": "86285469513ff164e7cd426c9eef0120f1d2d130",
+      "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W11",
+        "WP-W28"
+      ],
+      "aiq_refs": [],
+      "parity_exceptions": [
+        {
+          "path": "interchange.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.cortex.interchange import *",
+          "note": "Remote teacher/provider key and HTTP ownership remains singular at skeleton/cortex/interchange.py until provider-boundary cutover."
+        },
+        {
+          "path": "gates.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.cortex.gates import *",
+          "note": "Provider gate environment/key discovery remains singular at skeleton/cortex/gates.py until provider-boundary cutover."
+        }
+      ]
+    },
+    {
+      "id": "AIFT-ORGANISM",
+      "source": "skeleton/organism",
+      "destination": "skeleton/ai/runtime/organism",
+      "kind": "tree",
+      "source_git_object_sha": "a755a165bea2da544a4d2998ade1b2cc614e0e9c",
+      "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W11",
+        "WP-W19",
+        "WP-W20",
+        "WP-W21"
+      ],
+      "aiq_refs": [],
+      "parity_exceptions": [
+        {
+          "path": "secret_manager.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.organism.secret_manager import *",
+          "note": "Encrypted credential storage and master-secret ownership remains singular at skeleton/organism/secret_manager.py until explicit security-owner cutover."
+        }
+      ]
     }
   ],
   "ci_enforcement": {
@@ -737,7 +790,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Implementation scope reopened after post-freeze semantic mirror reconciliation and remaining planned-path migration. Re-sign only after the new payload is frozen and CI evidence is collected.",
+    "statement": "Implementation scope reopened for Cortex and Organism migration with non-owning credential/network facades. Re-sign only after this payload is frozen and required validation evidence is collected.",
     "signature_method": null
   },
   "verification_signoff": {

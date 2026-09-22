@@ -18,6 +18,8 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `runtime/frontier/` — routing, streams and frontier orchestration.
 - `runtime/skills/` — tools and skills.
 - `runtime/{api,vault,artifact_plane,observability,security,kernel,reliability,resilience,primitives,native}/` — plan-owned engine support planes, including the stable native ABI/acceleration boundary.
+- `runtime/cortex/` — owned-model cognition, routing, interchange, multimodal and learning runtime; credential/network files remain non-owning facades during staging.
+- `runtime/organism/` — engine organism DAG, policy/health/quality, resilience and operator-control support; encrypted secret storage remains a non-owning facade during staging.
 - `runtime/contexts/` — extended/legacy context support retained under governed parity.
 - `agents/jeeves/` — Jeeves reasoning and agent system.
 - `agents/core/` — core agent/swarm execution runtime.

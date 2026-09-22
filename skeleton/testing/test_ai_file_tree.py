@@ -71,3 +71,29 @@ def test_ai_file_tree_native_and_path_audit() -> None:
     assert {"skeleton/app", "skeleton/config", "skeleton/deploy", "skeleton/testing"} <= external
     assert "skeleton/research" in audit["planned_but_absent"]
     assert "skeleton/planning" in audit["planned_but_absent"]
+
+def test_ai_file_tree_cortex_and_organism_keep_sensitive_owners_singular() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mapping_by_id = {item["id"]: item for item in manifest["mappings"]}
+
+    cortex = mapping_by_id["AIFT-CORTEX"]
+    organism = mapping_by_id["AIFT-ORGANISM"]
+    assert cortex["source"] == "skeleton/cortex"
+    assert cortex["destination"] == "skeleton/ai/runtime/cortex"
+    assert organism["source"] == "skeleton/organism"
+    assert organism["destination"] == "skeleton/ai/runtime/organism"
+
+    cortex_interchange = (ROOT / "skeleton/ai/runtime/cortex/interchange.py").read_text(encoding="utf-8")
+    cortex_gates = (ROOT / "skeleton/ai/runtime/cortex/gates.py").read_text(encoding="utf-8")
+    organism_secrets = (ROOT / "skeleton/ai/runtime/organism/secret_manager.py").read_text(encoding="utf-8")
+
+    assert "from skeleton.cortex.interchange import *" in cortex_interchange
+    assert "from skeleton.cortex.gates import *" in cortex_gates
+    assert "from skeleton.organism.secret_manager import *" in organism_secrets
+
+    assert "KIMI_API_KEY" not in cortex_interchange
+    assert "OPENAI_API_KEY" not in cortex_gates
+    assert "SKELETON_MASTER_SECRET" not in organism_secrets
+
