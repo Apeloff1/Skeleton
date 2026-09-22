@@ -13,9 +13,9 @@
     "retirement_rule": "Candidates without maintained evidence or a current owner revert to watchlist/retired and must not remain on production critical paths."
   },
   "required_minimums": {
-    "total": 60,
-    "categories": 12,
-    "mapped_work_packages": 20
+    "total": 73,
+    "categories": 13,
+    "mapped_work_packages": 31
   },
   "categories": [
     "cognitive_architecture",
@@ -29,7 +29,8 @@
     "security_resilience",
     "dataflow_storage",
     "multimodal_interface",
-    "research_methodology"
+    "research_methodology",
+    "deployment_product"
   ],
   "entries": [
     {
@@ -2466,6 +2467,146 @@
         "WP-W30"
       ],
       "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-070",
+      "category": "deployment_product",
+      "title": "Microreboot lifecycle islands",
+      "mechanism": "Partition runtime services into restartable lifecycle islands so selected faults can be recovered without restarting the whole application.",
+      "mapped_volumes": [
+        29,
+        120,
+        278
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W19",
+        "WP-W30"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-071",
+      "category": "deployment_product",
+      "title": "Semantic resumable streaming",
+      "mechanism": "Stream durable operation state as resumable snapshot-plus-delta sequences with monotonic cursors and replay-safe client recovery.",
+      "mapped_volumes": [
+        40,
+        183,
+        295
+      ],
+      "work_package_refs": [
+        "WP-W22",
+        "WP-W04",
+        "WP-W21"
+      ],
+      "risk_level": "medium",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-072",
+      "category": "deployment_product",
+      "title": "Local-first ambient desktop profile",
+      "mechanism": "Keep workspace continuity and selected inference/memory capabilities local-first, synchronizing opportunistically without making cloud reachability a correctness dependency.",
+      "mapped_volumes": [
+        229,
+        329,
+        331
+      ],
+      "work_package_refs": [
+        "WP-W24",
+        "WP-W23",
+        "WP-W07"
+      ],
+      "risk_level": "high",
+      "status": "candidate",
+      "activation_tier": "research_sandbox",
+      "production_authority": false,
+      "prerequisites": [
+        "explicit owner",
+        "bounded experiment budget",
+        "baseline/champion comparison",
+        "rollback or deterministic fallback"
+      ],
+      "required_evidence": [
+        "reproducible benchmark or capability evaluation",
+        "failure-mode and adversarial evaluation",
+        "cost/latency/resource accounting",
+        "integration contract and rollback test before promotion"
+      ],
+      "kill_switch": "must be independently disableable without disabling the canonical fallback path",
+      "fallback": "canonical non-exotic implementation for the mapped capability",
+      "notes": "Depth-layer candidate only; does not create a new top-level architecture volume."
+    },
+    {
+      "id": "EXO-073",
+      "category": "deployment_product",
+      "title": "Dual-slot atomic installer and updater",
+      "mechanism": "Use A/B installation slots with content verification, health-gated activation and deterministic rollback to the prior bootable application image.",
+      "mapped_volumes": [
+        193,
+        276,
+        277,
+        278
+      ],
+      "work_package_refs": [
+        "WP-W25",
+        "WP-W30"
+      ],
+      "risk_level": "high",
       "status": "candidate",
       "activation_tier": "research_sandbox",
       "production_authority": false,
