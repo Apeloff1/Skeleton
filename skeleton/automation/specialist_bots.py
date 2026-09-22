@@ -24,15 +24,27 @@ from .build_authority import (
     BuildAuthorityError,
     revalidate_live_build_authorization,
 )
+from .build_followup import (
+    BuildFollowup,
+    inspect_build_followup,
+)
+from .build_plane import (
+    budget_from_manifest,
+    run_feature_build,
+)
+from .build_repair import run_feature_followup_repair
 from .builder_plane import (
     BuilderManifest,
     BuilderPlaneError,
+    builder_worker_branch,
+    compile_builder_proposal_receipt,
     manifest_prompt_fragment,
     validate_builder_custody,
 )
 from .advanced_bots import (
     ADVANCED_BOTS,
     BLOCKED_PREFIXES,
+    BUILD_SAFE_PREFIXES,
     SAFE_PREFIXES,
     AdvancedBot,
     allowed,
@@ -48,6 +60,7 @@ from .supervisor_runtime import (
     find_open_pr_for_worker,
     proposal_digest,
     remote_branch_exists,
+    remote_branch_head,
     require_clean_worktree,
     require_exact_head,
     require_remote_base_unchanged,
@@ -263,6 +276,84 @@ def admit_builder_manifest(
             "invalid feature-builder manifest custody"
         ) from exc
     return manifest
+
+
+def revalidate_builder_authority(
+    custody: WorkerCustody,
+    authorization: BuildAuthorization | None,
+    manifest: BuilderManifest | None,
+) -> BuildAuthorization | None:
+    """Rebind live issue authority to the exact admitted Builder manifest."""
+    if authorization is None:
+        if manifest is not None:
+            raise WorkerAdmissionError(
+                "Builder Plane manifest exists without build authority"
+            )
+        return None
+    if custody.worker != "feature-builder":
+        raise WorkerAdmissionError(
+            "build authority reached a non-builder worker"
+        )
+    if manifest is None:
+        raise WorkerAdmissionError(
+            "feature-builder live revalidation missing Builder manifest"
+        )
+
+    try:
+        current = revalidate_live_build_authorization(
+            authorization
+        )
+        validate_builder_custody(
+            manifest,
+            authorization=current,
+            snapshot_fingerprint=custody.snapshot_fingerprint,
+            execution=custody.execution,
+        )
+    except (BuildAuthorityError, BuilderPlaneError) as exc:
+        raise WorkerAdmissionError(
+            "live build authority no longer matches Builder custody"
+        ) from exc
+    return current
+
+
+
+def builder_requires_regression_intent(
+    spec: AdvancedBot,
+    manifest: BuilderManifest,
+) -> bool:
+    """Decide whether a Builder proposal must declare regression intent."""
+    if spec.name != "feature-builder":
+        raise WorkerAdmissionError(
+            "Builder regression policy reached a non-builder specialist"
+        )
+    if not spec.requires_tests:
+        return False
+    # A purely documentation-scoped authorization can be satisfied without
+    # manufacturing meaningless executable tests. Mixed documentation + code
+    # signals retain the normal feature-builder regression requirement.
+    return set(manifest.signals) != {"documentation"}
+
+
+def validate_builder_regression_policy(
+    result: Mapping[str, Any],
+    spec: AdvancedBot,
+    manifest: BuilderManifest,
+) -> None:
+    """Enforce the registry's requires_tests contract as bounded intent data."""
+    if not builder_requires_regression_intent(spec, manifest):
+        return
+    tests = result.get("tests")
+    if not isinstance(tests, list) or not tests:
+        raise WorkerAdmissionError(
+            "feature-builder proposal is missing required regression intent"
+        )
+    if any(
+        not isinstance(item, str) or not item.strip()
+        for item in tests
+    ):
+        raise WorkerAdmissionError(
+            "feature-builder regression intent contains empty entries"
+        )
 
 
 def validate_builder_proposal_budget(
@@ -632,6 +723,8 @@ def validate_generated_files(
 
 def validate_mutation_budget(
     files: list[dict[str, str]],
+    *,
+    max_changed_lines: int = MAX_CHANGED_LINES,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
     changed = 0
@@ -646,7 +739,7 @@ def validate_mutation_budget(
             for line in delta
             if line.startswith(("+ ", "- "))
         )
-        if changed > MAX_CHANGED_LINES:
+        if changed > max_changed_lines:
             raise RuntimeError(
                 "specialist mutation line budget exceeded"
             )
@@ -717,6 +810,64 @@ def _verify_single_parent(base_sha: str) -> None:
         raise RuntimeError(
             "worker commit is not directly based on admitted base"
         )
+
+
+def _require_followup_head_unchanged(
+    followup: BuildFollowup,
+) -> None:
+    current = remote_branch_head(
+        followup.branch
+    )
+    if current != followup.head_sha:
+        raise WorkerAdmissionError(
+            "active build PR head changed during repair"
+        )
+
+
+def _checkout_followup_head(
+    followup: BuildFollowup,
+    *,
+    env: dict[str, str],
+) -> None:
+    """Fetch and detach at the exact admitted PR head without branch mutation."""
+    _require_followup_head_unchanged(
+        followup
+    )
+    subprocess.run(
+        ["gh", "auth", "setup-git"],
+        check=True,
+        env=env,
+        timeout=30,
+    )
+    _run_git(
+        [
+            "fetch",
+            "--no-tags",
+            "origin",
+            f"refs/heads/{followup.branch}",
+        ],
+        env=env,
+        timeout=120,
+    )
+    fetched = _git_text(
+        ["rev-parse", "FETCH_HEAD"]
+    ).strip()
+    if fetched != followup.head_sha:
+        raise WorkerAdmissionError(
+            "fetched build PR head differs from admitted head"
+        )
+    _run_git(
+        [
+            "switch",
+            "--detach",
+            followup.head_sha,
+        ],
+        env=env,
+    )
+    require_clean_worktree()
+    _require_followup_head_unchanged(
+        followup
+    )
 
 
 def _render_prompt(
@@ -799,21 +950,43 @@ def _print_status(payload: dict[str, Any]) -> None:
 
 def _preflight(
     custody: WorkerCustody,
+    *,
+    builder_manifest: BuilderManifest | None = None,
 ) -> tuple[str, dict[str, Any] | None]:
     execution = custody.execution
     require_exact_head(execution.base_sha)
     require_clean_worktree()
     require_remote_base_unchanged(execution)
 
+    if builder_manifest is not None:
+        if custody.worker != "feature-builder":
+            raise WorkerAdmissionError(
+                "Builder Plane manifest reached a non-builder preflight"
+            )
+        try:
+            branch = builder_worker_branch(builder_manifest)
+        except BuilderPlaneError as exc:
+            raise WorkerAdmissionError(
+                "unable to derive task-bound feature-builder branch"
+            ) from exc
+    else:
+        branch = deterministic_worker_branch(custody)
+
     active = find_open_pr_for_worker(
         execution.repository,
         custody.worker,
     )
-    branch = deterministic_worker_branch(custody)
     if active is not None:
         if active.get("baseRefName") != execution.default_branch:
             raise WorkerAdmissionError(
                 "active worker pull request targets an unexpected base branch"
+            )
+        if (
+            builder_manifest is not None
+            and active.get("headRefName") != branch
+        ):
+            raise WorkerAdmissionError(
+                "active feature-builder pull request belongs to a different build task"
             )
         return branch, active
 
@@ -858,11 +1031,55 @@ def main() -> int:
             custody,
             build_authorization,
         )
-        branch, active_pr = _preflight(custody)
+        branch, active_pr = _preflight(
+            custody,
+            builder_manifest=builder_manifest,
+        )
+        followup: BuildFollowup | None = None
+        publish_env: dict[str, str] | None = None
 
         if active_pr is not None:
-            _print_status(
-                {
+            if (
+                spec.name == "feature-builder"
+                and build_authorization is not None
+                and builder_manifest is not None
+            ):
+                followup = inspect_build_followup(
+                    execution.repository,
+                    active_pr,
+                    build_authorization,
+                )
+                if followup.branch != branch:
+                    raise WorkerAdmissionError(
+                        "build followup branch differs from canonical Builder branch"
+                    )
+                if not followup.repairable:
+                    existing_evidence: dict[str, Any] = {
+                        "status": "existing-pr",
+                        "bot": spec.name,
+                        "branch": branch,
+                        "pull_request": followup.pr_number,
+                        "supervisor_snapshot_fingerprint": (
+                            custody.snapshot_fingerprint
+                        ),
+                        "build_issue_number": (
+                            build_authorization.issue_number
+                        ),
+                        "build_task_digest": (
+                            build_authorization.task_digest
+                        ),
+                    }
+                    _print_status(
+                        existing_evidence
+                    )
+                    return 0
+                publish_env = _publication_env()
+                _checkout_followup_head(
+                    followup,
+                    env=publish_env,
+                )
+            else:
+                existing_evidence = {
                     "status": "existing-pr",
                     "bot": spec.name,
                     "branch": active_pr.get(
@@ -874,8 +1091,10 @@ def main() -> int:
                         custody.snapshot_fingerprint
                     ),
                 }
-            )
-            return 0
+                _print_status(
+                    existing_evidence
+                )
+                return 0
 
         plan = _bounded_text(
             args.plan,
@@ -885,32 +1104,63 @@ def main() -> int:
         )
 
         client = FreeModelClient()
-        result = extract_plan(
-            client.chat(
-                (
-                    "You are a conservative specialist maintenance agent. "
-                    "Return JSON only."
-                ),
-                _render_prompt(
-                    spec,
-                    execution.repository,
-                    plan,
+        if spec.name == "feature-builder":
+            if (
+                build_authorization is None
+                or builder_manifest is None
+            ):
+                raise WorkerAdmissionError(
+                    "feature-builder missing canonical Builder custody"
+                )
+            implementation_budget = budget_from_manifest(
+                builder_manifest
+            )
+            if followup is not None:
+                result = run_feature_followup_repair(
+                    plan=plan,
                     build_authorization=build_authorization,
+                    followup=followup,
+                    client=client,
+                    budget=implementation_budget,
                     builder_manifest=builder_manifest,
+                )
+            else:
+                result = run_feature_build(
+                    plan=plan,
+                    build_authorization=build_authorization,
+                    client=client,
+                    builder_manifest=builder_manifest,
+                )
+        else:
+            result = extract_plan(
+                client.chat(
+                    (
+                        "You are a conservative specialist maintenance agent. "
+                        "Return JSON only."
+                    ),
+                    _render_prompt(
+                        spec,
+                        execution.repository,
+                        plan,
+                        build_authorization=build_authorization,
+                        builder_manifest=builder_manifest,
+                    ),
+                    max_tokens=MODEL_MAX_TOKENS,
                 ),
-                max_tokens=MODEL_MAX_TOKENS,
-            ),
-            (
-                min(spec.max_files, builder_manifest.budget.max_files)
-                if builder_manifest is not None
-                else spec.max_files
-            ),
-        )
+                spec.max_files,
+            )
+
         if builder_manifest is not None:
             validate_builder_proposal_budget(
                 result,
                 builder_manifest,
             )
+            if followup is None:
+                validate_builder_regression_policy(
+                    result,
+                    spec,
+                    builder_manifest,
+                )
 
         result["files"] = filter_noop_files(
             result["files"]
@@ -923,6 +1173,12 @@ def main() -> int:
                     "summary": result["summary"],
                     "supervisor_snapshot_fingerprint": (
                         custody.snapshot_fingerprint
+                    ),
+                    "execution_fingerprint": execution.fingerprint,
+                    "builder_manifest_digest": (
+                        builder_manifest.manifest_digest
+                        if builder_manifest is not None
+                        else None
                     ),
                 }
             )
@@ -938,34 +1194,53 @@ def main() -> int:
             )
 
         validate_generated_files(result["files"])
-        changed_lines = validate_mutation_budget(
-            result["files"]
+        changed_line_limit = (
+            builder_manifest.budget.max_changed_lines
+            if builder_manifest is not None
+            else MAX_CHANGED_LINES
         )
-        if (
-            builder_manifest is not None
-            and changed_lines > builder_manifest.budget.max_changed_lines
-        ):
-            raise WorkerAdmissionError(
-                "feature-builder proposal exceeds Builder Plane changed-line budget"
-            )
+        changed_lines = validate_mutation_budget(
+            result["files"],
+            max_changed_lines=changed_line_limit,
+        )
         digest = proposal_digest(
             worker=spec.name,
             snapshot_fingerprint=custody.snapshot_fingerprint,
             files=result["files"],
         )
+        builder_receipt = None
+        if builder_manifest is not None:
+            try:
+                builder_receipt = compile_builder_proposal_receipt(
+                    builder_manifest,
+                    proposal_digest=digest,
+                    branch=branch,
+                    files=result["files"],
+                    tests=result["tests"],
+                    changed_lines=changed_lines,
+                )
+            except BuilderPlaneError as exc:
+                raise WorkerAdmissionError(
+                    "feature-builder proposal receipt rejected"
+                ) from exc
 
         repo_root = Path.cwd().resolve()
+        active_safe_prefixes = (
+            BUILD_SAFE_PREFIXES
+            if spec.name == "feature-builder"
+            else SAFE_PREFIXES
+        )
         targets = {
             item["path"]: resolve_mutation_target(
                 item["path"],
                 repo_root=repo_root,
-                allowed_prefixes=SAFE_PREFIXES,
+                allowed_prefixes=active_safe_prefixes,
                 blocked_prefixes=BLOCKED_PREFIXES,
             )
             for item in result["files"]
         }
 
-        publish_env = _publication_env()
+        publish_env = publish_env or _publication_env()
         hooks = Path(
             os.environ.get(
                 "RUNNER_TEMP",
@@ -980,16 +1255,24 @@ def main() -> int:
             exist_ok=True,
         )
 
-        _run_git(
-            _hookless_git_args(
-                hooks,
-                "switch",
-                "--create",
-                branch,
-                execution.base_sha,
-            ),
-            env=publish_env,
-        )
+        if followup is None:
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "switch",
+                    "--create",
+                    branch,
+                    execution.base_sha,
+                ),
+                env=publish_env,
+            )
+        else:
+            require_exact_head(
+                followup.head_sha
+            )
+            _require_followup_head_unchanged(
+                followup
+            )
 
         for item in result["files"]:
             safe_write_text(
@@ -1021,6 +1304,15 @@ def main() -> int:
                     "status": "no-change",
                     "bot": spec.name,
                     "summary": result["summary"],
+                    "supervisor_snapshot_fingerprint": (
+                        custody.snapshot_fingerprint
+                    ),
+                    "execution_fingerprint": execution.fingerprint,
+                    "builder_manifest_digest": (
+                        builder_manifest.manifest_digest
+                        if builder_manifest is not None
+                        else None
+                    ),
                 }
             )
             return 0
@@ -1032,11 +1324,22 @@ def main() -> int:
         # Model generation may take long enough for repository authority or main
         # to change. Revalidate both immediately before creating the commit.
         if build_authorization is not None:
-            build_authorization = revalidate_live_build_authorization(
-                build_authorization
+            build_authorization = revalidate_builder_authority(
+                custody,
+                build_authorization,
+                builder_manifest,
             )
         require_remote_base_unchanged(execution)
+        if followup is not None:
+            _require_followup_head_unchanged(
+                followup
+            )
 
+        commit_subject = (
+            "repair autonomous build"
+            if followup is not None
+            else "specialist maintenance"
+        )
         _run_git(
             _hookless_git_args(
                 hooks,
@@ -1045,13 +1348,17 @@ def main() -> int:
                 "-m",
                 (
                     f"bot({spec.name}): "
-                    "specialist maintenance"
+                    f"{commit_subject}"
                 ),
             ),
             env=publish_env,
             timeout=60,
         )
-        _verify_single_parent(execution.base_sha)
+        _verify_single_parent(
+            followup.head_sha
+            if followup is not None
+            else execution.base_sha
+        )
 
         subprocess.run(
             ["gh", "auth", "setup-git"],
@@ -1062,28 +1369,45 @@ def main() -> int:
 
         # Close the final authority/base window before the remote mutation.
         if build_authorization is not None:
-            build_authorization = revalidate_live_build_authorization(
-                build_authorization
+            build_authorization = revalidate_builder_authority(
+                custody,
+                build_authorization,
+                builder_manifest,
             )
         require_remote_base_unchanged(execution)
-        _run_git(
-            _hookless_git_args(
-                hooks,
-                "push",
-                "--set-upstream",
-                "origin",
-                branch,
-            ),
-            env=publish_env,
-            timeout=120,
-        )
+        if followup is not None:
+            _require_followup_head_unchanged(
+                followup
+            )
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "push",
+                    "origin",
+                    f"HEAD:refs/heads/{branch}",
+                ),
+                env=publish_env,
+                timeout=120,
+            )
+        else:
+            _run_git(
+                _hookless_git_args(
+                    hooks,
+                    "push",
+                    "--set-upstream",
+                    "origin",
+                    branch,
+                ),
+                env=publish_env,
+                timeout=120,
+            )
 
         body = result["summary"] or (
             "Specialist maintenance proposal."
         )
         body += (
             f"\n\nChanged-line admission budget: "
-            f"{changed_lines}/{MAX_CHANGED_LINES}."
+            f"{changed_lines}/{changed_line_limit}."
         )
         body += (
             "\nDispatched by the repository Secretary; "
@@ -1110,6 +1434,11 @@ def main() -> int:
                 f"\nBuilder manifest: "
                 f"`{builder_manifest.manifest_digest}`"
             )
+        if builder_receipt is not None:
+            body += (
+                f"\nBuilder proposal receipt: "
+                f"`{builder_receipt.receipt_digest}`"
+            )
         if build_authorization is not None:
             body += (
                 f"\nAuthorized build issue: "
@@ -1130,93 +1459,114 @@ def main() -> int:
             for description in result["tests"]:
                 body += f"- {description}\n"
 
-        subprocess.run(
-            [
-                "gh",
-                "pr",
-                "create",
-                "--repo",
-                execution.repository,
-                "--base",
-                execution.default_branch,
-                "--head",
-                branch,
-                "--title",
-                (
-                    f"bot({spec.name}): "
-                    "specialist maintenance"
-                ),
-                "--body",
-                body[:12_000],
-            ],
-            check=True,
-            env=publish_env,
-            timeout=60,
-        )
-        pr_raw = subprocess.check_output(
-            [
-                "gh",
-                "pr",
-                "view",
-                branch,
-                "--repo",
-                execution.repository,
-                "--json",
-                "number,url",
-            ],
-            text=True,
-            env=publish_env,
-            timeout=30,
-        )
-        pr_metadata = json.loads(
-            pr_raw,
-            object_pairs_hook=_unique_json_object,
-        )
-        pull_request = pr_metadata.get("number")
-        pull_request_url = pr_metadata.get("url")
-        if (
-            isinstance(pull_request, bool)
-            or not isinstance(pull_request, int)
-            or pull_request <= 0
-            or not isinstance(pull_request_url, str)
-            or not pull_request_url.startswith("https://github.com/")
-        ):
-            raise WorkerAdmissionError(
-                "created pull request evidence is invalid"
+        pull_request: int | None = None
+        pull_request_url: str | None = None
+        if followup is None:
+            subprocess.run(
+                [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--repo",
+                    execution.repository,
+                    "--base",
+                    execution.default_branch,
+                    "--head",
+                    branch,
+                    "--title",
+                    (
+                        f"bot({spec.name}): "
+                        "specialist maintenance"
+                    ),
+                    "--body",
+                    body[:12_000],
+                ],
+                check=True,
+                env=publish_env,
+                timeout=60,
             )
 
+            pr_raw = subprocess.check_output(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    branch,
+                    "--repo",
+                    execution.repository,
+                    "--json",
+                    "number,url",
+                ],
+                text=True,
+                env=publish_env,
+                timeout=30,
+            )
+            pr_metadata = json.loads(
+                pr_raw,
+                object_pairs_hook=_unique_json_object,
+            )
+            pull_request = pr_metadata.get("number")
+            pull_request_url = pr_metadata.get("url")
+            if (
+                isinstance(pull_request, bool)
+                or not isinstance(pull_request, int)
+                or pull_request <= 0
+                or not isinstance(pull_request_url, str)
+                or not pull_request_url.startswith("https://github.com/")
+            ):
+                raise WorkerAdmissionError(
+                    "created pull request evidence is invalid"
+                )
+        status_payload: dict[str, Any] = {
+            "status": (
+                "pull-request-updated"
+                if followup is not None
+                else "pull-request-created"
+            ),
+            "bot": spec.name,
+            "branch": branch,
+            "changed_lines": changed_lines,
+            "proposal_digest": digest,
+            "base_sha": execution.base_sha,
+            "supervisor_snapshot_fingerprint": (
+                custody.snapshot_fingerprint
+            ),
+            "execution_fingerprint": (
+                execution.fingerprint
+            ),
+            "build_issue_number": (
+                build_authorization.issue_number
+                if build_authorization is not None
+                else None
+            ),
+            "build_task_digest": (
+                build_authorization.task_digest
+                if build_authorization is not None
+                else None
+            ),
+            "builder_manifest_digest": (
+                builder_manifest.manifest_digest
+                if builder_manifest is not None
+                else None
+            ),
+            "builder_proposal_receipt": (
+                builder_receipt.as_dict()
+                if builder_receipt is not None
+                else None
+            ),
+        }
+        if followup is not None:
+            status_payload["pull_request"] = (
+                followup.pr_number
+            )
+            status_payload["repair_parent_sha"] = (
+                followup.head_sha
+            )
+        else:
+            status_payload["pull_request"] = pull_request
+            status_payload["pull_request_url"] = pull_request_url
         _print_status(
-            {
-                "status": "pull-request-created",
-                "bot": spec.name,
-                "branch": branch,
-                "pull_request": pull_request,
-                "pull_request_url": pull_request_url,
-                "changed_lines": changed_lines,
-                "proposal_digest": digest,
-                "base_sha": execution.base_sha,
-                "supervisor_snapshot_fingerprint": (
-                    custody.snapshot_fingerprint
-                ),
-                "execution_fingerprint": (
-                    execution.fingerprint
-                ),
-                "build_issue_number": (
-                    build_authorization.issue_number
-                    if build_authorization is not None
-                    else None
-                ),
-                "build_task_digest": (
-                    build_authorization.task_digest
-                    if build_authorization is not None
-                    else None
-                ),
-                "builder_manifest_digest": (
-                    builder_manifest.manifest_digest
-                    if builder_manifest is not None
-                    else None
-                ),
-            }
+            status_payload
         )
         return 0
 
