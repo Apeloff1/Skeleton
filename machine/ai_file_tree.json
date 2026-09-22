@@ -3869,6 +3869,11 @@
       "path": "skeleton/turn",
       "owner": "package/compatibility boundary",
       "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/parse",
+      "owner": "parse-pointer facade / GB-42 lineage",
+      "reason": "bounded pointer-parsing facade is not named as an AI master-plan or construction implementation path and remains outside canonical AI ownership until an explicit migration contract exists"
     }
   ],
   "classification_coverage": {
@@ -4007,7 +4012,7 @@
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
     "governed_mapping_count": 104,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 33,
+    "retained_outside_ai_tree_count": 34,
     "batch_counts": {
       "B1-core-runtime": 54,
       "B3-owner-sensitive": 7,
