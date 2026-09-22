@@ -146,7 +146,7 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **104 governed source -> destination mappings**
+- **130 governed source -> destination mappings**
 - **1,997 changed files under `skeleton/ai`** in this migration PR
 - package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
@@ -226,7 +226,7 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **104 mappings**. The prior direct Git-object
+The current governed set contains **130 mappings**. The prior direct Git-object
 audit covered the first **78 mappings**. The remaining **26 current mappings**
 are explicitly carried in the pending refresh scope; stale references to the
 removed legacy project-manifest mirror have been dropped.
@@ -236,8 +236,8 @@ The preparation ledger is now internally consistent:
 - 54 mappings in `B1-core-runtime`
 - 12 mappings in `B2-domain-build`
 - 7 mappings in `B3-owner-sensitive`
-- 2 mappings in `B3-compat-convergence`
-- 29 mappings in `B4-research-quarantine`
+- 22 mappings in `B3-compat-convergence`
+- 35 mappings in `B4-research-quarantine`
 - 0 pending move assignments
 - 33 retained-outside classifications
 
@@ -279,3 +279,33 @@ against later designs. They are explicitly **non-authoritative**:
 No historical module can become a production owner through relocation alone;
 promotion requires an explicit masterplan adoption, evaluation evidence, and
 the normal signed-accountability process.
+
+
+## Transfer v2: legacy backend and GameForge AI recovery
+
+Transfer v2 is rebased onto current `main` after PR #1930 merged. It adds **26 governed mappings / 89 mirrored files**, extending the governed set from 104 to 130 without changing legacy imports or granting new runtime authority.
+
+### B4 research-quarantine recovery
+- `backend/gameforge/exocortex/agentic` -> `skeleton/ai/research/legacy/gameforge/exocortex/agentic`
+- `backend/gameforge/exocortex/zaibatsu` -> `skeleton/ai/research/legacy/gameforge/exocortex/zaibatsu`
+- `backend/gameforge/reasoning` -> `skeleton/ai/research/legacy/gameforge/reasoning`
+- `backend/gameforge/rag` -> `skeleton/ai/research/legacy/gameforge/rag`
+- `backend/gameforge/math_exocortex` -> `skeleton/ai/research/legacy/gameforge/math_exocortex`
+- `backend/gameforge/personal/neuro` -> `skeleton/ai/research/legacy/gameforge/personal/neuro`
+
+These trees are research evidence and historical implementation lineage. Relocation does not promote them into production authorities.
+
+### B3 compatibility-convergence recovery
+Twenty `backend/core` Jeeves/model/memory/swarm/world modules are mirrored under `skeleton/ai/compat/backend_core`. They must converge into existing canonical owners before any legacy retirement; relocation alone cannot create provider, memory, retrieval, planning, execution, agent, or simulation authority.
+
+### Post-#1930 parity reconciliation
+After #1930 merged, current `main` changed five exact-parity files under `skeleton/automation`: `build_plane.py`, `build_repair.py`, `builder_plane.py`, `secretary.py`, and `supervisor_runtime.py`. Transfer-v2 refreshes their `skeleton/ai/build/automation` mirrors and updates the mapping source-tree identity. `specialist_bots.py` remains an intentional compatibility facade and is not mirrored over.
+
+### Updated batch counts
+- B1-core-runtime: 54
+- B2-domain-build: 12
+- B3-owner-sensitive: 7
+- B3-compat-convergence: 22
+- B4-research-quarantine: 35
+
+Independent verification remains unsigned. Fresh full 130-mapping object/parity audit, the canonical file-tree validator, affected-domain validation, and required CI remain mandatory before any cutover or source retirement.
