@@ -17,9 +17,13 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `runtime/intelligence/` — admission, verification and execution.
 - `runtime/frontier/` — routing, streams and frontier orchestration.
 - `runtime/skills/` — tools and skills.
+- `runtime/{api,vault,artifact_plane,observability,security,kernel,reliability,resilience,primitives}/` — plan-owned engine support planes.
+- `runtime/contexts/` — extended/legacy context support retained under governed parity.
 - `agents/jeeves/` — Jeeves reasoning and agent system.
-- `build/shift_supervisor/` — planning/scheduling/build-control code promoted
-  from the transitional `core/` root.
+- `agents/core/` — core agent/swarm execution runtime.
+- `cognition/`, `learning/`, `evaluation/` — cognition, controlled learning, and evaluation support.
+- `build/shift_supervisor/` — planning/scheduling/build-control code promoted from the transitional `core/` root.
+- `build/{automation,repo_intelligence}/` — repository-side AI build/control support.
 
 No compatibility source may be deleted until imports, ownership, focused
 tests, rollback evidence, App Assembly, and signed accountability are explicit.
