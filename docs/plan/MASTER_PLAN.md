@@ -619,9 +619,11 @@ The second enforced tranche is **DP-041-080**, documented in `docs/plan/VOLUME_D
 
 The third enforced tranche is **DP-081-120**, documented in `docs/plan/VOLUME_DEPTH_081_120.md`. It deepens formal methods, benchmark/red-team/human-control disciplines, explainability/accessibility/i18n/compliance, documentation and operations, backlog/priority/build governance, VS-000 through VS-007, functional/autonomous/research/SOTA-candidate acceptance, anti-pattern/build-order/DoD/traceability/capability/debt/fitness controls, project metrics, roadmap/completion semantics, and final assembly qualification.
 
+The fourth enforced tranche is **DP-121-160**, documented in `docs/plan/VOLUME_DEPTH_121_160.md`. It deepens requirements/NFR/capability/behavior/state/interface/schema/compatibility contracts, internal protocols and consistency/transaction/outbox/cache/content-addressing rules, ingestion/document/lineage/data-quality/dataset/synthetic-data systems, training and post-training control/recovery/evaluation, multimodal ingestion/vision/audio/speech/video/retrieval, and the Tool SDK.
+
 The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
 
-Future depth passes should continue forward from **VOL-121** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+Future depth passes should continue forward from **VOL-161** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
 
 ## 24.4 Exotic systems depth layer
 
