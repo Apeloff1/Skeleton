@@ -29,9 +29,11 @@ from __future__ import annotations
 import threading
 import time
 from collections import deque
+from dataclasses import replace
 from typing import Any, Callable, Mapping, Sequence
 
 from .audit_assurance import FrontierExecutionReplayVerifier
+from .cortex import JeevesCortex
 from .execution_audit import (
     AuditEventKind,
     AuditSeverity,
@@ -40,6 +42,8 @@ from .execution_audit import (
     ReplayReport,
 )
 from .model_based_control import CompactState
+from .epistemic_frontier import KnowledgeObligation
+from .frontier_control_plane import FrontierCognitiveControlPlane
 from .runtime import RunCheckpoint, RunInputs, _RunState
 from .runtime_abstraction import (
     ArgumentAbstractor,
@@ -50,14 +54,31 @@ from .runtime_guard import (
     RuntimeGuardRequest,
     RuntimeGuardSignals,
 )
+from .semantic_frontier import LensInteractionKind
 from .semantic_lenses import SemanticFinding, SemanticObservation
 from .semantic_plane import (
     SemanticLensPlane,
     SemanticPlaneLearningUpdate,
     SemanticPlaneSnapshot,
 )
+from .semantic_topology_learning import (
+    SemanticTopologyLearningSnapshot,
+    SemanticTopologyLearningState,
+    TopologyBridgePrediction,
+    TopologyBridgeReport,
+    TopologyBridgeTrial,
+)
+from .semantic_research_bridge import (
+    SemanticTopologyResearchBridge,
+    SemanticTopologyResearchUpdate,
+)
+from .semantic_scope import (
+    ScopedSemanticPlanePool,
+    ScopedSemanticTopologyState,
+    SemanticLearningScope,
+)
 from .strict_runtime import StrictJeevesAgentRuntime
-from .types import AgentResult, RiskTier, TerminationReason, stable_fingerprint
+from .types import AgentResult, RiskTier, StepStatus, TerminationReason, stable_fingerprint
 
 
 class ScopedGeneralizingRuntimeEpistemicGuard(GeneralizingRuntimeEpistemicGuard):
@@ -232,6 +253,15 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         RiskTier.EXTERNAL.value,
         RiskTier.HIGH_IMPACT.value,
     }
+    _CORTEX_ASSESSMENT_KEY = "cortex:assessment"
+    _CORTEX_ERROR_KEY = "cortex:error"
+    _RISK_ORDER = {
+        RiskTier.READ_ONLY: 0,
+        RiskTier.REVERSIBLE: 1,
+        RiskTier.MUTATING: 2,
+        RiskTier.EXTERNAL: 3,
+        RiskTier.HIGH_IMPACT: 4,
+    }
 
     def __init__(
         self,
@@ -239,9 +269,26 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         argument_abstractor: ArgumentAbstractor | None = None,
         runtime_guard: RuntimeEpistemicGuard | None = None,
         semantic_plane: SemanticLensPlane | None = None,
+        semantic_scope_pool: ScopedSemanticPlanePool | None = None,
+        semantic_scoping_enabled: bool = True,
+        cortex: JeevesCortex | None = None,
+        cortex_enabled: bool = True,
+        cortex_required: bool = False,
         wall_clock: Callable[[], float] = time.time,
         **kwargs: Any,
     ) -> None:
+        if not isinstance(semantic_scoping_enabled, bool):
+            raise TypeError("semantic_scoping_enabled must be boolean")
+        if not isinstance(cortex_enabled, bool):
+            raise TypeError("cortex_enabled must be boolean")
+        if not isinstance(cortex_required, bool):
+            raise TypeError("cortex_required must be boolean")
+        if cortex_required and not cortex_enabled:
+            raise ValueError("cortex_required cannot be true when cortex is disabled")
+        if cortex is not None and not isinstance(cortex, JeevesCortex):
+            raise TypeError("cortex must be JeevesCortex or None")
+        if not cortex_enabled and cortex is not None:
+            raise ValueError("cortex cannot be supplied when cortex_enabled is false")
         # A caller supplying a complete guard owns its exact semantics. For the
         # default construction path, let Strict build validated components and
         # then re-compose those same objects under the scoped generalizing guard
@@ -273,6 +320,206 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 )
 
         self.semantic_plane = semantic_plane or SemanticLensPlane()
+        if (
+            semantic_scope_pool is not None
+            and not isinstance(
+                semantic_scope_pool,
+                ScopedSemanticPlanePool,
+            )
+        ):
+            raise TypeError(
+                "semantic_scope_pool must be ScopedSemanticPlanePool or None"
+            )
+        if (
+            semantic_scope_pool is not None
+            and semantic_scope_pool.template.fingerprint
+            != self.semantic_plane.fingerprint
+        ):
+            raise ValueError(
+                "semantic_scope_pool template contract differs from semantic_plane"
+            )
+        self.semantic_scoping_enabled = semantic_scoping_enabled
+        self.semantic_scope_pool = (
+            semantic_scope_pool
+            or ScopedSemanticPlanePool(self.semantic_plane)
+        )
+        self.cortex_required = cortex_required
+        self.cortex = cortex if cortex_enabled else None
+        if cortex_enabled and self.cortex is None:
+            self.cortex = JeevesCortex(
+                clock=wall_clock,
+                monotonic=self._monotonic,
+            )
+        self._cortex_lock = threading.RLock()
+        self._cortex_assessments: dict[str, Mapping[str, Any]] = {}
+
+    def semantic_learning_scope(
+        self,
+        inputs: RunInputs,
+    ) -> SemanticLearningScope:
+        if not isinstance(inputs, RunInputs):
+            raise TypeError("inputs must be RunInputs")
+        return SemanticLearningScope(
+            tenant_id=inputs.tenant_id,
+            user_id=inputs.user_id,
+            workspace_id=inputs.workspace_id,
+        )
+
+    def semantic_plane_for(
+        self,
+        inputs: RunInputs,
+    ) -> SemanticLensPlane:
+        """Return mutable semantic state isolated to one learning scope."""
+
+        if not isinstance(inputs, RunInputs):
+            raise TypeError("inputs must be RunInputs")
+        if not self.semantic_scoping_enabled:
+            return self.semantic_plane
+        return self.semantic_scope_pool.get(
+            inputs.tenant_id,
+            inputs.user_id,
+            inputs.workspace_id,
+        )
+
+    def semantic_plane_for_scope(
+        self,
+        tenant_id: str,
+        user_id: str,
+        workspace_id: str,
+    ) -> SemanticLensPlane:
+        if not self.semantic_scoping_enabled:
+            return self.semantic_plane
+        return self.semantic_scope_pool.get(
+            tenant_id,
+            user_id,
+            workspace_id,
+        )
+
+    def analyze_scoped_semantics(
+        self,
+        inputs: RunInputs,
+        observations: Sequence[SemanticObservation],
+        *,
+        findings: Sequence[SemanticFinding] = (),
+        requested: Sequence[str] = (),
+        base_rate: float | None = None,
+        sequence: int = 0,
+    ) -> SemanticPlaneSnapshot:
+        return self.semantic_plane_for(inputs).analyze(
+            observations,
+            findings=findings,
+            requested=requested,
+            base_rate=base_rate,
+            sequence=sequence,
+        )
+
+    def declare_scoped_semantic_topology_candidate_prediction(
+        self,
+        inputs: RunInputs,
+        candidate_id: str,
+        *,
+        kind: LensInteractionKind,
+        predicted_probability: float,
+        domain: str,
+        independent_run: str,
+        predicted_at: float,
+        negative_control: bool = False,
+        source_finding_ids: Sequence[str] = (),
+        source_forecast_ids: Sequence[str] = (),
+        evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgePrediction:
+        plane = self.semantic_plane_for(inputs)
+        return plane.declare_topology_candidate_prediction(
+            candidate_id,
+            kind=kind,
+            predicted_probability=predicted_probability,
+            domain=domain,
+            independent_run=independent_run,
+            predicted_at=predicted_at,
+            negative_control=negative_control,
+            source_finding_ids=source_finding_ids,
+            source_forecast_ids=source_forecast_ids,
+            evidence_ids=evidence_ids,
+            metadata=metadata,
+        )
+
+    def resolve_scoped_semantic_topology_prediction(
+        self,
+        inputs: RunInputs,
+        prediction_id: str,
+        *,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgeReport:
+        plane = self.semantic_plane_for(inputs)
+        return plane.resolve_topology_bridge_prediction(
+            prediction_id,
+            outcome=outcome,
+            observed_at=observed_at,
+            outcome_evidence_ids=outcome_evidence_ids,
+            metadata=metadata,
+        )
+
+    def scoped_semantic_topology_learning_summary(
+        self,
+        inputs: RunInputs,
+    ) -> Mapping[str, Any]:
+        return self.semantic_plane_for(
+            inputs
+        ).topology_learning_summary()
+
+    def scoped_semantic_topology_learning_diagnostics(
+        self,
+        inputs: RunInputs,
+        *,
+        candidate_id: str | None = None,
+        kind: LensInteractionKind | None = None,
+        limit: int = 100,
+    ) -> Mapping[str, Any]:
+        return self.semantic_plane_for(
+            inputs
+        ).topology_learning_diagnostics(
+            candidate_id=candidate_id,
+            kind=kind,
+            limit=limit,
+        )
+
+    def export_scoped_semantic_topology_learning_state(
+        self,
+        inputs: RunInputs,
+    ) -> ScopedSemanticTopologyState:
+        return self.semantic_scope_pool.export_topology_state(
+            inputs.tenant_id,
+            inputs.user_id,
+            inputs.workspace_id,
+        )
+
+    def restore_scoped_semantic_topology_learning_state(
+        self,
+        inputs: RunInputs,
+        state: ScopedSemanticTopologyState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        return self.semantic_scope_pool.restore_topology_state(
+            inputs.tenant_id,
+            inputs.user_id,
+            inputs.workspace_id,
+            state,
+        )
+
+    def semantic_scope_diagnostics(self) -> Mapping[str, Any]:
+        return {
+            "enabled": self.semantic_scoping_enabled,
+            "pool": self.semantic_scope_pool.diagnostics(),
+            "global_compatibility_plane": {
+                "contract_fingerprint": self.semantic_plane.fingerprint,
+                "topology_learning_fingerprint": (
+                    self.semantic_plane.topology_learning.fingerprint
+                ),
+            },
+        }
 
     def analyze_semantics(
         self,
@@ -282,7 +529,6 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         requested: Sequence[str] = (),
         base_rate: float | None = None,
         sequence: int = 0,
-        domain: str | None = None,
     ) -> SemanticPlaneSnapshot:
         """Run the governed semantic plane without bypassing runtime evidence rules."""
         return self.semantic_plane.analyze(
@@ -291,7 +537,6 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             requested=requested,
             base_rate=base_rate,
             sequence=sequence,
-            domain=domain,
         )
 
     def resolve_semantic_forecast(
@@ -315,6 +560,197 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             observation_id=observation_id,
             negative_control=negative_control,
         )
+
+    def declare_semantic_topology_candidate_prediction(
+        self,
+        candidate_id: str,
+        *,
+        kind: LensInteractionKind,
+        predicted_probability: float,
+        domain: str,
+        independent_run: str,
+        predicted_at: float,
+        negative_control: bool = False,
+        source_finding_ids: Sequence[str] = (),
+        source_forecast_ids: Sequence[str] = (),
+        evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgePrediction:
+        """Create one canonical predeclared semantic topology experiment."""
+
+        return self.semantic_plane.declare_topology_candidate_prediction(
+            candidate_id,
+            kind=kind,
+            predicted_probability=predicted_probability,
+            domain=domain,
+            independent_run=independent_run,
+            predicted_at=predicted_at,
+            negative_control=negative_control,
+            source_finding_ids=source_finding_ids,
+            source_forecast_ids=source_forecast_ids,
+            evidence_ids=evidence_ids,
+            metadata=metadata,
+        )
+
+    def unresolved_semantic_topology_predictions(
+        self,
+        *,
+        candidate_id: str | None = None,
+    ) -> tuple[TopologyBridgePrediction, ...]:
+        return self.semantic_plane.unresolved_topology_predictions(
+            candidate_id=candidate_id,
+        )
+
+    def declare_semantic_topology_candidate_prediction(
+        self,
+        candidate_id: str,
+        *,
+        kind: LensInteractionKind,
+        predicted_probability: float,
+        domain: str,
+        independent_run: str,
+        predicted_at: float,
+        negative_control: bool = False,
+        source_finding_ids: Sequence[str] = (),
+        source_forecast_ids: Sequence[str] = (),
+        evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgePrediction:
+        """Create and declare one canonical topology experiment prediction."""
+
+        return self.semantic_plane.declare_topology_candidate_prediction(
+            candidate_id,
+            kind=kind,
+            predicted_probability=predicted_probability,
+            domain=domain,
+            independent_run=independent_run,
+            predicted_at=predicted_at,
+            negative_control=negative_control,
+            source_finding_ids=source_finding_ids,
+            source_forecast_ids=source_forecast_ids,
+            evidence_ids=evidence_ids,
+            metadata=metadata,
+        )
+
+    def unresolved_semantic_topology_predictions(
+        self,
+        *,
+        candidate_id: str | None = None,
+    ) -> tuple[TopologyBridgePrediction, ...]:
+        """List predeclared topology predictions still awaiting outcomes."""
+
+        return self.semantic_plane.unresolved_topology_predictions(
+            candidate_id=candidate_id,
+        )
+
+    def declare_semantic_topology_prediction(
+        self,
+        prediction: TopologyBridgePrediction,
+    ) -> TopologyBridgePrediction:
+        """Declare a topology bridge prediction before observing its outcome."""
+
+        return self.semantic_plane.declare_topology_bridge_prediction(
+            prediction
+        )
+
+    def resolve_semantic_topology_prediction(
+        self,
+        prediction_id: str,
+        *,
+        outcome: bool,
+        observed_at: float,
+        outcome_evidence_ids: Sequence[str] = (),
+        metadata: Mapping[str, Any] | None = None,
+    ) -> TopologyBridgeReport:
+        """Resolve one declared topology bridge prediction exactly once."""
+
+        return self.semantic_plane.resolve_topology_bridge_prediction(
+            prediction_id,
+            outcome=outcome,
+            observed_at=observed_at,
+            outcome_evidence_ids=outcome_evidence_ids,
+            metadata=metadata,
+        )
+
+    def record_semantic_topology_trial(
+        self,
+        trial: TopologyBridgeTrial,
+    ) -> TopologyBridgeReport:
+        """Import a resolved trial whose prediction is already in custody."""
+
+        return self.semantic_plane.record_topology_bridge_trial(trial)
+
+    def semantic_topology_learning_diagnostics(
+        self,
+        *,
+        candidate_id: str | None = None,
+        kind: LensInteractionKind | None = None,
+        limit: int = 100,
+    ) -> Mapping[str, Any]:
+        """Return bounded semantic topology-learning diagnostics."""
+
+        return self.semantic_plane.topology_learning_diagnostics(
+            candidate_id=candidate_id,
+            kind=kind,
+            limit=limit,
+        )
+
+    def semantic_topology_research_obligations(
+        self,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+    ) -> tuple[KnowledgeObligation, ...]:
+        """Return semantic-topology gaps as typed research obligations."""
+
+        return self.semantic_plane.topology_research_obligations(
+            limit=limit,
+            minimum_candidate_score=minimum_candidate_score,
+            include_rejected=include_rejected,
+        )
+
+    def map_semantic_topology_research(
+        self,
+        control_plane: FrontierCognitiveControlPlane,
+        *,
+        limit: int = 24,
+        minimum_candidate_score: float = 0.18,
+        include_rejected: bool = False,
+        dependencies: Mapping[str, Sequence[str]] | None = None,
+    ) -> SemanticTopologyResearchUpdate:
+        """Refresh topology research debt into Jeeves' durable research agenda."""
+
+        bridge = SemanticTopologyResearchBridge(
+            self.semantic_plane.topology_learning,
+            control_plane,
+        )
+        return bridge.refresh(
+            limit=limit,
+            minimum_candidate_score=minimum_candidate_score,
+            include_rejected=include_rejected,
+            dependencies=dependencies,
+        )
+
+    def export_semantic_topology_learning_state(
+        self,
+    ) -> SemanticTopologyLearningState:
+        """Export contract-bound semantic topology learning state."""
+
+        return self.semantic_plane.export_topology_learning_state()
+
+    def restore_semantic_topology_learning_state(
+        self,
+        state: SemanticTopologyLearningState | Mapping[str, Any],
+    ) -> SemanticTopologyLearningSnapshot:
+        """Restore semantic topology state after full contract validation."""
+
+        return self.semantic_plane.restore_topology_learning_state(state)
+
+    def semantic_topology_learning_summary(self) -> Mapping[str, Any]:
+        """Return bounded bridge-learning state without promoting it to evidence."""
+
+        return self.semantic_plane.topology_learning_summary()
 
     def _state_from_checkpoint(
         self,
@@ -347,6 +783,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             state.last_error = (
                 "recovery quarantine: ambiguous side effect(s) require external reconciliation"
             )
+        self._restore_cortex_advisory(state, checkpoint)
         return state
 
     def _drive(self, state: _RunState) -> AgentResult:
@@ -357,7 +794,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "run.recovery_quarantined",
                 dict(quarantine),
             )
-            return self._finish_failure(
+            result = self._finish_failure(
                 state,
                 TerminationReason.CONFIRMATION_REQUIRED,
                 "A prior consequential tool call may already have taken effect; autonomous replanning is blocked until external state is reconciled.",
@@ -366,7 +803,9 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                     "required_action": "reconcile_external_state_before_new_execution",
                 },
             )
-        return super()._drive(state)
+        else:
+            result = super()._drive(state)
+        return self._observe_cortex_result(state, result)
 
     def _checkpoint(self, state: _RunState) -> RunCheckpoint:
         """Persist after reciprocally binding checkpoint, audit, and model roots."""
@@ -377,7 +816,11 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             if isinstance(self.runtime_guard, ScopedGeneralizingRuntimeEpistemicGuard)
             else None
         )
-        world_fingerprint = self.runtime_guard.world.snapshot(persist=False).fingerprint
+        world_fingerprint = self.runtime_guard.world.snapshot(
+            persist=False
+        ).fingerprint
+        semantic_scope = self.semantic_learning_scope(state.inputs)
+        semantic_plane = self.semantic_plane_for(state.inputs)
         state.checkpoint_sequence += 1
         scratch = {
             entry.key: {
@@ -400,7 +843,17 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "execution_audit_checkpoint": audit.checkpoint_fingerprint,
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
-            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_scoping_enabled": self.semantic_scoping_enabled,
+            "semantic_learning_scope_fingerprint": (
+                semantic_scope.fingerprint
+            ),
+            "semantic_plane_fingerprint": semantic_plane.fingerprint,
+            "semantic_runtime_state_fingerprint": (
+                semantic_plane.runtime_state_fingerprint
+            ),
+            "semantic_topology_learning_fingerprint": (
+                semantic_plane.topology_learning.fingerprint
+            ),
         }
         if lineage is not None:
             metadata.update(
@@ -428,7 +881,7 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             metadata=metadata,
         )
         binding_payload = {
-            "frontier_binding_version": 2,
+            "frontier_binding_version": 5,
             "checkpoint_sequence": checkpoint.sequence,
             "checkpoint_fingerprint": checkpoint.fingerprint,
             "audit_head_before": audit.head_hash,
@@ -437,7 +890,17 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
             "runtime_guard_policy": self.runtime_guard.policy.fingerprint,
             "transition_model_fingerprint": self.runtime_guard.transition_model.fingerprint,
             "world_model_fingerprint": world_fingerprint,
-            "semantic_plane_fingerprint": self.semantic_plane.fingerprint,
+            "semantic_scoping_enabled": self.semantic_scoping_enabled,
+            "semantic_learning_scope_fingerprint": (
+                semantic_scope.fingerprint
+            ),
+            "semantic_plane_fingerprint": semantic_plane.fingerprint,
+            "semantic_runtime_state_fingerprint": (
+                semantic_plane.runtime_state_fingerprint
+            ),
+            "semantic_topology_learning_fingerprint": (
+                semantic_plane.topology_learning.fingerprint
+            ),
         }
         if lineage is not None:
             binding_payload.update(
@@ -455,7 +918,287 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         self.checkpointer.save(checkpoint)
         self.metrics.increment("agent.checkpoints.saved")
         self.metrics.increment("agent.checkpoints.audit_bound")
+        self._observe_cortex_checkpoint(state, checkpoint)
         return checkpoint
+
+    def _ensure_cortex_run(
+        self,
+        state: _RunState,
+        checkpoint_sequence: int,
+    ) -> bool:
+        if self.cortex is None:
+            return False
+        try:
+            self.cortex.begin(
+                state.inputs,
+                run_id=state.run_id,
+                evidence_ledger=state.ledger,
+            )
+            return True
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            self.metrics.increment("agent.cortex.checkpoint_errors")
+            error = {
+                "stage": "bind_run",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:512],
+                "checkpoint_sequence": checkpoint_sequence,
+                "authority": "advisory_only",
+            }
+            state.scratch.set(self._CORTEX_ERROR_KEY, error, importance=0.90)
+            state.trace.emit("cortex.error", error)
+            if self.cortex_required:
+                raise
+            return False
+
+    def _restore_cortex_advisory(
+        self,
+        state: _RunState,
+        checkpoint: RunCheckpoint,
+    ) -> None:
+        if self.cortex is None:
+            return
+        if not self._ensure_cortex_run(state, checkpoint.sequence):
+            return
+        with self._cortex_lock:
+            cached = self._cortex_assessments.get(state.run_id)
+        if cached is not None and cached.get("checkpoint_sequence") == checkpoint.sequence:
+            state.scratch.set(
+                self._CORTEX_ASSESSMENT_KEY,
+                cached,
+                importance=0.95,
+            )
+            state.scratch.delete(self._CORTEX_ERROR_KEY)
+            return
+        self._observe_cortex_checkpoint(state, checkpoint)
+
+    def _observe_cortex_checkpoint(
+        self,
+        state: _RunState,
+        checkpoint: RunCheckpoint,
+    ) -> Mapping[str, Any] | None:
+        if self.cortex is None:
+            return None
+        if not self._ensure_cortex_run(state, checkpoint.sequence):
+            return None
+        try:
+            assessment = self.cortex.observe_checkpoint(
+                state.inputs,
+                checkpoint,
+                current_risk=self._cortex_current_risk(state),
+            )
+            payload = {
+                "schema_version": 1,
+                "authority": "advisory_only",
+                "checkpoint_sequence": checkpoint.sequence,
+                "checkpoint_fingerprint": checkpoint.fingerprint,
+                "decision_id": assessment.decision.decision_id,
+                "mode": assessment.decision.mode.value,
+                "score": assessment.decision.score,
+                "directive": assessment.decision.directive,
+                "hard_stop": assessment.decision.hard_stop,
+                "requires_confirmation": assessment.decision.requires_confirmation,
+                "reasons": [reason.value for reason in assessment.decision.reasons],
+                "recommended_skill_id": assessment.recommended_skill_id,
+                "world_fingerprint": assessment.world_fingerprint,
+                "probes": [
+                    {
+                        "probe_id": probe.probe_id,
+                        "proposition_id": probe.proposition_id,
+                        "expected_information_gain_bits": probe.expected_information_gain_bits,
+                        "priority": probe.priority,
+                    }
+                    for probe in assessment.probes[:4]
+                ],
+                "notes": list(assessment.notes[:8]),
+            }
+            with self._cortex_lock:
+                self._cortex_assessments[state.run_id] = payload
+            state.scratch.set(
+                self._CORTEX_ASSESSMENT_KEY,
+                payload,
+                importance=0.95,
+            )
+            state.scratch.delete(self._CORTEX_ERROR_KEY)
+            state.trace.emit(
+                "cortex.checkpoint_assessed",
+                {
+                    "checkpoint_sequence": checkpoint.sequence,
+                    "decision_id": assessment.decision.decision_id,
+                    "mode": assessment.decision.mode.value,
+                    "score": assessment.decision.score,
+                    "hard_stop": assessment.decision.hard_stop,
+                    "recommended_skill_id": assessment.recommended_skill_id,
+                    "probe_count": len(assessment.probes),
+                    "authority": "advisory_only",
+                },
+            )
+            self.metrics.increment("agent.cortex.checkpoints_assessed")
+            return payload
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            self.metrics.increment("agent.cortex.checkpoint_errors")
+            error = {
+                "stage": "checkpoint",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:512],
+                "checkpoint_sequence": checkpoint.sequence,
+                "authority": "advisory_only",
+            }
+            state.scratch.set(self._CORTEX_ERROR_KEY, error, importance=0.90)
+            state.trace.emit("cortex.error", error)
+            if self.cortex_required:
+                raise
+            return None
+
+    def _observe_cortex_result(
+        self,
+        state: _RunState,
+        result: AgentResult,
+    ) -> AgentResult:
+        if self.cortex is None:
+            return result
+        try:
+            verification_scores, action_costs, action_risks = self._cortex_learning_signals(
+                state.run_id
+            )
+            report = self.cortex.observe_result(
+                state.inputs,
+                result,
+                verification_scores=verification_scores,
+                action_costs=action_costs,
+                action_risks=action_risks,
+            )
+            metadata = dict(result.metadata)
+            metadata["cortex"] = {
+                "status": "observed",
+                "authority": "advisory_only",
+                "report_fingerprint": report.report_fingerprint,
+                "world_fingerprint": report.world_fingerprint,
+                "belief_count": report.belief_count,
+                "hypothesis_count": report.hypothesis_count,
+                "world_entropy_bits": report.world_entropy_bits,
+                "decision_count": len(report.decisions),
+                "learned_skill_ids": list(report.learned_skill_ids),
+                "verified_tool_signal_count": len(verification_scores),
+                "cost_bound_tool_signal_count": len(action_costs),
+                "risk_bound_tool_signal_count": len(action_risks),
+                "anomalies": list(report.anomalies),
+            }
+            self.metrics.increment("agent.cortex.results_observed")
+            return replace(result, metadata=metadata)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as exc:
+            self.metrics.increment("agent.cortex.result_errors")
+            if self.cortex_required:
+                raise
+            metadata = dict(result.metadata)
+            metadata["cortex"] = {
+                "status": "degraded",
+                "authority": "advisory_only",
+                "error_type": type(exc).__name__,
+                "message": str(exc)[:512],
+            }
+            return replace(result, metadata=metadata)
+
+    def _cortex_learning_signals(
+        self,
+        run_id: str,
+    ) -> tuple[dict[str, float], dict[str, float], dict[str, RiskTier]]:
+        ledger = self.runtime_guard.audit_store.get(run_id)
+        if ledger is None:
+            return {}, {}, {}
+
+        by_operation: dict[str, dict[str, Any]] = {}
+        for entry in ledger.entries():
+            if entry.operation_id is None:
+                continue
+            record = by_operation.setdefault(entry.operation_id, {})
+            if entry.kind is AuditEventKind.INTENT_BOUND:
+                call_id = entry.payload.get("call_id")
+                risk = entry.payload.get("risk")
+                if isinstance(call_id, str) and call_id:
+                    record["call_id"] = call_id
+                try:
+                    if risk is not None:
+                        record["risk"] = (
+                            risk
+                            if isinstance(risk, RiskTier)
+                            else RiskTier(str(risk))
+                        )
+                except ValueError:
+                    pass
+            elif entry.kind is AuditEventKind.EXECUTION_FINALIZED:
+                score = entry.payload.get("verification_score")
+                try:
+                    normalized = float(score)
+                except (TypeError, ValueError):
+                    continue
+                if 0.0 <= normalized <= 1.0:
+                    record["verification_score"] = normalized
+
+        finalization_costs = {
+            item.operation_id: item.experience.cost
+            for item in self.runtime_guard.finalizations(run_id)
+        }
+        verification_scores: dict[str, float] = {}
+        action_costs: dict[str, float] = {}
+        action_risks: dict[str, RiskTier] = {}
+        for operation_id, record in by_operation.items():
+            call_id = record.get("call_id")
+            if not isinstance(call_id, str) or not call_id:
+                continue
+            score = record.get("verification_score")
+            if isinstance(score, float):
+                verification_scores[call_id] = score
+            cost = finalization_costs.get(operation_id)
+            if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+                action_costs[call_id] = max(0.0, float(cost))
+            risk = record.get("risk")
+            if isinstance(risk, RiskTier):
+                action_risks[call_id] = risk
+        return verification_scores, action_costs, action_risks
+
+    def _cortex_current_risk(self, state: _RunState) -> RiskTier:
+        if state.plan is None:
+            return RiskTier.READ_ONLY
+        running = [
+            step for step in state.plan.steps
+            if step.status is StepStatus.RUNNING
+        ]
+        candidates = running or list(state.plan.ready_steps())
+        if not candidates:
+            return RiskTier.READ_ONLY
+        risks: list[RiskTier] = []
+        for step in candidates:
+            risk = step.risk
+            if step.tool is not None:
+                registered = self.tools.get(step.tool)
+                if registered is not None:
+                    host_risk = registered.spec.risk
+                    if self._RISK_ORDER[host_risk] > self._RISK_ORDER[risk]:
+                        risk = host_risk
+            risks.append(risk)
+        return max(risks, key=lambda risk: self._RISK_ORDER[risk])
+
+    def cortex_summary(self) -> Mapping[str, Any]:
+        if self.cortex is None:
+            return {
+                "enabled": False,
+                "required": self.cortex_required,
+            }
+        summary = dict(self.cortex.global_summary())
+        summary.update(
+            {
+                "enabled": True,
+                "required": self.cortex_required,
+                "authority": "advisory_only",
+            }
+        )
+        return summary
 
     @staticmethod
     def _verify_resume_identity(inputs: RunInputs, checkpoint: RunCheckpoint) -> None:
@@ -494,13 +1237,80 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
         if expected_world != current_world:
             raise ExecutionAuditError("world model fingerprint changed on resume")
 
-        expected_semantic_plane = checkpoint.metadata.get("semantic_plane_fingerprint")
+        checkpoint_scoping = checkpoint.metadata.get(
+            "semantic_scoping_enabled"
+        )
+        if checkpoint_scoping is None:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic scoping mode"
+            )
+        if bool(checkpoint_scoping) != self.semantic_scoping_enabled:
+            raise ExecutionAuditError(
+                "semantic scoping mode changed on resume"
+            )
+
+        try:
+            semantic_scope = SemanticLearningScope(
+                tenant_id=str(checkpoint.metadata["tenant_id"]),
+                user_id=str(checkpoint.metadata["user_id"]),
+                workspace_id=str(checkpoint.metadata["workspace_id"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic learning scope metadata"
+            ) from exc
+        expected_scope = checkpoint.metadata.get(
+            "semantic_learning_scope_fingerprint"
+        )
+        if expected_scope != semantic_scope.fingerprint:
+            raise ExecutionAuditError(
+                "semantic learning scope fingerprint mismatch"
+            )
+        semantic_plane = self.semantic_plane_for_scope(
+            semantic_scope.tenant_id,
+            semantic_scope.user_id,
+            semantic_scope.workspace_id,
+        )
+
+        expected_semantic_plane = checkpoint.metadata.get(
+            "semantic_plane_fingerprint"
+        )
         if (
-            expected_semantic_plane is not None
-            and expected_semantic_plane != self.semantic_plane.fingerprint
+            expected_semantic_plane is None
+            or expected_semantic_plane != semantic_plane.fingerprint
         ):
             raise ExecutionAuditError(
                 "semantic plane contract fingerprint changed on resume"
+            )
+
+        expected_semantic_state = checkpoint.metadata.get(
+            "semantic_runtime_state_fingerprint"
+        )
+        if expected_semantic_state is None:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic runtime state root"
+            )
+        if (
+            expected_semantic_state
+            != semantic_plane.runtime_state_fingerprint
+        ):
+            raise ExecutionAuditError(
+                "semantic runtime state fingerprint changed on resume"
+            )
+
+        expected_topology_learning = checkpoint.metadata.get(
+            "semantic_topology_learning_fingerprint"
+        )
+        if expected_topology_learning is None:
+            raise ExecutionAuditError(
+                "checkpoint is missing semantic topology learning root"
+            )
+        current_topology_learning = (
+            semantic_plane.topology_learning.fingerprint
+        )
+        if expected_topology_learning != current_topology_learning:
+            raise ExecutionAuditError(
+                "semantic topology learning fingerprint changed on resume"
             )
 
         if isinstance(self.runtime_guard, ScopedGeneralizingRuntimeEpistemicGuard):
@@ -583,6 +1393,16 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 "world_model_fingerprint"
             ):
                 continue
+            if payload.get(
+                "semantic_scoping_enabled"
+            ) != checkpoint.metadata.get("semantic_scoping_enabled"):
+                continue
+            if payload.get(
+                "semantic_learning_scope_fingerprint"
+            ) != checkpoint.metadata.get(
+                "semantic_learning_scope_fingerprint"
+            ):
+                continue
             checkpoint_semantic_plane = checkpoint.metadata.get(
                 "semantic_plane_fingerprint"
             )
@@ -590,6 +1410,28 @@ class FrontierJeevesAgentRuntime(StrictJeevesAgentRuntime):
                 checkpoint_semantic_plane is not None
                 and payload.get("semantic_plane_fingerprint")
                 != checkpoint_semantic_plane
+            ):
+                continue
+            checkpoint_semantic_state = checkpoint.metadata.get(
+                "semantic_runtime_state_fingerprint"
+            )
+            if (
+                checkpoint_semantic_state is None
+                or payload.get(
+                    "semantic_runtime_state_fingerprint"
+                )
+                != checkpoint_semantic_state
+            ):
+                continue
+            checkpoint_topology_learning = checkpoint.metadata.get(
+                "semantic_topology_learning_fingerprint"
+            )
+            if (
+                checkpoint_topology_learning is None
+                or payload.get(
+                    "semantic_topology_learning_fingerprint"
+                )
+                != checkpoint_topology_learning
             ):
                 continue
             checkpoint_lineage = checkpoint.metadata.get(
