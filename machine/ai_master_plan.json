@@ -8424,19 +8424,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Separate connector discovery/configuration from credential-bearing execution.",
+        "Require explicit read/write scopes, pagination, rate limits and error semantics."
+      ],
+      "capabilities": [
+        "connector registry",
+        "auth-scoped execution",
+        "connector lifecycle"
+      ],
+      "contracts": [
+        "ConnectorDefinition",
+        "ConnectorSession",
+        "ConnectorResult"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "planned:skeleton/connectors"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_connector_framework.py"
+      ],
+      "evaluations": [
+        "planned:rate-limit/auth failure matrix"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "scope escalation",
+        "provider-specific leakage"
+      ],
+      "gaps": [
+        "materialize connector SDK",
+        "bind connectors to tool policy"
+      ],
       "accountability_id": "ACC-VOL-161",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 162,
@@ -8446,19 +8471,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Plugins must declare capabilities, permissions and compatibility before activation.",
+        "Plugin lifecycle must support disable/remove without corrupting core state."
+      ],
+      "capabilities": [
+        "plugin manifests",
+        "plugin lifecycle",
+        "permission grants"
+      ],
+      "contracts": [
+        "PluginManifest",
+        "PluginGrant",
+        "PluginLifecycle"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "planned:skeleton/plugins"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_plugin_ecosystem.py"
+      ],
+      "evaluations": [
+        "planned:plugin compatibility matrix"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "plugin privilege creep",
+        "uninstall residue"
+      ],
+      "gaps": [
+        "define plugin manifest schema",
+        "bind plugin state to capability registry"
+      ],
       "accountability_id": "ACC-VOL-162",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 163,
@@ -8468,19 +8518,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Verify provenance/signatures and permission declarations.",
+        "Quarantine/revoke packages on security or policy failure."
+      ],
+      "capabilities": [
+        "package verification",
+        "risk classification",
+        "revocation"
+      ],
+      "contracts": [
+        "MarketplacePackage",
+        "PackageAttestation",
+        "RevocationRecord"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "planned:skeleton/plugins"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_tool_marketplace_security.py"
+      ],
+      "evaluations": [
+        "planned:malicious plugin corpus"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "supply-chain compromise",
+        "confused-deputy permissions"
+      ],
+      "gaps": [
+        "define trust tiers",
+        "materialize quarantine/revocation path"
+      ],
       "accountability_id": "ACC-VOL-163",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 164,
@@ -8490,19 +8565,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Default deny undeclared capabilities and egress.",
+        "Destroy/reconcile sandbox state after terminal execution."
+      ],
+      "capabilities": [
+        "sandbox creation",
+        "resource isolation",
+        "sandbox teardown"
+      ],
+      "contracts": [
+        "SandboxSpec",
+        "SandboxGrant",
+        "SandboxReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_sandbox_runtime.py"
+      ],
+      "evaluations": [
+        "planned:escape/resource-exhaustion campaign"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "sandbox escape",
+        "host resource denial"
+      ],
+      "gaps": [
+        "bind platform isolation backends",
+        "add teardown residue checks"
+      ],
       "accountability_id": "ACC-VOL-164",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 165,
@@ -8512,19 +8612,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Policy evaluation must be deterministic for identical inputs/version.",
+        "Unknown values and parse failures fail closed for privileged actions."
+      ],
+      "capabilities": [
+        "policy definitions",
+        "policy evaluation",
+        "policy versioning"
+      ],
+      "contracts": [
+        "Policy",
+        "PolicyInput",
+        "PolicyDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_policy_language.py"
+      ],
+      "evaluations": [
+        "planned:policy ambiguity/fuzz suite"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "ambiguous policy",
+        "model-generated authority"
+      ],
+      "gaps": [
+        "define minimal policy grammar",
+        "bind decisions to receipts"
+      ],
       "accountability_id": "ACC-VOL-165",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 166,
@@ -8534,19 +8659,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Simulation cannot grant real authority or execute external side effects.",
+        "Compare allow/deny/abstain deltas and affected populations/workloads."
+      ],
+      "capabilities": [
+        "policy replay",
+        "impact analysis",
+        "candidate comparison"
+      ],
+      "contracts": [
+        "PolicySimulation",
+        "PolicyTrace",
+        "PolicyDelta"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "experiments"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_policy_simulation.py"
+      ],
+      "evaluations": [
+        "planned:policy regression replay"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "simulation differs from runtime",
+        "biased trace corpus"
+      ],
+      "gaps": [
+        "share evaluator with runtime",
+        "establish trace corpus governance"
+      ],
       "accountability_id": "ACC-VOL-166",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 167,
@@ -8556,19 +8706,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Map threats to concrete components and controls.",
+        "Review threat model when authority/data/network boundaries change."
+      ],
+      "capabilities": [
+        "threat registry",
+        "boundary mapping",
+        "mitigation traceability"
+      ],
+      "contracts": [
+        "Threat",
+        "AttackSurface",
+        "Mitigation"
+      ],
+      "implementation_paths": [
+        "docs/security",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_threat_model.py"
+      ],
+      "evaluations": [
+        "planned:threat-control coverage audit"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "stale threat model",
+        "unowned mitigation"
+      ],
+      "gaps": [
+        "materialize threat IDs",
+        "bind PR impact triggers"
+      ],
       "accountability_id": "ACC-VOL-167",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 168,
@@ -8578,19 +8753,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Treat untrusted model/context/tool outputs as data, never authority.",
+        "Map each AI threat to prevention, detection, recovery and eval evidence."
+      ],
+      "capabilities": [
+        "AI threat catalogue",
+        "adversarial controls",
+        "AI incident signals"
+      ],
+      "contracts": [
+        "AIThreat",
+        "TrustLabel",
+        "AIThreatControl"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/eval"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_ai_threat_controls.py"
+      ],
+      "evaluations": [
+        "planned:prompt/memory/tool injection campaign"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "indirect injection",
+        "memory poisoning"
+      ],
+      "gaps": [
+        "bind catalogue to edge cases",
+        "materialize permanent adversarial suite"
+      ],
       "accountability_id": "ACC-VOL-168",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 169,
@@ -8600,19 +8800,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Every privileged crossing needs authenticated identity and explicit authorization.",
+        "Boundary failures must degrade closed without widening access."
+      ],
+      "capabilities": [
+        "boundary registry",
+        "crossing enforcement",
+        "boundary telemetry"
+      ],
+      "contracts": [
+        "SecurityBoundary",
+        "BoundaryCrossing",
+        "BoundaryDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_security_boundaries.py"
+      ],
+      "evaluations": [
+        "planned:boundary-bypass evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "implicit trust crossing",
+        "fallback privilege widening"
+      ],
+      "gaps": [
+        "map all trust boundaries",
+        "bind crossings to trace model"
+      ],
       "accountability_id": "ACC-VOL-169",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 170,
@@ -8622,19 +8847,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use workload/service identity and least-privilege grants internally.",
+        "Continuously revalidate authority for long-running operations where risk warrants."
+      ],
+      "capabilities": [
+        "internal identity",
+        "least-privilege authorization",
+        "continuous validation"
+      ],
+      "contracts": [
+        "WorkloadIdentity",
+        "InternalGrant",
+        "TrustDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/network"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_zero_trust_internal.py"
+      ],
+      "evaluations": [
+        "planned:stolen-token/lateral movement evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "ambient authority",
+        "stale service token"
+      ],
+      "gaps": [
+        "define workload identity model",
+        "bind internal RPC auth"
+      ],
       "accountability_id": "ACC-VOL-170",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 171,
@@ -8644,19 +8894,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Separate public ingress from internal control/data paths.",
+        "Specify DNS, timeout, retry, proxy and partition behavior."
+      ],
+      "capabilities": [
+        "network zones",
+        "service connectivity",
+        "partition handling"
+      ],
+      "contracts": [
+        "NetworkZone",
+        "NetworkRoute",
+        "NetworkPolicy"
+      ],
+      "implementation_paths": [
+        "skeleton/network",
+        "deploy"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_network_architecture.py"
+      ],
+      "evaluations": [
+        "planned:partition/DNS failure matrix"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "flat network trust",
+        "retry storms"
+      ],
+      "gaps": [
+        "materialize network topology",
+        "bind egress/identity controls"
+      ],
       "accountability_id": "ACC-VOL-171",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 172,
@@ -8666,19 +8941,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Default deny unapproved destinations for privileged sandboxes/tools.",
+        "Resolve DNS/rebinding and redirect behavior within policy."
+      ],
+      "capabilities": [
+        "egress allowlists",
+        "DNS/redirect enforcement",
+        "egress receipts"
+      ],
+      "contracts": [
+        "EgressPolicy",
+        "EgressRequest",
+        "EgressDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/network"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_egress_control.py"
+      ],
+      "evaluations": [
+        "planned:SSRF/DNS-rebinding campaign"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "SSRF",
+        "policy bypass via redirects"
+      ],
+      "gaps": [
+        "implement destination canonicalization",
+        "bind network tools to egress policy"
+      ],
       "accountability_id": "ACC-VOL-172",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 173,
@@ -8688,19 +8988,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Secrets are referenced by handles/scopes rather than copied into general state.",
+        "Detect and redact accidental secret propagation."
+      ],
+      "capabilities": [
+        "secret handles",
+        "secret redaction",
+        "rotation"
+      ],
+      "contracts": [
+        "SecretRef",
+        "SecretGrant",
+        "SecretUseReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/vault"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_secret_security.py"
+      ],
+      "evaluations": [
+        "planned:secret exfiltration evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "secret in prompt/log",
+        "long-lived credentials"
+      ],
+      "gaps": [
+        "unify secret access path",
+        "bind detectors to CI/runtime"
+      ],
       "accountability_id": "ACC-VOL-173",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 174,
@@ -8710,19 +9035,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Separate key material from metadata/identifiers.",
+        "Design rotation and restore so old data/evidence remains verifiable where required."
+      ],
+      "capabilities": [
+        "key lifecycle",
+        "rotation",
+        "revocation/recovery"
+      ],
+      "contracts": [
+        "KeyId",
+        "KeyVersion",
+        "KeyRotation"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/vault"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_key_management.py"
+      ],
+      "evaluations": [
+        "planned:key-rotation/restore drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "lost key",
+        "revoked key remains trusted"
+      ],
+      "gaps": [
+        "define KMS abstraction",
+        "bind signatures/encryption to versions"
+      ],
       "accountability_id": "ACC-VOL-174",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 175,
@@ -8732,19 +9082,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Attach tenant scope before lookup/ranking/execution.",
+        "Test cross-tenant negative access paths continuously."
+      ],
+      "capabilities": [
+        "tenant-scoped execution",
+        "tenant storage isolation",
+        "tenant negative tests"
+      ],
+      "contracts": [
+        "TenantScope",
+        "TenantBoundary",
+        "TenantAccessDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/persistence"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_tenant_isolation_deep.py"
+      ],
+      "evaluations": [
+        "planned:cross-tenant red-team campaign"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "tenant bleed",
+        "shared cache leak"
+      ],
+      "gaps": [
+        "propagate tenant identity universally",
+        "bind isolation to trace/evidence"
+      ],
       "accountability_id": "ACC-VOL-175",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 176,
@@ -8754,19 +9129,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Propagate privacy labels into derived data and artifacts.",
+        "Block incompatible processing/export based on policy and jurisdictional scope."
+      ],
+      "capabilities": [
+        "data classification",
+        "purpose enforcement",
+        "privacy transformations"
+      ],
+      "contracts": [
+        "PrivacyLabel",
+        "PurposeGrant",
+        "PrivacyDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/vault",
+        "skeleton/security"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_privacy_engine.py"
+      ],
+      "evaluations": [
+        "planned:purpose/derivation leakage evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "classification loss",
+        "secondary-use violation"
+      ],
+      "gaps": [
+        "define privacy label lattice",
+        "bind to ingestion/retrieval/tools"
+      ],
       "accountability_id": "ACC-VOL-176",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 177,
@@ -8776,19 +9176,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Track deletion scope through replicas, indexes, caches, artifacts and backups.",
+        "Prevent restore/rebuild from resurrecting deleted data."
+      ],
+      "capabilities": [
+        "deletion requests",
+        "tombstones",
+        "deletion propagation"
+      ],
+      "contracts": [
+        "DeletionRequest",
+        "DeletionTombstone",
+        "DeletionEvidence"
+      ],
+      "implementation_paths": [
+        "skeleton/vault",
+        "skeleton/persistence"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_data_deletion.py"
+      ],
+      "evaluations": [
+        "planned:restore-after-delete drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "tombstone resurrection",
+        "orphan derivatives"
+      ],
+      "gaps": [
+        "materialize deletion graph",
+        "bind backup/restore reconciliation"
+      ],
       "accountability_id": "ACC-VOL-177",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 178,
@@ -8798,19 +9223,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Bind SBOM to exact build artifact digest.",
+        "Include direct/transitive/native/container components."
+      ],
+      "capabilities": [
+        "SBOM generation",
+        "dependency provenance",
+        "vulnerability linkage"
+      ],
+      "contracts": [
+        "SBOM",
+        "SoftwareComponent",
+        "VulnerabilityFinding"
+      ],
+      "implementation_paths": [
+        "scripts",
+        "release"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_sbom.py"
+      ],
+      "evaluations": [
+        "planned:artifact/SBOM consistency audit"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "missing transitive dependency",
+        "stale vulnerability data"
+      ],
+      "gaps": [
+        "select SBOM format",
+        "bind generation to release pipeline"
+      ],
       "accountability_id": "ACC-VOL-178",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 179,
@@ -8820,19 +9270,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Bind MBOM to immutable model artifact/version.",
+        "Record training/post-training lineage without exposing restricted secrets/data."
+      ],
+      "capabilities": [
+        "model inventory",
+        "lineage",
+        "model compliance metadata"
+      ],
+      "contracts": [
+        "MBOM",
+        "ModelComponent",
+        "ModelLineage"
+      ],
+      "implementation_paths": [
+        "machine",
+        "training"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_model_bom.py"
+      ],
+      "evaluations": [
+        "planned:model lineage completeness audit"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "unknown base model lineage",
+        "license ambiguity"
+      ],
+      "gaps": [
+        "define MBOM schema",
+        "bind model registry promotion"
+      ],
       "accountability_id": "ACC-VOL-179",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 180,
@@ -8842,19 +9317,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Specify SLI, target, window and excluded conditions explicitly.",
+        "Use SLOs to drive operations and capacity rather than decorative dashboards."
+      ],
+      "capabilities": [
+        "SLO registry",
+        "SLI measurement",
+        "SLO reporting"
+      ],
+      "contracts": [
+        "SLO",
+        "SLI",
+        "SLOWindow"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_slo_registry.py"
+      ],
+      "evaluations": [
+        "planned:SLI correctness evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "misleading SLI",
+        "unowned objective"
+      ],
+      "gaps": [
+        "define core service SLOs",
+        "bind alerts/error budgets"
+      ],
       "accountability_id": "ACC-VOL-180",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 181,
@@ -8864,19 +9364,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Calculate budgets from authoritative SLI data and declared windows.",
+        "Prevent budget override from silently disabling safety/reliability gates."
+      ],
+      "capabilities": [
+        "budget calculation",
+        "burn-rate policy",
+        "release constraints"
+      ],
+      "contracts": [
+        "ErrorBudget",
+        "BurnRate",
+        "BudgetDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "release"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_error_budgets.py"
+      ],
+      "evaluations": [
+        "planned:burn-rate scenario evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "bad denominator",
+        "budget used to excuse critical failure"
+      ],
+      "gaps": [
+        "define burn policy",
+        "bind to canary/release gates"
+      ],
       "accountability_id": "ACC-VOL-181",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 182,
@@ -8886,19 +9411,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Declare allowed label sets and high-cardinality exceptions.",
+        "Reject secrets/user content as uncontrolled telemetry dimensions."
+      ],
+      "capabilities": [
+        "cardinality budgets",
+        "label governance",
+        "telemetry sampling"
+      ],
+      "contracts": [
+        "TelemetryLabel",
+        "CardinalityBudget",
+        "SamplingPolicy"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_observability_cardinality.py"
+      ],
+      "evaluations": [
+        "planned:cardinality explosion evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "metrics backend overload",
+        "PII in labels"
+      ],
+      "gaps": [
+        "inventory metric labels",
+        "add cardinality linting"
+      ],
       "accountability_id": "ACC-VOL-182",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 183,
@@ -8908,19 +9458,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use stable operation/correlation identity across process boundaries.",
+        "Record causal links without making telemetry authoritative state."
+      ],
+      "capabilities": [
+        "distributed tracing",
+        "causal links",
+        "trace-to-evidence correlation"
+      ],
+      "contracts": [
+        "TraceId",
+        "Span",
+        "TraceLink"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_trace_model.py"
+      ],
+      "evaluations": [
+        "planned:trace completeness evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "broken correlation",
+        "trace contains secrets"
+      ],
+      "gaps": [
+        "define span taxonomy",
+        "bind receipts/events to traces"
+      ],
       "accountability_id": "ACC-VOL-183",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 184,
@@ -8930,19 +9505,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Profile before optimization and retain workload/environment identity.",
+        "Separate steady-state, startup and tail-path costs."
+      ],
+      "capabilities": [
+        "profiling sessions",
+        "hot-path attribution",
+        "regression comparison"
+      ],
+      "contracts": [
+        "ProfileRun",
+        "ProfileSample",
+        "PerformanceFinding"
+      ],
+      "implementation_paths": [
+        "benchmarks",
+        "skeleton/observability"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_profile_records.py"
+      ],
+      "evaluations": [
+        "planned:representative workload profiles"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "benchmark distortion",
+        "profiler overhead misread"
+      ],
+      "gaps": [
+        "standardize profile bundles",
+        "bind findings to backlog"
+      ],
       "accountability_id": "ACC-VOL-184",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 185,
@@ -8952,19 +9552,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Set percentile budgets per operation class and environment.",
+        "Expose budget exhaustion/degradation rather than hiding latency with retries."
+      ],
+      "capabilities": [
+        "latency decomposition",
+        "stage budgets",
+        "tail monitoring"
+      ],
+      "contracts": [
+        "LatencyBudget",
+        "LatencyStage",
+        "LatencyObservation"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_latency_budgets.py"
+      ],
+      "evaluations": [
+        "planned:p95/p99 budget evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "retry hides tail latency",
+        "stage budget oversubscription"
+      ],
+      "gaps": [
+        "define canonical operation budgets",
+        "bind routing/admission"
+      ],
       "accountability_id": "ACC-VOL-185",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 186,
@@ -8974,19 +9599,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Reserve/charge/refund costs using durable accounting semantics.",
+        "Budget exhaustion may reduce capability only through declared safe fallback."
+      ],
+      "capabilities": [
+        "cost admission",
+        "cost accounting",
+        "budget fallback"
+      ],
+      "contracts": [
+        "CostReservation",
+        "CostCharge",
+        "CostDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/observability"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_cost_governor.py"
+      ],
+      "evaluations": [
+        "planned:retry/runaway-spend campaign"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "double charge",
+        "unsafe cheap fallback"
+      ],
+      "gaps": [
+        "unify cost ledger",
+        "bind model/tool routing"
+      ],
       "accountability_id": "ACC-VOL-186",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 187,
@@ -8996,19 +9646,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use hardware/workload-normalized measurements.",
+        "Require quality/reliability equivalence for efficiency claims."
+      ],
+      "capabilities": [
+        "compute efficiency",
+        "energy metrics",
+        "efficiency optimization"
+      ],
+      "contracts": [
+        "EfficiencyMetric",
+        "ComputeObservation",
+        "EfficiencyClaim"
+      ],
+      "implementation_paths": [
+        "benchmarks",
+        "skeleton/observability"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_efficiency_metrics.py"
+      ],
+      "evaluations": [
+        "planned:quality-normalized efficiency benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "greenwashing metric",
+        "quality loss hidden by efficiency"
+      ],
+      "gaps": [
+        "define measurement methodology",
+        "bind to capacity/cost reviews"
+      ],
       "accountability_id": "ACC-VOL-187",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 188,
@@ -9018,19 +9693,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Chaos experiments require bounded blast radius and abort controls.",
+        "Map experiments to hypotheses, SLOs and recovery evidence."
+      ],
+      "capabilities": [
+        "fault injection",
+        "blast-radius control",
+        "chaos evidence"
+      ],
+      "contracts": [
+        "ChaosExperiment",
+        "FaultInjection",
+        "ChaosResult"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "experiments"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_chaos_contracts.py"
+      ],
+      "evaluations": [
+        "planned:compound fault campaigns"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "chaos causes real outage",
+        "unmeasured recovery"
+      ],
+      "gaps": [
+        "define fault library",
+        "bind campaigns to runbooks"
+      ],
       "accountability_id": "ACC-VOL-188",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 189,
@@ -9040,19 +9740,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Drills must exercise real procedures/artifacts in representative environments.",
+        "Track RTO/RPO and unresolved manual dependencies."
+      ],
+      "capabilities": [
+        "restore drills",
+        "failover drills",
+        "recovery evidence"
+      ],
+      "contracts": [
+        "RecoveryDrill",
+        "RecoveryMeasurement",
+        "DrillFinding"
+      ],
+      "implementation_paths": [
+        "recovery",
+        "docs"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_recovery_drills.py"
+      ],
+      "evaluations": [
+        "planned:quarterly full recovery scenario"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "paper runbook only",
+        "unrehearsed dependency"
+      ],
+      "gaps": [
+        "build drill scheduler/harness",
+        "bind findings to risk ledger"
+      ],
       "accountability_id": "ACC-VOL-189",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 190,
@@ -9062,19 +9787,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Map every release class to mandatory tests/evidence and allowed waivers.",
+        "Fail closed on missing/cancelled required gate states."
+      ],
+      "capabilities": [
+        "qualification matrix",
+        "change-impact gating",
+        "release evidence"
+      ],
+      "contracts": [
+        "ReleaseClass",
+        "QualificationGate",
+        "QualificationResult"
+      ],
+      "implementation_paths": [
+        "release",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_release_qualification_matrix.py"
+      ],
+      "evaluations": [
+        "planned:gate omission mutation test"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "wrong gate set",
+        "cancelled treated green"
+      ],
+      "gaps": [
+        "centralize qualification rules",
+        "bind merge readiness"
+      ],
       "accountability_id": "ACC-VOL-190",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 191,
@@ -9084,19 +9834,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Define canary cohort, duration, success/failure thresholds and abort controls.",
+        "Compare canary against control on SLO/quality/security/cost signals."
+      ],
+      "capabilities": [
+        "canary rollout",
+        "control comparison",
+        "automatic abort"
+      ],
+      "contracts": [
+        "CanaryPlan",
+        "CanaryObservation",
+        "CanaryDecision"
+      ],
+      "implementation_paths": [
+        "deploy",
+        "skeleton/observability"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_canary_deployment.py"
+      ],
+      "evaluations": [
+        "planned:bad-canary rollback drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "insufficient sample",
+        "slow rollback"
+      ],
+      "gaps": [
+        "define canary controller",
+        "bind error budget/quality vector"
+      ],
       "accountability_id": "ACC-VOL-191",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 192,
@@ -9106,19 +9881,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Flags must have owner, default, scope, expiry and rollback semantics.",
+        "Security/authority guarantees cannot be disabled by ordinary feature flags."
+      ],
+      "capabilities": [
+        "flag registry",
+        "targeting",
+        "flag retirement"
+      ],
+      "contracts": [
+        "FeatureFlag",
+        "FlagEvaluation",
+        "FlagLifecycle"
+      ],
+      "implementation_paths": [
+        "config",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_feature_flags.py"
+      ],
+      "evaluations": [
+        "planned:stale-flag audit"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "flag combinatorial explosion",
+        "security bypass"
+      ],
+      "gaps": [
+        "define flag schema",
+        "add expiry/combination checks"
+      ],
       "accountability_id": "ACC-VOL-192",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 193,
@@ -9128,19 +9928,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Rollback plans must account for forward-written durable data.",
+        "Test rollback from partially completed deployments/migrations."
+      ],
+      "capabilities": [
+        "release rollback",
+        "data compatibility",
+        "partial rollback reconciliation"
+      ],
+      "contracts": [
+        "RollbackPlan",
+        "RollbackCheckpoint",
+        "RollbackEvidence"
+      ],
+      "implementation_paths": [
+        "release",
+        "recovery"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_rollback_architecture.py"
+      ],
+      "evaluations": [
+        "planned:migration rollback campaign"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "old binary cannot read new data",
+        "external effects unreverted"
+      ],
+      "gaps": [
+        "classify reversible changes",
+        "bind rollback proof to release"
+      ],
       "accountability_id": "ACC-VOL-193",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 194,
@@ -9150,19 +9975,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Provide fast local validation aligned with CI.",
+        "Surface ownership/contracts/gaps at edit time where practical."
+      ],
+      "capabilities": [
+        "developer commands",
+        "templates",
+        "actionable diagnostics"
+      ],
+      "contracts": [
+        "DeveloperCommand",
+        "Template",
+        "Diagnostic"
+      ],
+      "implementation_paths": [
+        "scripts",
+        "docs"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_developer_experience.py"
+      ],
+      "evaluations": [
+        "planned:local-vs-CI parity evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "slow feedback encourages bypass",
+        "tooling drifts from CI"
+      ],
+      "gaps": [
+        "consolidate dev commands",
+        "generate contract-aware templates"
+      ],
       "accountability_id": "ACC-VOL-194",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 195,
@@ -9172,19 +10022,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Local setup must declare required services and seeded data explicitly.",
+        "Use non-production credentials/data and preserve architecture behavior."
+      ],
+      "capabilities": [
+        "local bootstrap",
+        "service orchestration",
+        "local diagnostics"
+      ],
+      "contracts": [
+        "LocalEnvironment",
+        "LocalService",
+        "LocalBootstrap"
+      ],
+      "implementation_paths": [
+        "scripts",
+        "docker-compose.yml"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_local_development.py"
+      ],
+      "evaluations": [
+        "planned:clean-machine local bootstrap"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "works-only-on-maintainer machine",
+        "production secret reuse"
+      ],
+      "gaps": [
+        "define one-command bootstrap",
+        "bind versions to environment spec"
+      ],
       "accountability_id": "ACC-VOL-195",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 196,
@@ -9194,19 +10069,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Fixtures must declare scope/ownership and avoid network/clock/randomness leakage by default.",
+        "Version complex fixtures and preserve provenance for captured corpora."
+      ],
+      "capabilities": [
+        "fixture registry",
+        "deterministic fakes",
+        "fault fixtures"
+      ],
+      "contracts": [
+        "Fixture",
+        "FixtureFactory",
+        "FixtureVersion"
+      ],
+      "implementation_paths": [
+        "skeleton/testing",
+        "tests"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_fixture_platform.py"
+      ],
+      "evaluations": [
+        "planned:fixture determinism evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "brittle shared fixtures",
+        "real external side effects"
+      ],
+      "gaps": [
+        "catalog fixtures",
+        "add hermeticity checks"
+      ],
       "accountability_id": "ACC-VOL-196",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 197,
@@ -9216,19 +10116,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Simulation must never silently invoke production effects.",
+        "Mark simulated receipts/data so they cannot satisfy production evidence gates."
+      ],
+      "capabilities": [
+        "simulated tools",
+        "simulated services",
+        "simulation receipts"
+      ],
+      "contracts": [
+        "SimulationMode",
+        "SimulatedEffect",
+        "SimulationReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/simulation",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_simulation_mode.py"
+      ],
+      "evaluations": [
+        "planned:simulation/real boundary evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "simulation leakage",
+        "simulated proof accepted as production"
+      ],
+      "gaps": [
+        "define adapter switch contract",
+        "bind evidence labels"
+      ],
       "accountability_id": "ACC-VOL-197",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 198,
@@ -9238,19 +10163,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Fuzz parsers/validators before privileged execution boundaries.",
+        "Persist minimal reproducer cases for every confirmed failure."
+      ],
+      "capabilities": [
+        "schema fuzzing",
+        "protocol fuzzing",
+        "reproducer minimization"
+      ],
+      "contracts": [
+        "FuzzCampaign",
+        "FuzzCase",
+        "FuzzFinding"
+      ],
+      "implementation_paths": [
+        "skeleton/testing",
+        "scripts"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_contract_fuzzing.py"
+      ],
+      "evaluations": [
+        "planned:serialization/parser campaigns"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "resource-exhausting fuzz run",
+        "non-reproducible crash"
+      ],
+      "gaps": [
+        "select P0 contract targets",
+        "integrate reproducers into regression suite"
+      ],
       "accountability_id": "ACC-VOL-198",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 199,
@@ -9260,19 +10210,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Map properties to named invariants/state machines.",
+        "Persist failing seeds and shrink to stable regression cases."
+      ],
+      "capabilities": [
+        "property generators",
+        "stateful testing",
+        "shrinking"
+      ],
+      "contracts": [
+        "Property",
+        "GeneratedCase",
+        "Counterexample"
+      ],
+      "implementation_paths": [
+        "skeleton/testing",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_property_invariants.py"
+      ],
+      "evaluations": [
+        "planned:state-machine property campaigns"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "weak property passes bad behavior",
+        "flaky randomness"
+      ],
+      "gaps": [
+        "define generator library",
+        "bind properties to invariant registry"
+      ],
       "accountability_id": "ACC-VOL-199",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 200,
@@ -9282,19 +10257,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Select candidates where concurrency/authority/recovery ambiguity justifies cost.",
+        "Bind formal assumptions and checked properties to executable implementation tests."
+      ],
+      "capabilities": [
+        "candidate scoring",
+        "formal model linkage",
+        "proof-to-test handoff"
+      ],
+      "contracts": [
+        "FormalCandidate",
+        "FormalModelRef",
+        "VerifiedProperty"
+      ],
+      "implementation_paths": [
+        "formal",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_formal_candidates.py"
+      ],
+      "evaluations": [
+        "planned:candidate selection review"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "formal effort on low-value target",
+        "model/code divergence"
+      ],
+      "gaps": [
+        "rank first candidate set",
+        "establish conformance workflow"
+      ],
       "accountability_id": "ACC-VOL-200",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-161-200"
     },
     {
       "id": 201,
@@ -14383,6 +15383,27 @@
       ],
       "evidence_policy": "Planning depth does not equal implementation evidence; verified+ states require real artifact-bound evidence under existing maturity/accountability policy.",
       "purpose": "Deepen requirements/contracts/state/data/training/post-training/multimodal/tool-SDK domains into buildable planning records."
+    },
+    {
+      "id": "DP-161-200",
+      "title": "Connector-security-to-formal-verification depth pass",
+      "volume_range": [
+        161,
+        200
+      ],
+      "status": "specified_depth",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "risks",
+        "gaps"
+      ],
+      "evidence_policy": "Planning depth is not implementation evidence; verified+ maturity remains artifact-bound and signed.",
+      "purpose": "Deepen connectors/plugins/security/privacy/SBOM/SLO/performance/chaos/release/developer/test/formal-verification domains."
     }
   ],
   "engineering_pass": {
