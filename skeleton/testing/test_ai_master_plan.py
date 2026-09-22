@@ -59,3 +59,10 @@ def test_master_plan_references_engineering_pass() -> None:
     assert engineering["machine_contract"] == "machine/ai_engineering_pass.json"
     assert engineering["human_contract"] == "docs/plan/ENGINEERING_PASS.md"
     assert engineering["required_for_promotion"] == ["verified", "hardened", "production"]
+
+
+def test_master_plan_references_engineering_task_matrix() -> None:
+    data = checker.load_plan()
+    engineering = data["engineering_pass"]
+    assert engineering["task_matrix"] == "machine/ai_engineering_task_matrix.json"
+    assert engineering["task_matrix_human"] == "docs/plan/ENGINEERING_TASK_MATRIX.md"
