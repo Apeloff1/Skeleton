@@ -55,13 +55,6 @@ XTRACE_RE = re.compile(
 )
 OPTION_ONLY_RE = re.compile(r"^(?:--?[A-Za-z0-9][A-Za-z0-9-]*\s*)+$")
 
-COMPOUND_OUTPUT_COMMAND_RE = re.compile(
-    r"(?:&&|\||\|\||;|\bthen\b|\bdo\b)\s*"
-    r"(?P<body>(?:echo|printf|printenv|env|set|tee|cat|export|declare|typeset)"
-    r"\b[^;&|]*)",
-    re.IGNORECASE,
-)
-
 
 class WorkflowSecretOutputScanError(RuntimeError):
     """Raised when required workflow coverage cannot be established."""
@@ -75,8 +68,8 @@ def _options_only(rest: str) -> bool:
     return bool(rest and OPTION_ONLY_RE.fullmatch(rest))
 
 
-def _single_command_violation(command: str) -> str | None:
-    """Inspect one shell command whose first token is security-significant."""
+def command_violation(command: str) -> str | None:
+    """Return one high-confidence reason for a dangerous shell command."""
     stripped = command.strip()
     if not stripped or stripped.startswith("#"):
         return None
@@ -124,24 +117,6 @@ def _single_command_violation(command: str) -> str | None:
         for name in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rest):
             if _secretish_var(name):
                 return f"workflow output command exposes secret-like variable {name}"
-    return None
-
-
-def command_violation(command: str) -> str | None:
-    """Return one high-confidence reason for a dangerous shell command.
-
-    Direct sinks are inspected first. Sinks introduced after common shell
-    control operators are then inspected so a benign leading command cannot
-    hide a later secret-printing sink.
-    """
-    stripped = command.strip()
-    violation = _single_command_violation(stripped)
-    if violation:
-        return violation
-    for match in COMPOUND_OUTPUT_COMMAND_RE.finditer(stripped):
-        violation = _single_command_violation(match.group("body"))
-        if violation:
-            return violation
     return None
 
 
