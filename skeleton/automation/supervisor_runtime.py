@@ -758,6 +758,7 @@ WORKER_RESULT_STATUSES = frozenset({
     "existing-pr",
     "no-change",
     "pull-request-created",
+    "pull-request-updated",
 })
 MAX_WORKER_RESULT_BYTES = 16_384
 
