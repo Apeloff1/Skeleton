@@ -2065,6 +2065,7 @@
     "human_contract": "docs/plan/ENGINEERING_TASK_MATRIX.md",
     "validator": "scripts/check_ai_engineering_task_matrix.py",
     "regression_test": "skeleton/testing/test_ai_engineering_task_matrix.py",
-    "rule": "Every atomic AIQ task inherits the exact union of engineering obligations from all work_package_refs. Task completion does not by itself satisfy verified/hardened/production capability promotion."
+    "rule": "Every atomic AIQ task inherits the exact union of engineering obligations and adversarial closure axes/campaigns from all work_package_refs. Task completion does not by itself satisfy verified/hardened/production capability promotion.",
+    "adversarial_source": "machine/ai_adversarial_closure.json"
   }
 }
