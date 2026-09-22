@@ -252,16 +252,16 @@
     "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T12:29:49Z",
-    "git_sha": "f3053efe38b06820bc1b6188a7c0175b3ea6ceef",
+    "signed_at_utc": "2026-09-22T12:32:25Z",
+    "git_sha": "1b4d2037cf7872ae34702c5c6a715e56a488730a",
     "evidence_refs": [
-      "git:f3053efe38b06820bc1b6188a7c0175b3ea6ceef",
-      "git-tree:8a7c0ab04ab4d907b2c84d00038cb59f73380bac",
+      "git:1b4d2037cf7872ae34702c5c6a715e56a488730a",
       "machine/ai_file_tree.json",
       "scripts/check_ai_file_tree.py",
-      "skeleton/testing/test_ai_file_tree.py"
+      "skeleton/testing/test_ai_file_tree.py",
+      "machine/ai_engineering_task_matrix.json"
     ],
-    "statement": "Implementation payload assembled through the authorized GitHub connection and bound to GitHub identity Apeloff1 at the cited full SHA. GitHub reports that payload commit itself as unsigned, so this uses the plan-permitted github_identity method and is not a GPG/SSH/Sigstore attestation or independent verification.",
+    "statement": "Implementation payload, including AIQ engineering-union reconciliation required by App Assembly, was assembled through the authorized GitHub connection and bound to GitHub identity Apeloff1 at the cited full SHA. GitHub reports that payload commit itself as unsigned, so this uses the plan-permitted github_identity method and is not a GPG/SSH/Sigstore attestation or independent verification.",
     "signature_method": "github_identity"
   },
   "verification_signoff": {
