@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from core.exec_guard import configure_cors_environment, normalize_cors_origins
 
 
