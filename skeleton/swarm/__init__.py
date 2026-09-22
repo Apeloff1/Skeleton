@@ -1,31 +1,37 @@
-"""
-Skeleton Swarm Package
+"""Swarm public facade.
 
-Exports:
-- SwarmMesh: Agent routing mesh
-- PheromoneField: Stigmergic communication
-- HiveMind: Collective reasoning
-- CapabilityNegotiator: Dynamic capability discovery
-- Platoons: Pre-configured agent groups
-- StigmergicRouter: Pheromone-influenced routing
-- SwarmDag / TaskNode / TaskStatus / SubmitError: attested task DAG
-- ReadyWaveRunner: sync drain of ready_wave → claim → attested complete
+GB-29's `Mesh`/handoff contracts are canonical. Legacy routing exports remain
+available for Genesis and compatibility callers while those surfaces migrate.
 """
 
+from __future__ import annotations
+
+from skeleton.swarm.capabilities import capabilities
 from skeleton.swarm.dag import SubmitError, SwarmDag, TaskNode, TaskStatus
+from skeleton.swarm.law import N_CAP, PACKET, VERSION
 from skeleton.swarm.mesh import (
     Agent,
     CapabilityNegotiator,
     HiveMind,
+    Mesh,
     PheromoneField,
     Platoons,
     StigmergicRouter,
     SwarmMesh,
     standard_platoons,
 )
+from skeleton.swarm.mesh_boundary import boundary
+from skeleton.swarm.mesh_handoff import handoff
 from skeleton.swarm.ready_wave_runner import ReadyWaveReport, ReadyWaveRunner
 
 __all__ = [
+    "N_CAP",
+    "PACKET",
+    "VERSION",
+    "Mesh",
+    "boundary",
+    "capabilities",
+    "handoff",
     "SwarmMesh",
     "Agent",
     "PheromoneField",
