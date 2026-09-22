@@ -4086,6 +4086,102 @@
       ],
       "move_batch": "B3-compat-convergence",
       "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GAMING",
+      "source": "skeleton/acquired/gaming",
+      "destination": "skeleton/ai/research/acquired/gaming",
+      "kind": "tree",
+      "source_git_object_sha": "8bb0c27b4685d41fb3321afd87c945eb6751f4e6",
+      "role": "quarantined acquired gaming primitives, knowledge references, provenance, and deterministic simulation lineage",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W18"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-073",
+        "VOL-078"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GATES",
+      "source": "skeleton/acquired/gates",
+      "destination": "skeleton/ai/research/acquired/gates",
+      "kind": "tree",
+      "source_git_object_sha": "70ea65b5a92b366ce9f8fd76a7fbd0114ea79691",
+      "role": "quarantined provider/model gate catalogue lineage for characterization against canonical provider and routing contracts",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W20"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-008",
+        "VOL-026"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GENOS",
+      "source": "skeleton/acquired/genos",
+      "destination": "skeleton/ai/research/acquired/genos",
+      "kind": "tree",
+      "source_git_object_sha": "0bb01a0eeac6251de4fb97129738b52565b3d78a",
+      "role": "quarantined historical model pulse and evaluation lineage for research comparison only",
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W28"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-035"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
+    },
+    {
+      "id": "AIFT-ACQUIRED-INGEST",
+      "source": "skeleton/acquired/ingest.py",
+      "destination": "skeleton/ai/research/acquired/ingest.py",
+      "kind": "file",
+      "source_git_object_sha": "7bf23a4d35d5cf3e61c07d8ca1c2c31ee77190f4",
+      "role": "quarantined asset ingestion and validation lineage for later artifact-plane characterization",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W26"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-075",
+        "VOL-077"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
     }
   ],
   "ci_enforcement": {
@@ -4581,10 +4677,15 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "Prior full 130-mapping audit remains historical evidence. Current-main reconciliation mirrors the three newly landed skeleton/economy files into the governed simulation/economy destination, refreshes the AIFT-ECONOMY source tree identity, and explicitly classifies skeleton/parse outside AI ownership. Fresh CI/object evidence is required for this reconciled head before landing.",
-    "current_mapping_count": 130,
-    "audit_scope_status": "full_130_mapping_object_and_parity_audit_current",
-    "pending_mapping_ids": [],
+    "note": "The full 130-mapping audit remains valid historical evidence for its scope. Four remaining skeleton/acquired source units are now exact Git-object mirrors under skeleton/ai/research/acquired and require incremental object/parity validation before any stronger cutover claim.",
+    "current_mapping_count": 134,
+    "audit_scope_status": "prior_full_130_mapping_audit_valid_current_134_mapping_set_requires_incremental_refresh",
+    "pending_mapping_ids": [
+      "AIFT-ACQUIRED-GAMING",
+      "AIFT-ACQUIRED-GATES",
+      "AIFT-ACQUIRED-GENOS",
+      "AIFT-ACQUIRED-INGEST"
+    ],
     "post_1930_parity_repair": {
       "base_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
       "mapping_id": "AIFT-AUTOMATION",
@@ -4643,6 +4744,18 @@
       "parse_classification": "retained_outside_ai_tree",
       "retained_outside_ai_tree_count": 34,
       "status": "reconciled_pending_fresh_validation"
+    },
+    "acquired_recovery": {
+      "payload_git_sha": "a5c7a8d309d0f88320de2ada521df98884430589",
+      "added_mapping_count": 4,
+      "destinations_reuse_source_git_objects": true,
+      "mapping_ids": [
+        "AIFT-ACQUIRED-GAMING",
+        "AIFT-ACQUIRED-GATES",
+        "AIFT-ACQUIRED-GENOS",
+        "AIFT-ACQUIRED-INGEST"
+      ],
+      "policy": "Acquired gaming, provider-gate catalog, Genos pulse data, and asset-ingest code are research-quarantine lineage only. Relocation grants no provider, runtime, model, or artifact authority."
     }
   },
   "move_tag_contract": {
@@ -4668,22 +4781,22 @@
     }
   },
   "pre_move_readiness": {
-    "status": "fully_classified_staged_mirror_object_audit_green_cutover_not_authorized",
-    "governed_mapping_count": 130,
+    "status": "fully_classified_staged_mirror_cutover_not_authorized",
+    "governed_mapping_count": 134,
     "pending_assignment_count": 0,
     "retained_outside_ai_tree_count": 34,
     "batch_counts": {
       "B1-core-runtime": 54,
       "B3-owner-sensitive": 7,
       "B2-domain-build": 12,
-      "B4-research-quarantine": 35,
+      "B4-research-quarantine": 39,
       "B3-compat-convergence": 22
     },
     "fresh_object_audit_required": true,
     "global_cutover_blockers": [
       "BASE-FRONTEND-SSR-RAF-01"
     ],
-    "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
+    "invariant": "Preparation metadata and move tags authorize staging only; the current 134-mapping set requires fresh/incremental parity-object evidence, green affected-domain gates, and required signoffs before source retirement/import inversion."
   },
   "validation_request": {
     "requested_at_utc": "2026-09-22T15:47:00Z",
