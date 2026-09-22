@@ -433,6 +433,16 @@ The next major convergence is MBW-02 + MBW-03: intelligence context and privileg
 
 MBW-04 is the point where bounded autonomy becomes legitimate. MBW-05 and MBW-06 can then deepen product/evidence surfaces in parallel. MBW-07 is qualification, not feature accumulation: installer, distributed execution and production hardening must prove that the already-built system survives clean machines, upgrades, rollback, congestion and failure.
 
+## 21.5 Reverse-engineered end-state proof graph
+
+The forward build sequence is now paired with a reverse-engineering proof layer at `docs/plan/REVERSE_ENGINEERING_PASS.md` and `machine/ai_reverse_engineering_pass.json`.
+
+The reverse layer begins with terminal claims such as “a user can complete a durable AI operation”, “a privileged side effect is safe”, “continuity survives restore”, “multi-agent work cannot escalate authority”, and “a signed release can install and roll back”. Each claim is traced backward through acceptance witnesses, failure oracles, forbidden shortcuts, exact wave/work-package prerequisites, negative/fault evidence, and a minimum commit-bound proof bundle.
+
+This does not create new architecture or a second completion system. It deepens the existing breadth-frozen plan and preserves signed accountability as the only completion authority. Its principal construction correction is that **build overlap is not promotion overlap**: downstream work may develop against stable upstream contract slices, but hardened/production promotion waits until the full reverse proof chain closes.
+
+Reverse constraints additionally require bootstrap closure, verifier independence, restart equivalence, explicit unknown-outcome handling, migration symmetry, projection humility, and negative-space proof for high-impact capabilities. The plan therefore cannot treat file existence, UI state, planned tests, model confidence, telemetry, package creation, or manual checkboxes as terminal evidence.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
