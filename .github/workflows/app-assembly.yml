@@ -25,6 +25,7 @@ on:
       - "skeleton/testing/test_ai_full_edge_case_matrix.py"
       - "skeleton/testing/test_ai_master_build_sequence.py"
       - "skeleton/testing/test_ai_engineering_pass.py"
+      - "skeleton/testing/test_ai_engineering_task_matrix.py"
       - "skeleton/testing/test_ai_build_accountability.py"
       - "skeleton/testing/test_ai_accountability_cli.py"
       - "skeleton/testing/test_capability_interfaces.py"
@@ -95,6 +96,7 @@ on:
       - "scripts/check_ai_full_edge_case_matrix.py"
       - "scripts/check_ai_master_build_sequence.py"
       - "scripts/check_ai_engineering_pass.py"
+      - "scripts/check_ai_engineering_task_matrix.py"
       - "scripts/check_ai_build_accountability.py"
       - "scripts/ai_accountability.py"
       - "scripts/check_capability_interfaces.py"
@@ -111,6 +113,7 @@ on:
       - "machine/ai_full_edge_case_matrix.json"
       - "machine/ai_master_build_sequence.json"
       - "machine/ai_engineering_pass.json"
+      - "machine/ai_engineering_task_matrix.json"
       - "machine/ai_edge_case_priority_queue.json"
       - "machine/ai_build_accountability.json"
       - "machine/capability_interfaces.json"
@@ -274,6 +277,7 @@ jobs:
           skeleton/testing/test_ai_p0_edge_case_matrix.py
           skeleton/testing/test_ai_full_edge_case_matrix.py
           skeleton/testing/test_ai_engineering_pass.py
+          skeleton/testing/test_ai_engineering_task_matrix.py
           skeleton/testing/test_ai_build_accountability.py
           skeleton/testing/test_ai_accountability_cli.py
           skeleton/testing/test_capability_interfaces.py
