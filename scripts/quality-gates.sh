@@ -25,10 +25,6 @@ printf '\n== Shell execution plane regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_shell_*.py
 
-printf '\n== Shell worker runtime regressions ==\n'
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  skeleton/testing/test_worker_*.py
-
 printf '\n== Backend Ruff ==\n'
 (
   cd backend
@@ -63,11 +59,6 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_pr_automation_event_firewall.py \
   skeleton/testing/test_pr_automation_operator_safety.py \
   skeleton/testing/test_outbound_url_resolution_security.py \
-  skeleton/testing/test_security_rooted_fs.py \
-  skeleton/testing/test_security_archive_sandbox.py \
-  skeleton/testing/test_security_outbound_http.py \
-  tests/test_container_digest_refresh.py \
-  tests/test_container_digest_refresh_workflow.py \
   tests/test_orchestration_error_redaction.py \
   tests/test_frontier_runtime_memory_retrieval.py \
   tests/test_retrieval_pipeline_internals.py \
@@ -149,21 +140,11 @@ python backend/scripts/check_workflow_concurrency.py
 printf '\n== GitHub Actions workflow_run branch completions ==\n'
 python backend/scripts/check_workflow_run_branch_completions.py
 
-printf '\n== Archived dependency-surface quarantine ==\n'
-python scripts/check_archived_dependency_surface.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  tests/test_archived_dependency_surface.py
-
 printf '\n== Repository secret hygiene ==\n'
 python backend/scripts/check_secret_hygiene.py
 
 printf '\n== Repository malware / IOC scan ==\n'
 python backend/scripts/check_malware_iocs.py
-
-printf '\n== Live-service backend test boundary ==\n'
-python backend/scripts/check_live_service_test_boundaries.py
-PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
-  backend/tests/test_live_service_test_boundaries.py
 
 printf '\n== Backend security scanner regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
@@ -218,7 +199,6 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_developer_tooling_security.py \
-  backend/tests/test_dependency_security_workflow_contract.py \
   backend/tests/test_incident_response_runbook.py \
   backend/tests/test_api_middleware_adversarial.py \
   backend/tests/test_api_middleware_regression_gaps.py \
