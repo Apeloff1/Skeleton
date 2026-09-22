@@ -135,3 +135,37 @@ The next engine-owned recovery batch brings two long-lived AI/runtime domains un
 Three sensitive surfaces are intentionally **not duplicated as owners**. `cortex/interchange.py` and `cortex/gates.py` remain the legacy owners of provider-key/network discovery, while `organism/secret_manager.py` remains the encrypted credential-store owner. Their AI-tree counterparts are pure compatibility re-export facades until an explicit owner/import cutover is approved.
 
 This remains a staged mirror. The batch does not mark model-runtime, cognition, learning, security, resilience, or observability work packages complete.
+
+
+## Assigned next migration batch
+
+The manifest now carries a plan-derived `next_move_assignments` queue. These are assignments, not completed moves. Each item remains pending until its source is mirrored or merged into the canonical owner, parity/evidence is produced, imports are inverted where applicable, and the assignment is promoted into the governed `mappings` set.
+
+Priority 1 assignments are the structural/runtime spine:
+
+- `skeleton/state` -> `skeleton/ai/runtime/state`
+- `skeleton/network` -> `skeleton/ai/runtime/distributed/network`
+- `skeleton/kv` -> `skeleton/ai/runtime/inference/kv`
+- `skeleton/swarm` -> `skeleton/ai/agents/swarm`
+- `skeleton/telemetry` -> `skeleton/ai/runtime/observability/telemetry`
+- `skeleton/quality` -> `skeleton/ai/evaluation/quality`
+- `skeleton/foundation` -> `skeleton/ai/runtime/foundation`
+- `skeleton/gate_plane` -> `skeleton/ai/runtime/policy/gate_plane`
+- `skeleton/build` -> `skeleton/ai/build/core`
+- `skeleton/repo_machine` -> `skeleton/ai/build/repo_machine`
+
+Priority 2 assignments deepen governed subsystems without creating new owners:
+
+- `skeleton/hive` -> `skeleton/ai/agents/swarm/hive`
+- `skeleton/integrations` -> `skeleton/ai/runtime/tools/integrations`
+- `skeleton/inventory` -> `skeleton/ai/runtime/capabilities/inventory`
+- `skeleton/graphs` -> `skeleton/ai/runtime/knowledge/graphs`
+- `skeleton/creator` -> `skeleton/ai/forge/creator`
+- split `skeleton/acquired/learning.py`, `resilient_cache.py`, and `runtime_guard.py` into learning/state/reliability owners while preserving acquired-source provenance.
+
+Priority 3 assignments require overlap/domain comparison before cutover:
+
+- `skeleton/pipelines` -> `skeleton/ai/forge/pipelines` with game-domain scope retained.
+- `skeleton/persist` -> merge useful behavior into `skeleton/ai/runtime/persistence/legacy_persist` under the existing persistence owner rather than establishing another state authority.
+
+The validator fails if required assignments disappear, point outside `skeleton/ai`, duplicate an occupied destination, lose work-package ownership, reference malformed volume IDs, or lose their migration preconditions. Assignment does not satisfy implementation, verification, maturity, or signed-accountability requirements.
