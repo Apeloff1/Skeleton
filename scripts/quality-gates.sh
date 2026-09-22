@@ -4,6 +4,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# Plugin autoload is intentionally disabled in isolated test commands below.
+# Explicitly load the approved asyncio plugin so async tests remain hermetic.
+export PYTEST_ADDOPTS="${PYTEST_ADDOPTS:+$PYTEST_ADDOPTS }-p pytest_asyncio.plugin"
+
 printf '\n== Toolchain contract ==\n'
 python scripts/check_toolchain_contract.py
 
