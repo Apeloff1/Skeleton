@@ -265,14 +265,14 @@ jobs:
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
         if: steps.scope.outputs.full == 'true'
         # The job default is backend/. This suite mixes repository-root tests
-        # with backend/tests, so pin it to the checkout root explicitly and
-        # force pytest's root to the checkout to keep backend.tests distinct
-        # from the repository-root tests package.
+        # with backend/tests, so pin it to the checkout root explicitly. Importlib
+        # mode preserves each test file's full package path and prevents the two
+        # distinct tests packages from aliasing each other during collection.
         working-directory: ${{ github.workspace }}
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
-          PYTHONPATH=. python -m pytest -q --noconftest --rootdir=.
+          PYTHONPATH=. python -m pytest -q --noconftest --rootdir=. --import-mode=importlib
           tests/test_architecture_boundaries.py
           backend/tests/test_ai_provider_reliability.py
           backend/tests/test_auth_security.py
