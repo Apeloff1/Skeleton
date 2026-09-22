@@ -18,6 +18,7 @@ Research source topology: [architecture/research-source-topology.md](architectur
 Research dependency map: [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md)
 Research execution program: [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md)
 Research program scorecard: [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md)
+Research control-plane internals: [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md)
 
 ## 0. Construction constitution
 
@@ -3842,6 +3843,113 @@ PRODUCTION EVIDENCE READINESS
 ```
 
 **Gate:** high planning coverage cannot be reported as high production completion.
+
+### AD105. Research package substrate — ⬜
+
+Implement the canonical `skeleton/research/` package layout from the control-plane internals manual.
+
+First-class modules cover:
+- identities;
+- evidence/claims;
+- research debt;
+- protocols/manifests;
+- runs/results;
+- benchmarks/evaluators;
+- scheduler;
+- review/signoff;
+- freshness/invalidation;
+- research-agent authority;
+- stores/APIs/observability.
+
+### AD106. Typed research identities — ⬜
+
+Implement immutable typed IDs and canonical object digests for work, evidence, claims, debt, protocols, manifests, runs, results, benchmarks, evaluators, artifacts and reviews.
+
+**Gate:** mutable titles or URLs are never authoritative identity.
+
+### AD107. Work/source identity graph — ⬜
+
+Unify preprint/submission/proceedings/code/data/model/correction/retraction manifestations under explicit WorkIdentity with false-merge-safe adjudication.
+
+### AD108. Claim/evidence/contradiction store — ⬜
+
+Persist narrow claims with supporting/opposing evidence, scope, confidence, maturity, expiry, architecture dependencies and explicit contradiction graph edges.
+
+### AD109. Transactional research-debt engine — ⬜
+
+Enforce RDE state transitions centrally.
+
+**Gate:** OPEN→RETIRED without evidence is structurally invalid.
+
+### AD110. Immutable protocol and manifest engine — ⬜
+
+Version RXP definitions and freeze executable ExperimentManifest objects before runs begin.
+
+Post-result protocol edits create new versions and are marked exploratory when applicable.
+
+### AD111. Distributed run state machine — ⬜
+
+Implement queued/leased/preparing/running/checkpointing/analyzing/review/completed plus typed failure states.
+
+Use leases + fencing so stale workers cannot finalize authoritative state.
+
+### AD112. Manifest-atomic checkpoints — ⬜
+
+Checkpoint identity binds model/optimizer/scheduler/RNG/data cursor/precision/topology as applicable.
+
+Partial uploads never become valid checkpoints.
+
+### AD113. First-class failure and cost records — ⬜
+
+Persist failed runs and multidimensional compute/human/network/storage costs separately from scientific conclusions.
+
+### AD114. Result-bundle validity split — ⬜
+
+Separate:
+- experiment validity;
+- scientific result state.
+
+A null result may be valid.
+An invalid baseline makes the result uninterpretable, not negative evidence.
+
+### AD115. Benchmark/evaluator custody — ⬜
+
+Implement versioned benchmark and evaluator registries plus hidden-answer access auditing and evaluator-independence metadata.
+
+### AD116. Research scheduler and compute classes — ⬜
+
+Schedule by prerequisites, open debt, decision value, freshness, resource availability, reviewer capacity and risk.
+
+C5 work requires explicit signed decision value and abort criteria.
+
+### AD117. Research-agent principal and capabilities — ⬜
+
+Give every research agent authenticated principal identity, explicit workspace/capabilities/budgets and no blind-eval or self-signoff authority.
+
+### AD118. Idempotency and unknown-outcome reconciliation — ⬜
+
+Launches, resource reservations, artifact uploads and paid evaluator calls require idempotency keys.
+
+Timeouts reconcile provider state before retry.
+
+### AD119. Freshness/invalidation engine — ⬜
+
+Source/benchmark/model/evaluator changes emit receipts and review tasks. They never silently rewrite conclusions.
+
+### AD120. Research control-plane M0–M8 implementation — ⬜
+
+Build in order:
+- M0 IDs/enums/store/migrations;
+- M1 source/evidence graph;
+- M2 manifests/runs/results;
+- M3 scheduler/leases/cost/cancel;
+- M4 benchmark/evaluator custody;
+- M5 review/signoff/ADR bridge;
+- M6 freshness/invalidation/scorecard;
+- M7 sandboxed research-agent C0/C1;
+- M8 C2+ launch integration.
+
+**Exit gate:** demonstrate source status history, open debt→protocol linkage, frozen manifest, success+failure retention, independent review, debt transition, claim invalidation, benchmark custody, idempotent launch reconciliation, restore drill, and zero research-agent→production authority path.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
