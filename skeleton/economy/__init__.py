@@ -1,17 +1,9 @@
-"""Skeleton economy — double-entry treasury (ported from gameforge-rs)."""
+"""Catalog economy facade (GB-45). No coin."""
 
-from skeleton.economy.treasury import (
-    LEDGER_CAP,
-    Account,
-    Entry,
-    Treasury,
-    TreasuryError,
-)
+from __future__ import annotations
 
-__all__ = [
-    "LEDGER_CAP",
-    "Account",
-    "Entry",
-    "Treasury",
-    "TreasuryError",
-]
+from skeleton.economy.capabilities import capabilities
+from skeleton.economy.harbor import Harbor
+from skeleton.economy.law import PACKET, VERSION
+
+__all__ = ["PACKET", "VERSION", "Harbor", "capabilities"]
