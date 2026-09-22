@@ -262,7 +262,8 @@ Canonical navigation for this layer:
 - [architecture/research-source-topology.md](architecture/research-source-topology.md) — RS001–RS055 archives, proceedings, artifacts, standards, operational evidence, and source-ingestion policy;
 - [architecture/research-dependency-map-2026.md](architecture/research-dependency-map-2026.md) — explicit RQ→RDE→RXP→ADR→promotion dependencies and cross-domain blockers;
 - [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md) — wave-based ordering, compute classes, stop/fast/slow-track rules, and result-to-plan reconciliation;
-- [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md) — multidimensional planning/reproduction/readiness, debt, freshness, validity, and information-yield reporting.
+- [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md) — multidimensional planning/reproduction/readiness, debt, freshness, validity, and information-yield reporting;
+- [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md) — concrete package/module layout, state machines, transactional stores, scheduler, custody, leases, agent capabilities, APIs, recovery, and M0–M8 implementation.
 
 The machine-readable counterpart is `skeleton/architecture_index.py`, which must index every
 numbered architecture round. A future architecture round that is not indexed is incomplete.
