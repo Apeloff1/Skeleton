@@ -38,6 +38,10 @@ Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/
 
 Foundational volume depth pass: [`VOLUME_DEPTH_000_040.md`](VOLUME_DEPTH_000_040.md)
 
+Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
+
+Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -70,8 +74,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 20. `docs/plan/MASTER_BUILD_SEQUENCE.md`
 21. `machine/ai_master_build_sequence.json`
 22. `docs/plan/VOLUME_DEPTH_000_040.md`
+23. `docs/plan/ENGINEERING_PASS.md`
+24. `machine/ai_engineering_pass.json`
 
-The first ten remain the present implementation/construction authority. Items 11–13 add the canonical long-range index and planning authority.
+The first ten remain the present implementation/construction authority. Items 11–24 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
 
 ## Index laws
 
@@ -115,6 +121,8 @@ The first ten remain the present implementation/construction authority. Items 11
 ## Build-depth transition
 
 The master build sequence provides the canonical middle layer between frozen architecture breadth and atomic implementation. It assigns W00–W30 to MBW-00..07, preserves AIQ task authority, and makes dependency/promotion/stop conditions explicit without creating a second completion mechanism.
+
+The engineering pass then binds those packages to explicit interfaces, invariants, failure/recovery semantics, quantitative budgets, compatibility rules, evidence and release proof. It deepens the frozen plan; it does not expand it.
 
 Breadth is frozen. Future work should preferentially deepen the following chain:
 

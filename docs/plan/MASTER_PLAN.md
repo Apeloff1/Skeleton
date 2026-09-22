@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.0.0**
+Plan version: **1.4.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -433,6 +433,37 @@ The next major convergence is MBW-02 + MBW-03: intelligence context and privileg
 
 MBW-04 is the point where bounded autonomy becomes legitimate. MBW-05 and MBW-06 can then deepen product/evidence surfaces in parallel. MBW-07 is qualification, not feature accumulation: installer, distributed execution and production hardening must prove that the already-built system survives clean machines, upgrades, rollback, congestion and failure.
 
+## 21.5 Systems-engineering closure overlay
+
+The depth-only systems-engineering contract is `machine/ai_engineering_pass.json`, with the human ledger in `docs/plan/ENGINEERING_PASS.md`. It covers every W00–W30 package without adding architecture breadth or creating a second completion mechanism.
+
+The required closure chain is:
+
+```text
+requirement
+-> interface
+-> authoritative state + invariant
+-> authority/trust rule
+-> failure model
+-> quantitative budget
+-> implementation
+-> executable test/eval
+-> fault/recovery evidence
+-> telemetry
+-> migration + rollback
+-> reproducibility record
+-> independent verification
+-> signed accountability
+```
+
+Fifteen engineering dimensions are machine-enforced across requirement testability, interface ownership, state authority, authority/trust, failure containment, recovery, quantitative NFR budgets, capacity/backpressure, compatibility/migration, observability, executable verification, evaluation, reproducibility, release/rollback, and ownership/change impact.
+
+Numeric targets are bound at implementation depth rather than invented globally. Any applicable latency, throughput, durability, availability, resource, cost or quality claim must declare a threshold, unit, workload, environment, measurement method, owner and waiver policy before promotion. Production evidence must contain measured values against those thresholds.
+
+Cross-boundary schema/API/config/storage/model changes must also declare mixed-version behavior, migration order and rollback/restore semantics. Promotion stops if a queue/fan-out/store can grow without a bound, replay can duplicate an effect, cancellation/restart can violate terminal finality, a migration assumes atomic fleet upgrade, or evidence cannot be reproduced from code/config/data/model/environment identity.
+
+The engineering overlay is a stronger definition of implementation depth. It does not override current runtime authority; it makes `verified`, `hardened` and `production` claims require concrete engineering proof in addition to the existing signed accountability contract.
+
 ## 22. Vertical-slice acceptance ladder
 
 - **VS-000:** install/boot/persist/event/stream/shutdown/restart/recover.
@@ -458,14 +489,17 @@ A production capability is complete only when all applicable elements exist:
 - architecture owner and capability descriptor;
 - contract/schema/state model;
 - implementation and configuration;
+- systems-engineering profile covering applicable engineering dimensions;
 - authority/security/privacy assessment;
-- migration/compatibility behavior;
+- explicit failure model, bounded retries/queues/fan-out, and recovery semantics;
+- migration/compatibility behavior including mixed-version and rollback/restore behavior;
+- quantitative NFR budgets with units, workload, environment and measurement method;
 - unit/property/contract/integration tests;
 - adversarial/failure/recovery tests;
-- performance characterization;
-- observability;
-- evaluation and evidence;
-- deployment and rollback;
+- performance/capacity characterization against bound thresholds;
+- observability sufficient to reconstruct critical transitions and recovery;
+- reproducible evaluation and evidence bound to code/config/environment identity;
+- deployment, canary and executable rollback;
 - operator/developer documentation;
 - machine manifest updates;
 - architecture validation.
