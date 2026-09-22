@@ -9,14 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import (
-    UbuntuAction,
-    UbuntuPlan,
-    _clean,
-    _policy_errors,
-    _validate_policy_fields,
-    validate_plan,
-)
+from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
 
 @dataclass(frozen=True, slots=True)
 class StorageMountPlan:
@@ -30,25 +23,17 @@ class StorageMountPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-mount:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -58,11 +43,9 @@ class StorageMountPlan:
 
 def validate_storage_mount(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-mount action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-mount:"+identifier, ("ubuntu","storage","mount",identifier,desired), "validated storage-mount")
 
 def plan_storage_mount(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -90,25 +73,17 @@ class StorageFstabPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-fstab:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -118,11 +93,9 @@ class StorageFstabPlan:
 
 def validate_storage_fstab(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-fstab action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-fstab:"+identifier, ("ubuntu","storage","fstab",identifier,desired), "validated storage-fstab")
 
 def plan_storage_fstab(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -150,25 +123,17 @@ class StorageDiskPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-disk:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -178,11 +143,9 @@ class StorageDiskPlan:
 
 def validate_storage_disk(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-disk action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-disk:"+identifier, ("ubuntu","storage","disk",identifier,desired), "validated storage-disk")
 
 def plan_storage_disk(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -210,25 +173,17 @@ class StoragePartitionPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-partition:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -238,11 +193,9 @@ class StoragePartitionPlan:
 
 def validate_storage_partition(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-partition action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-partition:"+identifier, ("ubuntu","storage","partition",identifier,desired), "validated storage-partition")
 
 def plan_storage_partition(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -270,25 +223,17 @@ class StorageLvmPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-lvm:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -298,11 +243,9 @@ class StorageLvmPlan:
 
 def validate_storage_lvm(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-lvm action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-lvm:"+identifier, ("ubuntu","storage","lvm",identifier,desired), "validated storage-lvm")
 
 def plan_storage_lvm(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -330,25 +273,17 @@ class StorageZfsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-zfs:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -358,11 +293,9 @@ class StorageZfsPlan:
 
 def validate_storage_zfs(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-zfs action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-zfs:"+identifier, ("ubuntu","storage","zfs",identifier,desired), "validated storage-zfs")
 
 def plan_storage_zfs(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -390,25 +323,17 @@ class StorageRaidPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-raid:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -418,11 +343,9 @@ class StorageRaidPlan:
 
 def validate_storage_raid(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-raid action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-raid:"+identifier, ("ubuntu","storage","raid",identifier,desired), "validated storage-raid")
 
 def plan_storage_raid(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -450,25 +373,17 @@ class StorageQuotaPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-quota:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -478,11 +393,9 @@ class StorageQuotaPlan:
 
 def validate_storage_quota(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-quota action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-quota:"+identifier, ("ubuntu","storage","quota",identifier,desired), "validated storage-quota")
 
 def plan_storage_quota(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -510,25 +423,17 @@ class StorageTmpfsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-tmpfs:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -538,11 +443,9 @@ class StorageTmpfsPlan:
 
 def validate_storage_tmpfs(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-tmpfs action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-tmpfs:"+identifier, ("ubuntu","storage","tmpfs",identifier,desired), "validated storage-tmpfs")
 
 def plan_storage_tmpfs(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -570,25 +473,17 @@ class StorageBackupPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "storage-backup:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -598,11 +493,9 @@ class StorageBackupPlan:
 
 def validate_storage_backup(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated storage-backup action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("storage-backup:"+identifier, ("ubuntu","storage","backup",identifier,desired), "validated storage-backup")
 
 def plan_storage_backup(identifiers: Sequence[str]) -> UbuntuPlan:

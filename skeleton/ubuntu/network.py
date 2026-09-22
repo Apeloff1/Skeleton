@@ -9,14 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
-from .model import (
-    UbuntuAction,
-    UbuntuPlan,
-    _clean,
-    _policy_errors,
-    _validate_policy_fields,
-    validate_plan,
-)
+from .model import UbuntuAction, UbuntuPlan, _clean, validate_plan
 
 @dataclass(frozen=True, slots=True)
 class NetworkNetplanPlan:
@@ -30,25 +23,17 @@ class NetworkNetplanPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-netplan:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -58,11 +43,9 @@ class NetworkNetplanPlan:
 
 def validate_network_netplan(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-netplan action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-netplan:"+identifier, ("ubuntu","network","netplan",identifier,desired), "validated network-netplan")
 
 def plan_network_netplan(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -90,25 +73,17 @@ class NetworkDnsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-dns:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -118,11 +93,9 @@ class NetworkDnsPlan:
 
 def validate_network_dns(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-dns action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-dns:"+identifier, ("ubuntu","network","dns",identifier,desired), "validated network-dns")
 
 def plan_network_dns(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -150,25 +123,17 @@ class NetworkRoutePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-route:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -178,11 +143,9 @@ class NetworkRoutePlan:
 
 def validate_network_route(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-route action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-route:"+identifier, ("ubuntu","network","route",identifier,desired), "validated network-route")
 
 def plan_network_route(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -210,25 +173,17 @@ class NetworkBridgePlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-bridge:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -238,11 +193,9 @@ class NetworkBridgePlan:
 
 def validate_network_bridge(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-bridge action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-bridge:"+identifier, ("ubuntu","network","bridge",identifier,desired), "validated network-bridge")
 
 def plan_network_bridge(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -270,25 +223,17 @@ class NetworkBondPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-bond:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -298,11 +243,9 @@ class NetworkBondPlan:
 
 def validate_network_bond(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-bond action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-bond:"+identifier, ("ubuntu","network","bond",identifier,desired), "validated network-bond")
 
 def plan_network_bond(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -330,25 +273,17 @@ class NetworkVlanPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-vlan:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -358,11 +293,9 @@ class NetworkVlanPlan:
 
 def validate_network_vlan(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-vlan action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-vlan:"+identifier, ("ubuntu","network","vlan",identifier,desired), "validated network-vlan")
 
 def plan_network_vlan(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -390,25 +323,17 @@ class NetworkMtuPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-mtu:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -418,11 +343,9 @@ class NetworkMtuPlan:
 
 def validate_network_mtu(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-mtu action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-mtu:"+identifier, ("ubuntu","network","mtu",identifier,desired), "validated network-mtu")
 
 def plan_network_mtu(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -450,25 +373,17 @@ class NetworkFirewallPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-firewall:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -478,11 +393,9 @@ class NetworkFirewallPlan:
 
 def validate_network_firewall(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-firewall action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-firewall:"+identifier, ("ubuntu","network","firewall",identifier,desired), "validated network-firewall")
 
 def plan_network_firewall(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -510,25 +423,17 @@ class NetworkProxyPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-proxy:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -538,11 +443,9 @@ class NetworkProxyPlan:
 
 def validate_network_proxy(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-proxy action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-proxy:"+identifier, ("ubuntu","network","proxy",identifier,desired), "validated network-proxy")
 
 def plan_network_proxy(identifiers: Sequence[str]) -> UbuntuPlan:
@@ -570,25 +473,17 @@ class NetworkTlsPlan:
     restart: bool = False
     tags: tuple[str, ...] = ()
     def __post_init__(self) -> None:
-        _validate_policy_fields(
-            identifier=self.identifier,
-            desired=self.desired,
-            version=self.version,
-            owner=self.owner,
-            mode=self.mode,
-            enabled=self.enabled,
-            restart=self.restart,
-            tags=self.tags,
-        )
+        _clean(self.identifier); _clean(self.desired); _clean(self.version); _clean(self.owner); _clean(self.mode)
+        if len(self.tags)>32: raise ValueError("too many tags")
     @property
     def key(self) -> str:
         return "network-tls:" + self.identifier
     def validate(self) -> tuple[str, ...]:
-        return _policy_errors(
-            self.desired,
-            enabled=self.enabled,
-            restart=self.restart,
-        )
+        e=[]
+        if self.desired not in {"present","absent","latest","running","stopped"}: e.append("unsupported desired state")
+        if self.enabled and self.desired=="absent": e.append("absent resource cannot be enabled")
+        if self.restart and self.desired in {"absent","stopped"}: e.append("restart conflicts with state")
+        return tuple(e)
     def action(self) -> UbuntuAction:
         e=self.validate()
         if e: raise ValueError("; ".join(e))
@@ -598,11 +493,9 @@ class NetworkTlsPlan:
 
 def validate_network_tls(identifier: str, desired: str = "present", *, enabled: bool = True) -> UbuntuAction:
     """Construct a validated network-tls action."""
-    identifier = _clean(identifier)
-    desired = _clean(desired)
-    errors = _policy_errors(desired, enabled=enabled, restart=False)
-    if errors:
-        raise ValueError("; ".join(errors))
+    identifier=_clean(identifier); desired=_clean(desired)
+    if desired not in {"present","absent","latest","running","stopped"}: raise ValueError("unsupported desired state")
+    if desired=="absent" and enabled: raise ValueError("absent resources cannot be enabled")
     return UbuntuAction("network-tls:"+identifier, ("ubuntu","network","tls",identifier,desired), "validated network-tls")
 
 def plan_network_tls(identifiers: Sequence[str]) -> UbuntuPlan:
