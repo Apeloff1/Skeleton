@@ -230,6 +230,7 @@ jobs:
           "networkx==3.5"
           "bcrypt==4.3.0"
           "PyJWT==2.14.0"
+          "email-validator==2.3.0"
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
