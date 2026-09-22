@@ -38,3 +38,19 @@ def test_ai_file_tree_credential_surfaces_are_facades() -> None:
         assert "OPENAI_API_KEY" not in source
         assert "api.openai.com" not in source
         assert "from openai import" not in source
+
+
+def test_python_parity_allows_formatting_but_rejects_semantic_drift(tmp_path: Path) -> None:
+    module = _module()
+    source = tmp_path / "source.py"
+    destination = tmp_path / "destination.py"
+
+    source.write_text("def value(x: int) -> int:\n    return x + 1\n", encoding="utf-8")
+    destination.write_text(
+        "def value( x: int )->int:\n\n    return (x + 1)\n",
+        encoding="utf-8",
+    )
+    assert module._content_equivalent(source, destination)
+
+    destination.write_text("def value(x: int) -> int:\n    return x + 2\n", encoding="utf-8")
+    assert not module._content_equivalent(source, destination)
