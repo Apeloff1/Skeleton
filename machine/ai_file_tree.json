@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.3.7",
+  "tree_version": "1.4.1",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -3512,6 +3512,41 @@
       "source_provenance": "historical_architecture_lineage",
       "production_authority": false,
       "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-PROJECT-MANIFEST-LEGACY",
+      "source": "skeleton/manifest.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/manifest.py",
+      "kind": "file",
+      "source_git_object_sha": "05c7faf2f9b9c604c67fc2e0475214764e62a1bc",
+      "role": "legacy module-purpose/dependency registry retained as historical architecture lineage",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine architecture and current capability registries remain authoritative",
+        "use the legacy registry only for provenance/reverse-engineering comparison",
+        "promote no recorded dependency or module role without current-plan evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Preserved as historical module metadata only; relocation creates no runtime authority.",
       "move_tags": [
         "ai-tree:mapped",
         "migration:staged-mirror",
