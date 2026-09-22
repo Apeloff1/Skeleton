@@ -40,6 +40,8 @@ Foundational volume depth pass: [`VOLUME_DEPTH_000_040.md`](VOLUME_DEPTH_000_040
 
 Sequential volume depth pass: [`VOLUME_DEPTH_041_080.md`](VOLUME_DEPTH_041_080.md)
 
+Next sequential depth target: **VOL-081** (`DP-081-120`).
+
 Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
 Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
