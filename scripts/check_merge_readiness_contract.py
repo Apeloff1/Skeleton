@@ -122,6 +122,23 @@ def main() -> int:
         failures,
     )
 
+    quality_security = job_block(text, "quality_security")
+    require(bool(quality_security), "quality/security validation job missing", failures)
+    require(
+        '"pytest-asyncio>=0.24,<2"' in quality_security,
+        "quality/security job must install the explicit asyncio test plugin",
+        failures,
+    )
+    try:
+        quality_gates = (ROOT / "scripts" / "quality-gates.sh").read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise SystemExit(f"merge-readiness contract: cannot read quality gates: {exc}")
+    require(
+        "-p pytest_asyncio.plugin" in quality_gates,
+        "quality gates must explicitly load pytest-asyncio while plugin autoload is disabled",
+        failures,
+    )
+
     pr_automation = job_block(text, "pr_automation")
     require(bool(pr_automation), "PR automation validation job missing", failures)
     require("name: PR Automation Tests" in pr_automation, "stable PR Automation Tests job name missing", failures)
