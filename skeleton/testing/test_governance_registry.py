@@ -289,7 +289,7 @@ def test_register_canonical_write_requires_purpose_and_preserves_registry_author
             created_at=10.0,
         )
 
-    registry.register_canonical_write(
+    first = registry.register_canonical_write(
         "conversation",
         record_id="message-1",
         tenant_id="tenant-a",
@@ -299,13 +299,24 @@ def test_register_canonical_write_requires_purpose_and_preserves_registry_author
         created_at=10.0,
     )
 
-    with pytest.raises(LifecycleConflict, match="record already registered"):
+    replay = registry.register_canonical_write(
+        "conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation://message-1",
+        data_class="internal",
+        purposes=("model-inference",),
+        created_at=10.0,
+    )
+    assert replay == first
+
+    with pytest.raises(LifecycleConflict, match="record identity conflicts"):
         registry.register_canonical_write(
             "conversation",
             record_id="message-1",
             tenant_id="tenant-a",
             source_ref="conversation://message-1",
-            data_class="internal",
+            data_class="confidential",
             purposes=("model-inference",),
             created_at=10.0,
         )
