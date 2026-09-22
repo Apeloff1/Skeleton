@@ -46,6 +46,10 @@ Adversarial closure pass: [`ADVERSARIAL_CLOSURE_PASS.md`](ADVERSARIAL_CLOSURE_PA
 
 Machine adversarial closure contract: [`machine/ai_adversarial_closure.json`](../../machine/ai_adversarial_closure.json)
 
+Engineering task matrix: [`ENGINEERING_TASK_MATRIX.md`](ENGINEERING_TASK_MATRIX.md)
+
+Machine engineering task matrix: [`machine/ai_engineering_task_matrix.json`](../../machine/ai_engineering_task_matrix.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -82,8 +86,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 24. `machine/ai_engineering_pass.json`
 25. `docs/plan/ADVERSARIAL_CLOSURE_PASS.md`
 26. `machine/ai_adversarial_closure.json`
+27. `docs/plan/ENGINEERING_TASK_MATRIX.md`
+28. `machine/ai_engineering_task_matrix.json`
 
-The first ten remain the present implementation/construction authority. Items 11–26 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
+The first ten remain the present implementation/construction authority. Items 11–28 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
 
 ## Index laws
 
