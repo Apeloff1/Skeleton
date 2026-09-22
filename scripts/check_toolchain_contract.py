@@ -316,12 +316,12 @@ def main() -> int:
         failures,
     )
     require(
-        pinned_action_count(ci, "docker/setup-buildx-action", "v4.3.0") == 1,
+        pinned_action_count(ci, "docker/setup-buildx-action", "v4.4.1") == 1,
         "Buildx version/count drifted",
         failures,
     )
     require(
-        pinned_action_count(ci, "docker/build-push-action", "v7.3.0") == 3,
+        pinned_action_count(ci, "docker/build-push-action", "v7.4.0") == 3,
         "build-push version/count drifted",
         failures,
     )

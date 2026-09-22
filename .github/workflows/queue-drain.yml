@@ -533,7 +533,11 @@ jobs:
                       attempted.add(run_id)
                       transient.discard(run_id)
                       moved += 1
-                  elif status in retryable:
+                  elif status in retryable or status in {409, 422}:
+                      # GitHub can return conflict while a queued run is being
+                      # scheduled/cancelled internally. Keep it retryable so a
+                      # later sweep or scheduled invocation can reclaim it;
+                      # only terminally classify once GitHub reports completion.
                       transient.add(run_id)
                       deferred += 1
                   else:
