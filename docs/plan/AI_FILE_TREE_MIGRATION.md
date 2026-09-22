@@ -340,3 +340,8 @@ Remaining transfer-v2 gates are canonical CI/App Assembly and affected-domain va
 The active inherited frontend gate is `BASE-FRONTEND-SSR-RAF-01`. The same App Assembly run advances into `expo export --platform web` and then fails during Node-side static rendering with `ReferenceError: requestAnimationFrame is not defined`, originating from `react-native-worklets/lib/module/threads.js` under Node v24.20.0.
 
 Transfer-v2 changes no `frontend/*` files. The SSR/export failure is therefore tracked as downstream base-state debt rather than transfer-v2 object/parity drift. The full 130-mapping object/parity audit remains green, but App Assembly must be green before source retirement, `cutover_complete`, or independent completion signoff.
+
+
+## Pull-request head synchronization
+
+The transfer-v2 branch has been reconciled directly onto `main`, completed its 130-mapping object/parity audit, and recorded the inherited Expo SSR export blocker. This checkpoint is intentionally documentation-only and exists to force a standard GitHub pull-request `synchronize` event from the current branch tip so App Assembly, CI/CD, Backend Quality, Frontier Contracts, and Merge Readiness evaluate the exact live transfer head.
