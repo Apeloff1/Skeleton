@@ -199,11 +199,9 @@ class EvidenceJeevesCore(JeevesCore):
         ``(registry_name, arguments, request_payload)`` and should route execution
         through the canonical runtime (for example ``ExecutionContext.invoke``).
 
-        Mutating or approval-required capabilities are never attached, and the live
-        spec is revalidated immediately before every invocation to close registry
-        replacement races. The entire registry snapshot is preflighted before
-        registration so malformed input, duplicate normalized names, and conflicts
-        fail without partial attachment.
+        Mutating or approval-required capabilities are never attached. The entire
+        registry snapshot is preflighted before registration so malformed input,
+        duplicate normalized names, and conflicts fail without partial attachment.
         """
         if not callable(invoker):
             raise TypeError("capability invoker must be callable")
@@ -266,13 +264,6 @@ class EvidenceJeevesCore(JeevesCore):
                 *,
                 _registry_name: str = registry_name,
             ) -> Any:
-                live_spec = registry.get(_registry_name)
-                if live_spec is None:
-                    raise _EvidencePolicyError("capability_unavailable")
-                if bool(getattr(live_spec, "mutates", False)):
-                    raise _EvidencePolicyError("capability_became_mutating")
-                if bool(getattr(live_spec, "approval_required", False)):
-                    raise _EvidencePolicyError("capability_requires_approval")
                 return invoker(
                     _registry_name,
                     dict(payload.get("arguments") or {}),
@@ -332,15 +323,9 @@ class EvidenceJeevesCore(JeevesCore):
                 raise _EvidencePolicyError("provenance_not_registered")
             return raw
 
-        raw_now = self._evidence_clock()
-        if isinstance(raw_now, bool):
-            raise _EvidencePolicyError("invalid_clock")
-        try:
-            now = float(raw_now)
-        except (TypeError, ValueError) as exc:
-            raise _EvidencePolicyError("invalid_clock") from exc
-        if not math.isfinite(now) or now < 0.0:
-            raise _EvidencePolicyError("invalid_clock")
+        now = float(self._evidence_clock())
+        if not math.isfinite(now):
+            raise RuntimeError("evidence_clock returned a non-finite timestamp")
 
         if isinstance(raw, EvidenceResult):
             data = raw.data
@@ -359,25 +344,33 @@ class EvidenceJeevesCore(JeevesCore):
         }
 
         max_age = source["max_age_seconds"]
-        if observed_at is None:
-            if max_age is not None:
+        if max_age is not None:
+            if observed_at is None:
                 raise _EvidencePolicyError("freshness_required")
-        else:
             if isinstance(observed_at, bool):
                 raise _EvidencePolicyError("invalid_observed_at")
             try:
                 observed = float(observed_at)
             except (TypeError, ValueError) as exc:
                 raise _EvidencePolicyError("invalid_observed_at") from exc
-            if not math.isfinite(observed) or observed < 0.0:
+            if not math.isfinite(observed):
                 raise _EvidencePolicyError("invalid_observed_at")
             if observed > now + 60.0:
                 raise _EvidencePolicyError("future_evidence")
-            if max_age is not None and now - observed > max_age:
+            if now - observed > max_age:
                 raise _EvidencePolicyError("stale_evidence")
             provenance["observed_at"] = observed
-            if max_age is not None:
-                provenance["age_seconds"] = max(0.0, now - observed)
+            provenance["age_seconds"] = max(0.0, now - observed)
+        elif observed_at is not None:
+            if isinstance(observed_at, bool):
+                raise _EvidencePolicyError("invalid_observed_at")
+            try:
+                observed = float(observed_at)
+            except (TypeError, ValueError) as exc:
+                raise _EvidencePolicyError("invalid_observed_at") from exc
+            if not math.isfinite(observed):
+                raise _EvidencePolicyError("invalid_observed_at")
+            provenance["observed_at"] = observed
 
         if revision is not None:
             provenance["revision"] = self._revision(revision)
@@ -417,14 +410,6 @@ class EvidenceJeevesCore(JeevesCore):
                         "arguments": call["arguments"],
                     }
                 )
-            except _EvidencePolicyError as exc:
-                self._record_evidence_failure(
-                    errors,
-                    name=name,
-                    code=exc.code,
-                    policy=True,
-                )
-                continue
             except Exception:
                 self._record_evidence_failure(errors, name=name, code="execution_failed")
                 continue
