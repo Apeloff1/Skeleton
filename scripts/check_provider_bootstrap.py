@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -689,8 +691,94 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
     return errors
 
 
-def main() -> int:
+def build_provider_surface_evidence(
+    repo_root: Path = ROOT,
+    *,
+    head_sha: str | None = None,
+    errors: list[str] | None = None,
+) -> dict:
+    """Return a secret-free current-head provider surface receipt."""
+
+    try:
+        contract = _load() if repo_root == ROOT else json.loads(
+            (repo_root / "machine/ai_app_construction.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    except (ValueError, OSError, json.JSONDecodeError):
+        contract = {}
+
+    declared: list[dict] = []
+    for item in contract.get("provider_surfaces", []):
+        if not isinstance(item, dict):
+            continue
+        declared.append(
+            {
+                "id": item.get("id"),
+                "owner": item.get("owner"),
+                "surface_class": item.get("surface_class"),
+                "credential_owner": item.get("credential_owner"),
+                "network_transport_owner": item.get("network_transport_owner"),
+                "sdk_client_owner": item.get("sdk_client_owner"),
+                "discovery_edge_classes": item.get(
+                    "discovery_edge_classes", []
+                ),
+            }
+        )
+
+    convergence = contract.get("provider_surface_convergence_blueprint", {})
+    isolated = []
+    if isinstance(convergence, dict):
+        for item in convergence.get("application_isolation_surfaces", []):
+            if isinstance(item, dict) and isinstance(item.get("path"), str):
+                isolated.append(item["path"])
+
+    return {
+        "schema_version": 1,
+        "head_sha": (
+            head_sha
+            if head_sha is not None
+            else os.environ.get("GITHUB_SHA", "").strip() or "unknown"
+        ),
+        "declared_surfaces": sorted(
+            declared,
+            key=lambda item: str(item.get("id") or ""),
+        ),
+        "discovered_surfaces": discover_provider_surfaces(repo_root),
+        "application_isolation_surfaces": sorted(isolated),
+        "validation_errors": list(errors or []),
+        "valid": not bool(errors),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Validate and inventory provider execution surfaces."
+    )
+    parser.add_argument(
+        "--evidence-out",
+        type=Path,
+        default=None,
+        help="Write a secret-free JSON evidence receipt to this path.",
+    )
+    parser.add_argument(
+        "--print-evidence",
+        action="store_true",
+        help="Print the JSON evidence receipt after validation.",
+    )
+    args = parser.parse_args(argv)
+
     errors = validate_provider_bootstrap()
+    evidence = build_provider_surface_evidence(errors=errors)
+    if args.evidence_out is not None:
+        args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        args.evidence_out.write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if args.print_evidence:
+        print(json.dumps(evidence, indent=2, sort_keys=True))
+
     if errors:
         print("provider-bootstrap: rejected", file=sys.stderr)
         for error in errors:
