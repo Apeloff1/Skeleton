@@ -10,6 +10,7 @@ on:
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
       - "skeleton/testing/test_app_plan.py"
+      - "skeleton/testing/test_app_compose_parity.py"
       - "skeleton/testing/test_app_bootstrap.py"
       - "skeleton/testing/test_app_runtime_contract.py"
       - "docker-compose.yml"
@@ -19,6 +20,7 @@ on:
       - "pyproject.toml"
       - ".env.example"
       - "scripts/check_app_assembly.py"
+      - "scripts/check_app_compose_parity.py"
       - "machine/manifest.json"
       - ".github/workflows/app-assembly.yml"
 
@@ -98,6 +100,7 @@ jobs:
           python -m pytest -q
           skeleton/testing/test_app_assembly.py
           skeleton/testing/test_app_plan.py
+          skeleton/testing/test_app_compose_parity.py
           skeleton/testing/test_app_bootstrap.py
           skeleton/testing/test_app_runtime_contract.py
 
@@ -120,7 +123,11 @@ jobs:
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.yml --profile "*" config --format json > /tmp/skeleton-compose.json
+          python scripts/check_app_compose_parity.py /tmp/skeleton-compose.json
           docker compose -f docker-compose.yml -f docker-compose.hot.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.hot.yml --profile "*" config --format json > /tmp/skeleton-compose-hot.json
+          python scripts/check_app_compose_parity.py /tmp/skeleton-compose-hot.json
           BUILD_TARGET=production \
           FRONTEND_BUILD_TARGET=production \
           FRONTEND_CONTAINER_PORT=8080 \
