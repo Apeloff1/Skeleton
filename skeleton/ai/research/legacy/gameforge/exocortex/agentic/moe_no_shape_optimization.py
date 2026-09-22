@@ -73,20 +73,20 @@ class MoENoShapeOptimization:
         High-confidence design; selective physics evaluation for OOD.
         """
         constraint = self.constraints.get(user_intent, ShapeConstraint([], {}, [], user_intent))
-        
+
         # MoE-NO prediction + uncertainty
         mape, trend = self.moe_no_surrogate(initial_shape)
         uncertainty = self.uncertainty_estimation(initial_shape)
         ood = uncertainty > 0.7
-        
+
         # Simulate optimization (DFFD deformation within constraints)
         optimized = initial_shape + np.random.normal(0, 0.05, initial_shape.shape)
         drag_reduction = np.random.uniform(4.0, 10.0)  # % reduction
-        
+
         if ood and physics_solver_available:
             # Selective local enrichment with physics solver
             drag_reduction += 1.5  # bonus from physics validation
-        
+
         result = OptimizationResult(
             optimized_shape=optimized,
             drag_reduction=drag_reduction,
