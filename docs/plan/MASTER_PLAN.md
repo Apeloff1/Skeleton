@@ -577,7 +577,7 @@ Future depth passes should continue forward from VOL-041 using the same rule: de
 
 The breadth-frozen plan now includes a dedicated exotic-mechanism reservoir at `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`, with a machine mirror at `machine/ai_exotic_systems_catalog.json`.
 
-The first enforced tranche contains **60 candidates across 12 categories**:
+The first enforced tranche contains **73 candidates across 13 categories**:
 
 - cognitive architectures: active inference, predictive processing, global-workspace arbitration, leased blackboards and stigmergic coordination;
 - optimization/search: MCTS tool planning, CMA-ES, MAP-Elites, novelty search, population-based training, bandit allocation and value-of-information scheduling;
@@ -590,7 +590,8 @@ The first enforced tranche contains **60 candidates across 12 categories**:
 - security/resilience: capability-style authority, information-flow labels, rotating sandbox identities, N-version verification, Byzantine-resilient aggregation and honeytoken canaries;
 - dataflow/storage: content-addressed artifacts, Merkle snapshots, incremental view maintenance, erasure-coded cold evidence and temporal feature logs;
 - multimodal interfaces: event cameras, spatial audio, haptic simulation hooks and cross-modal agreement checks;
-- research methodology: negative-results registries, ablation-first promotion, mechanism-transfer lineage and sunset-by-default experiments.
+- research methodology: negative-results registries, ablation-first promotion, mechanism-transfer lineage and sunset-by-default experiments;
+- deployment/product: microreboot lifecycle islands, semantic resumable streams, local-first ambient desktop profiles and dual-slot atomic installers/updaters.
 
 These are **not** implied implementation commitments and do not receive production authority by novelty. The default state is `candidate` in `research_sandbox` (or `watchlist` for horizon technologies). Promotion is fail-closed and must preserve the ordinary architecture:
 
@@ -606,7 +607,7 @@ candidate
   -> existing maturity + signed-accountability promotion
 ```
 
-Every exotic item must remain mapped to existing Volume 000–420 domains and W00–W30 ownership. An exotic mechanism cannot bypass durable-state authority, policy/authorization, normal evidence requirements, rollback/recovery, compatibility, SLO/cost review, or the signed completion system. If a candidate loses ownership, evidence, reproducibility or an operable fallback, it reverts to watchlist/retired rather than lingering on the critical path.
+Every exotic item must remain mapped to existing Volume 000–420 domains and complete W00–W30 ownership. An exotic mechanism cannot bypass durable-state authority, policy/authorization, normal evidence requirements, rollback/recovery, compatibility, SLO/cost review, or the signed completion system. If a candidate loses ownership, evidence, reproducibility or an operable fallback, it reverts to watchlist/retired rather than lingering on the critical path.
 
 The machine validator rejects unknown volume/work-package references, missing fallback/kill-switch semantics, insufficient evidence requirements, production-authority defaults, category-depth regressions, and breadth-freeze violations.
 
