@@ -60,14 +60,14 @@ def _cases():
 
 
 class IdentityPass(CompilationPass):
-    contract = PassContract("semantic-identity", replay_safe=True)
+    contract = PassContract("semantic-identity")
 
     def apply(self, module: IRModule) -> IRModule:
         return module
 
 
 class ChangeOverflowPass(CompilationPass):
-    contract = PassContract("change-overflow", replay_safe=True)
+    contract = PassContract("change-overflow")
 
     def __init__(self, target: OverflowSemantics) -> None:
         self.target = target
