@@ -96,3 +96,26 @@ def test_ai_file_tree_cortex_and_organism_keep_sensitive_owners_singular() -> No
     assert "KIMI_API_KEY" not in cortex_interchange
     assert "OPENAI_API_KEY" not in cortex_gates
     assert "SKELETON_MASTER_SECRET" not in organism_secrets
+
+
+def test_ai_file_tree_pending_assignments_follow_masterplan() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    assignments = {item["source"]: item for item in manifest["next_move_assignments"]}
+
+    assert assignments["skeleton/state"]["destination"] == "skeleton/ai/runtime/state"
+    assert assignments["skeleton/network"]["destination"] == "skeleton/ai/runtime/distributed/network"
+    assert assignments["skeleton/kv"]["destination"] == "skeleton/ai/runtime/inference/kv"
+    assert assignments["skeleton/swarm"]["destination"] == "skeleton/ai/agents/swarm"
+    assert assignments["skeleton/telemetry"]["destination"] == "skeleton/ai/runtime/observability/telemetry"
+    assert assignments["skeleton/foundation"]["destination"] == "skeleton/ai/runtime/foundation"
+    assert assignments["skeleton/build"]["destination"] == "skeleton/ai/build/core"
+    assert assignments["skeleton/repo_machine"]["destination"] == "skeleton/ai/build/repo_machine"
+    assert assignments["skeleton/acquired/learning.py"]["action"] == "split_then_mirror"
+    assert assignments["skeleton/persist"]["action"] == "merge_into_existing_owner"
+
+    for item in assignments.values():
+        assert item["destination"].startswith("skeleton/ai/")
+        assert item["work_package_refs"]
+        assert item["preconditions"]
