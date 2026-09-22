@@ -68,7 +68,7 @@ export const GroupChatModal: React.FC<GroupChatModalProps> = ({ visible, onClose
   const [loading, setLoading] = useState(true);
   const [jeevesLevel, setJeevesLevel] = useState({ level: 1, xp: 0, xp_to_next: 100 });
   const [showBlurbs, setShowBlurbs] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   useEffect(() => {
     if (visible) loadData();
