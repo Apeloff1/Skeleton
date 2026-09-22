@@ -9,6 +9,10 @@ on:
       - "skeleton/app/**"
       - "skeleton/__main__.py"
       - "skeleton/testing/test_app_assembly.py"
+      - "skeleton/testing/test_app_installer.py"
+      - "skeleton/testing/test_windows_installer.py"
+      - "packaging/windows/**"
+      - "scripts/windows/**"
       - "docker-compose.yml"
       - "docker-compose.hot.yml"
       - "frontend/**"
@@ -87,7 +91,11 @@ jobs:
       - name: Run assembly contract tests
         env:
           PYTHONPATH: "."
-        run: python -m pytest -q skeleton/testing/test_app_assembly.py
+        run: |
+          python -m pytest -q \
+            skeleton/testing/test_app_assembly.py \
+            skeleton/testing/test_app_installer.py \
+            skeleton/testing/test_windows_installer.py
 
       - name: Validate structural assembly
         env:
@@ -131,6 +139,10 @@ jobs:
               "skeleton/app/assembly.py",
               "skeleton/app/cli.py",
               "skeleton/app/health.py",
+              "skeleton/app/installer.py",
+              "skeleton/app/preloader.py",
+              "skeleton/app/setup_runtime.py",
+              "skeleton/app/windows_launcher.py",
               "skeleton/app/manifest.json",
           }
           missing = sorted(required - names)

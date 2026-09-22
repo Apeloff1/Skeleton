@@ -5,6 +5,12 @@ AI game engine and agent orchestration framework.
 ## Quick Start
 
 ```bash
+# First-time host/runtime setup
+python -m skeleton app preload
+python -m skeleton app setup
+python -m skeleton app install
+# or, before installing the Python package: python scripts/install_app.py
+
 # Inspect canonical topology, then optionally probe live runtime health
 python -m skeleton app status
 python -m skeleton app status --live
@@ -35,6 +41,22 @@ python -m skeleton test
 ```
 
 The application assembly contract and operator commands are documented in [`docs/APP_ASSEMBLY.md`](docs/APP_ASSEMBLY.md).
+
+### Windows installer
+
+Windows users can install the assembled application through a normal per-user
+Setup wizard. The CI artifact is named `Skeleton-Setup-<version>-windows-x64.exe`.
+It installs `Skeleton.exe`, Start Menu shortcuts, optional desktop shortcut,
+repair controls, and an uninstaller.
+
+To build the installer on Windows:
+
+```powershell
+pwsh ./scripts/windows/build_installer.ps1
+```
+
+The installed launcher contains its own Python runtime. Docker Desktop with the
+Docker Compose plugin remains required to build and run the application services.
 
 ## Architecture
 
