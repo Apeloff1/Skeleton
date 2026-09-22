@@ -105,3 +105,31 @@ def test_network_provider_path_is_classified_without_literal_credential(
     ]
     assert signals["edge_classes"] == ["network_transport"]
     assert signals["network_imports"] == ["httpx"]
+
+
+def test_application_provider_surfaces_are_delegation_only() -> None:
+    module = _checker()
+    contract = json.loads(
+        (ROOT / "machine/ai_app_construction.json").read_text(encoding="utf-8")
+    )
+    surfaces = contract["provider_surface_convergence_blueprint"][
+        "application_isolation_surfaces"
+    ]
+
+    assert surfaces
+    for item in surfaces:
+        path = ROOT / item["path"]
+        source = path.read_text(encoding="utf-8")
+        for token in item["required_tokens"]:
+            assert token in source
+
+        signals = module._provider_surface_signals(path, source)
+        edges = set()
+        if signals["credential_markers"]:
+            edges.add("credential")
+        if signals["sdk_imports"]:
+            edges.add("sdk_client")
+        if module._looks_like_provider_network_surface(path, source, signals):
+            edges.add("network_transport")
+
+        assert not edges.intersection(item["forbidden_edge_classes"])
