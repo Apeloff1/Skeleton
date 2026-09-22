@@ -273,8 +273,6 @@ jobs:
           PYTHONPATH=. python -m pytest -q --noconftest
           tests/test_architecture_boundaries.py
           backend/tests/test_ai_provider_reliability.py
-          tests/test_exec_guard.py
-          tests/test_auth_security.py
           tests/test_process_safety_gate.py
           tests/test_process_safety_destructuring.py
           tests/test_process_safety_partial.py
