@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.3.0",
+  "plan_version": "1.4.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -10916,5 +10916,19 @@
       "evidence_policy": "evidence may remain empty while implementation_status is unverified; evidence must become non-empty under the volume maturity promotion policy before verified+ states.",
       "purpose": "Replace title-only placeholders in the foundational 41 volumes with buildable requirements, contracts, test/eval intent, risks and known gaps."
     }
-  ]
+  ],
+  "engineering_pass": {
+    "status": "active",
+    "machine_contract": "machine/ai_engineering_pass.json",
+    "human_contract": "docs/plan/ENGINEERING_PASS.md",
+    "validator": "scripts/check_ai_engineering_pass.py",
+    "regression_test": "skeleton/testing/test_ai_engineering_pass.py",
+    "scope": "Depth-only systems-engineering obligations for W00-W30; no new top-level architecture.",
+    "required_for_promotion": [
+      "verified",
+      "hardened",
+      "production"
+    ],
+    "closure_rule": "Applicable interface, invariant, failure/recovery, budget, compatibility, observability, reproducibility and release obligations require concrete evidence before strong maturity claims."
+  }
 }
