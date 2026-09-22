@@ -356,3 +356,17 @@ Repository Hygiene exposed trailing whitespace inherited from 11 legacy GameForg
 The inherited `BASE-FRONTEND-SSR-RAF-01` failure was reproduced from App Assembly run `35743872291`: TypeScript and the operation-stream reducer suite passed, then `expo export --platform web` failed in Node v24 while `react-native-worklets` called an undefined `requestAnimationFrame`.
 
 The validated transfer branch adds a supported Expo Router custom entry point that installs `requestAnimationFrame` / `cancelAnimationFrame` fallbacks only when missing and then loads `expo-router/entry`. `frontend/package.json` now points `main` at that entry. This is a repair-applied/pending-validation state until a fresh App Assembly run proves static export succeeds.
+
+
+### Transfer-v2 validation repair ledger
+
+The validated successor PR is **#1941**. The earlier #1937 lineage is superseded and must not be used for landing evidence.
+
+Two focused validation repairs are staged and deliberately remain **pending CI evidence**:
+
+- Merge Readiness contract alignment (`ac55d02f4aab769e5699151c5c24de17e63e1089`): the contract now matches the Expo remediation install lane, requiring lifecycle scripts to stay disabled and the install to remain non-interactive while lock reconciliation is temporarily allowed.
+- Expo static-render RAF compatibility (`4737a8c8bdbc7fc3aab1e1b525ef677393d33153`): the existing fail-closed node_modules patcher recognizes exactly `react-native-worklets@0.13.0` and falls back to `setTimeout(callback, 0)` only when Node static rendering has no `requestAnimationFrame`. Browser/native RAF behavior is unchanged.
+
+Commit `8f076935c39fead4fbccef61872290bc68d50566` normalized trailing whitespace in one quarantined Python mirror. The source/destination blob IDs therefore differ for that file, but the canonical validator's Python semantic-parity rule remains satisfied; this is not runtime drift or a custody promotion.
+
+Neither validation repair closes `BASE-FRONTEND-SSR-RAF-01` until current-head App Assembly succeeds through typecheck, reducer tests, and `expo export --platform web`. Independent verification and all source retirement remain blocked.
