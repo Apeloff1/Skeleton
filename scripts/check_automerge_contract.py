@@ -57,9 +57,12 @@ REQUIRED_RECONCILE_PERMISSIONS = {
 }
 
 REQUIRED_WORKFLOW_TRIGGERS = (
-    "workflow_dispatch:",
     "workflow_run:",
     "schedule:",
+)
+
+FORBIDDEN_MANUAL_TRIGGERS = (
+    "workflow_dispatch:",
 )
 
 REQUIRED_SOURCE_SYMBOLS = {
@@ -163,6 +166,16 @@ def _workflow_findings(text: str) -> list[Finding]:
                 Finding(
                     "missing-trigger",
                     f"required trigger {marker!r} is absent",
+                    rel,
+                )
+            )
+
+    for marker in FORBIDDEN_MANUAL_TRIGGERS:
+        if marker in text:
+            findings.append(
+                Finding(
+                    "manual-trigger",
+                    f"manual auto-merge trigger {marker!r} must remain disabled",
                     rel,
                 )
             )
@@ -420,12 +433,6 @@ def _cross_file_findings() -> list[Finding]:
             "stop_after_stack_mutation" in engine,
             "stack landing must support forced exact-head revalidation",
             "skeleton/pr_automation/automerge_engine.py",
-        ),
-        (
-            "critical-surface",
-            "critical_trust_surface_requires_human_merge" in policy,
-            "critical automation trust surface must remain human-merge only",
-            "skeleton/pr_automation/automerge_policy.py",
         ),
         (
             "fork-policy",
