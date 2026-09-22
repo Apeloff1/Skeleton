@@ -268,6 +268,8 @@ jobs:
           "matplotlib==3.10.6"
           "networkx==3.5"
           "bcrypt==4.3.0"
+          "PyJWT==2.14.0"
+          "email-validator==2.3.0"
 
       - name: Install plan-only test runtime
         if: steps.scope.outputs.full != 'true'
