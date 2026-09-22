@@ -7,6 +7,7 @@ import pytest
 from skeleton.jeeves.agent.relational_memory import RelationalMemoryIndex
 from skeleton.jeeves.agent.context_pipeline import LayeredContextResolver, ResolutionPolicy
 from skeleton.jeeves.agent.evidence import EvidenceLedger
+from skeleton.jeeves.agent.interpretive_science import ScientificLensLab
 from skeleton.jeeves.agent.memory import MemoryManager, MemoryNamespace
 from skeleton.jeeves.agent.memory_game import MemoryGameIndex, MemoryGamePolicy
 from skeleton.jeeves.agent.nuance_runtime import (
@@ -15,10 +16,13 @@ from skeleton.jeeves.agent.nuance_runtime import (
 )
 from skeleton.jeeves.agent.provider import DeterministicProvider, ProviderRouter
 from skeleton.jeeves.agent.runtime import RunInputs
-from skeleton.jeeves.agent.scientific_runtime import (
-    MaximalScientificJeevesRuntime,
-    ScientificJeevesRuntime,
+from skeleton.jeeves.agent.scientific_runtime import ScientificJeevesRuntime
+from skeleton.jeeves.agent.semantic_lenses import (
+    LensFamily,
+    SemanticFinding,
+    SemanticObservation,
 )
+from skeleton.jeeves.agent.semantic_plane import SemanticLensPlane
 from skeleton.jeeves.agent.types import (
     AgentResult,
     Goal,
@@ -64,7 +68,17 @@ def _compiler(clock: TickClock):
             maximum_tier=1,
         ),
     )
-    return memory, cards, relations, resolver, ScientificContextCompiler(resolver)
+    semantic_plane = SemanticLensPlane()
+    return (
+        memory,
+        cards,
+        relations,
+        resolver,
+        ScientificContextCompiler(
+            resolver,
+            semantic_plane=semantic_plane,
+        ),
+    )
 
 
 def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_workbench() -> None:
@@ -98,18 +112,20 @@ def test_scientific_context_compiler_preserves_base_packet_contract_and_adds_wor
     assert payload["contract"]["interpretive_only"] is True
     assert payload["contract"]["semantic_readings_are_not_evidence"] is True
     assert payload["contract"]["relations_change_retrieval_priority_not_factual_trust"] is True
-    assert payload["contract"]["lens_predictive_influence_is_empirically_gated"] is True
-    assert payload["contract"]["lens_hypergraphs_never_create_evidence"] is True
-    assert payload["contract"]["forecast_fusion_requires_textually_identical_targets"] is True
-    assert payload["contract"]["forecast_fusion_may_abstain"] is True
+    assert payload["contract"]["governed_semantic_plane"] is True
+    assert payload["contract"]["semantic_lens_weights_are_domain_scoped"] is True
     assert payload["semantic_domain"] == "narrative-game-analysis"
+    assert payload["semantic_governance_fingerprint"]
     assert any(row["family"] == "film" for row in payload["lenses"])
-    assert all("scientific_status" in row for row in payload["lenses"])
-    assert all("global_predictive_weight" in row for row in payload["lenses"])
-    assert all("predictive_weight" in row for row in payload["lenses"])
-    assert all("domain_status" in row for row in payload["lenses"])
-    assert all(row["factual_assertion_authorized"] is False for row in payload["lenses"])
-    assert all(row["causal_assertion_authorized"] is False for row in payload["lenses"])
+    assert payload["governed_semantic_lenses"]
+    assert all(
+        row["factual_assertion_authorized"] is False
+        for row in payload["governed_semantic_lenses"]
+    )
+    assert all(
+        row["causal_assertion_authorized"] is False
+        for row in payload["governed_semantic_lenses"]
+    )
     assert prior.card_id in {
         source_id
         for section in packet.sections
@@ -285,50 +301,17 @@ def test_scientific_runtime_shares_one_memory_and_relational_plane() -> None:
     assert runtime.context_resolver.memory is runtime.memory
     assert runtime.scientific_context.resolver is runtime.context_resolver
     assert runtime.nuance_runtime.resolver is runtime.context_resolver
+    assert runtime.scientific_context.semantic_plane is runtime.semantic_plane
+    assert runtime.lens_lab is runtime.semantic_plane.governance.registry.lab
     assert runtime.context_resolver.cards is runtime.memory_cards
     assert runtime.context_resolver.relations is runtime.relational_memory
     summary = runtime.scientific_summary()
-    assert "lens_science" in summary
-    assert summary["maximal_semantics_enabled"] is False
-    assert summary["semantic_lens_count"] >= 1
-    assert summary["lens_science"]["invariants"]["semantic_lenses_remain_interpretive"] is True
-    assert summary["lens_science"]["invariants"]["hypergraph_never_creates_evidence"] is True
+    assert summary["semantic_plane_fingerprint"] == runtime.semantic_plane.fingerprint
+    assert summary["semantic_lens_count"] >= 100
+    assert summary["invariants"]["semantic_plane_is_governed"] is True
 
 
-def test_maximal_scientific_runtime_routes_extreme_rare_lenses() -> None:
-    clock = TickClock()
-    provider = DeterministicProvider(("unused",))
-    runtime = MaximalScientificJeevesRuntime(
-        provider_router=ProviderRouter((provider,), clock=clock),
-        wall_clock=clock,
-        monotonic=clock,
-    )
-    namespace = _namespace()
-    runtime.nuance_runtime.prepare(
-        namespace,
-        "A shot reverse shot establishes a look across a dialogue cut.",
-    )
-    frame = runtime.nuance_runtime.prepare(
-        namespace,
-        "The reverse shot repeats the look and dialogue cut from a second viewpoint.",
-        requested_lenses=("shot_reverse_shot_suture",),
-        capture_interaction=False,
-    )
-
-    assert runtime.scientific_summary()["maximal_semantics_enabled"] is True
-    assert runtime.nuance_runtime.semantic_registry.get(
-        "shot_reverse_shot_suture"
-    ).key == "shot_reverse_shot_suture"
-    assert "shot_reverse_shot_suture" in {
-        lens.key for lens in frame.lens_selection.lenses
-    }
-    governed = frame.lens_governance.record_for("shot_reverse_shot_suture")
-    assert governed is not None
-    assert governed.decision.factual_assertion_authorized is False
-    assert governed.decision.causal_assertion_authorized is False
-
-
-def test_scientific_result_metadata_preserves_existing_metadata() -> None:
+def test_scientific_runtime_exposes_governed_semantic_analysis() -> None:
     clock = TickClock()
     provider = DeterministicProvider(("unused",))
     runtime = ScientificJeevesRuntime(
@@ -336,34 +319,90 @@ def test_scientific_result_metadata_preserves_existing_metadata() -> None:
         wall_clock=clock,
         monotonic=clock,
     )
+    observations = (
+        SemanticObservation(
+            "runtime-semantic-1",
+            "The deployment shows concept drift after a regime switch.",
+            0,
+            evidence_ids=("ev-runtime",),
+            tags=("concept drift", "regime"),
+        ),
+        SemanticObservation(
+            "runtime-semantic-2",
+            "Conditional accuracy degrades while covariate coverage remains.",
+            1,
+            evidence_ids=("ev-runtime",),
+            tags=("target", "mapping"),
+        ),
+        SemanticObservation(
+            "runtime-semantic-3",
+            "A later window preserves the changed predictor-target relation.",
+            2,
+            evidence_ids=("ev-runtime",),
+            tags=("drift", "relationship changed"),
+        ),
+    )
+    finding = SemanticFinding(
+        finding_id="runtime-drift",
+        lens_key="concept_drift",
+        family=LensFamily.PREDICTIVE,
+        observation_ids=("runtime-semantic-1",),
+        interpretation="Concept drift is a candidate explanation.",
+        prediction="The held-out deployment window will preserve the drift.",
+        confidence=0.80,
+        ambiguity=0.20,
+        novelty=0.60,
+        evidence_ids=("ev-runtime",),
+    )
+
+    snapshot = runtime.analyze_semantics(
+        observations,
+        findings=(finding,),
+        requested=("concept_drift",),
+        domain="narrative-game-analysis",
+    )
+
+    assert snapshot.semantic_domain == "narrative-game-analysis"
+    assert snapshot.governance.domain == "narrative-game-analysis"
+    assert snapshot.forecasts
+    assert snapshot.target_fusions
+    assert snapshot.factual_assertion_authorized is False
+    assert snapshot.causal_assertion_authorized is False
+
+
+def test_scientific_runtime_can_share_lens_lab_and_preserves_result_metadata() -> None:
+    clock = TickClock()
+    lab = ScientificLensLab()
+    provider = DeterministicProvider(("unused",))
+    runtime = ScientificJeevesRuntime(
+        provider_router=ProviderRouter((provider,), clock=clock),
+        lens_lab=lab,
+        wall_clock=clock,
+        monotonic=clock,
+    )
     result = AgentResult(
-        run_id="run-result",
+        run_id="run-science-result",
         goal_id="goal-1",
         success=True,
         reason=TerminationReason.GOAL_REACHED,
         answer="done",
         usage=Usage(),
         metadata={
-            "existing": {"value": 7},
             "scientific": {"caller_owned": True},
+            "existing": 7,
         },
     )
 
     decorated = runtime._decorate_scientific_result(result)
 
-    assert result.metadata["scientific"] == {"caller_owned": True}
-    assert decorated.metadata["existing"] == {"value": 7}
+    assert runtime.lens_lab is lab
+    assert runtime.semantic_plane.governance.registry.lab is lab
     assert decorated.metadata["scientific"] == {"caller_owned": True}
-    scientific = decorated.metadata["jeeves_scientific"]
-    assert scientific["maximal_semantics_enabled"] is False
-    assert scientific["semantic_lens_count"] > 0
-    assert scientific["invariants"]["semantic_interpretation_is_not_evidence"] is True
-    assert (
-        scientific["lens_science"]["invariants"][
-            "forecast_fusion_requires_textually_identical_targets"
-        ]
-        is True
-    )
+    assert decorated.metadata["existing"] == 7
+    assert "jeeves_scientific" in decorated.metadata
+    summary = decorated.metadata["jeeves_scientific"]
+    assert summary["semantic_plane_fingerprint"] == runtime.semantic_plane.fingerprint
+    assert summary["invariants"]["semantic_calibration_retains_forecast_custody"] is True
 
 
 def test_scientific_runtime_rebinds_relations_to_supplied_resolver_cards() -> None:

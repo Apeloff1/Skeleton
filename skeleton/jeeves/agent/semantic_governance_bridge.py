@@ -27,7 +27,6 @@ from .lens_system import (
     LensFamily as GovernedLensFamily,
 )
 from .semantic_extreme_lenses import LensMaturity, rare_semantic_definitions
-from .semantic_depth_lenses import depth_semantic_definitions
 from .semantic_lenses import (
     LensFamily,
     LensSelection,
@@ -36,7 +35,7 @@ from .semantic_lenses import (
 )
 from .semantic_plane_lenses import plane_semantic_definitions
 from .semantic_research_lenses import research_semantic_definitions
-from .types import stable_fingerprint
+from .types import AgentContractError, stable_fingerprint
 
 
 _FAMILY_MAP: Mapping[LensFamily, GovernedLensFamily] = {
@@ -77,7 +76,6 @@ def semantic_maturity_index() -> Mapping[str, LensMaturity]:
         rare_semantic_definitions(),
         research_semantic_definitions(),
         plane_semantic_definitions(),
-        depth_semantic_definitions(),
     ):
         for definition in definitions:
             result.setdefault(definition.spec.key, definition.maturity)
@@ -132,10 +130,25 @@ class SemanticGovernanceSnapshot:
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
     fingerprint: str
+    domain: str | None = None
+    domain_predictive_weights: tuple[tuple[str, float], ...] = ()
+    domain_statuses: tuple[tuple[str, str], ...] = ()
+
+    def global_weight_for(self, lens_key: str, default: float = 0.0) -> float:
+        key = str(lens_key).strip().casefold()
+        return dict(self.predictive_weights).get(key, default)
 
     def weight_for(self, lens_key: str, default: float = 0.0) -> float:
         key = str(lens_key).strip().casefold()
-        return dict(self.predictive_weights).get(key, default)
+        if self.domain is not None:
+            domain_weights = dict(self.domain_predictive_weights)
+            if key in domain_weights:
+                return domain_weights[key]
+        return self.global_weight_for(key, default)
+
+    def domain_status_for(self, lens_key: str) -> str:
+        key = str(lens_key).strip().casefold()
+        return dict(self.domain_statuses).get(key, "unspecified")
 
     def decision_for(self, lens_key: str) -> LensGovernanceDecision | None:
         key = str(lens_key).strip().casefold()
@@ -202,7 +215,13 @@ class SemanticGovernanceBridge:
         selection: LensSelection,
         *,
         observations: Sequence[SemanticObservation] = (),
+        domain: str | None = None,
     ) -> SemanticGovernanceSnapshot:
+        normalized_domain = (
+            str(domain).strip().casefold()
+            if domain is not None and str(domain).strip()
+            else None
+        )
         activations = tuple(
             self.activation_for(
                 spec,
@@ -240,6 +259,52 @@ class SemanticGovernanceBridge:
                 for decision in decisions
             )
         )
+        activations_by_key = {
+            activation.lens.lens_id: activation
+            for activation in activations
+        }
+        domain_weights: list[tuple[str, float]] = []
+        domain_statuses: list[tuple[str, str]] = []
+        for decision in decisions:
+            weight = decision.predictive_weight
+            status = "unspecified"
+            activation = activations_by_key.get(decision.lens_id)
+            if normalized_domain is not None and activation is not None:
+                profile = self.registry.profile(activation.lens)
+                if not profile.domain_specific:
+                    status = "domain_invariant"
+                else:
+                    try:
+                        report = self.registry.lab.report(decision.lens_id)
+                    except AgentContractError:
+                        report = None
+                    if report is None:
+                        status = "unobserved"
+                        weight = min(weight, 0.10)
+                    else:
+                        domain_report = next(
+                            (
+                                item
+                                for item in report.domain_calibration
+                                if item.domain == normalized_domain
+                            ),
+                            None,
+                        )
+                        if domain_report is None:
+                            status = "unseen"
+                            weight = min(weight, 0.10)
+                        elif (
+                            domain_report.count
+                            < self.registry.lab.policy.minimum_transfer_trials_per_domain
+                        ):
+                            status = "underpowered"
+                            weight = min(weight, 0.10)
+                        else:
+                            status = "observed"
+            domain_weights.append((decision.lens_id, weight))
+            domain_statuses.append((decision.lens_id, status))
+        domain_weight_tuple = tuple(sorted(domain_weights))
+        domain_status_tuple = tuple(sorted(domain_statuses))
         forecast_blocked = tuple(
             sorted(
                 decision.lens_id
@@ -263,6 +328,9 @@ class SemanticGovernanceBridge:
                 "bundle": bundle.fingerprint,
                 "decisions": [item.fingerprint for item in decisions],
                 "weights": weights,
+                "domain": normalized_domain,
+                "domain_weights": domain_weight_tuple,
+                "domain_statuses": domain_status_tuple,
                 "forecast_blocked": forecast_blocked,
                 "decision_blocked": decision_blocked,
                 "factual": factual,
@@ -277,4 +345,7 @@ class SemanticGovernanceBridge:
             factual_assertion_authorized=factual,
             causal_assertion_authorized=causal,
             fingerprint=fingerprint,
+            domain=normalized_domain,
+            domain_predictive_weights=domain_weight_tuple,
+            domain_statuses=domain_status_tuple,
         )
