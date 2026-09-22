@@ -2122,7 +2122,7 @@
       "source": "skeleton/economy",
       "destination": "skeleton/ai/simulation/economy",
       "kind": "tree",
-      "source_git_object_sha": "51a53f830e3223bc72520fe65a3e6451ad7c5eb1",
+      "source_git_object_sha": "ff47921c83321c4644ee8040fcb20604de5f72af",
       "role": "The GameForge-derived treasury/economy model is simulation-domain state and belongs under simulation rather than a parallel runtime root.",
       "work_package_refs": [
         "WP-W11",
@@ -4226,7 +4226,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_semantic_parity_green_ssr_raf_repair_pending_ci_and_independent_verification",
+  "validation_state": "130_mapping_transfer_v2_reconciled_current_main_pending_fresh_ci_and_object_audit",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4506,7 +4506,7 @@
   "classification_coverage": {
     "status": "closed_after_all_preclassified_moves",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "6abe7d71becbf36595eec1131dc1c65ae8bbfa66"
+    "source_head": "0c867cca9131f14532b31fce627f176f9119ba17"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -4581,7 +4581,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "Transfer-v2 remains structurally and semantically parity-clean across 130 mappings. After the full audit, commit 8f076935c39fead4fbccef61872290bc68d50566 normalized trailing whitespace in one quarantined Python mirror only; source and destination remain AST-equivalent under the canonical Python semantic-parity policy. No runtime/custody authority changed.",
+    "note": "Prior full 130-mapping audit remains historical evidence. Current-main reconciliation mirrors the three newly landed skeleton/economy files into the governed simulation/economy destination, refreshes the AIFT-ECONOMY source tree identity, and explicitly classifies skeleton/parse outside AI ownership. Fresh CI/object evidence is required for this reconciled head before landing.",
     "current_mapping_count": 130,
     "audit_scope_status": "full_130_mapping_object_and_parity_audit_current",
     "pending_mapping_ids": [],
@@ -4631,6 +4631,18 @@
       "destination_only": true,
       "semantic_parity_required": true,
       "byte_identity_required": false
+    },
+    "post_main_reconciliation": {
+      "base_main_sha": "0c867cca9131f14532b31fce627f176f9119ba17",
+      "economy_source_tree_sha": "ff47921c83321c4644ee8040fcb20604de5f72af",
+      "economy_mirror_files": [
+        "capabilities.py",
+        "harbor.py",
+        "law.py"
+      ],
+      "parse_classification": "retained_outside_ai_tree",
+      "retained_outside_ai_tree_count": 34,
+      "status": "reconciled_pending_fresh_validation"
     }
   },
   "move_tag_contract": {
@@ -4659,7 +4671,7 @@
     "status": "fully_classified_staged_mirror_object_audit_green_cutover_not_authorized",
     "governed_mapping_count": 130,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 33,
+    "retained_outside_ai_tree_count": 34,
     "batch_counts": {
       "B1-core-runtime": 54,
       "B3-owner-sensitive": 7,
@@ -4667,7 +4679,7 @@
       "B4-research-quarantine": 35,
       "B3-compat-convergence": 22
     },
-    "fresh_object_audit_required": false,
+    "fresh_object_audit_required": true,
     "global_cutover_blockers": [
       "BASE-FRONTEND-SSR-RAF-01"
     ],
