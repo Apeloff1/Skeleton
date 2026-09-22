@@ -27,7 +27,7 @@ export default function DevLogOverlay() {
   const [expanded, setExpanded] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [copied, setCopied] = useState(false);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
 
   useEffect(() => {
     const unsub = subscribeTrace((t) => setSteps(t.slice(-60)));
