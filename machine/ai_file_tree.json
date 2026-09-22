@@ -790,9 +790,9 @@
         "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
       },
       {
-        "path": "skeleton/shells/ai/governance.py",
-        "owner": "shell/product compatibility surface",
-        "reason": "shell/UI governance adapter is not canonical engine ownership"
+        "path": "skeleton/shells",
+        "owner": "shell/product compatibility surfaces",
+        "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
       }
     ],
     "covered_aliases": [
