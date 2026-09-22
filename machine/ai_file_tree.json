@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.3.6",
+  "tree_version": "1.4.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -2749,6 +2749,776 @@
       ],
       "move_batch": "B3-compat-convergence",
       "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-LEGACY",
+      "source": "skeleton/architecture.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
+      "kind": "file",
+      "source_git_object_sha": "2698d9f9ce47bb092e9259b9835e2d7e2faa921b",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-INDEX-LEGACY",
+      "source": "skeleton/architecture_index.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_index.py",
+      "kind": "file",
+      "source_git_object_sha": "dc0cc3cc241bdfd066fefec4bac64978b3249da4",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R03",
+      "source": "skeleton/architecture_round3.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round3.py",
+      "kind": "file",
+      "source_git_object_sha": "1749fb191a5ae10a85f31201fc559b62fa8fe201",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R04",
+      "source": "skeleton/architecture_round4.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round4.py",
+      "kind": "file",
+      "source_git_object_sha": "37494202290c896bfd336ff49723833d924acef5",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R05",
+      "source": "skeleton/architecture_round5.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round5.py",
+      "kind": "file",
+      "source_git_object_sha": "193ba887f3af884e2b7903a2d7ef25d54ca26b62",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R06",
+      "source": "skeleton/architecture_round6.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round6.py",
+      "kind": "file",
+      "source_git_object_sha": "a26f8dce143001fea8d216326d6cfd27b1975879",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R07",
+      "source": "skeleton/architecture_round7.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round7.py",
+      "kind": "file",
+      "source_git_object_sha": "b4010f8645cd133a0f482986393b6e604f19efa7",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R08",
+      "source": "skeleton/architecture_round8.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round8.py",
+      "kind": "file",
+      "source_git_object_sha": "b5c4ca3e7f377dbd3b2244c7bd4c7e1ea4c819f4",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R09",
+      "source": "skeleton/architecture_round9.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round9.py",
+      "kind": "file",
+      "source_git_object_sha": "da3777be7a99bcf38c81ba4b91ee54b3ec80b1e4",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R10",
+      "source": "skeleton/architecture_round10.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round10.py",
+      "kind": "file",
+      "source_git_object_sha": "b8a97d10c23c06563eb0edeb24816fd0181a9951",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R11",
+      "source": "skeleton/architecture_round11.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round11.py",
+      "kind": "file",
+      "source_git_object_sha": "edcd8b04bbe4270286adaed96025186aa4999a68",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R12",
+      "source": "skeleton/architecture_round12.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round12.py",
+      "kind": "file",
+      "source_git_object_sha": "614e0b2ed6862aa0887551ec7b44ccf970ce1873",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R13",
+      "source": "skeleton/architecture_round13.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round13.py",
+      "kind": "file",
+      "source_git_object_sha": "364914860027b2639afd040ce4791aeed3a62016",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R14",
+      "source": "skeleton/architecture_round14.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round14.py",
+      "kind": "file",
+      "source_git_object_sha": "936e2a3cdaf0e4b5f9cdf43b240f6eac8ff75934",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R15",
+      "source": "skeleton/architecture_round15.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round15.py",
+      "kind": "file",
+      "source_git_object_sha": "f016b8e5a293e6f5e4418fd32164eeab27b7c515",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R16",
+      "source": "skeleton/architecture_round16.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round16.py",
+      "kind": "file",
+      "source_git_object_sha": "8b82415ba83d672d8cdf258887fe1706980be825",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R17",
+      "source": "skeleton/architecture_round17.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round17.py",
+      "kind": "file",
+      "source_git_object_sha": "7a9e471574c8a2e01eaba11014e82dd4308f9227",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R18",
+      "source": "skeleton/architecture_round18.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round18.py",
+      "kind": "file",
+      "source_git_object_sha": "4d1246adde8961f08ee5d725bec7b84e8ed08b84",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R19",
+      "source": "skeleton/architecture_round19.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round19.py",
+      "kind": "file",
+      "source_git_object_sha": "d64f5b0437c46df9d1206d0b72a8ed21e9a2f653",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R20",
+      "source": "skeleton/architecture_round20.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round20.py",
+      "kind": "file",
+      "source_git_object_sha": "f19f13b731224db383b2c2a3288f1c4d3122b4dd",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R21",
+      "source": "skeleton/architecture_round21.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round21.py",
+      "kind": "file",
+      "source_git_object_sha": "3d55af787fc345c0fb88514cef2be31658062f46",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R22",
+      "source": "skeleton/architecture_round22.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round22.py",
+      "kind": "file",
+      "source_git_object_sha": "03e08ee64e14ad01807644b684639539b9b05323",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     }
   ],
   "ci_enforcement": {
