@@ -249,10 +249,10 @@ export const AchievementsModal: React.FC<Props> = ({ visible, onClose, colors })
                 contentContainerStyle={st.listContent}
                 onEndReached={() => { if (hasMore && !loadingMore && !search) loadAchievements(false); }}
                 onEndReachedThreshold={0.3}
-                ListFooterComponent={
+                ListFooterComponent={() => (
                   loadingMore ? <ActivityIndicator color="#8B5CF6" style={{ padding: 16 }} /> :
                   !hasMore ? <Text style={st.endText}>All achievements loaded</Text> : null
-                }
+                )}
                 ListEmptyComponent={<Text style={st.emptyText}>No achievements found</Text>}
                 initialNumToRender={20}
                 maxToRenderPerBatch={20}
