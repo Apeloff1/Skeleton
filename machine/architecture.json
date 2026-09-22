@@ -24,7 +24,8 @@
     "ai_runtime_schema_catalog": "machine/ai_runtime_schemas.json",
     "ai_implementation_handoff": "machine/ai_implementation_handoff.json",
     "ai_closure_evidence": "machine/ai_closure_evidence.json",
-    "ai_capability_registry": "machine/ai_capabilities.json"
+    "ai_capability_registry": "machine/ai_capabilities.json",
+    "ai_file_tree": "machine/ai_file_tree.json"
   },
   "objectives": [
     "one product shell",
@@ -48,7 +49,8 @@
     "every construction-plane relationship is materialized as an explicit capability interface contract",
     "one machine-readable state authority topology separating authoritative, derived, scratch, recovery, and transitional stores",
     "restore canonical state before rebuilding vector indexes, caches, snapshots, and other projections",
-    "one typed machine-readable schema catalog for cross-plane AI runtime envelopes"
+    "one typed machine-readable schema catalog for cross-plane AI runtime envelopes",
+    "one governed canonical AI assembly file tree under skeleton/ai"
   ],
   "principles": [
     "runtime topology and repository topology are separate contracts linked by this map",
@@ -560,7 +562,8 @@
     "typed AI runtime schema catalog must exist and remain linked from the construction contract and runtime manifest",
     "Every functional-AI P0 gap must have one file-level implementation handoff entry consistent with the closure DAG.",
     "Functional-AI P0 closure is evidence-based and tracked separately from implementation progress.",
-    "Every user-visible AI capability must be declared in the concrete capability registry and resolve readiness from canonical plane/provider dependencies."
+    "Every user-visible AI capability must be declared in the concrete capability registry and resolve readiness from canonical plane/provider dependencies.",
+    "AI file-tree migration mirrors remain byte-identical to compatibility sources until explicit import/ownership cutover"
   ],
   "construction": {
     "contract": "machine/ai_app_construction.json",

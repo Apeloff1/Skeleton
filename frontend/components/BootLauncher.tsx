@@ -12,13 +12,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
-  InteractionManager,
   Animated,
   Easing,
   ScrollView,
   AccessibilityInfo,
 } from 'react-native';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+
+
+const requestIdleTask = (callback: () => void) => {
+  const id = setTimeout(callback, 0);
+  return { cancel: () => clearTimeout(id) };
+};import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import { traceStep, getMemoryTrace, clearCrashes } from '../utils/bootTracer';
 import { STAGES, BootRunner, RunnerSnapshot, readBootCache, writeBootCache } from '../src/boot';
 import api from '../src/utils/apiClient';
@@ -63,7 +67,7 @@ function DecorativeStarfall({ enabled }: { enabled: boolean }) {
 
   React.useEffect(() => {
     if (!enabled) return;
-    const handle = InteractionManager.runAfterInteractions(() => {
+    const handle = requestIdleTask(() => {
       try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const module = require('../src/components/StarfallBackground');

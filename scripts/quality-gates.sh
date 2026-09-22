@@ -52,6 +52,11 @@ python scripts/check_ai_master_build_sequence.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_master_build_sequence.py
 
+printf '\n== Canonical AI file tree ==\n'
+python scripts/check_ai_file_tree.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_file_tree.py
+
 printf '\n== Masterplan engineering pass ==\n'
 python scripts/check_ai_engineering_pass.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \

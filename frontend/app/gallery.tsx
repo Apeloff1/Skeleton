@@ -96,7 +96,7 @@ function BuildCard({ build }: { build: any }) {
         colors={[color + '12', 'transparent'] as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}
+        style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
       />
       <View style={st.cardHead}>
         <View style={[st.iconHalo, { backgroundColor: color + '22', borderColor: color + '44' }]}>

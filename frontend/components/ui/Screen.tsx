@@ -42,7 +42,7 @@ export const Screen: React.FC<ScreenProps> = ({
           colors={theme.gradients.cosmic as any}
           start={{ x: 0.1, y: 0 }}
           end={{ x: 0.9, y: 1 }}
-          style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}
+          style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
         />
       )}
       <SafeAreaView style={styles.safe} edges={edges as any}>

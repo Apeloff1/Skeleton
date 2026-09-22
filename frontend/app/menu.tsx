@@ -211,7 +211,7 @@ export default function MenuScreen() {
   const flagRouteAudit = useFeatureFlag('show_route_audit');
 
   // ── Scroll-to-top FAB + pull-to-refresh comfort ────────────────────
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView> | null>(null);
   const fabOpacity = useRef(new RNAnimated.Value(0)).current;
   const [showFab,   setShowFab]   = useState(false);
   const [refreshing, setRefreshing] = useState(false);

@@ -57,7 +57,7 @@ const genStyles = StyleSheet.create({
     backgroundColor: '#0b0814', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   halo: {
-    ...StyleSheet.absoluteFillObject, borderRadius: 16, borderWidth: 2, borderColor: '#8B5CF6',
+    ...StyleSheet.absoluteFill, borderRadius: 16, borderWidth: 2, borderColor: '#8B5CF6',
     ...Platform.select({ ios: { shadowColor: '#8B5CF6', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.9, shadowRadius: 22 }, default: {} }),
   },
   scanBar: { position: 'absolute', top: 0, bottom: 0, width: '30%', backgroundColor: 'rgba(139,92,246,0.10)' },
@@ -172,7 +172,7 @@ export default function PlayableScreen() {
   const params = useLocalSearchParams<{ id?: string; remix?: string; brief?: string; autopolish?: string }>();
   const autopolishedRef = React.useRef(false);
   const haptics = useHaptics();
-  const tweakRef = React.useRef<TextInput>(null);
+  const tweakRef = React.useRef<React.ElementRef<typeof TextInput>>(null);
   const [brief, setBrief] = React.useState('A one-thumb arcade game where you tap to make a glowing orb hop between rising platforms — go as high as you can without falling.');
   const [busy, setBusy] = React.useState(false);
   const [busyLabel, setBusyLabel] = React.useState('Building your game…');

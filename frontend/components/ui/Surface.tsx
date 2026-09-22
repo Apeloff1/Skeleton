@@ -81,9 +81,9 @@ export const Surface: React.FC<SurfaceProps> = ({
         <BlurView
           tint="dark"
           intensity={blurIntensity}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
-        <View style={[{ backgroundColor: glassTint || 'rgba(15,23,42,0.45)', ...StyleSheet.absoluteFillObject }, { pointerEvents: 'none' }]} />
+        <View style={[{ backgroundColor: glassTint || 'rgba(15,23,42,0.45)', ...StyleSheet.absoluteFill }, { pointerEvents: 'none' }]} />
         {children}
       </View>
     );

@@ -49,7 +49,7 @@ export function CollaborationModal({
   const [participants, setParticipants] = useState<CollaboratorInfo[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const chatScrollRef = useRef<ScrollView>(null);
+  const chatScrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
 
   // Initialize callbacks
   useEffect(() => {

@@ -55,7 +55,7 @@ export const JeevesModal: React.FC<JeevesModalProps> = ({
   const [personality, setPersonality] = useState<Personality>('friendly');
   const [skillLevel, setSkillLevel] = useState<SkillLevel>('intermediate');
   const [showSettings, setShowSettings] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const sessionId = useRef(`jeeves-${Date.now()}`);
   const dotAnim = useRef(new Animated.Value(0)).current;
 

@@ -29,7 +29,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       <View style={styles.iconWrap}>
         <LinearGradient
           colors={[accent + '33', accent + '08'] as any}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
         <Ionicons name={icon} size={32} color={accent} />
       </View>

@@ -1,0 +1,4024 @@
+{
+  "schema_version": 1,
+  "tree_version": "1.4.3",
+  "status": "staged_mirror",
+  "architecture_tag": "arch-map/v3.7",
+  "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
+  "canonical_root": "skeleton/ai",
+  "migration_mode": "strangler_mirror_then_explicit_cutover",
+  "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
+  "authorities": {
+    "architecture": "machine/architecture.json",
+    "master_plan": "machine/ai_master_plan.json",
+    "master_build_sequence": "machine/ai_master_build_sequence.json",
+    "build_queue": "machine/ai_build_queue.json",
+    "accountability": "machine/ai_build_accountability.json",
+    "human_packet": "docs/plan/AI_FILE_TREE_MIGRATION.md",
+    "validator": "scripts/check_ai_file_tree.py"
+  },
+  "promotion_policy": {
+    "current_state": "destination tree is canonical assembly destination; non-credential Python code is semantic-parity mirrored, non-Python content remains byte-parity mirrored, and credential-bearing surfaces are non-owning compatibility facades",
+    "cutover_requires": [
+      "affected imports and package entrypoints point to skeleton/ai or an explicit compatibility facade",
+      "source/destination parity validator is green before source removal",
+      "focused affected-domain tests are green",
+      "App Assembly and canonical quality gates are green",
+      "rollback path is documented and tested",
+      "implementation signoff is bound to a full git SHA",
+      "independent verification signoff is bound to a validated full git SHA"
+    ],
+    "forbidden": [
+      "deleting compatibility sources before import inversion",
+      "allowing source and destination implementations to diverge",
+      "marking AIQ/work-package completion from file relocation alone",
+      "moving backend or frontend compatibility adapters into engine ownership without an architecture change"
+    ]
+  },
+  "mappings": [
+    {
+      "id": "AIFT-PROVIDER-CONTRACT",
+      "source": "skeleton/provider_contract.py",
+      "destination": "skeleton/ai/providers/contract.py",
+      "kind": "file",
+      "source_git_object_sha": "dd06c93cf39d6f4f12f58348aebd04c8084f36cc",
+      "role": "provider-neutral request/receipt contract",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W05"
+      ],
+      "aiq_refs": [
+        "AIQ-S2-PROTO-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PROVIDER-RUNTIME",
+      "source": "skeleton/provider_runtime.py",
+      "destination": "skeleton/ai/providers/runtime.py",
+      "kind": "file",
+      "source_git_object_sha": "1e753fb40702a6bd420f16d79791d4ea6efd73da",
+      "role": "credential-bearing provider runtime",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-PROV-02",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S2-PROTO-03",
+        "AIQ-S7-E2E-01"
+      ],
+      "parity_mode": "compatibility_facade",
+      "facade_required_import": "from skeleton.provider_runtime import",
+      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-CONTRACTS",
+      "source": "skeleton/contracts",
+      "destination": "skeleton/ai/runtime/contracts",
+      "kind": "tree",
+      "source_git_object_sha": "0513a269bd19d405de5a1e9f729843ea85b7373a",
+      "role": "canonical operation/conversation/context contracts",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S1-CONV-02",
+        "AIQ-S4-EXEC-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PERSISTENCE",
+      "source": "skeleton/persistence",
+      "destination": "skeleton/ai/runtime/persistence",
+      "kind": "tree",
+      "source_git_object_sha": "d808e2da42400ca8eae4ccd7a310b11a2954e058",
+      "role": "durable AI state and recovery",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S1-CONV-01",
+        "AIQ-S4-EXEC-01"
+      ],
+      "overlay_children": [
+        "legacy_persist"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CONTEXT",
+      "source": "skeleton/context",
+      "destination": "skeleton/ai/runtime/context",
+      "kind": "tree",
+      "source_git_object_sha": "6e808777ce8fc27375ae5cedf7ddd969ccabc73b",
+      "role": "context compilation",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "aiq_refs": [
+        "AIQ-S2-CTX-01",
+        "AIQ-S2-CTX-02"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-RETRIEVAL",
+      "source": "skeleton/retrieval",
+      "destination": "skeleton/ai/runtime/retrieval",
+      "kind": "tree",
+      "source_git_object_sha": "d34439f931e844ede82f22393760014db831b162",
+      "role": "retrieval and grounding",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W09"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-MEM-03",
+        "AIQ-S3-VER-02"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MEMORY",
+      "source": "skeleton/memory",
+      "destination": "skeleton/ai/runtime/memory",
+      "kind": "tree",
+      "source_git_object_sha": "0745fd645cf03a4ab3b7ede95563f56802970662",
+      "role": "memory authority and recall",
+      "work_package_refs": [
+        "WP-W07"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-INTELLIGENCE",
+      "source": "skeleton/intelligence",
+      "destination": "skeleton/ai/runtime/intelligence",
+      "kind": "tree",
+      "source_git_object_sha": "1ee7fbd18489713a01711fb4b261df9e4fbfecc5",
+      "role": "admission verification and execution",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-COST-01",
+        "AIQ-S3-VER-01",
+        "AIQ-S4-EXEC-02"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-FRONTIER",
+      "source": "skeleton/frontier",
+      "destination": "skeleton/ai/runtime/frontier",
+      "kind": "tree",
+      "source_git_object_sha": "50523f0a4aa82797c820f8163cd765da72be1900",
+      "role": "routing streams and frontier orchestration",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W05",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-STATE-02",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SKILLS",
+      "source": "skeleton/skills",
+      "destination": "skeleton/ai/runtime/skills",
+      "kind": "tree",
+      "source_git_object_sha": "09d238958b9e446054165faecc3fed72360d6719",
+      "role": "tool and skill runtime",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-TOOL-01",
+        "AIQ-S1-TOOL-02",
+        "AIQ-S1-TOOL-03"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-JEEVES",
+      "source": "skeleton/jeeves",
+      "destination": "skeleton/ai/agents/jeeves",
+      "kind": "tree",
+      "source_git_object_sha": "bb1bb10fa461417ab1cd609dc4f849a1bcd5a6e7",
+      "role": "Jeeves reasoning planning semantics verification and agent runtime",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-PROV-02",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-BUILD-PLANNING",
+      "source": "core/shift_supervisor",
+      "destination": "skeleton/ai/build/shift_supervisor",
+      "kind": "tree",
+      "source_git_object_sha": "dc3300593b0049186fcce43f7921e947a829afd6",
+      "role": "transitional planning scheduling and build-control harness",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W16"
+      ],
+      "aiq_refs": [],
+      "parity_exceptions": [
+        {
+          "path": "model_gateway.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from core.shift_supervisor.model_gateway import",
+          "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
+        }
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-ENGINE-API",
+      "source": "skeleton/api",
+      "destination": "skeleton/ai/runtime/api",
+      "kind": "tree",
+      "source_git_object_sha": "5e2d7c09c42b2f7df6e42edf4bd74d6d576810b3",
+      "role": "engine API/auth/gateway runtime",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "aiq_refs": [
+        "AIQ-S5-ENG-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-VAULT",
+      "source": "skeleton/vault",
+      "destination": "skeleton/ai/runtime/vault",
+      "kind": "tree",
+      "source_git_object_sha": "c0d43bd5703b877710fd7f32f0e31db08c266d11",
+      "role": "data governance lifecycle and audit authority",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-GOV-02",
+        "AIQ-S0-GOV-03",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-AGENTS",
+      "source": "skeleton/agents",
+      "destination": "skeleton/ai/agents/core",
+      "kind": "tree",
+      "source_git_object_sha": "940ef2520e015bf13d7eba00813a792b575a7b3d",
+      "role": "core agent/swarm execution runtime",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-COST-03",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-AUTOMATION",
+      "source": "skeleton/automation",
+      "destination": "skeleton/ai/build/automation",
+      "kind": "tree",
+      "source_git_object_sha": "fac1338e8ee20de30ea2dbd60b91532ce03bdc35",
+      "role": "repository automation AI support plane",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "free_model.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.free_model import",
+          "note": "Repository-automation provider credential/network ownership remains singular at skeleton/automation/free_model.py until cutover."
+        },
+        {
+          "path": "chatgpt_adapter.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.chatgpt_adapter import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "idle_studio.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.idle_studio import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "idle_studio_publisher.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.idle_studio_publisher import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "idle_studio_v2.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.idle_studio_v2 import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "specialist_bots.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.specialist_bots import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "supervisor.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.automation.supervisor import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        }
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-ARTIFACT-PLANE",
+      "source": "skeleton/artifact_plane",
+      "destination": "skeleton/ai/runtime/artifact_plane",
+      "kind": "tree",
+      "source_git_object_sha": "9ae9937eb4f748ce827105abd4307fc32d62bc16",
+      "role": "artifact production and governance plane",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S0-COST-02",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-OBSERVABILITY",
+      "source": "skeleton/observability",
+      "destination": "skeleton/ai/runtime/observability",
+      "kind": "tree",
+      "source_git_object_sha": "3fa6e2abe22110c24ff5829764684156c70cbb54",
+      "role": "AI runtime observability audit and telemetry plane",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-03",
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CONTEXTS",
+      "source": "skeleton/contexts",
+      "destination": "skeleton/ai/runtime/contexts",
+      "kind": "tree",
+      "source_git_object_sha": "8f3df332fdca226208a0c4f7cbd4560b291b15fe",
+      "role": "legacy/extended context runtime support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SECURITY",
+      "source": "skeleton/security",
+      "destination": "skeleton/ai/runtime/security",
+      "kind": "tree",
+      "source_git_object_sha": "62acf8347687d2c69fd1047fa593e5e9618d9270",
+      "role": "AI runtime security and activation controls",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "activation_security.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.security.activation_security import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        },
+        {
+          "path": "injection_corpus.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.security.injection_corpus import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        }
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-EVALUATION",
+      "source": "skeleton/eval",
+      "destination": "skeleton/ai/evaluation",
+      "kind": "tree",
+      "source_git_object_sha": "337e6ec148d5e141984f602e94bc75e5348c2bb1",
+      "role": "evaluation and evidence support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "quality"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-KERNEL",
+      "source": "skeleton/kernel",
+      "destination": "skeleton/ai/runtime/kernel",
+      "kind": "tree",
+      "source_git_object_sha": "d070a8f416237ede18c124076dfe2d22f278ee36",
+      "role": "engine kernel and governance primitives",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-RELIABILITY",
+      "source": "skeleton/reliability",
+      "destination": "skeleton/ai/runtime/reliability",
+      "kind": "tree",
+      "source_git_object_sha": "3b51243d6072a6d853ef104e6f4cc510d678d459",
+      "role": "runtime reliability controls",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "acquired_guard.py"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-LEARNING",
+      "source": "skeleton/learning",
+      "destination": "skeleton/ai/learning",
+      "kind": "tree",
+      "source_git_object_sha": "aa2e9a8c65dae1849dbd6a559e2e0c4b598c1dde",
+      "role": "controlled learning support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "acquired.py",
+        "school"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-RESILIENCE",
+      "source": "skeleton/resilience",
+      "destination": "skeleton/ai/runtime/resilience",
+      "kind": "tree",
+      "source_git_object_sha": "c96ed099d077363019a7ee96dd351c50582c8c74",
+      "role": "failure recovery and resilience runtime",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-COGNITION",
+      "source": "skeleton/cognition",
+      "destination": "skeleton/ai/cognition",
+      "kind": "tree",
+      "source_git_object_sha": "24f689205da1c891c3794ab43dd1d99ab20a1703",
+      "role": "cognition and telemetry support",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PRIMITIVES",
+      "source": "skeleton/primitives",
+      "destination": "skeleton/ai/runtime/primitives",
+      "kind": "tree",
+      "source_git_object_sha": "35369ec7cc85ab9759d1540762f549b6d75c242d",
+      "role": "AI runtime primitive contracts and utilities",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-REPO-INTELLIGENCE",
+      "source": "skeleton/repo_intelligence",
+      "destination": "skeleton/ai/build/repo_intelligence",
+      "kind": "tree",
+      "source_git_object_sha": "a089e3c09730d6c67ef71b8f2ee493ce891506db",
+      "role": "repository intelligence for build/control workflows",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SIMULATION",
+      "source": "skeleton/simulation",
+      "destination": "skeleton/ai/simulation",
+      "kind": "tree",
+      "source_git_object_sha": "d7f2bce60e4333095ea911d6272afce25d233b61",
+      "role": "world-model and simulation plane kept separate from real-world authority",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019"
+      ],
+      "overlay_children": [
+        "content",
+        "economy",
+        "game",
+        "platform",
+        "world"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-FORGE",
+      "source": "skeleton/forge",
+      "destination": "skeleton/ai/forge",
+      "kind": "tree",
+      "source_git_object_sha": "64b73768128390fa7dbd23133de4a1d7e54d2dff",
+      "role": "bounded candidate generation and champion/challenger forge plane",
+      "work_package_refs": [
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-023"
+      ],
+      "overlay_children": [
+        "creator",
+        "pipelines"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-NATIVE",
+      "source": "skeleton/native",
+      "destination": "skeleton/ai/runtime/native",
+      "kind": "tree",
+      "source_git_object_sha": "69804584a7f002f1bcd1709dc2c50cab12597e5b",
+      "role": "high-performance native capability registry, ABI boundary and accelerated kernels",
+      "volume_refs": [
+        "VOL-032"
+      ],
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W30"
+      ],
+      "work_package_linkage_basis": "VOL-032 is a runtime/native-core implementation path whose stable ABI belongs to kernel lifecycle and whose promotion/fallback obligations belong to production hardening.",
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "jvm_registry.py"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CORTEX",
+      "source": "skeleton/cortex",
+      "destination": "skeleton/ai/runtime/cortex",
+      "kind": "tree",
+      "source_git_object_sha": "7661cbfa36ecfe96ce841d41fff4eefc10383d44",
+      "role": "owned-model cognition, model interchange, routing, multimodal and learning runtime",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06",
+        "WP-W11",
+        "WP-W28"
+      ],
+      "aiq_refs": [],
+      "parity_exceptions": [
+        {
+          "path": "interchange.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.cortex.interchange import *",
+          "note": "Remote teacher/provider key and HTTP ownership remains singular at skeleton/cortex/interchange.py until provider-boundary cutover."
+        },
+        {
+          "path": "gates.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.cortex.gates import *",
+          "note": "Provider gate environment/key discovery remains singular at skeleton/cortex/gates.py until provider-boundary cutover."
+        },
+        {
+          "path": "catalog.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.cortex.catalog import",
+          "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
+        }
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-ORGANISM",
+      "source": "skeleton/organism",
+      "destination": "skeleton/ai/runtime/organism",
+      "kind": "tree",
+      "source_git_object_sha": "bc423ad5d959119aa4c905e6eaeff55e6dc043bd",
+      "role": "engine organism runtime DAG, health, policy, quality, recovery and operator control support",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W11",
+        "WP-W19",
+        "WP-W20",
+        "WP-W21"
+      ],
+      "aiq_refs": [],
+      "parity_exceptions": [
+        {
+          "path": "secret_manager.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.organism.secret_manager import *",
+          "note": "Encrypted credential storage and master-secret ownership remains singular at skeleton/organism/secret_manager.py until explicit security-owner cutover."
+        }
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-APPLICATION",
+      "source": "skeleton/application",
+      "destination": "skeleton/ai/runtime/application",
+      "kind": "tree",
+      "source_git_object_sha": "8115bf017e1ee7bf1617c1df22bb89118f876550",
+      "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W02",
+        "WP-W13",
+        "WP-W14",
+        "WP-W22",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-041",
+        "VOL-128"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve backend versus engine ownership boundary",
+        "preserve command/version/authorization contracts",
+        "invert imports only after focused application and API regression tests"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-BUILD",
+      "source": "skeleton/build",
+      "destination": "skeleton/ai/build/core",
+      "kind": "tree",
+      "source_git_object_sha": "754faddb86a11687ff6057cc473e771b7d304cba",
+      "role": "Incremental build graph and network audit are repository-engineering/build-control support for autonomous AI work.",
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-067",
+        "VOL-079",
+        "VOL-095"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep repository input as data",
+        "preserve offline/network-required classification",
+        "bound graph traversal"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CHRONICLE",
+      "source": "skeleton/chronicle",
+      "destination": "skeleton/ai/runtime/provenance/chronicle",
+      "kind": "tree",
+      "source_git_object_sha": "ee6ebd667a67fab74eb295e1914a0ab205c77217",
+      "role": "Append-only Merkle chronicle behavior is provenance/event evidence and belongs under the governed runtime provenance owner.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W17",
+        "WP-W21"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-038",
+        "VOL-039",
+        "VOL-139"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve append-only and tamper-detection semantics",
+        "preserve content hashes across migration",
+        "keep verification independent from the producer path"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CORE",
+      "source": "skeleton/core",
+      "destination": "skeleton/ai/runtime/core",
+      "kind": "tree",
+      "source_git_object_sha": "19b497bde810d84158a905a71d974ac5b44e6109",
+      "role": "Scheduler, task queue, worker pool, locking, shutdown, and job orchestration are core execution/runtime primitives.",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W19",
+        "WP-W29"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-029",
+        "VOL-286"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve cancellation and graceful-shutdown semantics",
+        "preserve lock/task idempotency behavior",
+        "exercise worker starvation and restart paths before cutover"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-DATA",
+      "source": "skeleton/data",
+      "destination": "skeleton/ai/runtime/data",
+      "kind": "tree",
+      "source_git_object_sha": "4f15354ee8e7ea83828ece8f8460bd22722239a4",
+      "role": "Cache, event bus, schema evolution, migrations, and lineage helpers are governed runtime data/state infrastructure.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W21"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-039",
+        "VOL-139"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep authoritative versus derived state explicit",
+        "preserve migration rollback semantics",
+        "preserve event identity and lineage across import inversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-DEVELOPER",
+      "source": "skeleton/developer",
+      "destination": "skeleton/ai/build/developer",
+      "kind": "tree",
+      "source_git_object_sha": "ed36bcb01c8fb4093685c804c09c291075f3d21b",
+      "role": "Developer CLI, doctor, scaffold, health, and gate tooling support the AI build/repair plane rather than core inference.",
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-194",
+        "VOL-281"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep operator tooling outside model authority",
+        "preserve dry-run/diagnostic modes",
+        "prove doctor/scaffold output parity before cutover"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-FOUNDATION",
+      "source": "skeleton/foundation",
+      "destination": "skeleton/ai/runtime/foundation",
+      "kind": "tree",
+      "source_git_object_sha": "19f7f0add28f457427da23f03a1f6437c7c9965e",
+      "role": "Merkle lineage, event journal/replay, capability security, and temporal invariants are cross-cutting AI runtime primitives.",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W03",
+        "WP-W04",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-003",
+        "VOL-005",
+        "VOL-028",
+        "VOL-038"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve content-address identity",
+        "preserve append-only replay semantics",
+        "preserve capability attenuation/revocation",
+        "retain invariant violation traces"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-GALAXY",
+      "source": "skeleton/galaxy",
+      "destination": "skeleton/ai/runtime/distributed/galaxy",
+      "kind": "tree",
+      "source_git_object_sha": "c376f28b7e4241b4327551fd64d7bed6655ff7ab",
+      "role": "Federation, transport, election, consensus, synchronization, and fleet coordination are distributed/multi-agent runtime capabilities.",
+      "work_package_refs": [
+        "WP-W16",
+        "WP-W19",
+        "WP-W29"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-017",
+        "VOL-030"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded consensus/election behavior",
+        "preserve node identity and serialization contracts",
+        "fault-test partitions, duplicate delivery, and stale leadership"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-GATE-PLANE",
+      "source": "skeleton/gate_plane",
+      "destination": "skeleton/ai/runtime/policy/gate_plane",
+      "kind": "tree",
+      "source_git_object_sha": "ae0376577043c5f94103316a8116f62e396e937c",
+      "role": "Admission, proxy, chaos, and gate evidence are deterministic policy/reliability controls around AI execution.",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W19",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-025",
+        "VOL-028",
+        "VOL-029"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep policy deterministic",
+        "do not grant model-controlled bypass",
+        "preserve chaos evidence and safe defaults"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-GENESIS",
+      "source": "skeleton/genesis.py",
+      "destination": "skeleton/ai/runtime/bootstrap/genesis.py",
+      "kind": "file",
+      "source_git_object_sha": "be99fd15d0feb66a848e44c70a7208cafaddb9d4",
+      "role": "Genesis is the engine bootstrap/wiring orchestrator and should become a governed bootstrap entry beneath the canonical AI runtime.",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W19",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-120"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "do not create a second application bootstrap owner",
+        "preserve boot ordering and invariant registration",
+        "prove boot/health parity before legacy facade conversion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-KV",
+      "source": "skeleton/kv",
+      "destination": "skeleton/ai/runtime/inference/kv",
+      "kind": "tree",
+      "source_git_object_sha": "41fc253161afa293f75c72a0f3e4833b91c81958",
+      "role": "Paged/tiered KV management is an inference/runtime optimization with integrity and resource implications.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W19",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-007",
+        "VOL-029",
+        "VOL-031"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "prove cache reuse cannot change semantics",
+        "retain integrity checks",
+        "bind capacity/eviction telemetry"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-KV-CACHE",
+      "source": "skeleton/kv_cache.py",
+      "destination": "skeleton/ai/runtime/inference/kv_cache.py",
+      "kind": "file",
+      "source_git_object_sha": "78ff394cc150afc8e0d85f5c4d9f8a603d0ac068",
+      "role": "The standalone KV-cache implementation is inference/runtime state and must converge beside the already assigned KV package.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W19",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-007",
+        "VOL-029",
+        "VOL-387"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "prove cache reuse is semantics-preserving",
+        "bound capacity and eviction",
+        "retain deterministic fallback when cache state is unavailable"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-MESH",
+      "source": "skeleton/mesh",
+      "destination": "skeleton/ai/runtime/distributed/mesh",
+      "kind": "tree",
+      "source_git_object_sha": "8fd4dfc796dc23e95aecffa182dfdc9dcf18dc98",
+      "role": "Service discovery, dependency graphs, hedging, deduplication, traffic splitting, and throughput control belong in distributed runtime infrastructure.",
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-030",
+        "VOL-171"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "bound retries and hedges",
+        "preserve deduplication identity",
+        "prove traffic controls cannot bypass authority or overload protections"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-NETWORK",
+      "source": "skeleton/network",
+      "destination": "skeleton/ai/runtime/distributed/network",
+      "kind": "tree",
+      "source_git_object_sha": "991ff2d003b9c1668762311b1bb85b236128c1a1",
+      "role": "Replication, reconciliation, rollback, ordering, and delivery outcomes directly implement reliability/distributed-runtime obligations.",
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W29"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-029",
+        "VOL-030"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve canonical serialization",
+        "retain no-socket engine-neutral contract",
+        "exercise duplicate/reorder/history-exhaustion tests"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-OVERSEER",
+      "source": "skeleton/overseer",
+      "destination": "skeleton/ai/runtime/distributed/overseer",
+      "kind": "tree",
+      "source_git_object_sha": "ec0dbf04244ebe3ec9521a3c72fed2d7d9945b3c",
+      "role": "Governor, digital-twin, hardware, recovery, fleet, and model-predictive control code is runtime supervision/scheduling infrastructure.",
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W21",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-029",
+        "VOL-030",
+        "VOL-284",
+        "VOL-286"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve human override and safe-degradation controls",
+        "separate observation from mutation authority",
+        "fault-test recovery and resource-saturation behavior"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PR-AUTOMATION",
+      "source": "skeleton/pr_automation",
+      "destination": "skeleton/ai/build/pr_automation",
+      "kind": "tree",
+      "source_git_object_sha": "b5a5d8f2b9bfe60adac8eb157c47c4cf10c6623d",
+      "role": "Automerge, runner, queue, policy, evidence, and hygiene logic is autonomous repository-engineering/build-control code.",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W17",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-022",
+        "VOL-059",
+        "VOL-098"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve protected-base and merge-gate fail-closed behavior",
+        "keep GitHub mutation behind explicit authority",
+        "retain queue starvation and cancellation regression coverage"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-QUALITY",
+      "source": "skeleton/quality",
+      "destination": "skeleton/ai/evaluation/quality",
+      "kind": "tree",
+      "source_git_object_sha": "84b7a57648c6ae138d489fe5c920ce731310f110",
+      "role": "Replay evidence and property coverage are evaluation/qualification evidence, not an independent runtime owner.",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-035",
+        "VOL-036",
+        "VOL-079"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep evidence read-mostly",
+        "preserve deterministic replay inputs",
+        "do not convert planned evidence into passing evidence"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-REPO-MACHINE",
+      "source": "skeleton/repo_machine",
+      "destination": "skeleton/ai/build/repo_machine",
+      "kind": "tree",
+      "source_git_object_sha": "65244048f5a78b62e83615d8be4984a9debe7832",
+      "role": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W27",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-021",
+        "VOL-022",
+        "VOL-098"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "never import/execute inspected repository files",
+        "retain bounded graph/search behavior",
+        "keep mutation authority outside analysis package"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-STATE",
+      "source": "skeleton/state",
+      "destination": "skeleton/ai/runtime/state",
+      "kind": "tree",
+      "source_git_object_sha": "d5f727abee13befa9255a8358d6e9ce24f3172f9",
+      "role": "Durable run/checkpoint state is engine-owned state/recovery infrastructure and belongs beside canonical persistence.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W19"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-005"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve schema/migration semantics",
+        "prove checkpoint/restart parity",
+        "keep legacy import facade until callers invert"
+      ],
+      "overlay_children": [
+        "resilient_cache.py"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SWARM",
+      "source": "skeleton/swarm",
+      "destination": "skeleton/ai/agents/swarm",
+      "kind": "tree",
+      "source_git_object_sha": "a340e961569a134a27bb5302baa0778e75d7a1dd",
+      "role": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W16",
+        "WP-W19"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-016",
+        "VOL-017"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve bounded fan-out",
+        "preserve handoff/lease semantics",
+        "verify no authority escalation"
+      ],
+      "overlay_children": [
+        "hive"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-GRAPHS",
+      "source": "skeleton/graphs",
+      "destination": "skeleton/ai/runtime/knowledge/graphs",
+      "kind": "tree",
+      "source_git_object_sha": "faaf484c2d16019039f8c16a6c5383ed01247d05",
+      "role": "Graph, spectral, motif, and GAT primitives are reusable knowledge/reasoning substrate when isolated from product-domain ownership.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-012"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep export/render helpers side-effect free",
+        "separate mathematical primitives from knowledge authority",
+        "add focused graph invariant tests"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-INTEGRATIONS",
+      "source": "skeleton/integrations",
+      "destination": "skeleton/ai/runtime/tools/integrations",
+      "kind": "tree",
+      "source_git_object_sha": "e0ad81df2a6baf6b340aabafd144ddf5660c13d9",
+      "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-015",
+        "VOL-026"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "credential objects remain references",
+        "authorize connector calls independently",
+        "validate webhook authenticity and replay behavior"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-INVENTORY",
+      "source": "skeleton/inventory",
+      "destination": "skeleton/ai/runtime/capabilities/inventory",
+      "kind": "tree",
+      "source_git_object_sha": "d5ca24e895fd8939a1f8bb96f6ecb168b2aaef47",
+      "role": "Fail-closed capability inventory is machine-readable capability/security evidence for the canonical AI runtime.",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W13",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-113",
+        "VOL-124"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve fail-closed classification",
+        "keep inventory read-only with respect to authority",
+        "bind inventory drift to validation"
+      ],
+      "parity_exceptions": [
+        {
+          "path": "capabilities.py",
+          "mode": "compatibility_facade",
+          "facade_required_import": "from skeleton.inventory.capabilities import",
+          "note": "The source is an inventory classifier that contains credential-name sentinels as data. Keep those sentinels out of skeleton.ai so provider-bootstrap does not treat the mirror as a second credential-bearing surface."
+        }
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
+    },
+    {
+      "id": "AIFT-SOCIAL",
+      "source": "skeleton/social",
+      "destination": "skeleton/ai/research/social",
+      "kind": "tree",
+      "source_git_object_sha": "0f7c484c4d2692f789dc603b60f9c5f854693276",
+      "role": "Archive/source ingestion, coverage, graph, and SOTA discovery code is research evidence intake rather than serving authority.",
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-210",
+        "VOL-211"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "treat external material as untrusted evidence",
+        "retain source/citation provenance",
+        "prevent discovery results from mutating production directly"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-SUPPORT",
+      "source": "skeleton/support",
+      "destination": "skeleton/ai/runtime/support",
+      "kind": "tree",
+      "source_git_object_sha": "98bf68c7c3d68ebe6e952b4850d2b285de2b7b30",
+      "role": "Agentic RAG/loading/support-plane helpers are engine support capabilities and should not remain an ungoverned top-level owner.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W10",
+        "WP-W11",
+        "WP-W19"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-009",
+        "VOL-011",
+        "VOL-029"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve retrieval trust labeling",
+        "keep loading bounded and recoverable",
+        "avoid creating a second context or retrieval authority"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ACQUIRED-LEARNING",
+      "source": "skeleton/acquired/learning.py",
+      "destination": "skeleton/ai/learning/acquired.py",
+      "kind": "file",
+      "source_git_object_sha": "cfcf021de5b7ff3cfe9a9d5bdd2dc144b4dc6a7f",
+      "role": "Adaptive learning/progression logic is useful but currently shares a quarantine namespace; move only the learning slice into the controlled learning plane.",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-074"
+      ],
+      "migration_action": "split_then_mirror",
+      "cutover_preconditions": [
+        "retain provenance that code was acquired",
+        "keep candidate status until evaluated",
+        "do not promote from quarantine by relocation"
+      ],
+      "source_provenance": "acquired_quarantine",
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ACQUIRED-CACHE",
+      "source": "skeleton/acquired/resilient_cache.py",
+      "destination": "skeleton/ai/runtime/state/resilient_cache.py",
+      "kind": "file",
+      "source_git_object_sha": "6022e05f00457ebfc76ae5affe5dddfb07767bdd",
+      "role": "Resilient TTL cache is state/reliability support and should be separated from the mixed acquired namespace.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W19"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-029",
+        "VOL-135"
+      ],
+      "migration_action": "split_then_mirror",
+      "cutover_preconditions": [
+        "cache remains derived/non-authoritative",
+        "test expiry and stale-read behavior",
+        "retain source provenance"
+      ],
+      "source_provenance": "acquired_quarantine",
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GUARD",
+      "source": "skeleton/acquired/runtime_guard.py",
+      "destination": "skeleton/ai/runtime/reliability/acquired_guard.py",
+      "kind": "file",
+      "source_git_object_sha": "4f4eca085d595d4be2192d9ae162dc9d9032e104",
+      "role": "Admission/degradation/chaos guard behavior belongs with reliability and policy, not a mixed quarantine namespace.",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W19",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-025",
+        "VOL-029"
+      ],
+      "migration_action": "split_then_mirror",
+      "cutover_preconditions": [
+        "fail closed on unknown policy",
+        "prove degradation never widens authority",
+        "retain quarantine provenance"
+      ],
+      "source_provenance": "acquired_quarantine",
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CONTENT",
+      "source": "skeleton/content",
+      "destination": "skeleton/ai/simulation/content",
+      "kind": "tree",
+      "source_git_object_sha": "b858b6bce8d39570ee94e12ac73251a7495d5327",
+      "role": "Lorebuffa-derived NPC/dialogue domain knowledge belongs beneath the governed simulation/world-model owner.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "retain source lineage",
+        "keep domain knowledge separate from system instruction authority",
+        "deduplicate with existing simulation knowledge before cutover"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CREATOR",
+      "source": "skeleton/creator",
+      "destination": "skeleton/ai/forge/creator",
+      "kind": "tree",
+      "source_git_object_sha": "7debd95822e3b7694bfdc668db945a6c94a19145",
+      "role": "Intent compilation and reversible design edits are candidate-generation/planning primitives for Forge.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-014",
+        "VOL-023"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "retain provenance links",
+        "retain reversible edit semantics",
+        "forbid direct production mutation"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ECONOMY",
+      "source": "skeleton/economy",
+      "destination": "skeleton/ai/simulation/economy",
+      "kind": "tree",
+      "source_git_object_sha": "51a53f830e3223bc72520fe65a3e6451ad7c5eb1",
+      "role": "The GameForge-derived treasury/economy model is simulation-domain state and belongs under simulation rather than a parallel runtime root.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve double-entry invariants",
+        "retain provenance requirements for minting",
+        "keep simulation economy isolated from real financial authority"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-GAME",
+      "source": "skeleton/game",
+      "destination": "skeleton/ai/simulation/game",
+      "kind": "tree",
+      "source_git_object_sha": "b3643c67b7547e82ccd4231684a10afeb39532d3",
+      "role": "Game mechanics, replay, AI FSM, economy simulation, progression, and tick-clock code is simulation/world-model substrate.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve deterministic replay",
+        "keep game-domain state out of global AI authority",
+        "merge only after overlap analysis with skeleton/simulation"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-HIVE",
+      "source": "skeleton/hive",
+      "destination": "skeleton/ai/agents/swarm/hive",
+      "kind": "tree",
+      "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788",
+      "role": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W16"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-017"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "compare overlap with skeleton/swarm before cutover",
+        "retain canonical capability contract",
+        "avoid duplicate scheduler ownership"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-JVM-REGISTRY",
+      "source": "skeleton/jvm_accelerators.py",
+      "destination": "skeleton/ai/runtime/native/jvm_registry.py",
+      "kind": "file",
+      "source_git_object_sha": "fc62b6b66d45c6d0d9c9a2ecaf2e260ce3833764",
+      "role": "The optional JVM accelerator registry is engine runtime support and should live beside native/JVM acceleration ownership while java-accelerators remains its separate accelerator root.",
+      "work_package_refs": [
+        "WP-W29",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-032",
+        "VOL-033"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep JVM helpers optional and fallback-safe",
+        "preserve process lifecycle/timeout accounting",
+        "do not absorb the java-accelerators top-level owner"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PLATFORM",
+      "source": "skeleton/platform",
+      "destination": "skeleton/ai/simulation/platform",
+      "kind": "tree",
+      "source_git_object_sha": "3d1c2ef9c429dbf09363fcb8fb82e6f23754f43a",
+      "role": "The engine-neutral Godot adapter translates simulation/game documents and should sit with simulation/forge integration.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-023",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve engine-neutral schemas",
+        "do not move backend/Godot product ownership",
+        "retain unsupported-feature fail-closed behavior"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SCHOOL",
+      "source": "skeleton/school",
+      "destination": "skeleton/ai/learning/school",
+      "kind": "tree",
+      "source_git_object_sha": "2dfa6897682f678abb1ce9191a192a2c94682bee",
+      "role": "Curriculum, assessment, tutoring, code-intelligence, and learning-control modules deepen the existing controlled-learning owner.",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-074"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "deduplicate overlap with skeleton/learning",
+        "retain learner-state provenance and privacy boundaries",
+        "evaluate adaptive policies before promotion"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-WORLD",
+      "source": "skeleton/world",
+      "destination": "skeleton/ai/simulation/world",
+      "kind": "tree",
+      "source_git_object_sha": "965d35c8a027bfd77688ecf7bd8eec2e70724e71",
+      "role": "Scene/world state is canonical simulation input and should converge under the already governed simulation tree.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-019",
+        "VOL-073"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "preserve world/scene schema identity",
+        "deduplicate with frontier world representations",
+        "retain deterministic serialization and replay"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-CIRCULATION",
+      "source": "skeleton/circulation",
+      "destination": "skeleton/ai/research/historical/circulation",
+      "kind": "tree",
+      "source_git_object_sha": "0cd36fe180c83f247b5da39495b89a9e1856f57e",
+      "role": "Circulation is a historical wave facade; preserve it as research lineage without granting production ownership.",
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain original acceptance evidence",
+        "characterize reusable mechanism versus domain metaphor",
+        "no runtime cutover until a concrete masterplan capability adopts it"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-HOAG",
+      "source": "skeleton/hoag",
+      "destination": "skeleton/ai/research/historical/hoag",
+      "kind": "tree",
+      "source_git_object_sha": "01493041cc8c61fe7ccf5f84f0c2e0779cd3871c",
+      "role": "HOAG is a historical wave facade and belongs in lineage/research characterization rather than a top-level production owner.",
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain original acceptance evidence",
+        "identify reusable mechanisms explicitly",
+        "keep product/runtime ownership unchanged until promotion evidence exists"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-MOTIVE",
+      "source": "skeleton/motive",
+      "destination": "skeleton/ai/research/historical/motive",
+      "kind": "tree",
+      "source_git_object_sha": "8d9061eb40a8f79ca8bdfb22ed1e879d4f1ebed8",
+      "role": "Motive is a historical abstract-reasoning primitive; preserve and characterize it rather than granting runtime ownership.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain existing algebraic invariant tests",
+        "identify a concrete AI problem before promotion",
+        "keep research outputs isolated from serving state"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-PERSIST-LEGACY",
+      "source": "skeleton/persist",
+      "destination": "skeleton/ai/runtime/persistence/legacy_persist",
+      "kind": "tree",
+      "source_git_object_sha": "824401f1d5755a325a7438398794f7fac96d3072",
+      "role": "Legacy Persist facade overlaps canonical persistence; useful behavior should be merged behind the existing persistence owner rather than creating another state authority.",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-039"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "compare against skeleton/persistence",
+        "deduplicate state ownership",
+        "retain compatibility facade until zero required callers"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-PIPELINES",
+      "source": "skeleton/pipelines",
+      "destination": "skeleton/ai/forge/pipelines",
+      "kind": "tree",
+      "source_git_object_sha": "a1dff95046b9d6c9959142129061e3feaaed78fb",
+      "role": "Generation pipelines are Forge candidates; game-specific behavior stays scoped beneath Forge rather than becoming a core runtime dependency.",
+      "work_package_refs": [
+        "WP-W27"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-023",
+        "VOL-073"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve domain scoping",
+        "no production authority from generated artifacts",
+        "benchmark against current canonical forge path"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-SHEAF",
+      "source": "skeleton/sheaf",
+      "destination": "skeleton/ai/research/historical/sheaf",
+      "kind": "tree",
+      "source_git_object_sha": "d9164c7fee370ad9680b0cabe39253f56e0c3b68",
+      "role": "Sheaf/Čech/gluing primitives are research-grade knowledge/topology candidates and should remain quarantined until a concrete knowledge-system use is measured.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-012",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain mathematical invariant tests",
+        "preserve provenance to historical wave",
+        "require measured benefit before production integration"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-SPINE",
+      "source": "skeleton/spine",
+      "destination": "skeleton/ai/research/historical/spine",
+      "kind": "tree",
+      "source_git_object_sha": "02462d1e6f84d08b93a6cb735ba9d7122e630646",
+      "role": "Spine is a historically promoted kinematics/constraint primitive; preserve it under research lineage until a simulation owner adopts specific mechanisms.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-019",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "retain invariant/acceptance evidence",
+        "separate reusable mechanics from historical facade semantics",
+        "no production authority from relocation alone"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-VISCERA",
+      "source": "skeleton/viscera",
+      "destination": "skeleton/ai/research/model_internals/viscera",
+      "kind": "tree",
+      "source_git_object_sha": "9115c9f6d7c0e75ac102baac47bb202ed70d28a8",
+      "role": "QK normalization, speculative decoding, quantization, rematerialization, Muon, GQA, logit-lens, steering, and autodiff primitives are model-internals research candidates, not production defaults.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W26",
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-006",
+        "VOL-007",
+        "VOL-077"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "benchmark each primitive against a named baseline",
+        "retain experiment provenance and kill criteria",
+        "promote only through evaluation/canary evidence"
+      ],
+      "source_provenance": "historical_quarantine",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-CONFIG",
+      "source": "skeleton/config",
+      "destination": "skeleton/ai/runtime/config",
+      "kind": "tree",
+      "source_git_object_sha": "8af2a5f58b6e3071472f77e85c660de1ab01bdeb",
+      "role": "typed engine configuration, secret references, immutable settings and redacted configuration snapshots",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W02",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve secret-reference separation and redaction behavior",
+        "keep deployment-specific settings outside runtime authority",
+        "invert imports only after startup/config regression coverage is green"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-AI-SHELL",
+      "source": "skeleton/shells/ai",
+      "destination": "skeleton/ai/shell",
+      "kind": "tree",
+      "source_git_object_sha": "fdc91a7a68144b474beaa12e0122280121c5e235",
+      "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W11",
+        "WP-W12",
+        "WP-W14",
+        "WP-W15",
+        "WP-W17",
+        "WP-W19",
+        "WP-W20",
+        "WP-W21"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S3-VER-01",
+        "AIQ-S4-EXEC-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "retain canonical provider credential ownership outside shell modules",
+        "preserve durable journal/checkpoint and recovery invariants",
+        "map governance/policy/verification imports before source retirement",
+        "pass shell-focused regression, provider bootstrap and App Assembly"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-TURN-COMPAT",
+      "source": "skeleton/turn",
+      "destination": "skeleton/ai/compat/turn",
+      "kind": "tree",
+      "source_git_object_sha": "2f01eac16fb3350b7912654c19adfbec71c20306",
+      "role": "legacy TurnEngine facade retained for convergence into canonical conversation/execution owners",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W03",
+        "WP-W11",
+        "WP-W15",
+        "WP-W17"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-CONV-01",
+        "AIQ-S4-EXEC-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "characterize TurnEngine state/packet semantics against canonical conversation and execution contracts",
+        "move reusable behavior behind canonical owners without creating a second turn authority",
+        "retain compatibility source until callers and regression tests are inverted"
+      ],
+      "production_authority": false,
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+    },
+    {
+      "id": "AIFT-TELEMETRY-COMPAT",
+      "source": "skeleton/telemetry",
+      "destination": "skeleton/ai/compat/telemetry",
+      "kind": "tree",
+      "source_git_object_sha": "9c8075339a2711682f3080d2cac855416e62c14e",
+      "role": "legacy telemetry/SSE facade retained for convergence into canonical observability and streaming owners",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S6-STREAM-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "compare event-store and SSE semantics against canonical observability/operation-stream contracts",
+        "deduplicate telemetry state and stream ownership",
+        "retain compatibility source until consumer imports and replay/stream tests are inverted"
+      ],
+      "production_authority": false,
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-LEGACY",
+      "source": "skeleton/architecture.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture.py",
+      "kind": "file",
+      "source_git_object_sha": "2698d9f9ce47bb092e9259b9835e2d7e2faa921b",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-INDEX-LEGACY",
+      "source": "skeleton/architecture_index.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_index.py",
+      "kind": "file",
+      "source_git_object_sha": "dc0cc3cc241bdfd066fefec4bac64978b3249da4",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R03",
+      "source": "skeleton/architecture_round3.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round3.py",
+      "kind": "file",
+      "source_git_object_sha": "1749fb191a5ae10a85f31201fc559b62fa8fe201",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R04",
+      "source": "skeleton/architecture_round4.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round4.py",
+      "kind": "file",
+      "source_git_object_sha": "37494202290c896bfd336ff49723833d924acef5",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R05",
+      "source": "skeleton/architecture_round5.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round5.py",
+      "kind": "file",
+      "source_git_object_sha": "193ba887f3af884e2b7903a2d7ef25d54ca26b62",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R06",
+      "source": "skeleton/architecture_round6.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round6.py",
+      "kind": "file",
+      "source_git_object_sha": "a26f8dce143001fea8d216326d6cfd27b1975879",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R07",
+      "source": "skeleton/architecture_round7.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round7.py",
+      "kind": "file",
+      "source_git_object_sha": "b4010f8645cd133a0f482986393b6e604f19efa7",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R08",
+      "source": "skeleton/architecture_round8.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round8.py",
+      "kind": "file",
+      "source_git_object_sha": "b5c4ca3e7f377dbd3b2244c7bd4c7e1ea4c819f4",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R09",
+      "source": "skeleton/architecture_round9.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round9.py",
+      "kind": "file",
+      "source_git_object_sha": "da3777be7a99bcf38c81ba4b91ee54b3ec80b1e4",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R10",
+      "source": "skeleton/architecture_round10.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round10.py",
+      "kind": "file",
+      "source_git_object_sha": "b8a97d10c23c06563eb0edeb24816fd0181a9951",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R11",
+      "source": "skeleton/architecture_round11.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round11.py",
+      "kind": "file",
+      "source_git_object_sha": "edcd8b04bbe4270286adaed96025186aa4999a68",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R12",
+      "source": "skeleton/architecture_round12.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round12.py",
+      "kind": "file",
+      "source_git_object_sha": "614e0b2ed6862aa0887551ec7b44ccf970ce1873",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R13",
+      "source": "skeleton/architecture_round13.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round13.py",
+      "kind": "file",
+      "source_git_object_sha": "364914860027b2639afd040ce4791aeed3a62016",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R14",
+      "source": "skeleton/architecture_round14.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round14.py",
+      "kind": "file",
+      "source_git_object_sha": "936e2a3cdaf0e4b5f9cdf43b240f6eac8ff75934",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R15",
+      "source": "skeleton/architecture_round15.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round15.py",
+      "kind": "file",
+      "source_git_object_sha": "f016b8e5a293e6f5e4418fd32164eeab27b7c515",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R16",
+      "source": "skeleton/architecture_round16.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round16.py",
+      "kind": "file",
+      "source_git_object_sha": "8b82415ba83d672d8cdf258887fe1706980be825",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R17",
+      "source": "skeleton/architecture_round17.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round17.py",
+      "kind": "file",
+      "source_git_object_sha": "7a9e471574c8a2e01eaba11014e82dd4308f9227",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R18",
+      "source": "skeleton/architecture_round18.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round18.py",
+      "kind": "file",
+      "source_git_object_sha": "4d1246adde8961f08ee5d725bec7b84e8ed08b84",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R19",
+      "source": "skeleton/architecture_round19.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round19.py",
+      "kind": "file",
+      "source_git_object_sha": "d64f5b0437c46df9d1206d0b72a8ed21e9a2f653",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R20",
+      "source": "skeleton/architecture_round20.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round20.py",
+      "kind": "file",
+      "source_git_object_sha": "f19f13b731224db383b2c2a3288f1c4d3122b4dd",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R21",
+      "source": "skeleton/architecture_round21.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round21.py",
+      "kind": "file",
+      "source_git_object_sha": "3d55af787fc345c0fb88514cef2be31658062f46",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-ARCHITECTURE-R22",
+      "source": "skeleton/architecture_round22.py",
+      "destination": "skeleton/ai/research/historical/architecture_registry/architecture_round22.py",
+      "kind": "file",
+      "source_git_object_sha": "03e08ee64e14ad01807644b684639539b9b05323",
+      "role": "historical architecture lineage retained for research comparison; current machine architecture remains authoritative",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-419"
+      ],
+      "migration_action": "quarantine_then_characterize",
+      "cutover_preconditions": [
+        "machine/architecture.json remains the only current architecture authority",
+        "retain historical module identity and provenance",
+        "promote no historical architecture behavior without explicit masterplan adoption and evaluation evidence"
+      ],
+      "source_provenance": "historical_architecture_lineage",
+      "production_authority": false,
+      "promotion_note": "Relocation preserves historical architecture evidence and does not make legacy round metadata production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
+    }
+  ],
+  "ci_enforcement": {
+    "local_quality_gate": "scripts/quality-gates.sh",
+    "app_assembly": ".github/workflows/app-assembly.yml",
+    "test": "skeleton/testing/test_ai_file_tree.py",
+    "exact_parity_required_while_status_is": [
+      "staged_mirror",
+      "cutover_pending"
+    ]
+  },
+  "implementation_signoff": {
+    "signed": true,
+    "signer_id": "github:Apeloff1",
+    "signer_type": "service",
+    "role": "implementation",
+    "signed_at_utc": "2026-09-22T15:02:19Z",
+    "git_sha": "aafbd20a94e40ce302ce686581e87251c0ff4514",
+    "evidence_refs": [
+      "git:aafbd20a94e40ce302ce686581e87251c0ff4514",
+      "git-tree:413bf013784f077f3908adb5dc77087a349faeaa",
+      "object-audit:104-mappings-zero-stale-zero-missing-zero-exact-drift",
+      "pr:1930"
+    ],
+    "statement": "Move-preparation implementation is identity-bound to GitHub user Apeloff1 at the cited 104-mapping hygiene-repaired payload SHA. The governed set covers core/runtime, Jeeves, AI shell/control-plane, configuration, domain/build surfaces, compatibility convergence, historical architecture lineage, and research quarantine. The object audit found zero stale source Git objects, zero missing mappings, and zero exact-mirror drift. This implementation attestation records payload identity and preparation evidence only; import inversion, source retirement, production readiness, AIQ/work-package completion, and independent verification remain separately gated.",
+    "signature_method": "github_identity"
+  },
+  "verification_signoff": {
+    "signed": false,
+    "signer_id": null,
+    "signer_type": null,
+    "role": "independent_verification",
+    "signed_at_utc": null,
+    "git_sha": null,
+    "evidence_refs": [],
+    "statement": "Pending distinct verification after BASE-FRONTEND-TSC-01 is closed and required cutover validation is green.",
+    "signature_method": null
+  },
+  "parity_policy": {
+    "python": "AST-equivalent to the compatibility source unless the mapping declares a compatibility_facade exception",
+    "non_python": "byte-identical to the compatibility source unless the mapping declares an explicit exception",
+    "rationale": "Formatting-only Python normalization must not create false migration drift, while semantic code changes and non-Python content drift still fail closed."
+  },
+  "planned_path_audit": {
+    "policy": "Every concrete masterplan skeleton/* implementation root must be migrated, intentionally external with an architecture owner, covered by a migrated alias, or absent. A planned-but-absent engine root appearing later fails validation until classified.",
+    "intentionally_external": [
+      {
+        "path": "skeleton/app",
+        "owner": "product/application assembly",
+        "reason": "application manifest and product runtime assembly remain outside engine implementation ownership"
+      },
+      {
+        "path": "skeleton/assets",
+        "owner": "product/application assets",
+        "reason": "artifact/product assets are not executable AI engine ownership"
+      },
+      {
+        "path": "skeleton/config",
+        "owner": "configuration-secrets plane",
+        "reason": "shared startup/configuration authority intentionally remains a top-level architecture plane"
+      },
+      {
+        "path": "skeleton/deploy",
+        "owner": "deployment-release plane",
+        "reason": "release/deployment ownership validates the AI engine but must not be nested inside it"
+      },
+      {
+        "path": "skeleton/deployment",
+        "owner": "deployment-release plane",
+        "reason": "deployment support remains release infrastructure"
+      },
+      {
+        "path": "skeleton/testing",
+        "owner": "evidence/test plane",
+        "reason": "test evidence remains repository-level and must exercise both legacy compatibility paths and canonical AI destinations"
+      },
+      {
+        "path": "skeleton/shells",
+        "owner": "shell/product compatibility surfaces",
+        "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
+      }
+    ],
+    "covered_aliases": [
+      {
+        "planned_path": "skeleton/evaluation",
+        "implemented_path": "skeleton/eval",
+        "mapping_id": "AIFT-EVALUATION"
+      },
+      {
+        "planned_path": "skeleton/runtime/resilience",
+        "implemented_path": "skeleton/resilience",
+        "mapping_id": "AIFT-RESILIENCE"
+      },
+      {
+        "planned_path": "planned:native",
+        "implemented_path": "skeleton/native",
+        "mapping_id": "AIFT-NATIVE"
+      }
+    ],
+    "planned_but_absent": [
+      "skeleton/autonomy",
+      "skeleton/compute",
+      "skeleton/distributed",
+      "skeleton/experiments",
+      "skeleton/hardware",
+      "skeleton/inference",
+      "skeleton/knowledge",
+      "skeleton/modeling",
+      "skeleton/multimodal",
+      "skeleton/planning",
+      "skeleton/policy",
+      "skeleton/provenance",
+      "skeleton/repo_engineering",
+      "skeleton/research",
+      "skeleton/routing",
+      "skeleton/safety",
+      "skeleton/tools",
+      "skeleton/training",
+      "skeleton/verification",
+      "skeleton/workers"
+    ],
+    "non_engine_root_exclusions": [
+      "skeleton/__init__.py"
+    ]
+  },
+  "provenance_refresh": {
+    "status": "current",
+    "refreshed_from_head": "b747f5818bf1fc4c49299359fd7004819af84cc8",
+    "refreshed_mapping_count": 10,
+    "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline.",
+    "whitespace_normalization": {
+      "payload_git_sha": "178a6d4ba05854e79d7fe13fd298a6f3d4145915",
+      "source_destination_pairs": 5,
+      "policy": "Whitespace-only normalization was applied atomically to both legacy sources and exact AI mirrors; recorded source tree identities were refreshed without changing runtime semantics."
+    }
+  },
+  "next_move_assignments": [],
+  "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
+  "validation_state": "104_mapping_preparation_signed_pending_fresh_ci_and_object_audit",
+  "validation_blockers": [
+    {
+      "id": "BASE-FRONTEND-TSC-01",
+      "status": "open",
+      "scope": "downstream_frontend_base_state",
+      "detected_on_payload_sha": "ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e",
+      "current_main_sha": "90ff896e8f18d8a472ce6b301156d461a8e8dc7f",
+      "app_assembly_run_id": 35732594976,
+      "app_assembly_job_id": 106761777382,
+      "failing_step": "Validate assembled frontend",
+      "migration_specific_gates_before_failure": [
+        "Validate architecture contract",
+        "Validate AI construction contract",
+        "Validate AI master plan",
+        "Validate AI edge/historical catalogue",
+        "Validate AI exotic systems catalogue",
+        "Validate P0 edge-case construction matrix",
+        "Validate full edge-case construction matrix",
+        "Validate master build sequence",
+        "Validate canonical AI file tree",
+        "Validate masterplan engineering pass",
+        "Validate AIQ engineering propagation",
+        "Validate masterplan adversarial closure",
+        "Validate signed build accountability",
+        "Validate capability interface registry",
+        "Validate state authority topology",
+        "Validate mandatory provider bootstrap"
+      ],
+      "evidence": "Current-main comparison shows zero frontend/* files changed by this branch. TypeScript failure is therefore inherited from the base/merged frontend state rather than introduced by the AI-tree migration.",
+      "representative_errors": [
+        "StatusBar backgroundColor/translucent props rejected by current types",
+        "StyleSheet.absoluteFillObject missing from current React Native types",
+        "ScrollView instance refs typed as component functions",
+        "InteractionManager missing from current React Native exports"
+      ],
+      "effect": "Blocks cutover_complete, compatibility-source deletion, and independent completion claim until App Assembly is green on a reconciled base."
+    }
+  ],
+  "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
+  "assignment_policy": {
+    "version": "1.0.0",
+    "source_identity": "Each pending assignment is bound to the source Git tree/blob object on assignment_basis_git_sha.",
+    "completion_rule": "Assignment is classification only; migration, import cutover, evidence, and signed accountability remain separate.",
+    "historical_rule": "quarantine_then_characterize destinations preserve useful/historical code under research ownership and do not authorize production use.",
+    "external_rule": "Product, packaging, deployment, architecture-authority, and accelerator roots stay outside skeleton/ai unless separately reclassified."
+  },
+  "retained_outside_ai_tree": [
+    {
+      "path": "skeleton/README.py",
+      "owner": "package documentation",
+      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
+    },
+    {
+      "path": "skeleton/__main__.py",
+      "owner": "package CLI shell",
+      "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
+    },
+    {
+      "path": "skeleton/acquired",
+      "owner": "quarantine/provenance",
+      "reason": "mixed acquired-source quarantine; only explicitly assigned files move after characterization and provenance preservation"
+    },
+    {
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
+    },
+    {
+      "path": "skeleton/architecture_index.py",
+      "owner": "architecture authority",
+      "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
+    },
+    {
+      "path": "skeleton/architecture_round3.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round4.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round5.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round6.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round7.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round8.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round9.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round10.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round11.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round12.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round13.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round14.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round15.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round16.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round17.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round18.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round19.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round20.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round21.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round22.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/manifest.py",
+      "owner": "package/module registry",
+      "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
+    },
+    {
+      "path": "skeleton/quickstart.py",
+      "owner": "developer/package guidance",
+      "reason": "quickstart guidance is a package/developer surface, not engine implementation"
+    },
+    {
+      "path": "skeleton/release",
+      "owner": "release engineering",
+      "reason": "release evidence and qualification remain outside the AI runtime per architecture ownership"
+    },
+    {
+      "path": "skeleton/requirements.py",
+      "owner": "package dependency metadata",
+      "reason": "package dependency declaration stays at package boundary"
+    },
+    {
+      "path": "skeleton/setup_config.py",
+      "owner": "package/install metadata",
+      "reason": "setup/install metadata stays with packaging and installer ownership"
+    },
+    {
+      "path": "skeleton/ubuntu",
+      "owner": "deployment/platform support",
+      "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
+    },
+    {
+      "path": "skeleton/telemetry",
+      "owner": "observability/telemetry boundary",
+      "reason": "Top-level telemetry compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/turn",
+      "owner": "package/compatibility boundary",
+      "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    }
+  ],
+  "classification_coverage": {
+    "status": "closed_after_all_preclassified_moves",
+    "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
+    "source_head": "6abe7d71becbf36595eec1131dc1c65ae8bbfa66"
+  },
+  "priority_one_migration": {
+    "status": "mirrored_governed_cutover_pending",
+    "payload_git_sha": "e7eabe27778d01cc4b6f44f6580b7bfa6506df90",
+    "migrated_assignment_count": 20,
+    "migrated_sources": [
+      "skeleton/application",
+      "skeleton/build",
+      "skeleton/chronicle",
+      "skeleton/core",
+      "skeleton/data",
+      "skeleton/developer",
+      "skeleton/foundation",
+      "skeleton/galaxy",
+      "skeleton/gate_plane",
+      "skeleton/genesis.py",
+      "skeleton/kv",
+      "skeleton/kv_cache.py",
+      "skeleton/mesh",
+      "skeleton/network",
+      "skeleton/overseer",
+      "skeleton/pr_automation",
+      "skeleton/quality",
+      "skeleton/repo_machine",
+      "skeleton/state",
+      "skeleton/swarm"
+    ],
+    "policy": "Exact source-object mirrors are now governed mappings. Legacy imports remain authoritative compatibility paths until focused cutover tests and independent verification are complete."
+  },
+  "priority_two_standalone_migration": {
+    "status": "mirrored_governed_cutover_pending",
+    "payload_git_sha": "0abf709e745bb6d705f1766803d439dfd40a2241",
+    "migrated_sources": [
+      "skeleton/graphs",
+      "skeleton/integrations",
+      "skeleton/inventory",
+      "skeleton/social",
+      "skeleton/support"
+    ]
+  },
+  "priority_two_overlay_migration": {
+    "status": "mirrored_governed_cutover_pending",
+    "overlay_mapping_count": 12,
+    "parent_overlay_owners": [
+      "AIFT-LEARNING",
+      "AIFT-STATE",
+      "AIFT-RELIABILITY",
+      "AIFT-SIMULATION",
+      "AIFT-FORGE",
+      "AIFT-SWARM",
+      "AIFT-NATIVE"
+    ],
+    "policy": "Parent exact mirrors ignore only explicitly declared overlay children, and every overlay child must be a separately governed mapping."
+  },
+  "priority_three_migration": {
+    "status": "mirrored_governed_research_or_cutover_pending",
+    "migrated_assignment_count": 8,
+    "historical_quarantine_sources": [
+      "skeleton/circulation",
+      "skeleton/hoag",
+      "skeleton/motive",
+      "skeleton/sheaf",
+      "skeleton/spine",
+      "skeleton/viscera"
+    ],
+    "policy": "Historical/research mappings preserve lineage and do not gain production authority from relocation."
+  },
+  "object_audit": {
+    "payload_git_sha": "c924e854ad94815080efb3b6c691c2641e4a0162",
+    "checked_mapping_count": 78,
+    "pending_assignments": 0,
+    "source_identity_errors": 0,
+    "ungoverned_overlay_errors": 0,
+    "frontend_changes_against_main": 0,
+    "note": "The last completed direct Git-object audit covered the first 78 mappings. The current 104-mapping prepared set preserves that evidence but requires a fresh full-object/parity audit before any cutover claim. Removed mappings are excluded from pending audit scope.",
+    "current_mapping_count": 104,
+    "audit_scope_status": "prior_78_mapping_audit_valid_current_104_mapping_set_requires_full_refresh",
+    "pending_mapping_ids": [
+      "AIFT-CONFIG",
+      "AIFT-AI-SHELL",
+      "AIFT-TURN-COMPAT",
+      "AIFT-TELEMETRY-COMPAT",
+      "AIFT-ARCHITECTURE-LEGACY",
+      "AIFT-ARCHITECTURE-INDEX-LEGACY",
+      "AIFT-ARCHITECTURE-R03",
+      "AIFT-ARCHITECTURE-R04",
+      "AIFT-ARCHITECTURE-R05",
+      "AIFT-ARCHITECTURE-R06",
+      "AIFT-ARCHITECTURE-R07",
+      "AIFT-ARCHITECTURE-R08",
+      "AIFT-ARCHITECTURE-R09",
+      "AIFT-ARCHITECTURE-R10",
+      "AIFT-ARCHITECTURE-R11",
+      "AIFT-ARCHITECTURE-R12",
+      "AIFT-ARCHITECTURE-R13",
+      "AIFT-ARCHITECTURE-R14",
+      "AIFT-ARCHITECTURE-R15",
+      "AIFT-ARCHITECTURE-R16",
+      "AIFT-ARCHITECTURE-R17",
+      "AIFT-ARCHITECTURE-R18",
+      "AIFT-ARCHITECTURE-R19",
+      "AIFT-ARCHITECTURE-R20",
+      "AIFT-ARCHITECTURE-R21",
+      "AIFT-ARCHITECTURE-R22"
+    ]
+  },
+  "move_tag_contract": {
+    "schema_version": 1,
+    "global_state": "prepared_not_cutover_authorized",
+    "invariant": "move tags classify structural migration readiness only; they do not imply AIQ/work-package completion, production maturity, source deletion, or independent verification",
+    "required_tags": [
+      "ai-tree:mapped",
+      "migration:staged-mirror"
+    ],
+    "cutover_tags": {
+      "cutover:parity-ready": "Exact mirror is structurally prepared for import inversion after global gates and focused regression validation.",
+      "cutover:owner-sensitive": "One or more provider/credential/network owner surfaces remain compatibility facades and require explicit ownership/import cutover.",
+      "cutover:quarantine": "Historical/model-internals/research lineage remains characterization-gated and is not a production cutover candidate.",
+      "cutover:merge-required": "Compatibility/convergence mirror overlaps an existing canonical owner and must be merged into that owner before legacy source retirement."
+    },
+    "batches": {
+      "B1-core-runtime": "Core runtime, provider-neutral, agent, cognition, learning, evaluation, reliability and state surfaces.",
+      "B2-domain-build": "Build/repository engineering, simulation and Forge surfaces.",
+      "B3-owner-sensitive": "Mappings containing compatibility facades or explicit parity exceptions; cut over only after authority-owner review.",
+      "B4-research-quarantine": "Historical or model-internals research lineage; characterize before any production promotion.",
+      "B3-compat-convergence": "Compatibility mirrors staged only for convergence into an existing canonical runtime owner; never promoted as independent production authorities."
+    }
+  },
+  "pre_move_readiness": {
+    "status": "fully_classified_staged_mirror_cutover_not_authorized",
+    "governed_mapping_count": 104,
+    "pending_assignment_count": 0,
+    "retained_outside_ai_tree_count": 33,
+    "batch_counts": {
+      "B1-core-runtime": 54,
+      "B3-owner-sensitive": 7,
+      "B2-domain-build": 12,
+      "B4-research-quarantine": 29,
+      "B3-compat-convergence": 2
+    },
+    "fresh_object_audit_required": true,
+    "global_cutover_blockers": [
+      "BASE-FRONTEND-TSC-01"
+    ],
+    "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
+  }
+}

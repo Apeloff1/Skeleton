@@ -115,10 +115,10 @@ export const BookCover: React.FC<BookCoverProps> = ({
         colors={[palette[0], palette[1]]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
       />
       {/* Faint repeating accent pattern */}
-      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}>
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
         <Text style={{ position: 'absolute', top: 4,  right: 6,  color: '#ffffff15', fontSize: dims.mono * 0.8, fontWeight: '900' }}>{accentChar}</Text>
         <Text style={{ position: 'absolute', bottom: 6, left: 6, color: '#ffffff10', fontSize: dims.mono * 1.4, fontWeight: '900' }}>{accentChar}</Text>
       </View>

@@ -213,7 +213,7 @@ export const ReadingVisualizer: React.FC<ReadingVisualizerProps> = ({
   const [draftNote, setDraftNote] = useState('');
   const [draftColor] = useState('#3B82F6');
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<React.ElementRef<typeof ScrollView>>(null);
   const ttsPollRef = useRef<any>(null);
 
   // ═══ 2026-05 — READING TIME TRACKER ════════════════════════════════
