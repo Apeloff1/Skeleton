@@ -2630,19 +2630,16 @@
     "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T14:40:23Z",
-    "git_sha": "7b6b8c488074514a4232684cf8a9a78e858f5f8d",
+    "signed_at_utc": "2026-09-22T14:45:23Z",
+    "git_sha": "a1e0829233a76dc4a5632656fa627e38195f1a0a",
     "evidence_refs": [
-      "git:7b6b8c488074514a4232684cf8a9a78e858f5f8d",
-      "pr:1930",
-      "workflow:35741962389",
-      "job:106793731337",
-      "workflow:35741962507",
-      "workflow:35741962371",
-      "workflow:35741962561",
-      "workflow:35741962515"
+      "git:4b3692e8d81ac43c91615df04383aca2be9edf0e",
+      "git:f9e2019a55ec28c78bc4b919f4c1b69aa5da2b3c",
+      "git:770c0a6f62f27655545e0e409c7adb9e2301553d",
+      "git:a1e0829233a76dc4a5632656fa627e38195f1a0a",
+      "pr:1930"
     ],
-    "statement": "Implementation payload is identity-bound to GitHub user Apeloff1 at the cited full SHA after canonical AI-tree parity, architecture/master-plan/master-build-sequence, engineering propagation, adversarial closure, signed-accountability, capability-interface, state-authority, provider-bootstrap, Repository Hygiene, PR Hygiene, Secret Scanning, and Dependency Review evidence. Downstream App Assembly validation beyond the migration-specific gates remains separate, and independent verification is intentionally not self-issued. GitHub reports the payload commit itself as unsigned, so this is the plan-permitted github_identity attestation rather than GPG/SSH/Sigstore verification.",
+    "statement": "Move-preparation tagging payload is identity-bound to GitHub user Apeloff1 at the cited full payload SHA. The payload classifies all 78 governed source-to-AI-tree mappings into machine-enforced cutover tags and deterministic batches, replaces stale pending-assignment regression expectations, and reconciles the migration packet. This implementation attestation does not assert current CI completion, import cutover, source deletion, AIQ/work-package maturity, production readiness, or independent verification.",
     "signature_method": "github_identity"
   },
   "verification_signoff": {
