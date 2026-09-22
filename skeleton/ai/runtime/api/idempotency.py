@@ -28,7 +28,7 @@ class IdempotencyEntry:
 
 class IdempotencyGuard:
     """Deduplicate retry-sensitive POST operations.
-    
+
     A client retry replays the first recorded response
     instead of re-executing the operation.
     """
@@ -57,17 +57,17 @@ class IdempotencyGuard:
         if not key:
             self._misses += 1
             return None
-        
+
         entry = self._cache.get(key)
         if entry is None:
             self._misses += 1
             return None
-        
+
         if entry.is_expired():
             del self._cache[key]
             self._misses += 1
             return None
-        
+
         self._hits += 1
         return entry.response
 
