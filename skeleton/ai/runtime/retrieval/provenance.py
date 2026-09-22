@@ -49,7 +49,7 @@ class ProvenanceEntry:
 
 class ProvenanceLedger:
     """Track data lineage and transformations for auditability.
-    
+
     Every data transformation is recorded as a ProvenanceEntry,
     creating an immutable chain of custody.
     """
@@ -73,40 +73,40 @@ class ProvenanceLedger:
             metadata=metadata or {},
             parent_id=parent_id,
         )
-        
+
         self._entries[entry.entry_id] = entry
-        
+
         # Track chain
         root = parent_id or entry.entry_id
         if root not in self._chains:
             self._chains[root] = []
         self._chains[root].append(entry.entry_id)
-        
+
         self._stats["recorded"] += 1
-        
+
         if self._bus:
             self._bus.emit("retrieval.provenance.recorded", {
                 "entry_id": entry.entry_id,
                 "source": source,
                 "operation": operation,
             })
-        
+
         return entry
 
     def trace(self, entry_id: str) -> List[ProvenanceEntry]:
         """Trace the full lineage chain for an entry."""
         self._stats["queries"] += 1
-        
+
         # Find which chain contains this entry
         chain_entries = []
         for root, entries in self._chains.items():
             if entry_id in entries:
                 chain_entries = entries
                 break
-        
+
         if not chain_entries:
             return []
-        
+
         # Build ordered lineage
         lineage = []
         for eid in chain_entries:
@@ -114,7 +114,7 @@ class ProvenanceLedger:
                 lineage.append(self._entries[eid])
             if eid == entry_id:
                 break
-        
+
         return lineage
 
     def verify(self, entry_id: str, current_data: Any) -> bool:
@@ -122,7 +122,7 @@ class ProvenanceLedger:
         entry = self._entries.get(entry_id)
         if not entry:
             return False
-        
+
         current_hash = ProvenanceEntry.hash_data(current_data)
         return current_hash == entry.output_hash
 
