@@ -42,6 +42,10 @@ Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
 Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
 
+Adversarial closure pass: [`ADVERSARIAL_CLOSURE_PASS.md`](ADVERSARIAL_CLOSURE_PASS.md)
+
+Machine adversarial closure contract: [`machine/ai_adversarial_closure.json`](../../machine/ai_adversarial_closure.json)
+
 ## Purpose
 
 This index is the canonical navigation root for the full Skeleton AI architecture, research, construction, validation, release, and operations program. It incorporates the architecture-planning passes that expanded the target from a model wrapper into a complete AI platform: durable state, provider-neutral inference, context, memory, retrieval, knowledge, cognition, planning, governed tools, agents, swarms, multimodal processing, repository engineering, research, training, evaluation, security, distributed compute, installation, release, and production operations.
@@ -76,8 +80,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 22. `docs/plan/VOLUME_DEPTH_000_040.md`
 23. `docs/plan/ENGINEERING_PASS.md`
 24. `machine/ai_engineering_pass.json`
+25. `docs/plan/ADVERSARIAL_CLOSURE_PASS.md`
+26. `machine/ai_adversarial_closure.json`
 
-The first ten remain the present implementation/construction authority. Items 11–24 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
+The first ten remain the present implementation/construction authority. Items 11–26 form the frozen long-range planning, risk, sequencing, depth and engineering-validation stack.
 
 ## Index laws
 
@@ -86,6 +92,7 @@ The first ten remain the present implementation/construction authority. Items 11
 - New material after breadth freeze should normally become a chapter/subchapter under an existing volume rather than a new top-level volume.
 - Every P0 implementation item must trace to a requirement, capability, contract, implementation path, test/evaluation, and acceptance evidence.
 - Documentation does not make a capability implemented.
+- Cross-condition closure evidence is required where single-axis success can hide compound lifecycle, authority, restore, resource, or evidence failure.
 - Research does not become architecture merely because it is novel or highly cited.
 - Generated output does not grant authority.
 - Streams, caches, model context, and UI state are projections; durable governed state remains authoritative.
