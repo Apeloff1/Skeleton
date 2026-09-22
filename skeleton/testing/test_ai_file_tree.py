@@ -54,3 +54,20 @@ def test_python_parity_allows_formatting_but_rejects_semantic_drift(tmp_path: Pa
 
     destination.write_text("def value(x: int) -> int:\n    return x + 2\n", encoding="utf-8")
     assert not module._content_equivalent(source, destination)
+
+
+def test_ai_file_tree_native_and_path_audit() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mapping_by_id = {item["id"]: item for item in manifest["mappings"]}
+    assert mapping_by_id["AIFT-NATIVE"]["source"] == "skeleton/native"
+    assert mapping_by_id["AIFT-NATIVE"]["destination"] == "skeleton/ai/runtime/native"
+    assert mapping_by_id["AIFT-NATIVE"]["volume_refs"] == ["VOL-032"]
+    assert (ROOT / "skeleton/ai/runtime/native/registry.py").is_file()
+
+    audit = manifest["planned_path_audit"]
+    external = {item["path"] for item in audit["intentionally_external"]}
+    assert {"skeleton/app", "skeleton/config", "skeleton/deploy", "skeleton/testing"} <= external
+    assert "skeleton/research" in audit["planned_but_absent"]
+    assert "skeleton/planning" in audit["planned_but_absent"]
