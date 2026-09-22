@@ -35,6 +35,7 @@ on:
       - "skeleton/testing/test_state_topology.py"
       - "skeleton/testing/test_state_recovery_drill.py"
       - "skeleton/testing/test_provider_contract.py"
+      - "skeleton/testing/test_provider_surface_inventory.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/testing/test_operation_stream.py"
@@ -377,6 +378,7 @@ jobs:
           skeleton/testing/test_state_topology.py
           skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_provider_contract.py
+          skeleton/testing/test_provider_surface_inventory.py
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_data_lifecycle.py
           skeleton/testing/test_governance_registry.py
