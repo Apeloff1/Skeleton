@@ -64,16 +64,6 @@ through the declarative registry in `backend/core/routes_registry.py`
 (engines group). Generated projects/builds live under `backend/data/godot_projects/`
 and `backend/data/godot_builds/` (volume-backed, gitignored).
 
-Engine-neutral project/game/world documents map into Godot-facing views through
-`skeleton/platform/godot_adapter.py` (`platform.godot_adapter.v1`). Core
-mechanics stay in `skeleton/game`; world policy stays in `skeleton/frontier/world`
-and `skeleton/forge/world`. `skeleton/forge/godot_emit.py` remains the pack
-materialiser — the adapter wraps it and does not replace it.
-
-Measured footprint (leave in place; binary relocation is #1008 / GB-9):
-`backend/godot` (~99–103 MiB), `backend/gameforge/godot_engine/` (~72 KiB),
-`skeleton/forge/godot_emit.py` (~24 KiB).
-
 Try it:
 
 ```bash
