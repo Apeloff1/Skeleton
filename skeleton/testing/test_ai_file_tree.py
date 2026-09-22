@@ -113,8 +113,18 @@ def test_ai_file_tree_pending_assignments_follow_masterplan() -> None:
     assert assignments["skeleton/repo_machine"]["destination"] == "skeleton/ai/build/repo_machine"
     assert assignments["skeleton/acquired/learning.py"]["action"] == "split_then_mirror"
     assert assignments["skeleton/persist"]["action"] == "merge_into_existing_owner"
+    assert assignments["skeleton/application"]["destination"] == "skeleton/ai/runtime/application"
+    assert assignments["skeleton/core"]["destination"] == "skeleton/ai/runtime/core"
+    assert assignments["skeleton/data"]["destination"] == "skeleton/ai/runtime/data"
+    assert assignments["skeleton/genesis.py"]["destination"] == "skeleton/ai/runtime/bootstrap/genesis.py"
+    assert assignments["skeleton/galaxy"]["destination"] == "skeleton/ai/runtime/distributed/galaxy"
+    assert assignments["skeleton/pr_automation"]["destination"] == "skeleton/ai/build/pr_automation"
+    assert assignments["skeleton/school"]["destination"] == "skeleton/ai/learning/school"
+    assert assignments["skeleton/social"]["destination"] == "skeleton/ai/research/social"
+    assert assignments["skeleton/viscera"]["action"] == "quarantine_then_characterize"
 
     for item in assignments.values():
         assert item["destination"].startswith("skeleton/ai/")
         assert item["work_package_refs"]
         assert item["preconditions"]
+        assert len(item["source_git_object_sha"]) == 40

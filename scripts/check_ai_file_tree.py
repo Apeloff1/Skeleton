@@ -360,7 +360,7 @@ def validate() -> list[str]:
         errors.append("next_move_assignments must contain the plan-derived pending migration batch")
         assignments = []
 
-    allowed_actions = {"mirror_then_cutover", "split_then_mirror", "merge_into_existing_owner"}
+    allowed_actions = {"mirror_then_cutover", "split_then_mirror", "merge_into_existing_owner", "quarantine_then_characterize"}
     mapped_sources = {
         item.get("source")
         for item in mappings
@@ -377,6 +377,15 @@ def validate() -> list[str]:
         "skeleton/foundation",
         "skeleton/build",
         "skeleton/repo_machine",
+        "skeleton/application",
+        "skeleton/core",
+        "skeleton/data",
+        "skeleton/genesis.py",
+        "skeleton/galaxy",
+        "skeleton/mesh",
+        "skeleton/overseer",
+        "skeleton/pr_automation",
+        "skeleton/chronicle",
     }
     for item in assignments:
         if not isinstance(item, dict):
@@ -401,6 +410,8 @@ def validate() -> list[str]:
         pending_sources.add(source)
         if source in mapped_sources:
             errors.append(f"{aid}: source is already a governed mirror and must leave the pending queue: {source}")
+        if not FULL_SHA.fullmatch(str(item.get("source_git_object_sha", ""))):
+            errors.append(f"{aid}: pending source_git_object_sha must be a full SHA")
         if not (ROOT / source).exists():
             errors.append(f"{aid}: pending source missing: {source}")
         if not isinstance(destination, str) or not destination.startswith("skeleton/ai/"):

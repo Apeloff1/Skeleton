@@ -169,3 +169,40 @@ Priority 3 assignments require overlap/domain comparison before cutover:
 - `skeleton/persist` -> merge useful behavior into `skeleton/ai/runtime/persistence/legacy_persist` under the existing persistence owner rather than establishing another state authority.
 
 The validator fails if required assignments disappear, point outside `skeleton/ai`, duplicate an occupied destination, lose work-package ownership, reference malformed volume IDs, or lose their migration preconditions. Assignment does not satisfy implementation, verification, maturity, or signed-accountability requirements.
+
+
+## Masterplan assignment expansion — runtime, build, research, simulation
+
+This pass binds the pending move queue to Git object identities from
+`2291e57f40c55b4aa705faa64a5e5c1ae34e437a` and expands assignment coverage without claiming implementation
+completion.
+
+New priority-1 engine/build assignments include:
+
+- `skeleton/application` -> `skeleton/ai/runtime/application`
+- `skeleton/core` -> `skeleton/ai/runtime/core`
+- `skeleton/data` -> `skeleton/ai/runtime/data`
+- `skeleton/genesis.py` -> `skeleton/ai/runtime/bootstrap/genesis.py`
+- `skeleton/galaxy`, `skeleton/mesh`, and `skeleton/overseer` -> governed distributed-runtime subtrees
+- `skeleton/kv_cache.py` -> `skeleton/ai/runtime/inference/kv_cache.py`
+- `skeleton/chronicle` -> `skeleton/ai/runtime/provenance/chronicle`
+- `skeleton/developer` and `skeleton/pr_automation` -> governed AI build/repository-engineering subtrees.
+
+Priority-2 assignments converge support, learning, research intake, simulation,
+and optional JVM runtime support:
+
+- `skeleton/support` -> runtime support
+- `skeleton/school` -> controlled learning
+- `skeleton/social` -> research intake
+- `skeleton/content`, `skeleton/game`, `skeleton/economy`, `skeleton/platform`, and `skeleton/world` -> simulation/world-model ownership
+- `skeleton/jvm_accelerators.py` -> the AI runtime native/JVM registry while the separate `java-accelerators/` architecture root remains external.
+
+Priority-3 historical/model-internals code is assigned with
+`quarantine_then_characterize`, not production cutover:
+
+- `skeleton/viscera` -> model-internals research
+- `skeleton/spine`, `skeleton/sheaf`, `skeleton/motive`, `skeleton/circulation`, and `skeleton/hoag` -> historical research lineage.
+
+Every pending assignment now records `source_git_object_sha`. If the source
+tree/blob changes before migration, the assignment must be refreshed rather
+than silently treating a different object as the reviewed source.
