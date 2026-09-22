@@ -165,6 +165,15 @@ No exotic mechanism receives production authority because it is novel, fashionab
 | EXO-068 | Mechanism transfer ledger | low | 1, 38, 263, 419 | WP-W00, WP-W26 | Track when an old/rare technique is reused in a modern subsystem, including changed assumptions and failure modes. |
 | EXO-069 | Sunset-by-default experiments | medium | 118, 262, 411, 418 | WP-W26, WP-W27, WP-W30 | Every exotic candidate receives an expiry/review date and is removed unless evidence justifies continued maintenance. |
 
+### deployment product
+
+| ID | Candidate | Risk | Volumes | Work packages | Mechanism |
+|---|---|---|---|---|---|
+| EXO-070 | Microreboot lifecycle islands | medium | 29, 120, 278 | WP-W02, WP-W19, WP-W30 | Partition runtime services into restartable lifecycle islands so selected faults can be recovered without restarting the whole application. |
+| EXO-071 | Semantic resumable streaming | medium | 40, 183, 295 | WP-W22, WP-W04, WP-W21 | Stream durable operation state as resumable snapshot-plus-delta sequences with monotonic cursors and replay-safe client recovery. |
+| EXO-072 | Local-first ambient desktop profile | high | 229, 329, 331 | WP-W24, WP-W23, WP-W07 | Keep workspace continuity and selected inference/memory capabilities local-first, synchronizing opportunistically without making cloud reachability a correctness dependency. |
+| EXO-073 | Dual-slot atomic installer and updater | high | 193, 276, 277, 278 | WP-W25, WP-W30 | Use A/B installation slots with content verification, health-gated activation and deterministic rollback to the prior bootable application image. |
+
 ## Acceptance template for any promoted exotic
 
 Before an item can graduate from `candidate` to an implementation-bearing status, its owning package must add:
