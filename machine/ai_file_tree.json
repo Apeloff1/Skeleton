@@ -3531,15 +3531,20 @@
     ]
   },
   "implementation_signoff": {
-    "signed": false,
-    "signer_id": null,
+    "signed": true,
+    "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": null,
-    "git_sha": null,
-    "evidence_refs": [],
-    "statement": "Pending refreshed implementation attestation after hygiene repair removed the nonessential legacy project-manifest mirror.",
-    "signature_method": null
+    "signed_at_utc": "2026-09-22T15:02:19Z",
+    "git_sha": "aafbd20a94e40ce302ce686581e87251c0ff4514",
+    "evidence_refs": [
+      "git:aafbd20a94e40ce302ce686581e87251c0ff4514",
+      "git-tree:413bf013784f077f3908adb5dc77087a349faeaa",
+      "object-audit:104-mappings-zero-stale-zero-missing-zero-exact-drift",
+      "pr:1930"
+    ],
+    "statement": "Move-preparation implementation is identity-bound to GitHub user Apeloff1 at the cited 104-mapping hygiene-repaired payload SHA. The governed set covers core/runtime, Jeeves, AI shell/control-plane, configuration, domain/build surfaces, compatibility convergence, historical architecture lineage, and research quarantine. The object audit found zero stale source Git objects, zero missing mappings, and zero exact-mirror drift. This implementation attestation records payload identity and preparation evidence only; import inversion, source retirement, production readiness, AIQ/work-package completion, and independent verification remain separately gated.",
+    "signature_method": "github_identity"
   },
   "verification_signoff": {
     "signed": false,
