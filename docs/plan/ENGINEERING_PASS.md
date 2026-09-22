@@ -1,7 +1,7 @@
 # Masterplan Engineering Pass
 
-Engineering pass: **v1.0.0**  
-Scope: **depth-only; no new top-level volume beyond VOL-420**  
+Engineering pass: **v1.0.0**
+Scope: **depth-only; no new top-level volume beyond VOL-420**
 Machine contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
 
 ## Purpose
