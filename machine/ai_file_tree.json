@@ -2084,21 +2084,19 @@
     "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T13:20:27Z",
-    "git_sha": "ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e",
+    "signed_at_utc": "2026-09-22T14:40:23Z",
+    "git_sha": "7b6b8c488074514a4232684cf8a9a78e858f5f8d",
     "evidence_refs": [
-      "git:ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e",
+      "git:7b6b8c488074514a4232684cf8a9a78e858f5f8d",
       "pr:1930",
-      "workflow:35732594976",
-      "job:106761777382",
-      "workflow:35732594713",
-      "workflow:35732594851",
-      "workflow:35732594986",
-      "workflow:35732594933",
-      "workflow:35732594715",
-      "compare:90ff896e8f18d8a472ce6b301156d461a8e8dc7f...ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e"
+      "workflow:35741962389",
+      "job:106793731337",
+      "workflow:35741962507",
+      "workflow:35741962371",
+      "workflow:35741962561",
+      "workflow:35741962515"
     ],
-    "statement": "Implementation payload is identity-bound to GitHub user Apeloff1 at the cited full SHA after canonical AI-tree parity, master-plan/build-sequence, engineering, adversarial, accountability, interface, state-authority, provider-bootstrap, repository-hygiene, PR-hygiene, secret-scanning, dependency-review, and workflow-input-security evidence. App Assembly continues past migration-specific gates but fails at unchanged frontend TypeScript validation; BASE-FRONTEND-TSC-01 therefore keeps cutover and source deletion blocked. GitHub reports the payload commit itself as unsigned, so this is a plan-permitted github_identity attestation, not GPG/SSH/Sigstore or independent verification.",
+    "statement": "Implementation payload is identity-bound to GitHub user Apeloff1 at the cited full SHA after canonical AI-tree parity, architecture/master-plan/master-build-sequence, engineering propagation, adversarial closure, signed-accountability, capability-interface, state-authority, provider-bootstrap, Repository Hygiene, PR Hygiene, Secret Scanning, and Dependency Review evidence. Downstream App Assembly validation beyond the migration-specific gates remains separate, and independent verification is intentionally not self-issued. GitHub reports the payload commit itself as unsigned, so this is the plan-permitted github_identity attestation rather than GPG/SSH/Sigstore verification.",
     "signature_method": "github_identity"
   },
   "verification_signoff": {
@@ -2212,7 +2210,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "all_preclassified_moves_mirrored_object_audit_green_ci_pending",
+  "validation_state": "migration_specific_gates_green_repo_hygiene_green_downstream_app_validation_pending",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
