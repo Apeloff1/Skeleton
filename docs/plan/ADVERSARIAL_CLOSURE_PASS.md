@@ -1,8 +1,8 @@
 # Masterplan Adversarial Closure Pass
 
-Pass version: **1.0.0**  
-Created: **2026-09-22T11:48:00Z**  
-Scope: **depth-only; Volume 420 breadth freeze preserved**  
+Pass version: **1.0.0**
+Created: **2026-09-22T11:48:00Z**
+Scope: **depth-only; Volume 420 breadth freeze preserved**
 Machine contract: [`machine/ai_adversarial_closure.json`](../../machine/ai_adversarial_closure.json)
 
 ## Purpose
