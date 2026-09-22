@@ -234,3 +234,17 @@ def test_final_depth_doc_closes_at_scope_freeze() -> None:
     assert "VOL-401" in text
     assert "VOL-420" in text
     assert "Architecture Scope Freeze" in text
+
+
+def test_depth_pass_coverage_rejects_overlap() -> None:
+    data = checker.load_plan()
+    mutated = json.loads(json.dumps(data))
+    mutated["depth_passes"].append(
+        {
+            "id": "DP-OVERLAP-TEST",
+            "volume_range": [0, 0],
+            "required_nonempty_fields": ["requirements"],
+        }
+    )
+    errors = checker.validate(mutated)
+    assert any("depth coverage for VOL-000 must be exactly one pass" in e for e in errors)
