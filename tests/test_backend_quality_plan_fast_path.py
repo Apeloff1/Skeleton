@@ -13,6 +13,9 @@ def _workflow() -> str:
 def test_backend_quality_has_fail_closed_plan_only_classifier() -> None:
     text = _workflow()
     assert "Classify backend-quality scope" in text
+    assert 'BASE_REF: ${{ github.base_ref }}' in text
+    assert 'git fetch --no-tags --depth=1 origin "$BASE_REF"' in text
+    assert 'current_base="$(git rev-parse FETCH_HEAD)"' in text
     assert 'docs/plan/*|machine/ai_master_plan.json|scripts/check_ai_master_plan.py|skeleton/testing/test_ai_master_plan.py)' in text
     assert 'if [ "${#changed[@]}" -eq 0 ]; then' in text
     assert 'echo "full=true" >> "$GITHUB_OUTPUT"' in text
