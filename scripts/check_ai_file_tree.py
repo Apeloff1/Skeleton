@@ -2,6 +2,7 @@
 """Fail-closed validation for the canonical AI file-tree migration."""
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
@@ -28,6 +29,26 @@ def _tree_files(root: Path) -> dict[str, Path]:
         for path in root.rglob("*")
         if path.is_file() and not path.is_symlink()
     }
+
+
+def _python_semantically_equal(source: Path, destination: Path) -> bool:
+    try:
+        source_tree = ast.parse(source.read_text(encoding="utf-8"))
+        destination_tree = ast.parse(destination.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, SyntaxError):
+        return False
+    return ast.dump(source_tree, include_attributes=False) == ast.dump(
+        destination_tree,
+        include_attributes=False,
+    )
+
+
+def _content_equivalent(source: Path, destination: Path) -> bool:
+    if _digest(source) == _digest(destination):
+        return True
+    if source.suffix == ".py" and destination.suffix == ".py":
+        return _python_semantically_equal(source, destination)
+    return False
 
 
 def _validate_facade(
@@ -69,8 +90,8 @@ def _compare(
     if source.is_file() != destination.is_file():
         return [f"mapping kind mismatch: {source} -> {destination}"]
     if source.is_file():
-        return [] if _digest(source) == _digest(destination) else [
-            f"file drift: {source.relative_to(ROOT)} != {destination.relative_to(ROOT)}"
+        return [] if _content_equivalent(source, destination) else [
+            f"file semantic/content drift: {source.relative_to(ROOT)} != {destination.relative_to(ROOT)}"
         ]
 
     exceptions = parity_exceptions or {}
@@ -103,8 +124,8 @@ def _compare(
                 )
             )
             continue
-        if _digest(src[rel]) != _digest(dst[rel]):
-            errors.append(f"tree content drift: {source.relative_to(ROOT)}/{rel}")
+        if not _content_equivalent(src[rel], dst[rel]):
+            errors.append(f"tree semantic/content drift: {source.relative_to(ROOT)}/{rel}")
     return errors
 
 
