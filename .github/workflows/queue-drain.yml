@@ -318,8 +318,11 @@ jobs:
               head = payload.get('head') or {}
               head_repo = ((head.get('repo') or {}).get('full_name') or '')
               head_ref = head.get('ref') or ''
-              state = str(payload.get('state') or '')
-              return state == 'closed' and head_repo == repo and head_ref == branch
+              return (
+                  str(payload.get('state') or '') == 'closed'
+                  and head_repo == repo
+                  and head_ref == branch
+              )
 
           def path(run):
               return run.get('path') or ''
