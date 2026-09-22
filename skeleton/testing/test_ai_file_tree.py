@@ -98,36 +98,54 @@ def test_ai_file_tree_cortex_and_organism_keep_sensitive_owners_singular() -> No
     assert "SKELETON_MASTER_SECRET" not in organism_secrets
 
 
-def test_ai_file_tree_pending_assignments_follow_masterplan() -> None:
+def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> None:
     import json
 
     manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
-    assignments = {item["source"]: item for item in manifest["next_move_assignments"]}
+    mappings = {item["source"]: item for item in manifest["mappings"]}
 
-    assert assignments["skeleton/state"]["destination"] == "skeleton/ai/runtime/state"
-    assert assignments["skeleton/network"]["destination"] == "skeleton/ai/runtime/distributed/network"
-    assert assignments["skeleton/kv"]["destination"] == "skeleton/ai/runtime/inference/kv"
-    assert assignments["skeleton/swarm"]["destination"] == "skeleton/ai/agents/swarm"
-    assert assignments["skeleton/foundation"]["destination"] == "skeleton/ai/runtime/foundation"
-    assert assignments["skeleton/build"]["destination"] == "skeleton/ai/build/core"
-    assert assignments["skeleton/repo_machine"]["destination"] == "skeleton/ai/build/repo_machine"
-    assert assignments["skeleton/acquired/learning.py"]["action"] == "split_then_mirror"
-    assert assignments["skeleton/persist"]["action"] == "merge_into_existing_owner"
-    assert assignments["skeleton/application"]["destination"] == "skeleton/ai/runtime/application"
-    assert assignments["skeleton/core"]["destination"] == "skeleton/ai/runtime/core"
-    assert assignments["skeleton/data"]["destination"] == "skeleton/ai/runtime/data"
-    assert assignments["skeleton/genesis.py"]["destination"] == "skeleton/ai/runtime/bootstrap/genesis.py"
-    assert assignments["skeleton/galaxy"]["destination"] == "skeleton/ai/runtime/distributed/galaxy"
-    assert assignments["skeleton/pr_automation"]["destination"] == "skeleton/ai/build/pr_automation"
-    assert assignments["skeleton/school"]["destination"] == "skeleton/ai/learning/school"
-    assert assignments["skeleton/social"]["destination"] == "skeleton/ai/research/social"
-    assert assignments["skeleton/viscera"]["action"] == "quarantine_then_characterize"
+    promoted_sources = {
+        "skeleton/state",
+        "skeleton/network",
+        "skeleton/kv",
+        "skeleton/swarm",
+        "skeleton/foundation",
+        "skeleton/build",
+        "skeleton/repo_machine",
+        "skeleton/acquired/learning.py",
+        "skeleton/persist",
+        "skeleton/application",
+        "skeleton/core",
+        "skeleton/data",
+        "skeleton/genesis.py",
+        "skeleton/galaxy",
+        "skeleton/pr_automation",
+        "skeleton/school",
+        "skeleton/social",
+        "skeleton/viscera",
+    }
+    assert promoted_sources <= mappings.keys()
+    assert manifest["next_move_assignments"] == []
 
-    for item in assignments.values():
-        assert item["destination"].startswith("skeleton/ai/")
-        assert item["work_package_refs"]
-        assert item["preconditions"]
-        assert len(item["source_git_object_sha"]) == 40
+    contract = manifest["move_tag_contract"]
+    assert contract["global_state"] == "prepared_not_cutover_authorized"
+    assert set(contract["batches"]) == {
+        "B1-core-runtime",
+        "B2-domain-build",
+        "B3-owner-sensitive",
+        "B4-research-quarantine",
+    }
+
+    for item in mappings.values():
+        assert item["move_tags"][0:2] == ["ai-tree:mapped", "migration:staged-mirror"]
+        assert len([tag for tag in item["move_tags"] if tag.startswith("cutover:")]) == 1
+        assert item["move_batch"] in contract["batches"]
+        assert item["source_disposition"]
+
+    assert mappings["skeleton/provider_runtime.py"]["move_batch"] == "B3-owner-sensitive"
+    assert "cutover:owner-sensitive" in mappings["skeleton/provider_runtime.py"]["move_tags"]
+    assert mappings["skeleton/viscera"]["move_batch"] == "B4-research-quarantine"
+    assert "cutover:quarantine" in mappings["skeleton/viscera"]["move_tags"]
 
 
 def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
