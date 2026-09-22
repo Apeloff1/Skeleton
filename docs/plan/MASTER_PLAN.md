@@ -613,20 +613,31 @@ A file existing is not “implemented.” A happy-path test is not “verified.�
 
 The masterplan is no longer allowed to remain uniformly title-level. Depth passes progressively convert frozen volumes into buildable records without falsely claiming implementation.
 
-The first enforced tranche is **DP-000-040**, documented in `docs/plan/VOLUME_DEPTH_000_040.md`. VOL-000 through VOL-040 now each carry non-empty:
+The first enforced tranche is **DP-000-040**, documented in `docs/plan/VOLUME_DEPTH_000_040.md`. VOL-000 through VOL-040 each carry non-empty requirements, capabilities, contracts, implementation paths, tests, evaluations, risks, and gaps.
 
-- requirements;
-- capabilities;
-- contracts;
-- implementation paths;
-- tests;
-- evaluations;
-- risks;
-- gaps.
+The second enforced tranche is **DP-041-080**, documented in `docs/plan/VOLUME_DEPTH_041_080.md`. It continues the exact same non-empty traceability rule across API Architecture, product/web/desktop and long-running UX, multi-tenancy, install/update/repair/uninstall, repository and import architecture, machine manifests/linting, gap/risk/ADR control, CI/release/deployment/environment/configuration, backup/DR/incident response, performance/capacity/cost/quality, specialized intelligence including Jeeves, artifact/CAS/experimentation/reproducibility, and software/test architecture.
 
-This covers the foundational spine from Plan Constitution through Streaming. The fields may contain planned targets; they are planning depth, not evidence. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
+The third enforced tranche is **DP-081-120**, documented in `docs/plan/VOLUME_DEPTH_081_120.md`. It deepens formal methods, benchmark/red-team/human-control disciplines, explainability/accessibility/i18n/compliance, documentation and operations, backlog/priority/build governance, VS-000 through VS-007, functional/autonomous/research/SOTA-candidate acceptance, anti-pattern/build-order/DoD/traceability/capability/debt/fitness controls, project metrics, roadmap/completion semantics, and final assembly qualification.
 
-Future depth passes should continue forward from VOL-041 using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+The fourth enforced tranche is **DP-121-160**, documented in `docs/plan/VOLUME_DEPTH_121_160.md`. It deepens requirements/NFR/capability/behavior/state/interface/schema/compatibility contracts, internal protocols and consistency/transaction/outbox/cache/content-addressing rules, ingestion/document/lineage/data-quality/dataset/synthetic-data systems, training and post-training control/recovery/evaluation, multimodal ingestion/vision/audio/speech/video/retrieval, and the Tool SDK.
+
+The fifth enforced tranche is **DP-161-200**, documented in `docs/plan/VOLUME_DEPTH_161_200.md`. It deepens connectors/plugins/marketplace/sandboxing, policy simulation, threat/security/zero-trust/network/egress/secrets/keys/tenant/privacy/deletion controls, SBOM/MBOM and SLO/error-budget/trace/performance/cost/efficiency disciplines, chaos/recovery/release/canary/feature-flag/rollback architecture, and developer/local/fixture/simulation/fuzz/property/formal-verification infrastructure.
+
+The sixth enforced tranche is **DP-201-240**, documented in `docs/plan/VOLUME_DEPTH_201_240.md`. It deepens agent communication/handoff/performance/economics/delegation/consensus/reviewer/verifier workflows, research teams/literature/citations/reproduction/statistics/evaluation, model/dataset/tool/agent cards and health, provider risk/failover and offline/air-gap/edge/enterprise deployment, identity/admin/audit/operations dashboards, and model operations/rollback.
+
+The seventh enforced tranche is **DP-241-280**, documented in `docs/plan/VOLUME_DEPTH_241_280.md`. It deepens prompt/routing/memory/retrieval policy registries, temporal/uncertainty/hypothesis/causal/search/stopping intelligence, answer/artifact quality and human/reversibility/blast-radius/change budgets, migration/legacy/deprecation/archaeology/consolidation/provenance/ownership controls, documentation/diagram/snapshot/build reproducibility and provenance, and installer/update/bootstrap/crash/support security/recovery.
+
+The eighth enforced tranche is **DP-281-320**, documented in `docs/plan/VOLUME_DEPTH_281_320.md`. It deepens doctor/self-diagnosis/safe-repair/digital-twin/deployment planning, scheduler/fairness/backpressure/load-shedding/queue/retry/breaker/bulkhead/dead-letter/replay primitives, determinism/time/identity/logical ordering, master control/objective/constraint/decision/workflow compilation and migration, task complexity/decomposition/critical-path/scheduling simulation, and autonomy control/levels/escalation/de-escalation.
+
+The ninth enforced tranche is **DP-321-360**, documented in `docs/plan/VOLUME_DEPTH_321_360.md`. It deepens human override/interrupt/goal-drift/specification-gaming/plan-execution alignment, human factors/approval fatigue/trust/intent/project memory/workspaces, resource/artifact/change-impact/change-risk/safe-change/system compiler domains, generated/internal/provider/storage/event/evaluation SDKs, data/index/embedding/freshness lifecycle, and source-trust/claim/knowledge reconciliation/snapshots.
+
+The tenth enforced tranche is **DP-361-400**, documented in `docs/plan/VOLUME_DEPTH_361_400.md`. It deepens memory garbage collection/quality/interference/versioning/reconciliation, cognitive strategy selection and reasoning cost/regression, plan verification/static analysis/simulation, tool composition/dependency/health/discovery/result-trust/effect/compensation/saga semantics, distributed inference and model placement/caching/autoscaling/load testing, hardware/NUMA/GPU/storage/data/network topology, remote execution/worker attestation, and the build farm.
+
+The final tranche is **DP-401-420**, documented in `docs/plan/VOLUME_DEPTH_401_420.md`. It closes evaluation/research compute, quotas/budget/forecasting/cost anomaly controls, license/data-rights/attribution/research-ethics governance, model lifecycle/deprecation/provider migration/shadow/champion-challenger systems, experimental sandbox/research branching/technique retirement/failure knowledge, and the Architecture Scope Freeze at VOL-420.
+
+The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
+
+Sequential depth is now complete across **VOL-000..VOL-420**. Future work must increase implementation, verification, hardening and production evidence inside the frozen domains; new top-level breadth requires the existing scope-freeze ADR exception.
 
 ## 24.4 Exotic systems depth layer
 
