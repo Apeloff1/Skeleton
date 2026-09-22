@@ -82,11 +82,11 @@ jobs:
         run: python -m compileall -q .
 
       - name: Canonical local/CI quality parity gate
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         run: python scripts/check_quality_gate_parity.py
 
       - name: Canonical architecture boundary gate
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
@@ -94,7 +94,7 @@ jobs:
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_architecture_boundaries.py
 
       - name: Provider runtime boundary gate
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: |
@@ -108,11 +108,11 @@ jobs:
         run: python scripts/check_security_scan_surface.py
 
       - name: Defense control-plane contract
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         run: python scripts/check_defense_control_plane_contract.py
 
       - name: Security scanner and capability fail-closed contracts
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
@@ -143,7 +143,7 @@ jobs:
         run: python scripts/check_sast_security.py
 
       - name: Core/tooling Python high-confidence SAST gate
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         run: python scripts/check_repository_python_sast.py
 
       - name: JavaScript child_process alias safety gate
@@ -179,7 +179,7 @@ jobs:
           python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
 
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
-        working-directory: ${{ github.workspace }}
+        working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
