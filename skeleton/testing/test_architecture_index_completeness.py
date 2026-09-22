@@ -38,6 +38,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["research_execution_program"] == "docs/architecture/research-execution-program-2026.md"
     assert documents["research_program_scorecard"] == "docs/architecture/research-program-scorecard-2026.md"
     assert documents["research_control_plane_internals"] == "docs/architecture/research-control-plane-internals-2026.md"
+    assert documents["research_control_plane_backlog"] == "docs/architecture/research-control-plane-build-backlog-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -602,3 +603,37 @@ def test_research_control_plane_internals_are_fail_closed() -> None:
     assert "Minimum viable implementation sequence" in internals
     assert "AD105. Research package substrate" in plan
     assert "AD120. Research control-plane M0–M8 implementation" in plan
+
+
+def test_research_control_plane_backlog_is_acceptance_gated() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260922-RESEARCH-CONTROL-PLANE-BACKLOG"
+    ]
+    assert checkpoint["tracks"] == ("AD",)
+    assert checkpoint["backlog_range"] == ("RCB001", "RCB120")
+    assert checkpoint["cross_acceptance_range"] == ("RCB-A01", "RCB-A10")
+    assert checkpoint["milestones"] == (
+        "M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"
+    )
+    assert checkpoint["completion_requires_test_evidence"] is True
+    assert checkpoint["production_authority_granted"] is False
+    assert len(architecture_index.RESEARCH_CONTROL_PLANE_BACKLOG_IDS) == 120
+
+    root = Path(__file__).resolve().parents[2]
+    backlog = (
+        root
+        / "docs"
+        / "architecture"
+        / "research-control-plane-build-backlog-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+
+    for backlog_id in architecture_index.RESEARCH_CONTROL_PLANE_BACKLOG_IDS:
+        assert backlog_id in backlog
+    for number in range(1, 11):
+        assert f"RCB-A{number:02d}" in backlog
+
+    assert "AD121. Research control-plane build backlog" in plan
+    assert "Completion requires the declared acceptance evidence" in plan
