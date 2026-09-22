@@ -290,3 +290,16 @@ The hardened baseline bridge now owns the inherited automation parity refreshes.
 - expected delta: 91 files
 
 The six GameForge trees remain research quarantine. Twenty backend-core modules remain compatibility-convergence inputs. No import inversion, source retirement, runtime-authority transfer, AIQ completion, work-package completion, or production-readiness claim is created by relocation.
+
+
+### Bridge-rebased transfer-v2 audit evidence
+
+Payload `bee3fdbfad1669f58ca5a2afc3d73c4d2c7a5735` (tree `6b03cc2c847e9c2615206a8bfac2a88ff46847a5`) passed the full 130-mapping object/parity audit:
+- zero stale source identities
+- zero missing source/destination mappings
+- zero tree-membership drift
+- zero exact mirror drift
+- 16 compatibility facades valid
+- zero forbidden provider credential/network markers
+
+The hardened baseline bridge owns the five inherited automation parity refreshes, leaving transfer-v2 with 89 new mirror files plus two governance-file updates.
