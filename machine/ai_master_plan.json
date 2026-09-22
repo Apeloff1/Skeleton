@@ -14064,19 +14064,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Separate diagnosis from repair and report evidence for every finding.",
+        "Support machine-readable output for automation and runbooks."
+      ],
+      "capabilities": [
+        "health scan",
+        "diagnostic report",
+        "repair recommendations"
+      ],
+      "contracts": [
+        "DoctorCheck",
+        "DoctorFinding",
+        "DoctorReport"
+      ],
+      "implementation_paths": [
+        "scripts",
+        "repair"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_doctor_command.py"
+      ],
+      "evaluations": [
+        "planned:damaged-install diagnosis matrix"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "doctor changes state",
+        "false healthy result"
+      ],
+      "gaps": [
+        "define check registry",
+        "bind findings to repair plans"
+      ],
       "accountability_id": "ACC-VOL-281",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 282,
@@ -14086,19 +14111,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Self-diagnosis is advisory and cannot self-certify production health.",
+        "Correlate component reports with external telemetry/checks."
+      ],
+      "capabilities": [
+        "component diagnostics",
+        "fault hypotheses",
+        "health evidence"
+      ],
+      "contracts": [
+        "SelfDiagnostic",
+        "HealthEvidence",
+        "FaultHypothesis"
+      ],
+      "implementation_paths": [
+        "skeleton/observability",
+        "skeleton/runtime"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_self_diagnosis.py"
+      ],
+      "evaluations": [
+        "planned:known-fault detection evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "self-report bias",
+        "diagnosis loop"
+      ],
+      "gaps": [
+        "define diagnostic API",
+        "bind independent health checks"
+      ],
       "accountability_id": "ACC-VOL-282",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 283,
@@ -14108,19 +14158,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Repair plan declares affected state and rollback before mutation.",
+        "Post-repair verification must prove targeted invariant restoration."
+      ],
+      "capabilities": [
+        "repair transactions",
+        "repair rollback",
+        "post-repair verification"
+      ],
+      "contracts": [
+        "SafeRepairPlan",
+        "RepairCheckpoint",
+        "RepairEvidence"
+      ],
+      "implementation_paths": [
+        "repair",
+        "skeleton/security"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_safe_repair.py"
+      ],
+      "evaluations": [
+        "planned:repair fault injection"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "repair causes more damage",
+        "silent reset"
+      ],
+      "gaps": [
+        "classify repair actions",
+        "bind doctor findings"
+      ],
       "accountability_id": "ACC-VOL-283",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 284,
@@ -14130,19 +14205,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Twin state records freshness/uncertainty and never authorizes real effects.",
+        "Synchronize from governed observations, not inferred model text alone."
+      ],
+      "capabilities": [
+        "topology twin",
+        "resource simulation",
+        "failure rehearsal"
+      ],
+      "contracts": [
+        "DigitalTwin",
+        "TwinObservation",
+        "TwinScenario"
+      ],
+      "implementation_paths": [
+        "skeleton/simulation",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_system_digital_twin.py"
+      ],
+      "evaluations": [
+        "planned:twin-vs-real drift evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "stale twin",
+        "simulation treated as truth"
+      ],
+      "gaps": [
+        "define synchronization model",
+        "bind deployment planner"
+      ],
       "accountability_id": "ACC-VOL-284",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 285,
@@ -14152,19 +14252,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Plans respect compatibility, blast radius, SLO and resource constraints.",
+        "Planner output remains proposal until deployment policy authorizes."
+      ],
+      "capabilities": [
+        "deployment planning",
+        "dependency sequencing",
+        "rollback planning"
+      ],
+      "contracts": [
+        "DeploymentProposal",
+        "DeploymentConstraint",
+        "DeploymentSequence"
+      ],
+      "implementation_paths": [
+        "deploy",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_deployment_planner.py"
+      ],
+      "evaluations": [
+        "planned:known-topology planning scenarios"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "unsafe plan authorized by generation",
+        "stale capacity input"
+      ],
+      "gaps": [
+        "bind digital twin/capacity",
+        "add plan verifier"
+      ],
       "accountability_id": "ACC-VOL-285",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 286,
@@ -14174,19 +14299,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Admission must reserve bounded resources before work starts.",
+        "Scheduler handles preemption/recovery without losing ownership."
+      ],
+      "capabilities": [
+        "resource admission",
+        "placement",
+        "preemption"
+      ],
+      "contracts": [
+        "ResourceRequest",
+        "ResourceLease",
+        "PlacementDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/runtime",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_resource_scheduler.py"
+      ],
+      "evaluations": [
+        "planned:saturation/preemption evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "oversubscription",
+        "orphan reservation"
+      ],
+      "gaps": [
+        "define resource model",
+        "bind capacity/backpressure"
+      ],
       "accountability_id": "ACC-VOL-286",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 287,
@@ -14196,19 +14346,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Track wait age/tenant/share and apply bounded anti-starvation policy.",
+        "Fairness must not override security or hard safety constraints."
+      ],
+      "capabilities": [
+        "fair queuing",
+        "aging",
+        "tenant shares"
+      ],
+      "contracts": [
+        "FairnessPolicy",
+        "QueueShare",
+        "StarvationSignal"
+      ],
+      "implementation_paths": [
+        "skeleton/runtime",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_fairness_starvation.py"
+      ],
+      "evaluations": [
+        "planned:mixed-priority load evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "priority starvation",
+        "fairness hurts critical incident work"
+      ],
+      "gaps": [
+        "define fairness policy",
+        "bind scheduler metrics"
+      ],
       "accountability_id": "ACC-VOL-287",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 288,
@@ -14218,19 +14393,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Every unbounded producer/consumer boundary must define pressure semantics.",
+        "Cancellation/degradation behavior remains explicit under pressure."
+      ],
+      "capabilities": [
+        "pressure signals",
+        "bounded buffers",
+        "producer throttling"
+      ],
+      "contracts": [
+        "BackpressureSignal",
+        "BufferLimit",
+        "PressureDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "skeleton/frontier"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_backpressure.py"
+      ],
+      "evaluations": [
+        "planned:slow-consumer saturation test"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "memory blowup",
+        "pressure ignored across boundary"
+      ],
+      "gaps": [
+        "catalog producer/consumer edges",
+        "bind queue/stream limits"
+      ],
       "accountability_id": "ACC-VOL-288",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 289,
@@ -14240,19 +14440,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Define shed priority/class and response semantics.",
+        "Never shed required security/audit/authority operations silently."
+      ],
+      "capabilities": [
+        "admission shedding",
+        "degraded service",
+        "priority protection"
+      ],
+      "contracts": [
+        "LoadShedPolicy",
+        "ShedDecision",
+        "DegradedResponse"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "skeleton/runtime"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_load_shedding.py"
+      ],
+      "evaluations": [
+        "planned:overload SLO evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "wrong work shed",
+        "hidden data loss"
+      ],
+      "gaps": [
+        "define workload classes",
+        "bind capacity/SLOs"
+      ],
       "accountability_id": "ACC-VOL-289",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 290,
@@ -14262,19 +14487,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Measure depth/age/service rate and enforce queue budgets.",
+        "Congestion policy differentiates new work, retries and recovery work."
+      ],
+      "capabilities": [
+        "queue budgets",
+        "congestion signals",
+        "drain policies"
+      ],
+      "contracts": [
+        "QueueBudget",
+        "CongestionState",
+        "QueueDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "skeleton/automation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_queue_congestion.py"
+      ],
+      "evaluations": [
+        "planned:burst/retry storm evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "queue collapse",
+        "recovery work starved"
+      ],
+      "gaps": [
+        "inventory queues",
+        "bind retry/fairness"
+      ],
       "accountability_id": "ACC-VOL-290",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 291,
@@ -14284,19 +14534,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Retry only classified transient failures with idempotency safety.",
+        "Shared budget prevents nested layers multiplying attempts."
+      ],
+      "capabilities": [
+        "retry admission",
+        "budget propagation",
+        "retry telemetry"
+      ],
+      "contracts": [
+        "RetryBudget",
+        "RetryAttempt",
+        "RetryDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_retry_budgets.py"
+      ],
+      "evaluations": [
+        "planned:nested-retry amplification test"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "retry storm",
+        "duplicate side effect"
+      ],
+      "gaps": [
+        "define budget propagation",
+        "bind protocols/tools"
+      ],
       "accountability_id": "ACC-VOL-291",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 292,
@@ -14306,19 +14581,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Breaker state is scoped per dependency/failure domain.",
+        "Fallback remains policy-compatible and observable."
+      ],
+      "capabilities": [
+        "circuit breakers",
+        "recovery probes",
+        "fallback signals"
+      ],
+      "contracts": [
+        "CircuitBreaker",
+        "BreakerState",
+        "ProbeResult"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "skeleton/network"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_circuit_breaker_standard.py"
+      ],
+      "evaluations": [
+        "planned:flapping dependency evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "global breaker overblocks",
+        "half-open stampede"
+      ],
+      "gaps": [
+        "define standard library",
+        "bind provider/connectors"
+      ],
       "accountability_id": "ACC-VOL-292",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 293,
@@ -14328,19 +14628,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Define concurrency/resource pools by critical domain.",
+        "Cross-bulkhead fallback requires explicit capacity/authority policy."
+      ],
+      "capabilities": [
+        "resource pools",
+        "failure isolation",
+        "overflow policy"
+      ],
+      "contracts": [
+        "Bulkhead",
+        "BulkheadLimit",
+        "OverflowDecision"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "skeleton/runtime"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_bulkheads.py"
+      ],
+      "evaluations": [
+        "planned:noisy-neighbor evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "shared pool collapse",
+        "overflow breaks isolation"
+      ],
+      "gaps": [
+        "map bulkhead domains",
+        "bind scheduler"
+      ],
       "accountability_id": "ACC-VOL-293",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 294,
@@ -14350,19 +14675,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "DLQ entries preserve original identity, attempts and failure cause.",
+        "Replay requires current authorization/idempotency and compatibility checks."
+      ],
+      "capabilities": [
+        "dead-letter storage",
+        "triage",
+        "controlled replay"
+      ],
+      "contracts": [
+        "DeadLetter",
+        "DeadLetterDisposition",
+        "ReplayAuthorization"
+      ],
+      "implementation_paths": [
+        "skeleton/reliability",
+        "skeleton/automation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_dead_letter_workflow.py"
+      ],
+      "evaluations": [
+        "planned:stale DLQ replay evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "poison message loop",
+        "unauthorized replay"
+      ],
+      "gaps": [
+        "define DLQ schema",
+        "bind operator UI/runbook"
+      ],
       "accountability_id": "ACC-VOL-294",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 295,
@@ -14372,19 +14722,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Replay distinguishes read-only reconstruction, simulation and real side-effect retry.",
+        "External effects require reconciliation/idempotency before re-execution."
+      ],
+      "capabilities": [
+        "operation reconstruction",
+        "safe replay",
+        "replay comparison"
+      ],
+      "contracts": [
+        "ReplayRequest",
+        "ReplayMode",
+        "ReplayResult"
+      ],
+      "implementation_paths": [
+        "skeleton/frontier",
+        "skeleton/persistence"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_operation_replay.py"
+      ],
+      "evaluations": [
+        "planned:replay determinism evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "duplicate real effect",
+        "missing historical dependency"
+      ],
+      "gaps": [
+        "define replay modes",
+        "bind event retention"
+      ],
       "accountability_id": "ACC-VOL-295",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 296,
@@ -14394,19 +14769,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Tests use appropriate equivalence/tolerance for each determinism class.",
+        "Nondeterminism sources are recorded in reproducibility evidence."
+      ],
+      "capabilities": [
+        "determinism classification",
+        "seed control",
+        "tolerance policies"
+      ],
+      "contracts": [
+        "DeterminismClass",
+        "DeterminismEnvelope",
+        "VariancePolicy"
+      ],
+      "implementation_paths": [
+        "machine",
+        "skeleton/eval"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_determinism_envelope.py"
+      ],
+      "evaluations": [
+        "planned:repeat-run variance characterization"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "false deterministic expectation",
+        "tolerance hides regression"
+      ],
+      "gaps": [
+        "classify critical paths",
+        "bind replay/tests"
+      ],
       "accountability_id": "ACC-VOL-296",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 297,
@@ -14416,19 +14816,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Never use wall clock for elapsed-duration correctness.",
+        "Represent timezone/calendar semantics explicitly at boundaries."
+      ],
+      "capabilities": [
+        "time source",
+        "deadlines",
+        "clock abstraction"
+      ],
+      "contracts": [
+        "Instant",
+        "Duration",
+        "Deadline"
+      ],
+      "implementation_paths": [
+        "skeleton/foundation",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_time_architecture.py"
+      ],
+      "evaluations": [
+        "planned:clock-skew/DST evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "wall-clock jump",
+        "timezone ambiguity"
+      ],
+      "gaps": [
+        "unify time primitives",
+        "inject clocks in tests"
+      ],
       "accountability_id": "ACC-VOL-297",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 298,
@@ -14438,19 +14863,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "IDs never encode mutable/display-sensitive authority data.",
+        "Parsing/canonicalization reject ambiguous forms."
+      ],
+      "capabilities": [
+        "identifier generation",
+        "canonicalization",
+        "typed IDs"
+      ],
+      "contracts": [
+        "Identifier",
+        "IdentifierKind",
+        "IdentifierCodec"
+      ],
+      "implementation_paths": [
+        "skeleton/foundation",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_identifier_standard.py"
+      ],
+      "evaluations": [
+        "planned:collision/canonicalization test"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "ID collision",
+        "case/Unicode ambiguity"
+      ],
+      "gaps": [
+        "inventory ID formats",
+        "migrate ad-hoc identifiers"
+      ],
       "accountability_id": "ACC-VOL-298",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 299,
@@ -14460,19 +14910,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use sequence/fencing/logical-clock semantics per domain.",
+        "Never infer causality solely from timestamps."
+      ],
+      "capabilities": [
+        "logical clocks",
+        "causal ordering",
+        "fencing sequence"
+      ],
+      "contracts": [
+        "LogicalClock",
+        "SequenceNumber",
+        "CausalRelation"
+      ],
+      "implementation_paths": [
+        "skeleton/foundation",
+        "skeleton/network"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_logical_clocks.py"
+      ],
+      "evaluations": [
+        "planned:reorder/partition evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "causality inversion",
+        "sequence reset"
+      ],
+      "gaps": [
+        "select clock models",
+        "bind events/leases"
+      ],
       "accountability_id": "ACC-VOL-299",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 300,
@@ -14482,19 +14957,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Control plane orchestrates only through canonical contracts and independent policy gates.",
+        "Its durable state is explicit, recoverable and auditable."
+      ],
+      "capabilities": [
+        "global orchestration",
+        "control-plane state",
+        "system coordination"
+      ],
+      "contracts": [
+        "ControlPlaneCommand",
+        "ControlPlaneState",
+        "ControlPlaneReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_master_control_plane.py"
+      ],
+      "evaluations": [
+        "planned:control-plane failure drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "god-object authority",
+        "single point of failure"
+      ],
+      "gaps": [
+        "define minimal responsibilities",
+        "bind distributed recovery"
+      ],
       "accountability_id": "ACC-VOL-300",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 301,
@@ -14504,19 +15004,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Distinguish requested objective from inferred subgoals.",
+        "Objectives cannot override policy/authority constraints."
+      ],
+      "capabilities": [
+        "objective registry",
+        "success criteria",
+        "objective lifecycle"
+      ],
+      "contracts": [
+        "Objective",
+        "ObjectiveCriterion",
+        "ObjectiveState"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_system_objectives.py"
+      ],
+      "evaluations": [
+        "planned:goal-drift evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "objective ambiguity",
+        "goal overrides policy"
+      ],
+      "gaps": [
+        "define objective schema",
+        "bind planning/workflows"
+      ],
       "accountability_id": "ACC-VOL-301",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 302,
@@ -14526,19 +15051,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Normalization records interpretations/assumptions.",
+        "Ambiguous high-impact objectives require clarification or bounded alternative."
+      ],
+      "capabilities": [
+        "objective parsing",
+        "assumption capture",
+        "canonical goals"
+      ],
+      "contracts": [
+        "NormalizedObjective",
+        "ObjectiveAssumption",
+        "ObjectiveAmbiguity"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/eval"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_objective_normalization.py"
+      ],
+      "evaluations": [
+        "planned:ambiguous objective corpus"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "intent distortion",
+        "lost user constraint"
+      ],
+      "gaps": [
+        "define normalization pipeline",
+        "bind human confirmation thresholds"
+      ],
       "accountability_id": "ACC-VOL-302",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 303,
@@ -14548,19 +15098,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Hard constraints cannot be traded away by utility scoring.",
+        "Constraint provenance and conflicts are explicit."
+      ],
+      "capabilities": [
+        "constraint registry",
+        "constraint solving",
+        "conflict explanation"
+      ],
+      "contracts": [
+        "Constraint",
+        "ConstraintSet",
+        "ConstraintResult"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_constraint_engine.py"
+      ],
+      "evaluations": [
+        "planned:unsatisfiable constraint evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "hard constraint weakened",
+        "hidden conflict"
+      ],
+      "gaps": [
+        "define constraint types",
+        "bind planner/scheduler"
+      ],
       "accountability_id": "ACC-VOL-303",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 304,
@@ -14570,19 +15145,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Decision process separates admissibility from preference optimization.",
+        "Record evidence/options/criteria and uncertainty for consequential choices."
+      ],
+      "capabilities": [
+        "option evaluation",
+        "decision selection",
+        "decision evidence"
+      ],
+      "contracts": [
+        "DecisionOption",
+        "DecisionContext",
+        "Decision"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/eval"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_decision_engine.py"
+      ],
+      "evaluations": [
+        "planned:known-choice benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "optimizes forbidden option",
+        "opaque criteria"
+      ],
+      "gaps": [
+        "define decision policy interface",
+        "bind decision graph"
+      ],
       "accountability_id": "ACC-VOL-304",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 305,
@@ -14592,19 +15192,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Decision records are immutable; corrections/supersession append new nodes.",
+        "Link decisions to actions/artifacts/results."
+      ],
+      "capabilities": [
+        "decision lineage",
+        "supersession",
+        "impact tracing"
+      ],
+      "contracts": [
+        "DecisionRecord",
+        "DecisionEdge",
+        "DecisionOutcome"
+      ],
+      "implementation_paths": [
+        "skeleton/persistence",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_decision_record_graph.py"
+      ],
+      "evaluations": [
+        "planned:decision impact trace evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "rewritten history",
+        "missing consequence link"
+      ],
+      "gaps": [
+        "define graph schema",
+        "bind ADR/runtime decisions"
+      ],
       "accountability_id": "ACC-VOL-305",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 306,
@@ -14614,19 +15239,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "IR includes dependencies, inputs/outputs, authority, retries, timeouts and compensation.",
+        "Compiler/runtime share the same versioned IR contract."
+      ],
+      "capabilities": [
+        "workflow IR",
+        "static validation",
+        "runtime serialization"
+      ],
+      "contracts": [
+        "WorkflowIR",
+        "WorkflowNode",
+        "WorkflowEdge"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_workflow_ir.py"
+      ],
+      "evaluations": [
+        "planned:IR roundtrip evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "authoring/runtime semantic drift",
+        "invalid DAG"
+      ],
+      "gaps": [
+        "define IR schema",
+        "bind DSL/compiler"
+      ],
       "accountability_id": "ACC-VOL-306",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 307,
@@ -14636,19 +15286,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "DSL cannot express undeclared privilege or bypass policy.",
+        "Parsing/versioning errors fail with precise diagnostics."
+      ],
+      "capabilities": [
+        "workflow authoring",
+        "DSL parser",
+        "static checks"
+      ],
+      "contracts": [
+        "WorkflowSource",
+        "DSLVersion",
+        "DSLDiagnostic"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "docs"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_workflow_dsl.py"
+      ],
+      "evaluations": [
+        "planned:parser/fuzz corpus"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "language injection",
+        "ambiguous syntax"
+      ],
+      "gaps": [
+        "define grammar",
+        "bind schema completion/tooling"
+      ],
       "accountability_id": "ACC-VOL-307",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 308,
@@ -14658,19 +15333,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Compilation is deterministic for identical source/version.",
+        "Reject missing capabilities, cycles and invalid compensation before runtime."
+      ],
+      "capabilities": [
+        "workflow compilation",
+        "static linking",
+        "compile diagnostics"
+      ],
+      "contracts": [
+        "CompiledWorkflow",
+        "WorkflowLink",
+        "CompileResult"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "scripts"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_workflow_compiler.py"
+      ],
+      "evaluations": [
+        "planned:invalid-workflow corpus"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "compiler/runtime mismatch",
+        "cycle escapes validation"
+      ],
+      "gaps": [
+        "materialize compiler phases",
+        "bind capability registry"
+      ],
       "accountability_id": "ACC-VOL-308",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 309,
@@ -14680,19 +15380,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "In-flight operations retain the workflow version they started with unless explicit migration occurs.",
+        "Version changes declare compatibility."
+      ],
+      "capabilities": [
+        "workflow versions",
+        "version pinning",
+        "compatibility"
+      ],
+      "contracts": [
+        "WorkflowVersion",
+        "WorkflowCompatibility",
+        "WorkflowBinding"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_workflow_versioning.py"
+      ],
+      "evaluations": [
+        "planned:in-flight upgrade evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "workflow changes mid-run",
+        "unbounded old versions"
+      ],
+      "gaps": [
+        "define retention policy",
+        "bind migration"
+      ],
       "accountability_id": "ACC-VOL-309",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 310,
@@ -14702,19 +15427,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Migration declares state mapping and irreversible transformations.",
+        "Unmigratable runs remain pinned or explicitly terminated/restarted."
+      ],
+      "capabilities": [
+        "workflow state migration",
+        "compatibility checks",
+        "migration rollback"
+      ],
+      "contracts": [
+        "WorkflowMigration",
+        "StateMapping",
+        "WorkflowMigrationReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/persistence"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_workflow_migration.py"
+      ],
+      "evaluations": [
+        "planned:partial workflow migration drill"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "lost in-flight state",
+        "semantic change hidden"
+      ],
+      "gaps": [
+        "define migration protocol",
+        "bind version registry"
+      ],
       "accountability_id": "ACC-VOL-310",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 311,
@@ -14724,19 +15474,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Task type drives default policy/budgets/tests but cannot grant privilege.",
+        "Unknown tasks use conservative generic classification."
+      ],
+      "capabilities": [
+        "task taxonomy",
+        "task defaults",
+        "task validation"
+      ],
+      "contracts": [
+        "TaskType",
+        "TaskProfile",
+        "TaskClassification"
+      ],
+      "implementation_paths": [
+        "machine",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_semantic_task_types.py"
+      ],
+      "evaluations": [
+        "planned:task classification corpus"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "misclassification weakens gates",
+        "taxonomy explosion"
+      ],
+      "gaps": [
+        "define core types",
+        "bind priority/evaluation"
+      ],
       "accountability_id": "ACC-VOL-311",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 312,
@@ -14746,19 +15521,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Estimator exposes uncertainty and calibration.",
+        "Underestimation cannot bypass hard limits; runtime can revise estimate."
+      ],
+      "capabilities": [
+        "complexity estimates",
+        "calibration",
+        "estimate revision"
+      ],
+      "contracts": [
+        "ComplexityEstimate",
+        "ComplexityFeature",
+        "EstimateRevision"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/eval"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_task_complexity.py"
+      ],
+      "evaluations": [
+        "planned:estimate calibration evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "systematic underestimate",
+        "complexity score gamed"
+      ],
+      "gaps": [
+        "define features/baselines",
+        "bind scheduler/budgets"
+      ],
       "accountability_id": "ACC-VOL-312",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 313,
@@ -14768,19 +15568,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Subtasks preserve parent constraints/authority.",
+        "Detect over-decomposition, cycles and missing integration step."
+      ],
+      "capabilities": [
+        "task DAG generation",
+        "dependency assignment",
+        "acceptance propagation"
+      ],
+      "contracts": [
+        "TaskDecomposition",
+        "Subtask",
+        "TaskDependency"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "machine"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_task_decomposition.py"
+      ],
+      "evaluations": [
+        "planned:known-project decomposition benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "constraint loss",
+        "fragmentation overhead"
+      ],
+      "gaps": [
+        "define decomposition heuristics",
+        "bind critical path"
+      ],
       "accountability_id": "ACC-VOL-313",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 314,
@@ -14790,19 +15615,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Use real dependency/state data rather than narrative estimates alone.",
+        "Recompute when task duration/dependency changes."
+      ],
+      "capabilities": [
+        "critical path",
+        "slack",
+        "blocker analysis"
+      ],
+      "contracts": [
+        "CriticalPath",
+        "TaskSlack",
+        "PathBlocker"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/automation"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_critical_path.py"
+      ],
+      "evaluations": [
+        "planned:DAG known-answer tests"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "missing dependency",
+        "stale durations"
+      ],
+      "gaps": [
+        "bind task graph",
+        "surface blockers in roadmap"
+      ],
       "accountability_id": "ACC-VOL-314",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 315,
@@ -14812,19 +15662,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Schedulers respect hard dependencies/leases/authority before optimization.",
+        "Algorithm choice is measurable and replaceable."
+      ],
+      "capabilities": [
+        "task scheduling",
+        "worker matching",
+        "deadline scheduling"
+      ],
+      "contracts": [
+        "Schedule",
+        "SchedulingPolicy",
+        "Assignment"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "skeleton/runtime"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_scheduling_algorithms.py"
+      ],
+      "evaluations": [
+        "planned:workload scheduler benchmark"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "starvation",
+        "priority inversion"
+      ],
+      "gaps": [
+        "implement baseline algorithms",
+        "bind simulator"
+      ],
       "accountability_id": "ACC-VOL-315",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 316,
@@ -14834,19 +15709,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Simulation is non-authoritative and labels assumptions.",
+        "Compare throughput/latency/fairness/resource metrics across policies."
+      ],
+      "capabilities": [
+        "workload replay",
+        "policy comparison",
+        "capacity experiments"
+      ],
+      "contracts": [
+        "SchedulingSimulation",
+        "WorkloadTrace",
+        "SimulationMetric"
+      ],
+      "implementation_paths": [
+        "skeleton/simulation",
+        "skeleton/eval"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_scheduling_simulator.py"
+      ],
+      "evaluations": [
+        "planned:historical trace backtest"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "simulator unrealistic",
+        "optimizing synthetic metric"
+      ],
+      "gaps": [
+        "build trace format",
+        "calibrate to production"
+      ],
       "accountability_id": "ACC-VOL-316",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 317,
@@ -14856,19 +15756,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Controllers cannot exceed policy/authority or resource bounds.",
+        "Stability/oscillation behavior is evaluated before production use."
+      ],
+      "capabilities": [
+        "feedback controllers",
+        "state estimation",
+        "stability monitoring"
+      ],
+      "contracts": [
+        "AutonomyController",
+        "ControlSignal",
+        "ControlState"
+      ],
+      "implementation_paths": [
+        "skeleton/ai",
+        "experiments"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_autonomy_control.py"
+      ],
+      "evaluations": [
+        "planned:oscillation/disturbance evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "unstable control loop",
+        "bad state estimate"
+      ],
+      "gaps": [
+        "define safe controller candidates",
+        "bind autonomy levels"
+      ],
       "accountability_id": "ACC-VOL-317",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 318,
@@ -14878,19 +15803,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Level changes are policy decisions, not model self-assessment.",
+        "Each level maps to mandatory human controls/evidence."
+      ],
+      "capabilities": [
+        "autonomy profiles",
+        "level enforcement",
+        "capability restrictions"
+      ],
+      "contracts": [
+        "AutonomyLevel",
+        "AutonomyProfile",
+        "LevelConstraint"
+      ],
+      "implementation_paths": [
+        "machine",
+        "skeleton/security"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_autonomy_levels.py"
+      ],
+      "evaluations": [
+        "planned:level boundary evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "implicit autonomy creep",
+        "confusing capability with authority"
+      ],
+      "gaps": [
+        "define tier matrix",
+        "bind agent/task profiles"
+      ],
       "accountability_id": "ACC-VOL-318",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 319,
@@ -14900,19 +15850,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "Escalation requires explicit eligibility and approval policy.",
+        "Escalated grants expire/revoke cleanly."
+      ],
+      "capabilities": [
+        "escalation requests",
+        "eligibility checks",
+        "time-bounded grants"
+      ],
+      "contracts": [
+        "AutonomyEscalation",
+        "EscalationGrant",
+        "EscalationEvidence"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_autonomy_escalation.py"
+      ],
+      "evaluations": [
+        "planned:unauthorized escalation attack"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "self-escalation",
+        "stale elevated grant"
+      ],
+      "gaps": [
+        "define transition rules",
+        "bind verifier/human gates"
+      ],
       "accountability_id": "ACC-VOL-319",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 320,
@@ -14922,19 +15897,44 @@
       "scope": "canonical-plan",
       "documentation": "docs/plan/MASTER_PLAN.md",
       "implementation_status": "unverified",
-      "requirements": [],
-      "capabilities": [],
-      "contracts": [],
-      "implementation_paths": [],
-      "tests": [],
-      "evaluations": [],
+      "requirements": [
+        "De-escalation propagates to active child work/tool grants promptly.",
+        "Preserve recoverable checkpoints/evidence while stopping effects."
+      ],
+      "capabilities": [
+        "authority reduction",
+        "safe pause",
+        "revocation propagation"
+      ],
+      "contracts": [
+        "AutonomyDeescalation",
+        "DeescalationReason",
+        "RevocationReceipt"
+      ],
+      "implementation_paths": [
+        "skeleton/security",
+        "skeleton/ai"
+      ],
+      "tests": [
+        "planned:skeleton/testing/test_autonomy_deescalation.py"
+      ],
+      "evaluations": [
+        "planned:revocation-during-action evaluation"
+      ],
       "evidence": [],
-      "risks": [],
-      "gaps": [],
+      "risks": [
+        "child work keeps privilege",
+        "de-escalation loses state"
+      ],
+      "gaps": [
+        "define propagation protocol",
+        "bind human control/incidents"
+      ],
       "accountability_id": "ACC-VOL-320",
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "signing_required": true
+      "signing_required": true,
+      "depth_pass": "DP-281-320"
     },
     {
       "id": 321,
@@ -17446,6 +18446,27 @@
       ],
       "evidence_policy": "Planning depth remains non-evidentiary; promotion requires executable artifact-bound evidence.",
       "purpose": "Deepen prompt/routing/memory/retrieval policy, knowledge/reasoning/quality/human gates, migration/consolidation/provenance/docs/build/install/update/recovery/support domains."
+    },
+    {
+      "id": "DP-281-320",
+      "title": "Recovery-scheduling-to-autonomy-control depth pass",
+      "volume_range": [
+        281,
+        320
+      ],
+      "status": "specified_depth",
+      "required_nonempty_fields": [
+        "requirements",
+        "capabilities",
+        "contracts",
+        "implementation_paths",
+        "tests",
+        "evaluations",
+        "risks",
+        "gaps"
+      ],
+      "evidence_policy": "Planning depth remains separate from implementation/verification evidence.",
+      "purpose": "Deepen diagnosis/repair/digital-twin/deployment scheduling/reliability primitives, time/identity/control-plane, workflow compilation/task scheduling, and autonomy control."
     }
   ],
   "engineering_pass": {
