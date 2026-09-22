@@ -199,6 +199,31 @@ def validate() -> list[str]:
     if not isinstance(mappings, list) or len(mappings) < 10:
         return errors + ["mappings must contain the governed consolidation set"]
 
+    move_tag_contract = data.get("move_tag_contract")
+    if not isinstance(move_tag_contract, dict):
+        errors.append("move_tag_contract must be an object")
+    else:
+        if move_tag_contract.get("global_state") != "prepared_not_cutover_authorized":
+            errors.append("move_tag_contract global_state must remain prepared_not_cutover_authorized")
+        required_tags = move_tag_contract.get("required_tags")
+        if required_tags != ["ai-tree:mapped", "migration:staged-mirror"]:
+            errors.append("move_tag_contract required_tags drifted")
+        cutover_tags = move_tag_contract.get("cutover_tags")
+        if not isinstance(cutover_tags, dict) or set(cutover_tags) != {
+            "cutover:parity-ready",
+            "cutover:owner-sensitive",
+            "cutover:quarantine",
+        }:
+            errors.append("move_tag_contract cutover tag set drifted")
+        batches = move_tag_contract.get("batches")
+        if not isinstance(batches, dict) or set(batches) != {
+            "B1-core-runtime",
+            "B2-domain-build",
+            "B3-owner-sensitive",
+            "B4-research-quarantine",
+        }:
+            errors.append("move_tag_contract batch set drifted")
+
     try:
         master_plan = json.loads(MASTER_PLAN.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -249,6 +274,57 @@ def validate() -> list[str]:
             errors.append(f"{mid}: source_git_object_sha must be a full SHA")
         if not item.get("work_package_refs"):
             errors.append(f"{mid}: missing work_package_refs")
+
+        move_tags = item.get("move_tags")
+        if not isinstance(move_tags, list) or len(move_tags) != 3:
+            errors.append(f"{mid}: move_tags must contain exactly three governed tags")
+            move_tags = []
+        if "ai-tree:mapped" not in move_tags or "migration:staged-mirror" not in move_tags:
+            errors.append(f"{mid}: missing mandatory AI-tree migration tags")
+        cutover = [
+            tag for tag in move_tags
+            if isinstance(tag, str) and tag.startswith("cutover:")
+        ]
+        if len(cutover) != 1:
+            errors.append(f"{mid}: exactly one cutover tag is required")
+            cutover_tag = None
+        else:
+            cutover_tag = cutover[0]
+        parity_sensitive = (
+            item.get("parity_mode") == "compatibility_facade"
+            or bool(item.get("parity_exceptions"))
+        )
+        quarantine = dst.startswith("skeleton/ai/research/")
+        expected_cutover = (
+            "cutover:quarantine"
+            if quarantine
+            else "cutover:owner-sensitive"
+            if parity_sensitive
+            else "cutover:parity-ready"
+        )
+        if cutover_tag != expected_cutover:
+            errors.append(
+                f"{mid}: cutover tag {cutover_tag!r} does not match expected {expected_cutover!r}"
+            )
+        expected_batch = (
+            "B4-research-quarantine"
+            if quarantine
+            else "B3-owner-sensitive"
+            if parity_sensitive
+            else "B2-domain-build"
+            if (
+                dst.startswith("skeleton/ai/build/")
+                or dst.startswith("skeleton/ai/simulation/")
+                or dst.startswith("skeleton/ai/forge/")
+            )
+            else "B1-core-runtime"
+        )
+        if item.get("move_batch") != expected_batch:
+            errors.append(
+                f"{mid}: move_batch {item.get('move_batch')!r} does not match {expected_batch!r}"
+            )
+        if not isinstance(item.get("source_disposition"), str) or not item.get("source_disposition"):
+            errors.append(f"{mid}: source_disposition is required")
 
         source = ROOT / src
         destination = ROOT / dst
