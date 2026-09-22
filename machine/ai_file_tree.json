@@ -4226,7 +4226,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "130_mapping_transfer_v2_repairs_applied_pending_fresh_ci_and_independent_verification",
+  "validation_state": "130_mapping_transfer_v2_semantic_parity_green_ssr_raf_repair_pending_ci_and_independent_verification",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -4255,7 +4255,7 @@
         "Validate state authority topology",
         "Validate mandatory provider bootstrap"
       ],
-      "evidence": "Current-main comparison shows zero frontend/* files changed by this branch. TypeScript failure is therefore inherited from the base/merged frontend state rather than introduced by the AI-tree migration.",
+      "evidence": "At detection time, the migration payload changed no frontend/* files. TypeScript failure is therefore inherited from the base/merged frontend state rather than introduced by the AI-tree migration.",
       "representative_errors": [
         "StatusBar backgroundColor/translucent props rejected by current types",
         "StyleSheet.absoluteFillObject missing from current React Native types",
@@ -4284,7 +4284,7 @@
     },
     {
       "id": "BASE-FRONTEND-SSR-RAF-01",
-      "status": "repair_applied_pending_validation",
+      "status": "repair_pending_validation",
       "scope": "downstream_frontend_base_state",
       "detected_on_payload_sha": "57d28bc4bd57b74330c5a2883f08c775c82a5f03",
       "current_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
@@ -4299,14 +4299,28 @@
       "representative_error": "ReferenceError: requestAnimationFrame is not defined",
       "failure_origin": "react-native-worklets/lib/module/threads.js under Node v24.20.0 during Expo static rendering",
       "evidence": "PR #1936 merged the Expo 54 React/React Native alignment and closed BASE-FRONTEND-TSC-01. Its latest available App Assembly progressed through TypeScript and reducer validation, then failed during Node-side static web export. Transfer-v2 contains no frontend/* changes, so this is inherited base-state debt rather than a transfer-v2 regression.",
-      "effect": "Repair is staged. Blocks cutover_complete, compatibility-source deletion, and independent completion signoff until App Assembly proves static web export succeeds.",
+      "effect": "Cutover remains blocked until App Assembly proves the guarded SSR repair closes the static export failure.",
       "repair_branch": "integration/ai-file-tree-transfer-v2-validated",
       "repair_head_sha": "72dd90cbac181daf5db40a83d283dc2fa2fc48a8",
       "repair_commits": [
         "e8af82c2ff14147996eefb8e66345ec7edfb2300",
         "f35dd1cc0826586a7c42f4559332c838f84f78ff"
       ],
-      "repair_summary": "Added an Expo Router custom entry point that installs requestAnimationFrame/cancelAnimationFrame only when absent before loading expo-router/entry; package main now points to index.js."
+      "repair_summary": "Added an Expo Router custom entry point that installs requestAnimationFrame/cancelAnimationFrame only when absent before loading expo-router/entry; package main now points to index.js.",
+      "repair": {
+        "strategy": "version- and shape-guarded node_modules compatibility patch",
+        "package": "react-native-worklets",
+        "package_version": "0.13.0",
+        "target": "frontend/node_modules/react-native-worklets/lib/module/threads.js",
+        "repair_commit": "4737a8c8bdbc7fc3aab1e1b525ef677393d33153",
+        "behavior": "preserve browser/native requestAnimationFrame; use setTimeout(callback, 0) only when requestAnimationFrame is unavailable during Node static rendering",
+        "fail_closed": "patch script rejects unexpected package versions, missing targets, or changed vulnerable source shape",
+        "validation_required": [
+          "App Assembly: yarn typecheck",
+          "App Assembly: operation-stream reducer",
+          "App Assembly: expo export --platform web"
+        ]
+      }
     }
   ],
   "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
@@ -4562,7 +4576,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "Full transfer-v2 Git-object audit completed on PR #1937 head a3d200375e6775e95ac50add5daaca30bbabe058: all 130 recorded source identities current; all source/destination memberships present; exact mappings and overlays show zero object drift; all 16 declared compatibility facades contain their required re-export and no forbidden provider credential/network markers.",
+    "note": "Transfer-v2 remains structurally and semantically parity-clean across 130 mappings. After the full audit, commit 8f076935c39fead4fbccef61872290bc68d50566 normalized trailing whitespace in one quarantined Python mirror only; source and destination remain AST-equivalent under the canonical Python semantic-parity policy. No runtime/custody authority changed.",
     "current_mapping_count": 130,
     "audit_scope_status": "full_130_mapping_object_and_parity_audit_current",
     "pending_mapping_ids": [],
@@ -4592,16 +4606,19 @@
       "scope": "transfer-v2 additions and identified post-1930 automation drift; full 130-mapping validator remains mandatory"
     },
     "full_130_mapping_audit": {
-      "audited_head_sha": "a3d200375e6775e95ac50add5daaca30bbabe058",
       "mapping_count": 130,
       "source_identity_errors": 0,
       "missing_source_or_destination_errors": 0,
       "membership_drift_errors": 0,
-      "exact_object_drift_errors": 0,
       "facade_count": 16,
       "facade_contract_errors": 0,
       "forbidden_provider_marker_hits": 0,
-      "method": "Git tree/blob identity + governed overlay membership + compatibility-facade contract inspection"
+      "method": "Git tree/blob identity + governed overlay membership + compatibility-facade contract inspection; Python mirror parity additionally permits AST-equivalent whitespace-only normalization per scripts/check_ai_file_tree.py",
+      "audit_basis_head_sha": "a3d200375e6775e95ac50add5daaca30bbabe058",
+      "post_audit_semantic_normalization_commit": "8f076935c39fead4fbccef61872290bc68d50566",
+      "exact_object_identity_variances": 1,
+      "python_semantic_only_variances": 1,
+      "semantic_content_drift_errors": 0
     },
     "quarantine_hygiene_normalization": {
       "normalized_mirror_file_count": 11,
@@ -4664,5 +4681,18 @@
     ],
     "expected_active_blocker": "BASE-FRONTEND-SSR-RAF-01",
     "invariant": "This request records validation intent only and does not change cutover or completion authority."
+  },
+  "validation_repairs": {
+    "transfer_v2_pr": 1941,
+    "merge_readiness_contract": {
+      "commit": "ac55d02f4aab769e5699151c5c24de17e63e1089",
+      "state": "pending_ci",
+      "note": "Contract now matches the Expo remediation install lane: lifecycle scripts disabled and non-interactive; lock reconciliation is permitted until a canonical regenerated lock is committed."
+    },
+    "ssr_request_animation_frame": {
+      "commit": "4737a8c8bdbc7fc3aab1e1b525ef677393d33153",
+      "state": "pending_app_assembly",
+      "package": "react-native-worklets@0.13.0"
+    }
   }
 }
