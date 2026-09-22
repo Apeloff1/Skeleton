@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.5.0",
+  "tree_version": "1.6.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -1372,6 +1372,136 @@
         "preserve handoff/lease semantics",
         "verify no authority escalation"
       ]
+    },
+    {
+      "id": "AIFT-GRAPHS",
+      "source": "skeleton/graphs",
+      "destination": "skeleton/ai/runtime/knowledge/graphs",
+      "kind": "tree",
+      "source_git_object_sha": "faaf484c2d16019039f8c16a6c5383ed01247d05",
+      "role": "Graph, spectral, motif, and GAT primitives are reusable knowledge/reasoning substrate when isolated from product-domain ownership.",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-012"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "keep export/render helpers side-effect free",
+        "separate mathematical primitives from knowledge authority",
+        "add focused graph invariant tests"
+      ]
+    },
+    {
+      "id": "AIFT-INTEGRATIONS",
+      "source": "skeleton/integrations",
+      "destination": "skeleton/ai/runtime/tools/integrations",
+      "kind": "tree",
+      "source_git_object_sha": "56485385b59019340aed56d26842019613857261",
+      "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-015",
+        "VOL-026"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "credential objects remain references",
+        "authorize connector calls independently",
+        "validate webhook authenticity and replay behavior"
+      ]
+    },
+    {
+      "id": "AIFT-INVENTORY",
+      "source": "skeleton/inventory",
+      "destination": "skeleton/ai/runtime/capabilities/inventory",
+      "kind": "tree",
+      "source_git_object_sha": "d5ca24e895fd8939a1f8bb96f6ecb168b2aaef47",
+      "role": "Fail-closed capability inventory is machine-readable capability/security evidence for the canonical AI runtime.",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W13",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-113",
+        "VOL-124"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve fail-closed classification",
+        "keep inventory read-only with respect to authority",
+        "bind inventory drift to validation"
+      ]
+    },
+    {
+      "id": "AIFT-SOCIAL",
+      "source": "skeleton/social",
+      "destination": "skeleton/ai/research/social",
+      "kind": "tree",
+      "source_git_object_sha": "4bd53d8234eb3b31a4cedddcdfa9df82ba7b47f5",
+      "role": "Archive/source ingestion, coverage, graph, and SOTA discovery code is research evidence intake rather than serving authority.",
+      "work_package_refs": [
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-001",
+        "VOL-210",
+        "VOL-211"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "treat external material as untrusted evidence",
+        "retain source/citation provenance",
+        "prevent discovery results from mutating production directly"
+      ]
+    },
+    {
+      "id": "AIFT-SUPPORT",
+      "source": "skeleton/support",
+      "destination": "skeleton/ai/runtime/support",
+      "kind": "tree",
+      "source_git_object_sha": "98bf68c7c3d68ebe6e952b4850d2b285de2b7b30",
+      "role": "Agentic RAG/loading/support-plane helpers are engine support capabilities and should not remain an ungoverned top-level owner.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W10",
+        "WP-W11",
+        "WP-W19"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "volume_refs": [
+        "VOL-009",
+        "VOL-011",
+        "VOL-029"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve retrieval trust labeling",
+        "keep loading bounded and recoverable",
+        "avoid creating a second context or retrieval authority"
+      ]
     }
   ],
   "ci_enforcement": {
@@ -1666,27 +1796,6 @@
       "source_git_object_sha": "b3643c67b7547e82ccd4231684a10afeb39532d3"
     },
     {
-      "id": "AIFT-NEXT-GRAPHS",
-      "priority": 2,
-      "source": "skeleton/graphs",
-      "destination": "skeleton/ai/runtime/knowledge/graphs",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W09",
-        "WP-W11"
-      ],
-      "volume_refs": [
-        "VOL-012"
-      ],
-      "rationale": "Graph, spectral, motif, and GAT primitives are reusable knowledge/reasoning substrate when isolated from product-domain ownership.",
-      "preconditions": [
-        "keep export/render helpers side-effect free",
-        "separate mathematical primitives from knowledge authority",
-        "add focused graph invariant tests"
-      ],
-      "source_git_object_sha": "faaf484c2d16019039f8c16a6c5383ed01247d05"
-    },
-    {
       "id": "AIFT-NEXT-HIVE",
       "priority": 2,
       "source": "skeleton/hive",
@@ -1706,53 +1815,6 @@
         "avoid duplicate scheduler ownership"
       ],
       "source_git_object_sha": "7e67a520396889574559791262fe83b591fec788"
-    },
-    {
-      "id": "AIFT-NEXT-INTEGRATIONS",
-      "priority": 2,
-      "source": "skeleton/integrations",
-      "destination": "skeleton/ai/runtime/tools/integrations",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W13",
-        "WP-W14",
-        "WP-W20"
-      ],
-      "volume_refs": [
-        "VOL-015",
-        "VOL-026"
-      ],
-      "rationale": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
-      "preconditions": [
-        "credential objects remain references",
-        "authorize connector calls independently",
-        "validate webhook authenticity and replay behavior"
-      ],
-      "source_git_object_sha": "56485385b59019340aed56d26842019613857261"
-    },
-    {
-      "id": "AIFT-NEXT-INVENTORY",
-      "priority": 2,
-      "source": "skeleton/inventory",
-      "destination": "skeleton/ai/runtime/capabilities/inventory",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W01",
-        "WP-W13",
-        "WP-W20",
-        "WP-W30"
-      ],
-      "volume_refs": [
-        "VOL-113",
-        "VOL-124"
-      ],
-      "rationale": "Fail-closed capability inventory is machine-readable capability/security evidence for the canonical AI runtime.",
-      "preconditions": [
-        "preserve fail-closed classification",
-        "keep inventory read-only with respect to authority",
-        "bind inventory drift to validation"
-      ],
-      "source_git_object_sha": "d5ca24e895fd8939a1f8bb96f6ecb168b2aaef47"
     },
     {
       "id": "AIFT-NEXT-JVM-REGISTRY",
@@ -1819,53 +1881,6 @@
         "evaluate adaptive policies before promotion"
       ],
       "source_git_object_sha": "2dfa6897682f678abb1ce9191a192a2c94682bee"
-    },
-    {
-      "id": "AIFT-NEXT-SOCIAL",
-      "priority": 2,
-      "source": "skeleton/social",
-      "destination": "skeleton/ai/research/social",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W26"
-      ],
-      "volume_refs": [
-        "VOL-001",
-        "VOL-210",
-        "VOL-211"
-      ],
-      "rationale": "Archive/source ingestion, coverage, graph, and SOTA discovery code is research evidence intake rather than serving authority.",
-      "preconditions": [
-        "treat external material as untrusted evidence",
-        "retain source/citation provenance",
-        "prevent discovery results from mutating production directly"
-      ],
-      "source_git_object_sha": "4bd53d8234eb3b31a4cedddcdfa9df82ba7b47f5"
-    },
-    {
-      "id": "AIFT-NEXT-SUPPORT",
-      "priority": 2,
-      "source": "skeleton/support",
-      "destination": "skeleton/ai/runtime/support",
-      "action": "mirror_then_cutover",
-      "work_package_refs": [
-        "WP-W08",
-        "WP-W10",
-        "WP-W11",
-        "WP-W19"
-      ],
-      "volume_refs": [
-        "VOL-009",
-        "VOL-011",
-        "VOL-029"
-      ],
-      "rationale": "Agentic RAG/loading/support-plane helpers are engine support capabilities and should not remain an ungoverned top-level owner.",
-      "preconditions": [
-        "preserve retrieval trust labeling",
-        "keep loading bounded and recoverable",
-        "avoid creating a second context or retrieval authority"
-      ],
-      "source_git_object_sha": "98bf68c7c3d68ebe6e952b4850d2b285de2b7b30"
     },
     {
       "id": "AIFT-NEXT-WORLD",
@@ -2068,7 +2083,7 @@
     }
   ],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "priority_one_mirrored_validation_pending",
+  "validation_state": "priority_two_standalone_mirrored_validation_pending",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -2314,5 +2329,16 @@
       "skeleton/swarm"
     ],
     "policy": "Exact source-object mirrors are now governed mappings. Legacy imports remain authoritative compatibility paths until focused cutover tests and independent verification are complete."
+  },
+  "priority_two_standalone_migration": {
+    "status": "mirrored_governed_cutover_pending",
+    "payload_git_sha": "0abf709e745bb6d705f1766803d439dfd40a2241",
+    "migrated_sources": [
+      "skeleton/graphs",
+      "skeleton/integrations",
+      "skeleton/inventory",
+      "skeleton/social",
+      "skeleton/support"
+    ]
   }
 }
