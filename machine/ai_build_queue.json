@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "queue_version": "1.2.0",
+  "queue_version": "1.3.0",
   "status": "active",
   "architecture_tag": "arch-map/v3.7",
   "construction_version": "3.7.0",
@@ -56,7 +56,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -79,7 +80,8 @@
           "WP-W03",
           "WP-W04"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -113,7 +115,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -136,7 +139,8 @@
           "WP-W03",
           "WP-W04"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -177,7 +181,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -200,7 +205,8 @@
           "WP-W03",
           "WP-W04"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -236,7 +242,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -262,7 +269,8 @@
           "WP-W08",
           "WP-W09"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -299,7 +307,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -325,7 +334,8 @@
           "WP-W08",
           "WP-W09"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -361,7 +371,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -387,7 +398,8 @@
           "WP-W08",
           "WP-W09"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -418,7 +430,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -441,7 +454,8 @@
           "WP-W06",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -475,7 +489,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -498,7 +513,8 @@
           "WP-W06",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -531,7 +547,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -554,7 +571,8 @@
           "WP-W06",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -585,7 +603,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -608,7 +627,8 @@
           "WP-W05",
           "WP-W06"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -644,7 +664,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -667,7 +688,8 @@
           "WP-W05",
           "WP-W06"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -699,7 +721,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -722,7 +745,8 @@
           "WP-W05",
           "WP-W06"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -761,7 +785,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -786,7 +811,8 @@
           "WP-W10",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -824,7 +850,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -849,7 +876,8 @@
           "WP-W10",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -887,7 +915,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -912,7 +941,8 @@
           "WP-W10",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -948,7 +978,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -973,7 +1004,8 @@
           "WP-W09",
           "WP-W10"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1011,7 +1043,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1036,7 +1069,8 @@
           "WP-W09",
           "WP-W10"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1075,7 +1109,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1100,7 +1135,8 @@
           "WP-W09",
           "WP-W10"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1136,7 +1172,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1160,7 +1197,8 @@
           "WP-W13",
           "WP-W14"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1199,7 +1237,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1223,7 +1262,8 @@
           "WP-W13",
           "WP-W14"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1262,7 +1302,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1286,7 +1327,8 @@
           "WP-W13",
           "WP-W14"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1323,7 +1365,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1345,7 +1388,8 @@
         "engineering_profile_refs": [
           "WP-W10"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1384,7 +1428,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1406,7 +1451,8 @@
         "engineering_profile_refs": [
           "WP-W10"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1445,7 +1491,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1467,7 +1514,8 @@
         "engineering_profile_refs": [
           "WP-W10"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1503,7 +1551,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1526,7 +1575,8 @@
           "WP-W01",
           "WP-W05"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1565,7 +1615,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1588,7 +1639,8 @@
           "WP-W01",
           "WP-W05"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1625,7 +1677,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1648,7 +1701,8 @@
           "WP-W01",
           "WP-W05"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1684,7 +1738,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1708,7 +1763,8 @@
           "WP-W11",
           "WP-W17"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1748,7 +1804,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1772,7 +1829,8 @@
           "WP-W11",
           "WP-W17"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1811,7 +1869,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1835,7 +1894,8 @@
           "WP-W11",
           "WP-W17"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1875,7 +1935,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1897,7 +1958,8 @@
         "engineering_profile_refs": [
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -1940,7 +2002,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -1962,7 +2025,8 @@
         "engineering_profile_refs": [
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2005,7 +2069,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2027,7 +2092,8 @@
         "engineering_profile_refs": [
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2064,7 +2130,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2089,7 +2156,8 @@
           "WP-W11",
           "WP-W22"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2129,7 +2197,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2154,7 +2223,8 @@
           "WP-W11",
           "WP-W22"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2195,7 +2265,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2220,7 +2291,8 @@
           "WP-W11",
           "WP-W22"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2254,7 +2326,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2278,7 +2351,8 @@
           "WP-W11",
           "WP-W22"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2317,7 +2391,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2341,7 +2416,8 @@
           "WP-W11",
           "WP-W22"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2380,7 +2456,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2404,7 +2481,8 @@
           "WP-W11",
           "WP-W22"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2460,7 +2538,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2493,7 +2572,8 @@
           "WP-W10",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2550,7 +2630,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2583,7 +2664,8 @@
           "WP-W10",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     },
     {
@@ -2641,7 +2723,8 @@
       "acceptance_overlays": [
         "p0_edge_case_matrix",
         "full_program_edge_case_matrix",
-        "engineering_task_matrix"
+        "engineering_task_matrix",
+        "adversarial_closure"
       ],
       "edge_case_inheritance": {
         "source": "machine/ai_full_edge_case_matrix.json",
@@ -2674,7 +2757,8 @@
           "WP-W10",
           "WP-W11"
         ],
-        "semantics": "derived obligations; task completion does not imply strong capability promotion"
+        "adversarial_closure_source": "machine/ai_adversarial_closure.json",
+        "semantics": "derived engineering and adversarial obligations; task completion does not imply strong capability promotion"
       }
     }
   ],
@@ -2684,7 +2768,8 @@
     "no task can mark its gap closed directly",
     "gap closure remains controlled by machine/ai_closure_evidence.json",
     "tasks changing canonical contracts must update dependent validators/manual/typed schemas in the same lane",
-    "every task inherits systems-engineering obligations from all work_package_refs through machine/ai_engineering_task_matrix.json"
+    "every task inherits systems-engineering obligations from all work_package_refs through machine/ai_engineering_task_matrix.json",
+    "every task inherits adversarial closure axes and compound campaigns from all work_package_refs through machine/ai_engineering_task_matrix.json"
   ],
   "acceptance_overlays": {
     "p0_edge_case_matrix": {
@@ -2704,6 +2789,12 @@
       "human": "docs/plan/ENGINEERING_TASK_MATRIX.md",
       "inheritance_rule": "Each task inherits the exact union of engineering obligations from all work_package_refs; omissions require explicit disposition and cannot be implied by a shorter local acceptance list.",
       "promotion_rule": "AIQ done state does not by itself satisfy verified/hardened/production capability promotion."
+    },
+    "adversarial_closure": {
+      "contract": "machine/ai_adversarial_closure.json",
+      "human": "docs/plan/ADVERSARIAL_CLOSURE_PASS.md",
+      "inheritance_rule": "Each task inherits the union of adversarial closure axes and applicable compound campaigns from its work_package_refs; silence is not a not-applicable disposition.",
+      "promotion_rule": "Strong capability maturity requires ADV-E0..ADV-E5 in addition to task completion."
     }
   },
   "accountability": {
