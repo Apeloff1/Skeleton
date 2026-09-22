@@ -51,3 +51,11 @@ def test_foundational_depth_doc_exists_and_spans_000_040() -> None:
     text = checker.DEPTH_000_040.read_text(encoding="utf-8")
     assert "VOL-000" in text
     assert "VOL-040" in text
+
+
+def test_master_plan_references_engineering_pass() -> None:
+    data = checker.load_plan()
+    engineering = data["engineering_pass"]
+    assert engineering["machine_contract"] == "machine/ai_engineering_pass.json"
+    assert engineering["human_contract"] == "docs/plan/ENGINEERING_PASS.md"
+    assert engineering["required_for_promotion"] == ["verified", "hardened", "production"]
