@@ -2765,16 +2765,17 @@
     "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T14:45:23Z",
-    "git_sha": "a1e0829233a76dc4a5632656fa627e38195f1a0a",
+    "signed_at_utc": "2026-09-22T14:54:27Z",
+    "git_sha": "719eb39862b1b20f30ca2c303e9be317c7c166bc",
     "evidence_refs": [
       "git:4b3692e8d81ac43c91615df04383aca2be9edf0e",
       "git:f9e2019a55ec28c78bc4b919f4c1b69aa5da2b3c",
       "git:770c0a6f62f27655545e0e409c7adb9e2301553d",
       "git:a1e0829233a76dc4a5632656fa627e38195f1a0a",
+      "git:719eb39862b1b20f30ca2c303e9be317c7c166bc",
       "pr:1930"
     ],
-    "statement": "Move-preparation tagging payload is identity-bound to GitHub user Apeloff1 at the cited full payload SHA. The payload classifies all 78 governed source-to-AI-tree mappings into machine-enforced cutover tags and deterministic batches, replaces stale pending-assignment regression expectations, and reconciles the migration packet. This implementation attestation does not assert current CI completion, import cutover, source deletion, AIQ/work-package maturity, production readiness, or independent verification.",
+    "statement": "Move-preparation implementation is identity-bound to GitHub user Apeloff1 at the cited 80-mapping payload SHA. The latest payload adds governed config and full AI shell/control-plane mappings on top of the previously tagged migration set. This attestation records implementation identity only; it does not assert fresh CI completion for the two latest mappings, import cutover, source deletion, AIQ/work-package maturity, production readiness, or independent verification.",
     "signature_method": "github_identity"
   },
   "verification_signoff": {
@@ -2888,7 +2889,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "migration_specific_gates_green_repo_hygiene_green_downstream_app_validation_pending",
+  "validation_state": "latest_80_mapping_extension_pending_fresh_migration_validation",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -3180,7 +3181,13 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "One nested mapping bookkeeping gap (AIFT-EVALUATION -> quality) was found by direct Git-object audit and closed in this commit."
+    "note": "The direct Git-object audit through c924e854ad94815080efb3b6c691c2641e4a0162 covered 78 mappings and closed the AIFT-EVALUATION -> quality bookkeeping gap. The subsequent AIFT-CONFIG and AIFT-AI-SHELL mappings are implementation-signed at payload 719eb39862b1b20f30ca2c303e9be317c7c166bc but remain pending fresh parity/object-audit and CI evidence.",
+    "current_mapping_count": 80,
+    "audit_scope_status": "prior_78_mapping_audit_valid_latest_2_mappings_pending_refresh",
+    "pending_mapping_ids": [
+      "AIFT-CONFIG",
+      "AIFT-AI-SHELL"
+    ]
   },
   "move_tag_contract": {
     "schema_version": 1,
