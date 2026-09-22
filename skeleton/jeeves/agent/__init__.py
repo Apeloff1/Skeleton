@@ -349,10 +349,6 @@ from .runtime import (
     RunCheckpoint,
     RunInputs,
 )
-from .scientific_runtime import (
-    ScientificAdaptiveJeevesRuntime,
-    ScientificJeevesRuntime,
-)
 from .runtime_abstraction import (
     ArgumentAbstractionPolicy,
     ArgumentAbstractor,
@@ -383,33 +379,6 @@ from .semantic_extreme_lenses import (
     rare_semantic_specs,
     register_rare_lenses,
 )
-from .semantic_research_lenses import (
-    CATALOG_VERSION as RESEARCH_LENS_CATALOG_VERSION,
-    register_research_lenses,
-    research_catalog_fingerprint,
-    research_definitions_by_family,
-    research_semantic_definitions,
-    research_semantic_specs,
-)
-from .semantic_plane_lenses import (
-    PLANE_CATALOG_VERSION,
-    plane_catalog_fingerprint,
-    plane_definitions_by_family,
-    plane_semantic_definitions,
-    plane_semantic_specs,
-    register_plane_lenses,
-)
-from .semantic_plane_interactions import (
-    plane_interaction_keys,
-    plane_interaction_rules,
-)
-from .semantic_governance_bridge import (
-    SemanticGovernanceBridge,
-    SemanticGovernanceSnapshot,
-    governed_family,
-    semantic_maturity_index,
-    semantic_spec_to_definition,
-)
 
 from .semantic_deep_lenses import DeepLensLineage, deep_lens_lineage, deep_semantic_lenses
 from .semantic_frontier import (
@@ -428,16 +397,6 @@ from .semantic_maximal import (
     MaximalSemanticRegistry,
     MaximalSemanticRuntime,
     MaximalSemanticSnapshot,
-)
-from .semantic_plane import (
-    FindingRejection,
-    SemanticFindingAudit,
-    SemanticLensPlane,
-    SemanticPlaneCoverage,
-    SemanticPlaneLearningUpdate,
-    SemanticPlanePolicy,
-    SemanticPlaneSnapshot,
-    SemanticTargetFusion,
 )
 from .semantic_lenses import (
     JuxtapositionAnalyzer,

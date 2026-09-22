@@ -99,6 +99,19 @@ from .semantics import (
     semantic_contract_attributes,
 )
 
+from .validation_frontier import (
+    AssuranceConsensus,
+    AssuranceConsensusEngine,
+    AssuranceConsensusPolicy,
+    AssuranceConsensusStatus,
+    IndependenceGroupAssessment,
+    InternalValidationFactory,
+    ValidationEvidence,
+    ValidationFrontierError,
+    ValidationVerdict,
+    ValidatorKind,
+)
+
 __all__ = [
     "AbstractState",
     "AbstractValue",
@@ -180,4 +193,14 @@ __all__ = [
     "SemanticRiskSurface",
     "SemanticSafetyProfile",
     "semantic_contract_attributes",
+    "AssuranceConsensus",
+    "AssuranceConsensusEngine",
+    "AssuranceConsensusPolicy",
+    "AssuranceConsensusStatus",
+    "IndependenceGroupAssessment",
+    "InternalValidationFactory",
+    "ValidationEvidence",
+    "ValidationFrontierError",
+    "ValidationVerdict",
+    "ValidatorKind",
 ]

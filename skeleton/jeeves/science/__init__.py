@@ -86,8 +86,6 @@ from .survivorship import (
     default_historical_methods,
 )
 
-from .semantic_exchange import SemanticForecastExpert, SemanticTargetBinding
-
 __all__ = [
     "ArchitecturalLineage",
     "ArtifactKind",
@@ -157,6 +155,4 @@ __all__ = [
     "SurvivorshipPolicy",
     "YearFacetFrontier",
     "default_historical_methods",
-    "SemanticForecastExpert",
-    "SemanticTargetBinding",
 ]
