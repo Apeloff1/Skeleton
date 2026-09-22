@@ -442,7 +442,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "fac1338e8ee20de30ea2dbd60b91532ce03bdc35",
+      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -3657,7 +3657,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "104_mapping_preparation_signed_pending_fresh_ci_and_object_audit",
+  "validation_state": "104_mapping_baseline_bridge_parity_refreshed_pending_ci_and_fresh_object_audit",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -3949,7 +3949,7 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The last completed direct Git-object audit covered the first 78 mappings. The current 104-mapping prepared set preserves that evidence but requires a fresh full-object/parity audit before any cutover claim. Removed mappings are excluded from pending audit scope.",
+    "note": "Baseline bridge refreshed the five drifted exact-parity automation mirrors and the AIFT-AUTOMATION source-tree identity. Fresh full-object/parity audit remains required before cutover.",
     "current_mapping_count": 104,
     "audit_scope_status": "prior_78_mapping_audit_valid_current_104_mapping_set_requires_full_refresh",
     "pending_mapping_ids": [
@@ -3979,7 +3979,18 @@
       "AIFT-ARCHITECTURE-R20",
       "AIFT-ARCHITECTURE-R21",
       "AIFT-ARCHITECTURE-R22"
-    ]
+    ],
+    "baseline_bridge": {
+      "source_tree_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
+      "refreshed_exact_mirror_files": [
+        "build_plane.py",
+        "build_repair.py",
+        "builder_plane.py",
+        "secretary.py",
+        "supervisor_runtime.py"
+      ],
+      "purpose": "restore canonical staged-mirror parity after post-1930 source changes"
+    }
   },
   "move_tag_contract": {
     "schema_version": 1,
