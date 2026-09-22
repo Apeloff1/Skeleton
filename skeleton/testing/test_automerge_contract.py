@@ -78,6 +78,17 @@ def test_reconcile_job_invokes_canonical_cli():
     assert "python -m skeleton.pr_automation.automerge_cli" in reconcile
 
 
+def test_reconcile_job_installs_runtime_dependencies_before_cli():
+    reconcile = _line_block(_workflow_text(), "reconcile:")
+    pydantic = reconcile.find('"pydantic>=2,<3"')
+    settings = reconcile.find('"pydantic-settings>=2.1,<3"')
+    cli = reconcile.find("python -m skeleton.pr_automation.automerge_cli")
+    assert pydantic >= 0
+    assert settings >= 0
+    assert cli > pydantic
+    assert cli > settings
+
+
 def test_stack_mutation_forces_fresh_reconciliation():
     reconcile = _line_block(_workflow_text(), "reconcile:")
     assert 'AUTOMERGE_STOP_AFTER_STACK_MUTATION: "true"' in reconcile
