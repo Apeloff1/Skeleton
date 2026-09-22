@@ -235,3 +235,4 @@ class PlanVerifier:
             issues.append(f"hard: schism on predicate {pred}")
         penalty = min(0.5, 0.25 * len(by_pred))
         return max(0.0, coherence - penalty)
+

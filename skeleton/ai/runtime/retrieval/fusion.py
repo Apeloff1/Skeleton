@@ -108,7 +108,7 @@ class Ranker:
     def rerank(self, results: List[ScoredResult], query: str, top_k: int = 10) -> List[ScoredResult]:
         """Re-rank results based on query relevance features."""
         self._queries += 1
-
+        
         # Simple feature-based scoring
         query_terms = set(query.lower().split())
         scored = []
@@ -117,7 +117,7 @@ class Ranker:
             overlap = len(query_terms & content_terms)
             feature_score = result.score * (1 + 0.1 * overlap)
             scored.append((feature_score, result))
-
+        
         scored.sort(key=lambda x: x[0], reverse=True)
         self._reranked += len(scored)
         return [r for _, r in scored[:top_k]]

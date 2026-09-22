@@ -574,3 +574,4 @@ def encode_channel_179(value: Any) -> str:
 
 def encode_channel_180(value: Any) -> str:
     return dumps({"channel": "180", "value": value})
+
