@@ -421,7 +421,7 @@ def validate() -> list[str]:
             errors.append(f"{aid}: invalid work_package_refs")
         volume_refs = item.get("volume_refs", [])
         if not isinstance(volume_refs, list) or any(
-            not isinstance(ref, str) or not re.fullmatch(r"VOL-\\d{3}", ref) for ref in volume_refs
+            not isinstance(ref, str) or not re.fullmatch(r"VOL-\d{3}", ref) for ref in volume_refs
         ):
             errors.append(f"{aid}: invalid volume_refs")
         if not isinstance(item.get("rationale"), str) or not item.get("rationale"):
