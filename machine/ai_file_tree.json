@@ -860,7 +860,7 @@
       "source": "skeleton/application",
       "destination": "skeleton/ai/runtime/application",
       "kind": "tree",
-      "source_git_object_sha": "c2590fada86e0b82890a7501c19fc7380ae8333d",
+      "source_git_object_sha": "8115bf017e1ee7bf1617c1df22bb89118f876550",
       "role": "Engine command lifecycle, capability runtime, contract audits, and admission/authorization helpers belong inside the governed AI runtime application layer; this is not the backend product API owner.",
       "work_package_refs": [
         "WP-W01",
@@ -1056,7 +1056,7 @@
       "source": "skeleton/galaxy",
       "destination": "skeleton/ai/runtime/distributed/galaxy",
       "kind": "tree",
-      "source_git_object_sha": "82b4f7c34bff7a0bc041e84209947f85c6f92b33",
+      "source_git_object_sha": "c376f28b7e4241b4327551fd64d7bed6655ff7ab",
       "role": "Federation, transport, election, consensus, synchronization, and fleet coordination are distributed/multi-agent runtime capabilities.",
       "work_package_refs": [
         "WP-W16",
@@ -1435,7 +1435,7 @@
       "source": "skeleton/integrations",
       "destination": "skeleton/ai/runtime/tools/integrations",
       "kind": "tree",
-      "source_git_object_sha": "56485385b59019340aed56d26842019613857261",
+      "source_git_object_sha": "e0ad81df2a6baf6b340aabafd144ddf5660c13d9",
       "role": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
       "work_package_refs": [
         "WP-W13",
@@ -1496,7 +1496,7 @@
       "source": "skeleton/social",
       "destination": "skeleton/ai/research/social",
       "kind": "tree",
-      "source_git_object_sha": "4bd53d8234eb3b31a4cedddcdfa9df82ba7b47f5",
+      "source_git_object_sha": "0f7c484c4d2692f789dc603b60f9c5f854693276",
       "role": "Archive/source ingestion, coverage, graph, and SOTA discovery code is research evidence intake rather than serving authority.",
       "work_package_refs": [
         "WP-W26"
@@ -2203,7 +2203,12 @@
     "status": "current",
     "refreshed_from_head": "b747f5818bf1fc4c49299359fd7004819af84cc8",
     "refreshed_mapping_count": 10,
-    "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline."
+    "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline.",
+    "whitespace_normalization": {
+      "payload_git_sha": "178a6d4ba05854e79d7fe13fd298a6f3d4145915",
+      "source_destination_pairs": 5,
+      "policy": "Whitespace-only normalization was applied atomically to both legacy sources and exact AI mirrors; recorded source tree identities were refreshed without changing runtime semantics."
+    }
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
