@@ -32,7 +32,6 @@ from .supervisor_runtime import (
     ExecutionIdentity,
     SupervisorRuntimeError,
     canonical_json,
-    validate_branch,
     validate_fingerprint,
     validate_repository,
     validate_sha,
@@ -53,8 +52,6 @@ MAX_BUDGET_FILES = 16
 MAX_BUDGET_CHANGED_LINES = 1_200
 MAX_BUDGET_TOTAL_BYTES = 240_000
 MAX_BUDGET_TEST_DESCRIPTIONS = 12
-MAX_PROPOSAL_RECEIPT_BYTES = 12_000
-MAX_RECEIPT_PATH_BYTES = 320
 
 _STAGE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,47}$")
 _STAGE_KIND_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
@@ -162,24 +159,6 @@ def _sha(value: object) -> str:
         return validate_sha(value, label="builder base SHA")
     except SupervisorRuntimeError as exc:
         raise BuilderPlaneError("invalid builder base SHA") from exc
-
-
-def _builder_path(value: object) -> str:
-    path = _bounded_text(
-        value,
-        label="builder proposal path",
-        byte_limit=MAX_RECEIPT_PATH_BYTES,
-    )
-    if (
-        "\\" in path
-        or path.startswith("/")
-        or "//" in path
-    ):
-        raise BuilderPlaneError("invalid builder proposal path")
-    parts = path.split("/")
-    if any(part in {"", ".", ".."} for part in parts):
-        raise BuilderPlaneError("invalid builder proposal path")
-    return path
 
 
 def _unique_json_object(
@@ -590,199 +569,6 @@ class BuilderManifest:
         return cls.from_payload(value)
 
 
-@dataclass(frozen=True, slots=True)
-class BuilderProposalReceipt:
-    """Canonical attestation for one bounded feature-builder proposal."""
-
-    version: int
-    repository: str
-    issue_number: int
-    manifest_digest: str
-    task_digest: str
-    snapshot_fingerprint: str
-    execution_fingerprint: str
-    base_sha: str
-    branch: str
-    proposal_digest: str
-    paths: tuple[str, ...]
-    changed_lines: int
-    total_bytes: int
-    test_count: int
-    tests_digest: str
-
-    def __post_init__(self) -> None:
-        if self.version != 1:
-            raise BuilderPlaneError(
-                "unsupported builder proposal receipt version"
-            )
-        _repository(self.repository)
-        _positive_int(
-            self.issue_number,
-            label="builder receipt issue number",
-            maximum=2_147_483_647,
-        )
-        for value, label in (
-            (self.manifest_digest, "builder receipt manifest digest"),
-            (self.task_digest, "builder receipt task digest"),
-            (
-                self.snapshot_fingerprint,
-                "builder receipt snapshot fingerprint",
-            ),
-            (
-                self.execution_fingerprint,
-                "builder receipt execution fingerprint",
-            ),
-            (self.proposal_digest, "builder receipt proposal digest"),
-            (self.tests_digest, "builder receipt tests digest"),
-        ):
-            _fingerprint(value, label=label)
-        _sha(self.base_sha)
-        try:
-            validate_branch(
-                self.branch,
-                label="builder receipt branch",
-            )
-        except SupervisorRuntimeError as exc:
-            raise BuilderPlaneError(
-                "invalid builder receipt branch"
-            ) from exc
-
-        raw_paths = _strict_sequence(
-            self.paths,
-            label="builder receipt paths",
-            maximum=MAX_BUDGET_FILES,
-        )
-        if not raw_paths:
-            raise BuilderPlaneError(
-                "builder proposal receipt requires changed paths"
-            )
-        normalized_paths = tuple(
-            sorted(_builder_path(item) for item in raw_paths)
-        )
-        if len(normalized_paths) != len(set(normalized_paths)):
-            raise BuilderPlaneError(
-                "duplicate builder proposal receipt path"
-            )
-        if self.paths != normalized_paths:
-            raise BuilderPlaneError(
-                "builder proposal receipt paths are not canonical"
-            )
-
-        _positive_int(
-            self.changed_lines,
-            label="builder receipt changed lines",
-            maximum=MAX_BUDGET_CHANGED_LINES,
-        )
-        _positive_int(
-            self.total_bytes,
-            label="builder receipt total bytes",
-            maximum=MAX_BUDGET_TOTAL_BYTES,
-        )
-        _positive_int(
-            self.test_count,
-            label="builder receipt test count",
-            maximum=MAX_BUDGET_TEST_DESCRIPTIONS,
-            minimum=0,
-        )
-
-    def unsigned_payload(self) -> dict[str, object]:
-        return {
-            "version": self.version,
-            "repository": self.repository,
-            "issue_number": self.issue_number,
-            "manifest_digest": self.manifest_digest,
-            "task_digest": self.task_digest,
-            "snapshot_fingerprint": self.snapshot_fingerprint,
-            "execution_fingerprint": self.execution_fingerprint,
-            "base_sha": self.base_sha,
-            "branch": self.branch,
-            "proposal_digest": self.proposal_digest,
-            "paths": list(self.paths),
-            "changed_lines": self.changed_lines,
-            "total_bytes": self.total_bytes,
-            "test_count": self.test_count,
-            "tests_digest": self.tests_digest,
-        }
-
-    @property
-    def receipt_digest(self) -> str:
-        return _canonical_digest(self.unsigned_payload())
-
-    def as_dict(self) -> dict[str, object]:
-        payload = {
-            **self.unsigned_payload(),
-            "receipt_digest": self.receipt_digest,
-        }
-        if len(canonical_json(payload)) > MAX_PROPOSAL_RECEIPT_BYTES:
-            raise BuilderPlaneError(
-                "builder proposal receipt exceeds byte budget"
-            )
-        return payload
-
-    @classmethod
-    def from_payload(
-        cls,
-        value: object,
-    ) -> "BuilderProposalReceipt":
-        if not isinstance(value, dict):
-            raise BuilderPlaneError(
-                "builder proposal receipt must be an object"
-            )
-        expected = {
-            "version",
-            "repository",
-            "issue_number",
-            "manifest_digest",
-            "task_digest",
-            "snapshot_fingerprint",
-            "execution_fingerprint",
-            "base_sha",
-            "branch",
-            "proposal_digest",
-            "paths",
-            "changed_lines",
-            "total_bytes",
-            "test_count",
-            "tests_digest",
-            "receipt_digest",
-        }
-        if set(value) != expected:
-            raise BuilderPlaneError(
-                "builder proposal receipt shape mismatch"
-            )
-        raw_paths = value["paths"]
-        receipt = cls(
-            version=value["version"],
-            repository=value["repository"],
-            issue_number=value["issue_number"],
-            manifest_digest=value["manifest_digest"],
-            task_digest=value["task_digest"],
-            snapshot_fingerprint=value["snapshot_fingerprint"],
-            execution_fingerprint=value["execution_fingerprint"],
-            base_sha=value["base_sha"],
-            branch=value["branch"],
-            proposal_digest=value["proposal_digest"],
-            paths=(
-                tuple(raw_paths)
-                if isinstance(raw_paths, list)
-                else raw_paths
-            ),
-            changed_lines=value["changed_lines"],
-            total_bytes=value["total_bytes"],
-            test_count=value["test_count"],
-            tests_digest=value["tests_digest"],
-        )
-        if value.get("receipt_digest") != receipt.receipt_digest:
-            raise BuilderPlaneError(
-                "builder proposal receipt digest mismatch"
-            )
-        if len(canonical_json(value)) > MAX_PROPOSAL_RECEIPT_BYTES:
-            raise BuilderPlaneError(
-                "builder proposal receipt exceeds byte budget"
-            )
-        return receipt
-
-
 def _derive_signals(authorization: BuildAuthorization) -> tuple[str, ...]:
     haystack = " ".join(
         (
@@ -995,284 +781,26 @@ def validate_builder_custody(
     return manifest
 
 
-def builder_worker_branch(manifest: BuilderManifest) -> str:
-    """Derive a feature-builder branch from immutable base and build task.
-
-    Generic specialists converge on worker + base SHA. Feature work has one
-    additional identity dimension: the maintainer-approved task. Including the
-    task digest prevents two approved issues on the same base commit from
-    aliasing one autonomous feature PR.
-    """
-    if not isinstance(manifest, BuilderManifest):
-        raise BuilderPlaneError("invalid builder manifest type")
-    suffix = _canonical_digest(
-        {
-            "base_sha": manifest.base_sha,
-            "task_digest": manifest.task_digest,
-        }
-    )[:16]
-    try:
-        return validate_branch(
-            f"bot/specialist-feature-builder-{suffix}",
-            label="builder worker branch",
-        )
-    except SupervisorRuntimeError as exc:
-        raise BuilderPlaneError("invalid builder worker branch") from exc
-
-
-
-def compile_builder_proposal_receipt(
-    manifest: BuilderManifest,
-    *,
-    proposal_digest: str,
-    branch: str,
-    files: Iterable[Mapping[str, Any]],
-    tests: Iterable[str],
-    changed_lines: int,
-) -> BuilderProposalReceipt:
-    """Seal exact path/test/budget evidence for a proposed feature mutation."""
-    if not isinstance(manifest, BuilderManifest):
-        raise BuilderPlaneError("invalid builder manifest type")
-
-    expected_branch = builder_worker_branch(manifest)
-    if branch != expected_branch:
-        raise BuilderPlaneError(
-            "builder proposal receipt branch mismatch"
-        )
-    proposal = _fingerprint(
-        proposal_digest,
-        label="builder proposal digest",
-    )
-
-    try:
-        file_items = tuple(files)
-    except TypeError as exc:
-        raise BuilderPlaneError(
-            "builder proposal files must be iterable"
-        ) from exc
-    if (
-        not file_items
-        or len(file_items) > manifest.budget.max_files
-    ):
-        raise BuilderPlaneError(
-            "builder proposal exceeds manifest file budget"
-        )
-
-    paths: list[str] = []
-    total_bytes = 0
-    for item in file_items:
-        if not isinstance(item, Mapping):
-            raise BuilderPlaneError(
-                "builder proposal file must be a mapping"
-            )
-        if set(item) != {"path", "content"}:
-            raise BuilderPlaneError(
-                "builder proposal file shape mismatch"
-            )
-        path = _builder_path(item.get("path"))
-        content = item.get("content")
-        if not isinstance(content, str):
-            raise BuilderPlaneError(
-                "builder proposal content must be text"
-            )
-        paths.append(path)
-        total_bytes += len(path.encode("utf-8"))
-        total_bytes += len(content.encode("utf-8"))
-
-    canonical_paths = tuple(sorted(paths))
-    if len(canonical_paths) != len(set(canonical_paths)):
-        raise BuilderPlaneError(
-            "duplicate builder proposal path"
-        )
-    if total_bytes > manifest.budget.max_total_bytes:
-        raise BuilderPlaneError(
-            "builder proposal exceeds manifest byte budget"
-        )
-
-    changed = _positive_int(
-        changed_lines,
-        label="builder proposal changed lines",
-        maximum=manifest.budget.max_changed_lines,
-    )
-
-    try:
-        raw_tests = tuple(tests)
-    except TypeError as exc:
-        raise BuilderPlaneError(
-            "builder proposal tests must be iterable"
-        ) from exc
-    if len(raw_tests) > manifest.budget.max_test_descriptions:
-        raise BuilderPlaneError(
-            "builder proposal exceeds manifest test budget"
-        )
-    normalized_tests = tuple(
-        _bounded_text(
-            item,
-            label="builder proposal test description",
-            byte_limit=MAX_ACCEPTANCE_TEXT_BYTES,
-        )
-        for item in raw_tests
-    )
-
-    return BuilderProposalReceipt(
-        version=1,
-        repository=manifest.repository,
-        issue_number=manifest.issue_number,
-        manifest_digest=manifest.manifest_digest,
-        task_digest=manifest.task_digest,
-        snapshot_fingerprint=manifest.snapshot_fingerprint,
-        execution_fingerprint=manifest.execution_fingerprint,
-        base_sha=manifest.base_sha,
-        branch=expected_branch,
-        proposal_digest=proposal,
-        paths=canonical_paths,
-        changed_lines=changed,
-        total_bytes=total_bytes,
-        test_count=len(normalized_tests),
-        tests_digest=_canonical_digest(list(normalized_tests)),
-    )
-
-
-def validate_builder_proposal_receipt(
-    receipt: BuilderProposalReceipt,
-    manifest: BuilderManifest,
-    *,
-    evidence: Mapping[str, Any] | None = None,
-) -> None:
-    """Verify receipt custody and manifest budgets at the Secretary boundary."""
-    if not isinstance(receipt, BuilderProposalReceipt):
-        raise BuilderPlaneError(
-            "invalid builder proposal receipt type"
-        )
-    if not isinstance(manifest, BuilderManifest):
-        raise BuilderPlaneError("invalid builder manifest type")
-
-    expected = {
-        "repository": manifest.repository,
-        "issue_number": manifest.issue_number,
-        "manifest_digest": manifest.manifest_digest,
-        "task_digest": manifest.task_digest,
-        "snapshot_fingerprint": manifest.snapshot_fingerprint,
-        "execution_fingerprint": manifest.execution_fingerprint,
-        "base_sha": manifest.base_sha,
-        "branch": builder_worker_branch(manifest),
-    }
-    for field, expected_value in expected.items():
-        if getattr(receipt, field) != expected_value:
-            raise BuilderPlaneError(
-                f"builder proposal receipt {field} mismatch"
-            )
-
-    if len(receipt.paths) > manifest.budget.max_files:
-        raise BuilderPlaneError(
-            "builder proposal receipt exceeds file budget"
-        )
-    if receipt.changed_lines > manifest.budget.max_changed_lines:
-        raise BuilderPlaneError(
-            "builder proposal receipt exceeds changed-line budget"
-        )
-    if receipt.total_bytes > manifest.budget.max_total_bytes:
-        raise BuilderPlaneError(
-            "builder proposal receipt exceeds byte budget"
-        )
-    if receipt.test_count > manifest.budget.max_test_descriptions:
-        raise BuilderPlaneError(
-            "builder proposal receipt exceeds test budget"
-        )
-
-    if evidence is None:
-        return
-    if not isinstance(evidence, Mapping):
-        raise BuilderPlaneError(
-            "builder proposal evidence must be a mapping"
-        )
-    evidence_expected = {
-        "branch": receipt.branch,
-        "proposal_digest": receipt.proposal_digest,
-        "changed_lines": receipt.changed_lines,
-        "base_sha": receipt.base_sha,
-        "supervisor_snapshot_fingerprint": (
-            receipt.snapshot_fingerprint
-        ),
-        "execution_fingerprint": receipt.execution_fingerprint,
-        "build_issue_number": receipt.issue_number,
-        "build_task_digest": receipt.task_digest,
-        "builder_manifest_digest": receipt.manifest_digest,
-    }
-    for field, expected_value in evidence_expected.items():
-        if evidence.get(field) != expected_value:
-            raise BuilderPlaneError(
-                f"builder proposal evidence {field} mismatch"
-            )
-
-
 def validate_builder_worker_evidence(
     evidence: Mapping[str, Any],
     manifest: BuilderManifest,
 ) -> None:
-    """Bind feature-builder evidence to exact task, branch, and custody."""
+    """Bind a newly published feature proposal to its exact Builder manifest."""
     if not isinstance(evidence, Mapping):
         raise BuilderPlaneError("builder worker evidence must be a mapping")
     if not isinstance(manifest, BuilderManifest):
         raise BuilderPlaneError("invalid builder manifest type")
-
-    status = evidence.get("status")
-    if status == "no-change":
-        if evidence.get("bot") != "feature-builder":
-            raise BuilderPlaneError(
-                "builder no-change evidence came from a non-builder worker"
-            )
+    if evidence.get("status") != "pull-request-created":
         return
-    if status not in {
-        "pull-request-created",
-        "pull-request-updated",
-        "existing-pr",
-    }:
-        raise BuilderPlaneError("builder worker evidence status is not admitted")
     if evidence.get("bot") != "feature-builder":
         raise BuilderPlaneError(
             "builder mutation evidence came from a non-builder worker"
         )
-
-    expected = {
-        "branch": builder_worker_branch(manifest),
-        "build_issue_number": manifest.issue_number,
-        "build_task_digest": manifest.task_digest,
-        "supervisor_snapshot_fingerprint": manifest.snapshot_fingerprint,
-    }
-    for field, expected_value in expected.items():
-        if evidence.get(field) != expected_value:
-            raise BuilderPlaneError(
-                f"builder worker evidence {field} mismatch"
-            )
-
-    if status == "existing-pr":
-        return
-
-    created_expected = {
-        "builder_manifest_digest": manifest.manifest_digest,
-        "base_sha": manifest.base_sha,
-        "execution_fingerprint": manifest.execution_fingerprint,
-    }
-    for field, expected_value in created_expected.items():
-        if evidence.get(field) != expected_value:
-            raise BuilderPlaneError(
-                f"builder worker evidence {field} mismatch"
-            )
-
-    try:
-        receipt = BuilderProposalReceipt.from_payload(
-            evidence.get("builder_proposal_receipt")
-        )
-        validate_builder_proposal_receipt(
-            receipt,
-            manifest,
-            evidence=evidence,
-        )
-    except BuilderPlaneError as exc:
+    supplied = evidence.get("builder_manifest_digest")
+    if supplied != manifest.manifest_digest:
         raise BuilderPlaneError(
-            "builder worker proposal receipt is invalid"
-        ) from exc
+            "builder worker evidence manifest digest mismatch"
+        )
 
 
 def manifest_prompt_fragment(manifest: BuilderManifest) -> str:
