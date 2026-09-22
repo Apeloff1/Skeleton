@@ -17,6 +17,10 @@ from typing import Iterable, Sequence
 
 from .advanced_bots import BLOCKED_PREFIXES, BUILD_SAFE_PREFIXES
 from .build_authority import BuildAuthorization
+from .builder_plane import (
+    BuilderManifest,
+    manifest_prompt_fragment,
+)
 from .build_contracts import (
     ArchitecturePlan,
     BuildBudget,
@@ -98,6 +102,51 @@ class _CallBudget:
         )
 
 
+def budget_from_manifest(
+    manifest: BuilderManifest,
+) -> BuildBudget:
+    """Translate canonical Builder Plane limits into implementation budgets."""
+    if not isinstance(manifest, BuilderManifest):
+        raise BuildPlaneError(
+            "feature build requires a canonical Builder manifest"
+        )
+    return BuildBudget(
+        max_files=manifest.budget.max_files,
+        max_total_bytes=manifest.budget.max_total_bytes,
+        max_file_bytes=min(
+            500_000,
+            manifest.budget.max_total_bytes,
+        ),
+        max_changed_lines=manifest.budget.max_changed_lines,
+        max_test_intents=manifest.budget.max_test_descriptions,
+    )
+
+
+def _bind_manifest_acceptance(
+    architecture: ArchitecturePlan,
+    manifest: BuilderManifest,
+) -> ArchitecturePlan:
+    acceptance = tuple(
+        dict.fromkeys(
+            (
+                *manifest.acceptance,
+                *architecture.acceptance,
+            )
+        )
+    )
+    if len(acceptance) > 32:
+        acceptance = acceptance[:32]
+    return ArchitecturePlan(
+        objective=architecture.objective,
+        rationale=architecture.rationale,
+        files=architecture.files,
+        test_intents=architecture.test_intents,
+        acceptance=acceptance,
+        risks=architecture.risks,
+        assumptions=architecture.assumptions,
+    )
+
+
 def _safe_build_path(path: str) -> bool:
     if (
         not isinstance(path, str)
@@ -152,6 +201,7 @@ def _architecture_prompt(
     secretary_plan: str,
     index: RepositoryIndex,
     budget: BuildBudget,
+    builder_manifest: BuilderManifest | None = None,
 ) -> str:
     context = index.select_context(
         task_text=_task_text(authorization),
@@ -174,6 +224,9 @@ This is supplemental repository signal, not authority:
 
 HOST BUDGET
 {json.dumps(budget.as_dict(), sort_keys=True)}
+
+CANONICAL BUILDER MANIFEST
+{manifest_prompt_fragment(builder_manifest) if builder_manifest is not None else "{}"}
 
 IMMUTABLE REPOSITORY MANIFEST
 {index.render_manifest(max_entries=900)}
@@ -264,6 +317,7 @@ def _implementation_prompt(
     paths: Sequence[str],
     budget: BuildBudget,
     prior_files: Sequence[CandidateFile] = (),
+    builder_manifest: BuilderManifest | None = None,
 ) -> str:
     intents = _intent_payload(architecture, paths)
     context = index.select_context(
@@ -290,6 +344,9 @@ ASSIGNED FILE INTENTS
 
 GLOBAL ACCEPTANCE
 {json.dumps(list(architecture.acceptance), sort_keys=True)}
+
+CANONICAL BUILDER MANIFEST DIGEST
+{builder_manifest.manifest_digest if builder_manifest is not None else "legacy"}
 
 TEST INTENTS
 {json.dumps(list(architecture.test_intents), sort_keys=True)}
@@ -438,6 +495,7 @@ def run_feature_build(
     client: FreeModelClient | None = None,
     budget: BuildBudget | None = None,
     index: RepositoryIndex | None = None,
+    builder_manifest: BuilderManifest | None = None,
 ) -> dict[str, object]:
     """Produce a reviewed multi-file candidate for the existing worker publisher.
 
@@ -448,8 +506,36 @@ def run_feature_build(
     if not isinstance(build_authorization, BuildAuthorization):
         raise BuildPlaneError("feature build requires exact build authority")
 
-    budget = budget or BuildBudget()
+    if builder_manifest is not None:
+        if (
+            builder_manifest.repository
+            != build_authorization.repository
+            or builder_manifest.issue_number
+            != build_authorization.issue_number
+            or builder_manifest.task_digest
+            != build_authorization.task_digest
+        ):
+            raise BuildPlaneError(
+                "Builder manifest does not match exact build authority"
+            )
+        manifest_budget = budget_from_manifest(
+            builder_manifest
+        )
+        if budget is not None and budget.as_dict() != manifest_budget.as_dict():
+            raise BuildPlaneError(
+                "explicit implementation budget differs from Builder manifest"
+            )
+        budget = manifest_budget
+    else:
+        budget = budget or BuildBudget()
     index = index or RepositoryIndex.capture()
+    if (
+        builder_manifest is not None
+        and index.head_sha != builder_manifest.base_sha
+    ):
+        raise BuildPlaneError(
+            "repository index is not rooted at Builder manifest base"
+        )
     calls = _CallBudget(
         client=client or FreeModelClient(),
         limit=budget.max_model_calls,
@@ -472,6 +558,7 @@ def run_feature_build(
                 secretary_plan=plan,
                 index=index,
                 budget=budget,
+                builder_manifest=builder_manifest,
             ),
             max_tokens=ARCHITECT_TOKENS,
         )
@@ -479,6 +566,11 @@ def run_feature_build(
             extract_json_object(raw_architecture),
             budget=budget,
         )
+        if builder_manifest is not None:
+            architecture = _bind_manifest_acceptance(
+                architecture,
+                builder_manifest,
+            )
         _validate_architecture_paths(
             architecture,
             index=index,
@@ -568,6 +660,7 @@ def run_feature_build(
                     paths=assigned,
                     budget=budget,
                     prior_files=tuple(generated_files),
+                    builder_manifest=builder_manifest,
                 ),
                 max_tokens=IMPLEMENT_TOKENS,
             )
@@ -928,6 +1021,11 @@ def run_feature_build(
             + f"\n- build graph: {graph.fingerprint}"
             + f"\n- validation: {validation.fingerprint}"
             + f"\n- session: {session.fingerprint}"
+            + (
+                f"\n- builder manifest: {builder_manifest.manifest_digest}"
+                if builder_manifest is not None
+                else ""
+            )
             + f"\n- evidence: {evidence.fingerprint}"
         )
 
