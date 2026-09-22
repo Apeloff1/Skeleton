@@ -9,6 +9,7 @@ See docs/CANONICAL_MODULE_BOUNDARIES.md for the ownership contract.
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -101,6 +102,38 @@ def _matches_module(module: str, forbidden: str) -> bool:
     return module == forbidden or module.startswith(forbidden + ".")
 
 
+def _is_staged_api_mirror(rel: str, repo_root: Path) -> bool:
+    """Allow the governed API mirror to reference its legacy owner only pre-cutover.
+
+    This is deliberately fail-closed: the exception exists only while the
+    machine-readable AI file-tree contract declares the exact
+    skeleton/api -> skeleton/ai/runtime/api mapping in a staged migration state.
+    Once cutover completes, missing/malformed metadata or any mapping drift makes
+    the normal upward-dependency rule apply again.
+    """
+    prefix = "skeleton/ai/runtime/api/"
+    if not rel.startswith(prefix):
+        return False
+
+    manifest = repo_root / "machine" / "ai_file_tree.json"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+
+    if data.get("status") not in {"staged_mirror", "cutover_pending"}:
+        return False
+    mappings = data.get("mappings")
+    if not isinstance(mappings, list):
+        return False
+    return any(
+        isinstance(item, dict)
+        and item.get("source") == "skeleton/api"
+        and item.get("destination") == "skeleton/ai/runtime/api"
+        for item in mappings
+    )
+
+
 def _production_rule_for(path: Path, repo_root: Path):
     try:
         rel = path.relative_to(repo_root).as_posix()
@@ -183,6 +216,7 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                         and not in_api
                         and not production_exempt
                         and not api_composition_root
+                        and not _is_staged_api_mirror(rel, repo_root)
                         and _imports_api(module, level)
                     ):
                         violations.append(
