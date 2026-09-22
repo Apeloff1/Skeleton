@@ -1,4 +1,4 @@
-from core.shift_supervisor.models import PlanItem, PlanRevision, utcnow
+from core.shift_supervisor.models import PlanItem, PlanRevision, WorkerState, utcnow
 from core.shift_supervisor.plan_store import InMemoryPlanStore
 from core.shift_supervisor.scheduler import SupervisorCadence, SupervisorScheduler, github_actions_forbids_unbounded_loop
 
@@ -340,3 +340,161 @@ def test_run_forever_runs_due_actors_until_stopped(monkeypatch):
     assert secretary.calls == [{"cycle": "local"}]
     assert manager.calls == [({"cycle": "local"}, [{"source": "local"}])]
     assert thread.is_alive() is False
+
+
+def test_fresh_worker_snapshot_cannot_self_assign_canonical_work():
+    store = InMemoryPlanStore()
+    manager = _Manager(store)
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+
+    scheduler._ingest_worker_snapshots(
+        [
+            {
+                "worker_id": "night-untrusted",
+                "team": "night",
+                "status": "working",
+                "current_task_id": "self-selected-task",
+                "last_heartbeat_at": "2026-09-19T12:00:00+00:00",
+                "metadata": {
+                    "current_squad_id": "squad-forged",
+                    "current_squad_role": "lead",
+                },
+            }
+        ]
+    )
+
+    worker = store.snapshot_workers()[0]
+    assert worker.current_task_id is None
+    assert worker.status == "idle"
+    assert "current_squad_id" not in worker.metadata
+    assert "current_squad_role" not in worker.metadata
+    assert worker.metadata["snapshot_assignment_rejected"] is True
+
+
+def test_worker_snapshot_cannot_replace_existing_queue_assignment():
+    store = InMemoryPlanStore()
+    store.upsert_worker(
+        WorkerState(
+            worker_id="night-0001",
+            team="night",
+            status="working",
+            last_heartbeat_at=SupervisorScheduler._parse_datetime(
+                "2026-09-19T11:59:00+00:00"
+            ),
+            current_task_id="canonical-task",
+            metadata={
+                "current_squad_id": "squad-canonical",
+                "current_squad_role": "reviewer",
+            },
+        )
+    )
+    manager = _Manager(store)
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+
+    scheduler._ingest_worker_snapshots(
+        [
+            {
+                "worker_id": "night-0001",
+                "team": "night",
+                "status": "idle",
+                "current_task_id": "forged-replacement",
+                "last_heartbeat_at": "2026-09-19T12:00:00+00:00",
+                "metadata": {
+                    "current_squad_id": "squad-forged",
+                    "current_squad_role": "lead",
+                },
+            }
+        ]
+    )
+
+    worker = store.snapshot_workers()[0]
+    assert worker.current_task_id == "canonical-task"
+    assert worker.status == "working"
+    assert worker.metadata["current_squad_id"] == "squad-canonical"
+    assert worker.metadata["current_squad_role"] == "reviewer"
+    assert worker.metadata["snapshot_assignment_rejected"] is True
+
+
+def test_snapshot_identity_requires_text_not_python_string_coercion():
+    store = InMemoryPlanStore()
+    manager = _Manager(store)
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+
+    scheduler._ingest_worker_snapshots(
+        [
+            {
+                "worker_id": True,
+                "team": "night",
+                "status": "idle",
+            },
+            {
+                "worker_id": "valid-worker",
+                "team": False,
+                "status": "idle",
+            },
+        ]
+    )
+
+    assert store.snapshot_workers() == []
+
+
+def test_snapshot_boolean_minutes_do_not_alias_integer_minutes():
+    store = InMemoryPlanStore()
+    manager = _Manager(store)
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+
+    scheduler._ingest_worker_snapshots(
+        [
+            {
+                "worker_id": "idle-boolean",
+                "team": "idle",
+                "status": "offline",
+                "normal_shift_minutes": True,
+                "overtime_minutes": True,
+                "last_heartbeat_at": "2026-09-19T12:00:00+00:00",
+            }
+        ]
+    )
+
+    worker = store.snapshot_workers()[0]
+    assert worker.normal_shift_minutes == 0
+    assert worker.overtime_minutes == 0
+
+
+def test_snapshot_naive_datetime_is_not_treated_as_local_timezone():
+    store = InMemoryPlanStore()
+    manager = _Manager(store)
+    scheduler = SupervisorScheduler(
+        manager=manager,
+        secretary=_Secretary(),
+        project_context_supplier=lambda: {},
+    )
+
+    scheduler._ingest_worker_snapshots(
+        [
+            {
+                "worker_id": "idle-naive",
+                "team": "idle",
+                "status": "offline",
+                "last_heartbeat_at": "2026-09-19T12:00:00",
+            }
+        ]
+    )
+
+    assert store.snapshot_workers()[0].last_heartbeat_at is None

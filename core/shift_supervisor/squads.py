@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping, Sequence
@@ -11,6 +14,8 @@ from .policy import may_admit_worker
 
 SQUAD_SIZE = 4
 SQUAD_ROLES = ("researcher", "lead", "reviewer", "verifier")
+LEASE_SCHEMA_VERSION = 1
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COMPLETION_EVIDENCE = (
     "research_complete",
     "implementation_complete",
@@ -31,18 +36,34 @@ class SquadLease:
     started_at: datetime
     expires_at: datetime
 
-    def to_dict(self) -> dict[str, Any]:
+    def _identity_payload(self) -> dict[str, Any]:
         return {
+            "schema_version": LEASE_SCHEMA_VERSION,
             "squad_id": self.squad_id,
             "task_id": self.task_id,
             "team": self.team,
-            "members": dict(self.members),
+            "members": {role: self.members[role] for role in SQUAD_ROLES},
             "conflict_domain": self.conflict_domain,
             "plan_generation": self.plan_generation,
             "lease_generation": self.lease_generation,
             "started_at": self.started_at.isoformat(),
             "expires_at": self.expires_at.isoformat(),
         }
+
+    @property
+    def fingerprint(self) -> str:
+        encoded = json.dumps(
+            self._identity_payload(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = self._identity_payload()
+        payload["fingerprint"] = self.fingerprint
+        return payload
 
 
 def safe_squad_capacity(
@@ -82,8 +103,18 @@ class SquadCoordinator:
         default_lease_minutes: int = 45,
     ) -> None:
         self.store = store
-        self.overtime_soft_limit_minutes = max(0, int(overtime_soft_limit_minutes))
-        self.default_lease_minutes = max(5, min(int(default_lease_minutes), 240))
+        self.overtime_soft_limit_minutes = self._policy_minutes(
+            overtime_soft_limit_minutes,
+            name="overtime_soft_limit_minutes",
+            minimum=0,
+            maximum=24 * 60,
+        )
+        self.default_lease_minutes = self._policy_minutes(
+            default_lease_minutes,
+            name="default_lease_minutes",
+            minimum=5,
+            maximum=240,
+        )
 
     def safe_capacity(self, team: str) -> int:
         return safe_squad_capacity(
@@ -110,7 +141,12 @@ class SquadCoordinator:
         lease_for = (
             self.default_lease_minutes
             if lease_minutes is None
-            else max(5, min(int(lease_minutes), 240))
+            else self._policy_minutes(
+                lease_minutes,
+                name="lease_minutes",
+                minimum=5,
+                maximum=240,
+            )
         )
 
         with self.store._lock:  # noqa: SLF001
@@ -200,7 +236,12 @@ class SquadCoordinator:
         extend = (
             self.default_lease_minutes
             if minutes is None
-            else max(5, min(int(minutes), 240))
+            else self._policy_minutes(
+                minutes,
+                name="minutes",
+                minimum=5,
+                maximum=240,
+            )
         )
         with self.store._lock:  # noqa: SLF001
             item = self._require_owned_item_locked(squad_id, task_id)
@@ -407,10 +448,24 @@ class SquadCoordinator:
 
     @staticmethod
     def _next_lease_generation(item: PlanItem) -> int:
-        try:
-            return max(1, int(item.metadata.get("lease_generation", 0)) + 1)
-        except (TypeError, ValueError):
+        value = item.metadata.get("lease_generation")
+        if value is None:
             return 1
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError("invalid task lease generation")
+        return value + 1
+
+    @staticmethod
+    def _policy_minutes(
+        value: Any,
+        *,
+        name: str,
+        minimum: int,
+        maximum: int,
+    ) -> int:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError(f"{name} must be an integer")
+        return max(minimum, min(value, maximum))
 
     def _require_owned_item_locked(self, squad_id: str, task_id: str) -> PlanItem:
         item = self.store._items.get(task_id)  # noqa: SLF001
@@ -424,56 +479,85 @@ class SquadCoordinator:
     def _lease_from_item(cls, item: PlanItem) -> SquadLease:
         raw = item.metadata.get("squad_lease")
         if not isinstance(raw, Mapping):
-            raise ValueError("task has no valid squad lease")
+            raise ValueError("malformed squad lease: envelope missing")
+        schema_version = raw.get("schema_version")
+        if isinstance(schema_version, bool) or type(schema_version) is not int:
+            raise ValueError("malformed squad lease: invalid schema version")
+        if schema_version != LEASE_SCHEMA_VERSION:
+            raise ValueError("malformed squad lease: unsupported schema version")
+
+        fingerprint = raw.get("fingerprint")
+        if not isinstance(fingerprint, str) or not _SHA256_RE.fullmatch(fingerprint):
+            raise ValueError("malformed squad lease: fingerprint missing")
+
         members_raw = raw.get("members")
         if not isinstance(members_raw, Mapping):
-            raise ValueError("squad lease members missing")
-        members = {str(role): str(worker_id) for role, worker_id in members_raw.items()}
-        if set(members) != set(SQUAD_ROLES):
-            raise ValueError("squad lease must contain the canonical four roles")
+            raise ValueError("malformed squad lease: members missing")
+        if set(members_raw) != set(SQUAD_ROLES):
+            raise ValueError("malformed squad lease: canonical roles required")
+        members: dict[str, str] = {}
+        for role in SQUAD_ROLES:
+            worker_id = members_raw.get(role)
+            if not isinstance(worker_id, str):
+                raise ValueError("malformed squad lease: worker identity must be text")
+            worker_id = worker_id.strip()
+            if not worker_id or len(worker_id) > 500 or "\\x00" in worker_id:
+                raise ValueError("malformed squad lease: invalid worker identity")
+            members[role] = worker_id
         if len(set(members.values())) != SQUAD_SIZE:
-            raise ValueError("squad lease must contain four distinct workers")
+            raise ValueError("malformed squad lease: four distinct workers required")
+
+        generation = raw.get("lease_generation")
+        if isinstance(generation, bool) or type(generation) is not int or generation < 1:
+            raise ValueError("malformed squad lease: invalid lease generation")
+
         try:
-            started = datetime.fromisoformat(
-                str(raw["started_at"]).replace("Z", "+00:00")
-            )
-            expires = datetime.fromisoformat(
-                str(raw["expires_at"]).replace("Z", "+00:00")
-            )
-            generation = int(raw["lease_generation"])
+            started = datetime.fromisoformat(str(raw["started_at"]).replace("Z", "+00:00"))
+            expires = datetime.fromisoformat(str(raw["expires_at"]).replace("Z", "+00:00"))
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError("malformed squad lease") from exc
+            raise ValueError("malformed squad lease: invalid timestamp") from exc
+        if started.tzinfo is None or started.utcoffset() is None:
+            raise ValueError("malformed squad lease: start timestamp must be timezone-aware")
+        if expires.tzinfo is None or expires.utcoffset() is None:
+            raise ValueError("malformed squad lease: expiry timestamp must be timezone-aware")
+
+        def require_text(name: str, *, maximum: int = 500) -> str:
+            value = raw.get(name)
+            if not isinstance(value, str):
+                raise ValueError(f"malformed squad lease: {name} must be text")
+            value = value.strip()
+            if not value or len(value) > maximum or "\\x00" in value:
+                raise ValueError(f"malformed squad lease: invalid {name}")
+            return value
 
         lease = SquadLease(
-            squad_id=str(raw.get("squad_id", "")),
-            task_id=str(raw.get("task_id", "")),
-            team=str(raw.get("team", "")),
+            squad_id=require_text("squad_id"),
+            task_id=require_text("task_id"),
+            team=require_text("team", maximum=16),
             members=members,
-            conflict_domain=str(raw.get("conflict_domain", "")),
-            plan_generation=str(raw.get("plan_generation", "")),
+            conflict_domain=require_text("conflict_domain"),
+            plan_generation=require_text("plan_generation"),
             lease_generation=generation,
             started_at=started.astimezone(timezone.utc),
             expires_at=expires.astimezone(timezone.utc),
         )
-        if not lease.squad_id or lease.squad_id != item.owner:
-            raise ValueError("squad lease owner mismatch")
+        if lease.squad_id != item.owner:
+            raise ValueError("malformed squad lease: owner mismatch")
         if lease.task_id != item.id:
-            raise ValueError("squad lease task mismatch")
+            raise ValueError("malformed squad lease: task mismatch")
         if lease.team != item.target_team:
-            raise ValueError("squad lease team mismatch")
-        if not lease.plan_generation:
-            raise ValueError("squad lease plan generation missing")
+            raise ValueError("malformed squad lease: team mismatch")
         if lease.expires_at <= lease.started_at:
-            raise ValueError("squad lease expiry must follow start")
+            raise ValueError("malformed squad lease: expiry must follow start")
         task_generation = item.metadata.get("lease_generation")
-        if task_generation is not None:
-            try:
-                if int(task_generation) != lease.lease_generation:
-                    raise ValueError("squad lease generation mismatch")
-            except (TypeError, ValueError) as exc:
-                if isinstance(exc, ValueError) and str(exc) == "squad lease generation mismatch":
-                    raise
-                raise ValueError("invalid task lease generation") from exc
+        if (
+            isinstance(task_generation, bool)
+            or type(task_generation) is not int
+            or task_generation != lease.lease_generation
+        ):
+            raise ValueError("malformed squad lease: generation mismatch")
+        if lease.fingerprint != fingerprint:
+            raise ValueError("malformed squad lease: fingerprint mismatch")
         return lease
 
     def _release_members_locked(self, lease: SquadLease, now: datetime) -> None:
@@ -515,7 +599,11 @@ class SquadCoordinator:
 
     @staticmethod
     def _nonnegative_int(value: Any) -> int:
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return max(0, value)
         try:
             return max(0, int(value))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return 0

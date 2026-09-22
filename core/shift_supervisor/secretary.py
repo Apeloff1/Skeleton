@@ -11,7 +11,7 @@ from .plan_graph import require_acyclic_new_items
 from .plan_store import InMemoryPlanStore
 from .planning_council import PlanningCouncil
 from .prompts import compose_role_prompt
-from .squads import SQUAD_ROLES, SQUAD_SIZE
+from .task_admission import SECRETARY_PROFILE, admit_model_task, admit_model_tasks
 
 
 class SecretaryBot:
@@ -99,44 +99,13 @@ class SecretaryBot:
         *,
         existing_ids: set[str],
     ) -> list[PlanItem]:
-        staged: list[tuple[dict[str, Any], str, str]] = []
-        key_to_id: dict[str, str] = {}
-        for index, task in enumerate(tasks[:128]):
-            title = str(task.get("title", "")).strip()
-            description = str(task.get("description", "")).strip()
-            team = str(task.get("target_team", "")).strip().lower()
-            if not title or not description or team not in {"night", "idle"}:
-                continue
-            task_key = str(task.get("task_key", "")).strip() or f"proposal-{index + 1}"
-            if task_key in key_to_id:
-                return []
-            item_id = f"sec-{uuid.uuid4()}"
-            key_to_id[task_key] = item_id
-            staged.append((task, task_key, item_id))
-
-        resolved_dependencies: dict[str, list[str]] = {}
-        for task, _task_key, item_id in staged:
-            raw_dependencies = task.get("dependencies", [])
-            if not isinstance(raw_dependencies, list):
-                return []
-            dependency_names = [str(value).strip() for value in raw_dependencies if str(value).strip()]
-            if any(name not in key_to_id and name not in existing_ids for name in dependency_names):
-                return []
-            resolved_dependencies[item_id] = [key_to_id.get(name, name) for name in dependency_names]
-
-        result: list[PlanItem] = []
-        for task, task_key, item_id in staged:
-            item = cls._parse_task(
-                task,
-                correlation_id,
-                item_id=item_id,
-                task_key=task_key,
-                dependencies=resolved_dependencies[item_id],
-            )
-            if item is None:
-                return []
-            result.append(item)
-        return require_acyclic_new_items(result)
+        """Compatibility wrapper over the shared planning admission contract."""
+        return admit_model_tasks(
+            tasks,
+            correlation_id,
+            existing_ids=existing_ids,
+            profile=SECRETARY_PROFILE,
+        )
 
     @staticmethod
     def _parse_task(
@@ -147,50 +116,25 @@ class SecretaryBot:
         task_key: str | None = None,
         dependencies: list[str] | None = None,
     ) -> PlanItem | None:
-        title = str(task.get("title", "")).strip()
-        description = str(task.get("description", "")).strip()
-        team = str(task.get("target_team", "")).strip().lower()
-        if not title or not description or team not in {"night", "idle"}:
-            return None
-        try:
-            priority = max(1, min(100, int(task.get("priority", 50))))
-        except (TypeError, ValueError):
-            priority = 50
-        paths = [str(value)[:500] for value in task.get("relevant_paths", [])[:32]] if isinstance(task.get("relevant_paths"), list) else []
-        conflict_domain = str(task.get("conflict_domain", "")).strip()
-        if not conflict_domain and paths:
-            conflict_domain = "/".join(paths[0].strip("/").split("/")[:2])
-        conflict_domain = conflict_domain or f"task:{task_key or title}"
-        acceptance = [str(value)[:1000] for value in task.get("acceptance_criteria", [])[:32]] if isinstance(task.get("acceptance_criteria"), list) else []
-        metadata: dict[str, Any] = {
-            "correlation_id": correlation_id,
-            "task_key": task_key or str(task.get("task_key", "")).strip(),
-            "task_type": str(task.get("task_type", "engineering"))[:100],
-            "squad_size": SQUAD_SIZE,
-            "squad_roles": list(SQUAD_ROLES),
-            "conflict_domain": conflict_domain[:300],
-            "relevant_paths": paths,
-            "acceptance_criteria": acceptance,
-            "security_considerations": str(task.get("security_considerations", ""))[:2000],
-            "performance_considerations": str(task.get("performance_considerations", ""))[:2000],
-        }
-        council = task.get("_planning_council")
-        if isinstance(council, dict):
-            metadata["planning_council"] = dict(council)
-        gate = task.get("_epistemic_gate")
-        if isinstance(gate, dict):
-            metadata["epistemic_gate"] = dict(gate)
-        return PlanItem(
-            id=item_id or f"sec-{uuid.uuid4()}",
-            title=title,
-            description=description,
-            priority=priority,
-            target_team=team,  # type: ignore[arg-type]
-            dependencies=dependencies if dependencies is not None else [str(x) for x in task.get("dependencies", []) if x],
-            source="secretary-model",
-            rationale=str(task.get("rationale", "")),
-            research_refs=[str(x) for x in task.get("research_refs", []) if x],
-            expected_output=str(task.get("expected_output", "")),
-            validation=[str(x) for x in task.get("validation", []) if x],
-            metadata=metadata,
+        """Compatibility wrapper for focused tests and legacy callers."""
+        resolved_key = (
+            str(task_key).strip()
+            if task_key is not None
+            else str(task.get("task_key", "")).strip() or "proposal-1"
+        )
+        raw_dependencies = task.get("dependencies", [])
+        resolved_dependencies = (
+            list(dependencies)
+            if dependencies is not None
+            else [str(value) for value in raw_dependencies if value]
+            if isinstance(raw_dependencies, list)
+            else []
+        )
+        return admit_model_task(
+            task,
+            correlation_id,
+            profile=SECRETARY_PROFILE,
+            item_id=item_id or f"sec-{uuid.uuid4()}",
+            task_key=resolved_key,
+            dependencies=resolved_dependencies,
         )

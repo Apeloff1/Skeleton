@@ -406,3 +406,111 @@ def test_inflight_squad_survives_durable_store_round_trip() -> None:
     )
     assert finished.status == "done"
     assert finished.metadata["squad_lease_history"][-1]["outcome"] == "done"
+
+
+def test_lease_envelope_is_versioned_and_content_addressed() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    lease = SquadCoordinator(store).claim_next("night", plan_generation="rev-1")
+    assert lease is not None
+
+    envelope = store.snapshot_items()[0].metadata["squad_lease"]
+    assert envelope["schema_version"] == 1
+    assert len(envelope["fingerprint"]) == 64
+    assert envelope["fingerprint"] == lease.fingerprint
+
+
+def test_tampered_lease_fingerprint_is_recovered_fail_closed() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    api = SquadPlanQueueAPI(store)
+    lease = api.claim_next("night", plan_generation="rev-1")
+    assert lease is not None
+
+    item = store.snapshot_items()[0]
+    envelope = dict(item.metadata["squad_lease"])
+    envelope["conflict_domain"] = "tampered-domain"
+    item.metadata["squad_lease"] = envelope
+    store.update_item(item)
+
+    assert api.recover_invalid_leases() == ["task-a"]
+    recovered = store.snapshot_items()[0]
+    assert recovered.status == "queued"
+    assert recovered.owner is None
+    assert "fingerprint mismatch" in recovered.metadata["squad_lease_history"][-1]["error"]
+    assert all(worker.current_task_id is None for worker in store.snapshot_workers())
+
+
+def test_lease_schema_bool_does_not_alias_integer_version() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    api = SquadPlanQueueAPI(store)
+    assert api.claim_next("night", plan_generation="rev-1") is not None
+
+    item = store.snapshot_items()[0]
+    envelope = dict(item.metadata["squad_lease"])
+    envelope["schema_version"] = True
+    item.metadata["squad_lease"] = envelope
+    store.update_item(item)
+
+    assert api.recover_invalid_leases() == ["task-a"]
+    assert "schema version" in store.snapshot_items()[0].metadata["squad_lease_history"][-1]["error"]
+
+
+def test_naive_lease_timestamp_is_recovered_fail_closed() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    api = SquadPlanQueueAPI(store)
+    assert api.claim_next("night", plan_generation="rev-1") is not None
+
+    item = store.snapshot_items()[0]
+    envelope = dict(item.metadata["squad_lease"])
+    envelope["started_at"] = "2026-09-19T12:00:00"
+    item.metadata["squad_lease"] = envelope
+    store.update_item(item)
+
+    assert api.recover_invalid_leases() == ["task-a"]
+    assert "timezone-aware" in store.snapshot_items()[0].metadata["squad_lease_history"][-1]["error"]
+
+
+@pytest.mark.parametrize("value", [True, False, 30.5, "30"])
+def test_lease_duration_policy_requires_real_integer(value) -> None:
+    store = InMemoryPlanStore()
+    with pytest.raises(ValueError, match="integer"):
+        SquadCoordinator(store, default_lease_minutes=value)  # type: ignore[arg-type]
+
+
+def test_malformed_queued_lease_generation_cannot_silently_reset() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    task = _task("task-a", 100, "gameplay")
+    task.metadata["lease_generation"] = True
+    store.add_items([task])
+
+    with pytest.raises(ValueError, match="lease generation"):
+        SquadCoordinator(store).claim_next("night", plan_generation="rev-1")
+
+
+def test_durable_lease_round_trip_preserves_fingerprint() -> None:
+    store = InMemoryPlanStore()
+    _seed_workers(store, 4)
+    store.add_items([_task("task-a", 100, "gameplay")])
+    store.append_revision(_revision("rev-1"))
+    start = datetime(2026, 9, 19, 12, 0, tzinfo=timezone.utc)
+    lease = SquadCoordinator(store).claim_next(
+        "night",
+        plan_generation="rev-1",
+        now=start,
+    )
+    assert lease is not None
+
+    restored = InMemoryPlanStore()
+    restored.restore_state(store.export_state(max_items=8, max_workers=8, max_revisions=8))
+    envelope = restored.snapshot_items()[0].metadata["squad_lease"]
+    assert envelope["fingerprint"] == lease.fingerprint
+    parsed = SquadCoordinator(restored)._lease_from_item(restored.snapshot_items()[0])
+    assert parsed.fingerprint == lease.fingerprint

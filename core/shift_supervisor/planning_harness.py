@@ -11,6 +11,7 @@ from .plan_store import InMemoryPlanStore
 from .scheduler import SupervisorScheduler
 from .secretary import SecretaryBot
 from .shift_manager import SMBShiftManager
+from .task_admission import MANAGER_PROFILE, SECRETARY_PROFILE, admit_model_tasks
 
 
 class ScriptedModel:
@@ -105,15 +106,17 @@ def _assert_dependency_batches_fail_closed() -> None:
         relevant_path="core/shift_supervisor/dependency_probe.py",
         dependencies=("missing-canonical-dependency",),
     )
-    manager_items = SMBShiftManager._parse_tasks(
+    manager_items = admit_model_tasks(
         [probe],
         "harness-manager-dependency",
         existing_ids=set(),
+        profile=MANAGER_PROFILE,
     )
-    secretary_items = SecretaryBot._parse_tasks(
+    secretary_items = admit_model_tasks(
         [probe],
         "harness-secretary-dependency",
         existing_ids=set(),
+        profile=SECRETARY_PROFILE,
     )
     if manager_items or secretary_items:
         raise AssertionError("unresolved dependency batch escaped fail-closed planner parsing")

@@ -163,9 +163,9 @@ class SupervisorScheduler:
         for row in raw[:MAX_WORKER_SNAPSHOTS]:
             if not isinstance(row, Mapping):
                 continue
-            worker_id = str(row.get("worker_id", "")).strip()
-            team = str(row.get("team", "")).strip().lower()
-            status = str(row.get("status", "offline")).strip().lower()
+            worker_id = self._snapshot_text(row.get("worker_id"), max_chars=500)
+            team = self._snapshot_text(row.get("team"), max_chars=16).lower()
+            status = self._snapshot_text(row.get("status"), max_chars=16).lower() or "offline"
             if not worker_id or team not in {"night", "idle"}:
                 continue
             if status not in {"offline", "idle", "working", "blocked"}:
@@ -189,11 +189,55 @@ class SupervisorScheduler:
                 existing_time = existing.last_heartbeat_at or existing.clocked_out_at or existing.clocked_in_at
                 if incoming_time is not None and existing_time is not None and incoming_time < existing_time:
                     continue
+            worker = self._reconcile_assignment_authority(existing, worker)
             worker = self._merge_daily_snapshot(existing, worker)
             self.manager.store.upsert_worker(worker)
             self._reconcile_validated_work(worker)
             known[worker_id] = worker
 
+    @staticmethod
+    def _reconcile_assignment_authority(
+        existing: WorkerState | None,
+        incoming: WorkerState,
+    ) -> WorkerState:
+        """Keep queue-owned assignment identity authoritative over snapshots.
+
+        Worker snapshots are telemetry/accounting evidence.  They may update
+        heartbeat/status information and report validated ``worked_on`` IDs,
+        but they may not create, replace, or clear a canonical queue lease.
+        """
+        metadata = dict(incoming.metadata)
+        reported_task = incoming.current_task_id
+        authoritative_task = existing.current_task_id if existing is not None else None
+
+        if authoritative_task is None:
+            incoming.current_task_id = None
+            metadata.pop("current_squad_id", None)
+            metadata.pop("current_squad_role", None)
+            if incoming.status == "working":
+                incoming.status = "idle"
+            if reported_task is not None:
+                metadata["snapshot_assignment_rejected"] = True
+        else:
+            incoming.current_task_id = authoritative_task
+            existing_meta = dict(existing.metadata) if existing is not None else {}
+            for key in ("current_squad_id", "current_squad_role"):
+                value = existing_meta.get(key)
+                if value is None:
+                    metadata.pop(key, None)
+                else:
+                    metadata[key] = value
+            if reported_task not in {None, authoritative_task}:
+                metadata["snapshot_assignment_rejected"] = True
+            if incoming.status == "idle":
+                incoming.status = (
+                    existing.status
+                    if existing is not None and existing.status in {"working", "blocked"}
+                    else "working"
+                )
+
+        incoming.metadata = metadata
+        return incoming
     def _reconcile_validated_work(self, worker: WorkerState) -> None:
         """Close canonical plan items proven by a validated studio snapshot.
 
@@ -358,34 +402,57 @@ class SupervisorScheduler:
 
     @staticmethod
     def _parse_datetime(value: Any) -> datetime | None:
-        if not value:
+        if value is None or value == "":
             return None
-        try:
-            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        except ValueError:
+        if isinstance(value, datetime):
+            parsed = value
+        elif isinstance(value, str):
+            if len(value) > 80 or "\x00" in value:
+                return None
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+        else:
             return None
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
         return parsed.astimezone(timezone.utc)
 
     @staticmethod
-    def _optional_string(value: Any) -> str | None:
-        if value is None:
-            return None
-        text = str(value).strip()
-        return text[:500] or None
+    def _snapshot_text(value: Any, *, max_chars: int) -> str:
+        if not isinstance(value, str):
+            return ""
+        value = value.strip()
+        if not value or "\x00" in value:
+            return ""
+        return value[:max_chars]
 
-    @staticmethod
-    def _string_list(value: Any) -> list[str]:
+    @classmethod
+    def _optional_string(cls, value: Any) -> str | None:
+        text = cls._snapshot_text(value, max_chars=500)
+        return text or None
+
+    @classmethod
+    def _string_list(cls, value: Any) -> list[str]:
         if not isinstance(value, list):
             return []
-        return [str(item)[:500] for item in value[:64] if item is not None]
+        result: list[str] = []
+        for raw in value[:64]:
+            text = cls._snapshot_text(raw, max_chars=500)
+            if text:
+                result.append(text)
+        return result
 
     @staticmethod
     def _nonnegative_int(value: Any) -> int:
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, int):
+            return max(0, value)
         try:
             return max(0, int(value))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return 0
 
     @staticmethod
