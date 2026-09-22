@@ -12,9 +12,11 @@ from skeleton.artifact_plane.plane import ArtifactPlane
 from skeleton.artifact_plane.seven_by import SevenByAuditor
 from skeleton.artifact_plane.sprawl import RootSprawlIndex
 from skeleton.artifact_plane.track_e import TrackEAuditor
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 
 __all__ = [
     "ArtifactPlane",
+    "ArtifactUsageMeter",
     "GodotLocator",
     "RootSprawlIndex",
     "SevenByAuditor",
