@@ -22,6 +22,22 @@ LAYERS = (
     "skeleton.chronicle",
 )
 
+# Explicit literal import targets keep capability discovery lazy while satisfying
+# the repository's fail-closed dynamic-import policy.
+_LAYER_LOADERS = (
+    lambda: import_module("skeleton.primitives"),
+    lambda: import_module("skeleton.graphs"),
+    lambda: import_module("skeleton.sheaf"),
+    lambda: import_module("skeleton.spine"),
+    lambda: import_module("skeleton.motive"),
+    lambda: import_module("skeleton.viscera"),
+    lambda: import_module("skeleton.circulation"),
+    lambda: import_module("skeleton.hive"),
+    lambda: import_module("skeleton.hoag"),
+    lambda: import_module("skeleton.persist"),
+    lambda: import_module("skeleton.chronicle"),
+)
+
 
 def _shape_ok(card: Any) -> bool:
     if not isinstance(card, dict):
@@ -31,9 +47,9 @@ def _shape_ok(card: Any) -> bool:
 
 def collect() -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
-    for path in LAYERS:
+    for load in _LAYER_LOADERS:
         try:
-            mod = import_module(path)
+            mod = load()
         except Exception:
             continue
         fn = getattr(mod, "capabilities", None)
