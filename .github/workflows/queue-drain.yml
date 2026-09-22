@@ -5,7 +5,9 @@ on:
   workflow_run:
     workflows: ["Merge Readiness"]
     types: [completed]
-    branches: [main]
+    branches:
+      - "*"
+      - "**"
   schedule:
     # Avoid top-of-five-minute scheduler hotspots while preserving 5-minute cadence.
     - cron: "2-57/5 * * * *"
