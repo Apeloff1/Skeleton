@@ -345,3 +345,14 @@ Transfer-v2 changes no `frontend/*` files. The SSR/export failure is therefore t
 ## Pull-request head synchronization
 
 The transfer-v2 branch has been reconciled directly onto `main`, completed its 130-mapping object/parity audit, and recorded the inherited Expo SSR export blocker. This checkpoint is intentionally documentation-only and exists to force a standard GitHub pull-request `synchronize` event from the current branch tip so App Assembly, CI/CD, Backend Quality, Frontier Contracts, and Merge Readiness evaluate the exact live transfer head.
+
+
+## Quarantine hygiene normalization
+
+Repository Hygiene exposed trailing whitespace inherited from 11 legacy GameForge Python sources after they were mirrored into the research-quarantine tree. The destination mirrors were normalized by stripping trailing spaces only; legacy sources were not modified. Python migration parity remains valid because the canonical file-tree validator accepts AST-equivalent Python content. These normalized research mirrors are therefore semantic-parity mirrors, not byte/object-identical mirrors.
+
+## Static-render RAF repair
+
+The inherited `BASE-FRONTEND-SSR-RAF-01` failure was reproduced from App Assembly run `35743872291`: TypeScript and the operation-stream reducer suite passed, then `expo export --platform web` failed in Node v24 while `react-native-worklets` called an undefined `requestAnimationFrame`.
+
+The validated transfer branch adds a supported Expo Router custom entry point that installs `requestAnimationFrame` / `cancelAnimationFrame` fallbacks only when missing and then loads `expo-router/entry`. `frontend/package.json` now points `main` at that entry. This is a repair-applied/pending-validation state until a fresh App Assembly run proves static export succeeds.
