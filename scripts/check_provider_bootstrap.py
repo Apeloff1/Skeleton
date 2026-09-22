@@ -584,6 +584,69 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
         if owner not in discovered or "sdk_client" not in discovered[owner]["edge_classes"]:
             errors.append(f"declared SDK owner has no discovered SDK edge: {owner}")
 
+    convergence = contract.get("provider_surface_convergence_blueprint")
+    isolation_surfaces = (
+        convergence.get("application_isolation_surfaces", [])
+        if isinstance(convergence, dict)
+        else []
+    )
+    if not isinstance(isolation_surfaces, list) or not isolation_surfaces:
+        errors.append("provider application isolation surfaces are missing")
+    else:
+        for item in isolation_surfaces:
+            if not isinstance(item, dict):
+                errors.append("provider application isolation entry must be an object")
+                continue
+            relative = item.get("path")
+            if not isinstance(relative, str) or not relative:
+                errors.append("provider application isolation path is invalid")
+                continue
+            path = repo_root / relative
+            if not path.is_file():
+                errors.append(
+                    f"provider application isolation surface missing: {relative}"
+                )
+                continue
+            source = path.read_text(encoding="utf-8", errors="replace")
+            required_tokens = item.get("required_tokens")
+            if not isinstance(required_tokens, list):
+                errors.append(
+                    f"provider application isolation required_tokens invalid: {relative}"
+                )
+                required_tokens = []
+            for token in required_tokens:
+                if not isinstance(token, str) or not token:
+                    errors.append(
+                        f"provider application isolation token invalid: {relative}"
+                    )
+                elif token not in source:
+                    errors.append(
+                        f"provider application surface lost canonical delegation token: "
+                        f"{relative}: {token}"
+                    )
+
+            forbidden = item.get("forbidden_edge_classes")
+            if not isinstance(forbidden, list):
+                errors.append(
+                    f"provider application isolation forbidden_edge_classes invalid: "
+                    f"{relative}"
+                )
+                forbidden = []
+            signals = _provider_surface_signals(path, source)
+            edge_classes: set[str] = set()
+            if signals["credential_markers"]:
+                edge_classes.add("credential")
+            if signals["sdk_imports"]:
+                edge_classes.add("sdk_client")
+            if _looks_like_provider_network_surface(path, source, signals):
+                edge_classes.add("network_transport")
+            violations = sorted(edge_classes.intersection(forbidden))
+            if violations:
+                errors.append(
+                    "provider application surface owns forbidden provider edges: "
+                    f"{relative}: {', '.join(violations)}"
+                )
+
 
     for root_name in ("backend", "skeleton"):
         source_root = repo_root / root_name
