@@ -213,6 +213,7 @@ def validate() -> list[str]:
             "cutover:parity-ready",
             "cutover:owner-sensitive",
             "cutover:quarantine",
+            "cutover:merge-required",
         }:
             errors.append("move_tag_contract cutover tag set drifted")
         batches = move_tag_contract.get("batches")
@@ -220,6 +221,7 @@ def validate() -> list[str]:
             "B1-core-runtime",
             "B2-domain-build",
             "B3-owner-sensitive",
+            "B3-compat-convergence",
             "B4-research-quarantine",
         }:
             errors.append("move_tag_contract batch set drifted")
@@ -295,9 +297,12 @@ def validate() -> list[str]:
             or bool(item.get("parity_exceptions"))
         )
         quarantine = dst.startswith("skeleton/ai/research/")
+        compat_convergence = dst.startswith("skeleton/ai/compat/")
         expected_cutover = (
             "cutover:quarantine"
             if quarantine
+            else "cutover:merge-required"
+            if compat_convergence
             else "cutover:owner-sensitive"
             if parity_sensitive
             else "cutover:parity-ready"
@@ -309,6 +314,8 @@ def validate() -> list[str]:
         expected_batch = (
             "B4-research-quarantine"
             if quarantine
+            else "B3-compat-convergence"
+            if compat_convergence
             else "B3-owner-sensitive"
             if parity_sensitive
             else "B2-domain-build"
