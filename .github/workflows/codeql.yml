@@ -1,0 +1,82 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.py'
+      - '**/*.pyi'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.mjs'
+      - '**/*.cjs'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '!satellites/branch-snapshots/**'
+      - '.github/workflows/codeql.yml'
+      - '.github/codeql/**'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - '**/*.py'
+      - '**/*.pyi'
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.mjs'
+      - '**/*.cjs'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '!satellites/branch-snapshots/**'
+      - '.github/workflows/codeql.yml'
+      - '.github/codeql/**'
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions: {}
+
+# PR synchronizations should supersede stale PR analysis, and the PR close event
+# must retain its runner-free cancellation barrier. Main pushes and scheduled
+# scans must not cancel analysis that has already started: frequent main updates
+# would otherwise starve CodeQL indefinitely. The queue drainer still removes
+# obsolete queued main runs while allowing an active security scan to finish.
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    name: Analyze ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          languages: ${{ matrix.language }}
+          config-file: ./.github/codeql/codeql-config.yml
+      - name: Analyze and retain SARIF
+        uses: github/codeql-action/analyze@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4.38.0
+        with:
+          category: "/language:${{ matrix.language }}"
+          output: ${{ runner.temp }}/codeql-${{ matrix.language }}
+          upload: never
+      - name: Upload CodeQL SARIF for remediation
+        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'drain/690-codeql-remediation-current-main-20260916' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: ${{ runner.temp }}/codeql-${{ matrix.language }}/**/*.sarif
+          if-no-files-found: error
+          retention-days: 3
