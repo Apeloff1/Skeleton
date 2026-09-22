@@ -25,9 +25,10 @@ When documents overlap, resolve them in this order:
 13. **Research execution program** — [architecture/research-execution-program-2026.md](architecture/research-execution-program-2026.md).
 14. **Research program scorecard** — [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md).
 15. **Research control-plane internals** — [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md).
-16. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
-17. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
-18. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
+16. **Research control-plane build backlog** — [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md).
+17. **Knowledge absorption and promotion mechanics** — [architecture/sota-absorb-engine.md](architecture/sota-absorb-engine.md) and [architecture/adaptive-absorption-fabric.md](architecture/adaptive-absorption-fabric.md).
+18. **Hostile gap audit** — [architecture/masterplan-gap-audit.md](architecture/masterplan-gap-audit.md).
+19. **Historical architecture rounds** — `skeleton/architecture_round3.py` through `skeleton/architecture_round22.py`.
 
 Historical rounds are evidence of design evolution, not permission to override newer contracts.
 
@@ -381,6 +382,7 @@ The 2026-09-21 atlas currently defines:
 - **RXP001–RXP062** — predeclared high-information local experiment protocols;
 - **HL001–HL110** — historical cross-disciplinary research lineage anchors;
 - **RS001–RS055** — research source families and archive/artifact topology;
+- **RCB001–RCB120** — research control-plane implementation backlog;
 - a staged experiment queue from foundational measurement through architecture, optimizer/data, reasoning, memory, agents, serving, safety, formal methods and interpretability.
 
 Research conclusions are not production defaults. A conclusion can recommend a contract, baseline, experiment, watch state or negative guardrail. Architecture changes still require the normal experiment/ADR/shadow/canary path.
