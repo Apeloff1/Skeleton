@@ -382,10 +382,11 @@ inside the governed AI tree as **research-quarantine lineage**:
 - `skeleton/acquired/genos` -> `skeleton/ai/research/acquired/genos`
 - `skeleton/acquired/ingest.py` -> `skeleton/ai/research/acquired/ingest.py`
 
-The destination trees/files reuse the original Git objects. Gaming primitives
-and reference metadata, the historical provider/model gate catalogue, Genos
-pulse/evaluation data, and the asset-ingest implementation are therefore
-preserved without content rewriting.
+The gaming, gates, and Genos destinations reuse the original Git tree objects.
+The asset-ingest Python mirror was initially object-identical, then received a
+destination-only trailing-whitespace cleanup required by repository hygiene;
+the canonical migration validator therefore requires Python AST-semantic parity
+for that file. Source provenance remains unchanged.
 
 This is deliberately not a production-authority move. The mixed
 `skeleton/acquired` root remains a provenance/quarantine owner, while the four
