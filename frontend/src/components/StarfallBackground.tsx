@@ -138,7 +138,7 @@ export const StarfallBackground: React.FC<StarfallProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute', top: 0, right: 0, bottom: 0, left: 0,
     overflow: 'hidden',
   },
   streak: {
