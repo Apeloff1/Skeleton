@@ -374,7 +374,6 @@ def validate() -> list[str]:
         "skeleton/network",
         "skeleton/kv",
         "skeleton/swarm",
-        "skeleton/telemetry",
         "skeleton/foundation",
         "skeleton/build",
         "skeleton/repo_machine",
