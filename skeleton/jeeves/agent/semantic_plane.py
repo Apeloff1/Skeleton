@@ -22,10 +22,9 @@ separate evidence/causal layer establishes them.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from typing import Any, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Sequence
 
-from .epistemic_frontier import KnowledgeObligation
 from .lens_fusion import LensFusionEngine, LensFusionResult, LensSignal
 from .lens_hypergraph import SemanticHypergraphSnapshot, SemanticLensHypergraph
 from .interpretive_science import LensOutcomeTrial, ScientificLensReport
@@ -33,12 +32,7 @@ from .perpendicular_semantics import (
     PerpendicularExpansionPlan,
     PerpendicularExpansionPlanner,
 )
-from .semantic_frontier import (
-    LensCompositionEngine,
-    LensInteractionKind,
-    SemanticComposition,
-    default_interaction_rules,
-)
+from .semantic_frontier import LensCompositionEngine, SemanticComposition
 from .semantic_governance_bridge import (
     SemanticGovernanceBridge,
     SemanticGovernanceSnapshot,
@@ -48,28 +42,12 @@ from .semantic_lenses import (
     LensSelection,
     ReadingStatus,
     SemanticFinding,
-    SemanticLensSpec,
     SemanticObservation,
     SemanticRole,
     TangentSeed,
 )
 from .semantic_maximal import MaximalLensRouter, MaximalSemanticRegistry
-from .semantic_lens_topology import (
-    LensBridgeCandidate,
-    SemanticLensTopology,
-    SemanticTopologySnapshot,
-)
 from .semantic_plane_interactions import plane_interaction_rules
-from .semantic_depth_interactions import depth_interaction_rules
-from .semantic_topology_learning import (
-    LearnedTopologyRule,
-    SemanticTopologyLearningLab,
-    SemanticTopologyLearningSnapshot,
-    SemanticTopologyLearningState,
-    TopologyBridgePrediction,
-    TopologyBridgeReport,
-    TopologyBridgeTrial,
-)
 from .semantic_prediction import (
     PredictionStatus,
     SemanticForecast,
@@ -137,12 +115,6 @@ class SemanticPlanePolicy:
     frontier_limit: int = 20
     frontier_max_per_axis: int = 3
     frontier_max_per_family: int = 3
-    topology_bridge_limit: int = 12
-    topology_bridge_minimum_score: float = 0.18
-    enable_learned_companions: bool = True
-    max_learned_companions: int = 4
-    minimum_learned_companion_cue_support: float = 0.20
-    minimum_learned_companion_bridge_quality: float = 0.55
     require_selected_findings: bool = True
     require_observation_overlap: bool = True
     require_observation_subset: bool = True
@@ -159,47 +131,13 @@ class SemanticPlanePolicy:
             "frontier_limit",
             "frontier_max_per_axis",
             "frontier_max_per_family",
-            "topology_bridge_limit",
-            "max_learned_companions",
         ):
             object.__setattr__(
                 self,
                 name,
                 positive_int(name, getattr(self, name), maximum=10_000),
             )
-        object.__setattr__(
-            self,
-            "topology_bridge_minimum_score",
-            probability(
-                "topology_bridge_minimum_score",
-                self.topology_bridge_minimum_score,
-            ),
-        )
-        object.__setattr__(
-            self,
-            "minimum_learned_companion_cue_support",
-            probability(
-                "minimum_learned_companion_cue_support",
-                self.minimum_learned_companion_cue_support,
-            ),
-        )
-        object.__setattr__(
-            self,
-            "minimum_learned_companion_bridge_quality",
-            probability(
-                "minimum_learned_companion_bridge_quality",
-                self.minimum_learned_companion_bridge_quality,
-            ),
-        )
-        if not isinstance(self.enable_learned_companions, bool):
-            raise AgentContractError(
-                "enable_learned_companions must be boolean"
-            )
-        object.__setattr__(
-            self,
-            "base_rate",
-            probability("base_rate", self.base_rate),
-        )
+        object.__setattr__(self, "base_rate", probability("base_rate", self.base_rate))
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,60 +162,6 @@ class SemanticFindingAudit:
 
 
 @dataclass(frozen=True, slots=True)
-class LearnedCompanionActivation:
-    lens_key: str
-    source_lens_key: str
-    candidate_id: str
-    report_id: str
-    interaction_kind: LensInteractionKind
-    cue_support: float
-    bridge_quality: float
-    activation_score: float
-    fingerprint: str
-
-    def __post_init__(self) -> None:
-        for name in (
-            "lens_key",
-            "source_lens_key",
-            "candidate_id",
-            "report_id",
-        ):
-            value = str(getattr(self, name)).strip()
-            if not value:
-                raise AgentContractError(f"{name} is required")
-            object.__setattr__(self, name, value)
-        if not isinstance(self.interaction_kind, LensInteractionKind):
-            object.__setattr__(
-                self,
-                "interaction_kind",
-                LensInteractionKind(str(self.interaction_kind)),
-            )
-        for name in (
-            "cue_support",
-            "bridge_quality",
-            "activation_score",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                probability(name, getattr(self, name)),
-            )
-
-    def as_json(self) -> dict[str, Any]:
-        return {
-            "lens_key": self.lens_key,
-            "source_lens_key": self.source_lens_key,
-            "candidate_id": self.candidate_id,
-            "report_id": self.report_id,
-            "interaction_kind": self.interaction_kind.value,
-            "cue_support": self.cue_support,
-            "bridge_quality": self.bridge_quality,
-            "activation_score": self.activation_score,
-            "fingerprint": self.fingerprint,
-        }
-
-
-@dataclass(frozen=True, slots=True)
 class SemanticPlaneCoverage:
     selected_families: tuple[LensFamily, ...]
     finding_families: tuple[LensFamily, ...]
@@ -298,13 +182,6 @@ class SemanticPlaneCoverage:
     fused_effective_lens_count: float
     tangent_count: int
     frontier_tangent_count: int
-    topology_components: int
-    topology_isolated_lenses: int
-    topology_bridge_lenses: int
-    topology_candidate_bridges: int
-    topology_learned_bridges: int
-    topology_active_learning_reports: int
-    learned_companion_lenses: int
     fingerprint: str
 
 
@@ -331,16 +208,6 @@ class SemanticPlaneSnapshot:
     coverage: SemanticPlaneCoverage
     tangent_ids: tuple[str, ...]
     frontier: FrontierSelection
-    topology: SemanticTopologySnapshot
-    topology_learning: SemanticTopologyLearningSnapshot
-    learned_topology_rules: tuple[LearnedTopologyRule, ...]
-    learned_companion_keys: tuple[str, ...]
-    learned_companion_activations: tuple[
-        LearnedCompanionActivation,
-        ...,
-    ]
-    topology_bridge_candidates: tuple[LensBridgeCandidate, ...]
-    runtime_state_fingerprint: str
     decision_feature_authorized: bool
     factual_assertion_authorized: bool
     causal_assertion_authorized: bool
@@ -363,35 +230,18 @@ class SemanticLensPlane:
         prediction_ledger: SemanticPredictionLedger | None = None,
         fusion: LensFusionEngine | None = None,
         tangent_graph: TangentGraph | None = None,
-        topology: SemanticLensTopology | None = None,
-        topology_learning: SemanticTopologyLearningLab | None = None,
         policy: SemanticPlanePolicy | None = None,
     ) -> None:
         self.registry = registry or MaximalSemanticRegistry()
         self.router = router or MaximalLensRouter(self.registry)
         self.governance = governance or SemanticGovernanceBridge()
         self.perpendicular = perpendicular or PerpendicularExpansionPlanner(self.registry)
-        self.composition = composition or LensCompositionEngine(
-            (
-                *default_interaction_rules(),
-                *plane_interaction_rules(),
-                *depth_interaction_rules(),
-            )
-        )
+        self.composition = composition or LensCompositionEngine(plane_interaction_rules())
         self.hypergraph = hypergraph or SemanticLensHypergraph()
         self.predictive = predictive or SemanticPredictiveModel()
         self.prediction_ledger = prediction_ledger or SemanticPredictionLedger()
         self.fusion = fusion or LensFusionEngine()
         self.tangent_graph = tangent_graph or TangentGraph()
-        self.topology = topology or SemanticLensTopology(self.registry)
-        self.topology_learning = (
-            topology_learning
-            or SemanticTopologyLearningLab(self.topology)
-        )
-        if self.topology_learning.topology is not self.topology:
-            raise ValueError(
-                "topology_learning must share the semantic topology"
-            )
         self.policy = policy or SemanticPlanePolicy()
 
     def select(
@@ -651,105 +501,6 @@ class SemanticLensPlane:
             )
         return tuple(signals)
 
-    def reasoning_signals(
-        self,
-        snapshot: SemanticPlaneSnapshot,
-        *,
-        limit: int = 24,
-    ) -> tuple[LensSignal, ...]:
-        """Return custody-checked semantic signals for inference escalation.
-
-        These signals are advisory and escalation-only. They may cause frontier
-        reasoning to deliberate, seek evidence, or abstain when semantic
-        forecasts conflict or are sensitive. They cannot increase factual
-        evidence quality or independently authorize a commit.
-        """
-
-        if not isinstance(snapshot, SemanticPlaneSnapshot):
-            raise TypeError("snapshot must be SemanticPlaneSnapshot")
-        maximum = positive_int("limit", limit, maximum=1_000)
-        if (
-            snapshot.factual_assertion_authorized
-            or snapshot.causal_assertion_authorized
-        ):
-            raise AgentContractError(
-                "semantic reasoning signals cannot carry factual/causal authority"
-            )
-
-        if (
-            snapshot.runtime_state_fingerprint
-            != self.runtime_state_fingerprint
-        ):
-            raise AgentContractError(
-                "semantic reasoning snapshot state revision is stale"
-            )
-
-        open_forecasts: list[SemanticForecast] = []
-        for forecast in snapshot.forecasts:
-            stored = self.prediction_ledger.get(forecast.forecast_id)
-            if stored is None:
-                raise AgentContractError(
-                    "semantic reasoning forecast is missing from prediction custody"
-                )
-            if stored.fingerprint != forecast.fingerprint:
-                raise AgentContractError(
-                    "semantic reasoning forecast differs from prediction custody"
-                )
-            if stored.status is not PredictionStatus.OPEN:
-                continue
-            open_forecasts.append(stored)
-
-        signals = self._signals(
-            tuple(open_forecasts[:maximum]),
-            snapshot.governance,
-        )
-        return tuple(
-            replace(
-                signal,
-                metadata={
-                    **dict(signal.metadata),
-                    "semantic_snapshot_fingerprint": snapshot.fingerprint,
-                    "semantic_governance_fingerprint": (
-                        snapshot.governance.fingerprint
-                    ),
-                    "semantic_topology_learning_fingerprint": (
-                        snapshot.topology_learning.fingerprint
-                    ),
-                    "semantic_runtime_state_fingerprint": (
-                        snapshot.runtime_state_fingerprint
-                    ),
-                    "inference_authority": "escalation_only",
-                    "may_increase_evidence_quality": False,
-                    "may_authorize_commit": False,
-                    "factual_assertion_authorized": False,
-                    "causal_assertion_authorized": False,
-                },
-            )
-            for signal in signals
-        )
-
-    def reasoning_signal_is_current(
-        self,
-        signal: LensSignal,
-    ) -> bool:
-        """Check that an advisory still points at the same open forecast."""
-
-        if not isinstance(signal, LensSignal):
-            return False
-        if signal.metadata.get("inference_authority") != "escalation_only":
-            return False
-        stored = self.prediction_ledger.get(signal.signal_id)
-        if stored is None or stored.status is not PredictionStatus.OPEN:
-            return False
-        return (
-            signal.metadata.get("forecast_fingerprint")
-            == stored.fingerprint
-            and signal.metadata.get(
-                "semantic_runtime_state_fingerprint"
-            )
-            == self.runtime_state_fingerprint
-        )
-
     def _seed_family(self, seed: TangentSeed) -> LensFamily | None:
         key = seed.lens_key.strip().casefold()
         try:
@@ -906,202 +657,6 @@ class SemanticLensPlane:
             for key in source_keys
         )
 
-    def _cue_support(
-        self,
-        spec: SemanticLensSpec,
-        observations: Sequence[SemanticObservation],
-    ) -> float:
-        if not spec.activation_cues:
-            return 0.0
-        observation_tokens: set[str] = set()
-        for observation in observations:
-            observation_tokens.update(
-                self.router._tokens(observation.content)
-            )
-            observation_tokens.update(
-                str(tag).strip().casefold()
-                for tag in observation.tags
-                if str(tag).strip()
-            )
-        matched = 0
-        for cue in spec.activation_cues:
-            cue_tokens = self.router._tokens(cue)
-            if cue_tokens and cue_tokens.issubset(observation_tokens):
-                matched += 1
-        return matched / max(1, len(spec.activation_cues))
-
-    def _augment_with_learned_companions(
-        self,
-        selection: LensSelection,
-        observations: Sequence[SemanticObservation],
-        learned_rules: Sequence[LearnedTopologyRule],
-    ) -> tuple[
-        LensSelection,
-        tuple[LearnedCompanionActivation, ...],
-    ]:
-        if (
-            not self.policy.enable_learned_companions
-            or not learned_rules
-            or len(selection.lenses) >= self.policy.max_lenses
-        ):
-            return selection, ()
-
-        selected = list(selection.lenses)
-        selected_keys = {item.key for item in selected}
-        scores = dict(selection.activation_scores)
-        family_counts: dict[LensFamily, int] = {}
-        for spec in selected:
-            family_counts[spec.family] = (
-                family_counts.get(spec.family, 0) + 1
-            )
-
-        proposals: dict[
-            str,
-            tuple[
-                float,
-                SemanticLensSpec,
-                LearnedCompanionActivation,
-            ],
-        ] = {}
-        for learned in learned_rules:
-            if (
-                learned.bridge_quality
-                < self.policy.minimum_learned_companion_bridge_quality
-            ):
-                continue
-            left_key, right_key = learned.rule.key
-            left_selected = left_key in selected_keys
-            right_selected = right_key in selected_keys
-            if left_selected == right_selected:
-                continue
-            source_key = left_key if left_selected else right_key
-            companion_key = right_key if left_selected else left_key
-            try:
-                companion = self.registry.get(companion_key)
-            except KeyError:
-                continue
-            if len(observations) < companion.minimum_observations:
-                continue
-            if (
-                family_counts.get(companion.family, 0)
-                >= self.policy.max_per_family
-            ):
-                continue
-
-            cue_support = self._cue_support(companion, observations)
-            if (
-                cue_support
-                < self.policy.minimum_learned_companion_cue_support
-            ):
-                continue
-
-            pair_bonus = (
-                0.07
-                if companion.pairwise and len(observations) >= 2
-                else 0.0
-            )
-            sequential_bonus = (
-                0.07
-                if companion.sequential and len(observations) >= 3
-                else 0.0
-            )
-            rarity_bonus = 0.03 if companion.rare else 0.0
-            activation = min(
-                1.0,
-                0.10
-                + 0.50 * cue_support
-                + 0.23 * learned.bridge_quality
-                + pair_bonus
-                + sequential_bonus
-                + rarity_bonus,
-            )
-            activation_record = LearnedCompanionActivation(
-                lens_key=companion.key,
-                source_lens_key=source_key,
-                candidate_id=learned.candidate_id,
-                report_id=learned.report_id,
-                interaction_kind=learned.rule.kind,
-                cue_support=cue_support,
-                bridge_quality=learned.bridge_quality,
-                activation_score=activation,
-                fingerprint=stable_fingerprint(
-                    {
-                        "lens": companion.key,
-                        "source": source_key,
-                        "candidate": learned.candidate_id,
-                        "report": learned.report_fingerprint,
-                        "kind": learned.rule.kind.value,
-                        "cue_support": cue_support,
-                        "bridge_quality": learned.bridge_quality,
-                        "activation": activation,
-                    }
-                ),
-            )
-            prior = proposals.get(companion.key)
-            if prior is None or activation > prior[0]:
-                proposals[companion.key] = (
-                    activation,
-                    companion,
-                    activation_record,
-                )
-
-        ordered = sorted(
-            proposals.values(),
-            key=lambda item: (
-                -item[0],
-                -item[2].bridge_quality,
-                item[1].family.value,
-                item[1].key,
-            ),
-        )
-        added: list[LearnedCompanionActivation] = []
-        for activation, companion, activation_record in ordered:
-            if (
-                len(selected) >= self.policy.max_lenses
-                or len(added) >= self.policy.max_learned_companions
-            ):
-                break
-            if companion.key in selected_keys:
-                continue
-            if (
-                family_counts.get(companion.family, 0)
-                >= self.policy.max_per_family
-            ):
-                continue
-            selected.append(companion)
-            selected_keys.add(companion.key)
-            family_counts[companion.family] = (
-                family_counts.get(companion.family, 0) + 1
-            )
-            scores[companion.key] = activation
-            added.append(activation_record)
-
-        if not added:
-            return selection, ()
-        return (
-            LensSelection(
-                lenses=tuple(selected),
-                activation_scores=scores,
-                families=tuple(
-                    sorted(
-                        {spec.family for spec in selected},
-                        key=lambda family: family.value,
-                    )
-                ),
-                perpendicular=selection.perpendicular,
-            ),
-            tuple(
-                sorted(
-                    added,
-                    key=lambda item: (
-                        item.lens_key,
-                        item.source_lens_key,
-                        item.candidate_id,
-                    ),
-                )
-            ),
-        )
-
     def _coverage(
         self,
         *,
@@ -1114,11 +669,6 @@ class SemanticLensPlane:
         fusion: LensFusionResult,
         tangent_ids: Sequence[str],
         frontier: FrontierSelection,
-        topology: SemanticTopologySnapshot,
-        topology_learning: SemanticTopologyLearningSnapshot,
-        learned_topology_rules: Sequence[LearnedTopologyRule],
-        learned_companion_keys: Sequence[str],
-        topology_bridge_candidates: Sequence[LensBridgeCandidate],
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
             sorted({spec.family for spec in selection.lenses}, key=lambda item: item.value)
@@ -1165,17 +715,6 @@ class SemanticLensPlane:
                 "effective_lenses": fusion.effective_lens_count,
                 "tangents": sorted(tangent_ids),
                 "frontier": frontier.fingerprint,
-                "topology": topology.fingerprint,
-                "topology_learning": topology_learning.fingerprint,
-                "learned_topology_rules": [
-                    item.fingerprint for item in learned_topology_rules
-                ],
-                "learned_companion_keys": sorted(
-                    set(learned_companion_keys)
-                ),
-                "topology_bridge_candidates": [
-                    item.candidate_id for item in topology_bridge_candidates
-                ],
             }
         )
         return SemanticPlaneCoverage(
@@ -1198,17 +737,6 @@ class SemanticLensPlane:
             fused_effective_lens_count=fusion.effective_lens_count,
             tangent_count=len(tuple(tangent_ids)),
             frontier_tangent_count=len(frontier.tangent_ids),
-            topology_components=topology.component_count,
-            topology_isolated_lenses=len(topology.isolated_lens_keys),
-            topology_bridge_lenses=len(topology.bridge_lens_keys),
-            topology_candidate_bridges=len(topology_bridge_candidates),
-            topology_learned_bridges=len(learned_topology_rules),
-            topology_active_learning_reports=len(
-                topology_learning.active_report_ids
-            ),
-            learned_companion_lenses=len(
-                tuple(set(learned_companion_keys))
-            ),
             fingerprint=fingerprint,
         )
 
@@ -1231,23 +759,7 @@ class SemanticLensPlane:
         if len(observation_ids) != len(set(observation_ids)):
             raise AgentContractError("semantic observation ids must be unique")
 
-        (
-            learned_topology_rules,
-            topology_learning,
-        ) = self.topology_learning.evaluate()
         selection = self.select(observations, requested=requested)
-        (
-            selection,
-            learned_companion_activations,
-        ) = self._augment_with_learned_companions(
-            selection,
-            observations,
-            learned_topology_rules,
-        )
-        learned_companion_keys = tuple(
-            item.lens_key
-            for item in learned_companion_activations
-        )
         governance = self.governance.assess(
             selection,
             observations=observations,
@@ -1271,12 +783,7 @@ class SemanticLensPlane:
             selected_lens_keys=tuple(spec.key for spec in selection.lenses),
             maximum_axes=self.policy.max_perpendicular_axes,
         )
-        composition = self.composition.compose(
-            audit.accepted,
-            supplemental_rules=tuple(
-                item.rule for item in learned_topology_rules
-            ),
-        )
+        composition = self.composition.compose(audit.accepted)
 
         calibration_weights = dict(governance.predictive_weights)
         hypergraph = self.hypergraph.build(
@@ -1337,21 +844,6 @@ class SemanticLensPlane:
             composition=composition,
             fusion=fusion,
         ) and not bool(audit.rejected)
-        topology = self.topology.snapshot_with_rules(
-            tuple(item.rule for item in learned_topology_rules)
-        )
-        learned_candidate_ids = {
-            item.candidate_id for item in learned_topology_rules
-        }
-        topology_bridge_candidates = tuple(
-            item
-            for item in self.topology.bridge_candidates(
-                limit=self.policy.topology_bridge_limit,
-                minimum_score=self.policy.topology_bridge_minimum_score,
-                focus_keys=tuple(spec.key for spec in selection.lenses),
-            )
-            if item.candidate_id not in learned_candidate_ids
-        )
         coverage = self._coverage(
             selection=selection,
             audit=audit,
@@ -1362,16 +854,7 @@ class SemanticLensPlane:
             fusion=fusion,
             tangent_ids=tangent_ids,
             frontier=frontier,
-            topology=topology,
-            topology_learning=topology_learning,
-            learned_topology_rules=learned_topology_rules,
-            learned_companion_keys=learned_companion_keys,
-            learned_companion_activations=(
-                learned_companion_activations
-            ),
-            topology_bridge_candidates=topology_bridge_candidates,
         )
-        runtime_state_fingerprint = self.runtime_state_fingerprint
         fingerprint = stable_fingerprint(
             {
                 "observations": [item.fingerprint for item in observations],
@@ -1391,20 +874,6 @@ class SemanticLensPlane:
                 "fusion": fusion.fingerprint,
                 "tangents": tangent_ids,
                 "frontier": frontier.fingerprint,
-                "topology": topology.fingerprint,
-                "topology_learning": topology_learning.fingerprint,
-                "learned_topology_rules": [
-                    item.fingerprint for item in learned_topology_rules
-                ],
-                "learned_companion_keys": learned_companion_keys,
-                "learned_companion_activations": [
-                    item.fingerprint
-                    for item in learned_companion_activations
-                ],
-                "topology_bridge_candidates": [
-                    item.candidate_id for item in topology_bridge_candidates
-                ],
-                "runtime_state_fingerprint": runtime_state_fingerprint,
                 "coverage": coverage.fingerprint,
                 "decision_feature_authorized": decision_feature_authorized,
                 "factual": False,
@@ -1424,176 +893,11 @@ class SemanticLensPlane:
             coverage=coverage,
             tangent_ids=tangent_ids,
             frontier=frontier,
-            topology=topology,
-            topology_learning=topology_learning,
-            learned_topology_rules=learned_topology_rules,
-            learned_companion_keys=learned_companion_keys,
-            learned_companion_activations=(
-                learned_companion_activations
-            ),
-            topology_bridge_candidates=topology_bridge_candidates,
-            runtime_state_fingerprint=runtime_state_fingerprint,
             decision_feature_authorized=decision_feature_authorized,
             factual_assertion_authorized=False,
             causal_assertion_authorized=False,
             fingerprint=fingerprint,
         )
-
-    def declare_topology_candidate_prediction(
-        self,
-        candidate_id: str,
-        *,
-        kind: LensInteractionKind,
-        predicted_probability: float,
-        domain: str,
-        independent_run: str,
-        predicted_at: float,
-        negative_control: bool = False,
-        source_finding_ids: Sequence[str] = (),
-        source_forecast_ids: Sequence[str] = (),
-        evidence_ids: Sequence[str] = (),
-        metadata: Mapping[str, Any] | None = None,
-    ) -> TopologyBridgePrediction:
-        """Create and persist one canonical topology experiment prediction."""
-
-        return self.topology_learning.declare_candidate_prediction(
-            candidate_id,
-            kind=kind,
-            predicted_probability=predicted_probability,
-            domain=domain,
-            independent_run=independent_run,
-            predicted_at=predicted_at,
-            negative_control=negative_control,
-            source_finding_ids=source_finding_ids,
-            source_forecast_ids=source_forecast_ids,
-            evidence_ids=evidence_ids,
-            metadata=metadata,
-        )
-
-    def unresolved_topology_predictions(
-        self,
-        *,
-        candidate_id: str | None = None,
-    ) -> tuple[TopologyBridgePrediction, ...]:
-        return self.topology_learning.unresolved_predictions(
-            candidate_id=candidate_id,
-        )
-
-    def declare_topology_bridge_prediction(
-        self,
-        prediction: TopologyBridgePrediction,
-    ) -> TopologyBridgePrediction:
-        """Persist a topology bridge prediction before outcome observation."""
-
-        return self.topology_learning.declare(prediction)
-
-    def resolve_topology_bridge_prediction(
-        self,
-        prediction_id: str,
-        *,
-        outcome: bool,
-        observed_at: float,
-        outcome_evidence_ids: Sequence[str] = (),
-        metadata: Mapping[str, Any] | None = None,
-    ) -> TopologyBridgeReport:
-        """Resolve a declared bridge prediction and return its current report."""
-
-        trial = self.topology_learning.resolve(
-            prediction_id,
-            outcome=outcome,
-            observed_at=observed_at,
-            outcome_evidence_ids=outcome_evidence_ids,
-            metadata=metadata,
-        )
-        return self.topology_learning.report(
-            trial.candidate_id,
-            trial.kind,
-        )
-
-    def record_topology_bridge_trial(
-        self,
-        trial: TopologyBridgeTrial,
-    ) -> TopologyBridgeReport:
-        """Import a resolved trial only when its prediction is already declared."""
-
-        recorded = self.topology_learning.record(trial)
-        return self.topology_learning.report(
-            recorded.candidate_id,
-            recorded.kind,
-        )
-
-    def topology_learning_diagnostics(
-        self,
-        *,
-        candidate_id: str | None = None,
-        kind: LensInteractionKind | None = None,
-        limit: int = 100,
-    ) -> Mapping[str, Any]:
-        return self.topology_learning.diagnostics(
-            candidate_id=candidate_id,
-            kind=kind,
-            limit=limit,
-        )
-
-    def topology_research_obligations(
-        self,
-        *,
-        limit: int = 24,
-        minimum_candidate_score: float = 0.18,
-        include_rejected: bool = False,
-    ) -> tuple[KnowledgeObligation, ...]:
-        """Emit unresolved semantic-topology gaps for the research frontier."""
-
-        return self.topology_learning.research_obligations(
-            limit=limit,
-            minimum_candidate_score=minimum_candidate_score,
-            include_rejected=include_rejected,
-        )
-
-    def export_topology_learning_state(
-        self,
-    ) -> SemanticTopologyLearningState:
-        """Export topology-learning state for contract-bound persistence."""
-
-        return self.topology_learning.export_state()
-
-    def restore_topology_learning_state(
-        self,
-        state: SemanticTopologyLearningState | Mapping[str, Any],
-    ) -> SemanticTopologyLearningSnapshot:
-        """Restore topology learning only when the runtime contract matches."""
-
-        return self.topology_learning.restore_state(state)
-
-    def topology_learning_summary(self) -> Mapping[str, Any]:
-        snapshot = self.topology_learning.snapshot()
-        return {
-            "prediction_count": snapshot.prediction_count,
-            "unresolved_prediction_count": snapshot.unresolved_prediction_count,
-            "trial_count": snapshot.trial_count,
-            "tested_bridge_count": snapshot.tested_bridge_count,
-            "active_report_ids": snapshot.active_report_ids,
-            "restricted_report_ids": snapshot.restricted_report_ids,
-            "rejected_report_ids": snapshot.rejected_report_ids,
-            "candidate_report_ids": snapshot.candidate_report_ids,
-            "ambiguous_active_candidate_ids": (
-                snapshot.ambiguous_active_candidate_ids
-            ),
-            "learned_rule_keys": snapshot.learned_rule_keys,
-            "snapshot_fingerprint": snapshot.fingerprint,
-            "contract_fingerprint": (
-                self.topology_learning.contract_fingerprint
-            ),
-            "invariants": {
-                "cue_overlap_never_auto_promotes": True,
-                "outcomes_require_predeclared_predictions": True,
-                "each_prediction_resolves_at_most_once": True,
-                "learned_bridges_remain_interpretive": True,
-                "negative_controls_are_required": True,
-                "replication_across_runs_and_domains_is_required": True,
-                "learned_bridges_never_create_evidence": True,
-            },
-        }
 
     def resolve_forecast(
         self,
@@ -1689,20 +993,6 @@ class SemanticLensPlane:
         )
 
     @property
-    def runtime_state_fingerprint(self) -> str:
-        """Fingerprint mutable semantic state that can affect run behavior."""
-
-        return stable_fingerprint(
-            {
-                "contract": self.fingerprint,
-                "governance": self.governance.registry.fingerprint,
-                "prediction_ledger": self.prediction_ledger.fingerprint,
-                "tangent_graph": self.tangent_graph.fingerprint,
-                "topology_learning": self.topology_learning.fingerprint,
-            }
-        )
-
-    @property
     def fingerprint(self) -> str:
         # Runtime/checkpoint identity binds the semantic contract, not mutable
         # calibration outcomes. Scientific trial ledgers may legitimately grow
@@ -1722,10 +1012,6 @@ class SemanticLensPlane:
                     )
                     for spec in self.registry.all()
                 ],
-                "topology": self.topology.fingerprint,
-                "topology_learning_contract": (
-                    self.topology_learning.contract_fingerprint
-                ),
                 "interaction_rules": [
                     (
                         rule.key,
@@ -1733,11 +1019,7 @@ class SemanticLensPlane:
                         rule.symmetric,
                         rule.tangent_axis_hint,
                     )
-                    for rule in (
-                        *default_interaction_rules(),
-                        *plane_interaction_rules(),
-                        *depth_interaction_rules(),
-                    )
+                    for rule in plane_interaction_rules()
                 ],
                 "policy": {
                     "max_lenses": self.policy.max_lenses,
@@ -1747,16 +1029,6 @@ class SemanticLensPlane:
                     "frontier_limit": self.policy.frontier_limit,
                     "frontier_max_per_axis": self.policy.frontier_max_per_axis,
                     "frontier_max_per_family": self.policy.frontier_max_per_family,
-                    "topology_bridge_limit": self.policy.topology_bridge_limit,
-                    "topology_bridge_minimum_score": self.policy.topology_bridge_minimum_score,
-                    "enable_learned_companions": self.policy.enable_learned_companions,
-                    "max_learned_companions": self.policy.max_learned_companions,
-                    "minimum_learned_companion_cue_support": (
-                        self.policy.minimum_learned_companion_cue_support
-                    ),
-                    "minimum_learned_companion_bridge_quality": (
-                        self.policy.minimum_learned_companion_bridge_quality
-                    ),
                     "require_selected": self.policy.require_selected_findings,
                     "require_overlap": self.policy.require_observation_overlap,
                     "require_observation_subset": self.policy.require_observation_subset,
