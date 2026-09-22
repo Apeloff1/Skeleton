@@ -133,6 +133,7 @@ def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> Non
         "B1-core-runtime",
         "B2-domain-build",
         "B3-owner-sensitive",
+        "B3-compat-convergence",
         "B4-research-quarantine",
     }
 
@@ -146,6 +147,10 @@ def test_ai_file_tree_move_preparation_tags_cover_all_governed_mappings() -> Non
     assert "cutover:owner-sensitive" in mappings["skeleton/provider_runtime.py"]["move_tags"]
     assert mappings["skeleton/viscera"]["move_batch"] == "B4-research-quarantine"
     assert "cutover:quarantine" in mappings["skeleton/viscera"]["move_tags"]
+    assert mappings["skeleton/turn"]["move_batch"] == "B3-compat-convergence"
+    assert "cutover:merge-required" in mappings["skeleton/turn"]["move_tags"]
+    assert mappings["skeleton/telemetry"]["move_batch"] == "B3-compat-convergence"
+    assert "cutover:merge-required" in mappings["skeleton/telemetry"]["move_tags"]
 
 
 def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
