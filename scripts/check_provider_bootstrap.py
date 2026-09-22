@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
 import sys
@@ -60,6 +61,25 @@ _AI_SURFACE_PATH_TERMS = (
     "/ai/",
 )
 
+_NETWORK_CLIENT_ROOTS = frozenset(
+    {
+        "aiohttp",
+        "httpx",
+        "requests",
+        "urllib3",
+    }
+)
+_PROVIDER_ENDPOINT_MARKERS = frozenset(
+    {
+        "api.openai.com",
+        "api.anthropic.com",
+        "generativelanguage.googleapis.com",
+        "api.groq.com",
+        "api.mistral.ai",
+        "api.cohere.ai",
+    }
+)
+
 
 def _load() -> dict:
     try:
@@ -111,6 +131,86 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
         ):
             hits.append(name)
     return hits
+
+
+def _network_client_imports(path: Path) -> list[str]:
+    hits: list[str] = []
+    for name in _imported_modules(path):
+        root = name.split(".", 1)[0]
+        if root in _NETWORK_CLIENT_ROOTS:
+            hits.append(name)
+    return hits
+
+
+def _credential_markers(source: str) -> list[str]:
+    return sorted(marker for marker in _AI_CREDENTIAL_MARKERS if marker in source)
+
+
+def _provider_endpoint_markers(source: str) -> list[str]:
+    lowered = source.lower()
+    return sorted(marker for marker in _PROVIDER_ENDPOINT_MARKERS if marker in lowered)
+
+
+def discover_provider_surface_inventory(repo_root: Path = ROOT) -> list[dict[str, object]]:
+    """Return deterministic provider/model edge classification for production Python."""
+    inventory: list[dict[str, object]] = []
+    for root_name in ("backend", "skeleton"):
+        root = repo_root / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            relative = path.relative_to(repo_root).as_posix()
+            if (
+                "/tests/" in "/" + relative
+                or relative.startswith("tests/")
+                or "/testing/" in "/" + relative
+                or path.name.startswith("test_")
+            ):
+                continue
+            try:
+                source = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+
+            credentials = _credential_markers(source)
+            sdk_imports = sorted(_provider_sdk_imports(path))
+            network_imports = sorted(_network_client_imports(path))
+            endpoints = _provider_endpoint_markers(source)
+            provider_path = any(
+                term in path.as_posix().lower()
+                for term in _AI_SURFACE_PATH_TERMS
+            )
+            model_network_edge = bool(
+                endpoints
+                or credentials
+                or sdk_imports
+                or (provider_path and network_imports)
+            )
+            if not model_network_edge:
+                continue
+
+            if credentials and (sdk_imports or network_imports or endpoints):
+                classification = "credential_network_owner"
+            elif credentials:
+                classification = "credential_surface"
+            elif sdk_imports:
+                classification = "provider_sdk_surface"
+            elif endpoints:
+                classification = "raw_provider_network"
+            else:
+                classification = "provider_network_candidate"
+
+            inventory.append(
+                {
+                    "path": relative,
+                    "classification": classification,
+                    "credential_markers": credentials,
+                    "provider_sdk_imports": sdk_imports,
+                    "network_client_imports": network_imports,
+                    "provider_endpoints": endpoints,
+                }
+            )
+    return inventory
 
 
 
@@ -404,6 +504,30 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             + ", ".join(undeclared_surfaces)
         )
 
+    declared_surface_owners = {
+        item.get("owner")
+        for item in surfaces
+        if isinstance(item, dict) and isinstance(item.get("owner"), str)
+    } if isinstance(surfaces, list) else set()
+    inventory = discover_provider_surface_inventory(repo_root)
+    unexplained_edges = sorted(
+        item["path"]
+        for item in inventory
+        if item["path"] not in declared_surface_owners
+    )
+    if unexplained_edges:
+        errors.append(
+            "provider/model network edges missing from construction inventory: "
+            + ", ".join(unexplained_edges)
+        )
+
+    for item in inventory:
+        relative = str(item["path"])
+        if item["classification"] == "raw_provider_network":
+            errors.append(
+                f"raw provider endpoint outside canonical credential boundary: {relative}"
+            )
+
     for root_name in ("backend", "skeleton"):
         source_root = repo_root / root_name
         if not source_root.is_dir():
@@ -432,7 +556,31 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="emit deterministic provider/model surface classification",
+    )
+    args = parser.parse_args()
+
     errors = validate_provider_bootstrap()
+    inventory = discover_provider_surface_inventory()
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "status": "rejected" if errors else "ok",
+                    "surface_count": len(inventory),
+                    "surfaces": inventory,
+                    "errors": errors,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 1 if errors else 0
+
     if errors:
         print("provider-bootstrap: rejected", file=sys.stderr)
         for error in errors:
@@ -440,7 +588,8 @@ def main() -> int:
         return 1
     print(
         "provider-bootstrap: OK "
-        "(mandatory docs, shared receipts, provider families, surface inventory, SDK isolation)"
+        f"({len(inventory)} classified provider/model edges; "
+        "mandatory docs, shared receipts, provider families, surface inventory, SDK isolation)"
     )
     return 0
 
