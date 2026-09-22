@@ -711,23 +711,15 @@
     ]
   },
   "implementation_signoff": {
-    "signed": true,
-    "signer_id": "github:Apeloff1",
+    "signed": false,
+    "signer_id": null,
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T12:49:45Z",
-    "git_sha": "64eed5856b02f5775a47f36b258ffd71c181858d",
-    "evidence_refs": [
-      "git:64eed5856b02f5775a47f36b258ffd71c181858d",
-      "git-tree:8f9e6c40a934668f6959953bd1fcfcec355e9259",
-      "machine/ai_file_tree.json",
-      "docs/plan/AI_FILE_TREE_MIGRATION.md",
-      "scripts/check_ai_file_tree.py",
-      "skeleton/testing/test_ai_file_tree.py",
-      "machine/ai_engineering_task_matrix.json"
-    ],
-    "statement": "Implementation scope is frozen at the cited payload SHA: 30 governed AI-tree mappings, provider/automation credential surfaces represented as non-owning facades, plan-derived Simulation/Forge recovery, semantic Python parity, and the AIQ engineering-union repair. The payload was written through the authorized GitHub connection and bound to GitHub identity Apeloff1. GitHub reports the payload commit itself as unsigned, so this is a plan-permitted github_identity attestation, not a GPG/SSH/Sigstore signature and not independent verification.",
-    "signature_method": "github_identity"
+    "signed_at_utc": null,
+    "git_sha": null,
+    "evidence_refs": [],
+    "statement": "Implementation scope reopened after post-freeze semantic mirror reconciliation and remaining planned-path migration. Re-sign only after the new payload is frozen and CI evidence is collected.",
+    "signature_method": null
   },
   "verification_signoff": {
     "signed": false,
