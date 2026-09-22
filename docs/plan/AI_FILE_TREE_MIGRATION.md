@@ -2,8 +2,8 @@
 
 Status: **staged mirror / cutover not authorized**
 
-Authority: `machine/ai_file_tree.json`  
-Canonical destination: `skeleton/ai`  
+Authority: `machine/ai_file_tree.json`
+Canonical destination: `skeleton/ai`
 Baseline: `6834ce802d1492ca1dcfa388b93c24db013419c1`
 
 ## Objective and non-goals
