@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.5.0**
+Plan version: **1.6.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -497,6 +497,28 @@ Unknown external outcome is a first-class recovery state. Restore is not complet
 
 No signature is fabricated by planning. Verified/hardened/production closure requires real artifact-bound evidence and the existing signed accountability mechanism.
 
+
+## 21.7 Atomic task engineering propagation
+
+The systems-engineering obligations defined for W00–W30 are propagated into every atomic AIQ task through `machine/ai_engineering_task_matrix.json`, documented in `docs/plan/ENGINEERING_TASK_MATRIX.md`.
+
+This closes the gap between package-level engineering policy and executable queue work. Each task inherits the exact union of its referenced work packages' engineering dimensions, NFR budget classes, evidence modes, principal failure modes, recovery requirements, change-impact triggers and construction-wave ownership.
+
+```text
+AIQ task
+-> work_package_refs
+-> engineering profiles
+-> inherited dimensions/budgets/failures/recovery
+-> adversarial closure obligations
+-> implementation packet
+-> executable evidence
+-> independent verification
+-> signed accountability
+```
+
+The inheritance is fail-closed. A shorter task-local acceptance list cannot silently narrow package-level engineering or adversarial obligations. Any not-applicable disposition must be explicit and reviewable.
+
+Task completion and engineering-strong capability promotion remain separate claims. Existing signed AIQ completion state is preserved, but it cannot by itself justify `verified`, `hardened` or `production` maturity. Those stronger claims require bound quantitative budgets, executable engineering evidence, applicable adversarial closure evidence, compatibility/recovery proof, independent verification and signed accountability.
 
 ## 22. Vertical-slice acceptance ladder
 
