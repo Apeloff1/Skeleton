@@ -1879,5 +1879,3 @@ def ttl_identity_rows() -> list[dict[str, object]]:
         {"source": "skeleton.api.idempotency:IdempotencyEntry.ttl_seconds", "value": entry},
         {"source": "skeleton.api.idempotency:IdempotencyGuard.default_ttl", "value": guard},
     ]
-
-

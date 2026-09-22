@@ -5,7 +5,7 @@ Zettel links, recast as house tiers T0–T5. Long-form conversation is
 not a transcript dump: it is a stack of atoms at increasing depth
 with round-trip recoverability of commitments.
 
-Rendering is ASCII-first compact (house CCL): 
+Rendering is ASCII-first compact (house CCL):
   T<n>|<kind>|<topic>|<conf>|<cite?>
 """
 from __future__ import annotations

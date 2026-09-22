@@ -50,14 +50,14 @@ class NodeRegistry:
         )
         self._nodes[node_id] = node
         self._stats["registered"] += 1
-        
+
         if self._bus:
             self._bus.emit("galaxy.node.registered", {
                 "node_id": node_id,
                 "address": address,
                 "region": region,
             })
-        
+
         return node
 
     def heartbeat(self, node_id: str) -> bool:
@@ -112,7 +112,7 @@ class FederationMesh:
         """Send a message to a target node."""
         if target_node not in self._registry._nodes:
             return False
-        
+
         envelope = {
             "from": "local",
             "to": target_node,
@@ -121,13 +121,13 @@ class FederationMesh:
             "message_id": str(uuid.uuid4())[:8],
         }
         self._outbox.setdefault(target_node, []).append(envelope)
-        
+
         if self._bus:
             self._bus.emit("galaxy.message.sent", {
                 "target": target_node,
                 "message_id": envelope["message_id"],
             })
-        
+
         return True
 
     def broadcast(self, message: Dict[str, Any], filter_capability: Optional[str] = None) -> int:
@@ -150,7 +150,7 @@ class FederationMesh:
             "votes": {},
         }
         self._consensus_log.append(proposal)
-        
+
         # Broadcast proposal
         self.broadcast({
             "type": "proposal",
@@ -158,7 +158,7 @@ class FederationMesh:
             "topic": topic,
             "value": value,
         })
-        
+
         return proposal_id
 
     def vote(self, proposal_id: str, node_id: str, accept: bool) -> Optional[Dict[str, Any]]:
@@ -166,7 +166,7 @@ class FederationMesh:
         for proposal in self._consensus_log:
             if proposal["proposal_id"] == proposal_id:
                 proposal["votes"][node_id] = accept
-                
+
                 # Check if consensus reached
                 alive_nodes = len(self._registry.discover())
                 votes = proposal["votes"]
@@ -174,16 +174,16 @@ class FederationMesh:
                     accepted = sum(votes.values()) > len(votes) / 2
                     proposal["status"] = "accepted" if accepted else "rejected"
                     proposal["final_votes"] = dict(votes)
-                    
+
                     if self._bus:
                         self._bus.emit("galaxy.consensus.reached", {
                             "proposal_id": proposal_id,
                             "accepted": accepted,
                             "votes": len(votes),
                         })
-                    
+
                     return proposal
-        
+
         return None
 
     def stats(self) -> Dict[str, Any]:
@@ -220,7 +220,7 @@ class GalaxyNode:
             capabilities=self._capabilities,
         )
         self._started = True
-        
+
         if self._bus:
             self._bus.emit("galaxy.node.started", {
                 "node_id": self.node_id,

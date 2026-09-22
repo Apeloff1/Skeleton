@@ -60,12 +60,12 @@ class ConnectorRegistry:
             "calls": 0,
             "errors": 0,
         }
-        
+
         if credentials:
             self._credentials[name] = credentials
-        
+
         self._stats["registered"] += 1
-        
+
         if self._bus:
             self._bus.emit("integrations.connector.registered", {
                 "name": name,
@@ -93,11 +93,11 @@ class ConnectorRegistry:
         connector = self._connectors.get(name)
         if not connector:
             return {"status": "not_found"}
-        
+
         calls = connector.get("calls", 0)
         errors = connector.get("errors", 0)
         error_rate = errors / calls if calls > 0 else 0
-        
+
         return {
             "status": "healthy" if error_rate < 0.1 else "degraded",
             "calls": calls,
@@ -136,36 +136,36 @@ class WebhookHandler:
         secret = self._secrets.get(source)
         if not secret:
             return False
-        
+
         expected = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
         # Support both hex and base64 signatures
         if signature.startswith("sha256="):
             signature = signature[7:]
-        
+
         return hmac.compare_digest(signature, expected)
 
     def handle(self, source: str, payload: bytes, signature: str) -> Dict[str, Any]:
         """Handle an incoming webhook."""
         self._stats["received"] += 1
-        
+
         if not self.verify(source, payload, signature):
             self._stats["rejected"] += 1
             return {"status": "rejected", "reason": "invalid_signature"}
-        
+
         self._stats["verified"] += 1
-        
+
         try:
             data = json.loads(payload)
             handler = self._handlers.get(source)
             if handler:
                 handler(data)
-            
+
             if self._bus:
                 self._bus.emit("integrations.webhook.received", {
                     "source": source,
                     "event_type": data.get("event_type", "unknown"),
                 })
-            
+
             return {"status": "processed", "source": source}
         except json.JSONDecodeError:
             self._stats["rejected"] += 1

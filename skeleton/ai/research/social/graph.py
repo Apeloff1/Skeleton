@@ -47,14 +47,14 @@ class SocialGraph:
         )
         self._interactions.append(interaction)
         self._stats["interactions"] += 1
-        
+
         # Update relationship strength
         key = f"{from_agent}:{to_agent}"
         current = self._relationships.get(from_agent, {}).get(to_agent, 0.0)
         # Moving average with decay
         new_strength = current * 0.9 + outcome * 0.1
         self._relationships.setdefault(from_agent, {})[to_agent] = max(-1.0, min(1.0, new_strength))
-        
+
         if self._bus:
             self._bus.emit("social.interaction", {
                 "from": from_agent,
@@ -119,7 +119,7 @@ class ReputationEngine:
 
     def compute_reputation(self, agent: str, method: str = "pagerank") -> float:
         """Compute reputation score for an agent.
-        
+
         Methods:
         - simple: Average of relationship strengths
         - weighted: Weighted by interaction count
@@ -130,7 +130,7 @@ class ReputationEngine:
             if not relationships:
                 return 0.0
             return sum(relationships.values()) / len(relationships)
-        
+
         elif method == "weighted":
             interactions = [i for i in self._graph._interactions if i.to_agent == agent or i.from_agent == agent]
             if not interactions:
@@ -140,11 +140,11 @@ class ReputationEngine:
                 return 0.0
             weighted_sum = sum(i.outcome * abs(i.outcome) for i in interactions)
             return weighted_sum / total_weight
-        
+
         elif method == "pagerank":
             # Simplified PageRank
             return self._simple_pagerank(agent)
-        
+
         return 0.0
 
     def _simple_pagerank(self, agent: str, iterations: int = 10, damping: float = 0.85) -> float:
@@ -152,12 +152,12 @@ class ReputationEngine:
         agents = set(self._graph._relationships.keys())
         for other in self._graph._relationships:
             agents.update(self._graph._relationships[other].keys())
-        
+
         if not agents:
             return 0.0
-        
+
         scores = {a: 1.0 / len(agents) for a in agents}
-        
+
         for _ in range(iterations):
             new_scores = {}
             for a in agents:
@@ -170,7 +170,7 @@ class ReputationEngine:
                             score += damping * scores[other] * relationships[a] / out_count
                 new_scores[a] = score
             scores = new_scores
-        
+
         return scores.get(agent, 0.0)
 
     def get_ranking(self, top_n: int = 10) -> List[tuple[str, float]]:
@@ -178,7 +178,7 @@ class ReputationEngine:
         agents = set(self._graph._relationships.keys())
         for other in self._graph._relationships:
             agents.update(self._graph._relationships[other].keys())
-        
+
         scores = [(agent, self.compute_reputation(agent)) for agent in agents]
         scores.sort(key=lambda x: x[1], reverse=True)
         return scores[:top_n]
@@ -204,14 +204,14 @@ class InteractionLog:
     def append(self, interaction: Interaction) -> None:
         """Add an interaction to the log."""
         self._interactions.append(interaction)
-        
+
         # Index by type
         self._by_type.setdefault(interaction.interaction_type, []).append(interaction)
-        
+
         # Index by agent
         self._by_agent.setdefault(interaction.from_agent, []).append(interaction)
         self._by_agent.setdefault(interaction.to_agent, []).append(interaction)
-        
+
         # Trim if too large
         overflow = len(self._interactions) - self._max_size
         if overflow > 0:
@@ -230,16 +230,16 @@ class InteractionLog:
     def query(self, agent: Optional[str] = None, interaction_type: Optional[str] = None, since: Optional[float] = None) -> List[Interaction]:
         """Query interactions by agent, type, or time and return a fresh list snapshot."""
         results = list(self._interactions)
-        
+
         if agent:
             results = [i for i in results if i.from_agent == agent or i.to_agent == agent]
-        
+
         if interaction_type:
             results = [i for i in results if i.interaction_type == interaction_type]
-        
+
         if since is not None:
             results = [i for i in results if i.timestamp >= since]
-        
+
         return results
 
     def stats(self) -> Dict[str, Any]:
