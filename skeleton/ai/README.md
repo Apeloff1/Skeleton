@@ -4,8 +4,7 @@
 
 The first migration is deliberately non-disruptive: build-plan-relevant code
 from current `main`, including Jeeves, is mirrored here using the exact Git
-objects already in the repository. Existing imports remain compatibility paths
-while `machine/ai_file_tree.json` requires source/destination parity.
+objects already in the repository. Existing imports remain compatibility paths. Non-credential code is held to exact source/destination parity, while credential-bearing destinations must be pure non-owning compatibility facades declared by `machine/ai_file_tree.json`.
 
 ## Layout
 
