@@ -6,6 +6,14 @@ on:
     types: [opened, synchronize, reopened, closed]
     paths:
       - '.github/workflows/**'
+      - '.machine/**'
+      - 'skeleton/repo_machine/**'
+      - 'scripts/check_repo_machine.py'
+      - 'tests/test_repo_machine.py'
+      - 'tests/test_repo_machine_advanced.py'
+      - 'tests/test_repo_machine_growth.py'
+      - 'tests/test_repo_machine_catalog.py'
+      - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
@@ -54,6 +62,14 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/**'
+      - '.machine/**'
+      - 'skeleton/repo_machine/**'
+      - 'scripts/check_repo_machine.py'
+      - 'tests/test_repo_machine.py'
+      - 'tests/test_repo_machine_advanced.py'
+      - 'tests/test_repo_machine_growth.py'
+      - 'tests/test_repo_machine_catalog.py'
+      - 'tests/test_repo_machine_sota.py'
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
