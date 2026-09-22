@@ -137,6 +137,9 @@ def test_active_auth_route_uses_shared_fail_closed_configuration_contract():
     assert "resolve_seed_admin" in source
     assert "resolve_session_api" in source
     assert "auth_enforced" in source
+    assert "import jwt" in source
+    assert "from jwt.exceptions import InvalidTokenError" in source
+    assert "from jose import" not in source
 
     # The active HTTP surface must never regress to the retired public defaults.
     assert "dev-insecure-secret-change-me" not in source
