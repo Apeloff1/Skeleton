@@ -623,9 +623,11 @@ The fourth enforced tranche is **DP-121-160**, documented in `docs/plan/VOLUME_D
 
 The fifth enforced tranche is **DP-161-200**, documented in `docs/plan/VOLUME_DEPTH_161_200.md`. It deepens connectors/plugins/marketplace/sandboxing, policy simulation, threat/security/zero-trust/network/egress/secrets/keys/tenant/privacy/deletion controls, SBOM/MBOM and SLO/error-budget/trace/performance/cost/efficiency disciplines, chaos/recovery/release/canary/feature-flag/rollback architecture, and developer/local/fixture/simulation/fuzz/property/formal-verification infrastructure.
 
+The sixth enforced tranche is **DP-201-240**, documented in `docs/plan/VOLUME_DEPTH_201_240.md`. It deepens agent communication/handoff/performance/economics/delegation/consensus/reviewer/verifier workflows, research teams/literature/citations/reproduction/statistics/evaluation, model/dataset/tool/agent cards and health, provider risk/failover and offline/air-gap/edge/enterprise deployment, identity/admin/audit/operations dashboards, and model operations/rollback.
+
 The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
 
-Future depth passes should continue forward from **VOL-201** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+Future depth passes should continue forward from **VOL-241** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
 
 ## 24.4 Exotic systems depth layer
 
