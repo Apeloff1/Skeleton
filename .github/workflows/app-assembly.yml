@@ -67,6 +67,10 @@ on:
       - "skeleton/vault/lifecycle_adapters.py"
       - "skeleton/intelligence/admission.py"
       - "skeleton/intelligence/admission_runtime.py"
+      - "skeleton/intelligence/shared_pressure.py"
+      - "skeleton/intelligence/capacity_planner.py"
+      - "skeleton/agents/swarm_load_shed.py"
+      - "skeleton/testing/test_shared_pressure.py"
       - "skeleton/intelligence/quota.py"
       - "skeleton/intelligence/quota_sqlite.py"
       - "skeleton/testing/test_admission_runtime.py"
@@ -387,6 +391,7 @@ jobs:
           skeleton/testing/test_tenant_quota.py
           skeleton/testing/test_tenant_quota_sqlite.py
           skeleton/testing/test_actual_usage_metering.py
+          skeleton/testing/test_shared_pressure.py
           skeleton/testing/test_operation_contract.py
           skeleton/testing/test_operation_store.py
           skeleton/testing/test_operation_runtime.py
