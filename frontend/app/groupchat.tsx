@@ -22,7 +22,7 @@ export default function GroupChat() {
   const gameId = params?.game ? String(params.game) : '';
   const [job, setJob] = React.useState<any>(null);
   const [running, setRunning] = React.useState(false);
-  const scrollRef = React.useRef<ScrollView>(null);
+  const scrollRef = React.useRef<React.ElementRef<typeof ScrollView>>(null);
 
   const run = React.useCallback(async (onlyMissing: boolean, onlyStale = false) => {
     if (running) return;
