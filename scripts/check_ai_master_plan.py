@@ -338,6 +338,29 @@ def validate(data: dict) -> list[str]:
                         if not isinstance(value, list) or not value:
                             errors.append(f"{volume.get('key', '?')}: depth pass requires non-empty {field}")
 
+    depth_coverage: dict[int, list[str]] = {volume_id: [] for volume_id in range(EXPECTED_FIRST, EXPECTED_LAST + 1)}
+    for depth in depth_passes if isinstance(depth_passes, list) else []:
+        if not isinstance(depth, dict):
+            continue
+        depth_id = depth.get("id")
+        volume_range = depth.get("volume_range")
+        if not isinstance(depth_id, str) or not isinstance(volume_range, list) or len(volume_range) != 2:
+            continue
+        start, end = volume_range
+        if not isinstance(start, int) or not isinstance(end, int) or start > end:
+            continue
+        if start < EXPECTED_FIRST or end > EXPECTED_LAST:
+            errors.append(f"{depth_id}: depth range must remain within VOL-000..VOL-420")
+            continue
+        for volume_id in range(start, end + 1):
+            depth_coverage[volume_id].append(depth_id)
+
+    for volume_id, owners in depth_coverage.items():
+        if len(owners) != 1:
+            errors.append(
+                f"depth coverage for VOL-{volume_id:03d} must be exactly one pass; found {owners}"
+            )
+
     if DEPTH_000_040.is_file():
         depth_text = DEPTH_000_040.read_text(encoding="utf-8")
         for marker in ("DP-000-040", "VOL-000", "VOL-040", "Remaining work after DP-000-040"):
