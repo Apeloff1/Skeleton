@@ -165,12 +165,13 @@ jobs:
       - name: Classify assembly scope
         id: scope
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.base_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
-          mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          current_base="$(git rev-parse FETCH_HEAD)"
+          mapfile -t changed < <(git diff --name-only "$current_base" "$HEAD_SHA")
 
           full=false
           frontend=false
