@@ -1,11 +1,12 @@
 """Session 17.2 — Faction sim + worldforge render-split + physics-wire (kick-only)."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 
 

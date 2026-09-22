@@ -9,6 +9,9 @@ Validates:
   • GET /api/galaxy-studio/gamefile-pipeline/controller/status:
       controller{gates:14, crosswired:true}, traffic metrics, systems[14] each with order+crosswire+feature_count=10
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -16,8 +19,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/") if os.environ.get("EXPO_PUBLIC_BACKEND_URL") else None
 if not BASE:
     # fall back to local in-cluster

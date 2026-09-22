@@ -6,6 +6,9 @@ Stage B (Distributed rigor) validation for GameForge / PROOD:
   B4 — Idempotency guard on ship
   REGRESSION — coverage/selftest, prood/readiness, omega/fabric persistence
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -15,8 +18,6 @@ import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 ADMIN_EMAIL = "admin@gameforge.io"
 ADMIN_PASSWORD = "GameForge#Admin2026"

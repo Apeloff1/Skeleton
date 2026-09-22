@@ -7,6 +7,9 @@ Iteration 124 — Galaxy Studio unified gamefile pipeline:
 
 Backend public URL is used (EXPO_BACKEND_URL). No auth.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -14,8 +17,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 PIPE = f"{BASE_URL}/api/galaxy-studio/gamefile-pipeline"
 TG = f"{BASE_URL}/api/galaxy-studio/text-gamefile"

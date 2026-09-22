@@ -10,6 +10,9 @@ Validates:
 - /search for mech/potion/runic/zzzz
 - REGRESSION: /compose, /seed
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -18,8 +21,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ["EXPO_BACKEND_URL"].rstrip("/") if os.environ.get("EXPO_BACKEND_URL") else \
     "https://player-retention.preview.emergentagent.com"
 API = f"{BASE}/api/galaxy-studio/forge"

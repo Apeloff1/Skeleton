@@ -4,6 +4,7 @@ from pathlib import Path
 
 from core.exec_guard import configure_cors_environment, normalize_cors_origins
 
+
 _DEPLOYMENT_KEYS = (
     "EMERGENT_DEPLOY",
     "ENVIRONMENT",
@@ -12,8 +13,6 @@ _DEPLOYMENT_KEYS = (
     "WEBSITE_INSTANCE_ID",
     "DYNO",
 )
-
-_LOCALHOST_3000 = "http://" + "localhost:3000"
 
 
 def _clear_deployment(monkeypatch) -> None:
@@ -102,9 +101,9 @@ def test_production_wildcard_fails_closed_even_with_dev_opt_in() -> None:
 
 def test_explicit_origins_are_normalized_and_deduplicated() -> None:
     assert normalize_cors_origins(
-        f" https://example.com/,https://example.com, {_LOCALHOST_3000}/ ",
+        " https://example.com/,https://example.com, http://localhost/ ",
         production=True,
-    ) == ("https://example.com", _LOCALHOST_3000)
+    ) == ("https://example.com", "http://localhost")
 
 
 def test_invalid_or_partially_invalid_origins_fail_closed() -> None:

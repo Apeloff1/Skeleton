@@ -1,12 +1,13 @@
 """Phase 3 Full SOTA backend regression — verifies all axes ≥9 options,
 axis-tree groupings, 22 tools, per-build Style Pack persistence, and pipeline
 honouring applied pack axes."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")
 
 EXPECTED_NEW_TOOLS = {

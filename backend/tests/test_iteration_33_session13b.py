@@ -8,13 +8,14 @@ Surface under test:
   • POST /api/worldforge/quest      — JSON-parse retry (branching DAG, consistency.ok)
   • REGRESSION /region /options /biomes
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 
 

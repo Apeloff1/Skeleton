@@ -2,12 +2,13 @@
 Iteration 62 retest — 10-level snowball audit + hard 95 delivery gate + heal apply/apply-all.
 Test game id: d02790d6d8174ff59bf7005221cd7609
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import requests
 import pytest
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", os.environ.get("EXPO_PUBLIC_BACKEND_URL", "")).rstrip("/")
 if not BASE_URL:
     # fallback to local for direct call where ingress unavailable

@@ -5,14 +5,15 @@ Covers: registry list/register, use → capability profile growth, permissions,
 versioning + rollback, evolution (improve / flag_for_deprecation),
 combination synergy scoring, status.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (
     os.environ.get("EXPO_PUBLIC_BACKEND_URL")
     or os.environ.get("EXPO_BACKEND_URL")

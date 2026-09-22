@@ -11,13 +11,14 @@ Covers:
   - POST /api/galaxy-studio/forge/generate  (tier-3 inscribed key)
   - Regression: /catalog, /styles, /search, /random, /compose, /seed
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 GS = f"{API}/galaxy-studio"

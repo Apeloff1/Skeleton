@@ -11,13 +11,14 @@ Coverage:
 - Factions raw HTML contains window.FACTIONS + id __factions
 - Regression: registry ok=116; factions/simulate; apply-physics/async; worldforge/render
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import requests
 import pytest
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 
 

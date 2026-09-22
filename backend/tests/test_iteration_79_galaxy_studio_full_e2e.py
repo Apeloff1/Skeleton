@@ -18,6 +18,9 @@ Covers (per review request):
 No auth (single-user sandbox). Backend = http://localhost:8001 (internal) — public
 EXPO_PUBLIC_BACKEND_URL works too. We use localhost for speed.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import zipfile
@@ -25,8 +28,6 @@ import io
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = "http://localhost:8001"
 TIMEOUT = 60
 

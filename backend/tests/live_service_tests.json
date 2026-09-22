@@ -14,223 +14,223 @@
       "target": "remote-preview"
     },
     "test_iteration_105_forge_asset_id_only.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_106_forge_new_axes_thumb_palette.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_107_tool_forge.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_108_tool_forge_phase25.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_109_phase3_full_sota.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_110_systems_forge.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_111_systems_forge_sota.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_115_snowball_axes.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_117_stage_builder.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_118_phases_era_inline_edit.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_120_unbulk_storage.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_121_command_center.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_122_unified_pipeline.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_124_unified_pipeline_merge_history.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_126_tier_scale_prune.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_129_ship_it.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_130_recent_artifacts.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_132_deployment_readiness.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "remote-preview"
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
+      "target": "localhost:8001"
     },
     "test_iteration_133_nexus_isolation.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_135_map_jeeves_git.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_136_knowledge_selflearn.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_137_persistent_vault_observability.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_139_ship_native_audit.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_146_agent_tool_system.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_14_session3.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_151_jeeves_compose.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_15_session4.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_16_session5.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_22_session11.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_23_session11_refactor.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_24_creator_dashboard.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_25_trending_creators.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_26_session11_4.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_27_session11_6.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_28_session12.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_29_worldforge_sota.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_30_worldforge_cosmic.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_32_realism_doctrine.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_33_session13b.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_40_vii5_autogate_hidden_marketplace.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_41_governance_appeals_ratelimit.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "remote-preview"
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
+      "target": "localhost:8001"
     },
     "test_iteration_42_session143.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_43_session144.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_44_session145.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_45_playable_htmlutils_split.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_47_playable_artwire.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_48_genesis_game_vault.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_49_polish.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_50_studio_pipeline.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_51_game_kb_forges.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_52_kbwire_inline_edit.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_55_session17_2.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_56_session17_3.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_57_session18.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_58_session19_modes.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_5_codegen_refactor.py": {
@@ -238,155 +238,151 @@
       "target": "localhost:8001"
     },
     "test_iteration_60_session21_snowball_provenance.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_62_audit_heal_v2.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_64_session26.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_66_triage_sweep.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_67_voiced_trailer_warroom.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_68_multiplayer_scaffold.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_69_wave_4wins.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_70_rewired_endpoints_trophy_voice.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_71_real_assets_imagine_tts.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_72_cover_studio_git.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_73_camera_director.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_76_snowball_escalate_api.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_77_era_sensitive_forge.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_78_final_build_async.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_79_galaxy_studio_full_e2e.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "remote-preview"
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
+      "target": "localhost:8001"
     },
     "test_iteration_80_responsiveness_concurrency.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_81_galaxy_studio_responsiveness.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_82_construct_forge_api.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_83_populate_world.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_84_universal_forge.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_85_universal_forge_v2.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_86_universal_forge_550.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_87_asset_grounded_phases.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_89_styles_detail_accuracy.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
       "target": "localhost:8001"
     },
     "test_iteration_90_compose_skin_variants.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_91_axes_treatments_packs.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_92_metal_grade_inscribe_custom_packs.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_95_universal_forge_1m.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_96_universal_forge_3tier.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_97_universal_forge_script_tattoo_mesh.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_98_forge_dna_taxonomy.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_99_boot_forge_full.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_iteration_9_vault_leaderboard.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_jeeves_voice_lab.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "remote-preview"
-    },
-    "test_live_collection_boundary.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
-      "target": "127.0.0.1:8000"
+      "reason": "Exercises a separately running local backend service over HTTP for iteration coverage.",
+      "target": "localhost:8001"
     },
     "test_stage_a_hardening.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_stage_b_hardening.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     },
     "test_stage_c_cognition.py": {
-      "reason": "Contains live-service endpoint signature(s); registered so Backend Test boundary gate fails closed until these tests are intentionally isolated.",
+      "reason": "Hits the Emergent preview backend over HTTPS for end-to-end forge/API regression.",
       "target": "remote-preview"
     }
   }

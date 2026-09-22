@@ -5,13 +5,14 @@ hidden-exclusion from public rails, marketplace near-dup warning + hidden-block.
 No auth. BASE_URL from EXPO_PUBLIC_BACKEND_URL / EXPO_BACKEND_URL.
 After hide-exclusion test, RESTORES the playable so catalogue isn't degraded.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (
     os.environ.get("EXPO_BACKEND_URL")
     or os.environ.get("EXPO_PUBLIC_BACKEND_URL")

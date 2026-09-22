@@ -133,6 +133,7 @@ def test_repository_manifest_is_explicit_and_versioned() -> None:
     assert payload["version"] == 1
 
     tests = payload["tests"]
+    assert isinstance(tests, dict) and tests
     assert {
         "test_galaxy_build_pipeline_regression.py",
         "test_galaxy_manifest_constants.py",
@@ -140,8 +141,8 @@ def test_repository_manifest_is_explicit_and_versioned() -> None:
         "test_iteration_5_codegen_refactor.py",
     } <= set(tests)
 
-    assert tests
     for name, metadata in tests.items():
         assert name.startswith("test_") and name.endswith(".py")
-        assert len(metadata["reason"].strip()) >= 20
-        assert metadata["target"].strip()
+        assert isinstance(metadata, dict)
+        assert isinstance(metadata.get("reason"), str) and len(metadata["reason"].strip()) >= 20
+        assert isinstance(metadata.get("target"), str) and metadata["target"].strip()

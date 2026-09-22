@@ -2,6 +2,9 @@
 Iteration 139 — Ship It + Native Engine builds (PyInstaller + Godot) + Audit log
 + RBAC/JWT regression + build/runtime/vault regression.
 """
+
+pytestmark = pytest.mark.live_service
+
 import io
 import os
 import zipfile
@@ -9,8 +12,6 @@ import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ["EXPO_PUBLIC_BACKEND_URL"].rstrip("/") if os.environ.get("EXPO_PUBLIC_BACKEND_URL") \
     else "https://player-retention.preview.emergentagent.com"
 

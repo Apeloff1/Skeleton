@@ -1,14 +1,15 @@
 """Iteration 89 — Universal Forge skin styles, detail/intricacy/complexity,
 deterministic accuracy, /forge/styles catalogue, non-persist escalate
 universal_scenes, region map de-dupe, and regression checks."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 FORGE = f"{BASE_URL}/api/galaxy-studio/forge"
 ESCALATE = f"{BASE_URL}/api/galaxy-studio/vault-gdd/escalate"

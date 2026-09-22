@@ -7,13 +7,14 @@ Iteration 71 — Verify rewired endpoints now return REAL assets (not simulated 
 - /api/jeeves-voice/trailer
 Plus regression: telemetry/critical/recent, hub/expansions/installed, tournaments/rewards/ledger
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import base64
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (
     os.environ.get("EXPO_BACKEND_URL")
     or os.environ.get("EXPO_PUBLIC_BACKEND_URL")

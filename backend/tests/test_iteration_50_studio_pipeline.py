@@ -7,13 +7,14 @@ Validates:
   - POST /api/pipeline/{pid}/forge/badstage/async  (error path)
   - Regression: leaderboard, apply-assets, genesis/styles, health/registry
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import requests
 import pytest
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 PID = "d02790d6d8174ff59bf7005221cd7609"
 

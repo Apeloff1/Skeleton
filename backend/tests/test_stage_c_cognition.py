@@ -10,6 +10,9 @@ Covers:
   DAG — Swarm run + shared knowledge-graph memory
   REG — coverage/selftest, prood/readiness, omega/fabric
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -18,8 +21,6 @@ import uuid
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get(
     "EXPO_BACKEND_URL",
     "https://player-retention.preview.emergentagent.com",

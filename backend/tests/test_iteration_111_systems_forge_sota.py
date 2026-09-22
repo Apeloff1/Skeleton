@@ -1,11 +1,12 @@
 """Iteration 111 — Systems Forge SOTA scale-up: 12 systems / 102 knobs / 593 options,
 12 engine models, 10 big-win playbooks, markdown exports & GDD integration."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_BACKEND_URL")
             or os.environ.get("EXPO_PUBLIC_BACKEND_URL")
             or "https://player-retention.preview.emergentagent.com").rstrip("/")

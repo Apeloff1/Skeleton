@@ -3,13 +3,14 @@ Iteration 9 — Vault Import + Leaderboard + Vote regression.
 Verifies the new EXPANSION features: vault import flow, public leaderboard,
 and that voting still affects leaderboard rankings.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 DEMO_BUILD = "demo-build-1"
 PID_A = "8ca4a00512034787b0094a8f7c07db3b"

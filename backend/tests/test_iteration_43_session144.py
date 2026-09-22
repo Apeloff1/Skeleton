@@ -8,6 +8,9 @@ Session 14.4 backend tests:
 - Marketplace /mine returns 'moderation_status' field; hidden game appears as 'hidden'
 - Regression: /api/playable/leaderboard and /api/marketplace/listings still 200
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import json
@@ -15,8 +18,6 @@ import uuid
 import requests
 import pytest
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 

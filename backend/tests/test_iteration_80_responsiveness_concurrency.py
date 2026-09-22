@@ -7,6 +7,9 @@ Strategy:
            guard, then IMMEDIATELY force-complete (to keep RSS under HARD limit).
   Phase C: downstream — files, stats, vault zip, final-build pipeline.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import time
 import statistics
@@ -15,8 +18,6 @@ import io
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "http://localhost:8001").rstrip("/")
 API = f"{BASE}/api"
 GS = f"{API}/galaxy-studio"

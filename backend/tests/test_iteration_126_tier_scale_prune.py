@@ -3,12 +3,13 @@
 Tests the new tier-volume scaling built into ALL 14 gates and the prune endpoint
 on /api/galaxy-studio/text-gamefile.
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")
             or os.environ.get("EXPO_BACKEND_URL")
             or "http://localhost:8001").rstrip("/")

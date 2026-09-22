@@ -14,6 +14,9 @@ Coverage:
 - Regression: compose without style/variants (Auto + toggle off) still composes
   & mounts, returns variants=0, total=primary.
 """
+
+pytestmark = pytest.mark.live_service
+
 from __future__ import annotations
 
 import os
@@ -22,8 +25,6 @@ import pytest
 import requests
 
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL") or os.environ.get(
     "EXPO_PUBLIC_BACKEND_URL"
 ) or "https://player-retention.preview.emergentagent.com"

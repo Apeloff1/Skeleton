@@ -1,11 +1,12 @@
 """Iteration 108 — Phase 2.5: 135 axes, 15 tools, precise/consecutive pipeline, AAA quality gate."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import json
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "http://localhost:8001").rstrip("/")
 UF_BASE = f"{BASE_URL}/api/galaxy-studio/forge"
 TOOLS_BASE = f"{BASE_URL}/api/galaxy-studio/tools"

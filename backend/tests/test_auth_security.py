@@ -15,7 +15,6 @@ from core.auth_security import (
 
 STRONG_SECRET = "s" * 48
 STRONG_PASSWORD = "Correct-Horse-Battery-Staple-2026"
-LOCAL_SESSION_API = "http://" + "localhost:8080/session"
 
 
 def test_auth_enforcement_defaults_closed_in_production_but_open_in_local_dev():
@@ -94,9 +93,9 @@ def test_session_exchange_requires_https_when_auth_is_enforced():
     assert resolve_session_api({}).startswith("https://")
     assert (
         resolve_session_api(
-            {"APP_ENV": "development", "EMERGENT_SESSION_API": LOCAL_SESSION_API}
+            {"APP_ENV": "development", "EMERGENT_SESSION_API": "http://localhost/session"}
         )
-        == LOCAL_SESSION_API
+        == "http://localhost/session"
     )
     with pytest.raises(AuthConfigurationError, match="must use HTTPS"):
         resolve_session_api(

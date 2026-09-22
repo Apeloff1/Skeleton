@@ -13,13 +13,14 @@ scientific realism in /api/worldforge endpoints:
   • /quest — branching DAG, realistic factions, real fieldwork objectives
   • Regression — /biomes (16), /presets (>=100), /render still 200
 """
+
+pytestmark = pytest.mark.live_service
+
 import os
 import re
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = (os.environ.get("EXPO_PUBLIC_BACKEND_URL")
             or os.environ.get("EXPO_BACKEND_URL")
             or "https://gemini-game-craft.preview.emergentagent.com").rstrip("/")

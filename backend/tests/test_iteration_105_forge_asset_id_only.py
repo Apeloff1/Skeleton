@@ -3,12 +3,13 @@
 Covers (a) /asset light vs full (geometry strip), (b) part_count/thumb_palette,
 (c) determinism across calls with same id+era+seed, (d) unknown-id graceful
 fallback, and regression checks on /catalog /random /styles."""
+
+pytestmark = pytest.mark.live_service
+
 import os
 import pytest
 import requests
 
-
-pytestmark = pytest.mark.live_service
 BASE_URL = os.environ.get("EXPO_BACKEND_URL", "https://player-retention.preview.emergentagent.com").rstrip("/")
 FORGE = f"{BASE_URL}/api/galaxy-studio/forge"
 
