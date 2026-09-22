@@ -724,9 +724,11 @@ def validate_generated_files(
 def validate_mutation_budget(
     files: list[dict[str, str]],
     *,
-    max_changed_lines: int = MAX_CHANGED_LINES,
+    max_changed_lines: int | None = None,
 ) -> int:
     """Bound aggregate inserted plus deleted lines before writing."""
+    if max_changed_lines is None:
+        max_changed_lines = MAX_CHANGED_LINES
     changed = 0
     for item in files:
         old = _head_text(item["path"]) or ""
