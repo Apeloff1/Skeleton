@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.2.0",
+  "tree_version": "1.3.4",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -49,7 +49,14 @@
       "aiq_refs": [
         "AIQ-S2-PROTO-01",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-PROVIDER-RUNTIME",
@@ -70,7 +77,14 @@
       ],
       "parity_mode": "compatibility_facade",
       "facade_required_import": "from skeleton.provider_runtime import",
-      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover."
+      "note": "Credential-bearing implementation remains at skeleton/provider_runtime.py until explicit import/ownership cutover.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-CONTRACTS",
@@ -88,7 +102,14 @@
         "AIQ-S0-STATE-02",
         "AIQ-S1-CONV-02",
         "AIQ-S4-EXEC-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-PERSISTENCE",
@@ -108,7 +129,14 @@
       ],
       "overlay_children": [
         "legacy_persist"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CONTEXT",
@@ -123,7 +151,14 @@
       "aiq_refs": [
         "AIQ-S2-CTX-01",
         "AIQ-S2-CTX-02"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-RETRIEVAL",
@@ -139,7 +174,14 @@
       "aiq_refs": [
         "AIQ-S1-MEM-03",
         "AIQ-S3-VER-02"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-MEMORY",
@@ -154,7 +196,14 @@
       "aiq_refs": [
         "AIQ-S1-MEM-02",
         "AIQ-S1-MEM-03"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-INTELLIGENCE",
@@ -172,7 +221,14 @@
         "AIQ-S0-COST-01",
         "AIQ-S3-VER-01",
         "AIQ-S4-EXEC-02"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-FRONTIER",
@@ -189,7 +245,14 @@
       "aiq_refs": [
         "AIQ-S0-STATE-02",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-SKILLS",
@@ -206,7 +269,14 @@
         "AIQ-S1-TOOL-01",
         "AIQ-S1-TOOL-02",
         "AIQ-S1-TOOL-03"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-JEEVES",
@@ -226,7 +296,14 @@
       "aiq_refs": [
         "AIQ-S0-PROV-02",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-BUILD-PLANNING",
@@ -249,7 +326,14 @@
           "facade_required_import": "from core.shift_supervisor.model_gateway import",
           "note": "Credential-bearing transitional model gateway remains singular at core/shift_supervisor/model_gateway.py during staged migration."
         }
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-ENGINE-API",
@@ -276,7 +360,14 @@
       "aiq_refs": [
         "AIQ-S5-ENG-01",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-VAULT",
@@ -304,7 +395,14 @@
         "AIQ-S0-GOV-02",
         "AIQ-S0-GOV-03",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-AGENTS",
@@ -330,7 +428,14 @@
       "aiq_refs": [
         "AIQ-S0-COST-03",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-AUTOMATION",
@@ -399,7 +504,14 @@
           "facade_required_import": "from skeleton.automation.supervisor import",
           "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
         }
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-ARTIFACT-PLANE",
@@ -426,7 +538,14 @@
         "AIQ-S0-GOV-01",
         "AIQ-S0-COST-02",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-OBSERVABILITY",
@@ -452,7 +571,14 @@
       "aiq_refs": [
         "AIQ-S0-GOV-03",
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CONTEXTS",
@@ -477,7 +603,14 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-SECURITY",
@@ -516,7 +649,14 @@
           "facade_required_import": "from skeleton.security.injection_corpus import",
           "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
         }
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-EVALUATION",
@@ -544,7 +684,14 @@
       ],
       "overlay_children": [
         "quality"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-KERNEL",
@@ -569,7 +716,14 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-RELIABILITY",
@@ -597,7 +751,14 @@
       ],
       "overlay_children": [
         "acquired_guard.py"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-LEARNING",
@@ -626,7 +787,14 @@
       "overlay_children": [
         "acquired.py",
         "school"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-RESILIENCE",
@@ -651,7 +819,14 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-COGNITION",
@@ -676,7 +851,14 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-PRIMITIVES",
@@ -701,7 +883,14 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-REPO-INTELLIGENCE",
@@ -726,7 +915,14 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-SIMULATION",
@@ -751,7 +947,14 @@
         "game",
         "platform",
         "world"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-FORGE",
@@ -772,7 +975,14 @@
       "overlay_children": [
         "creator",
         "pipelines"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-NATIVE",
@@ -794,7 +1004,14 @@
       ],
       "overlay_children": [
         "jvm_registry.py"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CORTEX",
@@ -829,7 +1046,14 @@
           "facade_required_import": "from skeleton.cortex.catalog import",
           "note": "Credential-marker/provider surface remains owned by the legacy source module until explicit cutover."
         }
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-ORGANISM",
@@ -853,7 +1077,14 @@
           "facade_required_import": "from skeleton.organism.secret_manager import *",
           "note": "Encrypted credential storage and master-secret ownership remains singular at skeleton/organism/secret_manager.py until explicit security-owner cutover."
         }
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-APPLICATION",
@@ -883,7 +1114,14 @@
         "preserve backend versus engine ownership boundary",
         "preserve command/version/authorization contracts",
         "invert imports only after focused application and API regression tests"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-BUILD",
@@ -909,7 +1147,14 @@
         "keep repository input as data",
         "preserve offline/network-required classification",
         "bound graph traversal"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CHRONICLE",
@@ -937,7 +1182,14 @@
         "preserve append-only and tamper-detection semantics",
         "preserve content hashes across migration",
         "keep verification independent from the producer path"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CORE",
@@ -965,7 +1217,14 @@
         "preserve cancellation and graceful-shutdown semantics",
         "preserve lock/task idempotency behavior",
         "exercise worker starvation and restart paths before cutover"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-DATA",
@@ -992,7 +1251,14 @@
         "keep authoritative versus derived state explicit",
         "preserve migration rollback semantics",
         "preserve event identity and lineage across import inversion"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-DEVELOPER",
@@ -1017,7 +1283,14 @@
         "keep operator tooling outside model authority",
         "preserve dry-run/diagnostic modes",
         "prove doctor/scaffold output parity before cutover"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-FOUNDATION",
@@ -1049,7 +1322,14 @@
         "preserve append-only replay semantics",
         "preserve capability attenuation/revocation",
         "retain invariant violation traces"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-GALAXY",
@@ -1075,7 +1355,14 @@
         "preserve bounded consensus/election behavior",
         "preserve node identity and serialization contracts",
         "fault-test partitions, duplicate delivery, and stale leadership"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-GATE-PLANE",
@@ -1102,7 +1389,14 @@
         "keep policy deterministic",
         "do not grant model-controlled bypass",
         "preserve chaos evidence and safe defaults"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-GENESIS",
@@ -1128,7 +1422,14 @@
         "do not create a second application bootstrap owner",
         "preserve boot ordering and invariant registration",
         "prove boot/health parity before legacy facade conversion"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-KV",
@@ -1156,7 +1457,14 @@
         "prove cache reuse cannot change semantics",
         "retain integrity checks",
         "bind capacity/eviction telemetry"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-KV-CACHE",
@@ -1184,7 +1492,14 @@
         "prove cache reuse is semantics-preserving",
         "bound capacity and eviction",
         "retain deterministic fallback when cache state is unavailable"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-MESH",
@@ -1210,7 +1525,14 @@
         "bound retries and hedges",
         "preserve deduplication identity",
         "prove traffic controls cannot bypass authority or overload protections"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-NETWORK",
@@ -1235,7 +1557,14 @@
         "preserve canonical serialization",
         "retain no-socket engine-neutral contract",
         "exercise duplicate/reorder/history-exhaustion tests"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-OVERSEER",
@@ -1264,7 +1593,14 @@
         "preserve human override and safe-degradation controls",
         "separate observation from mutation authority",
         "fault-test recovery and resource-saturation behavior"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-PR-AUTOMATION",
@@ -1291,7 +1627,14 @@
         "preserve protected-base and merge-gate fail-closed behavior",
         "keep GitHub mutation behind explicit authority",
         "retain queue starvation and cancellation regression coverage"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-QUALITY",
@@ -1317,7 +1660,14 @@
         "keep evidence read-mostly",
         "preserve deterministic replay inputs",
         "do not convert planned evidence into passing evidence"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-REPO-MACHINE",
@@ -1346,7 +1696,14 @@
         "never import/execute inspected repository files",
         "retain bounded graph/search behavior",
         "keep mutation authority outside analysis package"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-STATE",
@@ -1375,7 +1732,14 @@
       ],
       "overlay_children": [
         "resilient_cache.py"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-SWARM",
@@ -1404,7 +1768,14 @@
       ],
       "overlay_children": [
         "hive"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-GRAPHS",
@@ -1428,7 +1799,14 @@
         "keep export/render helpers side-effect free",
         "separate mathematical primitives from knowledge authority",
         "add focused graph invariant tests"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-INTEGRATIONS",
@@ -1454,7 +1832,14 @@
         "credential objects remain references",
         "authorize connector calls independently",
         "validate webhook authenticity and replay behavior"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-INVENTORY",
@@ -1489,7 +1874,14 @@
           "facade_required_import": "from skeleton.inventory.capabilities import",
           "note": "The source is an inventory classifier that contains credential-name sentinels as data. Keep those sentinels out of skeleton.ai so provider-bootstrap does not treat the mirror as a second credential-bearing surface."
         }
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:owner-sensitive"
+      ],
+      "move_batch": "B3-owner-sensitive",
+      "source_disposition": "retain_until_explicit_owner_and_import_cutover"
     },
     {
       "id": "AIFT-SOCIAL",
@@ -1514,7 +1906,14 @@
         "treat external material as untrusted evidence",
         "retain source/citation provenance",
         "prevent discovery results from mutating production directly"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     },
     {
       "id": "AIFT-SUPPORT",
@@ -1542,7 +1941,14 @@
         "preserve retrieval trust labeling",
         "keep loading bounded and recoverable",
         "avoid creating a second context or retrieval authority"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-ACQUIRED-LEARNING",
@@ -1568,7 +1974,14 @@
         "do not promote from quarantine by relocation"
       ],
       "source_provenance": "acquired_quarantine",
-      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority."
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-ACQUIRED-CACHE",
@@ -1596,7 +2009,14 @@
         "retain source provenance"
       ],
       "source_provenance": "acquired_quarantine",
-      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority."
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-ACQUIRED-GUARD",
@@ -1624,7 +2044,14 @@
         "retain quarantine provenance"
       ],
       "source_provenance": "acquired_quarantine",
-      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority."
+      "promotion_note": "Relocation preserves quarantine provenance and does not promote this code to production authority.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CONTENT",
@@ -1649,7 +2076,14 @@
         "retain source lineage",
         "keep domain knowledge separate from system instruction authority",
         "deduplicate with existing simulation knowledge before cutover"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CREATOR",
@@ -1674,7 +2108,14 @@
         "retain provenance links",
         "retain reversible edit semantics",
         "forbid direct production mutation"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-ECONOMY",
@@ -1699,7 +2140,14 @@
         "preserve double-entry invariants",
         "retain provenance requirements for minting",
         "keep simulation economy isolated from real financial authority"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-GAME",
@@ -1724,7 +2172,14 @@
         "preserve deterministic replay",
         "keep game-domain state out of global AI authority",
         "merge only after overlap analysis with skeleton/simulation"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-HIVE",
@@ -1748,7 +2203,14 @@
         "compare overlap with skeleton/swarm before cutover",
         "retain canonical capability contract",
         "avoid duplicate scheduler ownership"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-JVM-REGISTRY",
@@ -1773,7 +2235,14 @@
         "keep JVM helpers optional and fallback-safe",
         "preserve process lifecycle/timeout accounting",
         "do not absorb the java-accelerators top-level owner"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-PLATFORM",
@@ -1799,7 +2268,14 @@
         "preserve engine-neutral schemas",
         "do not move backend/Godot product ownership",
         "retain unsupported-feature fail-closed behavior"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-SCHOOL",
@@ -1823,7 +2299,14 @@
         "deduplicate overlap with skeleton/learning",
         "retain learner-state provenance and privacy boundaries",
         "evaluate adaptive policies before promotion"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-WORLD",
@@ -1848,7 +2331,14 @@
         "preserve world/scene schema identity",
         "deduplicate with frontier world representations",
         "retain deterministic serialization and replay"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-CIRCULATION",
@@ -1875,7 +2365,14 @@
       ],
       "source_provenance": "historical_quarantine",
       "production_authority": false,
-      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     },
     {
       "id": "AIFT-HOAG",
@@ -1902,7 +2399,14 @@
       ],
       "source_provenance": "historical_quarantine",
       "production_authority": false,
-      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     },
     {
       "id": "AIFT-MOTIVE",
@@ -1930,7 +2434,14 @@
       ],
       "source_provenance": "historical_quarantine",
       "production_authority": false,
-      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     },
     {
       "id": "AIFT-PERSIST-LEGACY",
@@ -1955,7 +2466,14 @@
         "compare against skeleton/persistence",
         "deduplicate state ownership",
         "retain compatibility facade until zero required callers"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-PIPELINES",
@@ -1979,7 +2497,14 @@
         "preserve domain scoping",
         "no production authority from generated artifacts",
         "benchmark against current canonical forge path"
-      ]
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B2-domain-build",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     },
     {
       "id": "AIFT-SHEAF",
@@ -2008,7 +2533,14 @@
       ],
       "source_provenance": "historical_quarantine",
       "production_authority": false,
-      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     },
     {
       "id": "AIFT-SPINE",
@@ -2037,7 +2569,14 @@
       ],
       "source_provenance": "historical_quarantine",
       "production_authority": false,
-      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     },
     {
       "id": "AIFT-VISCERA",
@@ -2067,7 +2606,14 @@
       ],
       "source_provenance": "historical_quarantine",
       "production_authority": false,
-      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use."
+      "promotion_note": "Relocation preserves lineage for research characterization and does not authorize production use.",
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_until_characterized_and_verified"
     }
   ],
   "ci_enforcement": {
@@ -2503,5 +3049,25 @@
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
     "note": "One nested mapping bookkeeping gap (AIFT-EVALUATION -> quality) was found by direct Git-object audit and closed in this commit."
+  },
+  "move_tag_contract": {
+    "schema_version": 1,
+    "global_state": "prepared_not_cutover_authorized",
+    "invariant": "move tags classify structural migration readiness only; they do not imply AIQ/work-package completion, production maturity, source deletion, or independent verification",
+    "required_tags": [
+      "ai-tree:mapped",
+      "migration:staged-mirror"
+    ],
+    "cutover_tags": {
+      "cutover:parity-ready": "Exact mirror is structurally prepared for import inversion after global gates and focused regression validation.",
+      "cutover:owner-sensitive": "One or more provider/credential/network owner surfaces remain compatibility facades and require explicit ownership/import cutover.",
+      "cutover:quarantine": "Historical/model-internals/research lineage remains characterization-gated and is not a production cutover candidate."
+    },
+    "batches": {
+      "B1-core-runtime": "Core runtime, provider-neutral, agent, cognition, learning, evaluation, reliability and state surfaces.",
+      "B2-domain-build": "Build/repository engineering, simulation and Forge surfaces.",
+      "B3-owner-sensitive": "Mappings containing compatibility facades or explicit parity exceptions; cut over only after authority-owner review.",
+      "B4-research-quarantine": "Historical or model-internals research lineage; characterize before any production promotion."
+    }
   }
 }
