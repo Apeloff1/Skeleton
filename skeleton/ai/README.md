@@ -17,7 +17,7 @@ objects already in the repository. Existing imports remain compatibility paths. 
 - `runtime/intelligence/` — admission, verification and execution.
 - `runtime/frontier/` — routing, streams and frontier orchestration.
 - `runtime/skills/` — tools and skills.
-- `runtime/{api,vault,artifact_plane,observability,security,kernel,reliability,resilience,primitives}/` — plan-owned engine support planes.
+- `runtime/{api,vault,artifact_plane,observability,security,kernel,reliability,resilience,primitives,native}/` — plan-owned engine support planes, including the stable native ABI/acceleration boundary.
 - `runtime/contexts/` — extended/legacy context support retained under governed parity.
 - `agents/jeeves/` — Jeeves reasoning and agent system.
 - `agents/core/` — core agent/swarm execution runtime.
@@ -29,3 +29,13 @@ objects already in the repository. Existing imports remain compatibility paths. 
 No compatibility source may be deleted until imports, ownership, focused
 tests, rollback evidence, App Assembly, and signed accountability are explicit.
 Relocation alone never completes an AIQ task or work package.
+
+
+## Planned-path disposition
+
+The machine manifest audits concrete `skeleton/*` roots referenced by the master
+plan and construction contract. Each root must be one of: migrated into this
+tree, intentionally external with a named architecture owner, represented by a
+mapped implementation alias, or still absent. If a planned-but-absent engine
+root later appears outside `skeleton/ai`, the AI file-tree gate fails until the
+root is migrated or explicitly reclassified.
