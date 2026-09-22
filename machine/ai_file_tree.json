@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "tree_version": "1.3.4",
+  "tree_version": "1.3.5",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
-  "purpose": "Consolidate build-plan-relevant AI engine, governance, agent, evaluation, reliability, build-control code and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
+  "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
   "authorities": {
     "architecture": "machine/architecture.json",
     "master_plan": "machine/ai_master_plan.json",
@@ -2614,6 +2614,76 @@
       ],
       "move_batch": "B4-research-quarantine",
       "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-CONFIG",
+      "source": "skeleton/config",
+      "destination": "skeleton/ai/runtime/config",
+      "kind": "tree",
+      "source_git_object_sha": "8af2a5f58b6e3071472f77e85c660de1ab01bdeb",
+      "role": "typed engine configuration, secret references, immutable settings and redacted configuration snapshots",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W02",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "preserve secret-reference separation and redaction behavior",
+        "keep deployment-specific settings outside runtime authority",
+        "invert imports only after startup/config regression coverage is green"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-AI-SHELL",
+      "source": "skeleton/shells/ai",
+      "destination": "skeleton/ai/shell",
+      "kind": "tree",
+      "source_git_object_sha": "fdc91a7a68144b474beaa12e0122280121c5e235",
+      "role": "AI shell/control-plane implementation spanning governance, planning, policy, verification, durable recovery, trust, provider routing and release evidence",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W11",
+        "WP-W12",
+        "WP-W14",
+        "WP-W15",
+        "WP-W17",
+        "WP-W19",
+        "WP-W20",
+        "WP-W21"
+      ],
+      "aiq_refs": [
+        "AIQ-S0-GOV-01",
+        "AIQ-S3-VER-01",
+        "AIQ-S4-EXEC-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "mirror_then_cutover",
+      "cutover_preconditions": [
+        "retain canonical provider credential ownership outside shell modules",
+        "preserve durable journal/checkpoint and recovery invariants",
+        "map governance/policy/verification imports before source retirement",
+        "pass shell-focused regression, provider bootstrap and App Assembly"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
     }
   ],
   "ci_enforcement": {
