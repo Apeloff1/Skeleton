@@ -160,6 +160,44 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 2
+
+      - name: Classify assembly scope
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          full=false
+          frontend=false
+          for path in "${changed[@]}"; do
+            case "$path" in
+              frontend/*|skeleton/frontier/operation_stream.py|skeleton/frontier/operation_stream_store.py|backend/core/operation_stream_transport.py|backend/routes/operation_stream.py|.github/workflows/app-assembly.yml)
+                frontend=true
+                ;;
+            esac
+
+            case "$path" in
+              docs/plan/*|machine/ai_master_plan.json|machine/ai_edge_case_catalog.json|machine/ai_exotic_systems_catalog.json|machine/ai_p0_edge_case_matrix.json|machine/ai_full_edge_case_matrix.json|machine/ai_master_build_sequence.json|machine/ai_engineering_pass.json|machine/ai_engineering_task_matrix.json|machine/ai_adversarial_closure.json|machine/ai_edge_case_priority_queue.json|machine/ai_build_accountability.json|scripts/check_ai_*.py|scripts/ai_accountability.py|skeleton/testing/test_ai_*.py)
+                ;;
+              *)
+                full=true
+                ;;
+            esac
+          done
+
+          if [ "${#changed[@]}" -eq 0 ]; then
+            full=true
+            frontend=true
+          fi
+
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          printf 'assembly scope: full=%s frontend=%s changed=%s\n' "$full" "$frontend" "${#changed[@]}"
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -214,7 +252,8 @@ jobs:
       - name: Validate mandatory provider bootstrap
         run: python scripts/check_provider_bootstrap.py
 
-      - name: Install focused test runtime
+      - name: Install full assembly test runtime
+        if: steps.scope.outputs.full == 'true'
         run: >-
           python -m pip install --disable-pip-version-check
           "pytest>=8,<9"
@@ -230,7 +269,12 @@ jobs:
           "networkx==3.5"
           "bcrypt==4.3.0"
 
+      - name: Install plan-only test runtime
+        if: steps.scope.outputs.full != 'true'
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
       - name: Set up Node
+        if: steps.scope.outputs.frontend == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "${{ env.NODE_VERSION }}"
@@ -238,14 +282,17 @@ jobs:
           cache-dependency-path: frontend/yarn.lock
 
       - name: Install frontend dependencies without third-party lifecycle scripts
+        if: steps.scope.outputs.frontend == 'true'
         working-directory: frontend
         run: yarn install --ignore-scripts
 
       - name: Apply reviewed local node_modules patches
+        if: steps.scope.outputs.frontend == 'true'
         working-directory: frontend
         run: node ./scripts/patch-node-modules.js
 
       - name: Validate assembled frontend
+        if: steps.scope.outputs.frontend == 'true'
         working-directory: frontend
         env:
           EXPO_PUBLIC_BACKEND_URL: http://localhost:8001
@@ -256,6 +303,7 @@ jobs:
           yarn export:web
 
       - name: Compile assembly surface
+        if: steps.scope.outputs.full == 'true'
         run: >-
           python -m compileall -q
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
@@ -281,9 +329,31 @@ jobs:
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_app_assembly.py
 
+      - name: Run plan-only contract tests
+        if: steps.scope.outputs.full != 'true'
+        env:
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q
+          skeleton/testing/test_architecture_map.py
+          skeleton/testing/test_ai_app_construction.py
+          skeleton/testing/test_ai_master_plan.py
+          skeleton/testing/test_ai_edge_case_catalog.py
+          skeleton/testing/test_ai_exotic_systems_catalog.py
+          skeleton/testing/test_ai_p0_edge_case_matrix.py
+          skeleton/testing/test_ai_full_edge_case_matrix.py
+          skeleton/testing/test_ai_master_build_sequence.py
+          skeleton/testing/test_ai_engineering_pass.py
+          skeleton/testing/test_ai_engineering_task_matrix.py
+          skeleton/testing/test_ai_adversarial_closure.py
+          skeleton/testing/test_ai_build_accountability.py
+          skeleton/testing/test_ai_accountability_cli.py
+
       - name: Run engine assembly contract tests
+        if: steps.scope.outputs.full == 'true'
         env:
           PYTHONPATH: ".:backend"
         run: >-
@@ -332,6 +402,7 @@ jobs:
           tests/test_jeeves_chat_workspace.py
 
       - name: Run isolated backend provider contract tests
+        if: steps.scope.outputs.full == 'true'
         env:
           PYTHONPATH: ".:backend"
         run: >-
@@ -347,6 +418,7 @@ jobs:
           backend/tests/test_ai_service_provider_convergence.py
 
       - name: Validate structural assembly
+        if: steps.scope.outputs.full == 'true'
         env:
           PYTHONPATH: "."
         run: |
@@ -357,6 +429,7 @@ jobs:
           python -m json.tool /tmp/skeleton-app-status.json >/dev/null
 
       - name: Validate Compose topology
+        if: steps.scope.outputs.full == 'true'
         env:
           MONGO_URL: mongodb://admin:dummy@mongo:27017/tutolage?authSource=admin
           SKL_MONGO_URI: mongodb://admin:dummy@mongo:27017/skeleton?authSource=admin
@@ -378,6 +451,7 @@ jobs:
           docker compose -f docker-compose.yml config --quiet
 
       - name: Verify wheel contains assembly manifest
+        if: steps.scope.outputs.full == 'true'
         run: |
           python -m pip wheel --no-deps . -w /tmp/wheelhouse
           python - <<'PY'
