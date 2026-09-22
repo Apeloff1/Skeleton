@@ -64,28 +64,90 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 2
+
+      - name: Classify backend-quality scope
+        id: scope
+        working-directory: ${{ github.workspace }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "plan_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" "$HEAD_SHA"
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          full=false
+
+          for path in "${changed[@]}"; do
+            case "$path" in
+              docs/plan/*|machine/ai_master_plan.json|scripts/check_ai_master_plan.py|skeleton/testing/test_ai_master_plan.py)
+                ;;
+              *)
+                full=true
+                ;;
+            esac
+          done
+
+          if [ "${#changed[@]}" -eq 0 ]; then
+            full=true
+          fi
+
+          if [ "$full" = true ]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+            echo "plan_only=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+            echo "plan_only=true" >> "$GITHUB_OUTPUT"
+          fi
+          printf 'backend-quality scope: full=%s changed=%s\n' "$full" "${#changed[@]}"
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11.16"
 
-      - name: Install quality dependencies
+      - name: Install full quality dependencies
+        if: steps.scope.outputs.full == 'true'
         run: >-
           python -m pip install --disable-pip-version-check
           "ruff==0.9.10" "pytest>=8,<9" "fastapi==0.136.1"
           "pydantic-settings>=2.1,<3" "httpx==0.28.1"
 
+      - name: Install plan-only quality runtime
+        if: steps.scope.outputs.plan_only == 'true'
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Validate plan-only masterplan contract
+        if: steps.scope.outputs.plan_only == 'true'
+        working-directory: ${{ github.workspace }}
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: |
+          python scripts/check_ai_master_plan.py
+          python -m pytest -q --noconftest skeleton/testing/test_ai_master_plan.py
+
       - name: Ruff lint
+        if: steps.scope.outputs.full == 'true'
         run: ruff check . --output-format=github
 
       - name: Syntax check (full backend)
+        if: steps.scope.outputs.full == 'true'
         run: python -m compileall -q .
 
       - name: Canonical local/CI quality parity gate
+        if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_quality_gate_parity.py
 
       - name: Canonical architecture boundary gate
+        if: steps.scope.outputs.full == 'true'
         working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -94,6 +156,7 @@ jobs:
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_architecture_boundaries.py
 
       - name: Provider runtime boundary gate
+        if: steps.scope.outputs.full == 'true'
         working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -102,16 +165,20 @@ jobs:
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_provider_runtime_boundary.py
 
       - name: Production layer boundary gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_architecture_boundaries.py
 
       - name: Security scanner surface preflight
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_security_scan_surface.py
 
       - name: Defense control-plane contract
+        if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_defense_control_plane_contract.py
 
       - name: Security scanner and capability fail-closed contracts
+        if: steps.scope.outputs.full == 'true'
         working-directory: .
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
@@ -128,57 +195,74 @@ jobs:
           tests/test_generated_code_sandbox.py
 
       - name: Process invocation safety gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_process_safety.py
 
       - name: Unsafe deserialization safety gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_deserialization_safety.py
 
       - name: Dynamic import safety gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_dynamic_import_safety.py
 
       - name: Tar archive extraction safety gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_archive_extraction_safety.py
 
       - name: High-confidence Python and JavaScript SAST gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_sast_security.py
 
       - name: Core/tooling Python high-confidence SAST gate
+        if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_repository_python_sast.py
 
       - name: JavaScript child_process alias safety gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_js_process_alias_safety.py
 
       - name: GitHub Actions workflow security gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_security.py
 
       - name: GitHub Actions repository allowlist
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_action_allowlist.py
 
       - name: GitHub Actions token permissions
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_permissions.py
 
       - name: GitHub Actions trigger-fanout audit
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_trigger_fanout.py
 
       - name: GitHub Actions concurrency collision audit
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_concurrency.py
 
       - name: GitHub Actions workflow_run branch-completion contract
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_run_branch_completions.py
 
       - name: Repository secret hygiene gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_secret_hygiene.py
 
       - name: Repository malware and IOC gate
+        if: steps.scope.outputs.full == 'true'
         run: python scripts/check_malware_iocs.py
 
       - name: Live-service backend test boundary
+        if: steps.scope.outputs.full == 'true'
         run: |
           python scripts/check_live_service_test_boundaries.py
           python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
 
       - name: Security, provider-chaos, and developer-tooling adversarial regression tests
+        if: steps.scope.outputs.full == 'true'
         # The job default is backend/. This suite mixes repository-root tests
         # with backend/tests, so pin it to the checkout root explicitly.
         working-directory: ${{ github.workspace }}
