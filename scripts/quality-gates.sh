@@ -52,6 +52,11 @@ python scripts/check_ai_engineering_pass.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_ai_engineering_pass.py
 
+printf '\n== AIQ engineering/adversarial propagation ==\n'
+python scripts/check_ai_engineering_task_matrix.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_ai_engineering_task_matrix.py
+
 printf '\n== Signed build accountability ==\n'
 python scripts/check_ai_build_accountability.py
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
