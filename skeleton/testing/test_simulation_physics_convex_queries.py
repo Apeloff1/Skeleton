@@ -90,17 +90,23 @@ def test_rotated_capsule_raycast_uses_body_transform() -> None:
     assert hit.normal.x < -0.999999
 
 
-def test_round_shape_raycast_inside_origin_returns_zero_distance() -> None:
-    for shape in (CapsuleShape(0.5, 1.0), CylinderShape(0.5, 1.0)):
-        body = _static("shape", shape)
-        ray = Ray(Vec3.zero(), Vec3(1.0, 2.0, 0.0), 10.0)
+@pytest.mark.parametrize(
+    "shape",
+    (
+        CapsuleShape(0.5, 1.0),
+        CylinderShape(0.5, 1.0),
+    ),
+)
+def test_round_shape_raycast_inside_origin_returns_zero_distance(shape) -> None:
+    body = _static("shape", shape)
+    ray = Ray(Vec3.zero(), Vec3(1.0, 2.0, 0.0), 10.0)
 
-        hit = raycast_body(ray, body)
+    hit = raycast_body(ray, body)
 
-        assert hit is not None
-        assert hit.distance == 0.0
-        assert hit.point == Vec3.zero()
-        assert hit.normal.dot(ray.direction) < -0.999999
+    assert hit is not None
+    assert hit.distance == 0.0
+    assert hit.point == Vec3.zero()
+    assert hit.normal.dot(ray.direction) < -0.999999
 
 
 def test_sphere_cast_capsule_is_exact_radius_expansion() -> None:
@@ -187,20 +193,26 @@ def _continuous_sphere(body_id: str, velocity: Vec3) -> RigidBody:
     return body
 
 
-def test_continuous_sphere_ccd_hits_static_round_target() -> None:
-    for target_shape in (CapsuleShape(0.5, 1.0), CylinderShape(0.5, 1.0)):
-        moving = _continuous_sphere("moving", Vec3(10.0, 0.0, 0.0))
-        target = _static("target", target_shape)
-        detector = ContinuousCollisionDetector(motion_threshold=0.1)
-        dt = 0.5
+@pytest.mark.parametrize(
+    "target_shape",
+    (
+        CapsuleShape(0.5, 1.0),
+        CylinderShape(0.5, 1.0),
+    ),
+)
+def test_continuous_sphere_ccd_hits_static_round_target(target_shape) -> None:
+    moving = _continuous_sphere("moving", Vec3(10.0, 0.0, 0.0))
+    target = _static("target", target_shape)
+    detector = ContinuousCollisionDetector(motion_threshold=0.1)
+    dt = 0.5
 
-        hit = detector.sweep(moving, (moving, target), dt)
+    hit = detector.sweep(moving, (moving, target), dt)
 
-        assert hit is not None
-        assert hit.target_body == "target"
-        assert hit.distance == pytest.approx(2.3, abs=2.0e-6)
-        assert hit.fraction == pytest.approx(2.3 / 5.0, abs=1.0e-6)
-        assert hit.normal.x < -0.999999
+    assert hit is not None
+    assert hit.target_body == "target"
+    assert hit.distance == pytest.approx(2.3, abs=2.0e-6)
+    assert hit.fraction == pytest.approx(2.3 / 5.0, abs=1.0e-6)
+    assert hit.normal.x < -0.999999
 
 
 def test_ccd_earliest_event_includes_capsule_target_in_global_order() -> None:
@@ -230,7 +242,7 @@ def test_world_ccd_prevents_fast_sphere_from_skipping_static_cylinder() -> None:
             gravity=Vec3.zero(),
             fixed_dt=0.25,
             ccd_motion_threshold=0.1,
-            ccd_max_substeps=8,
+            max_ccd_substeps=8,
             sleep_after_seconds=10.0,
         )
     )
@@ -241,5 +253,5 @@ def test_world_ccd_prevents_fast_sphere_from_skipping_static_cylinder() -> None:
 
     receipt = world.step()[0]
 
-    assert receipt.ccd_clamps >= 1
+    assert receipt.ccd_hits >= 1
     assert moving.position.x < 1.0

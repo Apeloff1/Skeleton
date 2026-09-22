@@ -17,11 +17,9 @@ from .convex import convex_penetration
 from .errors import PhysicsValidationError, UnsupportedCollisionError
 from .materials import ContactMaterial, combine_materials
 from .math3d import EPSILON, AABB, Vec3
-from .queries import Ray
 from .shapes import (
     BoxShape,
     CapsuleShape,
-    ConvexHullShape,
     CylinderShape,
     PlaneShape,
     ShapeKind,
@@ -31,8 +29,6 @@ from .shapes import (
 _AXIS_EPSILON_SQ = 1.0e-16
 _CONTACT_POSITION_EPSILON_SQ = 1.0e-18
 MAX_BROAD_PHASE_PAIRS = 1_000_000
-MAX_BROAD_PHASE_QUERY_HITS = 1_000_000
-MAX_BROAD_PHASE_SPATIAL_TESTS = 50_000_000
 MAX_MANIFOLD_POINTS = 4
 
 
@@ -124,56 +120,10 @@ def _needs_physical_pair(left: RigidBody, right: RigidBody) -> bool:
     return left.body_type is BodyType.DYNAMIC or right.body_type is BodyType.DYNAMIC
 
 
-def _ray_overlaps_aabb(ray: Ray, bounds: AABB) -> bool:
-    """Conservative finite-AABB ray prefilter used by batch scene queries."""
-    t_min = 0.0
-    t_max = ray.max_distance
-    origins = ray.origin.to_tuple()
-    directions = ray.direction.to_tuple()
-    minimums = bounds.minimum.to_tuple()
-    maximums = bounds.maximum.to_tuple()
-
-    for axis in range(3):
-        origin = origins[axis]
-        direction = directions[axis]
-        minimum = minimums[axis]
-        maximum = maximums[axis]
-        if direction == 0.0:
-            if origin < minimum or origin > maximum:
-                return False
-            continue
-        inverse = 1.0 / direction
-        near = (minimum - origin) * inverse
-        far = (maximum - origin) * inverse
-        if near > far:
-            near, far = far, near
-        t_min = max(t_min, near)
-        t_max = min(t_max, far)
-        if t_min > t_max + 1.0e-12:
-            return False
-
-    return (
-        t_max >= -1.0e-12
-        and t_min <= ray.max_distance + 1.0e-12
-    )
-
-
 class SweepAndPruneBroadPhase:
-    """Stable one-axis sweep with optional JVM acceleration for large finite sets.
+    """Stable one-axis sweep with full-AABB rejection."""
 
-    Java is only allowed to compute finite-AABB candidate indices. Python keeps
-    body identity, plane handling, physical-pair policy, bounds, and final pair
-    construction. Any accelerator failure falls back to this class's original
-    Python sweep.
-    """
-
-    def __init__(
-        self,
-        *,
-        max_pairs: int = 250_000,
-        use_jvm_acceleration: bool = False,
-        accelerator: object | None = None,
-    ) -> None:
+    def __init__(self, *, max_pairs: int = 250_000) -> None:
         if (
             isinstance(max_pairs, bool)
             or not isinstance(max_pairs, int)
@@ -181,16 +131,6 @@ class SweepAndPruneBroadPhase:
         ):
             raise PhysicsValidationError("max_pairs outside supported range")
         self.max_pairs = max_pairs
-        self._use_jvm_acceleration = bool(use_jvm_acceleration)
-        self._accelerator = accelerator
-        self._acceleration = {
-            "attempts": 0,
-            "successes": 0,
-            "fallbacks": 0,
-            "bypassed_small_batch": 0,
-            "spatial_attempts": 0,
-            "spatial_successes": 0,
-        }
 
     def _add_pair(self, pairs: set[BroadPhasePair], pair: BroadPhasePair) -> None:
         if pair in pairs:
@@ -199,367 +139,42 @@ class SweepAndPruneBroadPhase:
             raise PhysicsValidationError("broad-phase pair bound exceeded")
         pairs.add(pair)
 
-    def _compute_finite_pairs_python(
-        self,
-        finite: list[tuple[RigidBody, AABB]],
-        pairs: set[BroadPhasePair],
-    ) -> None:
-        ordered = [
-            (bounds.minimum.x, body.body_id, body, bounds)
-            for body, bounds in finite
-        ]
-        ordered.sort(key=lambda row: (row[0], row[1]))
-        active: list[tuple[float, str, RigidBody, AABB]] = []
+    def compute_pairs(self, bodies: tuple[RigidBody, ...]) -> tuple[BroadPhasePair, ...]:
+        finite: list[tuple[float, str, RigidBody, AABB]] = []
+        planes: list[RigidBody] = []
 
-        for _, _, body, bounds in ordered:
-            active = [
-                row
-                for row in active
-                if row[0] + EPSILON >= bounds.minimum.x
-            ]
+        for body in sorted(bodies, key=lambda row: row.body_id):
+            bounds = body.shape.aabb(body.transform)
+            if bounds is None:
+                planes.append(body)
+            else:
+                finite.append((bounds.minimum.x, body.body_id, body, bounds))
+
+        finite.sort(key=lambda row: (row[0], row[1]))
+        active: list[tuple[float, str, RigidBody, AABB]] = []
+        pairs: set[BroadPhasePair] = set()
+
+        for _, _, body, bounds in finite:
+            active = [row for row in active if row[0] + EPSILON >= bounds.minimum.x]
             for _, _, other, other_bounds in active:
                 if not _needs_physical_pair(body, other):
                     continue
                 if bounds.overlaps(other_bounds):
                     left, right = _ordered_pair(body, other)
-                    self._add_pair(
-                        pairs,
-                        BroadPhasePair(left.body_id, right.body_id),
-                    )
-            active.append(
-                (bounds.maximum.x, body.body_id, body, bounds)
-            )
+                    self._add_pair(pairs, BroadPhasePair(left.body_id, right.body_id))
+            active.append((bounds.maximum.x, body.body_id, body, bounds))
             active.sort(key=lambda row: (row[0], row[1]))
 
-    def _resolve_accelerator(self) -> object:
-        if self._accelerator is None:
-            from .jvm_broadphase_accelerator import (
-                get_default_broadphase_accelerator,
-            )
-
-            self._accelerator = get_default_broadphase_accelerator()
-        return self._accelerator
-
-    def acceleration_stats(self) -> dict[str, int | bool]:
-        return {
-            "enabled": self._use_jvm_acceleration,
-            **self._acceleration,
-        }
-
-    def query_aabbs(
-        self,
-        bodies: tuple[RigidBody, ...],
-        queries: tuple[AABB, ...],
-        *,
-        max_total_hits: int = MAX_BROAD_PHASE_QUERY_HITS,
-    ) -> tuple[tuple[str, ...], ...]:
-        """Return finite-body IDs overlapping each query AABB.
-
-        Infinite planes intentionally remain absent, matching the existing
-        PhysicsWorld.query_aabb semantics. Results for each query are in stable
-        body-ID order.
-        """
-        if (
-            isinstance(max_total_hits, bool)
-            or not isinstance(max_total_hits, int)
-            or not 1 <= max_total_hits <= MAX_BROAD_PHASE_QUERY_HITS
-        ):
-            raise PhysicsValidationError(
-                "max_total_hits outside supported range"
-            )
-        batch = tuple(queries)
-        if not all(isinstance(bounds, AABB) for bounds in batch):
-            raise PhysicsValidationError("queries must contain AABB values")
-        if not batch:
-            return ()
-
-        ordered_bodies = tuple(sorted(bodies, key=lambda row: row.body_id))
-        finite: list[tuple[RigidBody, AABB]] = []
-        for body in ordered_bodies:
-            bounds = body.shape.aabb(body.transform)
-            if bounds is not None:
-                finite.append((body, bounds))
-
-        def python_query() -> tuple[tuple[str, ...], ...]:
-            total = 0
-            output: list[tuple[str, ...]] = []
-            for query in batch:
-                hits: list[str] = []
-                for body, bounds in finite:
-                    if not bounds.overlaps(query):
-                        continue
-                    total += 1
-                    if total > max_total_hits:
-                        raise PhysicsValidationError(
-                            "AABB query total-hit bound exceeded"
-                        )
-                    hits.append(body.body_id)
-                output.append(tuple(hits))
-            return tuple(output)
-
-        spatial_tests = len(finite) * len(batch)
-        if spatial_tests > MAX_BROAD_PHASE_SPATIAL_TESTS:
-            raise PhysicsValidationError("spatial test bound exceeded")
-
-        if not self._use_jvm_acceleration or not finite:
-            return python_query()
-
-        try:
-            accelerator = self._resolve_accelerator()
-            minimum = int(
-                getattr(
-                    accelerator,
-                    "minimum_spatial_tests",
-                    getattr(accelerator, "minimum_bodies", 1),
-                )
-            )
-            if spatial_tests < minimum:
-                self._acceleration["bypassed_small_batch"] += 1
-                return python_query()
-
-            self._acceleration["attempts"] += 1
-            self._acceleration["spatial_attempts"] += 1
-            index_batches = accelerator.query_overlaps_many(
-                [bounds for _, bounds in finite],
-                batch,
-                max_total_hits=max_total_hits,
-            )
-            if len(index_batches) != len(batch):
-                raise RuntimeError(
-                    "accelerator returned wrong AABB query count"
-                )
-
-            total = 0
-            output: list[tuple[str, ...]] = []
-            for indices in index_batches:
-                if not isinstance(indices, (list, tuple)):
-                    raise TypeError("invalid accelerated AABB hit batch")
-                previous = -1
-                hits: list[str] = []
-                for index in indices:
-                    if (
-                        isinstance(index, bool)
-                        or not isinstance(index, int)
-                        or not 0 <= index < len(finite)
-                        or index <= previous
-                    ):
-                        raise ValueError(
-                            "invalid accelerated AABB hit index"
-                        )
-                    previous = index
-                    total += 1
-                    if total > max_total_hits:
-                        raise ValueError(
-                            "accelerated AABB total-hit bound exceeded"
-                        )
-                    hits.append(finite[index][0].body_id)
-                output.append(tuple(hits))
-
-            self._acceleration["successes"] += 1
-            self._acceleration["spatial_successes"] += 1
-            return tuple(output)
-        except Exception:
-            self._acceleration["fallbacks"] += 1
-            return python_query()
-
-    def ray_candidate_ids(
-        self,
-        bodies: tuple[RigidBody, ...],
-        rays: tuple[Ray, ...],
-        *,
-        max_total_candidates: int = MAX_BROAD_PHASE_QUERY_HITS,
-    ) -> tuple[tuple[str, ...], ...]:
-        """Return conservative body-ID candidates for each ray."""
-        if (
-            isinstance(max_total_candidates, bool)
-            or not isinstance(max_total_candidates, int)
-            or not 1 <= max_total_candidates <= MAX_BROAD_PHASE_QUERY_HITS
-        ):
-            raise PhysicsValidationError(
-                "max_total_candidates outside supported range"
-            )
-        batch = tuple(rays)
-        if not all(isinstance(ray, Ray) for ray in batch):
-            raise PhysicsValidationError("rays must contain Ray values")
-        if not batch:
-            return ()
-
-        ordered_bodies = tuple(sorted(bodies, key=lambda row: row.body_id))
-        finite: list[tuple[RigidBody, AABB]] = []
-        planes: list[RigidBody] = []
-        for body in ordered_bodies:
-            bounds = body.shape.aabb(body.transform)
-            if bounds is None:
-                planes.append(body)
-            else:
-                finite.append((body, bounds))
-
-        spatial_tests = len(ordered_bodies) * len(batch)
-        if spatial_tests > MAX_BROAD_PHASE_SPATIAL_TESTS:
-            raise PhysicsValidationError("spatial test bound exceeded")
-
-        plane_ids = tuple(body.body_id for body in planes)
-
-        def finish(
-            finite_batches: list[list[int]] | tuple[tuple[int, ...], ...],
-        ) -> tuple[tuple[str, ...], ...]:
-            if len(finite_batches) != len(batch):
-                raise ValueError("ray candidate batch count mismatch")
-            total = 0
-            output: list[tuple[str, ...]] = []
-            for indices in finite_batches:
-                previous = -1
-                ids: list[str] = []
-                for index in indices:
-                    if (
-                        isinstance(index, bool)
-                        or not isinstance(index, int)
-                        or not 0 <= index < len(finite)
-                        or index <= previous
-                    ):
-                        raise ValueError("invalid ray candidate index")
-                    previous = index
-                    ids.append(finite[index][0].body_id)
-                ids.extend(plane_ids)
-                ordered_ids = tuple(sorted(ids))
-                total += len(ordered_ids)
-                if total > max_total_candidates:
-                    raise PhysicsValidationError(
-                        "ray candidate total-hit bound exceeded"
-                    )
-                output.append(ordered_ids)
-            return tuple(output)
-
-        def python_query() -> tuple[tuple[str, ...], ...]:
-            batches: list[list[int]] = []
-            for ray in batch:
-                batches.append(
-                    [
-                        index
-                        for index, (_, bounds) in enumerate(finite)
-                        if _ray_overlaps_aabb(ray, bounds)
-                    ]
-                )
-            return finish(batches)
-
-        if not self._use_jvm_acceleration or not finite:
-            return python_query()
-
-        try:
-            accelerator = self._resolve_accelerator()
-            minimum = int(
-                getattr(
-                    accelerator,
-                    "minimum_spatial_tests",
-                    getattr(accelerator, "minimum_bodies", 1),
-                )
-            )
-            if len(finite) * len(batch) < minimum:
-                self._acceleration["bypassed_small_batch"] += 1
-                return python_query()
-
-            self._acceleration["attempts"] += 1
-            self._acceleration["spatial_attempts"] += 1
-            finite_batches = accelerator.ray_candidates_many(
-                [bounds for _, bounds in finite],
-                batch,
-                max_total_candidates=max_total_candidates,
-            )
-            result = finish(finite_batches)
-            self._acceleration["successes"] += 1
-            self._acceleration["spatial_successes"] += 1
-            return result
-        except PhysicsValidationError:
-            raise
-        except Exception:
-            self._acceleration["fallbacks"] += 1
-            return python_query()
-
-    def compute_pairs(
-        self,
-        bodies: tuple[RigidBody, ...],
-    ) -> tuple[BroadPhasePair, ...]:
-        ordered_bodies = tuple(sorted(bodies, key=lambda row: row.body_id))
-        finite: list[tuple[RigidBody, AABB]] = []
-        planes: list[RigidBody] = []
-
-        for body in ordered_bodies:
-            bounds = body.shape.aabb(body.transform)
-            if bounds is None:
-                planes.append(body)
-            else:
-                finite.append((body, bounds))
-
-        pairs: set[BroadPhasePair] = set()
-        accelerated_pairs: object | None = None
-
-        if self._use_jvm_acceleration and finite:
-            try:
-                accelerator = self._resolve_accelerator()
-                minimum = int(
-                    getattr(accelerator, "minimum_bodies", 1)
-                )
-                if len(finite) >= minimum:
-                    self._acceleration["attempts"] += 1
-                    accelerated_pairs = accelerator.compute_pairs(
-                        [
-                            (
-                                bounds,
-                                body.body_type is BodyType.DYNAMIC,
-                            )
-                            for body, bounds in finite
-                        ],
-                        max_pairs=self.max_pairs,
-                        epsilon=EPSILON,
-                    )
-                else:
-                    self._acceleration["bypassed_small_batch"] += 1
-            except Exception:
-                self._acceleration["fallbacks"] += 1
-                accelerated_pairs = None
-
-        if accelerated_pairs is None:
-            self._compute_finite_pairs_python(finite, pairs)
-        else:
-            try:
-                for index_pair in accelerated_pairs:
-                    left_body = finite[index_pair.left][0]
-                    right_body = finite[index_pair.right][0]
-                    left, right = _ordered_pair(left_body, right_body)
-                    self._add_pair(
-                        pairs,
-                        BroadPhasePair(left.body_id, right.body_id),
-                    )
-            except (AttributeError, IndexError, TypeError) as exc:
-                # An injected/custom accelerator may violate the bridge
-                # contract. Discard partial candidates and recompute in Python.
-                pairs.clear()
-                self._acceleration["fallbacks"] += 1
-                self._compute_finite_pairs_python(finite, pairs)
-            else:
-                self._acceleration["successes"] += 1
-
-        # Infinite planes are intentionally kept in Python. Their candidate
-        # semantics are domain-specific ("plane against every non-plane body")
-        # rather than a finite-AABB numeric kernel.
-        for plane in planes:
-            for body in ordered_bodies:
-                if (
-                    body.body_id == plane.body_id
-                    or isinstance(body.shape, PlaneShape)
-                ):
+        for plane in sorted(planes, key=lambda row: row.body_id):
+            for body in sorted(bodies, key=lambda row: row.body_id):
+                if body.body_id == plane.body_id or isinstance(body.shape, PlaneShape):
                     continue
                 if not _needs_physical_pair(plane, body):
                     continue
                 left, right = _ordered_pair(plane, body)
-                self._add_pair(
-                    pairs,
-                    BroadPhasePair(left.body_id, right.body_id),
-                )
+                self._add_pair(pairs, BroadPhasePair(left.body_id, right.body_id))
 
-        return tuple(
-            sorted(pairs, key=lambda row: (row.body_a, row.body_b))
-        )
+        return tuple(sorted(pairs, key=lambda row: (row.body_a, row.body_b)))
 
 
 def _contact_material(a: RigidBody, b: RigidBody) -> ContactMaterial:
@@ -1315,10 +930,7 @@ def _plane_support_convex(
 ) -> ContactManifold | None:
     plane_shape = plane.shape
     assert isinstance(plane_shape, PlaneShape)
-    assert isinstance(
-        convex.shape,
-        (CapsuleShape, CylinderShape, ConvexHullShape),
-    )
+    assert isinstance(convex.shape, (CapsuleShape, CylinderShape))
 
     normal, offset = plane_shape.world_equation(plane.transform)
     deepest = convex.shape.support(-normal, convex.transform)
@@ -1407,14 +1019,10 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
     if kind_a is ShapeKind.PLANE and kind_b is ShapeKind.PLANE:
         return None
 
-    support_convex = {
-        ShapeKind.CAPSULE,
-        ShapeKind.CYLINDER,
-        ShapeKind.CONVEX_HULL,
-    }
-    if kind_a is ShapeKind.PLANE and kind_b in support_convex:
+    round_convex = {ShapeKind.CAPSULE, ShapeKind.CYLINDER}
+    if kind_a is ShapeKind.PLANE and kind_b in round_convex:
         return _plane_support_convex(a, b)
-    if kind_b is ShapeKind.PLANE and kind_a in support_convex:
+    if kind_b is ShapeKind.PLANE and kind_a in round_convex:
         result = _plane_support_convex(b, a)
         return None if result is None else result.flipped()
 
@@ -1423,12 +1031,11 @@ def detect_collision(a: RigidBody, b: RigidBody) -> ContactManifold | None:
         ShapeKind.BOX,
         ShapeKind.CAPSULE,
         ShapeKind.CYLINDER,
-        ShapeKind.CONVEX_HULL,
     }
     if (
         kind_a in finite_convex
         and kind_b in finite_convex
-        and (kind_a in support_convex or kind_b in support_convex)
+        and (kind_a in round_convex or kind_b in round_convex)
     ):
         return _convex_convex(a, b)
 

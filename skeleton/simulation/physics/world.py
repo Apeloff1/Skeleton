@@ -11,18 +11,10 @@ from .ccd import ContinuousCollisionDetector, TOIEvent
 from .character import (
     CharacterGroundState,
     CharacterMoveResult,
-    CharacterRecoveryResult,
-    CharacterResizeResult,
-    CharacterRuntimeResult,
     KinematicCapsuleController,
-)
-from .character_motor import (
-    CharacterMotorResult,
-    KinematicCharacterMotor,
 )
 from .collision import (
     ContactManifold,
-    MAX_BROAD_PHASE_QUERY_HITS,
     SweepAndPruneBroadPhase,
     detect_collision,
     generate_manifolds,
@@ -47,14 +39,7 @@ from .islands import IslandGraph, IslandGraphStats, build_islands, solve_islands
 from .joint_cache import JointImpulseCache, JointImpulseEntry
 from .math3d import EPSILON, AABB, Quat, Vec3
 from .queries import Ray, RayHit, raycast_body, sort_hits, sphere_cast_body
-from .shapes import (
-    BoxShape,
-    CapsuleShape,
-    ConvexHullShape,
-    CylinderShape,
-    PlaneShape,
-    SphereShape,
-)
+from .shapes import BoxShape, CapsuleShape, CylinderShape, PlaneShape, SphereShape
 from .snapshots import (
     PhysicsBodyState,
     PhysicsSnapshot,
@@ -267,24 +252,14 @@ class PhysicsStepReceipt:
 
 
 class PhysicsWorld:
-    def __init__(
-        self,
-        settings: PhysicsSettings | None = None,
-        *,
-        use_jvm_broadphase: bool = False,
-        broad_phase_accelerator: object | None = None,
-    ) -> None:
+    def __init__(self, settings: PhysicsSettings | None = None) -> None:
         if settings is not None and not isinstance(settings, PhysicsSettings):
             raise PhysicsValidationError("settings must be PhysicsSettings")
         self.settings = settings or PhysicsSettings()
         self._bodies: dict[str, RigidBody] = {}
         self._joints: dict[str, JointConstraint] = {}
         self._tick = 0
-        self._broad_phase = SweepAndPruneBroadPhase(
-            max_pairs=self.settings.max_pairs,
-            use_jvm_acceleration=use_jvm_broadphase,
-            accelerator=broad_phase_accelerator,
-        )
+        self._broad_phase = SweepAndPruneBroadPhase(max_pairs=self.settings.max_pairs)
         self._solver = SequentialImpulseSolver(
             velocity_iterations=self.settings.velocity_iterations,
             position_iterations=self.settings.position_iterations,
@@ -386,10 +361,6 @@ class PhysicsWorld:
         self._joint_cache.remove_joint(joint_id)
         return joint
 
-    def broad_phase_acceleration_stats(self) -> dict[str, int | bool]:
-        """Return optional JVM broad-phase counters without changing physics state."""
-        return self._broad_phase.acceleration_stats()
-
     def contacts(self) -> tuple[ContactManifold, ...]:
         return self._last_manifolds
 
@@ -427,19 +398,6 @@ class PhysicsWorld:
                 matches.append(body.body_id)
         return tuple(matches)
 
-    def query_aabb_many(
-        self,
-        bounds: tuple[AABB, ...],
-        *,
-        max_total_hits: int = MAX_BROAD_PHASE_QUERY_HITS,
-    ) -> tuple[tuple[str, ...], ...]:
-        """Batch finite-body AABB queries with optional JVM acceleration."""
-        return self._broad_phase.query_aabbs(
-            self.bodies(),
-            tuple(bounds),
-            max_total_hits=max_total_hits,
-        )
-
     def raycast(
         self,
         ray: Ray,
@@ -454,34 +412,6 @@ class PhysicsWorld:
             if (hit := raycast_body(ray, body)) is not None
         ]
         return sort_hits(hits)
-
-    def raycast_many(
-        self,
-        rays: tuple[Ray, ...],
-        *,
-        ignore: tuple[str, ...] = (),
-        max_total_candidates: int = MAX_BROAD_PHASE_QUERY_HITS,
-    ) -> tuple[tuple[RayHit, ...], ...]:
-        """Batch raycasts with optional JVM coarse-AABB candidate filtering."""
-        batch = tuple(rays)
-        if not batch:
-            return ()
-        candidate_batches = self._broad_phase.ray_candidate_ids(
-            self.bodies(),
-            batch,
-            max_total_candidates=max_total_candidates,
-        )
-        ignored = set(ignore)
-        output: list[tuple[RayHit, ...]] = []
-        for ray, candidate_ids in zip(batch, candidate_batches):
-            hits = [
-                hit
-                for body_id in candidate_ids
-                if body_id not in ignored
-                if (hit := raycast_body(ray, self._bodies[body_id])) is not None
-            ]
-            output.append(sort_hits(hits))
-        return tuple(output)
 
     def raycast_closest(
         self,
@@ -554,98 +484,6 @@ class PhysicsWorld:
             distance=distance,
         )
 
-    def recover_character_overlaps(
-        self,
-        controller: KinematicCapsuleController,
-        *,
-        ignore: tuple[str, ...] = (),
-    ) -> CharacterRecoveryResult:
-        if not isinstance(controller, KinematicCapsuleController):
-            raise PhysicsValidationError(
-                "controller must be KinematicCapsuleController"
-            )
-        return controller.recover_overlaps(
-            self.bodies(),
-            ignore=ignore,
-        )
-
-    def resize_character(
-        self,
-        controller: KinematicCapsuleController,
-        new_half_height: float,
-        *,
-        ignore: tuple[str, ...] = (),
-        preserve_foot: bool = True,
-    ) -> CharacterResizeResult:
-        if not isinstance(controller, KinematicCapsuleController):
-            raise PhysicsValidationError(
-                "controller must be KinematicCapsuleController"
-            )
-        return controller.resize(
-            new_half_height,
-            self.bodies(),
-            ignore=ignore,
-            preserve_foot=preserve_foot,
-        )
-
-    def step_character_runtime(
-        self,
-        controller: KinematicCapsuleController,
-        requested_velocity: Vec3,
-        *,
-        dt: float | None = None,
-        ignore: tuple[str, ...] = (),
-        recover_overlaps: bool = True,
-        carry_support: bool = True,
-    ) -> CharacterRuntimeResult:
-        if not isinstance(controller, KinematicCapsuleController):
-            raise PhysicsValidationError(
-                "controller must be KinematicCapsuleController"
-            )
-        step_dt = self.settings.fixed_dt if dt is None else _positive(
-            dt,
-            name="character dt",
-        )
-        return controller.runtime_step(
-            requested_velocity,
-            self.bodies(),
-            dt=step_dt,
-            ignore=ignore,
-            recover_overlaps=recover_overlaps,
-            carry_support=carry_support,
-        )
-
-    def step_character_motor(
-        self,
-        controller: KinematicCapsuleController,
-        motor: KinematicCharacterMotor,
-        desired_velocity: Vec3,
-        *,
-        jump: bool = False,
-        dt: float | None = None,
-        ignore: tuple[str, ...] = (),
-    ) -> CharacterMotorResult:
-        if not isinstance(controller, KinematicCapsuleController):
-            raise PhysicsValidationError(
-                "controller must be KinematicCapsuleController"
-            )
-        if not isinstance(motor, KinematicCharacterMotor):
-            raise PhysicsValidationError(
-                "motor must be KinematicCharacterMotor"
-            )
-        step_dt = self.settings.fixed_dt if dt is None else _positive(
-            dt,
-            name="character motor dt",
-        )
-        return motor.step(
-            controller,
-            desired_velocity,
-            self.bodies(),
-            dt=step_dt,
-            jump=jump,
-            ignore=ignore,
-        )
-
     def _shape_record(self, body: RigidBody) -> dict[str, object]:
         shape = body.shape
         if isinstance(shape, SphereShape):
@@ -669,15 +507,6 @@ class PhysicsWorld:
                 "kind": shape.kind.value,
                 "radius": shape.radius,
                 "half_height": shape.half_height,
-            }
-        if isinstance(shape, ConvexHullShape):
-            return {
-                "kind": shape.kind.value,
-                "vertices": tuple(
-                    vertex.to_tuple()
-                    for vertex in shape.vertices
-                ),
-                "faces": shape.faces,
             }
         raise PhysicsValidationError("unknown shape implementation")
 
@@ -920,51 +749,15 @@ class PhysicsWorld:
             raise PhysicsValidationError(
                 "CCD TOI failed to produce a resolvable contact manifold"
             )
-        # The sweep normal is the first-contact normal. Re-running penetration
-        # at the microscopic bias depth can select a different smooth-feature
-        # EPA normal, which leaves artificial through-target velocity. Keep the
-        # narrow phase's witnesses/material but solve the interim impact along
-        # the stable TOI normal.
-        impact_manifold = ContactManifold(
-            body_a=manifold.body_a,
-            body_b=manifold.body_b,
-            normal=event.normal,
-            points=manifold.points,
-            material=manifold.material,
-        )
         # Do not persist interim impulses into the frame cache. The final
         # discrete solve owns next-frame warm-start state; caching here would
         # re-apply the same impact impulse later in this tick.
         self._solver.solve(
             self._bodies,
-            (impact_manifold,),
+            (manifold,),
             cache=None,
             tick=tick,
         )
-
-    def _clamp_settled_pair_closing_velocity(self, event: TOIEvent) -> None:
-        """Remove residual normal closing speed before a CCD pair is settled."""
-        body_a = self._bodies[event.body_a]
-        body_b = self._bodies[event.body_b]
-        inverse_mass_sum = body_a.inverse_mass + body_b.inverse_mass
-        if inverse_mass_sum <= 0.0:
-            return
-        relative_normal_speed = (
-            body_b.linear_velocity - body_a.linear_velocity
-        ).dot(event.normal)
-        if relative_normal_speed >= 0.0:
-            return
-        impulse = -relative_normal_speed / inverse_mass_sum
-        if body_a.inverse_mass > 0.0:
-            body_a.linear_velocity = (
-                body_a.linear_velocity - event.normal * (impulse * body_a.inverse_mass)
-            )
-            body_a.wake()
-        if body_b.inverse_mass > 0.0:
-            body_b.linear_velocity = (
-                body_b.linear_velocity + event.normal * (impulse * body_b.inverse_mass)
-            )
-            body_b.wake()
 
     def _integrate_velocity_phase(
         self,
@@ -978,7 +771,6 @@ class PhysicsWorld:
 
         remaining = dt
         events: list[TOIEvent] = []
-        settled_pairs: set[tuple[str, str]] = set()
         minimum_advance = dt * self.settings.ccd_min_advance_fraction
 
         for _ in range(self.settings.ccd_max_substeps):
@@ -986,11 +778,7 @@ class PhysicsWorld:
                 remaining = 0.0
                 break
 
-            event = self._ccd.earliest_event(
-                self.bodies(),
-                remaining,
-                ignore_pairs=frozenset(settled_pairs),
-            )
+            event = self._ccd.earliest_event(self.bodies(), remaining)
             if event is None:
                 self._advance_all_bodies(remaining)
                 remaining = 0.0
@@ -1009,21 +797,12 @@ class PhysicsWorld:
                 break
 
             if advance <= minimum_advance:
-                # Immediate re-entry after impact is a persistent contact, not
-                # a useful new sweep. Settle this pair for the rest of the
-                # fixed step and let the final discrete contact solve own it.
-                self._clamp_settled_pair_closing_velocity(event)
-                settled_pairs.add((event.body_a, event.body_b))
                 escape = min(remaining, minimum_advance)
                 self._advance_all_bodies(escape)
                 remaining = max(0.0, remaining - escape)
 
         if remaining > EPSILON:
-            pending = self._ccd.earliest_event(
-                self.bodies(),
-                remaining,
-                ignore_pairs=frozenset(settled_pairs),
-            )
+            pending = self._ccd.earliest_event(self.bodies(), remaining)
             if pending is not None:
                 raise PhysicsValidationError("CCD substep bound exceeded")
             self._advance_all_bodies(remaining)

@@ -50,8 +50,9 @@ def _dynamic(
     )
 
 
-def test_round_convex_pairings_generate_positive_contact() -> None:
-    cases = (
+@pytest.mark.parametrize(
+    ("shape_a", "shape_b", "offset"),
+    (
         (CapsuleShape(0.5, 0.8), SphereShape(0.5), 0.8),
         (CapsuleShape(0.5, 0.8), BoxShape(Vec3(0.4, 0.4, 0.4)), 0.7),
         (CylinderShape(0.5, 0.8), SphereShape(0.5), 0.8),
@@ -59,41 +60,48 @@ def test_round_convex_pairings_generate_positive_contact() -> None:
         (CapsuleShape(0.5, 0.8), CapsuleShape(0.5, 0.8), 0.8),
         (CylinderShape(0.5, 0.8), CylinderShape(0.5, 0.8), 0.8),
         (CapsuleShape(0.5, 0.8), CylinderShape(0.5, 0.8), 0.8),
+    ),
+)
+def test_round_convex_pairings_generate_positive_contact(
+    shape_a,
+    shape_b,
+    offset: float,
+) -> None:
+    a = _static(
+        "a",
+        shape_a,
+        orientation=Quat.from_axis_angle(Vec3.axis(2), math.radians(4.0)),
     )
-    for shape_a, shape_b, offset in cases:
-        a = _static(
-            "a",
-            shape_a,
-            orientation=Quat.from_axis_angle(Vec3.axis(2), math.radians(4.0)),
-        )
-        b = _dynamic(
-            "b",
-            shape_b,
-            position=Vec3(offset, 0.03, -0.02),
-            orientation=Quat.from_axis_angle(Vec3.axis(0), math.radians(-3.0)),
-        )
+    b = _dynamic(
+        "b",
+        shape_b,
+        position=Vec3(offset, 0.03, -0.02),
+        orientation=Quat.from_axis_angle(Vec3.axis(0), math.radians(-3.0)),
+    )
 
-        manifold = detect_collision(a, b)
+    manifold = detect_collision(a, b)
 
-        assert manifold is not None
-        assert manifold.penetration > 0.0
-        assert len(manifold.points) == 1
-        assert manifold.points[0].feature_id.startswith("convex:")
-        assert manifold.normal.length() == pytest.approx(1.0)
-        assert (b.position - a.position).dot(manifold.normal) >= -1.0e-8
+    assert manifold is not None
+    assert manifold.penetration > 0.0
+    assert len(manifold.points) == 1
+    assert manifold.points[0].feature_id.startswith("convex:")
+    assert manifold.normal.length() == pytest.approx(1.0)
+    assert (b.position - a.position).dot(manifold.normal) >= -1.0e-8
 
 
-def test_round_convex_pairings_reject_clear_separation() -> None:
-    cases = (
+@pytest.mark.parametrize(
+    ("shape_a", "shape_b"),
+    (
         (CapsuleShape(0.5, 0.8), SphereShape(0.5)),
         (CylinderShape(0.5, 0.8), BoxShape(Vec3(0.4, 0.4, 0.4))),
         (CapsuleShape(0.5, 0.8), CylinderShape(0.5, 0.8)),
-    )
-    for shape_a, shape_b in cases:
-        a = _static("a", shape_a)
-        b = _dynamic("b", shape_b, position=Vec3(5.0, 0.0, 0.0))
+    ),
+)
+def test_round_convex_pairings_reject_clear_separation(shape_a, shape_b) -> None:
+    a = _static("a", shape_a)
+    b = _dynamic("b", shape_b, position=Vec3(5.0, 0.0, 0.0))
 
-        assert detect_collision(a, b) is None
+    assert detect_collision(a, b) is None
 
 
 def test_plane_capsule_uses_exact_deepest_support_penetration() -> None:
