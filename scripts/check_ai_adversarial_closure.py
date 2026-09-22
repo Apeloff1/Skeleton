@@ -16,6 +16,8 @@ MASTER = ROOT / "machine" / "ai_master_plan.json"
 HUMAN = ROOT / "docs" / "plan" / "ADVERSARIAL_CLOSURE_PASS.md"
 PLAN = ROOT / "docs" / "plan" / "MASTER_PLAN.md"
 INDEX = ROOT / "docs" / "plan" / "MASTER_INDEX.md"
+ARCH_INDEX = ROOT / "docs" / "ARCHITECTURE_INDEX.md"
+BUILD_PLAN = ROOT / "docs" / "BUILD_PLAN.md"
 
 EXPECTED_WPS = [f"WP-W{i:02d}" for i in range(31)]
 EXPECTED_AXES = {f"AC-{i:02d}" for i in range(1, 25)}
@@ -37,7 +39,7 @@ def _load(path: Path) -> dict:
 
 def validate() -> list[str]:
     errors: list[str] = []
-    for path in (CLOSURE, MASTER, HUMAN, PLAN, INDEX):
+    for path in (CLOSURE, MASTER, HUMAN, PLAN, INDEX, ARCH_INDEX, BUILD_PLAN):
         if not path.is_file():
             errors.append(f"missing {path.relative_to(ROOT)}")
     if errors:
@@ -176,6 +178,16 @@ def validate() -> list[str]:
     index = INDEX.read_text(encoding="utf-8")
     if "ADVERSARIAL_CLOSURE_PASS.md" not in index or "ai_adversarial_closure.json" not in index:
         errors.append("master index must link adversarial human and machine contracts")
+
+    arch_index = ARCH_INDEX.read_text(encoding="utf-8")
+    for marker in ("Program-plan authority bridge", "plan/MASTER_PLAN.md", "plan/ADVERSARIAL_CLOSURE_PASS.md"):
+        if marker not in arch_index:
+            errors.append(f"architecture index missing program authority marker: {marker}")
+
+    build_plan = BUILD_PLAN.read_text(encoding="utf-8")
+    for marker in ("Program masterplan:", "plan/MASTER_PLAN.md", "plan/ADVERSARIAL_CLOSURE_PASS.md", "subordinate to `docs/plan/MASTER_PLAN.md`"):
+        if marker not in build_plan:
+            errors.append(f"frontier build plan missing program authority marker: {marker}")
 
     return errors
 
