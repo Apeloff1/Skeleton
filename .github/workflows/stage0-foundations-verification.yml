@@ -1,0 +1,148 @@
+name: Stage 0 Foundations Verification
+
+on:
+  pull_request:
+    paths:
+      - "backend/services/rag_state_repository.py"
+      - "backend/services/rag_service.py"
+      - "backend/tests/test_rag_state_repository.py"
+      - "backend/tests/test_rag_state_authority.py"
+      - "skeleton/contracts/operation.py"
+      - "skeleton/frontier/operation_stream.py"
+      - "skeleton/frontier/operation_stream_store.py"
+      - "skeleton/persistence/**"
+      - "skeleton/testing/test_operation_*.py"
+      - "skeleton/vault/**"
+      - "skeleton/memory/**"
+      - "skeleton/retrieval/**"
+      - "skeleton/artifact_plane/**"
+      - "skeleton/observability/**"
+      - "backend/routes/governance.py"
+      - "skeleton/testing/test_data_governance.py"
+      - "skeleton/testing/test_data_lifecycle.py"
+      - "skeleton/testing/test_governance_registry.py"
+      - "skeleton/testing/test_governance_audit.py"
+      - "skeleton/testing/test_lifecycle_adapters.py"
+      - "skeleton/intelligence/admission.py"
+      - "skeleton/intelligence/admission_runtime.py"
+      - "skeleton/intelligence/quota.py"
+      - "skeleton/intelligence/quota_sqlite.py"
+      - "skeleton/testing/test_tenant_quota.py"
+      - "skeleton/testing/test_tenant_quota_sqlite.py"
+      - "skeleton/testing/test_admission_runtime.py"
+      - "machine/state_topology.json"
+      - "machine/ai_app_construction.json"
+      - ".github/workflows/stage0-foundations-verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage0-foundations-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  state-authority:
+    name: State authority and durable operation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused verifier
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Verify canonical RAG state authority
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_rag_state_repository.py
+          backend/tests/test_rag_state_authority.py
+
+      - name: Verify durable operation and outbox authority
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_operation_contract.py
+          skeleton/testing/test_operation_store.py
+          skeleton/testing/test_operation_runtime.py
+          skeleton/testing/test_operation_server_binding.py
+          skeleton/testing/test_operation_stream.py
+          skeleton/testing/test_operation_stream_store.py
+
+      - name: Record state verification head
+        run: echo "State authority verified at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  governance:
+    name: Governance lifecycle and audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused verifier
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Verify registration lifecycle propagation and audit
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_data_governance.py
+          skeleton/testing/test_data_lifecycle.py
+          skeleton/testing/test_governance_registry.py
+          skeleton/testing/test_lifecycle_adapters.py
+          skeleton/testing/test_governance_audit.py
+
+      - name: Record governance verification head
+        run: echo "Governance lifecycle verified at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+  durable-cost-admission:
+    name: Durable tenant quota and admission
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused verifier
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9"
+
+      - name: Verify restart-safe quota and admission
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_tenant_quota.py
+          skeleton/testing/test_tenant_quota_sqlite.py
+          skeleton/testing/test_admission_runtime.py
+
+      - name: Record cost verification head
+        run: echo "Durable cost admission verified at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
