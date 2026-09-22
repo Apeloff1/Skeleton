@@ -51,22 +51,22 @@ class ResilienceFortress:
     def process_input(self, raw_input: str, user_id: str = "anonymous") -> Tuple[str, SanitizationReport]:
         """Sanitize input and return cleaned text + report."""
         self._stats["checked"] += 1
-        
+
         findings = []
         threat_score = 0.0
-        
+
         for name, pattern in self.PATTERNS.items():
             if pattern.search(raw_input):
                 findings.append(f"Detected: {name}")
                 threat_score += 0.25
-        
+
         # Length-based heuristic
         if len(raw_input) > 10000:
             findings.append("Input exceeds length threshold")
             threat_score += 0.1
-        
+
         level = self._score_to_level(threat_score)
-        
+
         if level in (ThreatLevel.HIGH, ThreatLevel.CRITICAL):
             self._stats["blocked"] += 1
             sanitized = ""
@@ -78,14 +78,14 @@ class ResilienceFortress:
         else:
             sanitized = raw_input
             action = "allowed"
-        
+
         report = SanitizationReport(
             level=level,
             confidence=min(threat_score, 1.0),
             action_taken=action,
             findings=findings,
         )
-        
+
         if self._bus:
             self._bus.emit("resilience.fortress.check", {
                 "user_id": user_id,
@@ -93,7 +93,7 @@ class ResilienceFortress:
                 "action": action,
                 "findings": len(findings),
             })
-        
+
         return sanitized, report
 
     @staticmethod
@@ -140,12 +140,12 @@ class CanaryRegistry:
         """Record a canary request outcome."""
         if subsystem not in self._canaries:
             return
-        
+
         canary = self._canaries[subsystem]
         canary["requests"] += 1
         if not success:
             canary["errors"] += 1
-        
+
         # Auto-rollback if error rate > 10%
         if canary["requests"] > 20:
             error_rate = canary["errors"] / canary["requests"]
