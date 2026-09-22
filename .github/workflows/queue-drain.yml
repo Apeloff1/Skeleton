@@ -3,7 +3,10 @@ name: Drain superseded Actions queue
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Merge Readiness"]
+    # Wake on terminal critical validation runs as well as the canonical merge
+    # gate. The drainer independently proves every cancellation candidate, so
+    # extra wakeups improve recovery latency without weakening fail-closed rules.
+    workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]
     types: [completed]
     branches: [main]
   schedule:
