@@ -4,8 +4,13 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Dimensions, PixelRatio, Platform, InteractionManager } from 'react-native';
+import { Dimensions, PixelRatio, Platform } from 'react-native';
 
+
+const requestIdleTask = (callback: () => void) => {
+  const id = setTimeout(callback, 0);
+  return { cancel: () => clearTimeout(id) };
+};
 interface ScreenMetrics {
   width: number;
   height: number;
@@ -53,7 +58,7 @@ export function useMobileOptimization() {
     imageQuality: 'medium',
   });
 
-  const interactionRef = useRef<ReturnType<typeof InteractionManager.runAfterInteractions> | null>(null);
+  const interactionRef = useRef<ReturnType<typeof requestIdleTask> | null>(null);
 
   // Update metrics on dimension change
   useEffect(() => {
@@ -96,7 +101,7 @@ export function useMobileOptimization() {
   // Run after interactions complete (prevents jank)
   const runAfterInteraction = useCallback(<T,>(callback: () => T): Promise<T> => {
     return new Promise((resolve) => {
-      interactionRef.current = InteractionManager.runAfterInteractions(() => {
+      interactionRef.current = requestIdleTask(() => {
         resolve(callback());
       });
     });
