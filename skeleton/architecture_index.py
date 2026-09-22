@@ -93,6 +93,7 @@ CANONICAL_DOCUMENTS = {
     "research_dependency_map": "docs/architecture/research-dependency-map-2026.md",
     "research_execution_program": "docs/architecture/research-execution-program-2026.md",
     "research_program_scorecard": "docs/architecture/research-program-scorecard-2026.md",
+    "research_control_plane_internals": "docs/architecture/research-control-plane-internals-2026.md",
 }
 
 EVIDENCE_STATES = (
@@ -191,6 +192,17 @@ PLAN_CHECKPOINTS = {
         "experiment_protocol_range": ("RXP001", "RXP062"),
         "production_authority_granted": False,
         "research_refresh_required": True,
+    },
+    "PLAN-20260922-RESEARCH-CONTROL-PLANE-INTERNALS": {
+        "created_at": "2026-09-22",
+        "tracks": ("AD",),
+        "package_target": "skeleton/research",
+        "implementation_milestones": ("M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"),
+        "authoritative_mutations_transactional": True,
+        "research_agent_self_signoff_forbidden": True,
+        "blind_eval_access_for_research_agent": False,
+        "unknown_external_outcomes_reconciled_before_retry": True,
+        "production_authority_granted": False,
     },
     "PLAN-20260922-RESEARCH-PROGRAM-SCORECARD": {
         "created_at": "2026-09-22",
