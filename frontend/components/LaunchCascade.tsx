@@ -235,7 +235,7 @@ export default function LaunchCascade() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#0a0a14' },
-  bg: { ...StyleSheet.absoluteFill },
+  bg: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
   title: {
     color: '#fff', fontSize: 38, fontWeight: '900', letterSpacing: -1, textAlign: 'center',
