@@ -67,3 +67,9 @@ def test_master_plan_binds_adversarial_closure() -> None:
     assert closure["machine_contract"] == "machine/ai_adversarial_closure.json"
     assert closure["human_contract"] == "docs/plan/ADVERSARIAL_CLOSURE_PASS.md"
     assert closure["required_for_promotion"] == ["verified", "hardened", "production"]
+
+def test_master_plan_references_engineering_task_matrix() -> None:
+    data = checker.load_plan()
+    engineering = data["engineering_pass"]
+    assert engineering["task_matrix"] == "machine/ai_engineering_task_matrix.json"
+    assert engineering["task_matrix_human"] == "docs/plan/ENGINEERING_TASK_MATRIX.md"
