@@ -921,7 +921,7 @@
       "stage": 1,
       "parallel_lane": "memory",
       "objective": "Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-state-authority-convergence",
