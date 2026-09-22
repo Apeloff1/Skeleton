@@ -42,6 +42,10 @@ Engineering pass: [`ENGINEERING_PASS.md`](ENGINEERING_PASS.md)
 
 Machine engineering contract: [`machine/ai_engineering_pass.json`](../../machine/ai_engineering_pass.json)
 
+Engineering task matrix: [`ENGINEERING_TASK_MATRIX.md`](ENGINEERING_TASK_MATRIX.md)
+
+Machine engineering task matrix: [`machine/ai_engineering_task_matrix.json`](../../machine/ai_engineering_task_matrix.json)
+
 Adversarial closure pass: [`ADVERSARIAL_CLOSURE_PASS.md`](ADVERSARIAL_CLOSURE_PASS.md)
 
 Machine adversarial closure contract: [`machine/ai_adversarial_closure.json`](../../machine/ai_adversarial_closure.json)
@@ -88,8 +92,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 26. `machine/ai_adversarial_closure.json`
 27. `docs/plan/EXOTIC_SYSTEMS_DEPTH.md`
 28. `machine/ai_exotic_systems_catalog.json`
+29. `docs/plan/ENGINEERING_TASK_MATRIX.md`
+30. `machine/ai_engineering_task_matrix.json`
 
-The first ten remain the present implementation/construction authority. Items 11–28 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack.
+The first ten remain the present implementation/construction authority. Items 11–30 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack.
 
 ## Index laws
 
@@ -136,6 +142,8 @@ The first ten remain the present implementation/construction authority. Items 11
 The master build sequence provides the canonical middle layer between frozen architecture breadth and atomic implementation. It assigns W00–W30 to MBW-00..07, preserves AIQ task authority, and makes dependency/promotion/stop conditions explicit without creating a second completion mechanism.
 
 The engineering pass then binds those packages to explicit interfaces, invariants, failure/recovery semantics, quantitative budgets, compatibility rules, evidence and release proof. It deepens the frozen plan; it does not expand it.
+
+The task matrix propagates those obligations into every atomic AIQ item, preserving queue completion semantics while preventing task-local acceptance from narrowing package-level engineering proof.
 
 Breadth is frozen. Future work should preferentially deepen the following chain:
 
