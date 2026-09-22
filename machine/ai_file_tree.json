@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.3.5",
+  "tree_version": "1.3.6",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -2684,6 +2684,71 @@
       ],
       "move_batch": "B1-core-runtime",
       "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-TURN-COMPAT",
+      "source": "skeleton/turn",
+      "destination": "skeleton/ai/compat/turn",
+      "kind": "tree",
+      "source_git_object_sha": "2f01eac16fb3350b7912654c19adfbec71c20306",
+      "role": "legacy TurnEngine facade retained for convergence into canonical conversation/execution owners",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W03",
+        "WP-W11",
+        "WP-W15",
+        "WP-W17"
+      ],
+      "aiq_refs": [
+        "AIQ-S1-CONV-01",
+        "AIQ-S4-EXEC-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "characterize TurnEngine state/packet semantics against canonical conversation and execution contracts",
+        "move reusable behavior behind canonical owners without creating a second turn authority",
+        "retain compatibility source until callers and regression tests are inverted"
+      ],
+      "production_authority": false,
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
+    },
+    {
+      "id": "AIFT-TELEMETRY-COMPAT",
+      "source": "skeleton/telemetry",
+      "destination": "skeleton/ai/compat/telemetry",
+      "kind": "tree",
+      "source_git_object_sha": "9c8075339a2711682f3080d2cac855416e62c14e",
+      "role": "legacy telemetry/SSE facade retained for convergence into canonical observability and streaming owners",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22",
+        "WP-W30"
+      ],
+      "aiq_refs": [
+        "AIQ-S6-STREAM-01",
+        "AIQ-S7-E2E-01"
+      ],
+      "migration_action": "merge_into_existing_owner",
+      "cutover_preconditions": [
+        "compare event-store and SSE semantics against canonical observability/operation-stream contracts",
+        "deduplicate telemetry state and stream ownership",
+        "retain compatibility source until consumer imports and replay/stream tests are inverted"
+      ],
+      "production_authority": false,
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_characterized_merged_and_callers_inverted"
     }
   ],
   "ci_enforcement": {
