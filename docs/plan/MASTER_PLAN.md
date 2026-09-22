@@ -631,9 +631,13 @@ The eighth enforced tranche is **DP-281-320**, documented in `docs/plan/VOLUME_D
 
 The ninth enforced tranche is **DP-321-360**, documented in `docs/plan/VOLUME_DEPTH_321_360.md`. It deepens human override/interrupt/goal-drift/specification-gaming/plan-execution alignment, human factors/approval fatigue/trust/intent/project memory/workspaces, resource/artifact/change-impact/change-risk/safe-change/system compiler domains, generated/internal/provider/storage/event/evaluation SDKs, data/index/embedding/freshness lifecycle, and source-trust/claim/knowledge reconciliation/snapshots.
 
+The tenth enforced tranche is **DP-361-400**, documented in `docs/plan/VOLUME_DEPTH_361_400.md`. It deepens memory garbage collection/quality/interference/versioning/reconciliation, cognitive strategy selection and reasoning cost/regression, plan verification/static analysis/simulation, tool composition/dependency/health/discovery/result-trust/effect/compensation/saga semantics, distributed inference and model placement/caching/autoscaling/load testing, hardware/NUMA/GPU/storage/data/network topology, remote execution/worker attestation, and the build farm.
+
+The final tranche is **DP-401-420**, documented in `docs/plan/VOLUME_DEPTH_401_420.md`. It closes evaluation/research compute, quotas/budget/forecasting/cost anomaly controls, license/data-rights/attribution/research-ethics governance, model lifecycle/deprecation/provider migration/shadow/champion-challenger systems, experimental sandbox/research branching/technique retirement/failure knowledge, and the Architecture Scope Freeze at VOL-420.
+
 The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
 
-Future depth passes should continue forward from **VOL-361** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+Sequential depth is now complete across **VOL-000..VOL-420**. Future work must increase implementation, verification, hardening and production evidence inside the frozen domains; new top-level breadth requires the existing scope-freeze ADR exception.
 
 ## 24.4 Exotic systems depth layer
 

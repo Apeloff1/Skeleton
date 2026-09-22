@@ -201,3 +201,36 @@ def test_master_plan_references_engineering_task_matrix() -> None:
     engineering = data["engineering_pass"]
     assert engineering["task_matrix"] == "machine/ai_engineering_task_matrix.json"
     assert engineering["task_matrix_human"] == "docs/plan/ENGINEERING_TASK_MATRIX.md"
+
+
+def test_sequential_depth_pass_361_400_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-361-400")
+    assert depth["volume_range"] == [361, 400]
+    for volume in data["volumes"][361:401]:
+        assert volume["depth_pass"] == "DP-361-400"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_sequential_depth_doc_exists_and_spans_361_400() -> None:
+    text = checker.DEPTH_361_400.read_text(encoding="utf-8")
+    assert "VOL-361" in text
+    assert "VOL-400" in text
+
+
+def test_final_depth_pass_401_420_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-401-420")
+    assert depth["volume_range"] == [401, 420]
+    for volume in data["volumes"][401:421]:
+        assert volume["depth_pass"] == "DP-401-420"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_final_depth_doc_closes_at_scope_freeze() -> None:
+    text = checker.DEPTH_401_420.read_text(encoding="utf-8")
+    assert "VOL-401" in text
+    assert "VOL-420" in text
+    assert "Architecture Scope Freeze" in text
