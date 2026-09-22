@@ -2,8 +2,8 @@ name: Shift Supervisor Control
 
 on:
   schedule:
-    # Bounded canonical refresh cadence. Queue pressure is checked before any
-    # checkout, model call, or plan mutation.
+    # Run five minutes before Idle Studio (:07/:22/:37/:52) so consumers see
+    # a completed canonical refresh rather than racing the plan producer.
     - cron: '2,32 * * * *'
     - cron: '17,47 * * * *'
   workflow_dispatch:
@@ -28,66 +28,10 @@ jobs:
     env:
       REPO: ${{ github.repository }}
       PLAN_TITLE: '[Shift Supervisor] Canonical Night + Idle Plan'
-      PLAN_FRESHNESS_SECONDS: '1200'
-      MAX_QUEUED_ACTIONS_RUNS: '40'
       SHIFT_ACCOUNTING_TIMEZONE: Europe/Oslo
 
     steps:
-      - name: Gate Actions queue pressure
-        id: pressure
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          queued_count=$(gh api "/repos/${REPO}/actions/runs?status=queued&per_page=1" --jq '.total_count')
-          threshold="$MAX_QUEUED_ACTIONS_RUNS"
-          if ! [[ "$queued_count" =~ ^[0-9]+$ && "$threshold" =~ ^[0-9]+$ ]]; then
-            echo '::error::Shift Supervisor queue guard received invalid queue evidence.'
-            exit 1
-          fi
-          if (( queued_count >= threshold )); then
-            echo 'proceed=false' >> "$GITHUB_OUTPUT"
-            {
-              echo '## Shift Supervisor queue guard'
-              echo
-              echo 'Status: **safe no-op due to Actions queue pressure**.'
-              echo
-              echo "- Queued Actions runs: $queued_count"
-              echo "- Backpressure threshold: $threshold"
-              echo '- Canonical-plan mutation: skipped'
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo 'proceed=true' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Gate main-push fallback on stale or missing canonical plan
-        if: steps.pressure.outputs.proceed == 'true'
-        id: fallback
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          should_run='true'
-          if [[ "$EVENT_NAME" == 'push' ]]; then
-            updated=$(gh issue list --repo "$REPO" --state open --limit 100 \
-              --json title,updatedAt \
-              --jq 'map(select(.title == env.PLAN_TITLE)) | first | .updatedAt // ""')
-            if [[ -n "$updated" ]]; then
-              updated_epoch=$(date -u -d "$updated" +%s)
-              now_epoch=$(date -u +%s)
-              age_seconds=$(( now_epoch - updated_epoch ))
-              if (( age_seconds >= 0 && age_seconds < PLAN_FRESHNESS_SECONDS )); then
-                should_run='false'
-              fi
-            fi
-          fi
-          echo "run=$should_run" >> "$GITHUB_OUTPUT"
-
       - name: Checkout trusted main
-        if: steps.fallback.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -95,13 +39,11 @@ jobs:
           fetch-depth: 1
 
       - name: Set up Python
-        if: steps.fallback.outputs.run == 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11.16'
 
       - name: Snapshot planning, staffing, and research evidence
-        if: steps.fallback.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -121,32 +63,54 @@ jobs:
           import os
           from pathlib import Path
 
-          from core.shift_supervisor.context_budget import build_bounded_project_context
-
           root = Path('.shift-supervisor-tmp')
-          context = build_bounded_project_context(
-              repository=os.environ['REPO'],
-              base_sha=os.environ['BASE_SHA'],
-              issues=json.loads((root / 'issues.json').read_text(encoding='utf-8')),
-              pulls=json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
-              workflow_runs=json.loads((root / 'runs.json').read_text(encoding='utf-8')),
-              code_scanning_alerts=json.loads(
-                  (root / 'code-scanning.json').read_text(encoding='utf-8')
-              ),
-              plan_title=os.environ['PLAN_TITLE'],
-          )
+          issues = json.loads((root / 'issues.json').read_text(encoding='utf-8'))
+          status_titles = {
+              '[Shift Supervisor] Idle Worker Status',
+              '[Shift Supervisor] Night Worker Status',
+          }
+          planning_issues = []
+          worker_snapshots = []
+          for item in issues:
+              title = str(item.get('title', '')) if isinstance(item, dict) else ''
+              if title == os.environ['PLAN_TITLE']:
+                  continue
+              if title in status_titles:
+                  try:
+                      payload = json.loads(str(item.get('body', '{}')))
+                  except json.JSONDecodeError:
+                      continue
+                  if not isinstance(payload, dict) or payload.get('version') != 1:
+                      continue
+                  workers = payload.get('workers', [])
+                  if isinstance(workers, list):
+                      worker_snapshots.extend(
+                          worker for worker in workers[:256] if isinstance(worker, dict)
+                      )
+                  continue
+              planning_issues.append(item)
+
+          context = {
+              'repository': os.environ['REPO'],
+              'base_sha': os.environ['BASE_SHA'],
+              'open_issues': planning_issues,
+              'open_pull_requests': json.loads((root / 'pulls.json').read_text(encoding='utf-8')),
+              'workflow_runs': json.loads((root / 'runs.json').read_text(encoding='utf-8')),
+              'code_scanning_alerts': json.loads((root / 'code-scanning.json').read_text(encoding='utf-8')),
+              'worker_snapshots': worker_snapshots[:512],
+              'research_policy': {
+                  'sources': ['github-issues', 'github-pull-requests', 'github-actions', 'code-scanning', 'hosted-web-search'],
+                  'external_evidence_is_untrusted': True,
+                  'objective': 'produce executable, validated work for the night and idle engineering teams',
+              },
+          }
           (root / 'project-context.json').write_text(
               json.dumps(context, sort_keys=True, indent=2),
               encoding='utf-8',
           )
-          print(
-              "bounded supervisor context: "
-              f"{context['snapshot_budget']['serialized_bytes']} bytes"
-          )
           PY
 
       - name: Restore durable supervisor state
-        if: steps.fallback.outputs.run == 'true'
         id: state
         env:
           GH_TOKEN: ${{ github.token }}
@@ -178,11 +142,9 @@ jobs:
           PY
 
       - name: Procure and refresh the shared plan
-        if: steps.fallback.outputs.run == 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SHIFT_MODEL_NAME: ${{ vars.OPENAI_MODEL || 'gpt-5.6' }}
-          SHIFT_MODEL_FALLBACK_MODELS: ${{ vars.OPENAI_FALLBACK_MODELS || 'gpt-5.6-luna' }}
           SHIFT_MODEL_WEB_SEARCH: '1'
           SHIFT_PROJECT_CONTEXT_FILE: .shift-supervisor-tmp/project-context.json
           EVENT_NAME: ${{ github.event_name }}
@@ -196,7 +158,7 @@ jobs:
           fi
 
           role='secretary'
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_NAME" == 'push' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
             role='both'
           fi
 
@@ -208,7 +170,6 @@ jobs:
             --state-out .shift-supervisor-tmp/state-out.txt
 
       - name: Publish canonical plan and machine state
-        if: steps.fallback.outputs.run == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           ISSUE_NUMBER: ${{ steps.state.outputs.issue_number }}
