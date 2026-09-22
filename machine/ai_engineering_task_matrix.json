@@ -881,7 +881,7 @@
     {
       "task_id": "AIQ-S0-PROV-01",
       "stage": 0,
-      "current_queue_status": "pending",
+      "current_queue_status": "in_progress",
       "work_package_refs": [
         "WP-W05",
         "WP-W06"
