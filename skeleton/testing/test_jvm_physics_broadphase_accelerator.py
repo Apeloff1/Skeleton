@@ -559,8 +559,7 @@ def test_real_java_batch_ray_candidate_roundtrip_is_stable() -> None:
             max_total_candidates=100,
         )
 
-    # Body 3 is the degenerate point (2, 2, 2). The first ray travels at
-    # y=1, z=1, so that point is off-ray and must not be a candidate.
+    # Degenerate point AABB body 3 at (2,2,2) is off the y=1,z=1 ray slab.
     assert batches == [[0, 1], [2], []]
 
 

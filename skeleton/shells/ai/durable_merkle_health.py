@@ -34,18 +34,12 @@ class DurableMerkleHealthPolicy:
     max_finalizations: int = 512
     require_nonempty: bool = False
     require_bundles: bool = False
-    maximum_missing: int | None = None
+    maximum_missing: int = 512
     maximum_incomplete: int = 0
     minimum_verified: int = 0
     reject_manual_review: bool = True
 
     def __post_init__(self) -> None:
-        if self.maximum_missing is None:
-            object.__setattr__(
-                self,
-                "maximum_missing",
-                min(512, self.max_finalizations),
-            )
         for name in (
             "max_finalizations",
             "maximum_missing",
@@ -65,15 +59,13 @@ class DurableMerkleHealthPolicy:
             raise ValueError(
                 "max_finalizations must be positive"
             )
-        for name in (
-            "maximum_missing",
-            "maximum_incomplete",
-            "minimum_verified",
-        ):
-            if getattr(self, name) > self.max_finalizations:
-                raise ValueError(
-                    f"{name} exceeds max_finalizations"
-                )
+        # Tolerances above the inspection bound are valid and simply act as
+        # effectively-unbounded ceilings. A required minimum, however, must be
+        # satisfiable within the bounded inspection set.
+        if self.minimum_verified > self.max_finalizations:
+            raise ValueError(
+                "minimum_verified exceeds max_finalizations"
+            )
         for name in (
             "require_nonempty",
             "require_bundles",

@@ -2,7 +2,6 @@
 """Fail closed when live-service backend tests escape their explicit boundary."""
 from __future__ import annotations
 
-import ast
 import json
 import re
 import sys
@@ -13,6 +12,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 TEST_ROOT = ROOT / "backend" / "tests"
 MANIFEST = TEST_ROOT / "live_service_tests.json"
+LIVE_MARKER = "pytestmark = pytest.mark.live_service"
+LIVE_MARKER_RE = re.compile(r"(?m)^pytestmark\s*=\s*pytest\.mark\.live_service\b")
 
 # These signatures intentionally target the repository's known external-service
 # test style rather than generic URL strings used by SSRF/parser unit fixtures.
@@ -68,41 +69,7 @@ def _load_manifest(path: Path = MANIFEST) -> dict[str, dict[str, str]]:
     return normalized
 
 
-def _is_live_marker_expr(node: ast.AST) -> bool:
-    """Return whether an expression contains ``pytest.mark.live_service``."""
-    if isinstance(node, ast.Attribute) and node.attr == "live_service":
-        mark = node.value
-        return (
-            isinstance(mark, ast.Attribute)
-            and mark.attr == "mark"
-            and isinstance(mark.value, ast.Name)
-            and mark.value.id == "pytest"
-        )
-    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
-        return any(_is_live_marker_expr(item) for item in node.elts)
-    return False
-
-
-def _has_live_marker(text: str) -> bool:
-    """Detect a real module-level pytestmark assignment, never fixture text."""
-    try:
-        module = ast.parse(text)
-    except SyntaxError as exc:
-        raise BoundaryError(f"backend test source is not valid Python: line {exc.lineno}") from exc
-    for statement in module.body:
-        if not isinstance(statement, (ast.Assign, ast.AnnAssign)):
-            continue
-        targets = statement.targets if isinstance(statement, ast.Assign) else [statement.target]
-        if not any(isinstance(target, ast.Name) and target.id == "pytestmark" for target in targets):
-            continue
-        value = statement.value
-        if value is not None and _is_live_marker_expr(value):
-            return True
-    return False
-
-
 def _detected_live_signature(text: str) -> bool:
-    """Detect endpoint literals that can corroborate an explicit live marker."""
     return any(pattern.search(text) is not None for pattern in LIVE_SERVICE_SIGNATURES)
 
 
@@ -130,15 +97,15 @@ def audit(
             findings.append(f"{name}: manifest entry points to a missing test")
             continue
         text = _read_text(path)
-        if not _has_live_marker(text):
+        if LIVE_MARKER_RE.search(text) is None:
             findings.append(f"{name}: missing module-level live_service pytest marker")
 
     for name, path in sorted(inventory.items()):
         text = _read_text(path)
-        marked = _has_live_marker(text)
+        marked = LIVE_MARKER_RE.search(text) is not None
         detected = _detected_live_signature(text)
         registered = name in manifest
-        if detected and marked and not registered:
+        if detected and not registered:
             findings.append(
                 f"{name}: contains a live-service endpoint signature but is not registered"
             )
@@ -147,6 +114,8 @@ def audit(
                 f"{name}: uses live_service marker but is absent from the manifest"
             )
         if registered and not marked:
+            # Already reported above, but keep this branch deliberately empty
+            # so registered status never suppresses future detection checks.
             continue
 
     return tuple(dict.fromkeys(findings))
