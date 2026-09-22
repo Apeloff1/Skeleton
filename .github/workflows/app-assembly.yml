@@ -24,6 +24,7 @@ on:
       - "skeleton/testing/test_ai_p0_edge_case_matrix.py"
       - "skeleton/testing/test_ai_full_edge_case_matrix.py"
       - "skeleton/testing/test_ai_master_build_sequence.py"
+      - "skeleton/testing/test_ai_engineering_pass.py"
       - "skeleton/testing/test_ai_build_accountability.py"
       - "skeleton/testing/test_ai_accountability_cli.py"
       - "skeleton/testing/test_capability_interfaces.py"
@@ -93,6 +94,7 @@ on:
       - "scripts/check_ai_p0_edge_case_matrix.py"
       - "scripts/check_ai_full_edge_case_matrix.py"
       - "scripts/check_ai_master_build_sequence.py"
+      - "scripts/check_ai_engineering_pass.py"
       - "scripts/check_ai_build_accountability.py"
       - "scripts/ai_accountability.py"
       - "scripts/check_capability_interfaces.py"
@@ -108,6 +110,7 @@ on:
       - "machine/ai_p0_edge_case_matrix.json"
       - "machine/ai_full_edge_case_matrix.json"
       - "machine/ai_master_build_sequence.json"
+      - "machine/ai_engineering_pass.json"
       - "machine/ai_edge_case_priority_queue.json"
       - "machine/ai_build_accountability.json"
       - "machine/capability_interfaces.json"
@@ -171,6 +174,9 @@ jobs:
 
       - name: Validate master build sequence
         run: python scripts/check_ai_master_build_sequence.py
+
+      - name: Validate masterplan engineering pass
+        run: python scripts/check_ai_engineering_pass.py
 
       - name: Validate signed build accountability
         run: python scripts/check_ai_build_accountability.py
@@ -247,7 +253,7 @@ jobs:
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
-          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
+          scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
       - name: Audit repository-wide assembly contracts
@@ -264,6 +270,7 @@ jobs:
           skeleton/testing/test_ai_edge_case_catalog.py
           skeleton/testing/test_ai_p0_edge_case_matrix.py
           skeleton/testing/test_ai_full_edge_case_matrix.py
+          skeleton/testing/test_ai_engineering_pass.py
           skeleton/testing/test_ai_build_accountability.py
           skeleton/testing/test_ai_accountability_cli.py
           skeleton/testing/test_capability_interfaces.py
