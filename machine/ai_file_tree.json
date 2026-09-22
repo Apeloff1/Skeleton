@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.3.1",
+  "tree_version": "1.5.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -896,5 +896,448 @@
     "refreshed_from_head": "b747f5818bf1fc4c49299359fd7004819af84cc8",
     "refreshed_mapping_count": 10,
     "note": "Source object identities refreshed after parity-preserving whitespace normalization; baseline_git_sha remains the original migration baseline."
-  }
+  },
+  "next_move_assignments": [
+    {
+      "id": "AIFT-NEXT-STATE",
+      "priority": 1,
+      "source": "skeleton/state",
+      "destination": "skeleton/ai/runtime/state",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W19"
+      ],
+      "volume_refs": [
+        "VOL-004",
+        "VOL-005"
+      ],
+      "rationale": "Durable run/checkpoint state is engine-owned state/recovery infrastructure and belongs beside canonical persistence.",
+      "preconditions": [
+        "preserve schema/migration semantics",
+        "prove checkpoint/restart parity",
+        "keep legacy import facade until callers invert"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-NETWORK",
+      "priority": 1,
+      "source": "skeleton/network",
+      "destination": "skeleton/ai/runtime/distributed/network",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W19",
+        "WP-W29"
+      ],
+      "volume_refs": [
+        "VOL-029",
+        "VOL-030"
+      ],
+      "rationale": "Replication, reconciliation, rollback, ordering, and delivery outcomes directly implement reliability/distributed-runtime obligations.",
+      "preconditions": [
+        "preserve canonical serialization",
+        "retain no-socket engine-neutral contract",
+        "exercise duplicate/reorder/history-exhaustion tests"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-KV",
+      "priority": 1,
+      "source": "skeleton/kv",
+      "destination": "skeleton/ai/runtime/inference/kv",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W19",
+        "WP-W29",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-007",
+        "VOL-029",
+        "VOL-031"
+      ],
+      "rationale": "Paged/tiered KV management is an inference/runtime optimization with integrity and resource implications.",
+      "preconditions": [
+        "prove cache reuse cannot change semantics",
+        "retain integrity checks",
+        "bind capacity/eviction telemetry"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-SWARM",
+      "priority": 1,
+      "source": "skeleton/swarm",
+      "destination": "skeleton/ai/agents/swarm",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W16",
+        "WP-W19"
+      ],
+      "volume_refs": [
+        "VOL-016",
+        "VOL-017"
+      ],
+      "rationale": "Agent mesh, DAG scheduling, handoff, negotiation, and bounded wave execution belong in the canonical multi-agent plane.",
+      "preconditions": [
+        "preserve bounded fan-out",
+        "preserve handoff/lease semantics",
+        "verify no authority escalation"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-HIVE",
+      "priority": 2,
+      "source": "skeleton/hive",
+      "destination": "skeleton/ai/agents/swarm/hive",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W15",
+        "WP-W16"
+      ],
+      "volume_refs": [
+        "VOL-017"
+      ],
+      "rationale": "Hive is a swarm coordination primitive and should sit beneath the multi-agent owner rather than remain a competing top-level runtime.",
+      "preconditions": [
+        "compare overlap with skeleton/swarm before cutover",
+        "retain canonical capability contract",
+        "avoid duplicate scheduler ownership"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-TELEMETRY",
+      "priority": 1,
+      "source": "skeleton/telemetry",
+      "destination": "skeleton/ai/runtime/observability/telemetry",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W21",
+        "WP-W22"
+      ],
+      "volume_refs": [
+        "VOL-034",
+        "VOL-040"
+      ],
+      "rationale": "Event-store/SSE telemetry is observability/stream delivery support and should converge under the AI runtime observability plane.",
+      "preconditions": [
+        "preserve terminal-event semantics",
+        "bound buffering",
+        "retain operation correlation and redaction"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-QUALITY",
+      "priority": 1,
+      "source": "skeleton/quality",
+      "destination": "skeleton/ai/evaluation/quality",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W18",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-035",
+        "VOL-036",
+        "VOL-079"
+      ],
+      "rationale": "Replay evidence and property coverage are evaluation/qualification evidence, not an independent runtime owner.",
+      "preconditions": [
+        "keep evidence read-mostly",
+        "preserve deterministic replay inputs",
+        "do not convert planned evidence into passing evidence"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-FOUNDATION",
+      "priority": 1,
+      "source": "skeleton/foundation",
+      "destination": "skeleton/ai/runtime/foundation",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W03",
+        "WP-W04",
+        "WP-W14",
+        "WP-W17",
+        "WP-W20"
+      ],
+      "volume_refs": [
+        "VOL-003",
+        "VOL-005",
+        "VOL-028",
+        "VOL-038"
+      ],
+      "rationale": "Merkle lineage, event journal/replay, capability security, and temporal invariants are cross-cutting AI runtime primitives.",
+      "preconditions": [
+        "preserve content-address identity",
+        "preserve append-only replay semantics",
+        "preserve capability attenuation/revocation",
+        "retain invariant violation traces"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-GATE-PLANE",
+      "priority": 1,
+      "source": "skeleton/gate_plane",
+      "destination": "skeleton/ai/runtime/policy/gate_plane",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W19",
+        "WP-W20"
+      ],
+      "volume_refs": [
+        "VOL-025",
+        "VOL-028",
+        "VOL-029"
+      ],
+      "rationale": "Admission, proxy, chaos, and gate evidence are deterministic policy/reliability controls around AI execution.",
+      "preconditions": [
+        "keep policy deterministic",
+        "do not grant model-controlled bypass",
+        "preserve chaos evidence and safe defaults"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-INTEGRATIONS",
+      "priority": 2,
+      "source": "skeleton/integrations",
+      "destination": "skeleton/ai/runtime/tools/integrations",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W14",
+        "WP-W20"
+      ],
+      "volume_refs": [
+        "VOL-015",
+        "VOL-026"
+      ],
+      "rationale": "Connectors/webhooks/credential references are privileged tool-edge integrations and belong under governed tool execution.",
+      "preconditions": [
+        "credential objects remain references",
+        "authorize connector calls independently",
+        "validate webhook authenticity and replay behavior"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-INVENTORY",
+      "priority": 2,
+      "source": "skeleton/inventory",
+      "destination": "skeleton/ai/runtime/capabilities/inventory",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W13",
+        "WP-W20",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-113",
+        "VOL-124"
+      ],
+      "rationale": "Fail-closed capability inventory is machine-readable capability/security evidence for the canonical AI runtime.",
+      "preconditions": [
+        "preserve fail-closed classification",
+        "keep inventory read-only with respect to authority",
+        "bind inventory drift to validation"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-GRAPHS",
+      "priority": 2,
+      "source": "skeleton/graphs",
+      "destination": "skeleton/ai/runtime/knowledge/graphs",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11"
+      ],
+      "volume_refs": [
+        "VOL-012"
+      ],
+      "rationale": "Graph, spectral, motif, and GAT primitives are reusable knowledge/reasoning substrate when isolated from product-domain ownership.",
+      "preconditions": [
+        "keep export/render helpers side-effect free",
+        "separate mathematical primitives from knowledge authority",
+        "add focused graph invariant tests"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-CREATOR",
+      "priority": 2,
+      "source": "skeleton/creator",
+      "destination": "skeleton/ai/forge/creator",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W27"
+      ],
+      "volume_refs": [
+        "VOL-014",
+        "VOL-023"
+      ],
+      "rationale": "Intent compilation and reversible design edits are candidate-generation/planning primitives for Forge.",
+      "preconditions": [
+        "retain provenance links",
+        "retain reversible edit semantics",
+        "forbid direct production mutation"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-PIPELINES",
+      "priority": 3,
+      "source": "skeleton/pipelines",
+      "destination": "skeleton/ai/forge/pipelines",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W27"
+      ],
+      "volume_refs": [
+        "VOL-023",
+        "VOL-073"
+      ],
+      "rationale": "Generation pipelines are Forge candidates; game-specific behavior stays scoped beneath Forge rather than becoming a core runtime dependency.",
+      "preconditions": [
+        "preserve domain scoping",
+        "no production authority from generated artifacts",
+        "benchmark against current canonical forge path"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-BUILD",
+      "priority": 1,
+      "source": "skeleton/build",
+      "destination": "skeleton/ai/build/core",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W27",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-067",
+        "VOL-079",
+        "VOL-095"
+      ],
+      "rationale": "Incremental build graph and network audit are repository-engineering/build-control support for autonomous AI work.",
+      "preconditions": [
+        "keep repository input as data",
+        "preserve offline/network-required classification",
+        "bound graph traversal"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-REPO-MACHINE",
+      "priority": 1,
+      "source": "skeleton/repo_machine",
+      "destination": "skeleton/ai/build/repo_machine",
+      "action": "mirror_then_cutover",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12",
+        "WP-W15",
+        "WP-W27",
+        "WP-W30"
+      ],
+      "volume_refs": [
+        "VOL-021",
+        "VOL-022",
+        "VOL-098"
+      ],
+      "rationale": "Repository model, impact, workgraph, governance, and stewardship are direct substrate for the engineering-agent vertical slice.",
+      "preconditions": [
+        "never import/execute inspected repository files",
+        "retain bounded graph/search behavior",
+        "keep mutation authority outside analysis package"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-ACQUIRED-LEARNING",
+      "priority": 2,
+      "source": "skeleton/acquired/learning.py",
+      "destination": "skeleton/ai/learning/acquired.py",
+      "action": "split_then_mirror",
+      "work_package_refs": [
+        "WP-W28"
+      ],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-074"
+      ],
+      "rationale": "Adaptive learning/progression logic is useful but currently shares a quarantine namespace; move only the learning slice into the controlled learning plane.",
+      "preconditions": [
+        "retain provenance that code was acquired",
+        "keep candidate status until evaluated",
+        "do not promote from quarantine by relocation"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-ACQUIRED-CACHE",
+      "priority": 2,
+      "source": "skeleton/acquired/resilient_cache.py",
+      "destination": "skeleton/ai/runtime/state/resilient_cache.py",
+      "action": "split_then_mirror",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W19"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-029",
+        "VOL-135"
+      ],
+      "rationale": "Resilient TTL cache is state/reliability support and should be separated from the mixed acquired namespace.",
+      "preconditions": [
+        "cache remains derived/non-authoritative",
+        "test expiry and stale-read behavior",
+        "retain source provenance"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-ACQUIRED-GUARD",
+      "priority": 2,
+      "source": "skeleton/acquired/runtime_guard.py",
+      "destination": "skeleton/ai/runtime/reliability/acquired_guard.py",
+      "action": "split_then_mirror",
+      "work_package_refs": [
+        "WP-W14",
+        "WP-W19",
+        "WP-W20"
+      ],
+      "volume_refs": [
+        "VOL-025",
+        "VOL-029"
+      ],
+      "rationale": "Admission/degradation/chaos guard behavior belongs with reliability and policy, not a mixed quarantine namespace.",
+      "preconditions": [
+        "fail closed on unknown policy",
+        "prove degradation never widens authority",
+        "retain quarantine provenance"
+      ]
+    },
+    {
+      "id": "AIFT-NEXT-PERSIST-LEGACY",
+      "priority": 3,
+      "source": "skeleton/persist",
+      "destination": "skeleton/ai/runtime/persistence/legacy_persist",
+      "action": "merge_into_existing_owner",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "volume_refs": [
+        "VOL-005",
+        "VOL-039"
+      ],
+      "rationale": "Legacy Persist facade overlaps canonical persistence; useful behavior should be merged behind the existing persistence owner rather than creating another state authority.",
+      "preconditions": [
+        "compare against skeleton/persistence",
+        "deduplicate state ownership",
+        "retain compatibility facade until zero required callers"
+      ]
+    }
+  ]
 }
