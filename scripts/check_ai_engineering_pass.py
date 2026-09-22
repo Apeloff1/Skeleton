@@ -90,6 +90,15 @@ def validate() -> list[str]:
     if not isinstance(chain, list) or not required_chain.issubset(set(chain)):
         errors.append("closure_chain is incomplete")
 
+    task_propagation = engineering.get("task_propagation")
+    if not isinstance(task_propagation, dict):
+        errors.append("engineering pass must declare task_propagation")
+    else:
+        if task_propagation.get("machine_contract") != "machine/ai_engineering_task_matrix.json":
+            errors.append("task_propagation machine path drifted")
+        if task_propagation.get("human_contract") != "docs/plan/ENGINEERING_TASK_MATRIX.md":
+            errors.append("task_propagation human path drifted")
+
     budget = engineering.get("budget_binding_policy", {})
     fields = budget.get("required_fields")
     if not isinstance(fields, list) or len(fields) < 9:
