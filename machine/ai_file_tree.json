@@ -92,7 +92,7 @@
       "destination": "skeleton/ai/runtime/contracts",
       "kind": "tree",
       "source_git_object_sha": "0513a269bd19d405de5a1e9f729843ea85b7373a",
-      "role": "canonical operation/conversation/context contracts",
+      "role": "canonical operation/conversation/context/memory contracts",
       "work_package_refs": [
         "WP-W00",
         "WP-W01",
@@ -101,7 +101,8 @@
       "aiq_refs": [
         "AIQ-S0-STATE-02",
         "AIQ-S1-CONV-02",
-        "AIQ-S4-EXEC-01"
+        "AIQ-S4-EXEC-01",
+        "AIQ-S1-MEM-01"
       ],
       "move_tags": [
         "ai-tree:mapped",
@@ -117,7 +118,7 @@
       "destination": "skeleton/ai/runtime/persistence",
       "kind": "tree",
       "source_git_object_sha": "d808e2da42400ca8eae4ccd7a310b11a2954e058",
-      "role": "durable AI state and recovery",
+      "role": "durable AI state, memory authority and recovery",
       "work_package_refs": [
         "WP-W03",
         "WP-W04"
@@ -125,7 +126,8 @@
       "aiq_refs": [
         "AIQ-S0-STATE-02",
         "AIQ-S1-CONV-01",
-        "AIQ-S4-EXEC-01"
+        "AIQ-S4-EXEC-01",
+        "AIQ-S1-MEM-01"
       ],
       "overlay_children": [
         "legacy_persist"
@@ -4677,9 +4679,9 @@
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The prior full 130-mapping audit remains valid for unchanged scope. Three new acquired mappings retain exact Git-object identity; AIFT-ACQUIRED-INGEST has destination-only trailing-whitespace normalization and remains subject to the canonical Python AST-semantic parity validator.",
+    "note": "Prior mapping audit remains valid for unchanged paths. AIQ-S1-MEM-01 added memory_record.py and memory_repository.py as identical Git blobs to AIFT-CONTRACTS and AIFT-PERSISTENCE source/destination trees, preserving staged-mirror parity without import inversion.",
     "current_mapping_count": 134,
-    "audit_scope_status": "full_134_mapping_object_and_parity_audit_current",
+    "audit_scope_status": "full_134_mapping_parity_current_with_exact_memory_mirror_extension",
     "pending_mapping_ids": [],
     "post_1930_parity_repair": {
       "base_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
@@ -4770,6 +4772,25 @@
       "method": "Prior 130-mapping audit retained for unchanged scope; direct Git tree/blob identity confirms three acquired mappings and the acquired ingest destination is destination-only trailing-whitespace normalized under the validator's Python AST-semantic parity rule.",
       "ci_validator_required": true,
       "incremental_python_semantic_only_matches": 1
+    },
+    "latest_exact_mirror_extension": {
+      "task_id": "AIQ-S1-MEM-01",
+      "commit_sha": "64b2af717a55252398206d6d654efdbb0e58aae8",
+      "mappings": [
+        "AIFT-CONTRACTS",
+        "AIFT-PERSISTENCE"
+      ],
+      "source_destination_blob_identity": true,
+      "paths": [
+        [
+          "skeleton/contracts/memory_record.py",
+          "skeleton/ai/runtime/contracts/memory_record.py"
+        ],
+        [
+          "skeleton/persistence/memory_repository.py",
+          "skeleton/ai/runtime/persistence/memory_repository.py"
+        ]
+      ]
     }
   },
   "move_tag_contract": {
