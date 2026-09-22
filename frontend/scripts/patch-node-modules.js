@@ -139,6 +139,29 @@ function patchWorkletsStaticRendering() {
   }
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   const version = String(pkg.version || '');
+
+  // Expo 54 / Reanimated 4.1.x currently resolves worklets 0.5.1. The app
+  // entry installs the RAF fallback before Expo Router loads, so this version
+  // does not require a node_modules rewrite. Keep this exact-version and
+  // entry-contract check fail-closed: any dependency drift still requires
+  // explicit review.
+  if (version === '0.5.1') {
+    const entryPath = path.join(ROOT, 'index.js');
+    if (!fs.existsSync(entryPath)) {
+      throw new Error('[patch-node-modules] worklets 0.5.1 requires the static-render entry shim');
+    }
+    const entry = fs.readFileSync(entryPath, 'utf8');
+    if (
+      !entry.includes("typeof globalThis.requestAnimationFrame !== 'function'") ||
+      !entry.includes("typeof globalThis.cancelAnimationFrame !== 'function'")
+    ) {
+      throw new Error('[patch-node-modules] worklets 0.5.1 static-render entry shim drifted');
+    }
+    skipped++;
+    console.log('[patch-node-modules] ✓ static-render protected by frontend/index.js (worklets 0.5.1)');
+    return;
+  }
+
   if (version !== '0.13.0') {
     throw new Error(`[patch-node-modules] react-native-worklets ${version} requires static-render patch review`);
   }
