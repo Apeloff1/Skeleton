@@ -24,7 +24,12 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { InteractionManager } from 'react-native';
-import { recordEvent } from './modalLogger';
+
+
+const requestIdleTask = (callback: () => void) => {
+  const id = setTimeout(callback, 0);
+  return { cancel: () => clearTimeout(id) };
+};import { recordEvent } from './modalLogger';
 import { traceStep } from './bootTracer';
 import { getFeatureFlag } from './featureFlags';
 
@@ -159,7 +164,7 @@ export function useStableCallback<T extends (...args: any[]) => any>(fn: T): T {
 export function useDeferredHeavy<T>(compute: () => T, fallback: T): T {
   const [val, setVal] = useState<T>(fallback);
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = requestIdleTask(() => {
       try {
         const next = compute();
         setVal(next);
