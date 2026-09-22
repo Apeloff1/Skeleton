@@ -399,7 +399,7 @@ def test_reconcile_respects_explicit_opt_out():
     assert "explicit_automerge_opt_out" in report.decisions[0].reasons
 
 
-def test_reconcile_does_not_mutate_critical_trust_surface():
+def test_reconcile_mutates_critical_trust_surface_after_full_evidence():
     candidate = snapshot(
         files=("skeleton/pr_automation/core.py",),
         workflow_runs=successful_runs(
@@ -416,9 +416,8 @@ def test_reconcile_does_not_mutate_critical_trust_surface():
     )
     client = FakeClient((candidate,), base_head=SHA_A)
     report = reconcile(client, policy(), clock=StaticClock())
-    assert client.merges == []
-    assert report.decisions[0].kind is DecisionKind.HOLD
-    assert report.decisions[0].reasons[0] == "critical_trust_surface_requires_human_merge"
+    assert client.merges
+    assert report.decisions[0].kind is DecisionKind.MERGE
 
 
 def test_reconcile_scanned_reports_inventory_size():

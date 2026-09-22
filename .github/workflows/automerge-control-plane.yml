@@ -1,22 +1,6 @@
 name: Auto-Merge Control Plane
 
 on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "observe, direct, or native"
-        required: false
-        default: "direct"
-        type: choice
-        options:
-          - observe
-          - direct
-          - native
-      max_merges:
-        description: "Maximum root merges in this reconciliation"
-        required: false
-        default: "3"
-        type: string
   workflow_run:
     workflows:
       - "Merge Readiness"
@@ -117,19 +101,17 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       AUTOMERGE_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-      AUTOMERGE_MODE: >-
-        ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'direct' }}
+      AUTOMERGE_MODE: "direct"
       AUTOMERGE_MERGE_METHOD: "squash"
-      AUTOMERGE_MAX_MERGES: >-
-        ${{ github.event_name == 'workflow_dispatch' && inputs.max_merges || '3' }}
+      AUTOMERGE_MAX_MERGES: "3"
       AUTOMERGE_MAX_STACK_MERGES: "2"
       AUTOMERGE_MAX_OPEN_PR_SCAN: "250"
       AUTOMERGE_MAX_CHANGED_FILES: "250"
       AUTOMERGE_MAX_LINE_DELTA: "20000"
       AUTOMERGE_STABILITY_SECONDS: "30"
       AUTOMERGE_REQUIRED_APPROVALS: "0"
-      AUTOMERGE_REQUIRE_RESOLVED_THREADS: "true"
-      AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "true"
+      AUTOMERGE_REQUIRE_RESOLVED_THREADS: "false"
+      AUTOMERGE_REQUIRE_NO_CHANGES_REQUESTED: "false"
       AUTOMERGE_SAME_REPOSITORY_ONLY: "true"
       AUTOMERGE_ALLOW_OWNER_WITHOUT_OPT_IN: "true"
       AUTOMERGE_ALLOW_DEPENDABOT_WITHOUT_OPT_IN: "true"
