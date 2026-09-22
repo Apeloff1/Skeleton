@@ -2372,7 +2372,8 @@
       "owner": "skeleton/provider_runtime.py",
       "credential_bearing": true,
       "receipt_required": true,
-      "status": "canonical"
+      "status": "canonical",
+      "edge_class": "credential_network_owner"
     },
     {
       "id": "backend-runtime-compat",
@@ -2381,7 +2382,8 @@
       "owner": "backend/core/ai_provider.py",
       "credential_bearing": false,
       "receipt_required": true,
-      "status": "compatibility"
+      "status": "compatibility",
+      "edge_class": "noncredential_compatibility_facade"
     },
     {
       "id": "backend-legacy-compat",
@@ -2390,7 +2392,8 @@
       "owner": "backend/core/ai_provider_compat.py",
       "credential_bearing": false,
       "receipt_required": true,
-      "status": "compatibility"
+      "status": "compatibility",
+      "edge_class": "noncredential_compatibility_facade"
     },
     {
       "id": "jeeves-runtime-compat",
@@ -2399,7 +2402,8 @@
       "owner": "skeleton/jeeves/providers.py",
       "credential_bearing": false,
       "receipt_required": true,
-      "status": "compatibility"
+      "status": "compatibility",
+      "edge_class": "noncredential_compatibility_facade"
     },
     {
       "id": "repository-automation",
@@ -2408,7 +2412,8 @@
       "owner": "skeleton/automation/free_model.py",
       "credential_bearing": true,
       "receipt_required": true,
-      "status": "canonical"
+      "status": "canonical",
+      "edge_class": "credential_network_owner"
     },
     {
       "id": "frontier-model-runtime",
@@ -2417,7 +2422,8 @@
       "owner": "skeleton/frontier/model_runtime.py",
       "credential_bearing": false,
       "receipt_required": false,
-      "status": "library"
+      "status": "library",
+      "edge_class": "provider_neutral_library"
     },
     {
       "id": "jeeves-provider-router",
@@ -2426,7 +2432,8 @@
       "owner": "skeleton/jeeves/agent/provider.py",
       "credential_bearing": false,
       "receipt_required": false,
-      "status": "library"
+      "status": "library",
+      "edge_class": "provider_neutral_library"
     }
   ],
   "request_lifecycle": [
@@ -7100,7 +7107,7 @@
   "provider_surface_convergence_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "implementation_in_progress",
     "gap": "gap-provider-surface-convergence",
     "canonical_owner": "skeleton/provider_runtime.py",
     "objective": "There is exactly one runtime model-provider transport/credential owner; every other provider-facing module is a declaration, adapter or compatibility facade without independent credentials or raw provider network execution.",
@@ -7141,7 +7148,25 @@
         "client constructor patterns"
       ],
       "allowlist": "machine contract declared provider surfaces only",
-      "result": "fail CI on unexplained credential-bearing/network provider surface"
+      "result": "fail CI on unexplained credential-bearing/network provider surface",
+      "inventory_contract": {
+        "output": "python scripts/check_provider_bootstrap.py --json",
+        "deterministic": true,
+        "fields": [
+          "path",
+          "classification",
+          "credential_markers",
+          "provider_sdk_imports",
+          "network_client_imports",
+          "provider_endpoints"
+        ],
+        "edge_classes": [
+          "credential_network_owner",
+          "noncredential_compatibility_facade",
+          "provider_neutral_library"
+        ],
+        "failure_rule": "Any credential/provider-SDK/provider-endpoint or provider-path network edge must map to a declared provider surface; raw network transport is allowed only on credential_network_owner surfaces."
+      }
     },
     "compatibility_migration": [
       "preserve public application signatures",
@@ -7160,7 +7185,9 @@
       "text/image/speech regression",
       "Jeeves/tool shadow provider denial",
       "undeclared provider denial",
-      "compatibility application modules contain no provider credential reads or raw provider SDK/network transport"
+      "compatibility application modules contain no provider credential reads or raw provider SDK/network transport",
+      "deterministic --json provider/model edge classification",
+      "raw network/provider endpoint ownership classification"
     ]
   },
   "functional_ai_acceptance_matrix": {
