@@ -39,6 +39,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["research_program_scorecard"] == "docs/architecture/research-program-scorecard-2026.md"
     assert documents["research_control_plane_internals"] == "docs/architecture/research-control-plane-internals-2026.md"
     assert documents["research_control_plane_backlog"] == "docs/architecture/research-control-plane-build-backlog-2026.md"
+    assert documents["research_control_plane_gap_audit"] == "docs/architecture/research-control-plane-gap-audit-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -637,3 +638,34 @@ def test_research_control_plane_backlog_is_acceptance_gated() -> None:
 
     assert "AD121. Research control-plane build backlog" in plan
     assert "Completion requires the declared acceptance evidence" in plan
+
+
+def test_research_control_plane_gap_audit_blocks_authority_expansion() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260922-RESEARCH-CONTROL-PLANE-GAP-AUDIT"
+    ]
+    assert checkpoint["tracks"] == ("AD",)
+    assert checkpoint["gap_range"] == ("RCG001", "RCG100")
+    assert checkpoint["open_p0_blocks_research_authority_expansion"] is True
+    assert checkpoint["production_authority_granted"] is False
+    assert len(architecture_index.RESEARCH_CONTROL_PLANE_GAP_IDS) == 100
+
+    root = Path(__file__).resolve().parents[2]
+    audit = (
+        root
+        / "docs"
+        / "architecture"
+        / "research-control-plane-gap-audit-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+    index = (root / "docs" / "ARCHITECTURE_INDEX.md").read_text(encoding="utf-8")
+
+    for gap_id in architecture_index.RESEARCH_CONTROL_PLANE_GAP_IDS:
+        assert gap_id in audit
+
+    assert "P0 research-plane invariants" in audit
+    assert "Fault campaigns" in audit
+    assert "AD122. Research control-plane adversarial gap closure" in plan
+    assert "Research control-plane adversarial gap audit" in index
