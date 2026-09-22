@@ -480,6 +480,23 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             if not isinstance(owner, str) or not owner:
                 errors.append(f"provider surface {surface_id} owner is invalid")
                 continue
+            edge_class = item.get("edge_class")
+            if edge_class not in {
+                "credential_network_owner",
+                "noncredential_compatibility_facade",
+                "provider_neutral_library",
+            }:
+                errors.append(
+                    f"provider surface {surface_id} edge_class is invalid: {edge_class!r}"
+                )
+            if item.get("credential_bearing") is True and edge_class != "credential_network_owner":
+                errors.append(
+                    f"credential-bearing provider surface {surface_id} must be credential_network_owner"
+                )
+            if item.get("credential_bearing") is not True and edge_class == "credential_network_owner":
+                errors.append(
+                    f"non-credential provider surface {surface_id} cannot own credential network transport"
+                )
             path = repo_root / owner
             if not path.is_file():
                 errors.append(f"provider surface owner missing: {owner}")
@@ -504,11 +521,12 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             + ", ".join(undeclared_surfaces)
         )
 
-    declared_surface_owners = {
-        item.get("owner")
+    declared_surface_by_owner = {
+        item.get("owner"): item
         for item in surfaces
         if isinstance(item, dict) and isinstance(item.get("owner"), str)
-    } if isinstance(surfaces, list) else set()
+    } if isinstance(surfaces, list) else {}
+    declared_surface_owners = set(declared_surface_by_owner)
     inventory = discover_provider_surface_inventory(repo_root)
     unexplained_edges = sorted(
         item["path"]
@@ -523,9 +541,18 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
 
     for item in inventory:
         relative = str(item["path"])
+        declaration = declared_surface_by_owner.get(relative)
         if item["classification"] == "raw_provider_network":
             errors.append(
                 f"raw provider endpoint outside canonical credential boundary: {relative}"
+            )
+        if (
+            declaration is not None
+            and (item["network_client_imports"] or item["provider_endpoints"])
+            and declaration.get("edge_class") != "credential_network_owner"
+        ):
+            errors.append(
+                f"non-owner provider surface performs raw network transport: {relative}"
             )
 
     for root_name in ("backend", "skeleton"):
