@@ -37,6 +37,7 @@ def test_architecture_index_exposes_canonical_research_documents() -> None:
     assert documents["research_dependency_map"] == "docs/architecture/research-dependency-map-2026.md"
     assert documents["research_execution_program"] == "docs/architecture/research-execution-program-2026.md"
     assert documents["research_program_scorecard"] == "docs/architecture/research-program-scorecard-2026.md"
+    assert documents["research_control_plane_internals"] == "docs/architecture/research-control-plane-internals-2026.md"
 
 
 def test_research_evolution_contract_is_fail_closed() -> None:
@@ -569,3 +570,35 @@ def test_research_program_scorecard_separates_planning_from_evidence() -> None:
     assert "PRODUCTION EVIDENCE READINESS" in scorecard
     assert "AD97. Multidimensional research scorecard" in plan
     assert "AD104. Planning/evidence/readiness separation" in plan
+
+
+def test_research_control_plane_internals_are_fail_closed() -> None:
+    from pathlib import Path
+
+    checkpoint = architecture_index.PLAN_CHECKPOINTS[
+        "PLAN-20260922-RESEARCH-CONTROL-PLANE-INTERNALS"
+    ]
+    assert checkpoint["tracks"] == ("AD",)
+    assert checkpoint["package_target"] == "skeleton/research"
+    assert checkpoint["implementation_milestones"] == (
+        "M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8"
+    )
+    assert checkpoint["authoritative_mutations_transactional"] is True
+    assert checkpoint["research_agent_self_signoff_forbidden"] is True
+    assert checkpoint["blind_eval_access_for_research_agent"] is False
+    assert checkpoint["unknown_external_outcomes_reconciled_before_retry"] is True
+    assert checkpoint["production_authority_granted"] is False
+
+    root = Path(__file__).resolve().parents[2]
+    internals = (
+        root / "docs" / "architecture" / "research-control-plane-internals-2026.md"
+    ).read_text(encoding="utf-8")
+    plan = (root / "docs" / "BUILD_PLAN.md").read_text(encoding="utf-8")
+
+    assert "NO DIRECT EDGE" in internals
+    assert "Run leases and fencing" in internals
+    assert "Unknown outcome reconciliation" in internals
+    assert "Research-agent capability tiers" in internals
+    assert "Minimum viable implementation sequence" in internals
+    assert "AD105. Research package substrate" in plan
+    assert "AD120. Research control-plane M0–M8 implementation" in plan
