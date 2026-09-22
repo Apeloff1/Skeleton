@@ -108,8 +108,13 @@ def main() -> int:
     require(f'"ruff=={RUFF_VERSION}"' in text, f"Ruff must be pinned to {RUFF_VERSION}", failures)
     require("ruff==0.9.*" not in text, "wildcard Ruff execution is forbidden", failures)
     require(
-        "--frozen-lockfile --non-interactive" in text,
-        "frontend install must be frozen and non-interactive",
+        "yarn --cwd frontend install --ignore-scripts --non-interactive" in text,
+        "frontend install must suppress lifecycle scripts and remain non-interactive",
+        failures,
+    )
+    require(
+        "--frozen-lockfile" not in text,
+        "Expo 54 remediation lane must allow lockfile reconciliation until the canonical lock refresh lands",
         failures,
     )
     require("python scripts/check_flaky_quarantine.py" in text, "quarantine policy checker must run", failures)
