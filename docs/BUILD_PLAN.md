@@ -20,6 +20,7 @@ Research execution program: [architecture/research-execution-program-2026.md](ar
 Research program scorecard: [architecture/research-program-scorecard-2026.md](architecture/research-program-scorecard-2026.md)
 Research control-plane internals: [architecture/research-control-plane-internals-2026.md](architecture/research-control-plane-internals-2026.md)
 Research control-plane build backlog: [architecture/research-control-plane-build-backlog-2026.md](architecture/research-control-plane-build-backlog-2026.md)
+Research control-plane adversarial gap audit: [architecture/research-control-plane-gap-audit-2026.md](architecture/research-control-plane-gap-audit-2026.md)
 
 ## 0. Construction constitution
 
@@ -3957,6 +3958,41 @@ Build in order:
 Execute RCB001–RCB120 in milestone order M0–M8, with RCB-A01–RCB-A10 as cross-milestone acceptance campaigns.
 
 **Gate:** no RCB item is complete from prose, code presence, or commit count alone. Completion requires the declared acceptance evidence.
+
+### AD122. Research control-plane adversarial audit — ⬜
+
+Maintain RCG001–RCG100 across:
+- source identity/status attacks;
+- unsafe ingestion;
+- experiment gaming;
+- measurement corruption;
+- scheduler/lease/budget races;
+- benchmark/evaluator custody;
+- research-agent privilege abuse;
+- persistence/restore failures;
+- governance/scorecard gaming;
+- authority creep.
+
+### AD123. Research-plane P0 closure gate — ⬜
+
+Applicable P0 RCG gaps block:
+- research-agent capability expansion;
+- C2+ autonomous launches;
+- debt retirement automation;
+- automated ADR proposals;
+- any new cross-boundary authority.
+
+### AD124. Research-plane compound fault campaigns — ⬜
+
+Run the six canonical campaigns:
+A source compromise;
+B runner ambiguity;
+C benchmark compromise;
+D restore/reconciliation;
+E research-agent gaming;
+F governance pressure.
+
+**Gate:** single-failure tests do not establish research control-plane robustness.
 
 **Exit gate for AD:** every major Skeleton subsystem is connected to current research evidence, counterevidence, verified source status, a scoped conclusion, and an explicit local experiment; uncertainty and negative results remain visible; research can refresh quickly without directly changing production authority.
 
