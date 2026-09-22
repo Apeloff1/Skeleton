@@ -1,0 +1,4242 @@
+{
+  "schema_version": 1,
+  "matrix_version": "1.0.0",
+  "status": "active",
+  "scope": "Derived engineering obligations for every atomic AIQ task.",
+  "sources": {
+    "build_queue": "machine/ai_build_queue.json",
+    "engineering_pass": "machine/ai_engineering_pass.json",
+    "build_sequence": "machine/ai_master_build_sequence.json",
+    "edge_matrix": "machine/ai_full_edge_case_matrix.json",
+    "accountability": "machine/ai_build_accountability.json"
+  },
+  "inheritance_policy": {
+    "rule": "Each AIQ task inherits the union of engineering obligations from every work_package_ref. Inheritance may only be reduced by an explicit, reviewable not-applicable disposition; task completion never erases capability-level promotion gates.",
+    "no_shortcut": "A task may remain queue-complete for historical/accountability purposes while engineering evidence is still pending; such completion cannot be cited as verified/hardened/production engineering proof."
+  },
+  "required_task_fields": [
+    "engineering_profile_refs",
+    "construction_wave_refs",
+    "required_dimensions",
+    "nfr_budget_classes",
+    "evidence_modes",
+    "principal_failure_modes",
+    "recovery_requirements",
+    "change_impact_triggers",
+    "accountability_id"
+  ],
+  "tasks": [
+    {
+      "task_id": "AIQ-S0-STATE-01",
+      "stage": 0,
+      "current_queue_status": "evidence_pending",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "engineering_profile_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "construction_wave_refs": [
+        "MBW-01"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "durability",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "transaction_latency"
+      ],
+      "evidence_modes": [
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "migration",
+        "property",
+        "replay",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-STATE-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-STATE-02",
+      "stage": 0,
+      "current_queue_status": "evidence_pending",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "engineering_profile_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "construction_wave_refs": [
+        "MBW-01"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "durability",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "transaction_latency"
+      ],
+      "evidence_modes": [
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "migration",
+        "property",
+        "replay",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-STATE-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-STATE-03",
+      "stage": 0,
+      "current_queue_status": "done",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "engineering_profile_refs": [
+        "WP-W03",
+        "WP-W04"
+      ],
+      "construction_wave_refs": [
+        "MBW-01"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "durability",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "transaction_latency"
+      ],
+      "evidence_modes": [
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "migration",
+        "property",
+        "replay",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-STATE-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-GOV-01",
+      "stage": 0,
+      "current_queue_status": "evidence_pending",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "engineering_profile_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "change_failure_rate",
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "latency",
+        "plan_drift",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "validation_latency",
+        "verification_latency"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "contract",
+        "crash recovery",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "retrieval eval",
+        "temporal eval",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors",
+        "partial commit",
+        "stale read",
+        "corruption",
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph",
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-GOV-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-GOV-02",
+      "stage": 0,
+      "current_queue_status": "evidence_pending",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "engineering_profile_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "change_failure_rate",
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "latency",
+        "plan_drift",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "validation_latency",
+        "verification_latency"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "contract",
+        "crash recovery",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "retrieval eval",
+        "temporal eval",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors",
+        "partial commit",
+        "stale read",
+        "corruption",
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph",
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-GOV-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-GOV-03",
+      "stage": 0,
+      "current_queue_status": "evidence_pending",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "engineering_profile_refs": [
+        "WP-W00",
+        "WP-W03",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "change_failure_rate",
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "latency",
+        "plan_drift",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "validation_latency",
+        "verification_latency"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "contract",
+        "crash recovery",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "retrieval eval",
+        "temporal eval",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors",
+        "partial commit",
+        "stale read",
+        "corruption",
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph",
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-GOV-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-COST-01",
+      "stage": 0,
+      "current_queue_status": "evidence_pending",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "fanout",
+        "latency",
+        "quality",
+        "recovery_time",
+        "step_budget",
+        "throughput",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "load",
+        "long-horizon",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "route oscillation",
+        "stale health",
+        "budget bypass",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "route fallback",
+        "circuit break",
+        "safe default",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-COST-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-COST-02",
+      "stage": 0,
+      "current_queue_status": "in_progress",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "fanout",
+        "latency",
+        "quality",
+        "recovery_time",
+        "step_budget",
+        "throughput",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "load",
+        "long-horizon",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "route oscillation",
+        "stale health",
+        "budget bypass",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "route fallback",
+        "circuit break",
+        "safe default",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-COST-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-COST-03",
+      "stage": 0,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W06",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "fanout",
+        "latency",
+        "quality",
+        "recovery_time",
+        "step_budget",
+        "throughput",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "load",
+        "long-horizon",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "route oscillation",
+        "stale health",
+        "budget bypass",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "route fallback",
+        "circuit break",
+        "safe default",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-COST-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-PROV-01",
+      "stage": 0,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "engineering_profile_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "contract",
+        "fault injection",
+        "integration",
+        "load",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "provider timeout",
+        "malformed output",
+        "stream truncation",
+        "route oscillation",
+        "stale health",
+        "budget bypass"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine",
+        "route fallback",
+        "circuit break",
+        "safe default"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-PROV-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-PROV-02",
+      "stage": 0,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "engineering_profile_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "contract",
+        "fault injection",
+        "integration",
+        "load",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "provider timeout",
+        "malformed output",
+        "stream truncation",
+        "route oscillation",
+        "stale health",
+        "budget bypass"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine",
+        "route fallback",
+        "circuit break",
+        "safe default"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-PROV-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S0-PROV-03",
+      "stage": 0,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "engineering_profile_refs": [
+        "WP-W05",
+        "WP-W06"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "contract",
+        "fault injection",
+        "integration",
+        "load",
+        "policy",
+        "regression",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "provider timeout",
+        "malformed output",
+        "stream truncation",
+        "route oscillation",
+        "stale health",
+        "budget bypass"
+      ],
+      "recovery_requirements": [
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine",
+        "route fallback",
+        "circuit break",
+        "safe default"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S0-PROV-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-CONV-01",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "long-horizon",
+        "migration",
+        "property",
+        "regression",
+        "replay",
+        "simulation",
+        "token-budget",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "safe minimal context fallback",
+        "evidence omission signal",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-CONV-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-CONV-02",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "long-horizon",
+        "migration",
+        "property",
+        "regression",
+        "replay",
+        "simulation",
+        "token-budget",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "safe minimal context fallback",
+        "evidence omission signal",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-CONV-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-CONV-03",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "crash recovery",
+        "fault injection",
+        "integration",
+        "long-horizon",
+        "migration",
+        "property",
+        "regression",
+        "replay",
+        "simulation",
+        "token-budget",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "safe minimal context fallback",
+        "evidence omission signal",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-CONV-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-MEM-01",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "engineering_profile_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "latency",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "verification_latency"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "retrieval eval",
+        "temporal eval",
+        "token-budget"
+      ],
+      "principal_failure_modes": [
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "recovery_requirements": [
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-MEM-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-MEM-02",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "engineering_profile_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "latency",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "verification_latency"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "retrieval eval",
+        "temporal eval",
+        "token-budget"
+      ],
+      "principal_failure_modes": [
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "recovery_requirements": [
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-MEM-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-MEM-03",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "engineering_profile_refs": [
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "latency",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "verification_latency"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "fault",
+        "graph property",
+        "lifecycle",
+        "migration",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "retrieval eval",
+        "temporal eval",
+        "token-budget"
+      ],
+      "principal_failure_modes": [
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "recovery_requirements": [
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-MEM-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-01",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "engineering_profile_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "construction_wave_refs": [
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "authorization_latency",
+        "cost",
+        "fanout",
+        "recovery_time",
+        "sandbox_resource",
+        "side_effect_rate",
+        "step_budget",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "authorization matrix",
+        "budget",
+        "contract",
+        "fault",
+        "long-horizon",
+        "policy mutation",
+        "sandbox",
+        "side-effect replay",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate side effect",
+        "TOCTOU",
+        "malformed tool output",
+        "policy bypass",
+        "confused deputy",
+        "stale decision"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "compensation",
+        "idempotency replay",
+        "revoke/disable tool",
+        "fail closed",
+        "policy rollback",
+        "decision invalidation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-TOOL-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-02",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "engineering_profile_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "construction_wave_refs": [
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "authorization_latency",
+        "cost",
+        "fanout",
+        "recovery_time",
+        "sandbox_resource",
+        "side_effect_rate",
+        "step_budget",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "authorization matrix",
+        "budget",
+        "contract",
+        "fault",
+        "long-horizon",
+        "policy mutation",
+        "sandbox",
+        "side-effect replay",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate side effect",
+        "TOCTOU",
+        "malformed tool output",
+        "policy bypass",
+        "confused deputy",
+        "stale decision"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "compensation",
+        "idempotency replay",
+        "revoke/disable tool",
+        "fail closed",
+        "policy rollback",
+        "decision invalidation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-TOOL-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-03",
+      "stage": 1,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "engineering_profile_refs": [
+        "WP-W11",
+        "WP-W13",
+        "WP-W14"
+      ],
+      "construction_wave_refs": [
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "authorization_latency",
+        "cost",
+        "fanout",
+        "recovery_time",
+        "sandbox_resource",
+        "side_effect_rate",
+        "step_budget",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "authorization matrix",
+        "budget",
+        "contract",
+        "fault",
+        "long-horizon",
+        "policy mutation",
+        "sandbox",
+        "side-effect replay",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate side effect",
+        "TOCTOU",
+        "malformed tool output",
+        "policy bypass",
+        "confused deputy",
+        "stale decision"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "compensation",
+        "idempotency replay",
+        "revoke/disable tool",
+        "fail closed",
+        "policy rollback",
+        "decision invalidation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S1-TOOL-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S2-CTX-01",
+      "stage": 2,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "engineering_profile_refs": [
+        "WP-W10"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "regression",
+        "token-budget"
+      ],
+      "principal_failure_modes": [
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "recovery_requirements": [
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S2-CTX-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S2-CTX-02",
+      "stage": 2,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "engineering_profile_refs": [
+        "WP-W10"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "regression",
+        "token-budget"
+      ],
+      "principal_failure_modes": [
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "recovery_requirements": [
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S2-CTX-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S2-CTX-03",
+      "stage": 2,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W10"
+      ],
+      "engineering_profile_refs": [
+        "WP-W10"
+      ],
+      "construction_wave_refs": [
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "property",
+        "regression",
+        "token-budget"
+      ],
+      "principal_failure_modes": [
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow"
+      ],
+      "recovery_requirements": [
+        "safe minimal context fallback",
+        "evidence omission signal"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S2-CTX-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-01",
+      "stage": 2,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "engineering_profile_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "compatibility_window",
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "schema_error_rate",
+        "serialization_cost",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "compatibility",
+        "contract",
+        "fault injection",
+        "fuzz",
+        "integration",
+        "property",
+        "schema"
+      ],
+      "principal_failure_modes": [
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change",
+        "provider timeout",
+        "malformed output",
+        "stream truncation"
+      ],
+      "recovery_requirements": [
+        "versioned decoder fallback",
+        "migration/rollback fixture",
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S2-PROTO-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-02",
+      "stage": 2,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "engineering_profile_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "compatibility_window",
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "schema_error_rate",
+        "serialization_cost",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "compatibility",
+        "contract",
+        "fault injection",
+        "fuzz",
+        "integration",
+        "property",
+        "schema"
+      ],
+      "principal_failure_modes": [
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change",
+        "provider timeout",
+        "malformed output",
+        "stream truncation"
+      ],
+      "recovery_requirements": [
+        "versioned decoder fallback",
+        "migration/rollback fixture",
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S2-PROTO-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-03",
+      "stage": 2,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "engineering_profile_refs": [
+        "WP-W01",
+        "WP-W05"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-02"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "compatibility_window",
+        "context_or_memory_budget",
+        "cost",
+        "latency",
+        "quality",
+        "schema_error_rate",
+        "serialization_cost",
+        "throughput"
+      ],
+      "evidence_modes": [
+        "cancellation",
+        "compatibility",
+        "contract",
+        "fault injection",
+        "fuzz",
+        "integration",
+        "property",
+        "schema"
+      ],
+      "principal_failure_modes": [
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change",
+        "provider timeout",
+        "malformed output",
+        "stream truncation"
+      ],
+      "recovery_requirements": [
+        "versioned decoder fallback",
+        "migration/rollback fixture",
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S2-PROTO-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S3-VER-01",
+      "stage": 3,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "engineering_profile_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "construction_wave_refs": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "cost",
+        "evidence_freshness",
+        "false_accept_rate",
+        "fanout",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "verification_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "deterministic checks",
+        "graph property",
+        "independent verifier",
+        "long-horizon",
+        "provenance",
+        "simulation",
+        "temporal eval"
+      ],
+      "principal_failure_modes": [
+        "stale claim",
+        "source loss",
+        "false merge",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "self-verification bias",
+        "stale evidence",
+        "unverifiable claim"
+      ],
+      "recovery_requirements": [
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "reject/redo",
+        "evidence refresh",
+        "escalation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S3-VER-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S3-VER-02",
+      "stage": 3,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "engineering_profile_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "construction_wave_refs": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "cost",
+        "evidence_freshness",
+        "false_accept_rate",
+        "fanout",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "verification_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "deterministic checks",
+        "graph property",
+        "independent verifier",
+        "long-horizon",
+        "provenance",
+        "simulation",
+        "temporal eval"
+      ],
+      "principal_failure_modes": [
+        "stale claim",
+        "source loss",
+        "false merge",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "self-verification bias",
+        "stale evidence",
+        "unverifiable claim"
+      ],
+      "recovery_requirements": [
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "reject/redo",
+        "evidence refresh",
+        "escalation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S3-VER-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S3-VER-03",
+      "stage": 3,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "engineering_profile_refs": [
+        "WP-W09",
+        "WP-W11",
+        "WP-W17"
+      ],
+      "construction_wave_refs": [
+        "MBW-02",
+        "MBW-03",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "cost",
+        "evidence_freshness",
+        "false_accept_rate",
+        "fanout",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "verification_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "deterministic checks",
+        "graph property",
+        "independent verifier",
+        "long-horizon",
+        "provenance",
+        "simulation",
+        "temporal eval"
+      ],
+      "principal_failure_modes": [
+        "stale claim",
+        "source loss",
+        "false merge",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "self-verification bias",
+        "stale evidence",
+        "unverifiable claim"
+      ],
+      "recovery_requirements": [
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "reject/redo",
+        "evidence refresh",
+        "escalation"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S3-VER-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-01",
+      "stage": 4,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "cost",
+        "fanout",
+        "recovery_time",
+        "step_budget",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "long-horizon",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S4-EXEC-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-02",
+      "stage": 4,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "cost",
+        "fanout",
+        "recovery_time",
+        "step_budget",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "long-horizon",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S4-EXEC-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S4-EXEC-03",
+      "stage": 4,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "cost",
+        "fanout",
+        "recovery_time",
+        "step_budget",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "adversarial",
+        "budget",
+        "long-horizon",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S4-EXEC-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S5-ENG-01",
+      "stage": 5,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "engineering_profile_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "accessibility",
+        "availability",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "memory_ceiling",
+        "reconnect_budget",
+        "recovery_point",
+        "recovery_time",
+        "resource_ceiling",
+        "startup_shutdown_latency",
+        "step_budget",
+        "storage_growth",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation",
+        "state-machine"
+      ],
+      "principal_failure_modes": [
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "recovery_requirements": [
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S5-ENG-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S5-ENG-02",
+      "stage": 5,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "engineering_profile_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "accessibility",
+        "availability",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "memory_ceiling",
+        "reconnect_budget",
+        "recovery_point",
+        "recovery_time",
+        "resource_ceiling",
+        "startup_shutdown_latency",
+        "step_budget",
+        "storage_growth",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation",
+        "state-machine"
+      ],
+      "principal_failure_modes": [
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "recovery_requirements": [
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S5-ENG-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S5-ENG-03",
+      "stage": 5,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "engineering_profile_refs": [
+        "WP-W02",
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "accessibility",
+        "availability",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "memory_ceiling",
+        "reconnect_budget",
+        "recovery_point",
+        "recovery_time",
+        "resource_ceiling",
+        "startup_shutdown_latency",
+        "step_budget",
+        "storage_growth",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation",
+        "state-machine"
+      ],
+      "principal_failure_modes": [
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "recovery_requirements": [
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S5-ENG-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-01",
+      "stage": 6,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "engineering_profile_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "accessibility",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "memory_ceiling",
+        "reconnect_budget",
+        "recovery_point",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S6-STREAM-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-02",
+      "stage": 6,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "engineering_profile_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "accessibility",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "memory_ceiling",
+        "reconnect_budget",
+        "recovery_point",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S6-STREAM-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S6-STREAM-03",
+      "stage": 6,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "engineering_profile_refs": [
+        "WP-W04",
+        "WP-W11",
+        "WP-W22"
+      ],
+      "construction_wave_refs": [
+        "MBW-01",
+        "MBW-04",
+        "MBW-05"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "accessibility",
+        "cost",
+        "durability",
+        "fanout",
+        "latency",
+        "memory_ceiling",
+        "reconnect_budget",
+        "recovery_point",
+        "recovery_time",
+        "step_budget",
+        "storage_growth",
+        "transaction_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "API contract",
+        "adversarial",
+        "budget",
+        "fault injection",
+        "integration",
+        "load",
+        "long-horizon",
+        "property",
+        "race",
+        "reconnect",
+        "replay",
+        "simulation"
+      ],
+      "principal_failure_modes": [
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "infinite loop",
+        "retry amplification",
+        "goal drift",
+        "duplicate submit",
+        "gap",
+        "out-of-order",
+        "reconnect storm"
+      ],
+      "recovery_requirements": [
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response",
+        "idempotent submit",
+        "client backoff"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S6-STREAM-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S7-E2E-01",
+      "stage": 7,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "availability",
+        "change_failure_rate",
+        "compatibility_window",
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "fanout",
+        "latency",
+        "plan_drift",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "resource_ceiling",
+        "schema_error_rate",
+        "serialization_cost",
+        "startup_shutdown_latency",
+        "step_budget",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "validation_latency",
+        "verification_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "budget",
+        "cancellation",
+        "compatibility",
+        "contract",
+        "crash recovery",
+        "fault",
+        "fault injection",
+        "fuzz",
+        "graph property",
+        "integration",
+        "lifecycle",
+        "load",
+        "long-horizon",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "replay",
+        "retrieval eval",
+        "schema",
+        "simulation",
+        "state-machine",
+        "temporal eval",
+        "token-budget",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors",
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change",
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race",
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "provider timeout",
+        "malformed output",
+        "stream truncation",
+        "route oscillation",
+        "stale health",
+        "budget bypass",
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph",
+        "versioned decoder fallback",
+        "migration/rollback fixture",
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback",
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine",
+        "route fallback",
+        "circuit break",
+        "safe default",
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "safe minimal context fallback",
+        "evidence omission signal",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S7-E2E-01",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S7-E2E-02",
+      "stage": 7,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "availability",
+        "change_failure_rate",
+        "compatibility_window",
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "fanout",
+        "latency",
+        "plan_drift",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "resource_ceiling",
+        "schema_error_rate",
+        "serialization_cost",
+        "startup_shutdown_latency",
+        "step_budget",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "validation_latency",
+        "verification_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "budget",
+        "cancellation",
+        "compatibility",
+        "contract",
+        "crash recovery",
+        "fault",
+        "fault injection",
+        "fuzz",
+        "graph property",
+        "integration",
+        "lifecycle",
+        "load",
+        "long-horizon",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "replay",
+        "retrieval eval",
+        "schema",
+        "simulation",
+        "state-machine",
+        "temporal eval",
+        "token-budget",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors",
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change",
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race",
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "provider timeout",
+        "malformed output",
+        "stream truncation",
+        "route oscillation",
+        "stale health",
+        "budget bypass",
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph",
+        "versioned decoder fallback",
+        "migration/rollback fixture",
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback",
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine",
+        "route fallback",
+        "circuit break",
+        "safe default",
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "safe minimal context fallback",
+        "evidence omission signal",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S7-E2E-02",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    },
+    {
+      "task_id": "AIQ-S7-E2E-03",
+      "stage": 7,
+      "current_queue_status": "pending",
+      "work_package_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "engineering_profile_refs": [
+        "WP-W00",
+        "WP-W01",
+        "WP-W02",
+        "WP-W03",
+        "WP-W04",
+        "WP-W05",
+        "WP-W06",
+        "WP-W07",
+        "WP-W08",
+        "WP-W09",
+        "WP-W10",
+        "WP-W11"
+      ],
+      "construction_wave_refs": [
+        "MBW-00",
+        "MBW-01",
+        "MBW-02",
+        "MBW-04"
+      ],
+      "required_dimensions": [
+        "ENG-REQ",
+        "ENG-IFACE",
+        "ENG-STATE",
+        "ENG-AUTH",
+        "ENG-FAIL",
+        "ENG-REC",
+        "ENG-NFR",
+        "ENG-CAP",
+        "ENG-COMPAT",
+        "ENG-OBS",
+        "ENG-TEST",
+        "ENG-EVAL",
+        "ENG-REPRO",
+        "ENG-DEPLOY",
+        "ENG-OWN"
+      ],
+      "nfr_budget_classes": [
+        "availability",
+        "change_failure_rate",
+        "compatibility_window",
+        "context_or_memory_budget",
+        "cost",
+        "durability",
+        "evidence_freshness",
+        "false_accept_rate",
+        "fanout",
+        "latency",
+        "plan_drift",
+        "quality",
+        "recovery_point",
+        "recovery_time",
+        "resource_ceiling",
+        "schema_error_rate",
+        "serialization_cost",
+        "startup_shutdown_latency",
+        "step_budget",
+        "storage_growth",
+        "throughput",
+        "transaction_latency",
+        "validation_latency",
+        "verification_latency",
+        "wall_clock"
+      ],
+      "evidence_modes": [
+        "access-control",
+        "adversarial",
+        "architecture fitness",
+        "budget",
+        "cancellation",
+        "compatibility",
+        "contract",
+        "crash recovery",
+        "fault",
+        "fault injection",
+        "fuzz",
+        "graph property",
+        "integration",
+        "lifecycle",
+        "load",
+        "long-horizon",
+        "migration",
+        "mutation",
+        "policy",
+        "property",
+        "provenance",
+        "regression",
+        "replay",
+        "retrieval eval",
+        "schema",
+        "simulation",
+        "state-machine",
+        "temporal eval",
+        "token-budget",
+        "transaction"
+      ],
+      "principal_failure_modes": [
+        "split-brain architecture",
+        "bypassed breadth freeze",
+        "stale generated mirrors",
+        "ambiguous null/absent",
+        "time/ID collision",
+        "incompatible schema change",
+        "partial boot",
+        "stuck shutdown",
+        "dependency startup race",
+        "partial commit",
+        "stale read",
+        "corruption",
+        "duplicate event",
+        "reordering",
+        "lost ack",
+        "provider timeout",
+        "malformed output",
+        "stream truncation",
+        "route oscillation",
+        "stale health",
+        "budget bypass",
+        "poisoning",
+        "resurrection",
+        "contradiction collapse",
+        "cross-tenant leak",
+        "stale index",
+        "embedding mismatch",
+        "stale claim",
+        "source loss",
+        "false merge",
+        "prompt injection",
+        "trust-label loss",
+        "budget overflow",
+        "infinite loop",
+        "retry amplification",
+        "goal drift"
+      ],
+      "recovery_requirements": [
+        "rollback manifest change",
+        "restore prior authority graph",
+        "versioned decoder fallback",
+        "migration/rollback fixture",
+        "safe restart",
+        "orphan cleanup",
+        "startup rollback",
+        "WAL/transaction recovery",
+        "backup/restore",
+        "schema rollback",
+        "cursor resync",
+        "dead-letter/replay",
+        "poison-event isolation",
+        "fallback/abort",
+        "stream reconciliation",
+        "provider quarantine",
+        "route fallback",
+        "circuit break",
+        "safe default",
+        "tombstone-safe restore",
+        "reindex",
+        "quarantine",
+        "index rebuild",
+        "version pin/fallback",
+        "degraded lexical path",
+        "rebuild from source ledger",
+        "quarantine invalid edges",
+        "safe minimal context fallback",
+        "evidence omission signal",
+        "checkpoint/abort",
+        "strategy downgrade",
+        "safe terminal response"
+      ],
+      "change_impact_triggers": [
+        "public or cross-boundary schema/API/config change",
+        "authoritative state or lifecycle change",
+        "security/trust/permission boundary change",
+        "retry/recovery/idempotency semantics change",
+        "budget/SLO/capacity assumption change"
+      ],
+      "edge_case_source": "machine/ai_full_edge_case_matrix.json",
+      "accountability_id": "ACC-AIQ-S7-E2E-03",
+      "implementation_packet_rule": "Before implementation review, the task packet must disposition every inherited engineering dimension and name concrete artifacts or explicit not-applicable rationale.",
+      "strong_promotion_rule": "AIQ task completion is not equivalent to verified/hardened/production capability status. Strong promotion requires bound budgets, executable evidence, recovery/compatibility proof, independent verification and signed accountability under the engineering pass.",
+      "engineering_evidence_refs": [],
+      "budget_binding_refs": [],
+      "engineering_gate_state": "obligations_bound_evidence_pending"
+    }
+  ]
+}
