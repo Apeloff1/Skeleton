@@ -613,20 +613,19 @@ A file existing is not “implemented.” A happy-path test is not “verified.�
 
 The masterplan is no longer allowed to remain uniformly title-level. Depth passes progressively convert frozen volumes into buildable records without falsely claiming implementation.
 
-The first enforced tranche is **DP-000-040**, documented in `docs/plan/VOLUME_DEPTH_000_040.md`. VOL-000 through VOL-040 now each carry non-empty:
+The first enforced tranche is **DP-000-040**, documented in `docs/plan/VOLUME_DEPTH_000_040.md`. VOL-000 through VOL-040 each carry non-empty requirements, capabilities, contracts, implementation paths, tests, evaluations, risks, and gaps.
 
-- requirements;
-- capabilities;
-- contracts;
-- implementation paths;
-- tests;
-- evaluations;
-- risks;
-- gaps.
+The second enforced tranche is **DP-041-080**, documented in `docs/plan/VOLUME_DEPTH_041_080.md`. It continues the exact same non-empty traceability rule across API Architecture, product/web/desktop and long-running UX, multi-tenancy, install/update/repair/uninstall, repository and import architecture, machine manifests/linting, gap/risk/ADR control, CI/release/deployment/environment/configuration, backup/DR/incident response, performance/capacity/cost/quality, specialized intelligence including Jeeves, artifact/CAS/experimentation/reproducibility, and software/test architecture.
 
-This covers the foundational spine from Plan Constitution through Streaming. The fields may contain planned targets; they are planning depth, not evidence. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
+The third enforced tranche is **DP-081-120**, documented in `docs/plan/VOLUME_DEPTH_081_120.md`. It deepens formal methods, benchmark/red-team/human-control disciplines, explainability/accessibility/i18n/compliance, documentation and operations, backlog/priority/build governance, VS-000 through VS-007, functional/autonomous/research/SOTA-candidate acceptance, anti-pattern/build-order/DoD/traceability/capability/debt/fitness controls, project metrics, roadmap/completion semantics, and final assembly qualification.
 
-Future depth passes should continue forward from VOL-041 using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
+The fourth enforced tranche is **DP-121-160**, documented in `docs/plan/VOLUME_DEPTH_121_160.md`. It deepens requirements/NFR/capability/behavior/state/interface/schema/compatibility contracts, internal protocols and consistency/transaction/outbox/cache/content-addressing rules, ingestion/document/lineage/data-quality/dataset/synthetic-data systems, training and post-training control/recovery/evaluation, multimodal ingestion/vision/audio/speech/video/retrieval, and the Tool SDK.
+
+The fifth enforced tranche is **DP-161-200**, documented in `docs/plan/VOLUME_DEPTH_161_200.md`. It deepens connectors/plugins/marketplace/sandboxing, policy simulation, threat/security/zero-trust/network/egress/secrets/keys/tenant/privacy/deletion controls, SBOM/MBOM and SLO/error-budget/trace/performance/cost/efficiency disciplines, chaos/recovery/release/canary/feature-flag/rollback architecture, and developer/local/fixture/simulation/fuzz/property/formal-verification infrastructure.
+
+The fields may contain planned targets; they are planning depth, not evidence. `planned:` paths are not passing tests. `evidence` remains empty unless real artifacts/results exist, and `implementation_status` remains governed by the signed accountability ledger.
+
+Future depth passes should continue forward from **VOL-201** using the same rule: deepen existing frozen volumes rather than adding parallel top-level architecture.
 
 ## 24.4 Exotic systems depth layer
 

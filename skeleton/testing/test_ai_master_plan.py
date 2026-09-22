@@ -53,6 +53,70 @@ def test_foundational_depth_doc_exists_and_spans_000_040() -> None:
     assert "VOL-040" in text
 
 
+def test_sequential_depth_pass_041_080_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-041-080")
+    assert depth["volume_range"] == [41, 80]
+    for volume in data["volumes"][41:81]:
+        assert volume["depth_pass"] == "DP-041-080"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_sequential_depth_doc_exists_and_spans_041_080() -> None:
+    text = checker.DEPTH_041_080.read_text(encoding="utf-8")
+    assert "VOL-041" in text
+    assert "VOL-080" in text
+
+
+def test_sequential_depth_pass_081_120_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-081-120")
+    assert depth["volume_range"] == [81, 120]
+    for volume in data["volumes"][81:121]:
+        assert volume["depth_pass"] == "DP-081-120"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_sequential_depth_doc_exists_and_spans_081_120() -> None:
+    text = checker.DEPTH_081_120.read_text(encoding="utf-8")
+    assert "VOL-081" in text
+    assert "VOL-120" in text
+
+
+def test_sequential_depth_pass_121_160_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-121-160")
+    assert depth["volume_range"] == [121, 160]
+    for volume in data["volumes"][121:161]:
+        assert volume["depth_pass"] == "DP-121-160"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_sequential_depth_doc_exists_and_spans_121_160() -> None:
+    text = checker.DEPTH_121_160.read_text(encoding="utf-8")
+    assert "VOL-121" in text
+    assert "VOL-160" in text
+
+
+def test_sequential_depth_pass_161_200_is_nonempty() -> None:
+    data = checker.load_plan()
+    depth = next(x for x in data["depth_passes"] if x["id"] == "DP-161-200")
+    assert depth["volume_range"] == [161, 200]
+    for volume in data["volumes"][161:201]:
+        assert volume["depth_pass"] == "DP-161-200"
+        for field in depth["required_nonempty_fields"]:
+            assert volume[field], (volume["key"], field)
+
+
+def test_sequential_depth_doc_exists_and_spans_161_200() -> None:
+    text = checker.DEPTH_161_200.read_text(encoding="utf-8")
+    assert "VOL-161" in text
+    assert "VOL-200" in text
+
+
 def test_master_plan_references_engineering_pass() -> None:
     data = checker.load_plan()
     engineering = data["engineering_pass"]
