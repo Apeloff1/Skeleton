@@ -25,6 +25,10 @@ printf '\n== Shell execution plane regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_shell_*.py
 
+printf '\n== Shell worker runtime regressions ==\n'
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_worker_*.py
+
 printf '\n== Backend Ruff ==\n'
 (
   cd backend
@@ -125,6 +129,9 @@ python backend/scripts/check_js_process_alias_safety.py
 printf '\n== GitHub Actions workflow security ==\n'
 python backend/scripts/check_workflow_security.py
 
+printf '\n== GitHub Actions workflow secret-output safety ==\n'
+python scripts/check_workflow_secret_output.py
+
 printf '\n== GitHub Actions repository allowlist ==\n'
 python backend/scripts/check_workflow_action_allowlist.py
 
@@ -145,6 +152,11 @@ python backend/scripts/check_secret_hygiene.py
 
 printf '\n== Repository malware / IOC scan ==\n'
 python backend/scripts/check_malware_iocs.py
+
+printf '\n== Live-service backend test boundary ==\n'
+python backend/scripts/check_live_service_test_boundaries.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  backend/tests/test_live_service_test_boundaries.py
 
 printf '\n== Backend security scanner regressions ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
@@ -175,6 +187,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_repository_python_sast_scope.py \
   backend/tests/test_js_process_alias_safety.py \
   backend/tests/test_workflow_security_gate.py \
+  backend/tests/test_workflow_secret_output.py \
   backend/tests/test_workflow_flow_style_security.py \
   backend/tests/test_workflow_event_context_security.py \
   backend/tests/test_workflow_quoted_key_security.py \
@@ -199,6 +212,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   backend/tests/test_malware_ioc_gate.py \
   backend/tests/test_malware_ioc_io_fail_closed.py \
   backend/tests/test_developer_tooling_security.py \
+  backend/tests/test_dependency_security_workflow_contract.py \
   backend/tests/test_incident_response_runbook.py \
   backend/tests/test_api_middleware_adversarial.py \
   backend/tests/test_api_middleware_regression_gaps.py \
