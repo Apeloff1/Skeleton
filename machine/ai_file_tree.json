@@ -2054,5 +2054,167 @@
     "completion_rule": "Assignment is classification only; migration, import cutover, evidence, and signed accountability remain separate.",
     "historical_rule": "quarantine_then_characterize destinations preserve useful/historical code under research ownership and do not authorize production use.",
     "external_rule": "Product, packaging, deployment, architecture-authority, and accelerator roots stay outside skeleton/ai unless separately reclassified."
+  },
+  "retained_outside_ai_tree": [
+    {
+      "path": "skeleton/README.py",
+      "owner": "package documentation",
+      "reason": "package-level documentation/legacy README surface; not AI runtime ownership"
+    },
+    {
+      "path": "skeleton/__main__.py",
+      "owner": "package CLI shell",
+      "reason": "top-level CLI dispatch remains a shell/compatibility entrypoint around canonical subsystems"
+    },
+    {
+      "path": "skeleton/acquired",
+      "owner": "quarantine/provenance",
+      "reason": "mixed acquired-source quarantine; only explicitly assigned files move after characterization and provenance preservation"
+    },
+    {
+      "path": "skeleton/architecture.py",
+      "owner": "architecture authority",
+      "reason": "runtime/dependency architecture authority stays at the canonical architecture root"
+    },
+    {
+      "path": "skeleton/architecture_index.py",
+      "owner": "architecture authority",
+      "reason": "machine-readable architecture history/index stays outside assembled AI implementation"
+    },
+    {
+      "path": "skeleton/architecture_round3.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round4.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round5.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round6.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round7.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round8.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round9.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round10.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round11.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round12.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round13.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round14.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round15.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round16.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round17.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round18.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round19.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round20.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round21.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/architecture_round22.py",
+      "owner": "architecture history",
+      "reason": "historical architecture round retained as design lineage, not runtime implementation"
+    },
+    {
+      "path": "skeleton/manifest.py",
+      "owner": "package/module registry",
+      "reason": "package-level module manifest remains a repository/package registry rather than an AI runtime owner"
+    },
+    {
+      "path": "skeleton/quickstart.py",
+      "owner": "developer/package guidance",
+      "reason": "quickstart guidance is a package/developer surface, not engine implementation"
+    },
+    {
+      "path": "skeleton/release",
+      "owner": "release engineering",
+      "reason": "release evidence and qualification remain outside the AI runtime per architecture ownership"
+    },
+    {
+      "path": "skeleton/requirements.py",
+      "owner": "package dependency metadata",
+      "reason": "package dependency declaration stays at package boundary"
+    },
+    {
+      "path": "skeleton/setup_config.py",
+      "owner": "package/install metadata",
+      "reason": "setup/install metadata stays with packaging and installer ownership"
+    },
+    {
+      "path": "skeleton/ubuntu",
+      "owner": "deployment/platform support",
+      "reason": "Ubuntu/cloud/service support belongs to deployment/operations ownership, not the AI engine tree"
+    }
+  ],
+  "classification_coverage": {
+    "status": "closed_for_current_top_level_skeleton_tree",
+    "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
+    "source_head": "126cadd236adede80ec632ec0535e0e460aaedc0"
   }
 }

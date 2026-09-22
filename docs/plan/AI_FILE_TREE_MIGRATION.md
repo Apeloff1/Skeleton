@@ -206,3 +206,24 @@ Priority-3 historical/model-internals code is assigned with
 Every pending assignment now records `source_git_object_sha`. If the source
 tree/blob changes before migration, the assignment must be refreshed rather
 than silently treating a different object as the reviewed source.
+
+
+## Explicit non-move classification
+
+The assignment pass also closes the top-level classification gap. Architecture
+authority/history, package CLI/metadata, release/deployment support, and the
+mixed `skeleton/acquired` quarantine are explicitly retained outside
+`skeleton/ai`.
+
+The file-tree validator now fails if a live first-level `skeleton/*` path is
+neither:
+
+1. already governed by a migration mapping,
+2. assigned to the pending move queue,
+3. architecture-approved as external,
+4. explicitly excluded, or
+5. listed in `retained_outside_ai_tree`.
+
+This prevents future "move everything" passes from accidentally relocating
+architecture authority, package/bootstrap metadata, release infrastructure, or
+uncharacterized acquired code.

@@ -128,3 +128,17 @@ def test_ai_file_tree_pending_assignments_follow_masterplan() -> None:
         assert item["work_package_refs"]
         assert item["preconditions"]
         assert len(item["source_git_object_sha"]) == 40
+
+
+def test_ai_file_tree_classifies_non_move_top_level_surfaces() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    retained = {item["path"]: item for item in manifest["retained_outside_ai_tree"]}
+
+    assert retained["skeleton/architecture.py"]["owner"] == "architecture authority"
+    assert retained["skeleton/architecture_index.py"]["owner"] == "architecture authority"
+    assert retained["skeleton/acquired"]["owner"] == "quarantine/provenance"
+    assert retained["skeleton/release"]["owner"] == "release engineering"
+    assert retained["skeleton/ubuntu"]["owner"] == "deployment/platform support"
+    assert retained["skeleton/__main__.py"]["owner"] == "package CLI shell"

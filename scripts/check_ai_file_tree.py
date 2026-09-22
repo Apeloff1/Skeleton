@@ -446,6 +446,70 @@ def validate() -> list[str]:
             "required plan-derived pending AI moves missing: " + ", ".join(missing_required_pending)
         )
 
+
+    retained = data.get("retained_outside_ai_tree")
+    if not isinstance(retained, list) or not retained:
+        errors.append("retained_outside_ai_tree must classify non-move top-level skeleton surfaces")
+        retained = []
+    retained_paths: set[str] = set()
+    for item in retained:
+        if not isinstance(item, dict):
+            errors.append("retained-outside entry must be an object")
+            continue
+        path_value = item.get("path")
+        if not isinstance(path_value, str) or not path_value.startswith("skeleton/"):
+            errors.append(f"invalid retained-outside path: {path_value!r}")
+            continue
+        if path_value in retained_paths:
+            errors.append(f"duplicate retained-outside path: {path_value}")
+        retained_paths.add(path_value)
+        if not (ROOT / path_value).exists():
+            errors.append(f"retained-outside path missing: {path_value}")
+        if not item.get("owner") or not item.get("reason"):
+            errors.append(f"retained-outside path lacks owner/reason: {path_value}")
+
+    def _first_level(path_value: object) -> str | None:
+        if not isinstance(path_value, str) or not path_value.startswith("skeleton/"):
+            return None
+        parts = Path(path_value).parts
+        return path_value if len(parts) == 2 else None
+
+    classified_top_level: set[str] = {"skeleton/ai"}
+    for item in mappings:
+        if isinstance(item, dict):
+            root = _first_level(item.get("source"))
+            if root:
+                classified_top_level.add(root)
+    for item in assignments:
+        if isinstance(item, dict):
+            root = _first_level(item.get("source"))
+            if root:
+                classified_top_level.add(root)
+    if isinstance(audit, dict):
+        for item in audit.get("intentionally_external", []):
+            if isinstance(item, dict):
+                root = _first_level(item.get("path"))
+                if root:
+                    classified_top_level.add(root)
+        for path_value in audit.get("non_engine_root_exclusions", []):
+            root = _first_level(path_value)
+            if root:
+                classified_top_level.add(root)
+    classified_top_level.update(retained_paths)
+
+    skeleton_root = ROOT / "skeleton"
+    live_top_level = {
+        f"skeleton/{path.name}"
+        for path in skeleton_root.iterdir()
+        if path.name != "__pycache__"
+    }
+    unclassified_live = sorted(live_top_level - classified_top_level)
+    if unclassified_live:
+        errors.append(
+            "live top-level skeleton paths lack AI-tree move/retain classification: "
+            + ", ".join(unclassified_live)
+        )
+
     forbidden = data.get("promotion_policy", {}).get("forbidden", [])
     if "marking AIQ/work-package completion from file relocation alone" not in forbidden:
         errors.append("relocation must not create completion authority")
