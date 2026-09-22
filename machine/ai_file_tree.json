@@ -3570,15 +3570,15 @@
     "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T14:58:45Z",
-    "git_sha": "609866ef9c6913b426e719c06b7a72fb19de4875",
+    "signed_at_utc": "2026-09-22T14:58:50Z",
+    "git_sha": "4c59f33204e2e1e6d38d10f4b2ac7acdeeae7e18",
     "evidence_refs": [
-      "git:a1e0829233a76dc4a5632656fa627e38195f1a0a",
-      "git:719eb39862b1b20f30ca2c303e9be317c7c166bc",
-      "git:609866ef9c6913b426e719c06b7a72fb19de4875",
+      "git:4c59f33204e2e1e6d38d10f4b2ac7acdeeae7e18",
+      "git-tree:dbec14d7bc0e18814f4b5a112c487a0990e77039",
+      "object-audit:105-mappings-zero-stale-zero-missing-zero-exact-drift",
       "pr:1930"
     ],
-    "statement": "Move-preparation implementation is identity-bound to GitHub user Apeloff1 at the cited 104-mapping payload SHA. The governed set includes core/runtime, domain/build, owner-sensitive, compatibility-convergence, and research-quarantine mappings with machine-enforced cutover tags. This implementation attestation records payload identity and preparation intent only; fresh CI/object-audit evidence is still required before import inversion, source retirement, production readiness, AIQ/work-package completion, or independent verification.",
+    "statement": "Move-preparation implementation is identity-bound to GitHub user Apeloff1 at the cited 105-mapping payload SHA. The governed set covers core/runtime, Jeeves, AI shell/control-plane, configuration, domain/build surfaces, compatibility convergence, historical architecture lineage, and research quarantine. The object audit found zero stale source Git objects, zero missing mappings, and zero exact-mirror drift. This implementation attestation records payload identity and preparation evidence only; import inversion, source retirement, production readiness, AIQ/work-package completion, and independent verification remain separately gated.",
     "signature_method": "github_identity"
   },
   "verification_signoff": {
