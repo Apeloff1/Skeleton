@@ -15,7 +15,7 @@ def test_state_topology_is_valid() -> None:
     assert errors == []
     assert summary["ok"] is True
     assert summary["architecture_tag"] == "arch-map/v3.7"
-    assert summary["topology_version"] == "1.5.0"
+    assert summary["topology_version"] == "1.6.0"
     assert summary["physical_stores"] >= 7
     assert summary["state_domains"] >= 10
     assert summary["state_flows"] >= 7
