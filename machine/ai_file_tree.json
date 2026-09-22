@@ -541,6 +541,9 @@
       ],
       "aiq_refs": [
         "AIQ-S7-E2E-01"
+      ],
+      "overlay_children": [
+        "quality"
       ]
     },
     {
@@ -2196,7 +2199,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "all_preclassified_moves_mirrored_validation_pending",
+  "validation_state": "all_preclassified_moves_mirrored_object_audit_green_ci_pending",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -2480,5 +2483,14 @@
       "skeleton/viscera"
     ],
     "policy": "Historical/research mappings preserve lineage and do not gain production authority from relocation."
+  },
+  "object_audit": {
+    "payload_git_sha": "c924e854ad94815080efb3b6c691c2641e4a0162",
+    "checked_mapping_count": 78,
+    "pending_assignments": 0,
+    "source_identity_errors": 0,
+    "ungoverned_overlay_errors": 0,
+    "frontend_changes_against_main": 0,
+    "note": "One nested mapping bookkeeping gap (AIFT-EVALUATION -> quality) was found by direct Git-object audit and closed in this commit."
   }
 }
