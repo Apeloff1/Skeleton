@@ -3554,7 +3554,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending distinct verification after BASE-FRONTEND-TSC-01 is closed and required cutover validation is green.",
+    "statement": "Pending distinct verification after final baseline-bridge CI/App Assembly is green.",
     "signature_method": null
   },
   "parity_policy": {
@@ -3657,7 +3657,7 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "104_mapping_baseline_bridge_parity_refreshed_pending_ci_and_fresh_object_audit",
+  "validation_state": "104_mapping_baseline_bridge_full_object_parity_audit_green_pending_final_ci",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
@@ -3943,43 +3943,16 @@
     "policy": "Historical/research mappings preserve lineage and do not gain production authority from relocation."
   },
   "object_audit": {
-    "payload_git_sha": "c924e854ad94815080efb3b6c691c2641e4a0162",
-    "checked_mapping_count": 78,
+    "payload_git_sha": "135773c2c63495e30b0cdf5801c077447e7a0265",
+    "checked_mapping_count": 104,
     "pending_assignments": 0,
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "Baseline bridge refreshed the five drifted exact-parity automation mirrors and the AIFT-AUTOMATION source-tree identity. Fresh full-object/parity audit remains required before cutover.",
+    "note": "Fresh recursive baseline-bridge audit at the cited SHA verified all 104 governed mappings with zero missing paths, zero stale source identities, zero tree-membership drift, and zero exact-parity drift. The prior frontend TypeScript blocker is closed: the latest App Assembly reached and passed assembled-frontend validation. The remaining App Assembly issue was a stale architecture-map test expectation for the newly declared ai_file_tree source and is repaired in the cited SHA.",
     "current_mapping_count": 104,
-    "audit_scope_status": "prior_78_mapping_audit_valid_current_104_mapping_set_requires_full_refresh",
-    "pending_mapping_ids": [
-      "AIFT-CONFIG",
-      "AIFT-AI-SHELL",
-      "AIFT-TURN-COMPAT",
-      "AIFT-TELEMETRY-COMPAT",
-      "AIFT-ARCHITECTURE-LEGACY",
-      "AIFT-ARCHITECTURE-INDEX-LEGACY",
-      "AIFT-ARCHITECTURE-R03",
-      "AIFT-ARCHITECTURE-R04",
-      "AIFT-ARCHITECTURE-R05",
-      "AIFT-ARCHITECTURE-R06",
-      "AIFT-ARCHITECTURE-R07",
-      "AIFT-ARCHITECTURE-R08",
-      "AIFT-ARCHITECTURE-R09",
-      "AIFT-ARCHITECTURE-R10",
-      "AIFT-ARCHITECTURE-R11",
-      "AIFT-ARCHITECTURE-R12",
-      "AIFT-ARCHITECTURE-R13",
-      "AIFT-ARCHITECTURE-R14",
-      "AIFT-ARCHITECTURE-R15",
-      "AIFT-ARCHITECTURE-R16",
-      "AIFT-ARCHITECTURE-R17",
-      "AIFT-ARCHITECTURE-R18",
-      "AIFT-ARCHITECTURE-R19",
-      "AIFT-ARCHITECTURE-R20",
-      "AIFT-ARCHITECTURE-R21",
-      "AIFT-ARCHITECTURE-R22"
-    ],
+    "audit_scope_status": "full_104_mapping_object_parity_audit_green",
+    "pending_mapping_ids": [],
     "baseline_bridge": {
       "source_tree_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
       "refreshed_exact_mirror_files": [
@@ -3990,7 +3963,11 @@
         "supervisor_runtime.py"
       ],
       "purpose": "restore canonical staged-mirror parity after post-1930 source changes"
-    }
+    },
+    "tree_membership_errors": 0,
+    "exact_parity_errors": 0,
+    "compatibility_facade_count": 16,
+    "compatibility_facade_errors": 0
   },
   "move_tag_contract": {
     "schema_version": 1,
@@ -4026,9 +4003,10 @@
       "B4-research-quarantine": 29,
       "B3-compat-convergence": 2
     },
-    "fresh_object_audit_required": true,
+    "fresh_object_audit_required": false,
     "global_cutover_blockers": [
-      "BASE-FRONTEND-TSC-01"
+      "final CI/App Assembly rerun after architecture-source contract-test synchronization",
+      "independent verification signoff is unsigned"
     ],
     "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
   }
