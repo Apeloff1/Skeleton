@@ -16,7 +16,9 @@ def test_repository_wide_adversarial_regressions_run_from_workspace_root() -> No
             "- name: Security, provider-chaos, and developer-tooling adversarial regression tests"
         ):
     ]
-    assert "working-directory: ." in step.split("      - name:", 1)[0]
-    assert "working-directory: .." not in step.split("      - name:", 1)[0]
+    step_header = step.split("      - name:", 1)[0]
+    assert "working-directory: ${{ github.workspace }}" in step_header
+    assert "working-directory: ." not in step_header
+    assert "working-directory: .." not in step_header
     assert "PYTHONPATH=. python -m pytest" in step
     assert "tests/test_architecture_boundaries.py" in step
