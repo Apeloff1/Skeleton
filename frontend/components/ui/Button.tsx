@@ -143,7 +143,7 @@ export const Button: React.FC<ButtonProps> = ({
             colors={theme.gradients[gradient] as any}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {content}
