@@ -331,7 +331,7 @@ export default function BuildHubScreen() {
 
   return (
     <SafeAreaView style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+      <StatusBar barStyle="light-content" />
 
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
