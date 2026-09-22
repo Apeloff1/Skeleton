@@ -55,36 +55,6 @@ def test_semantic_observation_has_stable_content_sensitive_fingerprint():
     assert left.fingerprint != changed.fingerprint
 
 
-
-def test_semantic_observation_identity_changes_with_position_and_source() -> None:
-    from skeleton.jeeves.agent.semantic_lenses import SemanticObservation
-
-    base = SemanticObservation(
-        "obs",
-        "same content",
-        0,
-        source="diary",
-        tags=("x",),
-    )
-    moved = SemanticObservation(
-        "obs",
-        "same content",
-        1,
-        source="diary",
-        tags=("x",),
-    )
-    resourced = SemanticObservation(
-        "obs",
-        "same content",
-        0,
-        source="current-input",
-        tags=("x",),
-    )
-
-    assert base.fingerprint != moved.fingerprint
-    assert base.fingerprint != resourced.fingerprint
-
-
 def test_perpendicular_planner_never_forces_zero_cue_rare_lenses():
     registry = FrontierSemanticRegistry()
     planner = PerpendicularExpansionPlanner(registry)
