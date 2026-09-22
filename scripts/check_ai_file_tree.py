@@ -446,8 +446,8 @@ def validate() -> list[str]:
             )
 
     assignments = data.get("next_move_assignments")
-    if not isinstance(assignments, list) or len(assignments) < 10:
-        errors.append("next_move_assignments must contain the plan-derived pending migration batch")
+    if not isinstance(assignments, list):
+        errors.append("next_move_assignments must be a list")
         assignments = []
 
     allowed_actions = {"mirror_then_cutover", "split_then_mirror", "merge_into_existing_owner", "quarantine_then_characterize"}
@@ -476,7 +476,11 @@ def validate() -> list[str]:
         "skeleton/overseer",
         "skeleton/pr_automation",
         "skeleton/chronicle",
-    }
+    } - mapped_sources
+    if required_pending_sources and len(assignments) < len(required_pending_sources):
+        errors.append(
+            "next_move_assignments must contain every still-unmapped plan-derived source"
+        )
     for item in assignments:
         if not isinstance(item, dict):
             errors.append("pending move assignment must be an object")
