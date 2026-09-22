@@ -116,7 +116,7 @@ export const StarlightBackground: React.FC<StarlightProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
   },
   star: {

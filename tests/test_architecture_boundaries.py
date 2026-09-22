@@ -149,3 +149,51 @@ def test_missing_canonical_root_fails_closed_when_required(tmp_path: Path) -> No
         item.path == tmp_path / "backend" and item.message == "missing canonical source root"
         for item in violations
     )
+
+
+def test_staged_exact_api_mirror_may_reference_legacy_api_until_cutover(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/api/routes.py", "VALUE = 1\n")
+    _write(root, "skeleton/ai/runtime/api/routes.py", "from skeleton.api import routes\n")
+    _write(
+        root,
+        "machine/ai_file_tree.json",
+        """{
+  "status": "staged_mirror",
+  "mappings": [
+    {
+      "source": "skeleton/api",
+      "destination": "skeleton/ai/runtime/api",
+      "parity_mode": "exact"
+    }
+  ]
+}
+""",
+    )
+
+    assert collect_violations(root) == []
+
+
+def test_completed_or_nonexact_api_mirror_does_not_bypass_boundary(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/api/routes.py", "VALUE = 1\n")
+    _write(root, "skeleton/ai/runtime/api/routes.py", "from skeleton.api import routes\n")
+    _write(
+        root,
+        "machine/ai_file_tree.json",
+        """{
+  "status": "cutover_complete",
+  "mappings": [
+    {
+      "source": "skeleton/api",
+      "destination": "skeleton/ai/runtime/api",
+      "parity_mode": "exact"
+    }
+  ]
+}
+""",
+    )
+
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message

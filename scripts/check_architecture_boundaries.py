@@ -9,6 +9,7 @@ See docs/CANONICAL_MODULE_BOUNDARIES.md for the ownership contract.
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +54,40 @@ _API_COMPOSITION_ROOTS = {
     "skeleton/__main__.py",
     "skeleton/deploy/harness.py",
 }
+
+_AI_FILE_TREE_MIRROR_STATES = {"staged_mirror", "cutover_pending"}
+
+
+def _staged_api_mirror_prefixes(repo_root: Path) -> tuple[str, ...]:
+    """Return manifest-governed skeleton.api mirrors that are still pre-cutover.
+
+    This is deliberately fail-closed: malformed/missing manifests, completed cutovers,
+    non-exact mappings, or destinations outside skeleton/ai grant no exemption.
+    """
+    manifest = repo_root / "machine" / "ai_file_tree.json"
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return ()
+
+    if data.get("status") not in _AI_FILE_TREE_MIRROR_STATES:
+        return ()
+
+    prefixes: list[str] = []
+    for item in data.get("mappings", ()):
+        if not isinstance(item, dict):
+            continue
+        source = item.get("source")
+        destination = item.get("destination")
+        parity_mode = item.get("parity_mode", "exact")
+        if (
+            source == "skeleton/api"
+            and isinstance(destination, str)
+            and destination.startswith("skeleton/ai/")
+            and parity_mode == "exact"
+        ):
+            prefixes.append(destination.rstrip("/"))
+    return tuple(sorted(set(prefixes)))
 
 
 @dataclass(frozen=True)
@@ -128,6 +163,7 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
     kernel_root = skeleton_root / "kernel"
     api_root = skeleton_root / "api"
     violations: list[Violation] = []
+    staged_api_mirror_prefixes = _staged_api_mirror_prefixes(repo_root)
 
     if require_roots:
         for root_name in ("skeleton", "backend"):
@@ -158,6 +194,10 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                 and any(rel.startswith(prefix) for prefix in production_rule["excluded_prefixes"])
             )
             api_composition_root = rel in _API_COMPOSITION_ROOTS
+            staged_api_mirror = any(
+                rel == prefix or rel.startswith(prefix + "/")
+                for prefix in staged_api_mirror_prefixes
+            )
 
             for node in ast.walk(tree):
                 imports: list[tuple[str, int]] = []
@@ -183,6 +223,7 @@ def collect_violations(repo_root: Path = REPO_ROOT, *, require_roots: bool = Fal
                         and not in_api
                         and not production_exempt
                         and not api_composition_root
+                        and not staged_api_mirror
                         and _imports_api(module, level)
                     ):
                         violations.append(
