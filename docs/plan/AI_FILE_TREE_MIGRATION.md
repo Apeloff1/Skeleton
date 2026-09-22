@@ -316,3 +316,16 @@ Payload `83483a87f5a19d15f4158ad2b34d655c31e0f22b` (tree `b554c929c4e60784783575
 - 0 forbidden provider credential/network markers in those facades
 
 The implementation attestation is bound to the payload SHA above. Independent verification remains unsigned and final main-based CI/App Assembly must still pass.
+
+
+## Durable transfer-v2B recovery
+
+The managed `integration/ai-file-tree-transfer-v2` branch was repeatedly rebuilt by baseline automation and dropped the second-wave expansion. To preserve the work without fighting the controller, the expansion is staged on `integration/ai-file-tree-transfer-v2b-legacy-recovery` as a child of the latest transfer-v2 head.
+
+This durable recovery adds **20 mappings / 148 exact-object mirrored files**, taking the governed set from **130 to 150 mappings**.
+
+Fourteen legacy GameForge AI trees are quarantined under `skeleton/ai/research/legacy/gameforge`: agents, Jeeves, workflow, runtime, omega, personal diaries, personal logs, forges, knowledge, skills, navigation, bootstrap, orchestrator, and indexing.
+
+Six backend-core modules are staged under `skeleton/ai/compat/backend_core`: `agent_ledger.py`, `agent_mesh.py`, `collection_agents.py`, `deployment_planner.py`, `director_agent.py`, and `playable_simulation.py`.
+
+The provider-bearing `backend/core/ai_provider.py` and `backend/core/ai_provider_compat.py` remain deliberately excluded until a non-owning facade/authority-cutover design is approved.
