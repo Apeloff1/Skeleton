@@ -1451,7 +1451,7 @@
     {
       "task_id": "AIQ-S1-MEM-01",
       "stage": 1,
-      "current_queue_status": "pending",
+      "current_queue_status": "in_progress",
       "work_package_refs": [
         "WP-W07",
         "WP-W08",
