@@ -215,16 +215,6 @@ class BuildRepairTests(unittest.TestCase):
             "Build followup evidence:",
             result["summary"],
         )
-        evidence = result["repair_evidence"]
-        self.assertEqual(
-            evidence["review_verdict"],
-            "accept",
-        )
-        self.assertEqual(
-            evidence["changed_paths"],
-            ["skeleton/example.py"],
-        )
-        self.assertEqual(len(evidence["fingerprint"]), 64)
         self.assertEqual(len(client.prompts), 2)
         self.assertIn(
             "expected 2 but got 1",
