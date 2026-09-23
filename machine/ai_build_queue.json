@@ -2098,7 +2098,7 @@
       "stage": 5,
       "parallel_lane": "engine-boundary",
       "objective": "Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S5-ENG-01"
       ],
@@ -2143,7 +2143,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -2163,7 +2163,7 @@
       "stage": 5,
       "parallel_lane": "engine-boundary",
       "objective": "Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S5-ENG-02"
       ],
@@ -2209,7 +2209,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
