@@ -1,4 +1,4 @@
-/** Device-local conversation data. No attachment bytes cross the persistence boundary. */
+/** Local conversation projection/cache. Server threads/messages are authoritative in product mode; attachment bytes never cross this persistence boundary. */
 export const WORKSPACE_KEY = '@tutolage/jeeves-workspace:v1';
 export const LEGACY_KEY = '@tutolage/jeeves-chat:v2';
 export const MAX_CONVERSATIONS = 30;
