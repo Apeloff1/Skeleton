@@ -150,7 +150,9 @@ class SQLiteEngineBoundaryRepository:
                     idempotency_key TEXT NOT NULL,
                     idempotency_digest TEXT NOT NULL,
                     authority_digest TEXT NOT NULL,
+                    service_principal TEXT NOT NULL,
                     command_digest TEXT NOT NULL,
+                    command_json TEXT NOT NULL,
                     operation_json TEXT NOT NULL,
                     ack_json TEXT NOT NULL,
                     operation_state TEXT NOT NULL,
@@ -184,6 +186,22 @@ class SQLiteEngineBoundaryRepository:
                 );
                 """
             )
+            columns = {
+                row["name"]
+                for row in self._connection.execute(
+                    "PRAGMA table_info(engine_submission)"
+                ).fetchall()
+            }
+            if "service_principal" not in columns:
+                self._connection.execute(
+                    "ALTER TABLE engine_submission "
+                    "ADD COLUMN service_principal TEXT NOT NULL DEFAULT ''"
+                )
+            if "command_json" not in columns:
+                self._connection.execute(
+                    "ALTER TABLE engine_submission "
+                    "ADD COLUMN command_json TEXT NOT NULL DEFAULT '{}'"
+                )
 
     @staticmethod
     def _command_digest(
@@ -307,10 +325,11 @@ class SQLiteEngineBoundaryRepository:
                         namespace, operation_id, execution_id,
                         tenant_id, actor_id, capability,
                         idempotency_key, idempotency_digest,
-                        authority_digest, command_digest,
+                        authority_digest, service_principal,
+                        command_digest, command_json,
                         operation_json, ack_json,
                         operation_state, accepted_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
@@ -322,7 +341,14 @@ class SQLiteEngineBoundaryRepository:
                         operation.idempotency_key,
                         command.idempotency_digest,
                         command.delegated_authority.authority_digest,
+                        command.delegated_authority.service_principal,
                         command_digest,
+                        json.dumps(
+                            command.as_dict(),
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                        ),
                         json.dumps(
                             operation.as_dict(),
                             sort_keys=True,
@@ -350,6 +376,73 @@ class SQLiteEngineBoundaryRepository:
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
+
+    def command(
+        self,
+        operation_id: str,
+    ) -> EngineExecutionCommand:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT command_json
+                FROM engine_submission
+                WHERE namespace = ?
+                  AND operation_id = ?
+                """,
+                (
+                    self.namespace,
+                    str(operation_id),
+                ),
+            ).fetchone()
+            if row is None:
+                raise EngineBoundaryRepositoryError(
+                    "unknown operation"
+                )
+            try:
+                payload = json.loads(row["command_json"])
+            except json.JSONDecodeError as exc:
+                raise EngineBoundaryRepositoryError(
+                    "stored command is invalid JSON"
+                ) from exc
+            if not isinstance(payload, dict):
+                raise EngineBoundaryRepositoryError(
+                    "stored command must be an object"
+                )
+            return EngineExecutionCommand.from_dict(
+                payload
+            )
+
+    def require_service_principal(
+        self,
+        operation_id: str,
+        service_principal: str,
+    ) -> None:
+        principal = str(service_principal).strip()
+        if not principal:
+            raise EngineBoundaryRepositoryConflict(
+                "service principal is required"
+            )
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT service_principal
+                FROM engine_submission
+                WHERE namespace = ?
+                  AND operation_id = ?
+                """,
+                (
+                    self.namespace,
+                    str(operation_id),
+                ),
+            ).fetchone()
+            if row is None:
+                raise EngineBoundaryRepositoryError(
+                    "unknown operation"
+                )
+            if row["service_principal"] != principal:
+                raise EngineBoundaryRepositoryConflict(
+                    "service principal does not own delegated execution"
+                )
 
     def ack(
         self,
