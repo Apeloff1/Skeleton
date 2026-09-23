@@ -29,6 +29,7 @@ export type Message = {
   artifactCount?: number;
   attachmentName?: string;
   error?: string;
+  idempotencyKey?: string;
 };
 
 export type Conversation = {
@@ -113,6 +114,7 @@ function restoreMessage(value: unknown, now: number): Message | null {
     artifactCount: typeof item.artifactCount === 'number' ? Math.max(0, Math.min(100, item.artifactCount)) : 0,
     attachmentName: text(item.attachmentName, 200) || undefined,
     error: interrupted ? 'Interrupted when the app closed. You can retry this message.' : text(item.error, 400) || undefined,
+    idempotencyKey: text(item.idempotencyKey, 256) || undefined,
   };
 }
 
@@ -181,6 +183,7 @@ export function encodeWorkspace(workspace: Workspace): string {
         status: m.status, tier: m.tier, model: m.model, forms: m.forms,
         artifactCount: m.artifacts?.length || m.artifactCount || 0,
         attachmentName: m.attachmentName, error: m.error,
+        idempotencyKey: m.idempotencyKey,
       })),
     })),
   });
