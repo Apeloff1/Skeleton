@@ -43,6 +43,12 @@ def _engine_service() -> EngineExecutionService:
     return service
 
 
+def _engine_coordinator():
+    from skeleton.api.server import get_state
+
+    return getattr(get_state(), "engine_execution_coordinator", None)
+
+
 def _verified_service_principal(request: Request) -> str:
     principal = request.headers.get("x-zaibatsu-attester")
     if not principal:
@@ -86,10 +92,11 @@ def _raise_engine_error(exc: Exception) -> None:
 
 
 @router.post("/executions", status_code=status.HTTP_202_ACCEPTED)
-def submit_execution(
+async def submit_execution(
     body: EngineSubmitBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    coordinator=Depends(_engine_coordinator),
 ) -> dict[str, Any]:
     principal = _verified_service_principal(request)
     try:
@@ -98,6 +105,8 @@ def submit_execution(
             command,
             verified_service_principal=principal,
         )
+        if coordinator is not None:
+            await coordinator.ensure_started(command)
     except Exception as exc:
         _raise_engine_error(exc)
         raise
@@ -157,4 +166,4 @@ def execution_events(
         raise
 
 
-__all__ = ["router"]
+__all__ = ["router", "_engine_coordinator", "_engine_service"]
