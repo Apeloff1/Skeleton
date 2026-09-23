@@ -64,6 +64,7 @@ _AI_SURFACE_PATH_TERMS = (
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
+        "urllib",
         "urllib.request",
         "requests",
         "httpx",
@@ -164,19 +165,55 @@ def _network_transport_imports(path: Path) -> list[str]:
     return hits
 
 
+def _credential_environment_reads(path: Path) -> list[str]:
+    """Return credential names actually read from os.getenv/os.environ APIs."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return []
+
+    hits: set[str] = set()
+
+    def constant_string(node: ast.AST | None) -> str | None:
+        return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            is_getenv = (
+                isinstance(func, ast.Attribute)
+                and func.attr == "getenv"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "os"
+            )
+            is_environ_get = (
+                isinstance(func, ast.Attribute)
+                and func.attr == "get"
+                and isinstance(func.value, ast.Attribute)
+                and func.value.attr == "environ"
+                and isinstance(func.value.value, ast.Name)
+                and func.value.value.id == "os"
+            )
+            if (is_getenv or is_environ_get) and node.args:
+                name = constant_string(node.args[0])
+                if name in _AI_CREDENTIAL_MARKERS:
+                    hits.add(name)
+        elif isinstance(node, ast.Subscript):
+            value = node.value
+            if (
+                isinstance(value, ast.Attribute)
+                and value.attr == "environ"
+                and isinstance(value.value, ast.Name)
+                and value.value.id == "os"
+            ):
+                name = constant_string(node.slice)
+                if name in _AI_CREDENTIAL_MARKERS:
+                    hits.add(name)
+    return sorted(hits)
+
+
 def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
-    credential_markers = sorted(
-        marker
-        for marker in _AI_CREDENTIAL_MARKERS
-        if (
-            `os.getenv("${marker}")` in source
-            or `os.getenv('${marker}')` in source
-            or `os.environ.get("${marker}")` in source
-            or `os.environ.get('${marker}')` in source
-            or `os.environ["${marker}"]` in source
-            or `os.environ['${marker}']` in source
-        )
-    )
+    credential_markers = _credential_environment_reads(path)
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
     network_imports = sorted(set(_network_transport_imports(path)))
     provider_urls = sorted(
@@ -192,7 +229,6 @@ def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
         "provider_urls": provider_urls,
         "client_markers": client_markers,
     }
-
 
 def _looks_like_provider_network_surface(
     path: Path,
