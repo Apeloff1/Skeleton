@@ -9,9 +9,11 @@ must not create a second credential-bearing provider runtime.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import asyncio
 from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_address
 import base64
 import hashlib
@@ -30,8 +32,16 @@ from uuid import UUID, uuid4
 
 from skeleton.contracts.context import ContextEnvelope
 from skeleton.provider_contract import (
+    FinishReason,
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
+    ProviderDelta,
+    ProviderDeltaKind,
+    ProviderProtocolError,
+    ProviderStructuredOutput,
+    ProviderToolCall,
+    ProviderToolDefinition,
+    ProviderUsage,
     load_provider_architecture,
 )
 from skeleton.intelligence.admission import (
@@ -198,6 +208,8 @@ class ProviderRequest:
     purpose: str = "model-inference"
     tenant_id: str | None = None
     operation_id: str | None = None
+    execution_id: str | None = None
+    turn_id: str | None = None
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
@@ -205,17 +217,29 @@ class ProviderRequest:
     context_digest: str | None = None
     context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
     context_compiler_version: str | None = None
+    tools: tuple[ProviderToolDefinition, ...] = field(default_factory=tuple)
+    # Temporary compatibility field. It is normalized into ProviderToolDefinition
+    # before provider I/O and must never escape as provider-native authority.
     tool_schemas: tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    structured_output_schema: Mapping[str, Any] | None = None
+    tool_choice: str = "auto"
+    specific_tool_id: str | None = None
+    deadline: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderResponse:
     """Normalized provider result returned to application code."""
 
-    text: str
+    text: str | None
     provider: str
     model: str
     request_id: str | None = None
+    response_id: str | None = None
+    structured_output: Mapping[str, Any] | None = None
+    tool_calls: tuple[ProviderToolCall, ...] = field(default_factory=tuple)
+    finish_reason: FinishReason = FinishReason.UNKNOWN
+    usage: ProviderUsage = field(default_factory=ProviderUsage)
     latency_ms: float | None = None
     governance_decision_id: str | None = None
     admission_decision_id: str | None = None
