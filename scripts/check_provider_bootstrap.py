@@ -780,8 +780,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence_out is not None:
         args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
         args.evidence_out.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "
-",
+            json.dumps(evidence, indent=2, sort_keys=True) + "\\n",
             encoding="utf-8",
         )
     if args.print_evidence:
