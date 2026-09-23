@@ -6,29 +6,9 @@ Machine authority: [`machine/ai_build_accountability.json`](../../machine/ai_bui
 
 ## Mandatory accountability protocol
 
-Tracked items: **742** (421 volumes, 31 work packages, 42 AIQ tasks, 8 vertical slices, 240 historical/edge/obscure obligations).
+Checkboxes are derived from signed machine state. Do not hand-edit them.
 
-Every tracked item has a completion checkbox. The checkbox is derived machine state and may not be hand-edited.
-
-Every lifecycle/status transition is attributable: actor identity/type, role, RFC3339 UTC timestamp, full git SHA, statement, signature method, and from/to status.
-
-Allowed signature methods are identity-bound only: `github_identity`, `git_gpg`, `git_ssh`, `sigstore`, `ci_oidc`. Unbound/manual attestations do not count.
-
-Completion requires implementation sign-off plus independent verification sign-off, non-empty evidence, a terminal status, completion timestamp, and a validated `[x]` checkbox.
-
-## Lifecycle
-
-```text
-[ ] planned / unverified
-  -> signed STARTED event + UTC timestamp + git SHA
-  -> implementation evidence
-  -> implementation sign-off
-  -> independent verification evidence
-  -> verification sign-off
-  -> signed completion / accepted-risk event
-  -> validator
-  -> [x] closed
-```
+Identity-bound signature methods: GitHub identity, GPG, SSH signing, Sigstore, or CI OIDC.
 
 ## Volumes 000–420
 
@@ -497,41 +477,41 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-AIQ-S0-GOV-02` — AIQ-S0-GOV-02 Wire delete/export/retention decisions through real durable-store and projection adapters. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-GOV-03` — AIQ-S0-GOV-03 Bind governance receipts and lifecycle actions into canonical observability/audit timelines. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-AIQ-S0-COST-01` — AIQ-S0-COST-01 Persist tenant quota windows/reservations so restart and multi-worker execution cannot reset consumption. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-COST-02` — AIQ-S0-COST-02 Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget. — status: `in_progress` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-COST-03` — AIQ-S0-COST-03 Add shared cross-process pressure/concurrency coordination and overload shedding. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-PROV-01` — AIQ-S0-PROV-01 Run provider-surface discovery and classify every credential/network model edge. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-PROV-02` — AIQ-S0-PROV-02 Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S0-PROV-03` — AIQ-S0-PROV-03 Produce current-head CI evidence that only declared source-level provider surfaces remain. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-CONV-01` — AIQ-S1-CONV-01 Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-CONV-02` — AIQ-S1-CONV-02 Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-CONV-03` — AIQ-S1-CONV-03 Make frontend transcript state rebuildable from server authority and wire delete/export/retention. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-MEM-01` — AIQ-S1-MEM-01 Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-MEM-02` — AIQ-S1-MEM-02 Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-MEM-03` — AIQ-S1-MEM-03 Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-TOOL-01` — AIQ-S1-TOOL-01 Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-TOOL-02` — AIQ-S1-TOOL-02 Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S1-TOOL-03` — AIQ-S1-TOOL-03 Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S2-CTX-01` — AIQ-S2-CTX-01 Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S2-CTX-02` — AIQ-S2-CTX-02 Converge legacy route/service system prompts onto versioned instruction-policy identities. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S2-CTX-03` — AIQ-S2-CTX-03 Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S2-PROTO-01` — AIQ-S2-PROTO-01 Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S2-PROTO-02` — AIQ-S2-PROTO-02 Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S2-PROTO-03` — AIQ-S2-PROTO-03 Add optional normalized provider streaming deltas without making provider stream the durable operation stream. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S3-VER-01` — AIQ-S3-VER-01 Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S3-VER-02` — AIQ-S3-VER-02 Implement deterministic claim grounding, citation integrity and tool postcondition adapters. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S3-VER-03` — AIQ-S3-VER-03 Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S4-EXEC-01` — AIQ-S4-EXEC-01 Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S4-EXEC-02` — AIQ-S4-EXEC-02 Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S4-EXEC-03` — AIQ-S4-EXEC-03 Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S5-ENG-01` — AIQ-S5-ENG-01 Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S5-ENG-02` — AIQ-S5-ENG-02 Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S5-ENG-03` — AIQ-S5-ENG-03 Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S6-STREAM-01` — AIQ-S6-STREAM-01 Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S6-STREAM-02` — AIQ-S6-STREAM-02 Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S6-STREAM-03` — AIQ-S6-STREAM-03 Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S7-E2E-01` — AIQ-S7-E2E-01 Build deterministic full-stack provider/tool/retrieval harness without live provider secrets. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S7-E2E-02` — AIQ-S7-E2E-02 Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-- [ ] `ACC-AIQ-S7-E2E-03` — AIQ-S7-E2E-03 Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle. — status: `pending` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-COST-02` — AIQ-S0-COST-02 Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-COST-03` — AIQ-S0-COST-03 Add shared cross-process pressure/concurrency coordination and overload shedding. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-PROV-01` — AIQ-S0-PROV-01 Run provider-surface discovery and classify every credential/network model edge. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-PROV-02` — AIQ-S0-PROV-02 Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S0-PROV-03` — AIQ-S0-PROV-03 Produce current-head CI evidence that only declared source-level provider surfaces remain. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-CONV-01` — AIQ-S1-CONV-01 Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-CONV-02` — AIQ-S1-CONV-02 Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-CONV-03` — AIQ-S1-CONV-03 Make frontend transcript state rebuildable from server authority and wire delete/export/retention. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-MEM-01` — AIQ-S1-MEM-01 Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-MEM-02` — AIQ-S1-MEM-02 Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-MEM-03` — AIQ-S1-MEM-03 Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-TOOL-01` — AIQ-S1-TOOL-01 Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-TOOL-02` — AIQ-S1-TOOL-02 Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S1-TOOL-03` — AIQ-S1-TOOL-03 Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S2-CTX-01` — AIQ-S2-CTX-01 Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S2-CTX-02` — AIQ-S2-CTX-02 Converge legacy route/service system prompts onto versioned instruction-policy identities. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S2-CTX-03` — AIQ-S2-CTX-03 Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S2-PROTO-01` — AIQ-S2-PROTO-01 Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S2-PROTO-02` — AIQ-S2-PROTO-02 Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S2-PROTO-03` — AIQ-S2-PROTO-03 Add optional normalized provider streaming deltas without making provider stream the durable operation stream. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S3-VER-01` — AIQ-S3-VER-01 Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S3-VER-02` — AIQ-S3-VER-02 Implement deterministic claim grounding, citation integrity and tool postcondition adapters. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S3-VER-03` — AIQ-S3-VER-03 Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S4-EXEC-01` — AIQ-S4-EXEC-01 Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S4-EXEC-02` — AIQ-S4-EXEC-02 Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S4-EXEC-03` — AIQ-S4-EXEC-03 Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S5-ENG-01` — AIQ-S5-ENG-01 Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S5-ENG-02` — AIQ-S5-ENG-02 Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S5-ENG-03` — AIQ-S5-ENG-03 Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S6-STREAM-01` — AIQ-S6-STREAM-01 Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S6-STREAM-02` — AIQ-S6-STREAM-02 Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S6-STREAM-03` — AIQ-S6-STREAM-03 Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S7-E2E-01` — AIQ-S7-E2E-01 Build deterministic full-stack provider/tool/retrieval harness without live provider secrets. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S7-E2E-02` — AIQ-S7-E2E-02 Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
+- [ ] `ACC-AIQ-S7-E2E-03` — AIQ-S7-E2E-03 Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle. — status: `evidence_pending` — builder: **chatgpt:gpt-5.6-sol** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
 ## Vertical Slices
 
@@ -787,8 +767,3 @@ Completion requires implementation sign-off plus independent verification sign-o
 - [ ] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 
-## Audit and correction rule
-
-Git history plus this ledger forms the construction audit trail. Do not rewrite prior sign-offs. Corrections append a superseding signed event tied to a new git revision.
-
-Use `python scripts/ai_accountability.py --help` for the governed signing workflow.
