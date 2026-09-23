@@ -993,6 +993,7 @@ def _normalize_provider_interaction(
             FinishReason.CONTENT_FILTERED,
             FinishReason.CANCELLED,
             FinishReason.DEADLINE,
+            FinishReason.PROVIDER_ERROR,
         }:
             raise ProviderInvocationError(
                 "model provider returned no normalized output"
@@ -1830,6 +1831,293 @@ class OpenAIProviderAdapter(ProviderAdapter):
             context_source_snapshot=request.context_source_snapshot,
             context_compiler_version=request.context_compiler_version,
         )
+
+
+    async def stream(
+        self,
+        request: ProviderRequest,
+    ) -> AsyncIterator[ProviderDelta]:
+        """Yield normalized ephemeral deltas from the Responses API stream.
+
+        Provider deltas are intentionally not durable replay/ack state. The
+        canonical operation stream remains the only durable event authority.
+        """
+
+        model = _validate_request(request, default_model=self.model)
+        effective_data_class, effective_purpose, effective_tenant_id = (
+            _effective_governance_fields(
+                data_class=request.data_class,
+                purpose=request.purpose,
+                tenant_id=request.tenant_id,
+                governance_context=request.governance_context,
+            )
+        )
+        try:
+            require_provider_transfer(
+                ProviderTransferRequest(
+                    provider_id=self.provider_id,
+                    data_class=effective_data_class,
+                    purpose=effective_purpose,
+                    tenant_id=effective_tenant_id,
+                    source="skeleton/provider_runtime.py",
+                )
+            )
+        except DataGovernanceDenied as exc:
+            raise ProviderPolicyError(
+                "model provider transfer denied by governance policy"
+            ) from exc
+
+        requested_output = (
+            request.max_output_tokens
+            if request.max_output_tokens is not None
+            else min(4_096, request.resource_budget.max_output_tokens)
+        )
+        lease, estimate = _admit_provider_request(
+            self.admission_runtime,
+            request,
+            tenant_id=effective_tenant_id,
+            requested_output_tokens=requested_output,
+            timeout_seconds=self.timeout_seconds,
+            provider_attempts=self.max_retries + 1,
+        )
+
+        started = time.perf_counter()
+        sequence = 0
+        response: object | None = None
+        response_id: str | None = None
+        accumulated_text: list[str] = []
+        emitted_tool_call_ids: set[str] = set()
+        lease_completed = False
+
+        try:
+            client = self._get_client()
+            messages: list[dict[str, str]] = [
+                message.as_openai_input()
+                for message in request.history
+            ]
+            messages.append(
+                {"role": "user", "content": request.prompt}
+            )
+            tools = _provider_tool_definitions(request)
+            kwargs: dict[str, Any] = {
+                "model": model,
+                "instructions": request.instructions,
+                "input": messages,
+                "stream": True,
+            }
+            if request.max_output_tokens is not None:
+                kwargs["max_output_tokens"] = request.max_output_tokens
+            if tools:
+                kwargs["tools"] = [
+                    tool.as_openai_tool()
+                    for tool in tools
+                ]
+                kwargs["tool_choice"] = _provider_tool_choice_payload(
+                    request,
+                    tools,
+                )
+            structured_payload = _provider_structured_output_payload(
+                request
+            )
+            if structured_payload is not None:
+                kwargs["text"] = structured_payload
+
+            timeout_seconds = _remaining_provider_timeout(
+                request,
+                self.timeout_seconds,
+            )
+            try:
+                async with asyncio.timeout(timeout_seconds):
+                    stream = await client.responses.create(**kwargs)
+                    async for event in stream:
+                        event_type = str(
+                            _provider_field(event, "type", "") or ""
+                        ).strip()
+                        event_response = _provider_field(
+                            event,
+                            "response",
+                            None,
+                        )
+                        if event_response is not None:
+                            response_candidate_id = _provider_field(
+                                event_response,
+                                "id",
+                                None,
+                            )
+                            if response_candidate_id:
+                                response_id = str(
+                                    response_candidate_id
+                                )
+
+                        if event_type == "response.output_text.delta":
+                            delta = _provider_field(
+                                event,
+                                "delta",
+                                None,
+                            )
+                            if isinstance(delta, str) and delta:
+                                accumulated_text.append(delta)
+                                yield ProviderDelta(
+                                    sequence=sequence,
+                                    kind=ProviderDeltaKind.TEXT,
+                                    response_id=response_id,
+                                    text=delta,
+                                )
+                                sequence += 1
+                            continue
+
+                        if event_type == "response.output_item.done":
+                            item = _provider_field(
+                                event,
+                                "item",
+                                None,
+                            )
+                            if item is None:
+                                continue
+                            call = _provider_tool_call_from_item(
+                                item,
+                                offered_tool_ids=frozenset(
+                                    tool.tool_id
+                                    for tool in tools
+                                ),
+                            )
+                            if (
+                                call is not None
+                                and call.call_id
+                                not in emitted_tool_call_ids
+                            ):
+                                emitted_tool_call_ids.add(call.call_id)
+                                yield ProviderDelta(
+                                    sequence=sequence,
+                                    kind=ProviderDeltaKind.TOOL_CALL,
+                                    response_id=response_id,
+                                    tool_call=call,
+                                )
+                                sequence += 1
+                            continue
+
+                        if event_type in {
+                            "response.completed",
+                            "response.incomplete",
+                            "response.failed",
+                        }:
+                            response = event_response
+                            if response is None:
+                                raise ProviderInvocationError(
+                                    "model provider terminal stream event "
+                                    "did not include response"
+                                )
+                            break
+            except TimeoutError as exc:
+                raise ProviderInvocationError(
+                    "model provider deadline exceeded"
+                ) from exc
+            except ProviderError:
+                raise
+            except ProviderInvocationError:
+                raise
+            except Exception as exc:
+                raise ProviderInvocationError(
+                    "model provider stream failed"
+                ) from exc
+
+            if response is None:
+                raise ProviderInvocationError(
+                    "model provider stream ended without terminal response"
+                )
+
+            raw_text = _provider_field(
+                response,
+                "output_text",
+                None,
+            )
+            final_text = (
+                str(raw_text)
+                if raw_text is not None
+                else "".join(accumulated_text)
+            )
+            (
+                normalized_text,
+                structured_output,
+                tool_calls,
+                finish_reason,
+                usage,
+            ) = _normalize_provider_interaction(
+                response,
+                request,
+                text=final_text,
+            )
+
+            latency_seconds = max(
+                0.0,
+                time.perf_counter() - started,
+            )
+            actual = _actual_provider_usage(
+                response,
+                estimate=estimate,
+                wall_seconds=latency_seconds,
+            )
+            try:
+                self.admission_runtime.complete(
+                    lease.operation_id,
+                    actual,
+                )
+                lease_completed = True
+            except AdmissionRuntimeError as exc:
+                raise ProviderPolicyError(
+                    "model provider stream usage reconciliation failed"
+                ) from exc
+
+            if not accumulated_text and normalized_text is not None:
+                yield ProviderDelta(
+                    sequence=sequence,
+                    kind=ProviderDeltaKind.TEXT,
+                    response_id=response_id,
+                    text=normalized_text,
+                )
+                sequence += 1
+
+            if structured_output is not None:
+                yield ProviderDelta(
+                    sequence=sequence,
+                    kind=ProviderDeltaKind.STRUCTURED,
+                    response_id=response_id,
+                    structured_fragment=dict(structured_output),
+                )
+                sequence += 1
+
+            for call in tool_calls:
+                if call.call_id in emitted_tool_call_ids:
+                    continue
+                emitted_tool_call_ids.add(call.call_id)
+                yield ProviderDelta(
+                    sequence=sequence,
+                    kind=ProviderDeltaKind.TOOL_CALL,
+                    response_id=response_id,
+                    tool_call=call,
+                )
+                sequence += 1
+
+            yield ProviderDelta(
+                sequence=sequence,
+                kind=ProviderDeltaKind.USAGE,
+                response_id=response_id,
+                usage=usage,
+            )
+            sequence += 1
+            yield ProviderDelta(
+                sequence=sequence,
+                kind=ProviderDeltaKind.FINAL,
+                response_id=response_id,
+                finish_reason=finish_reason,
+            )
+        except BaseException:
+            if not lease_completed:
+                _release_provider_lease(
+                    self.admission_runtime,
+                    lease,
+                )
+            raise
 
 
     async def generate_image(
