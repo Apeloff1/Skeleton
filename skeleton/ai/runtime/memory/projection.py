@@ -14,7 +14,10 @@ from typing import Iterable, Protocol
 from skeleton.contracts.memory_record import MemoryRecord, MemoryState
 from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk
-from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.persistence.memory_repository import (
+    MongoMemoryRepository,
+    SQLiteMemoryRepository,
+)
 
 
 class ProjectionState(str, Enum):
@@ -190,6 +193,27 @@ class MemoryProjectionCoordinator:
             results=tuple(results),
         )
 
+    def expire_and_sync_subject(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        subject_id: str,
+        projections: Iterable[MemoryProjection],
+        now=None,
+    ) -> ProjectionSyncReport:
+        self.repository.expire_due(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            now=now,
+        )
+        return self.sync_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            projections=projections,
+        )
+
     def rebuild_subject(
         self,
         *,
@@ -224,7 +248,145 @@ class MemoryProjectionCoordinator:
         )
 
 
+
+
+class AsyncMemoryProjectionCoordinator:
+    """Async canonical -> projection synchronizer for Mongo authority."""
+
+    def __init__(self, repository: MongoMemoryRepository) -> None:
+        if not isinstance(repository, MongoMemoryRepository):
+            raise TypeError("repository must be MongoMemoryRepository")
+        self.repository = repository
+
+    async def export_subject(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        subject_id: str,
+        include_tombstoned: bool = True,
+    ) -> tuple[dict[str, object], ...]:
+        records = await self.repository.list_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            include_tombstoned=include_tombstoned,
+        )
+        return tuple(record.as_dict() for record in records)
+
+    async def sync_subject(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        subject_id: str,
+        projections: Iterable[MemoryProjection],
+    ) -> ProjectionSyncReport:
+        records = await self.repository.list_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            include_tombstoned=True,
+        )
+        projection_list = tuple(projections)
+        if any(not getattr(item, "name", "") for item in projection_list):
+            raise ValueError("every projection requires a name")
+
+        active = tuple(r for r in records if r.state is MemoryState.ACTIVE)
+        tombstoned = tuple(r for r in records if r.state is MemoryState.TOMBSTONED)
+        results: list[ProjectionResult] = []
+
+        for projection in projection_list:
+            upserted = deleted = 0
+            try:
+                for record in records:
+                    if record.state is MemoryState.ACTIVE:
+                        projection.upsert(record)
+                        upserted += 1
+                    else:
+                        projection.delete(record.memory_id)
+                        deleted += 1
+                results.append(
+                    ProjectionResult(
+                        projection=projection.name,
+                        state=ProjectionState.HEALTHY,
+                        upserted=upserted,
+                        deleted=deleted,
+                    )
+                )
+            except Exception as exc:
+                results.append(
+                    ProjectionResult(
+                        projection=projection.name,
+                        state=ProjectionState.DEGRADED,
+                        upserted=upserted,
+                        deleted=deleted,
+                        error_code=type(exc).__name__,
+                    )
+                )
+
+        return ProjectionSyncReport(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            authoritative_records=len(records),
+            active_records=len(active),
+            tombstones=len(tombstoned),
+            results=tuple(results),
+        )
+
+    async def rebuild_subject(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        subject_id: str,
+        projections: Iterable[MemoryProjection],
+        known_projection_ids: Iterable[str] = (),
+    ) -> ProjectionSyncReport:
+        projection_list = tuple(projections)
+        known_ids = tuple(
+            dict.fromkeys(str(item).strip() for item in known_projection_ids)
+        )
+        if any(not item for item in known_ids):
+            raise ValueError("known_projection_ids must be non-empty ids")
+        for projection in projection_list:
+            try:
+                for memory_id in known_ids:
+                    projection.delete(memory_id)
+            except Exception:
+                pass
+        return await self.sync_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            projections=projection_list,
+        )
+
+    async def expire_and_sync_subject(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        subject_id: str,
+        projections: Iterable[MemoryProjection],
+        now=None,
+    ) -> ProjectionSyncReport:
+        await self.repository.expire_due(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            now=now,
+        )
+        return await self.sync_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            projections=projections,
+        )
+
+
 __all__ = [
+    "AsyncMemoryProjectionCoordinator",
     "LegacyMemoryStoreProjection",
     "MemoryProjection",
     "MemoryProjectionCoordinator",
