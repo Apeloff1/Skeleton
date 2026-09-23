@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 
 import pytest
 
 from skeleton.release.ai_journey_evidence import (
     AIJourneyRequirement,
+    MANDATORY_AI_JOURNEYS,
     collect_ai_journey_evidence,
 )
 from skeleton.release.evidence import EvidenceSchemaError
@@ -222,3 +224,23 @@ def test_empty_or_planned_report_is_not_evidence() -> None:
             report_format="pytest-json",
             requirements=REQS,
         )
+
+
+
+def test_mandatory_journey_matrix_references_real_test_functions() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    missing: list[str] = []
+    for requirement in MANDATORY_AI_JOURNEYS:
+        path_text, function_name = requirement.nodeid.split("::", 1)
+        path = repo_root / path_text
+        if not path.is_file():
+            missing.append(requirement.nodeid + ":missing-file")
+            continue
+        source = path.read_text(encoding="utf-8")
+        if (
+            f"def {function_name}(" not in source
+            and f"async def {function_name}(" not in source
+        ):
+            missing.append(requirement.nodeid + ":missing-function")
+
+    assert missing == []
