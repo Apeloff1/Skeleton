@@ -11,11 +11,13 @@ from uuid import uuid4
 
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.skills.tool_contract import (
+    ToolContractError,
     ToolEffect,
     ToolExecutionRequest,
     ToolExecutionReceipt,
     ToolExecutionStatus,
     ToolManifest,
+    validate_tool_arguments,
 )
 
 
@@ -151,6 +153,28 @@ class ToolRuntime:
                 return existing
 
             manifest = registered.manifest
+            try:
+                validate_tool_arguments(manifest.input_schema, request.arguments)
+            except ToolContractError:
+                receipt = ToolExecutionReceipt(
+                    receipt_id=_receipt_id(request, manifest),
+                    request_id=request.request_id,
+                    operation_id=request.operation_id,
+                    tenant_id=request.tenant_id,
+                    tool_id=request.tool_id,
+                    idempotency_key=request.idempotency_key,
+                    arguments_digest=request.arguments_digest,
+                    status=ToolExecutionStatus.DENIED,
+                    started_at=started,
+                    finished_at=started,
+                    error_code="arguments_invalid",
+                    approval_ref=request.approval_ref,
+                    metered_tool_calls=0,
+                )
+                self._request_fingerprints[key] = fingerprint
+                self._receipts[key] = receipt
+                return receipt
+
             self._request_fingerprints[key] = fingerprint
 
             if manifest.approval_required and request.approval_ref is None:
