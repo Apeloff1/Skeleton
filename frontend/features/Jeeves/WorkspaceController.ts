@@ -490,7 +490,21 @@ export class WorkspaceController {
   }
 
   select(id: string): void {
-    if (!this.snapshot.workspace.conversations.some(c => c.id === id)) return;
+    const selected = this.snapshot.workspace.conversations.find(
+      conversation => conversation.id === id,
+    );
+    if (!selected) return;
+    if (
+      this.authority
+      && selected.serverState !== 'active'
+    ) {
+      this.notify(
+        selected.serverState === 'deleting'
+          ? 'This conversation is pending deletion and cannot be reopened.'
+          : 'Restore this conversation on the server before reopening it.',
+      );
+      return;
+    }
     if (id !== this.active.id) this.cancel();
     this.change({
       ...updateConversation(
