@@ -19,6 +19,7 @@ from skeleton.provider_contract import (
     load_provider_architecture,
 )
 from skeleton.provider_runtime import (
+    OpenAIProviderAdapter,
     OpenAISyncProviderAdapter,
     ProviderAdapter,
     ProviderInvocationError,
@@ -601,3 +602,255 @@ def test_provider_stream_projection_is_ephemeral_not_operation_event() -> None:
     assert all("operation_id" not in delta for delta in serialized)
     assert all("event_id" not in delta for delta in serialized)
     assert all("ack" not in delta for delta in serialized)
+
+
+
+class _AsyncEventStream:
+    def __init__(self, events):
+        self._events = list(events)
+
+    def __aiter__(self):
+        self._iterator = iter(self._events)
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._iterator)
+        except StopIteration as exc:
+            raise StopAsyncIteration from exc
+
+
+class _AsyncResponses:
+    def __init__(self, events):
+        self.events = list(events)
+        self.kwargs = None
+
+    async def create(self, **kwargs):
+        self.kwargs = dict(kwargs)
+        return _AsyncEventStream(self.events)
+
+
+class _AsyncOpenAIClient:
+    def __init__(self, events):
+        self.responses = _AsyncResponses(events)
+
+
+@pytest.mark.asyncio
+async def test_openai_native_stream_emits_incremental_text_usage_and_final() -> None:
+    terminal = {
+        "id": "resp-native-text",
+        "status": "completed",
+        "output_text": "Hello",
+        "output": [],
+        "usage": {
+            "input_tokens": 4,
+            "output_tokens": 2,
+            "total_tokens": 6,
+        },
+    }
+    client = _AsyncOpenAIClient(
+        [
+            {
+                "type": "response.created",
+                "response": {"id": "resp-native-text"},
+            },
+            {
+                "type": "response.output_text.delta",
+                "delta": "Hel",
+            },
+            {
+                "type": "response.output_text.delta",
+                "delta": "lo",
+            },
+            {
+                "type": "response.completed",
+                "response": terminal,
+            },
+        ]
+    )
+    adapter = OpenAIProviderAdapter(
+        client=client,
+        model="test-model",
+        max_retries=0,
+    )
+
+    deltas = [
+        delta
+        async for delta in adapter.stream(
+            ProviderRequest(
+                instructions="answer",
+                prompt="hello",
+                tenant_id="tenant-a",
+                data_class="public",
+                operation_id="native-stream-text",
+            )
+        )
+    ]
+
+    assert [delta.kind for delta in deltas] == [
+        ProviderDeltaKind.TEXT,
+        ProviderDeltaKind.TEXT,
+        ProviderDeltaKind.USAGE,
+        ProviderDeltaKind.FINAL,
+    ]
+    assert [delta.text for delta in deltas[:2]] == ["Hel", "lo"]
+    assert [delta.sequence for delta in deltas] == [0, 1, 2, 3]
+    assert deltas[2].usage.total_tokens == 6
+    assert deltas[-1].finish_reason is FinishReason.COMPLETED
+    assert client.responses.kwargs["stream"] is True
+
+
+@pytest.mark.asyncio
+async def test_openai_native_stream_emits_completed_tool_call_once() -> None:
+    item = {
+        "type": "function_call",
+        "call_id": "call-native",
+        "name": "repo.read",
+        "arguments": json.dumps({"path": "README.md"}),
+    }
+    terminal = {
+        "id": "resp-native-tool",
+        "status": "completed",
+        "output": [item],
+        "usage": {
+            "input_tokens": 5,
+            "output_tokens": 3,
+            "total_tokens": 8,
+        },
+    }
+    client = _AsyncOpenAIClient(
+        [
+            {
+                "type": "response.created",
+                "response": {"id": "resp-native-tool"},
+            },
+            {
+                "type": "response.output_item.done",
+                "item": item,
+            },
+            {
+                "type": "response.completed",
+                "response": terminal,
+            },
+        ]
+    )
+    adapter = OpenAIProviderAdapter(
+        client=client,
+        model="test-model",
+        max_retries=0,
+    )
+
+    deltas = [
+        delta
+        async for delta in adapter.stream(
+            ProviderRequest(
+                instructions="use tool",
+                prompt="read README",
+                tenant_id="tenant-a",
+                data_class="public",
+                operation_id="native-stream-tool",
+                tools=(_tool_definition(),),
+                tool_choice="required",
+            )
+        )
+    ]
+
+    assert [delta.kind for delta in deltas] == [
+        ProviderDeltaKind.TOOL_CALL,
+        ProviderDeltaKind.USAGE,
+        ProviderDeltaKind.FINAL,
+    ]
+    assert deltas[0].tool_call.tool_id == "repo.read"
+    assert deltas[0].tool_call.arguments == {"path": "README.md"}
+    assert deltas[-1].finish_reason is FinishReason.TOOL_CALLS
+    assert sum(
+        delta.kind is ProviderDeltaKind.TOOL_CALL
+        for delta in deltas
+    ) == 1
+
+
+@pytest.mark.asyncio
+async def test_openai_native_stream_normalizes_provider_failure_terminal() -> None:
+    terminal = {
+        "id": "resp-native-failed",
+        "status": "failed",
+        "output": [],
+        "usage": {
+            "input_tokens": 2,
+            "output_tokens": 0,
+            "total_tokens": 2,
+        },
+    }
+    client = _AsyncOpenAIClient(
+        [
+            {
+                "type": "response.created",
+                "response": {"id": "resp-native-failed"},
+            },
+            {
+                "type": "response.failed",
+                "response": terminal,
+            },
+        ]
+    )
+    adapter = OpenAIProviderAdapter(
+        client=client,
+        model="test-model",
+        max_retries=0,
+    )
+
+    deltas = [
+        delta
+        async for delta in adapter.stream(
+            ProviderRequest(
+                instructions="answer",
+                prompt="hello",
+                tenant_id="tenant-a",
+                data_class="public",
+                operation_id="native-stream-failed",
+            )
+        )
+    ]
+
+    assert [delta.kind for delta in deltas] == [
+        ProviderDeltaKind.USAGE,
+        ProviderDeltaKind.FINAL,
+    ]
+    assert deltas[-1].finish_reason is FinishReason.PROVIDER_ERROR
+    assert deltas[0].usage.input_tokens == 2
+
+
+@pytest.mark.asyncio
+async def test_openai_native_stream_without_terminal_fails_closed() -> None:
+    client = _AsyncOpenAIClient(
+        [
+            {
+                "type": "response.created",
+                "response": {"id": "resp-no-terminal"},
+            },
+            {
+                "type": "response.output_text.delta",
+                "delta": "partial",
+            },
+        ]
+    )
+    adapter = OpenAIProviderAdapter(
+        client=client,
+        model="test-model",
+        max_retries=0,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="without terminal response",
+    ):
+        async for _ in adapter.stream(
+            ProviderRequest(
+                instructions="answer",
+                prompt="hello",
+                tenant_id="tenant-a",
+                data_class="public",
+                operation_id="native-stream-no-terminal",
+            )
+        ):
+            pass
