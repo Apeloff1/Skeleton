@@ -14,6 +14,7 @@ from skeleton.api.engine_authority import (
 )
 from skeleton.api.engine_routes import _engine_service, router
 from skeleton.api.engine_service import (
+    EngineContextHandoff,
     EngineExecutionCommand,
     EngineExecutionService,
     SQLiteEngineSubmissionStore,
@@ -38,6 +39,19 @@ def _service_and_command(tmp_path):
         idempotency_key="route-idem",
         trace_id="trace-route",
     )
+    handoff = EngineContextHandoff(
+        operation_id=operation.operation_id,
+        execution_id="route-exec",
+        turn_id="route-turn",
+        tenant_id="tenant-a",
+        context_id="route-context",
+        context_digest="a" * 64,
+        compiler_version="test-compiler",
+        source_snapshot=(("route-segment", "b" * 64),),
+        data_class="internal",
+        instructions="Follow canonical policy.",
+        prompt="Answer the route request.",
+    )
     execution_request = AIExecutionRequest(
         operation_id=operation.operation_id,
         execution_id="route-exec",
@@ -46,6 +60,14 @@ def _service_and_command(tmp_path):
             "tenant_id": "tenant-a",
             "capability": "assistant.chat",
             "data_class": "internal",
+            "context_id": handoff.context_id,
+            "context_digest": handoff.context_digest,
+            "compiler_version": handoff.compiler_version,
+            "handoff_digest": handoff.handoff_digest,
+            "source_snapshot": [
+                [segment_id, digest]
+                for segment_id, digest in handoff.source_snapshot
+            ],
         },
         tool_policy={
             "tenant_id": "tenant-a",
@@ -80,6 +102,7 @@ def _service_and_command(tmp_path):
         operation=operation,
         execution_request=execution_request,
         delegated_authority=authority,
+        compiled_context=handoff,
         context_seed_refs=("conversation:route-thread",),
         resource_budget=dict(execution_request.resource_budget),
         stream_preferences={"mode": "events"},
