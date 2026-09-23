@@ -63,4 +63,3 @@ def test_cli_does_not_reclassify_internal_supervisor_failure(monkeypatch):
     monkeypatch.setattr(supervisor_cli, "build_supervisor", lambda **_kwargs: BrokenSupervisor())
     with pytest.raises(ValueError, match="custody invariant failed"):
         supervisor_cli.main(["--once"])
-
