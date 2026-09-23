@@ -5,7 +5,7 @@ def test_failover_is_issue_backed_bounded_and_deterministic():
     context = {
         "issues": [
             {"number": 1685, "title": "Advance autonomous repository builder", "body": "Preserve custody.", "labels": [{"name": "bug"}]},
-            {"number": 540, "title": "Security hardening", "body": "Fail closed.", "labels": [{"name": "security"}]},
+            {"number": 540, "title": "Security hardening", "body": "Fail closed.", "labels": [{"name": "security-approved"}]},
             {"number": 1, "title": "[Shift Supervisor] Canonical Night + Idle Plan", "body": "state"},
         ]
     }
@@ -19,7 +19,7 @@ def test_failover_is_issue_backed_bounded_and_deterministic():
 
 def test_failover_preserves_unfinished_prior_custody():
     prior = {"plan_items": [{"id": "existing", "title": "Existing", "description": "Keep", "status": "assigned", "target_team": "night"}], "workers": []}
-    result = compile_fallback_state({"issues": [{"number": 2, "title": "New", "body": "Work"}]}, prior)
+    result = compile_fallback_state({"issues": [{"number": 2, "title": "New", "body": "Work", "labels": [{"name": "build-approved"}]}]}, prior)
     assert result["plan_items"][0]["id"] == "existing"
 
 
