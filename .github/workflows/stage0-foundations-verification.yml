@@ -66,7 +66,7 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
           PYTHONPATH: ${{ github.workspace }}/backend:${{ github.workspace }}
         run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_rag_state_repository.py
           backend/tests/test_rag_state_authority.py
 
@@ -74,7 +74,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_operation_contract.py
           skeleton/testing/test_operation_store.py
           skeleton/testing/test_operation_runtime.py
@@ -107,7 +107,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_data_lifecycle.py
           skeleton/testing/test_governance_registry.py
@@ -139,7 +139,7 @@ jobs:
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
         run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_tenant_quota.py
           skeleton/testing/test_tenant_quota_sqlite.py
           skeleton/testing/test_admission_runtime.py
