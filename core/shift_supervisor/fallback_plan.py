@@ -79,7 +79,7 @@ def compile_fallback_state(context: Mapping[str, Any], previous: Mapping[str, An
             "priority": _priority(issue),
             "target_team": team,
             "status": "queued",
-            "owner": "unassigned",
+            "owner": None,
             "dependencies": [],
             "validation": ["focused regression tests", "required repository CI"],
             "expected_output": f"Validated focused PR advancing issue #{number}",
