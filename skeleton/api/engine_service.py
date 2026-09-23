@@ -656,15 +656,22 @@ class EngineExecutionService:
         scope: str,
         now: datetime | None = None,
     ) -> _StoredSubmission:
+        del now
         stored = self.submissions.get_by_execution_id(execution_id)
         if stored is None:
             raise EngineServiceError("unknown engine execution")
-        self._validate(
-            stored.command,
-            verified_service_principal=verified_service_principal,
-            required_scope=scope,
-            now=now,
-        )
+        if stored.principal != verified_service_principal:
+            raise EngineServiceError(
+                "engine execution belongs to a different service principal"
+            )
+        grant = self.authorities.grant_for(verified_service_principal)
+        if scope not in grant.scopes:
+            raise EngineServiceError("engine service grant is missing required scope")
+        operation = stored.command.operation
+        if not grant.allows_tenant(operation.tenant_id):
+            raise EngineServiceError("tenant is outside engine service grant")
+        if not grant.allows_capability(operation.capability):
+            raise EngineServiceError("capability is outside engine service grant")
         return stored
 
     def status(
