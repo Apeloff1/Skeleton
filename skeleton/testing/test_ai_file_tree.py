@@ -231,3 +231,37 @@ def test_ai_file_tree_ignores_runtime_generated_membership_noise(tmp_path: Path)
     (generated / "module.cpython-311.pyc").write_bytes(b"runtime-only")
 
     assert module._compare(source, destination) == []
+
+
+def test_ai_file_tree_classifies_all_machine_authority_roots() -> None:
+    import json
+    import re
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mappings = manifest["mappings"]
+    audit = manifest["planned_path_audit"]
+
+    def root(path: str) -> str:
+        return "/".join(path.split("/")[:2])
+
+    classified = {manifest["canonical_root"]}
+    classified.update(root(item["source"]) for item in mappings if item.get("source", "").startswith("skeleton/"))
+    classified.update(root(item["path"]) for item in audit["intentionally_external"])
+    classified.update(root(item["planned_path"]) for item in audit["covered_aliases"] if item.get("planned_path", "").startswith("skeleton/"))
+    classified.update(root(path) for path in audit["planned_but_absent"])
+    classified.update(root(path) for path in audit["non_engine_root_exclusions"] if path.startswith("skeleton/"))
+
+    planned = set()
+    for authority in ("machine/ai_master_plan.json", "machine/ai_app_construction.json"):
+        text = (ROOT / authority).read_text(encoding="utf-8")
+        planned.update(re.findall(r"\\bskeleton/[A-Za-z0-9_.-]+", text))
+
+    assert planned <= classified, sorted(planned - classified)
+
+
+def test_planned_but_absent_roots_are_really_absent() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    for path in manifest["planned_path_audit"]["planned_but_absent"]:
+        assert not (ROOT / path).exists(), path
