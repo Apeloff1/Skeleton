@@ -11,7 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import asyncio
 from collections import deque
-from collections.abc import Sequence as SequenceABC
+from collections.abc import AsyncIterator, Sequence as SequenceABC
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_address
@@ -250,6 +250,85 @@ class ProviderResponse:
     context_compiler_version: str | None = None
 
 
+def provider_response_deltas(
+    response: ProviderResponse,
+    *,
+    emitted_at: datetime | None = None,
+) -> tuple[ProviderDelta, ...]:
+    """Project one normalized response into ordered ephemeral provider deltas.
+
+    This is a transport-neutral compatibility stream. These deltas are not
+    durable operation events and carry no replay/ack authority.
+    """
+
+    if not isinstance(response, ProviderResponse):
+        raise TypeError("response must be ProviderResponse")
+    instant = (
+        datetime.now(timezone.utc)
+        if emitted_at is None
+        else emitted_at.astimezone(timezone.utc)
+    )
+    sequence = 0
+    deltas: list[ProviderDelta] = []
+
+    if response.text is not None:
+        deltas.append(
+            ProviderDelta(
+                sequence=sequence,
+                kind=ProviderDeltaKind.TEXT,
+                response_id=response.response_id,
+                text=response.text,
+                emitted_at=instant,
+            )
+        )
+        sequence += 1
+
+    if response.structured_output is not None:
+        deltas.append(
+            ProviderDelta(
+                sequence=sequence,
+                kind=ProviderDeltaKind.STRUCTURED,
+                response_id=response.response_id,
+                structured_fragment=dict(response.structured_output),
+                emitted_at=instant,
+            )
+        )
+        sequence += 1
+
+    for call in response.tool_calls:
+        deltas.append(
+            ProviderDelta(
+                sequence=sequence,
+                kind=ProviderDeltaKind.TOOL_CALL,
+                response_id=response.response_id,
+                tool_call=call,
+                emitted_at=instant,
+            )
+        )
+        sequence += 1
+
+    deltas.append(
+        ProviderDelta(
+            sequence=sequence,
+            kind=ProviderDeltaKind.USAGE,
+            response_id=response.response_id,
+            usage=response.usage,
+            emitted_at=instant,
+        )
+    )
+    sequence += 1
+    deltas.append(
+        ProviderDelta(
+            sequence=sequence,
+            kind=ProviderDeltaKind.FINAL,
+            response_id=response.response_id,
+            finish_reason=response.finish_reason,
+            emitted_at=instant,
+        )
+    )
+    return tuple(deltas)
+
+
 @dataclass(frozen=True, slots=True)
 class ProviderImageRequest:
     """Provider-neutral image generation request."""
@@ -329,6 +408,21 @@ class ProviderAdapter(ABC):
     @abstractmethod
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         """Execute one generation request and normalize the provider response."""
+
+    async def stream(
+        self,
+        request: ProviderRequest,
+    ) -> AsyncIterator[ProviderDelta]:
+        """Yield normalized ephemeral deltas for one provider interaction.
+
+        Adapters may override this for native low-latency streaming. The default
+        path preserves compatibility by projecting the canonical final response.
+        Durable operation streaming remains owned by the operation/event layer.
+        """
+
+        response = await self.generate(request)
+        for delta in provider_response_deltas(response):
+            yield delta
 
     def status(self) -> dict[str, Any]:
         return {"id": self.provider_id, "model": self.model, "available": self.available}
@@ -2475,5 +2569,6 @@ __all__ = [
     "normalize_history",
     "provider_request_from_context",
     "provider_tool_definitions",
+    "provider_response_deltas",
 
 ]
