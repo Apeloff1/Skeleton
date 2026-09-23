@@ -741,7 +741,7 @@ class SQLiteExecutionRepository:
         instant = _utc(now or result.completed_at)
         terminal_state = {
             "completed": ExecutionState.COMPLETED,
-            "degraded": ExecutionState.DEGRADED,
+            "degraded": ExecutionState.COMPLETED,
             "failed": ExecutionState.FAILED,
             "cancelled": ExecutionState.CANCELLED,
         }[result.status]
@@ -767,16 +767,24 @@ class SQLiteExecutionRepository:
                         "execution version changed before finalization"
                     )
 
-                if terminal_state is not ExecutionState.DEGRADED:
-                    target = current.transition(ExecutionState.FINALIZING, now=instant)
-                    target = target.transition(terminal_state, now=instant)
-                    next_state = target.state
-                    next_version = target.version
+                if terminal_state in {
+                    ExecutionState.FAILED,
+                    ExecutionState.CANCELLED,
+                }:
+                    # Failure/cancellation must remain possible from wait states
+                    # where FINALIZING is intentionally not an allowed hop.
+                    target = current.transition(terminal_state, now=instant)
                 else:
-                    target = current.transition(ExecutionState.FINALIZING, now=instant)
-                    target = target.transition(ExecutionState.DEGRADED, now=instant)
-                    next_state = target.state
-                    next_version = target.version
+                    target = current.transition(
+                        ExecutionState.FINALIZING,
+                        now=instant,
+                    )
+                    target = target.transition(
+                        ExecutionState.COMPLETED,
+                        now=instant,
+                    )
+                next_state = target.state
+                next_version = target.version
 
                 self._connection.execute(
                     """
