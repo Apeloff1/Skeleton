@@ -432,3 +432,248 @@ def test_chat_retry_reuses_same_engine_operation_and_execution_identity(
     assert engine_identities[0] == engine_identities[1]
     assert engine_identities[0][3] == "stable-client-key"
     assert first.json()["engine_execution_id"] == second.json()["engine_execution_id"]
+
+
+
+def test_chat_tool_approval_suspends_approves_and_retries_to_final_result(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="approval-chat",
+        content="make the approved change",
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=initial.updated_at,
+        version=2,
+        message_sequence=1,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    after_assistant = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=initial.updated_at,
+        version=3,
+        message_sequence=2,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="approval-chat:assistant",
+        content="approved final answer",
+        parent_message_id=user_message.message_id,
+        causal_user_message_id=user_message.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="execution-result:approval",
+    )
+
+    async def append_user_message(*args, **kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*args, **kwargs):
+        return (user_message,)
+
+    async def commit_assistant_message(*args, **kwargs):
+        return after_assistant, assistant
+
+    class FakeApprovalEngineClient:
+        config = SimpleNamespace(service_principal="codedock-backend")
+
+        def __init__(self):
+            self.approved = False
+            self.execution_id = None
+            self.approval_calls = []
+
+        async def execute(self, command, *, deadline):
+            self.execution_id = command.execution_request.execution_id
+            if not self.approved:
+                raise route.EngineApprovalRequired(
+                    "approval required",
+                    execution_id=self.execution_id,
+                    status={"operation_state": "waiting_for_user"},
+                )
+            return {
+                "status": "completed",
+                "final_output": "approved final answer",
+                "verification": "verification:approval",
+                "verification_receipt": {"outcome": "verified"},
+                "evidence_refs": ["tool-receipt:approval"],
+                "usage": {"model_turns": 2, "tool_calls": 1},
+            }
+
+        async def pending_tool_approvals(
+            self,
+            execution_id,
+            *,
+            actor_id,
+            tenant_id,
+            deadline,
+        ):
+            assert execution_id == self.execution_id
+            assert actor_id == "anonymous"
+            assert tenant_id == "default"
+            return (
+                {
+                    "call_id": "call-write",
+                    "tool_id": "repo.write",
+                    "arguments_digest": "a" * 64,
+                },
+            )
+
+        async def approve_tool_call(
+            self,
+            execution_id,
+            *,
+            actor_id,
+            tenant_id,
+            call_id,
+            tool_id,
+            arguments_digest,
+            idempotency_key,
+            expires_at,
+            deadline,
+        ):
+            self.approval_calls.append(
+                {
+                    "execution_id": execution_id,
+                    "actor_id": actor_id,
+                    "tenant_id": tenant_id,
+                    "call_id": call_id,
+                    "tool_id": tool_id,
+                    "arguments_digest": arguments_digest,
+                    "idempotency_key": idempotency_key,
+                }
+            )
+            self.approved = True
+            return {
+                "approval_ref": "engine-tool-approval:approval-chat",
+                "execution_id": execution_id,
+                "call_id": call_id,
+            }
+
+    engine = FakeApprovalEngineClient()
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+    monkeypatch.setattr(route, "_engine_client", lambda: engine)
+
+    chat_payload = {
+        "message": "make the approved change",
+        "thread_id": initial.thread_id,
+        "idempotency_key": "approval-chat",
+        "expected_thread_version": 1,
+    }
+    suspended = client.post("/ai/chat", json=chat_payload)
+    assert suspended.status_code == 202
+    suspended_body = suspended.json()
+    assert suspended_body["approval_required"] is True
+    assert suspended_body["pending_approvals"] == [
+        {
+            "call_id": "call-write",
+            "tool_id": "repo.write",
+            "arguments_digest": "a" * 64,
+        }
+    ]
+    execution_id = suspended_body["engine_execution_id"]
+
+    approved = client.post(
+        f"/ai/chat/{execution_id}/tool-approvals",
+        json={
+            "call_id": "call-write",
+            "tool_id": "repo.write",
+            "arguments_digest": "a" * 64,
+            "idempotency_key": "approval-decision-1",
+            "expires_in_seconds": 20,
+        },
+    )
+    assert approved.status_code == 200
+    assert approved.json()["retry_required"] is True
+    assert engine.approval_calls == [
+        {
+            "execution_id": execution_id,
+            "actor_id": "anonymous",
+            "tenant_id": "default",
+            "call_id": "call-write",
+            "tool_id": "repo.write",
+            "arguments_digest": "a" * 64,
+            "idempotency_key": "approval-decision-1",
+        }
+    ]
+
+    resumed = client.post("/ai/chat", json=chat_payload)
+    assert resumed.status_code == 200
+    body = resumed.json()
+    assert body["response"] == "approved final answer"
+    assert body["engine_execution_id"] == execution_id
+    assert body["thread"]["version"] == 3
+
+
+def test_chat_tool_approval_rejects_pending_identity_mismatch(
+    route,
+    client,
+    monkeypatch,
+):
+    class FakeEngineClient:
+        config = SimpleNamespace(service_principal="codedock-backend")
+
+        async def pending_tool_approvals(
+            self,
+            execution_id,
+            *,
+            actor_id,
+            tenant_id,
+            deadline,
+        ):
+            return (
+                {
+                    "call_id": "call-write",
+                    "tool_id": "repo.write",
+                    "arguments_digest": "b" * 64,
+                },
+            )
+
+    monkeypatch.setattr(route, "_engine_client", lambda: FakeEngineClient())
+
+    response = client.post(
+        "/ai/chat/exec-approval/tool-approvals",
+        json={
+            "call_id": "call-write",
+            "tool_id": "repo.write",
+            "arguments_digest": "a" * 64,
+            "idempotency_key": "approval-decision-1",
+        },
+    )
+
+    assert response.status_code == 409
+    assert "does not match" in response.json()["detail"]
