@@ -138,22 +138,172 @@ export class WorkspaceController {
     return this.loading;
   }
 
-  private async load(): Promise<void> {
-    this.emit({ loadError: null, saveState: 'loading' });
+  private authorityMessage(message: AuthorityMessage): Message | null {
+    if (
+      (message.author_type !== 'user' && message.author_type !== 'assistant')
+      || typeof message.content !== 'string'
+      || !message.content.trim()
+    ) return null;
+    const createdAt = Date.parse(message.created_at);
+    return {
+      id: message.message_id,
+      role: message.author_type === 'user' ? 'user' : 'jeeves',
+      text: message.content.slice(0, MAX_TEXT),
+      createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+      status: 'complete',
+      artifactCount: message.artifact_refs?.length || 0,
+    };
+  }
+
+  private authorityConversation(
+    thread: AuthorityThread,
+    messages: AuthorityMessage[],
+    cached?: Conversation,
+  ): Conversation {
+    const createdAt = Date.parse(thread.created_at);
+    const updatedAt = Date.parse(thread.updated_at);
+    return {
+      id: thread.thread_id,
+      title: thread.title.slice(0, 100) || 'Untitled conversation',
+      createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
+      updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
+      pinned: cached?.pinned || false,
+      archived: thread.state === 'archived',
+      draft: cached?.draft || '',
+      context: cached?.context || '',
+      allForms: cached?.allForms || false,
+      sessionId: null,
+      sessionUpdatedAt: 0,
+      messages: messages
+        .map(message => this.authorityMessage(message))
+        .filter((message): message is Message => message !== null)
+        .slice(-MAX_MESSAGES),
+      handoffId: cached?.handoffId,
+      serverVersion: thread.version,
+      serverState: thread.state,
+    };
+  }
+
+  private async serverWorkspace(cached: Workspace): Promise<Workspace> {
+    if (!this.authority) return cached;
+    let threads = (await this.authority.listThreads())
+      .filter(thread => thread.state !== 'deleted');
+    if (!threads.some(thread => thread.state === 'active')) {
+      const created = await this.authority.createThread('New conversation');
+      threads = [created, ...threads];
+    }
+    const cachedById = new Map(
+      cached.conversations.map(conversation => [conversation.id, conversation]),
+    );
+    const conversations = await Promise.all(
+      threads.slice(0, 30).map(async thread => this.authorityConversation(
+        thread,
+        await this.authority!.listMessages(thread.thread_id),
+        cachedById.get(thread.thread_id),
+      )),
+    );
+    if (!conversations.length) {
+      throw new Error('Conversation authority returned no usable threads.');
+    }
+    const preferred = conversations.find(
+      conversation => (
+        conversation.id === cached.activeId
+        && !conversation.archived
+      ),
+    );
+    const active = preferred
+      || conversations.find(conversation => !conversation.archived)
+      || conversations[0];
+    return {
+      version: 1,
+      activeId: active.id,
+      conversations,
+    };
+  }
+
+  async refreshFromServer(): Promise<void> {
+    if (!this.authority || !this.snapshot.ready) return;
     try {
-      const saved = await this.storage.getItem(WORKSPACE_KEY);
-      const legacy = saved === null ? await this.storage.getItem(LEGACY_KEY) : null;
-      const workspace = saved !== null ? decodeWorkspace(saved)
-        : legacy !== null ? migrateLegacy(legacy) : this.snapshot.workspace;
-      this.emit({ workspace, ready: true, saveState: 'saved' });
-      // Migration is additive: retain the legacy key as a recovery copy.
+      const workspace = await this.serverWorkspace(this.snapshot.workspace);
+      this.emit({
+        workspace,
+        serverSynced: true,
+        loadError: null,
+        notice: null,
+      });
       this.queueSave();
     } catch {
       this.emit({
-        ready: false, saveState: 'error',
-        loadError: 'Saved chats could not be opened. Your stored data has been left intact. Retry after checking device storage.',
+        serverSynced: false,
+        notice: 'Server conversation history is unavailable. Showing the last cached view; sending, archive and delete are paused.',
       });
     }
+  }
+
+  private async load(): Promise<void> {
+    this.emit({
+      loadError: null,
+      saveState: 'loading',
+      serverSynced: !this.authority,
+    });
+    let cached = this.snapshot.workspace;
+    try {
+      const saved = await this.storage.getItem(WORKSPACE_KEY);
+      const legacy = saved === null
+        ? await this.storage.getItem(LEGACY_KEY)
+        : null;
+      cached = saved !== null
+        ? decodeWorkspace(saved)
+        : legacy !== null
+          ? migrateLegacy(legacy)
+          : cached;
+    } catch {
+      if (!this.authority) {
+        this.emit({
+          ready: false,
+          saveState: 'error',
+          loadError: 'Saved chats could not be opened. Your stored data has been left intact. Retry after checking device storage.',
+          serverSynced: false,
+        });
+        return;
+      }
+      // In server-authority mode the device copy is a cache only. Corruption
+      // must not prevent a clean rebuild from canonical server state.
+      cached = createWorkspace();
+    }
+
+    if (this.authority) {
+      try {
+        const workspace = await this.serverWorkspace(cached);
+        this.emit({
+          workspace,
+          ready: true,
+          saveState: 'saved',
+          serverSynced: true,
+          loadError: null,
+        });
+        this.queueSave();
+        return;
+      } catch {
+        this.emit({
+          workspace: cached,
+          ready: true,
+          saveState: 'saved',
+          serverSynced: false,
+          notice: 'Server conversation history is unavailable. Showing the last cached view; sending, archive and delete are paused.',
+        });
+        return;
+      }
+    }
+
+    this.emit({
+      workspace: cached,
+      ready: true,
+      saveState: 'saved',
+      serverSynced: true,
+    });
+    // Legacy migration is additive: retain the legacy key as a recovery copy.
+    this.queueSave();
   }
 
   private change(workspace: Workspace): void {
