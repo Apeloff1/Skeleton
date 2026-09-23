@@ -318,7 +318,11 @@ class EngineClient:
         return await self._request_json(
             "POST",
             "/api/v1/engine/executions",
-            body={"command": command.as_dict()},
+            body={
+                "actor_id": command.operation.actor_id,
+                "tenant_id": command.operation.tenant_id,
+                "command": command.as_dict(),
+            },
             deadline=deadline,
             retry=True,
         )
@@ -327,11 +331,19 @@ class EngineClient:
         self,
         execution_id: str,
         *,
+        actor_id: str,
+        tenant_id: str,
         deadline: datetime | None = None,
     ) -> dict[str, Any]:
+        query = urllib.parse.urlencode(
+            {
+                "actor_id": str(actor_id).strip(),
+                "tenant_id": str(tenant_id).strip(),
+            }
+        )
         return await self._request_json(
             "GET",
-            "/api/v1/engine/executions/" + execution_id,
+            "/api/v1/engine/executions/" + execution_id + "?" + query,
             deadline=deadline,
             retry=True,
         )
@@ -340,11 +352,24 @@ class EngineClient:
         self,
         execution_id: str,
         *,
+        actor_id: str,
+        tenant_id: str,
         deadline: datetime | None = None,
     ) -> dict[str, Any]:
+        query = urllib.parse.urlencode(
+            {
+                "actor_id": str(actor_id).strip(),
+                "tenant_id": str(tenant_id).strip(),
+            }
+        )
         return await self._request_json(
             "GET",
-            "/api/v1/engine/executions/" + execution_id + "/events",
+            (
+                "/api/v1/engine/executions/"
+                + execution_id
+                + "/events?"
+                + query
+            ),
             deadline=deadline,
             retry=True,
         )
@@ -472,6 +497,8 @@ class EngineClient:
         self,
         execution_id: str,
         *,
+        actor_id: str,
+        tenant_id: str,
         reason: str,
         deadline: datetime | None = None,
     ) -> dict[str, Any]:
@@ -480,7 +507,11 @@ class EngineClient:
         return await self._request_json(
             "POST",
             "/api/v1/engine/executions/" + execution_id + "/cancel",
-            body={"reason": reason.strip()},
+            body={
+                "actor_id": str(actor_id).strip(),
+                "tenant_id": str(tenant_id).strip(),
+                "reason": reason.strip(),
+            },
             deadline=deadline,
             retry=True,
         )
@@ -489,10 +520,17 @@ class EngineClient:
         self,
         execution_id: str,
         *,
+        actor_id: str,
+        tenant_id: str,
         deadline: datetime,
     ) -> dict[str, Any]:
         while True:
-            current = await self.status(execution_id, deadline=deadline)
+            current = await self.status(
+                execution_id,
+                actor_id=actor_id,
+                tenant_id=tenant_id,
+                deadline=deadline,
+            )
             state = str(current.get("operation_state") or "")
             if state in {"failed", "cancelled"}:
                 raise EngineExecutionFailed(
@@ -508,6 +546,8 @@ class EngineClient:
             if state == "completed":
                 snapshot = await self.events(
                     execution_id,
+                    actor_id=actor_id,
+                    tenant_id=tenant_id,
                     deadline=deadline,
                 )
                 events = snapshot.get("events")
@@ -550,6 +590,8 @@ class EngineClient:
         )
         return await self.wait_for_result(
             execution_id,
+            actor_id=command.operation.actor_id,
+            tenant_id=command.operation.tenant_id,
             deadline=deadline,
         )
 
