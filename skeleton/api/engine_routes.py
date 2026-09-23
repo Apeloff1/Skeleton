@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from skeleton.api.engine_authority import EngineAuthorityError
@@ -33,6 +33,8 @@ class EngineCancelBody(BaseModel):
 
 
 class EngineToolApprovalBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
     call_id: str = Field(min_length=1, max_length=256)
     tool_id: str = Field(min_length=1, max_length=128)
     arguments_digest: str = Field(
@@ -166,6 +168,8 @@ def cancel_execution(
 def pending_tool_approvals(
     execution_id: str,
     request: Request,
+    actor_id: str = Query(..., min_length=1, max_length=512),
+    tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
 ) -> dict[str, Any]:
     principal = _verified_service_principal(request)
@@ -173,6 +177,8 @@ def pending_tool_approvals(
         pending = service.pending_tool_approvals(
             execution_id,
             verified_service_principal=principal,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
         )
     except Exception as exc:
         _raise_engine_error(exc)
@@ -199,6 +205,8 @@ async def approve_tool_call(
         approval = service.approve_tool_call(
             execution_id,
             verified_service_principal=principal,
+            actor_id=body.actor_id,
+            tenant_id=body.tenant_id,
             call_id=body.call_id,
             tool_id=body.tool_id,
             arguments_digest=body.arguments_digest,
