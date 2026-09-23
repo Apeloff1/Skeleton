@@ -36,3 +36,31 @@ def test_failover_rejects_unapproved_open_issue():
         compile_fallback_state({
             "issues": [{"number": 999, "title": "Unapproved", "body": "Must not become work", "labels": []}]
         })
+
+def test_cli_classifies_only_model_unavailability_for_failover(monkeypatch):
+    import pytest
+    from core.shift_supervisor import __main__ as supervisor_cli
+    from core.shift_supervisor.model_gateway import ModelRequestError
+
+    class ModelUnavailable:
+        def run_once(self, **_kwargs):
+            raise ModelRequestError("provider unavailable")
+
+    monkeypatch.setattr(supervisor_cli, "build_supervisor", lambda **_kwargs: ModelUnavailable())
+    with pytest.raises(SystemExit) as exc:
+        supervisor_cli.main(["--once"])
+    assert exc.value.code == 78
+
+
+def test_cli_does_not_reclassify_internal_supervisor_failure(monkeypatch):
+    import pytest
+    from core.shift_supervisor import __main__ as supervisor_cli
+
+    class BrokenSupervisor:
+        def run_once(self, **_kwargs):
+            raise ValueError("custody invariant failed")
+
+    monkeypatch.setattr(supervisor_cli, "build_supervisor", lambda **_kwargs: BrokenSupervisor())
+    with pytest.raises(ValueError, match="custody invariant failed"):
+        supervisor_cli.main(["--once"])
+

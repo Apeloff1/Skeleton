@@ -6,9 +6,11 @@ import binascii
 import gzip
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+from .model_gateway import ModelRequestError
 from .plan_store import InMemoryPlanStore
 from .runtime import build_supervisor
 from .scheduler import github_actions_forbids_unbounded_loop
@@ -104,10 +106,14 @@ def main(argv: Sequence[str] | None = None) -> None:
         scheduler.run_forever()
         return
 
-    result = scheduler.run_once(
-        run_secretary=args.role in {"secretary", "both"},
-        run_manager=args.role in {"manager", "both"},
-    )
+    try:
+        result = scheduler.run_once(
+            run_secretary=args.role in {"secretary", "both"},
+            run_manager=args.role in {"manager", "both"},
+        )
+    except ModelRequestError as exc:
+        print(f"shift supervisor model planning unavailable: {exc}", file=sys.stderr)
+        raise SystemExit(78) from exc
     encoded = json.dumps(result, sort_keys=True, indent=2, default=str)
     if args.output:
         output = Path(args.output)

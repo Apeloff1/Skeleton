@@ -219,7 +219,7 @@ jobs:
             set -e
           fi
 
-          if (( model_status != 0 )); then
+          if (( model_status == 78 )); then
             echo "::warning::Advisory model planning unavailable (status=${model_status}); compiling deterministic issue-backed failover plan."
             python - <<'PY'
           from pathlib import Path
@@ -235,6 +235,9 @@ jobs:
               '.shift-supervisor-tmp/state-out.txt',
           )
           PY
+          elif (( model_status != 0 )); then
+            echo "::error::Shift Supervisor failed outside the model-unavailability boundary (status=${model_status}); refusing deterministic failover."
+            exit "$model_status"
           fi
 
       - name: Publish canonical plan and machine state
