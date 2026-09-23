@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -29,6 +30,18 @@ class EngineSubmitBody(BaseModel):
 
 class EngineCancelBody(BaseModel):
     reason: str = Field(min_length=1, max_length=2048)
+
+
+class EngineToolApprovalBody(BaseModel):
+    call_id: str = Field(min_length=1, max_length=256)
+    tool_id: str = Field(min_length=1, max_length=128)
+    arguments_digest: str = Field(
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    idempotency_key: str = Field(min_length=1, max_length=1024)
+    expires_at: datetime
 
 
 def _engine_service() -> EngineExecutionService:
@@ -147,6 +160,57 @@ def cancel_execution(
     except Exception as exc:
         _raise_engine_error(exc)
         raise
+
+
+@router.get("/executions/{execution_id}/tool-approvals/pending")
+def pending_tool_approvals(
+    execution_id: str,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request)
+    try:
+        pending = service.pending_tool_approvals(
+            execution_id,
+            verified_service_principal=principal,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return {
+        "execution_id": execution_id,
+        "pending": [dict(item) for item in pending],
+    }
+
+
+@router.post(
+    "/executions/{execution_id}/tool-approvals",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def approve_tool_call(
+    execution_id: str,
+    body: EngineToolApprovalBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request)
+    try:
+        approval = service.approve_tool_call(
+            execution_id,
+            verified_service_principal=principal,
+            call_id=body.call_id,
+            tool_id=body.tool_id,
+            arguments_digest=body.arguments_digest,
+            idempotency_key=body.idempotency_key,
+            expires_at=body.expires_at,
+        )
+        if coordinator is not None:
+            await coordinator.ensure_execution(execution_id)
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return approval.as_dict()
 
 
 @router.get("/executions/{execution_id}/events")
