@@ -1,0 +1,205 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
+
+import pytest
+
+from skeleton.contracts.memory_record import (
+    MemoryContractError,
+    MemoryKind,
+    MemoryState,
+    MemoryWriteProposal,
+)
+from skeleton.persistence.memory_repository import (
+    MemoryConflict,
+    MemoryNotFound,
+    SQLiteMemoryRepository,
+)
+
+
+def _now() -> datetime:
+    return datetime(2026, 9, 23, 16, 0, tzinfo=timezone.utc)
+
+
+def _proposal(
+    *,
+    key: str,
+    tenant: str = "tenant-a",
+    namespace: str = "assistant",
+    subject: str = "user-a",
+    content: str = "remember this",
+    target: str | None = None,
+    expected_version: int | None = None,
+) -> MemoryWriteProposal:
+    return MemoryWriteProposal(
+        proposal_id=str(uuid4()),
+        tenant_id=tenant,
+        namespace=namespace,
+        subject_id=subject,
+        kind=MemoryKind.SEMANTIC,
+        idempotency_key=key,
+        proposed_at=_now(),
+        content=content,
+        provenance_refs=("conversation:thread-1",),
+        source_operation_id=str(uuid4()),
+        target_memory_id=target,
+        expected_version=expected_version,
+    )
+
+
+def test_memory_proposal_requires_authoritative_payload() -> None:
+    with pytest.raises(MemoryContractError, match="content or content_ref"):
+        MemoryWriteProposal(
+            proposal_id=str(uuid4()),
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+            kind=MemoryKind.SEMANTIC,
+            idempotency_key="k",
+            proposed_at=_now(),
+        )
+
+
+def test_memory_proposal_rejects_expiry_before_creation() -> None:
+    with pytest.raises(MemoryContractError, match="expires_at"):
+        MemoryWriteProposal(
+            proposal_id=str(uuid4()),
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+            kind=MemoryKind.SEMANTIC,
+            idempotency_key="k",
+            proposed_at=_now(),
+            content="x",
+            expires_at=_now() - timedelta(seconds=1),
+        )
+
+
+def test_repository_reopens_durable_memory(tmp_path) -> None:
+    path = tmp_path / "memory.sqlite3"
+    first = SQLiteMemoryRepository(path)
+    stored = first.commit(_proposal(key="create-1"), now=_now())
+    first.close()
+
+    reopened = SQLiteMemoryRepository(path)
+    loaded = reopened.get(
+        stored.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert loaded == stored
+    assert loaded.version == 1
+    assert loaded.state is MemoryState.ACTIVE
+
+
+def test_namespace_and_tenant_isolation_fail_closed() -> None:
+    repo = SQLiteMemoryRepository()
+    stored = repo.commit(_proposal(key="create-1"), now=_now())
+
+    with pytest.raises(MemoryNotFound):
+        repo.get(stored.memory_id, tenant_id="tenant-b", namespace="assistant")
+    with pytest.raises(MemoryNotFound):
+        repo.get(stored.memory_id, tenant_id="tenant-a", namespace="other")
+
+
+def test_exact_idempotent_replay_returns_same_record() -> None:
+    repo = SQLiteMemoryRepository()
+    proposal = _proposal(key="same-key")
+
+    first = repo.commit(proposal, now=_now())
+    replay = repo.commit(proposal, now=_now() + timedelta(seconds=5))
+
+    assert replay == first
+    assert len(
+        repo.list_subject(
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+        )
+    ) == 1
+
+
+def test_idempotency_key_reuse_with_different_payload_conflicts() -> None:
+    repo = SQLiteMemoryRepository()
+    first = _proposal(key="same-key", content="one")
+    repo.commit(first, now=_now())
+    conflicting = _proposal(key="same-key", content="two")
+
+    with pytest.raises(MemoryConflict, match="idempotency_key"):
+        repo.commit(conflicting, now=_now())
+
+
+def test_optimistic_update_preserves_identity_and_increments_version() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create"), now=_now())
+
+    updated = repo.commit(
+        _proposal(
+            key="update",
+            content="new value",
+            target=created.memory_id,
+            expected_version=created.version,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+
+    assert updated.memory_id == created.memory_id
+    assert updated.version == 2
+    assert updated.created_at == created.created_at
+    assert updated.content == "new value"
+
+
+def test_stale_update_is_rejected() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create"), now=_now())
+    repo.commit(
+        _proposal(
+            key="update-1",
+            content="v2",
+            target=created.memory_id,
+            expected_version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+
+    with pytest.raises(MemoryConflict, match="version conflict"):
+        repo.commit(
+            _proposal(
+                key="update-2",
+                content="stale",
+                target=created.memory_id,
+                expected_version=1,
+            ),
+            now=_now() + timedelta(seconds=2),
+        )
+
+
+def test_tombstone_hides_memory_but_preserves_lineage() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create"), now=_now())
+
+    deleted = repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=1,
+        now=_now() + timedelta(seconds=1),
+    )
+
+    assert deleted.state is MemoryState.TOMBSTONED
+    assert deleted.version == 2
+    with pytest.raises(MemoryNotFound):
+        repo.get(
+            created.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    restored_view = repo.get(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        include_tombstoned=True,
+    )
+    assert restored_view.payload_digest == created.payload_digest
