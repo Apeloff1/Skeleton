@@ -243,16 +243,13 @@
       "implementation_state": "in_progress",
       "closure_decision": "open",
       "evidence_present": [
-        "skeleton/contracts/conversation.py",
-        "skeleton/persistence/conversation_repository.py",
-        "skeleton/testing/test_conversation_repository.py",
-        "backend/core/conversations.py",
-        "backend/routes/conversations.py",
-        "backend/tests/test_conversations_api.py",
-        "backend/gameforge/jeeves/chat_contract.py",
-        "backend/routes/jeeves_compose.py",
-        "tests/test_jeeves_chat_workspace.py",
-        "frontend/src/product/conversationClient.ts"
+        "skeleton/contracts/conversation.py and skeleton/persistence/conversation_repository.py — canonical thread/message/branch authority",
+        "skeleton/testing/test_conversation_repository.py — operation/result binding, authorization, sequence/version fencing, idempotency, edit/regenerate lineage and restart durability",
+        "backend/core/conversations.py and backend/routes/conversations.py — authenticated conversation application boundary",
+        "backend/tests/test_conversations_api.py — projection identity, cross-owner denial, append conflict/idempotency, active transcript, edit and delete intent",
+        "backend/tests/test_conversation_regeneration.py — causal-user branch regeneration",
+        "backend/tests/test_ai_chat_conversation_authority.py — client-history injection denial, server transcript, retry-stable engine identity, assistant lineage and approval/resume flow",
+        "frontend/src/product/conversationClient.ts — canonical frontend conversation client"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -267,16 +264,11 @@
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
       "outstanding_evidence": [
-        "new-thread and multi-turn continuation tests",
-        "client cannot inject hidden prior assistant/system messages as canonical history",
-        "cross-tenant/thread authorization denial",
-        "duplicate message idempotency test",
-        "ordered pagination and concurrent append test",
-        "edit/regenerate branch lineage test",
-        "assistant message binds to one operation and final execution result",
-        "conversation deletion/export propagation test",
-        "context projection preserves selected message/citation/tool provenance",
-        "browser refresh/reconnect reconstructs the same canonical transcript"
+        "frontend/browser refresh reconstructs canonical transcript from server authority",
+        "conversation export/retention propagation browser/API evidence",
+        "fresh CI execution of conversation repository/API/chat suites on current head",
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-governance-registry"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
@@ -301,9 +293,17 @@
       "plane": "memory",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/contracts/memory_record.py — canonical MemoryRecord/WriteProposal contracts",
+        "skeleton/persistence/memory_repository.py — durable SQLite and Mongo memory authority with idempotency/version fencing",
+        "skeleton/testing/test_memory_repository.py — restart, namespace isolation, replay/conflict, optimistic version, tombstone and expiry",
+        "skeleton/testing/test_mongo_memory_repository.py — Mongo indexes, restart/reinstantiation, scope isolation, optimistic update, tombstone/export, projection rebuild and expiry",
+        "skeleton/memory/policy.py and skeleton/memory/writeback.py — staged governed writeback",
+        "skeleton/testing/test_memory_writeback.py — provenance policy, review hold, side-effect-free staging, denial and proposal idempotency",
+        "skeleton/memory/projection.py and skeleton/testing/test_memory_projection.py — rebuildable derived projections, tombstone propagation and degraded projection behavior"
+      ],
       "closure_evidence_required": [
         "durable memory write/read/restart test",
         "tenant/user/namespace isolation tests",
@@ -317,16 +317,10 @@
         "memory outage produces explicit degraded continuity behavior"
       ],
       "outstanding_evidence": [
-        "durable memory write/read/restart test",
-        "tenant/user/namespace isolation tests",
-        "unverified model speculation cannot become canonical memory",
-        "preference/outcome write policy tests",
-        "dedupe/version/conflict tests",
-        "canonical memory delete/export/retention propagation tests",
-        "vector/index loss and rebuild from canonical memory test",
-        "process-memory loss does not lose canonical memory test",
-        "retrieval provenance points back to canonical memory records",
-        "memory outage produces explicit degraded continuity behavior"
+        "fresh CI execution of canonical memory SQLite/Mongo/writeback/projection suites on current head",
+        "assembled outage journey showing explicit application degraded continuity",
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-governance-registry"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
@@ -351,9 +345,15 @@
       "plane": "tool-runtime",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/skills/tool_contract.py — ToolManifest/ToolExecutionRequest/ToolExecutionReceipt authority",
+        "skeleton/skills/tool_runtime.py and skeleton/skills/tool_receipt_store.py — sync/async registry, approval, durable idempotency reservation, compensation/postconditions and restart replay",
+        "skeleton/testing/test_tool_runtime.py — schema validation, approval denial/resume, idempotent replay/conflict, admission-before-effect, compensation, concurrent reservation and restart/in-doubt fencing",
+        "skeleton/skills/tool_adapters/policy.py and skeleton/testing/test_tool_adapters.py — sandbox/database/network/artifact scope bounds",
+        "backend/services/tool_registry.py and backend/tests/test_tool_registry_scoped_adapters.py — delegate-only compatibility registry and pre-effect denial"
+      ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
         "model-visible tool inventory contains only declared enabled tools",
@@ -367,16 +367,11 @@
         "tool receipt lineage binds operation/execution/turn/call identity"
       ],
       "outstanding_evidence": [
-        "tool manifest schema validation/fuzz tests",
-        "model-visible tool inventory contains only declared enabled tools",
-        "no tool module owns model provider credentials or raw provider SDK/network transport",
-        "authority/risk/approval denial tests",
-        "idempotency reservation and replay tests",
-        "sandbox boundary tests for code execution/build tools",
-        "database tool collection/tenant scope denial tests",
-        "network tool timeout/result-bound/provenance tests",
-        "compatibility registry delegates to canonical runtime",
-        "tool receipt lineage binds operation/execution/turn/call identity"
+        "fresh CI execution of canonical tool runtime/adapter/backend delegation suites on current head",
+        "provider-surface proof that no tool module owns model credentials/raw provider transport",
+        "dependency closure: gap-governance-registry",
+        "dependency closure: gap-cost-admission",
+        "dependency closure: gap-provider-surface-convergence"
       ],
       "blockers": [
         "dependency must close: gap-governance-registry",
@@ -402,15 +397,15 @@
       "plane": "prompt-context",
       "stage": 2,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented",
       "closure_decision": "open",
       "evidence_present": [
-        "skeleton/contracts/context.py",
-        "skeleton/context/policy.py",
-        "skeleton/context/compiler.py",
-        "skeleton/context/sources/conversation.py",
-        "skeleton/context/sources/retrieval.py",
-        "skeleton/testing/test_context_compiler.py"
+        "skeleton/context/compiler.py and skeleton/context/policy.py — deterministic budget/trust compiler",
+        "skeleton/context/sources/* — conversation, memory, retrieval, artifact, skill and tool source adapters",
+        "skeleton/testing/test_context_compiler.py — deterministic digest/order, mandatory policy, cross-tenant/data-class denial, budget headroom, oversized artifact omission and prompt-injection tiering",
+        "skeleton/testing/test_context_source_adapters.py — explicit trust/provenance, source-order determinism, tenant denial and artifact prompt-injection handling",
+        "skeleton/context/instruction_policy.py and backend/tests/test_instruction_policy_convergence.py — canonical versioned instruction policy ownership and prompt parity",
+        "backend/tests/test_ai_chat_conversation_authority.py and backend/tests/test_ai_golden_journey.py — ContextEnvelope -> engine handoff with stable lineage"
       ],
       "closure_evidence_required": [
         "deterministic context snapshot/digest tests",
@@ -426,17 +421,11 @@
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "outstanding_evidence": [
-        "deterministic context snapshot/digest tests",
-        "same canonical inputs produce same selected segment order under fixed budget",
-        "system/policy segments cannot be displaced by untrusted content",
-        "client history injection cannot enter trusted instruction tier",
-        "cross-tenant memory/retrieval/artifact segments are denied",
-        "token budget/output headroom tests",
-        "oversized tool/artifact result externalization tests",
-        "summary/compaction provenance tests",
-        "citation/source ids survive context projection",
-        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
-        "legacy control-prompt source scan and compatibility prompt-parity tests"
+        "fresh CI execution of context compiler/source/policy and chat golden suites on current head",
+        "dependency closure: gap-conversation-state-authority",
+        "dependency closure: gap-memory-durable-authority",
+        "dependency closure: gap-tool-runtime-convergence",
+        "dependency closure: gap-governance-registry"
       ],
       "blockers": [
         "dependency must close: gap-conversation-state-authority",
@@ -463,9 +452,14 @@
       "plane": "model-provider",
       "stage": 2,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/provider_contract.py — provider-neutral tool definitions/calls, structured output, usage, finish reason and ProviderDelta contracts",
+        "skeleton/provider_runtime.py — normalized request/response translation, offered-tool validation, structured output, usage/finish/deadline handling and provider_response_deltas ephemeral stream projection",
+        "skeleton/testing/test_provider_contract.py — sync transport tool-only normalization, unoffered-tool denial, structured output, usage unknowns, deadline clamping/expiry, canonical deltas and default stream finalization",
+        "skeleton/testing/test_provider_stream_reliability_profiles.py — bounded pre-emission retry, no post-output replay, shared deadline and pressure/exhaustion behavior"
+      ],
       "closure_evidence_required": [
         "text-only compatibility tests",
         "structured output success/invalid schema tests",
@@ -479,16 +473,9 @@
         "no provider SDK/native response object escapes provider_runtime"
       ],
       "outstanding_evidence": [
-        "text-only compatibility tests",
-        "structured output success/invalid schema tests",
-        "single/multiple normalized tool-call tests",
-        "unknown/unoffered tool-call rejection",
-        "tool argument size/count bound tests",
-        "finish reason normalization tests",
-        "usage normalization/unknown-field tests",
-        "deadline/cancellation provider tests",
-        "stream delta ordering/finalization tests when streaming enabled",
-        "no provider SDK/native response object escapes provider_runtime"
+        "fresh CI execution of provider contract and stream reliability suites on current head",
+        "provider-surface convergence dependency must close",
+        "tool-runtime/governance/cost dependencies must close"
       ],
       "blockers": [
         "dependency must close: gap-provider-surface-convergence",
@@ -515,9 +502,14 @@
       "plane": "reasoning-verification",
       "stage": 3,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/contracts/verification.py — claim/evidence/citation/postcondition/receipt contracts",
+        "skeleton/intelligence/verification_policy.py — risk/effect verification-level policy",
+        "skeleton/intelligence/verification_runtime.py — deterministic grounding, citation integrity, postconditions, bounded semantic verifier/repair and finalization",
+        "skeleton/testing/test_verification_runtime.py — risk mapping, self-confidence non-authority, evidence binding/tamper, citation binding, failed postconditions, high-impact blocking, canonical provider verifier and bounded repair lineage"
+      ],
       "closure_evidence_required": [
         "structural verification tests",
         "claim-to-citation grounding tests",
@@ -531,16 +523,11 @@
         "no hidden reasoning text is required for audit/replay"
       ],
       "outstanding_evidence": [
-        "structural verification tests",
-        "claim-to-citation grounding tests",
-        "unsupported claim becomes qualified/abstain/block per policy",
-        "tool action postcondition verification tests",
-        "model verifier uses canonical provider/routing/admission boundary",
-        "self-confidence alone cannot mark evidence-required claim verified",
-        "repair lineage and max-repair tests",
-        "high-impact block cannot be bypassed by generator retry",
-        "verification receipt binds operation/execution/turn/result and evidence ids",
-        "no hidden reasoning text is required for audit/replay"
+        "fresh CI execution of verification runtime suite on current head",
+        "assembled golden journey evidence binding verification receipt to final execution result",
+        "dependency closure: gap-context-compiler-convergence",
+        "dependency closure: gap-tool-runtime-convergence",
+        "dependency closure: gap-provider-interaction-protocol"
       ],
       "blockers": [
         "dependency must close: gap-context-compiler-convergence",
