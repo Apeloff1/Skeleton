@@ -15,6 +15,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntimeError,
 )
 from skeleton.intelligence.quota import (
+    QuotaConflict,
     TenantQuota,
     TenantQuotaLedger,
 )
@@ -214,6 +215,8 @@ def test_snapshot_exposes_pressure_without_budget_payloads() -> None:
             "queue_depth": 3,
         },
         "active_operations": ("op-1",),
+        "unknown_usage_events": 0,
+        "unknown_usage_operations": (),
         "quota_enabled": False,
     }
 
@@ -239,3 +242,71 @@ def test_complete_rejects_invalid_wall_clock_without_releasing_lease(
         runtime.complete("op-clock", UsageEstimate(), now_wall=value)
 
     assert runtime.pressure.active_operations == 1
+
+
+def test_unknown_actual_usage_blocks_terminal_accounting_until_resolved() -> None:
+    runtime, ledger = _quota_runtime()
+    runtime.admit(_request("op-unknown"), now_wall=10.0)
+
+    marker = runtime.mark_usage_unknown(
+        "op-unknown",
+        "tool-event-1",
+        "tool",
+        "provider did not return usage",
+        now_wall=10.5,
+    )
+
+    assert marker.category == "tool"
+    assert ledger.snapshot("tenant-a")["unknown_usage_events"] == 1
+    with pytest.raises(AdmissionRuntimeError, match="actual_usage_unknown:tool"):
+        runtime.complete("op-unknown", UsageEstimate(), now_wall=11.0)
+    with pytest.raises(AdmissionRuntimeError, match="actual_usage_unknown:tool"):
+        runtime.release("op-unknown")
+
+    resolved = runtime.resolve_unknown_usage(
+        "op-unknown",
+        "tool-event-1",
+        UsageEstimate(tool_calls=1),
+        now_wall=11.5,
+    )
+    assert resolved.category == "tool"
+    assert ledger.snapshot("tenant-a")["unknown_usage_events"] == 0
+
+    completion = runtime.complete(
+        "op-unknown",
+        UsageEstimate(),
+        now_wall=12.0,
+    )
+    assert completion.quota_completion is not None
+    assert completion.quota_completion.actual.tool_calls == 1
+
+
+def test_incremental_metering_enforces_operation_budget_before_side_effect_growth() -> None:
+    runtime, _ = _quota_runtime()
+    request = _request("op-meter")
+    runtime.admit(request, now_wall=10.0)
+
+    runtime.meter_tool_call("op-meter", "tool-1", now_wall=10.1)
+    for index in range(2, 11):
+        runtime.meter_tool_call(
+            "op-meter",
+            f"tool-{index}",
+            now_wall=10.0 + index / 10,
+        )
+
+    with pytest.raises(AdmissionError, match="operation_budget_exceeded:tool_calls"):
+        runtime.meter_tool_call("op-meter", "tool-11", now_wall=12.0)
+
+
+def test_metered_usage_cannot_be_discarded_by_release() -> None:
+    runtime, _ = _quota_runtime()
+    runtime.admit(_request("op-metered-release"), now_wall=10.0)
+    runtime.meter_artifact_bytes(
+        "op-metered-release",
+        "artifact-1",
+        10,
+        now_wall=10.1,
+    )
+
+    with pytest.raises(QuotaConflict, match="cannot release reservation after metered usage"):
+        runtime.release("op-metered-release")
