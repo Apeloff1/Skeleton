@@ -66,6 +66,13 @@ export interface ConversationAuthority {
   listThreads(): Promise<AuthorityThread[]>;
   createThread(title: string): Promise<AuthorityThread>;
   listMessages(threadId: string): Promise<AuthorityMessage[]>;
+  snapshot?: (
+    threadId: string,
+    activeOnly: boolean,
+  ) => Promise<{
+    thread: AuthorityThread;
+    messages: AuthorityMessage[];
+  }>;
   chat(input: {
     threadId: string;
     expectedThreadVersion: number;
@@ -170,7 +177,10 @@ export class WorkspaceController {
       createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
       updatedAt: Number.isFinite(updatedAt) ? updatedAt : Date.now(),
       pinned: cached?.pinned || false,
-      archived: thread.state === 'archived',
+      // Only an active server thread is usable as the current conversation.
+      // Deleting is a governance lifecycle state, not an archived-but-sendable
+      // presentation state.
+      archived: thread.state !== 'active',
       draft: cached?.draft || '',
       context: cached?.context || '',
       allForms: cached?.allForms || false,
@@ -198,11 +208,24 @@ export class WorkspaceController {
       cached.conversations.map(conversation => [conversation.id, conversation]),
     );
     const conversations = await Promise.all(
-      threads.slice(0, 30).map(async thread => this.authorityConversation(
-        thread,
-        await this.authority!.listMessages(thread.thread_id),
-        cachedById.get(thread.thread_id),
-      )),
+      threads.slice(0, 30).map(async listedThread => {
+        if (this.authority!.snapshot) {
+          const stable = await this.authority!.snapshot(
+            listedThread.thread_id,
+            true,
+          );
+          return this.authorityConversation(
+            stable.thread,
+            stable.messages,
+            cachedById.get(stable.thread.thread_id),
+          );
+        }
+        return this.authorityConversation(
+          listedThread,
+          await this.authority!.listMessages(listedThread.thread_id),
+          cachedById.get(listedThread.thread_id),
+        );
+      }),
     );
     if (!conversations.length) {
       throw new Error('Conversation authority returned no usable threads.');
@@ -210,11 +233,13 @@ export class WorkspaceController {
     const preferred = conversations.find(
       conversation => (
         conversation.id === cached.activeId
-        && !conversation.archived
+        && conversation.serverState === 'active'
       ),
     );
     const active = preferred
-      || conversations.find(conversation => !conversation.archived)
+      || conversations.find(
+        conversation => conversation.serverState === 'active',
+      )
       || conversations[0];
     return {
       version: 1,
@@ -478,6 +503,34 @@ export class WorkspaceController {
     if (this.authority) void this.refreshFromServer();
   }
 
+  async exportAuthoritativeConversation(
+    id: string = this.active.id,
+  ): Promise<Conversation> {
+    const cached = this.snapshot.workspace.conversations.find(
+      item => item.id === id,
+    );
+    if (!cached) {
+      throw new Error('Conversation is unavailable.');
+    }
+    if (!this.authority) {
+      return cached;
+    }
+    if (!this.authority.snapshot) {
+      throw new Error(
+        'Server-authoritative export is unavailable. Refresh support must provide a stable snapshot.',
+      );
+    }
+    const stable = await this.authority.snapshot(id, false);
+    if (stable.thread.thread_id !== id) {
+      throw new Error('Server conversation snapshot identity changed.');
+    }
+    return this.authorityConversation(
+      stable.thread,
+      stable.messages,
+      cached,
+    );
+  }
+
   private async removeOnServer(id: string): Promise<void> {
     if (!this.authority) return;
     const conversation = this.snapshot.workspace.conversations.find(
@@ -491,6 +544,14 @@ export class WorkspaceController {
     );
     if (!current?.serverVersion) {
       this.notify('Conversation server version is unavailable; delete was not sent.');
+      return;
+    }
+    if (current.serverState === 'deleting') {
+      this.notify('Conversation deletion is already pending governance retention.');
+      return;
+    }
+    if (current.serverState === 'deleted') {
+      await this.refreshFromServer();
       return;
     }
     try {
@@ -533,6 +594,13 @@ export class WorkspaceController {
     );
     if (!current?.serverVersion) {
       this.notify('Conversation server version is unavailable; archive state was not changed.');
+      return;
+    }
+    if (
+      current.serverState === 'deleting'
+      || current.serverState === 'deleted'
+    ) {
+      this.notify('Conversation lifecycle is read-only while deletion is pending.');
       return;
     }
     try {
@@ -682,6 +750,14 @@ export class WorkspaceController {
       }
       if (!this.snapshot.serverSynced || !conversation.serverVersion) {
         this.notify('Server conversation state is unavailable. Your draft was kept.');
+        return;
+      }
+      if (conversation.serverState !== 'active') {
+        this.notify(
+          conversation.serverState === 'deleting'
+            ? 'This conversation is pending deletion and is read-only.'
+            : 'Only an active server conversation can accept new messages.',
+        );
         return;
       }
       const idempotencyKey = newId();
