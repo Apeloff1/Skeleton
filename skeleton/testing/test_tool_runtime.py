@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -13,6 +14,7 @@ from skeleton.skills.tool_contract import (
     ToolManifest,
 )
 from skeleton.skills.tool_runtime import (
+    AsyncToolRuntime,
     ToolExecutionConflict,
     ToolRuntime,
 )
@@ -313,3 +315,128 @@ def test_schema_rejects_additional_arguments_when_closed() -> None:
 
     assert receipt.status is ToolExecutionStatus.DENIED
     assert receipt.error_code == "arguments_invalid"
+
+
+@pytest.mark.asyncio
+async def test_async_concurrent_exact_retries_execute_once() -> None:
+    runtime = AsyncToolRuntime()
+    calls = 0
+    release = asyncio.Event()
+
+    async def handler(_request):
+        nonlocal calls
+        calls += 1
+        await release.wait()
+        return "artifact:shared"
+
+    await runtime.register(_manifest(), handler)
+    operation_id = str(uuid4())
+    request = _request(operation_id=operation_id, key="concurrent")
+    first_task = asyncio.create_task(runtime.execute(request, now=_now()))
+    await asyncio.sleep(0)
+    second_task = asyncio.create_task(runtime.execute(request, now=_now()))
+    await asyncio.sleep(0)
+
+    assert calls == 1
+    release.set()
+    first, second = await asyncio.gather(first_task, second_task)
+
+    assert first == second
+    assert first.status is ToolExecutionStatus.SUCCEEDED
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_async_conflicting_retry_is_rejected_while_first_is_inflight() -> None:
+    runtime = AsyncToolRuntime()
+    release = asyncio.Event()
+
+    async def handler(_request):
+        await release.wait()
+        return "artifact:shared"
+
+    await runtime.register(_manifest(), handler)
+    operation_id = str(uuid4())
+    first = _request(operation_id=operation_id, key="same", path="a")
+    first_task = asyncio.create_task(runtime.execute(first, now=_now()))
+    await asyncio.sleep(0)
+
+    with pytest.raises(ToolExecutionConflict, match="different tool or arguments"):
+        await runtime.execute(
+            _request(operation_id=operation_id, key="same", path="b"),
+            now=_now(),
+        )
+
+    release.set()
+    receipt = await first_task
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+
+
+@pytest.mark.asyncio
+async def test_async_postcondition_failure_runs_compensation_and_receipts_it() -> None:
+    runtime = AsyncToolRuntime()
+    events: list[str] = []
+    manifest = ToolManifest(
+        tool_id="repo.write",
+        version="1.0.0",
+        description="write tool",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        effect=ToolEffect.REVERSIBLE,
+        compensation_tool_id="repo.rollback",
+    )
+
+    async def handler(_request):
+        events.append("write")
+        return "mutation:1"
+
+    async def postcondition(_request, result_ref):
+        events.append(f"verify:{result_ref}")
+        return False
+
+    async def compensate(_request, result_ref):
+        events.append(f"rollback:{result_ref}")
+        return "compensation:1"
+
+    await runtime.register(
+        manifest,
+        handler,
+        postcondition=postcondition,
+        compensate=compensate,
+    )
+    request = _request(tool_id="repo.write")
+
+    receipt = await runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.FAILED
+    assert receipt.error_code == "postcondition_failed"
+    assert receipt.compensation_ref == "compensation:1"
+    assert events == ["write", "verify:mutation:1", "rollback:mutation:1"]
+
+
+@pytest.mark.asyncio
+async def test_async_budget_denial_happens_before_handler() -> None:
+    events: list[str] = []
+
+    class Meter:
+        def meter_tool_call(self, operation_id, event_id, *, now_wall=None):
+            events.append("meter")
+            raise RuntimeError("budget exhausted")
+
+    runtime = AsyncToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+
+    async def handler(_request):
+        events.append("handler")
+        return "artifact:1"
+
+    await runtime.register(_manifest(), handler)
+    receipt = await runtime.execute(_request(), now=_now())
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "budget_denied"
+    assert receipt.metered_tool_calls == 0
+    assert events == ["meter"]
