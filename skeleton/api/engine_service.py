@@ -799,6 +799,11 @@ class SQLiteEngineSubmissionStore:
                 raise
 
 
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
+
+
 def _operation_state(execution_state: ExecutionState) -> OperationState:
     if execution_state is ExecutionState.CREATED:
         return OperationState.ADMITTED
