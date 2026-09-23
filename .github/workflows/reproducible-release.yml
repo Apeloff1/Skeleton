@@ -11,6 +11,16 @@ on:
       - "scripts/testing/test_release_provenance.py"
       - "skeleton/release/evidence.py"
       - "skeleton/testing/test_release_evidence.py"
+      - "backend/core/engine_client.py"
+      - "skeleton/api/engine_*.py"
+      - "skeleton/context/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/persistence/execution_repository.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/skills/tool_*.py"
+      - "skeleton/testing/test_ai_golden_journey.py"
+      - "skeleton/testing/test_engine_execution_*.py"
+      - "skeleton/testing/test_execution_runtime.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
   push:
@@ -24,6 +34,16 @@ on:
       - "scripts/testing/test_release_provenance.py"
       - "skeleton/release/evidence.py"
       - "skeleton/testing/test_release_evidence.py"
+      - "backend/core/engine_client.py"
+      - "skeleton/api/engine_*.py"
+      - "skeleton/context/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/persistence/execution_repository.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/skills/tool_*.py"
+      - "skeleton/testing/test_ai_golden_journey.py"
+      - "skeleton/testing/test_engine_execution_*.py"
+      - "skeleton/testing/test_execution_runtime.py"
       - ".github/workflows/reproducible-release.yml"
       - "docs/REPRODUCIBLE_RELEASES.md"
   workflow_dispatch:
@@ -86,6 +106,14 @@ jobs:
             source-a/scripts/testing/test_release_provenance.py \
             source-a/skeleton/testing/test_release_evidence.py \
             --junitxml=source-a/release-meta/release-tests.xml
+          python -m pytest -q \
+            source-a/skeleton/testing/test_ai_golden_journey.py \
+            source-a/skeleton/testing/test_engine_execution_service.py \
+            source-a/skeleton/testing/test_engine_execution_coordinator.py \
+            source-a/skeleton/testing/test_execution_runtime.py \
+            --junitxml=source-a/release-meta/ai-golden-tests.xml
+          printf '{"source_commit":"%s","result":"pass","check":"ai-golden-engine-tool-approval"}\n' \
+            "$GITHUB_SHA" > source-a/release-meta/ai-golden-eval.json
 
       - name: Build release A
         working-directory: source-a
@@ -188,7 +216,10 @@ jobs:
 
           (root / "test-evidence.json").write_text(
               json.dumps(
-                  [evidence_record("release-tests", "release-tests.xml")],
+                  [
+                      evidence_record("release-tests", "release-tests.xml"),
+                      evidence_record("ai-golden-tests", "ai-golden-tests.xml"),
+                  ],
                   indent=2,
                   sort_keys=True,
               )
@@ -201,6 +232,10 @@ jobs:
                       evidence_record(
                           "reproducibility-eval",
                           "reproducibility-eval.json",
+                      ),
+                      evidence_record(
+                          "ai-golden-eval",
+                          "ai-golden-eval.json",
                       )
                   ],
                   indent=2,
