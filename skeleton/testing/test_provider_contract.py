@@ -11,6 +11,7 @@ from skeleton.automation.free_model import FreeModelClient, ModelError, redact_s
 from skeleton.jeeves.providers import AnthropicProvider, OpenAIProvider
 from skeleton.provider_contract import (
     FinishReason,
+    ProviderDeltaKind,
     ProviderProtocolError,
     ProviderToolCall,
     ProviderToolDefinition,
@@ -19,8 +20,11 @@ from skeleton.provider_contract import (
 )
 from skeleton.provider_runtime import (
     OpenAISyncProviderAdapter,
+    ProviderAdapter,
     ProviderInvocationError,
     ProviderRequest,
+    ProviderResponse,
+    provider_response_deltas,
 )
 
 
@@ -489,3 +493,111 @@ def test_sync_openai_rejects_expired_deadline_before_network(monkeypatch) -> Non
         )
 
     assert called["network"] == 0
+
+
+
+def test_provider_response_deltas_are_contiguous_and_finalize_once() -> None:
+    response = ProviderResponse(
+        text="partial-compatible text",
+        provider="fake",
+        model="fake-model",
+        response_id="resp-stream",
+        structured_output={"answer": "ok"},
+        tool_calls=(
+            ProviderToolCall(
+                call_id="call-1",
+                tool_id="repo.read",
+                arguments={"path": "README.md"},
+            ),
+        ),
+        finish_reason=FinishReason.TOOL_CALLS,
+        usage=ProviderUsage(
+            input_tokens=10,
+            output_tokens=5,
+            total_tokens=15,
+            usage_source="provider",
+        ),
+    )
+
+    deltas = provider_response_deltas(
+        response,
+        emitted_at=datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc),
+    )
+
+    assert [delta.sequence for delta in deltas] == list(range(len(deltas)))
+    assert [delta.kind for delta in deltas] == [
+        ProviderDeltaKind.TEXT,
+        ProviderDeltaKind.STRUCTURED,
+        ProviderDeltaKind.TOOL_CALL,
+        ProviderDeltaKind.USAGE,
+        ProviderDeltaKind.FINAL,
+    ]
+    assert deltas[0].text == "partial-compatible text"
+    assert deltas[1].structured_fragment == {"answer": "ok"}
+    assert deltas[2].tool_call is not None
+    assert deltas[2].tool_call.tool_id == "repo.read"
+    assert deltas[3].usage is response.usage
+    assert deltas[-1].finish_reason is FinishReason.TOOL_CALLS
+    assert sum(delta.kind is ProviderDeltaKind.FINAL for delta in deltas) == 1
+
+
+class _DefaultStreamingAdapter(ProviderAdapter):
+    provider_id = "fake"
+    model = "fake-model"
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    async def generate(self, request: ProviderRequest) -> ProviderResponse:
+        return ProviderResponse(
+            text="hello",
+            provider=self.provider_id,
+            model=self.model,
+            response_id="resp-default-stream",
+            finish_reason=FinishReason.COMPLETED,
+            usage=ProviderUsage(
+                input_tokens=1,
+                output_tokens=1,
+                total_tokens=2,
+                usage_source="provider",
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_default_provider_stream_projects_canonical_response_only() -> None:
+    adapter = _DefaultStreamingAdapter()
+    deltas = [
+        delta
+        async for delta in adapter.stream(
+            ProviderRequest(
+                instructions="rules",
+                prompt="hello",
+                tenant_id="tenant-a",
+            )
+        )
+    ]
+
+    assert [delta.kind for delta in deltas] == [
+        ProviderDeltaKind.TEXT,
+        ProviderDeltaKind.USAGE,
+        ProviderDeltaKind.FINAL,
+    ]
+    assert [delta.sequence for delta in deltas] == [0, 1, 2]
+    assert deltas[-1].finish_reason is FinishReason.COMPLETED
+    assert all(delta.response_id == "resp-default-stream" for delta in deltas)
+
+
+def test_provider_stream_projection_is_ephemeral_not_operation_event() -> None:
+    response = ProviderResponse(
+        text="hello",
+        provider="fake",
+        model="fake-model",
+        finish_reason=FinishReason.COMPLETED,
+    )
+    serialized = [delta.as_dict() for delta in provider_response_deltas(response)]
+
+    assert all("operation_id" not in delta for delta in serialized)
+    assert all("event_id" not in delta for delta in serialized)
+    assert all("ack" not in delta for delta in serialized)
