@@ -30,6 +30,7 @@ export type Message = {
   attachmentName?: string;
   error?: string;
   idempotencyKey?: string;
+  expectedThreadVersion?: number;
 };
 
 export type Conversation = {
@@ -115,6 +116,11 @@ function restoreMessage(value: unknown, now: number): Message | null {
     attachmentName: text(item.attachmentName, 200) || undefined,
     error: interrupted ? 'Interrupted when the app closed. You can retry this message.' : text(item.error, 400) || undefined,
     idempotencyKey: text(item.idempotencyKey, 256) || undefined,
+    expectedThreadVersion: (
+      typeof item.expectedThreadVersion === 'number'
+      && Number.isSafeInteger(item.expectedThreadVersion)
+      && item.expectedThreadVersion >= 1
+    ) ? item.expectedThreadVersion : undefined,
   };
 }
 
@@ -184,6 +190,7 @@ export function encodeWorkspace(workspace: Workspace): string {
         artifactCount: m.artifacts?.length || m.artifactCount || 0,
         attachmentName: m.attachmentName, error: m.error,
         idempotencyKey: m.idempotencyKey,
+        expectedThreadVersion: m.expectedThreadVersion,
       })),
     })),
   });
