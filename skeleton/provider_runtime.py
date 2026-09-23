@@ -203,6 +203,8 @@ class ProviderRequest:
     governance_context: GovernanceContext | None = None
     context_id: str | None = None
     context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    context_compiler_version: str | None = None
     tool_schemas: tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
 
 
@@ -220,6 +222,8 @@ class ProviderResponse:
     data_class: str | None = None
     context_id: str | None = None
     context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    context_compiler_version: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -527,6 +531,57 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
             or any(ch not in "0123456789abcdef" for ch in digest)
         ):
             raise ProviderPolicyError("model provider context digest is invalid")
+        if not request.context_source_snapshot:
+            raise ProviderPolicyError(
+                "compiled provider context requires immutable source snapshot"
+            )
+        seen_snapshot_ids: set[str] = set()
+        previous_snapshot_id: str | None = None
+        for item in request.context_source_snapshot:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise ProviderPolicyError(
+                    "model provider context snapshot entries must be pairs"
+                )
+            segment_id, content_digest = item
+            try:
+                parsed_segment_id = UUID(segment_id)
+            except (ValueError, AttributeError) as exc:
+                raise ProviderPolicyError(
+                    "model provider context snapshot segment identity is invalid"
+                ) from exc
+            if str(parsed_segment_id) != segment_id:
+                raise ProviderPolicyError(
+                    "model provider context snapshot segment identity is invalid"
+                )
+            if segment_id in seen_snapshot_ids:
+                raise ProviderPolicyError(
+                    "model provider context snapshot contains duplicate segment"
+                )
+            if previous_snapshot_id is not None and segment_id < previous_snapshot_id:
+                raise ProviderPolicyError(
+                    "model provider context snapshot must be deterministically ordered"
+                )
+            seen_snapshot_ids.add(segment_id)
+            previous_snapshot_id = segment_id
+            if (
+                not isinstance(content_digest, str)
+                or len(content_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in content_digest)
+            ):
+                raise ProviderPolicyError(
+                    "model provider context snapshot digest is invalid"
+                )
+        if (
+            not isinstance(request.context_compiler_version, str)
+            or not request.context_compiler_version.strip()
+        ):
+            raise ProviderPolicyError(
+                "compiled provider context requires compiler version"
+            )
+    elif request.context_source_snapshot or request.context_compiler_version is not None:
+        raise ProviderPolicyError(
+            "context snapshot/compiler version require context identity and digest"
+        )
     for schema in request.tool_schemas:
         if not isinstance(schema, Mapping) or not schema:
             raise ProviderPolicyError(
@@ -676,6 +731,8 @@ def provider_request_from_context(
         governance_context=governance_context,
         context_id=envelope.context_id,
         context_digest=envelope.context_digest,
+        context_source_snapshot=envelope.source_snapshot,
+        context_compiler_version=envelope.compiler_version,
         tool_schemas=tuple(parsed_tools),
     )
     projected_tokens = _estimated_input_tokens(request)
@@ -1159,6 +1216,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             data_class=governance.data_class,
             context_id=request.context_id,
             context_digest=request.context_digest,
+            context_source_snapshot=request.context_source_snapshot,
+            context_compiler_version=request.context_compiler_version,
         )
 
 
@@ -1705,6 +1764,8 @@ class OpenAISyncProviderAdapter:
                         data_class=governance.data_class,
                         context_id=request.context_id,
                         context_digest=request.context_digest,
+                        context_source_snapshot=request.context_source_snapshot,
+                        context_compiler_version=request.context_compiler_version,
                     )
                 except ProviderError:
                     raise
