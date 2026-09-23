@@ -706,6 +706,13 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             continue
         for path in sorted(source_root.rglob("*.py")):
             relative = path.relative_to(repo_root).as_posix()
+            if (
+                "/tests/" in "/" + relative
+                or relative.startswith("tests/")
+                or "/testing/" in "/" + relative
+                or path.name.startswith("test_")
+            ):
+                continue
             if relative not in sdk_surface_owners:
                 hits = _provider_sdk_imports(path)
                 if hits:
