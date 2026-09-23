@@ -70,7 +70,8 @@ $RuntimePaths = @(
     # Historical MasterMap progression snapshots are repository evidence, not
     # runtime inputs. Some intentionally verbose names breach Win32's legacy
     # destination-path boundary when installed under a normal user profile.
-    ":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json"
+    ":(exclude)backend/gameforge/jeeves/jeeves_mastermap_*.json",
+    ":(exclude)skeleton/ai/research/legacy/gameforge/jeeves/jeeves_mastermap_*.json"
 )
 $ArchiveArgs = @(
     "-C", $RepoRoot,
