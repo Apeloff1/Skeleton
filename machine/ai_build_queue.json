@@ -450,7 +450,7 @@
       "stage": 0,
       "parallel_lane": "cost-admission",
       "objective": "Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S0-COST-01"
       ],
@@ -489,7 +489,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -507,7 +507,7 @@
       "stage": 0,
       "parallel_lane": "cost-admission",
       "objective": "Add shared cross-process pressure/concurrency coordination and overload shedding.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S0-COST-01"
       ],
@@ -545,7 +545,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
