@@ -9,6 +9,7 @@ tombstone semantics. Derived vector/graph indexes may rebuild from this state.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import sqlite3
@@ -75,6 +76,71 @@ def _parse_refs(raw: object) -> tuple[str, ...]:
     return tuple(value)
 
 
+def _proposal_digest(proposal: MemoryWriteProposal) -> str:
+    payload = {
+        "tenant_id": proposal.tenant_id,
+        "namespace": proposal.namespace,
+        "subject_id": proposal.subject_id,
+        "kind": proposal.kind.value,
+        "idempotency_key": proposal.idempotency_key,
+        "payload_digest": proposal.payload_digest,
+        "source_operation_id": proposal.source_operation_id,
+        "target_memory_id": proposal.target_memory_id,
+        "expected_version": proposal.expected_version,
+        "expires_at": _iso(proposal.expires_at),
+        "data_class": proposal.data_class,
+    }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _record_json(record: MemoryRecord) -> str:
+    return json.dumps(
+        record.as_dict(),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+
+def _record_from_json(raw: object) -> MemoryRecord:
+    if not isinstance(raw, str):
+        raise MemoryRepositoryError("idempotency result must be JSON text")
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise MemoryRepositoryError("idempotency result is invalid JSON") from exc
+    if not isinstance(data, dict):
+        raise MemoryRepositoryError("idempotency result must be an object")
+    return MemoryRecord(
+        memory_id=data["memory_id"],
+        tenant_id=data["tenant_id"],
+        namespace=data["namespace"],
+        subject_id=data["subject_id"],
+        kind=MemoryKind(data["kind"]),
+        version=int(data["version"]),
+        created_at=_parse_time(data["created_at"], "created_at"),
+        updated_at=_parse_time(data["updated_at"], "updated_at"),
+        idempotency_key=data["idempotency_key"],
+        payload_digest=data["payload_digest"],
+        content=data.get("content"),
+        content_ref=data.get("content_ref"),
+        provenance_refs=tuple(data.get("provenance_refs") or ()),
+        source_operation_id=data.get("source_operation_id"),
+        expires_at=_parse_time(data.get("expires_at"), "expires_at"),
+        state=MemoryState(data["state"]),
+        data_class=data["data_class"],
+        schema_version=int(data.get("schema_version", 1)),
+    )
+
+
 class SQLiteMemoryRepository:
     """Transactional canonical memory store with explicit authority scope."""
 
@@ -124,6 +190,19 @@ class SQLiteMemoryRepository:
                 ON canonical_memory(
                     repository_namespace, tenant_id, namespace, subject_id, state, updated_at
                 );
+
+                CREATE TABLE IF NOT EXISTS canonical_memory_idempotency (
+                    repository_namespace TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    namespace TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    request_digest TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    committed_at TEXT NOT NULL,
+                    PRIMARY KEY(
+                        repository_namespace, tenant_id, namespace, idempotency_key
+                    )
+                );
                 """
             )
 
@@ -153,7 +232,7 @@ class SQLiteMemoryRepository:
     def _find_idempotency(self, proposal: MemoryWriteProposal) -> sqlite3.Row | None:
         return self._connection.execute(
             """
-            SELECT * FROM canonical_memory
+            SELECT * FROM canonical_memory_idempotency
             WHERE repository_namespace = ?
               AND tenant_id = ?
               AND namespace = ?
@@ -166,6 +245,31 @@ class SQLiteMemoryRepository:
                 proposal.idempotency_key,
             ),
         ).fetchone()
+
+    def _record_idempotency(
+        self,
+        proposal: MemoryWriteProposal,
+        record: MemoryRecord,
+        *,
+        committed_at: datetime,
+    ) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO canonical_memory_idempotency (
+                repository_namespace, tenant_id, namespace, idempotency_key,
+                request_digest, result_json, committed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                self.repository_namespace,
+                proposal.tenant_id,
+                proposal.namespace,
+                proposal.idempotency_key,
+                _proposal_digest(proposal),
+                _record_json(record),
+                _iso(committed_at),
+            ),
+        )
 
     def _find_memory(
         self,
@@ -199,16 +303,11 @@ class SQLiteMemoryRepository:
             try:
                 replay = self._find_idempotency(proposal)
                 if replay is not None:
-                    record = self._record(replay)
-                    if (
-                        record.payload_digest != proposal.payload_digest
-                        or record.subject_id != proposal.subject_id
-                        or record.kind is not proposal.kind
-                        or record.source_operation_id != proposal.source_operation_id
-                    ):
+                    if str(replay["request_digest"]) != _proposal_digest(proposal):
                         raise MemoryConflict(
-                            "idempotency_key replayed with different memory payload"
+                            "idempotency_key replayed with different memory write intent"
                         )
+                    record = _record_from_json(replay["result_json"])
                     self._connection.execute("COMMIT")
                     return record
 
@@ -327,6 +426,11 @@ class SQLiteMemoryRepository:
                             record.memory_id,
                         ),
                     )
+                self._record_idempotency(
+                    proposal,
+                    record,
+                    committed_at=instant,
+                )
                 self._connection.execute("COMMIT")
                 return record
             except Exception:
