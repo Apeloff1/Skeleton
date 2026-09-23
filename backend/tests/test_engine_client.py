@@ -315,3 +315,19 @@ def test_engine_command_identity_changes_with_resource_budget() -> None:
 
     assert left.operation.operation_id != right.operation.operation_id
     assert left.operation.idempotency_key != right.operation.idempotency_key
+
+
+
+def test_engine_commands_delegate_scoped_tool_approval_authority() -> None:
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
+    command = engine_command_from_provider_request(
+        ProviderRequest(
+            instructions="rules",
+            prompt="hello",
+            tenant_id="tenant-a",
+        ),
+        service_principal="codedock-backend",
+        deadline=deadline,
+    )
+
+    assert "engine:approve" in command.delegated_authority.scopes
