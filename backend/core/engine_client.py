@@ -434,6 +434,24 @@ def engine_command_from_context(
         idempotency_key=str(idempotency_key).strip(),
         trace_id=str(uuid4()),
     )
+    classification_rank = {
+        "public": 0,
+        "internal": 1,
+        "confidential": 2,
+        "restricted": 3,
+    }
+    selected_segments = (
+        context.instruction_segments
+        + context.evidence_segments
+        + context.tool_schema_segments
+    )
+    data_class = "internal"
+    if selected_segments:
+        data_class = max(
+            (segment.data_class for segment in selected_segments),
+            key=lambda value: classification_rank.get(value, 99),
+        )
+
     budget = {
         "max_model_turns": int(max_model_turns),
         "max_tool_calls": int(max_tool_calls),
@@ -450,7 +468,7 @@ def engine_command_from_context(
         context_policy={
             "tenant_id": context.tenant_id,
             "capability": operation.capability,
-            "data_class": context.data_class,
+            "data_class": data_class,
             "context_id": context.context_id,
             "context_digest": context.context_digest,
             "compiler_version": context.compiler_version,
