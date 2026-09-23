@@ -25,6 +25,13 @@ from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.exec_guard import code_execution_enabled, execution_disabled_response, execution_disabled_message
+from skeleton.skills.tool_adapters import (
+    ArtifactAdapterPolicy,
+    DatabaseAdapterPolicy,
+    NetworkEgressPolicy,
+    SandboxAdapterPolicy,
+    ToolAdapterDenied,
+)
 
 from . import vault_loader
 from . import jeeves_consultant
@@ -33,6 +40,18 @@ from . import binary_builder
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
 _client: AsyncIOMotorClient | None = None
+
+_db_scope_raw = tuple(
+    item.strip()
+    for item in os.environ.get("TOOL_DB_ALLOWED_COLLECTIONS", "").split(",")
+    if item.strip()
+)
+_SANDBOX_POLICY = SandboxAdapterPolicy()
+_DATABASE_POLICY = DatabaseAdapterPolicy(
+    allowed_collections=frozenset(_db_scope_raw) if _db_scope_raw else None
+)
+_NETWORK_POLICY = NetworkEgressPolicy()
+_ARTIFACT_POLICY = ArtifactAdapterPolicy()
 
 
 def _db():
@@ -67,10 +86,10 @@ async def _tool_compile_code(params: dict) -> dict:
     if not code_execution_enabled():
         return execution_disabled_response("Tool compile execution")
 
-    lang = params.get("language", "c")
-    code = params.get("code", "")
-    if not code:
-        return {"error": "empty code", "ok": False}
+    scoped = _SANDBOX_POLICY.compile_request(params)
+    lang = scoped["language"]
+    code = scoped["code"]
+    timeout_seconds = scoped["timeout_seconds"]
     # Lightweight inline compile — defers to /api/compiler/compile semantics
     # by spawning a subprocess for compiled langs we can support locally.
     suffix_map = {"c": ".c", "cpp": ".cpp", "cxx": ".cpp", "go": ".go", "rust": ".rs"}
@@ -88,7 +107,12 @@ async def _tool_compile_code(params: dict) -> dict:
         outp = os.path.join(td, "a.out")
         with open(src, "w") as fh: fh.write(code)
         try:
-            proc = subprocess.run(cmd_map[lang](src, outp), capture_output=True, text=True, timeout=30)
+            proc = subprocess.run(
+                cmd_map[lang](src, outp),
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
             return {
                 "ok": proc.returncode == 0,
                 "stdout": proc.stdout[-4000:],
@@ -132,14 +156,13 @@ async def _tool_package_build(params: dict) -> dict:
     if not code_execution_enabled():
         return execution_disabled_response("Tool binary packaging")
 
-    build_id = params.get("build_id")
-    if not build_id:
-        return {"ok": False, "error": "build_id required"}
+    scoped = _ARTIFACT_POLICY.package_request(params)
+    build_id = scoped["build_id"]
     db = _db()
     doc = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
     if not doc:
         return {"ok": False, "error": f"build_id not found: {build_id}"}
-    kinds = params.get("kinds", ["zip", "apk"])
+    kinds = scoped["kinds"]
     out = await binary_builder.package_build(doc, kinds=kinds)
     # Persist artifact metadata
     try:
@@ -154,13 +177,12 @@ async def _tool_package_build(params: dict) -> dict:
 
 
 async def _tool_mongo_query(params: dict) -> dict:
-    coll = params.get("collection")
-    if not coll:
-        return {"ok": False, "error": "collection required"}
+    scoped = _DATABASE_POLICY.query_request(params)
+    coll = scoped["collection"]
     db = _db()
-    q = params.get("filter", {})
-    proj = params.get("project", {"_id": 0})
-    limit = int(params.get("limit", 10))
+    q = scoped["filter"]
+    proj = scoped["project"]
+    limit = scoped["limit"]
     rows = await db[coll].find(q, proj).limit(limit).to_list(length=limit)
     return {"ok": True, "collection": coll, "rows": rows, "count": len(rows)}
 
@@ -181,20 +203,18 @@ async def _tool_llm_chat(params: dict) -> dict:
 
 
 async def _tool_web_search(params: dict) -> dict:
-    """Live web search via DuckDuckGo (no API key needed)."""
-    query = params.get("query") or params.get("q") or ""
-    if not query:
-        return {"ok": False, "error": "query required"}
+    """Live web search through a bounded egress/result policy."""
+    scoped = _NETWORK_POLICY.search_request(params)
+    query = scoped["query"]
+    max_results = scoped["max_results"]
+    kind = scoped["kind"]
     try:
         from ddgs import DDGS
     except Exception:
         return {"ok": False, "error": "ddgs_not_installed"}
     try:
-        max_results = int(params.get("max_results", 5))
-        kind = params.get("kind", "text")  # text | news | images
-        results: list[dict] = []
-        # ddgs is sync — run in executor to avoid blocking
         loop = asyncio.get_running_loop()
+
         def _search():
             with DDGS() as d:
                 if kind == "news":
@@ -202,17 +222,26 @@ async def _tool_web_search(params: dict) -> dict:
                 if kind == "images":
                     return list(d.images(query, max_results=max_results))
                 return list(d.text(query, max_results=max_results))
+
         results = await loop.run_in_executor(None, _search)
-        # Normalise — keep only the fields agents care about
-        clean = []
-        for r in results:
-            if not isinstance(r, dict): continue
-            clean.append({
-                "title":   r.get("title", "")[:200],
-                "url":     r.get("href") or r.get("url", ""),
-                "snippet": (r.get("body") or r.get("description") or "")[:600],
-            })
-        return {"ok": True, "query": query, "kind": kind, "results": clean, "count": len(clean)}
+        clean: list[dict[str, str]] = []
+        for raw in results:
+            if not isinstance(raw, dict):
+                continue
+            normalized = _NETWORK_POLICY.sanitize_result(raw)
+            if normalized is not None:
+                clean.append(normalized)
+            if len(clean) >= max_results:
+                break
+        return {
+            "ok": True,
+            "query": query,
+            "kind": kind,
+            "results": clean,
+            "count": len(clean),
+        }
+    except ToolAdapterDenied:
+        raise
     except Exception:
         return {"ok": False, "error": "web_search_failed"}
 
@@ -240,6 +269,8 @@ async def invoke(tool: str, params: dict) -> dict:
         return {"ok": False, "error": f"unknown tool: {tool}", "available": list(TOOLS.keys())}
     try:
         return await fn(params or {})
+    except ToolAdapterDenied:
+        return {"ok": False, "error": "tool_denied"}
     except Exception:
         return {"ok": False, "error": "tool_failed"}
 
