@@ -242,3 +242,10 @@ def test_invalid_or_missing_output_fails_closed(monkeypatch) -> None:
     missing = reasoner.reason(ReasoningRequest("diagnose", ()))
     assert missing.ok is False
     assert missing.error_kind == "missing_output"
+
+def test_reasoner_with_key_loads_mandatory_automation_architecture() -> None:
+    reasoner = ChatGPTReasoner(api_key="test-key")
+
+    assert reasoner.architecture_receipt is not None
+    assert reasoner.architecture_receipt.provider_id == "repository-automation"
+    assert reasoner.architecture_receipt.provider_family == "automation_model"
