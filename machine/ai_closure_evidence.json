@@ -463,7 +463,10 @@
         "skeleton/provider_contract.py — provider-neutral tool definitions/calls, structured output, usage, finish reason and ProviderDelta contracts",
         "skeleton/provider_runtime.py — normalized request/response translation, offered-tool validation, structured output, usage/finish/deadline handling and provider_response_deltas ephemeral stream projection",
         "skeleton/testing/test_provider_contract.py — sync transport tool-only normalization, unoffered-tool denial, structured output, usage unknowns, deadline clamping/expiry, canonical deltas and default stream finalization",
-        "skeleton/testing/test_provider_stream_reliability_profiles.py — bounded pre-emission retry, no post-output replay, shared deadline and pressure/exhaustion behavior"
+        "skeleton/testing/test_provider_stream_reliability_profiles.py — bounded pre-emission retry, no post-output replay, shared deadline and pressure/exhaustion behavior",
+        "skeleton/provider_contract.py — provider-neutral tool/call/structured/usage/finish/delta contracts",
+        "skeleton/provider_runtime.py — normalized sync/async generation plus native ephemeral Responses streaming",
+        "skeleton/testing/test_provider_contract.py — native streaming text/tool/failure/no-terminal regression coverage"
       ],
       "closure_evidence_required": [
         "text-only compatibility tests",
@@ -480,7 +483,9 @@
       "outstanding_evidence": [
         "fresh CI execution of provider contract and stream reliability suites on current head",
         "provider-surface convergence dependency must close",
-        "tool-runtime/governance/cost dependencies must close"
+        "tool-runtime/governance/cost dependencies must close",
+        "fresh CI execution on current branch head",
+        "live-provider compatibility smoke is optional and must not be required for deterministic release evidence"
       ],
       "blockers": [
         "dependency must close: gap-provider-surface-convergence",
