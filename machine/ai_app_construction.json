@@ -3146,38 +3146,23 @@
       "required_fields": [
         "memory_id",
         "tenant_id",
-        "owner_id",
+        "user_id",
+        "namespace",
+        "kind",
+        "content_ref",
         "content_digest",
         "data_class",
+        "purpose",
         "provenance",
+        "authority_class",
+        "confidence_band",
+        "retention_class",
         "created_at",
-        "updated_at"
-      ],
-      "owner_plane": "memory"
-    },
-    "memory_write_proposal": {
-      "required_fields": [
-        "proposal_id",
-        "operation_id",
-        "tenant_id",
-        "memory_id",
-        "content_digest",
-        "reason",
-        "provenance",
-        "created_at"
-      ],
-      "owner_plane": "memory"
-    },
-    "memory_write_receipt": {
-      "required_fields": [
-        "receipt_id",
-        "proposal_id",
-        "operation_id",
-        "memory_id",
-        "status",
-        "content_digest",
-        "created_at",
-        "completed_at"
+        "updated_at",
+        "expires_at",
+        "dedupe_key",
+        "version",
+        "status"
       ],
       "owner_plane": "memory"
     }
