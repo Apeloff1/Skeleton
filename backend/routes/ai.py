@@ -9,7 +9,8 @@ clients.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 import logging
 import re
 from typing import Any, Dict, List, Optional
@@ -26,6 +27,15 @@ from core.ai_provider import (
     provider_request_from_context,
 )
 from core.conversations import ConversationStorageUnavailable, conversation_authority
+from core.engine_client import (
+    EngineClient,
+    EngineClientConfig,
+    EngineClientError,
+    EngineDeadlineExceeded,
+    EngineExecutionFailed,
+    EngineUnavailable,
+    engine_command_from_context,
+)
 from routes.gameforge_auth import require_role
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import INSTRUCTION_POLICIES
@@ -42,6 +52,11 @@ from skeleton.persistence.conversation_repository import ConversationConflict, C
 logger = logging.getLogger("CodeDock.AI")
 router = APIRouter(prefix="/ai", tags=["AI Assistant v16"])
 AI_REGISTRY = ProviderRegistry.from_env()
+
+
+@lru_cache(maxsize=1)
+def _engine_client() -> EngineClient:
+    return EngineClient(EngineClientConfig.from_env())
 
 
 AI_MODES = {
@@ -465,60 +480,95 @@ async def ai_chat(
         segments=segments,
         compiled_at=created_at,
     )
-    provider_request = provider_request_from_context(
-        envelope,
-        purpose=purpose,
-    )
-    result = await _execute_provider_request(provider_request)
-    if result["success"]:
-        ai_result_id = str(
-            result.get("provider_request_id")
-            or f"provider-result:{operation_id}"
+    # Canonical chat execution crosses the Skeleton engine boundary. The
+    # backend owns conversation admission/context assembly but never falls back
+    # to a local credential-bearing provider for this route.
+    deadline = created_at + timedelta(seconds=90)
+    client = _engine_client()
+    try:
+        command = engine_command_from_context(
+            context=envelope,
+            actor_id=owner_id,
+            capability="assistant.chat",
+            objective=request.message,
+            idempotency_key=request.idempotency_key,
+            service_principal=client.config.service_principal,
+            deadline=deadline,
+            max_model_turns=6,
+            max_tool_calls=8,
+            max_output_tokens=4_096,
         )
-        try:
-            committed_thread, assistant_message = (
-                await conversation_authority.commit_assistant_message(
-                    request.thread_id,
-                    tenant_id=tenant_id,
-                    owner_id=owner_id,
-                    content=str(result["response"]),
-                    idempotency_key=f"{request.idempotency_key}:assistant",
-                    expected_thread_version=thread.version,
-                    causal_user_message_id=user_message.message_id,
-                    operation_id=operation_id,
-                    ai_result_id=ai_result_id,
-                )
+        engine_result = await client.execute(
+            command,
+            deadline=deadline,
+        )
+    except EngineExecutionFailed as exc:
+        logger.warning(
+            "Canonical AI engine execution failed: %s",
+            exc.status.get("failure_code") or "execution_failed",
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI engine execution failed",
+        ) from exc
+    except (EngineDeadlineExceeded, EngineUnavailable, EngineClientError) as exc:
+        logger.warning(
+            "Canonical AI engine unavailable: %s",
+            exc.__class__.__name__,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI engine is unavailable",
+        ) from exc
+
+    final_output = engine_result.get("final_output")
+    if not isinstance(final_output, str) or not final_output.strip():
+        logger.error("Canonical AI engine completed without final output")
+        raise HTTPException(
+            status_code=503,
+            detail="AI engine returned no final result",
+        )
+    final_output = final_output.strip()
+    ai_result_id = "execution-result:" + execution_id
+    try:
+        committed_thread, assistant_message = (
+            await conversation_authority.commit_assistant_message(
+                request.thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                content=final_output,
+                idempotency_key=f"{request.idempotency_key}:assistant",
+                expected_thread_version=thread.version,
+                causal_user_message_id=user_message.message_id,
+                operation_id=operation_id,
+                ai_result_id=ai_result_id,
             )
-        except Exception as exc:
-            raise _chat_error(exc) from exc
-        return {
-            "success": True,
-            "response": result["response"],
-            "ai_generated": True,
-            "provider": result["provider"],
-            "model": result["model"],
-            "provider_request_id": result.get("provider_request_id"),
-            "latency_ms": result.get("latency_ms"),
-            "context_id": result.get("context_id"),
-            "context_digest": result.get("context_digest"),
-            "context_source_snapshot": result.get("context_source_snapshot"),
-            "context_compiler_version": result.get("context_compiler_version"),
-            "thread": committed_thread.as_dict(),
-            "user_message": user_message.as_dict(),
-            "assistant_message": assistant_message.as_dict(),
-            "timestamp": _utcnow(),
-        }
+        )
+    except Exception as exc:
+        raise _chat_error(exc) from exc
 
     return {
-        "success": False,
-        "response": "The AI provider is unavailable right now. Check provider configuration and retry.",
-        "ai_generated": False,
-        "provider": AI_REGISTRY.active_id,
-        "model": _active_model(),
-        "thread": thread.as_dict(),
+        "success": True,
+        "response": final_output,
+        "ai_generated": True,
+        "provider": "skeleton-engine",
+        "model": "engine-routed",
+        "engine_execution_id": execution_id,
+        "engine_result_ref": ai_result_id,
+        "verification": engine_result.get("verification"),
+        "verification_receipt": engine_result.get("verification_receipt"),
+        "evidence_refs": list(engine_result.get("evidence_refs") or ()),
+        "usage": dict(engine_result.get("usage") or {}),
+        "context_id": envelope.context_id,
+        "context_digest": envelope.context_digest,
+        "context_source_snapshot": [
+            [segment_id, digest]
+            for segment_id, digest in envelope.source_snapshot
+        ],
+        "context_compiler_version": envelope.compiler_version,
+        "thread": committed_thread.as_dict(),
         "user_message": user_message.as_dict(),
-        "error": result["error"],
-        "error_code": result["error_code"],
+        "assistant_message": assistant_message.as_dict(),
         "timestamp": _utcnow(),
     }
 
