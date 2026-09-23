@@ -61,6 +61,11 @@ _AI_SURFACE_PATH_TERMS = (
     "/ai.",
     "/ai/",
 )
+_PROVIDER_NETWORK_PATH_TERMS = (
+    "provider",
+    "llm",
+    "model",
+)
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
@@ -213,7 +218,7 @@ def _looks_like_provider_network_surface(
         or bool(signals["sdk_imports"])
         or bool(signals["provider_urls"])
         or bool(signals["client_markers"])
-        or any(term in relative for term in _AI_SURFACE_PATH_TERMS)
+        or any(term in relative for term in _PROVIDER_NETWORK_PATH_TERMS)
     )
     return provider_context
 
