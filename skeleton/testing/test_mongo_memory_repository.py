@@ -8,6 +8,12 @@ from uuid import uuid4
 import pytest
 
 from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
+from skeleton.memory.projection import (
+    AsyncMemoryProjectionCoordinator,
+    LegacyMemoryStoreProjection,
+)
+from skeleton.memory.store import MemoryStore
+from skeleton.memory.types import MemoryChunk, MemoryQueryResult
 from skeleton.persistence.memory_repository import (
     MemoryConflict,
     MemoryNotFound,
@@ -108,6 +114,27 @@ class FakeCollection:
     def find(self, query):
         return FakeCursor(doc for doc in self.docs if _matches(doc, query))
 
+
+
+
+class FakeProjectionStore(MemoryStore):
+    def __init__(self):
+        self.items: dict[str, MemoryChunk] = {}
+
+    def add(self, chunk: MemoryChunk) -> None:
+        self.items[chunk.id] = chunk
+
+    def query(self, query_text, *, top_k=5, metadata_filter=None, min_score=0.0):
+        return [
+            MemoryQueryResult(chunk=item, score=1.0, rank=index + 1)
+            for index, item in enumerate(self.items.values())
+        ][:top_k]
+
+    def delete(self, chunk_id: str) -> bool:
+        return self.items.pop(chunk_id, None) is not None
+
+    def health(self):
+        return {"ok": True}
 
 class FakeDatabase:
     def __init__(self):
@@ -338,3 +365,70 @@ async def test_mongo_expire_due_tombstones_only_elapsed_records() -> None:
             namespace="assistant",
         )
     ).version == 1
+
+
+@pytest.mark.asyncio
+async def test_mongo_authority_rebuilds_derived_projection() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(_proposal(key="one", content="alpha"), now=_now())
+    second = await repo.commit(_proposal(key="two", content="beta"), now=_now())
+    store = FakeProjectionStore()
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    report = await coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        known_projection_ids=("stale-id",),
+    )
+
+    assert report.degraded is False
+    assert set(store.items) == {first.memory_id, second.memory_id}
+    assert store.items[first.memory_id].metadata["canonical_version"] == 1
+    assert store.items[first.memory_id].source_tier == "derived:rag"
+
+
+@pytest.mark.asyncio
+async def test_mongo_expiry_removes_projection_but_keeps_export_lineage() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    due = await repo.commit(
+        _proposal(
+            key="due-projection",
+            content="temporary",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+    store = FakeProjectionStore()
+    projection = LegacyMemoryStoreProjection("mag", store)
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+    await coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert due.memory_id in store.items
+
+    report = await coordinator.expire_and_sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+        now=_now() + timedelta(seconds=10),
+    )
+    exported = await coordinator.export_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+
+    assert due.memory_id not in store.items
+    assert report.tombstones == 1
+    assert report.active_records == 0
+    assert exported[0]["memory_id"] == due.memory_id
+    assert exported[0]["state"] == "tombstoned"
