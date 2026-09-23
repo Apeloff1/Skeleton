@@ -382,6 +382,7 @@ def test_reproducible_release_workflow_gates_bound_release_evidence() -> None:
     ).read_text(encoding="utf-8")
 
     assert '"skeleton/release/evidence.py"' in workflow
+    assert '"pytest-asyncio==1.4.0"' in workflow
     assert '"skeleton/testing/test_release_evidence.py"' in workflow
     assert "--junitxml=source-a/release-meta/release-tests.xml" in workflow
     assert "source-a/skeleton/testing/test_ai_golden_journey.py" in workflow
