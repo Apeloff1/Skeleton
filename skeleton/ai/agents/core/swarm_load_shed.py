@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from skeleton.agents.swarm_runtime import SwarmRuntime, SwarmTask
+from skeleton.intelligence.shared_pressure import SqliteSharedPressureLedger
 
 @dataclass(frozen=True, slots=True)
 class ShedDecision:
@@ -22,3 +23,32 @@ class LoadShedPolicy:
         if pressure >= self.max_queue_pressure:
             return ShedDecision(False, "queue pressure limit exceeded", pressure)
         return ShedDecision(True, "within pressure budget", pressure)
+
+
+@dataclass(frozen=True, slots=True)
+class SharedLoadShedPolicy:
+    """Agent-edge adapter for the durable shared pressure authority."""
+
+    ledger: SqliteSharedPressureLedger
+    scope: str
+
+    def evaluate(
+        self,
+        tenant_id: str,
+        *,
+        priority: int = 100,
+        for_queue: bool = False,
+        now: float | None = None,
+    ) -> ShedDecision:
+        decision = self.ledger.decide(
+            self.scope,
+            tenant_id,
+            priority=priority,
+            for_queue=for_queue,
+            now=now,
+        )
+        return ShedDecision(
+            decision.admitted,
+            decision.reason,
+            decision.snapshot.pressure_ratio,
+        )
