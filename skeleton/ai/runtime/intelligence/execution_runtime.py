@@ -730,7 +730,12 @@ class CognitiveExecutionRuntime:
                         "internal",
                     )
                 ),
-                purpose="cognitive-execution",
+                purpose=str(
+                    context_policy.get(
+                        "provider_purpose",
+                        "model-inference",
+                    )
+                ),
                 tenant_id=tenant_id,
                 operation_id=execution.operation_id,
                 execution_id=execution.execution_id,
