@@ -137,6 +137,7 @@ class EngineContextHandoff:
     data_class: str
     instructions: str
     prompt: str
+    purpose: str = "model-inference"
     history: tuple[tuple[str, str], ...] = ()
     tools: tuple[ProviderToolDefinition, ...] = ()
     model: str | None = None
@@ -178,6 +179,12 @@ class EngineContextHandoff:
         }:
             raise EngineServiceError("compiled context data_class is invalid")
         object.__setattr__(self, "data_class", data_class)
+        purpose = str(self.purpose).strip()
+        if not purpose or len(purpose) > 256:
+            raise EngineServiceError(
+                "compiled context purpose is invalid"
+            )
+        object.__setattr__(self, "purpose", purpose)
         instructions = str(self.instructions)
         prompt = str(self.prompt)
         if not instructions.strip() or not prompt.strip():
@@ -336,6 +343,7 @@ class EngineContextHandoff:
                 for segment_id, digest in self.source_snapshot
             ],
             "data_class": self.data_class,
+            "purpose": self.purpose,
             "instructions": self.instructions,
             "prompt": self.prompt,
             "history": [
@@ -422,6 +430,7 @@ class EngineContextHandoff:
             compiler_version=str(data.get("compiler_version") or ""),
             source_snapshot=snapshot,
             data_class=str(data.get("data_class") or ""),
+            purpose=str(data.get("purpose") or "model-inference"),
             instructions=str(data.get("instructions") or ""),
             prompt=str(data.get("prompt") or ""),
             history=tuple(history),
