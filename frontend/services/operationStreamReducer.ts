@@ -46,12 +46,21 @@ export type OperationConnectionState =
   | 'resync_required'
   | 'error';
 
+export type OperationContentState =
+  | 'none'
+  | 'provisional'
+  | 'authoritative'
+  | 'discarded';
+
 export interface OperationClientState {
   operationId: string;
   lastSequence: number;
   seenEventIds: string[];
   events: OperationStreamEvent[];
   operationState: string | null;
+  provisionalContent: string;
+  authoritativeContent: string | null;
+  contentState: OperationContentState;
   terminal: boolean;
   resyncRequired: boolean;
   connection: OperationConnectionState;
@@ -95,6 +104,9 @@ export function createOperationClientState(
     seenEventIds: [],
     events: [],
     operationState: null,
+    provisionalContent: '',
+    authoritativeContent: null,
+    contentState: 'none',
     terminal: false,
     resyncRequired: false,
     connection: 'idle',
@@ -149,6 +161,44 @@ export function reduceOperationEvent(
   );
   const events = [...state.events, event].slice(-MAX_RETAINED_OPERATION_EVENTS);
 
+  let provisionalContent = state.provisionalContent;
+  let authoritativeContent = state.authoritativeContent;
+  let contentState = state.contentState;
+
+  if (event.type === 'operation.output.delta') {
+    const delta = event.payload?.delta;
+    if (typeof delta !== 'string' || delta.length === 0) {
+      return failOperationResync(state, 'invalid_output_delta');
+    }
+    provisionalContent += delta;
+    contentState = 'provisional';
+  } else if (event.type === 'operation.output.snapshot') {
+    const content = event.payload?.content;
+    if (typeof content !== 'string') {
+      return failOperationResync(state, 'invalid_output_snapshot');
+    }
+    provisionalContent = content;
+    contentState = 'provisional';
+  }
+
+  if (event.type === 'operation.completed') {
+    const finalOutput = event.payload?.final_output;
+    if (typeof finalOutput === 'string') {
+      authoritativeContent = finalOutput;
+      provisionalContent = finalOutput;
+      contentState = 'authoritative';
+    } else if (contentState === 'provisional') {
+      return failOperationResync(state, 'terminal_result_missing');
+    }
+  } else if (
+    event.type === 'operation.failed'
+    || event.type === 'operation.cancelled'
+  ) {
+    if (contentState === 'provisional') {
+      contentState = 'discarded';
+    }
+  }
+
   return {
     ...state,
     lastSequence: event.sequence,
@@ -156,6 +206,9 @@ export function reduceOperationEvent(
     events,
     operationState:
       typeof payloadState === 'string' ? payloadState : state.operationState,
+    provisionalContent,
+    authoritativeContent,
+    contentState,
     terminal,
     resyncRequired: false,
     connection: terminal ? 'terminal' : 'following',
