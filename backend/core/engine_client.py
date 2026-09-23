@@ -11,6 +11,7 @@ import socket
 import time
 from typing import Any, Mapping
 import urllib.error
+import urllib.parse
 import urllib.request
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
@@ -50,6 +51,21 @@ class EngineExecutionFailed(EngineClientError):
 
     def __init__(self, message: str, *, status: Mapping[str, Any] | None = None):
         super().__init__(message)
+        self.status = dict(status or {})
+
+
+class EngineApprovalRequired(EngineClientError):
+    """Engine execution is suspended waiting for a bound tool approval."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        execution_id: str,
+        status: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.execution_id = str(execution_id)
         self.status = dict(status or {})
 
 
@@ -333,6 +349,125 @@ class EngineClient:
             retry=True,
         )
 
+    async def pending_tool_approvals(
+        self,
+        execution_id: str,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        deadline: datetime | None = None,
+    ) -> tuple[dict[str, str], ...]:
+        actor = str(actor_id).strip()
+        tenant = str(tenant_id).strip()
+        if not actor or not tenant:
+            raise EngineClientError(
+                "actor_id and tenant_id are required for tool approval lookup"
+            )
+        query = urllib.parse.urlencode(
+            {"actor_id": actor, "tenant_id": tenant}
+        )
+        payload = await self._request_json(
+            "GET",
+            (
+                "/api/v1/engine/executions/"
+                + execution_id
+                + "/tool-approvals/pending?"
+                + query
+            ),
+            deadline=deadline,
+            retry=True,
+        )
+        rows = payload.get("pending")
+        if not isinstance(rows, list):
+            raise EngineUnavailable(
+                "engine pending tool approval response is malformed"
+            )
+        normalized: list[dict[str, str]] = []
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise EngineUnavailable(
+                    "engine pending tool approval row is malformed"
+                )
+            call_id = str(row.get("call_id") or "").strip()
+            tool_id = str(row.get("tool_id") or "").strip()
+            digest = str(row.get("arguments_digest") or "").strip()
+            if (
+                not call_id
+                or not tool_id
+                or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)
+            ):
+                raise EngineUnavailable(
+                    "engine pending tool approval identity is malformed"
+                )
+            normalized.append(
+                {
+                    "call_id": call_id,
+                    "tool_id": tool_id,
+                    "arguments_digest": digest,
+                }
+            )
+        return tuple(normalized)
+
+    async def approve_tool_call(
+        self,
+        execution_id: str,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        call_id: str,
+        tool_id: str,
+        arguments_digest: str,
+        idempotency_key: str,
+        expires_at: datetime,
+        deadline: datetime | None = None,
+    ) -> dict[str, Any]:
+        if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+            raise EngineClientError(
+                "tool approval expires_at must be timezone-aware"
+            )
+        body = {
+            "actor_id": str(actor_id).strip(),
+            "tenant_id": str(tenant_id).strip(),
+            "call_id": str(call_id).strip(),
+            "tool_id": str(tool_id).strip(),
+            "arguments_digest": str(arguments_digest).strip(),
+            "idempotency_key": str(idempotency_key).strip(),
+            "expires_at": expires_at.astimezone(timezone.utc).isoformat(),
+        }
+        if any(
+            not body[key]
+            for key in (
+                "actor_id",
+                "tenant_id",
+                "call_id",
+                "tool_id",
+                "idempotency_key",
+            )
+        ):
+            raise EngineClientError(
+                "tool approval identity fields must be non-empty"
+            )
+        digest = body["arguments_digest"]
+        if (
+            len(digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in digest)
+        ):
+            raise EngineClientError(
+                "tool approval arguments_digest must be lowercase sha256"
+            )
+        return await self._request_json(
+            "POST",
+            (
+                "/api/v1/engine/executions/"
+                + execution_id
+                + "/tool-approvals"
+            ),
+            body=body,
+            deadline=deadline,
+            retry=True,
+        )
+
     async def cancel(
         self,
         execution_id: str,
@@ -362,6 +497,12 @@ class EngineClient:
             if state in {"failed", "cancelled"}:
                 raise EngineExecutionFailed(
                     "engine execution " + state,
+                    status=current,
+                )
+            if state == "waiting_for_user":
+                raise EngineApprovalRequired(
+                    "engine execution requires tool approval",
+                    execution_id=execution_id,
                     status=current,
                 )
             if state == "completed":
@@ -842,6 +983,7 @@ def engine_command_from_context(
 
 
 __all__ = [
+    "EngineApprovalRequired",
     "EngineClient",
     "EngineClientConfig",
     "EngineClientError",
