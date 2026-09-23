@@ -583,15 +583,138 @@ export class WorkspaceController {
     })));
   }
 
+  private async executeAuthoritative(
+    conversationId: string,
+    messageId: string,
+    content: string,
+    idempotencyKey: string,
+    expectedThreadVersion: number,
+  ): Promise<void> {
+    if (!this.authority) return;
+    const running: Running = {
+      controller: new AbortController(),
+      conversationId,
+      messageId,
+    };
+    this.running = running;
+    this.emit({ busyId: conversationId, notice: null });
+    try {
+      const cached = this.snapshot.workspace.conversations.find(
+        item => item.id === conversationId,
+      );
+      const response = await this.authority.chat({
+        threadId: conversationId,
+        expectedThreadVersion,
+        message: content,
+        idempotencyKey,
+        context: cached?.context || undefined,
+        signal: running.controller.signal,
+      });
+      if (this.running !== running) return;
+
+      const messages = await this.authority.listMessages(conversationId);
+      const latestCached = this.snapshot.workspace.conversations.find(
+        item => item.id === conversationId,
+      );
+      const canonical = this.authorityConversation(
+        response.thread,
+        messages,
+        latestCached,
+      );
+      this.change(updateConversation(
+        this.snapshot.workspace,
+        conversationId,
+        () => canonical,
+      ));
+      this.emit({ serverSynced: true });
+      this.attachments.delete(messageId);
+
+      if (response.approval_required) {
+        const tools = (response.pending_approvals || [])
+          .map(item => item.tool_id)
+          .filter(Boolean)
+          .join(', ');
+        this.notify(
+          tools
+            ? `Jeeves is waiting for approval to use: ${tools}.`
+            : 'Jeeves is waiting for tool approval before it can continue.',
+        );
+      }
+    } catch (error) {
+      if (this.running !== running) return;
+      this.setMessage(conversationId, messageId, {
+        status: 'failed',
+        error: error instanceof Error
+          ? error.message.slice(0, 400)
+          : 'Jeeves could not respond. Retry this server turn.',
+        idempotencyKey,
+        expectedThreadVersion,
+      });
+    } finally {
+      if (this.running === running) {
+        this.running = null;
+        this.emit({ busyId: null });
+      }
+    }
+  }
+
   async send(attachment?: Attachment): Promise<void> {
     if (!this.snapshot.ready || this.running) return;
-    const conversation = this.active;
-    const content = conversation.draft.trim() || (attachment ? `Analyze this ${attachment.modality}` : '');
+    let conversation = this.active;
+    const content = conversation.draft.trim()
+      || (attachment ? `Analyze this ${attachment.modality}` : '');
     if (!content) return;
     if (conversation.messages.length > MAX_MESSAGES - 2) {
       this.notify('This conversation has reached 100 messages. Start a new chat; the existing transcript is preserved.');
       return;
     }
+
+    if (this.authority) {
+      if (attachment) {
+        this.notify(
+          'This server-authoritative chat does not accept raw attachment bytes yet. Save or upload the file first, then reference it in the message.',
+        );
+        return;
+      }
+      if (!this.snapshot.serverSynced || !conversation.serverVersion) {
+        await this.refreshFromServer();
+        conversation = this.active;
+      }
+      if (!this.snapshot.serverSynced || !conversation.serverVersion) {
+        this.notify('Server conversation state is unavailable. Your draft was kept.');
+        return;
+      }
+      const idempotencyKey = newId();
+      const message: Message = {
+        id: idempotencyKey,
+        role: 'user',
+        text: content,
+        createdAt: Date.now(),
+        status: 'pending',
+        idempotencyKey,
+        expectedThreadVersion: conversation.serverVersion,
+      };
+      this.attachments.clear();
+      this.change(updateConversation(
+        this.snapshot.workspace,
+        conversation.id,
+        current => ({
+          ...current,
+          draft: '',
+          updatedAt: Date.now(),
+          messages: [...current.messages, message],
+        }),
+      ));
+      await this.executeAuthoritative(
+        conversation.id,
+        message.id,
+        content,
+        idempotencyKey,
+        conversation.serverVersion,
+      );
+      return;
+    }
+
     const message: Message = {
       id: newId(), role: 'user', text: content, createdAt: Date.now(), status: 'pending', attachmentName: attachment?.name,
     };
@@ -624,6 +747,38 @@ export class WorkspaceController {
       this.notify('The earlier message is in your draft. Send it as a new turn.');
       return;
     }
+
+    if (this.authority) {
+      if (message.attachmentName) {
+        this.edit({ draft: message.text });
+        this.notify(
+          'Raw attachments are not persisted in canonical chat. Re-upload the file before sending a new turn.',
+        );
+        return;
+      }
+      const idempotencyKey = message.idempotencyKey || message.id;
+      const expectedThreadVersion = message.expectedThreadVersion;
+      if (!expectedThreadVersion) {
+        this.edit({ draft: message.text });
+        this.notify(
+          'The original server precondition is unavailable. The message was restored as a new draft instead of risking a duplicate append.',
+        );
+        return;
+      }
+      this.setMessage(conversation.id, messageId, {
+        status: 'pending',
+        error: undefined,
+      });
+      await this.executeAuthoritative(
+        conversation.id,
+        messageId,
+        message.text,
+        idempotencyKey,
+        expectedThreadVersion,
+      );
+      return;
+    }
+
     const attachment = this.attachments.get(messageId);
     if (message.attachmentName && !attachment) {
       this.edit({ draft: message.text });
