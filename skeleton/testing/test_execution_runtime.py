@@ -15,6 +15,7 @@ from skeleton.provider_contract import (
 )
 from skeleton.provider_runtime import ProviderResponse
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
@@ -205,9 +206,15 @@ async def test_model_tool_model_round_trip_uses_canonical_receipt_lineage() -> N
 
 
 @pytest.mark.asyncio
-async def test_approval_required_suspends_before_effect_and_resumes_once() -> None:
+async def test_approval_required_suspends_before_effect_and_resumes_once(
+    tmp_path,
+) -> None:
     repo = SQLiteExecutionRepository()
-    tools = AsyncToolRuntime()
+    tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(
+            tmp_path / "approval-tool-receipts.sqlite3"
+        )
+    )
     effects = []
 
     async def handler(request):
@@ -382,9 +389,15 @@ async def test_repeated_identical_tool_batches_trip_cycle_limit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_cancellation_while_waiting_for_approval_finalizes_without_effect() -> None:
+async def test_cancellation_while_waiting_for_approval_finalizes_without_effect(
+    tmp_path,
+) -> None:
     repo = SQLiteExecutionRepository()
-    tools = AsyncToolRuntime()
+    tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(
+            tmp_path / "cancel-tool-receipts.sqlite3"
+        )
+    )
     effects = []
 
     async def handler(request):
