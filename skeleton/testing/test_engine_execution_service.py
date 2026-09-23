@@ -26,6 +26,7 @@ from skeleton.contracts.ai_execution import (
 )
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+from skeleton.provider_contract import ProviderToolCall
 
 
 def _now() -> datetime:
@@ -430,3 +431,202 @@ def test_command_parser_rejects_client_transcript_authority() -> None:
 
     with pytest.raises(Exception):
         EngineExecutionCommand.from_dict(payload)
+
+
+
+def _service_with_approval_scope(tmp_path):
+    return _service(
+        tmp_path,
+        registry=_registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:cancel",
+                "engine:events",
+                "engine:approve",
+            )
+        ),
+    )
+
+
+def _suspend_for_tool_approval(
+    service: EngineExecutionService,
+    *,
+    execution_id: str = "exec-1",
+):
+    repo = service.repository
+    current = repo.get(execution_id)
+    for state in (
+        ExecutionState.LOADING,
+        ExecutionState.ASSEMBLING_CONTEXT,
+        ExecutionState.ROUTING,
+        ExecutionState.PROVIDER_PENDING,
+        ExecutionState.PROVIDER_COMPLETED,
+        ExecutionState.CLASSIFYING_OUTPUT,
+        ExecutionState.WAITING_FOR_TOOL_AUTHORITY,
+    ):
+        current = repo.transition(
+            execution_id,
+            state,
+            expected_version=current.version,
+            now=_now(),
+        )
+    call = ProviderToolCall(
+        call_id="call-approval",
+        tool_id="repo.write",
+        arguments={"path": "README.md"},
+    )
+    repo.checkpoint(
+        execution_id,
+        {
+            "pending_tool_calls": [call.as_dict()],
+            "pending_approval_call_ids": [call.call_id],
+        },
+        expected_execution_version=current.version,
+        expected_checkpoint_version=current.checkpoint_version,
+        now=_now(),
+    )
+    current = repo.get(execution_id)
+    current = repo.transition(
+        execution_id,
+        ExecutionState.WAITING_FOR_USER,
+        expected_version=current.version,
+        now=_now(),
+    )
+    return call, current
+
+
+def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
+    tmp_path,
+) -> None:
+    service = _service_with_approval_scope(tmp_path)
+    command = _command()
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(service)
+
+    pending = service.pending_tool_approvals(
+        "exec-1",
+        verified_service_principal="backend-service",
+        now=_now(),
+    )
+    assert pending == (
+        {
+            "call_id": call.call_id,
+            "tool_id": call.tool_id,
+            "arguments_digest": call.arguments_digest,
+        },
+    )
+
+    approval = service.approve_tool_call(
+        "exec-1",
+        verified_service_principal="backend-service",
+        call_id=call.call_id,
+        tool_id=call.tool_id,
+        arguments_digest=call.arguments_digest,
+        idempotency_key="approve-1",
+        expires_at=_now() + timedelta(minutes=5),
+        now=_now(),
+    )
+    replay = service.approve_tool_call(
+        "exec-1",
+        verified_service_principal="backend-service",
+        call_id=call.call_id,
+        tool_id=call.tool_id,
+        arguments_digest=call.arguments_digest,
+        idempotency_key="approve-1",
+        expires_at=_now() + timedelta(minutes=5),
+        now=_now(),
+    )
+
+    assert replay == approval
+    assert service.active_approval_refs(
+        "exec-1",
+        now=_now(),
+    ) == {call.call_id: approval.approval_ref}
+
+    restarted = _service_with_approval_scope(tmp_path)
+    assert restarted.active_approval_refs(
+        "exec-1",
+        now=_now() + timedelta(minutes=1),
+    ) == {call.call_id: approval.approval_ref}
+
+
+def test_tool_approval_rejects_expired_and_mismatched_decisions(tmp_path) -> None:
+    service = _service_with_approval_scope(tmp_path)
+    service.submit(
+        _command(),
+        verified_service_principal="backend-service",
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(service)
+
+    with pytest.raises(Exception, match="already expired"):
+        service.approve_tool_call(
+            "exec-1",
+            verified_service_principal="backend-service",
+            call_id=call.call_id,
+            tool_id=call.tool_id,
+            arguments_digest=call.arguments_digest,
+            idempotency_key="expired",
+            expires_at=_now() - timedelta(seconds=1),
+            now=_now(),
+        )
+
+    with pytest.raises(Exception, match="does not match"):
+        service.approve_tool_call(
+            "exec-1",
+            verified_service_principal="backend-service",
+            call_id=call.call_id,
+            tool_id="repo.other",
+            arguments_digest=call.arguments_digest,
+            idempotency_key="wrong-tool",
+            expires_at=_now() + timedelta(minutes=5),
+            now=_now(),
+        )
+
+    with pytest.raises(Exception, match="does not match"):
+        service.approve_tool_call(
+            "exec-1",
+            verified_service_principal="backend-service",
+            call_id=call.call_id,
+            tool_id=call.tool_id,
+            arguments_digest="0" * 64,
+            idempotency_key="wrong-digest",
+            expires_at=_now() + timedelta(minutes=5),
+            now=_now(),
+        )
+
+    assert service.active_approval_refs("exec-1", now=_now()) == {}
+
+
+def test_expired_persisted_approval_is_not_replayed_into_resume(tmp_path) -> None:
+    service = _service_with_approval_scope(tmp_path)
+    service.submit(
+        _command(),
+        verified_service_principal="backend-service",
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(service)
+    approval = service.approve_tool_call(
+        "exec-1",
+        verified_service_principal="backend-service",
+        call_id=call.call_id,
+        tool_id=call.tool_id,
+        arguments_digest=call.arguments_digest,
+        idempotency_key="short-lived",
+        expires_at=_now() + timedelta(seconds=1),
+        now=_now(),
+    )
+
+    assert service.active_approval_refs(
+        "exec-1",
+        now=_now(),
+    ) == {call.call_id: approval.approval_ref}
+    assert service.active_approval_refs(
+        "exec-1",
+        now=_now() + timedelta(seconds=2),
+    ) == {}
