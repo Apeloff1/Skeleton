@@ -538,11 +538,78 @@ class SQLiteMemoryRepository:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    def expire_due(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        now: datetime | None = None,
+    ) -> tuple[MemoryRecord, ...]:
+        """Tombstone active records whose canonical expiry has elapsed."""
+
+        instant = _utc(now)
+        expired: list[MemoryRecord] = []
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                rows = self._connection.execute(
+                    """
+                    SELECT * FROM canonical_memory
+                    WHERE repository_namespace = ?
+                      AND tenant_id = ?
+                      AND namespace = ?
+                      AND state = ?
+                      AND expires_at IS NOT NULL
+                    ORDER BY expires_at ASC, memory_id ASC
+                    """,
+                    (
+                        self.repository_namespace,
+                        str(tenant_id),
+                        str(namespace),
+                        MemoryState.ACTIVE.value,
+                    ),
+                ).fetchall()
+                for row in rows:
+                    current = self._record(row)
+                    if current.expires_at is None or _utc(current.expires_at) > instant:
+                        continue
+                    result = self._connection.execute(
+                        """
+                        UPDATE canonical_memory
+                        SET version = ?, updated_at = ?, state = ?
+                        WHERE repository_namespace = ?
+                          AND memory_id = ?
+                          AND version = ?
+                          AND state = ?
+                        """,
+                        (
+                            current.version + 1,
+                            _iso(instant),
+                            MemoryState.TOMBSTONED.value,
+                            self.repository_namespace,
+                            current.memory_id,
+                            current.version,
+                            MemoryState.ACTIVE.value,
+                        ),
+                    )
+                    if result.rowcount != 1:
+                        raise MemoryConflict("memory version conflict during expiry")
+                    refreshed = self._find_memory(
+                        current.memory_id,
+                        tenant_id=current.tenant_id,
+                        namespace=current.namespace,
+                    )
+                    assert refreshed is not None
+                    expired.append(self._record(refreshed))
+                self._connection.execute("COMMIT")
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+        return tuple(expired)
+
     def close(self) -> None:
         with self._lock:
             self._connection.close()
-
-
 
 
 class MongoMemoryRepository:
@@ -984,6 +1051,43 @@ class MongoMemoryRepository:
         if updated is None:
             raise MemoryConflict("memory version conflict")
         return self._record_from_doc(updated)
+
+    async def expire_due(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        now: datetime | None = None,
+    ) -> tuple[MemoryRecord, ...]:
+        """Tombstone elapsed records using the same optimistic version fence."""
+
+        instant = _utc(now)
+        cursor = self.records.find(
+            {
+                **self._scope(tenant_id=tenant_id, namespace=namespace),
+                "state": MemoryState.ACTIVE.value,
+            }
+        ).sort([("expires_at", 1), ("memory_id", 1)])
+        if hasattr(cursor, "to_list"):
+            docs = await cursor.to_list(length=None)
+        else:
+            docs = [doc async for doc in cursor]
+
+        expired: list[MemoryRecord] = []
+        for doc in docs:
+            current = self._record_from_doc(doc)
+            if current.expires_at is None or _utc(current.expires_at) > instant:
+                continue
+            expired.append(
+                await self.tombstone(
+                    current.memory_id,
+                    tenant_id=current.tenant_id,
+                    namespace=current.namespace,
+                    expected_version=current.version,
+                    now=instant,
+                )
+            )
+        return tuple(expired)
 
 
 __all__ = [
