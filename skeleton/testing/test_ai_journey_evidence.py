@@ -10,6 +10,7 @@ from skeleton.release.ai_journey_evidence import (
     AIJourneyRequirement,
     MANDATORY_AI_JOURNEYS,
     collect_ai_journey_evidence,
+    requirements_from_manifest,
 )
 from skeleton.release.evidence import EvidenceSchemaError
 
@@ -311,3 +312,64 @@ def test_full_mandatory_matrix_fails_if_one_required_fault_is_missing() -> None:
         )
 
     assert missing.nodeid in str(exc.value)
+
+
+
+def test_machine_journey_manifest_matches_typed_fallback_matrix() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    payload = json.loads(
+        (repo_root / "machine" / "ai_required_journeys.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    from_machine = requirements_from_manifest(payload)
+
+    assert [
+        (item.evidence_id, item.nodeid, item.lane)
+        for item in from_machine
+    ] == [
+        (item.evidence_id, item.nodeid, item.lane)
+        for item in MANDATORY_AI_JOURNEYS
+    ]
+
+
+def test_machine_journey_manifest_rejects_duplicate_nodeid() -> None:
+    payload = {
+        "schema_id": "skeleton.ai.release-journeys",
+        "schema_version": 1,
+        "required": [
+            {
+                "evidence_id": "one",
+                "category": "golden",
+                "nodeid": "tests/test_one.py::test_one",
+                "rationale": "first",
+            },
+            {
+                "evidence_id": "two",
+                "category": "fault",
+                "nodeid": "tests/test_one.py::test_one",
+                "rationale": "duplicate node",
+            },
+        ],
+    }
+
+    with pytest.raises(EvidenceSchemaError, match="nodeids must be unique"):
+        requirements_from_manifest(payload)
+
+
+def test_machine_journey_manifest_rejects_unknown_category() -> None:
+    payload = {
+        "schema_id": "skeleton.ai.release-journeys",
+        "schema_version": 1,
+        "required": [
+            {
+                "evidence_id": "one",
+                "category": "planned",
+                "nodeid": "tests/test_one.py::test_one",
+                "rationale": "not executable",
+            }
+        ],
+    }
+
+    with pytest.raises(EvidenceSchemaError, match="golden or fault"):
+        requirements_from_manifest(payload)
