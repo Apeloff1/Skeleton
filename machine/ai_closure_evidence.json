@@ -765,7 +765,7 @@
       "plane": "product-experience",
       "stage": 7,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented",
       "closure_decision": "open",
       "evidence_present": [
         "backend/tests/test_ai_golden_journey.py — deterministic assembled retrieval -> context compiler -> engine -> approval-required tool -> verification/result journey with no live provider secret",
@@ -774,7 +774,11 @@
         "skeleton/testing/test_execution_runtime.py — provider checkpoint crash recovery, tool-effect crash recovery without duplicate side effect, cancellation and deadline faults",
         "backend/tests/test_operation_stream_transport.py and backend/tests/test_operation_stream_route.py — replay/resync/cancel/backpressure transport journeys",
         "frontend/scripts/test-operation-stream-reducer.mjs — client ordering/reconciliation/resync semantics",
-        "skeleton/testing/test_engine_execution_service.py — approval expiry/mismatch/idempotency fault coverage"
+        "skeleton/testing/test_engine_execution_service.py — approval expiry/mismatch/idempotency fault coverage",
+        "skeleton/release/ai_journey_evidence.py — mandatory named Stage-7 test/eval matrix with exact result-byte digest binding",
+        "scripts/ai_release_evidence.py — release collector Stage-7 matrix mode emits canonical TestEvidence only after named journeys pass",
+        ".github/workflows/reproducible-release.yml — canonical release gate consumes named Stage-7 matrix and artifact-usage journey",
+        ".github/workflows/ai-p0-integration-validation.yml — focused branch validation for Stage 3-7 Python and frontend stream contracts"
       ],
       "closure_evidence_required": [
         "browser E2E suite",
@@ -787,7 +791,10 @@
         "fresh execution of the deterministic golden journey and fault suites on current branch head",
         "assembled release evidence with run IDs/artifacts/log references",
         "full mandatory journey matrix execution including conversation, retrieval, tool, artifact, cancel/reconnect and outage under one CI release run",
-        "all Stage 0-6 dependency gaps must close before this gap can close"
+        "all Stage 0-6 dependency gaps must close before this gap can close",
+        "successful ai-p0-integration-validation workflow run on current branch head",
+        "successful reproducible-release run on a review/release ref",
+        "browser E2E evidence remains required for hardened production closure"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
