@@ -45,6 +45,10 @@ export type Conversation = {
   sessionId: string | null;
   sessionUpdatedAt: number;
   messages: Message[];
+  // Canonical server thread version. Local storage is only a cache/preferences
+  // projection when this field is present.
+  serverVersion?: number;
+  serverState?: 'active' | 'archived' | 'deleting' | 'deleted';
 };
 
 export type Workspace = {
@@ -132,6 +136,17 @@ function restoreConversation(value: unknown, now: number): Conversation | null {
     draft: text(item.draft), context: text(item.context, MAX_CONTEXT), allForms: item.allForms === true,
     sessionId: sessionFresh ? text(item.sessionId, 128) || null : null,
     sessionUpdatedAt: sessionFresh ? sessionUpdatedAt : 0, messages,
+    serverVersion: (
+      typeof item.serverVersion === 'number'
+      && Number.isSafeInteger(item.serverVersion)
+      && item.serverVersion >= 1
+    ) ? item.serverVersion : undefined,
+    serverState: (
+      item.serverState === 'active'
+      || item.serverState === 'archived'
+      || item.serverState === 'deleting'
+      || item.serverState === 'deleted'
+    ) ? item.serverState : undefined,
   };
 }
 
@@ -160,6 +175,7 @@ export function encodeWorkspace(workspace: Workspace): string {
       pinned: c.pinned, archived: c.archived, draft: c.draft.slice(0, MAX_TEXT),
       context: c.context.slice(0, MAX_CONTEXT), allForms: c.allForms,
       sessionId: c.sessionId, sessionUpdatedAt: c.sessionUpdatedAt,
+      serverVersion: c.serverVersion, serverState: c.serverState,
       messages: c.messages.slice(-MAX_MESSAGES).map(m => ({
         id: m.id, role: m.role, text: m.text.slice(0, MAX_TEXT), createdAt: m.createdAt,
         status: m.status, tier: m.tier, model: m.model, forms: m.forms,
