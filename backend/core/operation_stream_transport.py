@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -396,11 +397,15 @@ class OperationStreamTransport:
         operation_id: str,
         *,
         tenant_id: str,
+        now: datetime | None = None,
     ) -> int:
         """Compact only history acknowledged by every active consumer."""
 
         self._authorized_operation(operation_id, tenant_id=tenant_id)
-        return self.event_store.compact_acknowledged(operation_id)
+        return self.event_store.compact_acknowledged(
+            operation_id,
+            now=now,
+        )
 
     def cancel(
         self,
