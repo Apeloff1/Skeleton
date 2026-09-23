@@ -445,13 +445,6 @@ def deterministic_plan(snapshot: SupervisorSnapshot) -> str:
 
 def model_plan(snapshot: SupervisorSnapshot) -> str:
     """Ask the configured model for a plan, falling back deterministically."""
-    if (
-        not os.environ.get("MODEL_API_KEY")
-        or not os.environ.get("MODEL_API_URL")
-        or not os.environ.get("MODEL_NAME")
-    ):
-        return deterministic_plan(snapshot)
-
     prompt = (
         "You are the planning-only repository supervisor. Produce a concise "
         "JSON-like plan for the secretary. Never emit shell commands, "
