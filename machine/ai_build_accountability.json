@@ -19237,22 +19237,28 @@
       "id": "ACC-AIQ-S0-COST-02",
       "type": "queue_task",
       "title": "AIQ-S0-COST-02 Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
-      "status": "in_progress",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
       "started_at_utc": "2026-09-21T19:18:48Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S0-COST-02",
+          "skeleton/intelligence/admission.py",
+          "skeleton/skills",
+          "skeleton/artifact_plane"
+        ],
+        "statement": "Implementation signoff for AIQ-S0-COST-02: Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19268,7 +19274,7 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": "2026-09-21T19:18:48Z",
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
       "history": [
         {
           "sequence": 1,
@@ -19286,31 +19292,63 @@
           "evidence_refs": [
             "machine/accountability_events/ACC-AIQ-S0-COST-02/start.json"
           ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S0-COST-02: Meter and reconcile actual tool, artifact and storage usage against the same monotonic execution budget.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-COST-02",
+            "skeleton/intelligence/admission.py",
+            "skeleton/skills",
+            "skeleton/artifact_plane"
+          ]
         }
       ],
-      "evidence": [],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S0-COST-02",
+        "skeleton/artifact_plane",
+        "skeleton/intelligence/admission.py",
+        "skeleton/skills"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S0-COST-03",
       "type": "queue_task",
       "title": "AIQ-S0-COST-03 Add shared cross-process pressure/concurrency coordination and overload shedding.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S0-COST-03",
+          "skeleton/intelligence/capacity_planner.py",
+          "skeleton/agents"
+        ],
+        "statement": "Implementation signoff for AIQ-S0-COST-03: Add shared cross-process pressure/concurrency coordination and overload shedding.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19326,31 +19364,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S0-COST-03: Add shared cross-process pressure/concurrency coordination and overload shedding.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-COST-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S0-COST-03: Add shared cross-process pressure/concurrency coordination and overload shedding.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-COST-03",
+            "skeleton/intelligence/capacity_planner.py",
+            "skeleton/agents"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S0-COST-03",
+        "skeleton/agents",
+        "skeleton/intelligence/capacity_planner.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S0-PROV-01",
       "type": "queue_task",
       "title": "AIQ-S0-PROV-01 Run provider-surface discovery and classify every credential/network model edge.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S0-PROV-01",
+          "scripts/check_provider_bootstrap.py",
+          "machine/ai_app_construction.json"
+        ],
+        "statement": "Implementation signoff for AIQ-S0-PROV-01: Run provider-surface discovery and classify every credential/network model edge.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19366,31 +19453,83 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S0-PROV-01: Run provider-surface discovery and classify every credential/network model edge.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-PROV-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S0-PROV-01: Run provider-surface discovery and classify every credential/network model edge.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-PROV-01",
+            "scripts/check_provider_bootstrap.py",
+            "machine/ai_app_construction.json"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_app_construction.json",
+        "machine/ai_build_queue.json#AIQ-S0-PROV-01",
+        "scripts/check_provider_bootstrap.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S0-PROV-02",
       "type": "queue_task",
       "title": "AIQ-S0-PROV-02 Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S0-PROV-02",
+          "skeleton/provider_runtime.py",
+          "backend/core/ai_provider.py",
+          "skeleton/jeeves/providers.py",
+          "backend/routes/image_generation.py",
+          "backend/core/expressive_tts.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S0-PROV-02: Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19406,31 +19545,85 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S0-PROV-02: Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-PROV-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S0-PROV-02: Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-PROV-02",
+            "skeleton/provider_runtime.py",
+            "backend/core/ai_provider.py",
+            "skeleton/jeeves/providers.py",
+            "backend/routes/image_generation.py",
+            "backend/core/expressive_tts.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/core/ai_provider.py",
+        "backend/core/expressive_tts.py",
+        "backend/routes/image_generation.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S0-PROV-02",
+        "skeleton/jeeves/providers.py",
+        "skeleton/provider_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S0-PROV-03",
       "type": "queue_task",
       "title": "AIQ-S0-PROV-03 Produce current-head CI evidence that only declared source-level provider surfaces remain.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S0-PROV-03",
+          "scripts/check_provider_bootstrap.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S0-PROV-03: Produce current-head CI evidence that only declared source-level provider surfaces remain.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19446,31 +19639,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S0-PROV-03: Produce current-head CI evidence that only declared source-level provider surfaces remain.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-PROV-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S0-PROV-03: Produce current-head CI evidence that only declared source-level provider surfaces remain.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S0-PROV-03",
+            "scripts/check_provider_bootstrap.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S0-PROV-03",
+        "scripts/check_provider_bootstrap.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-CONV-01",
       "type": "queue_task",
       "title": "AIQ-S1-CONV-01 Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-CONV-01",
+          "backend/core/conversations.py",
+          "backend/routes/conversations.py",
+          "backend/routes/ai.py",
+          "skeleton/persistence/conversation_repository.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-CONV-01: Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19486,31 +19728,84 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-CONV-01: Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-CONV-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-CONV-01: Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-CONV-01",
+            "backend/core/conversations.py",
+            "backend/routes/conversations.py",
+            "backend/routes/ai.py",
+            "skeleton/persistence/conversation_repository.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/core/conversations.py",
+        "backend/routes/ai.py",
+        "backend/routes/conversations.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-CONV-01",
+        "skeleton/persistence/conversation_repository.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-CONV-02",
       "type": "queue_task",
       "title": "AIQ-S1-CONV-02 Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-CONV-02",
+          "backend/core/conversations.py",
+          "skeleton/contracts/conversation.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-CONV-02: Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19526,31 +19821,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-CONV-02: Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-CONV-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-CONV-02: Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-CONV-02",
+            "backend/core/conversations.py",
+            "skeleton/contracts/conversation.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/core/conversations.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-CONV-02",
+        "skeleton/contracts/conversation.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-CONV-03",
       "type": "queue_task",
       "title": "AIQ-S1-CONV-03 Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-CONV-03",
+          "frontend/src/product/conversationClient.ts",
+          "backend/routes/conversations.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-CONV-03: Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19566,31 +19910,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-CONV-03: Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-CONV-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-CONV-03: Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-CONV-03",
+            "frontend/src/product/conversationClient.ts",
+            "backend/routes/conversations.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/routes/conversations.py",
+        "frontend/src/product/conversationClient.ts",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-CONV-03"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-MEM-01",
       "type": "queue_task",
       "title": "AIQ-S1-MEM-01 Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-MEM-01",
+          "skeleton/contracts/memory_record.py",
+          "skeleton/persistence/memory_repository.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-MEM-01: Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19606,31 +19999,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-MEM-01: Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-MEM-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-MEM-01: Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-MEM-01",
+            "skeleton/contracts/memory_record.py",
+            "skeleton/persistence/memory_repository.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-MEM-01",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-MEM-02",
       "type": "queue_task",
       "title": "AIQ-S1-MEM-02 Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-MEM-02",
+          "skeleton/memory/policy.py",
+          "skeleton/memory/writeback.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-MEM-02: Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19646,31 +20088,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-MEM-02: Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-MEM-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-MEM-02: Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-MEM-02",
+            "skeleton/memory/policy.py",
+            "skeleton/memory/writeback.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-MEM-02",
+        "skeleton/memory/policy.py",
+        "skeleton/memory/writeback.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-MEM-03",
       "type": "queue_task",
       "title": "AIQ-S1-MEM-03 Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-MEM-03",
+          "skeleton/memory",
+          "skeleton/retrieval"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-MEM-03: Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19686,31 +20177,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-MEM-03: Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-MEM-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-MEM-03: Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-MEM-03",
+            "skeleton/memory",
+            "skeleton/retrieval"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-MEM-03",
+        "skeleton/memory",
+        "skeleton/retrieval"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-TOOL-01",
       "type": "queue_task",
       "title": "AIQ-S1-TOOL-01 Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-TOOL-01",
+          "skeleton/skills/tool_contract.py",
+          "skeleton/skills/tool_runtime.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-TOOL-01: Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19726,31 +20266,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-TOOL-01: Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-TOOL-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-TOOL-01: Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-TOOL-01",
+            "skeleton/skills/tool_contract.py",
+            "skeleton/skills/tool_runtime.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-TOOL-01",
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-TOOL-02",
       "type": "queue_task",
       "title": "AIQ-S1-TOOL-02 Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-TOOL-02",
+          "skeleton/skills/tool_adapters/",
+          "backend/services/tool_registry.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-TOOL-02: Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19766,31 +20355,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-TOOL-02: Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-TOOL-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-TOOL-02: Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-TOOL-02",
+            "skeleton/skills/tool_adapters/",
+            "backend/services/tool_registry.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/services/tool_registry.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-TOOL-02",
+        "skeleton/skills/tool_adapters/"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S1-TOOL-03",
       "type": "queue_task",
       "title": "AIQ-S1-TOOL-03 Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S1-TOOL-03",
+          "skeleton/skills/tool_runtime.py",
+          "backend/services/tool_registry.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S1-TOOL-03: Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19806,31 +20444,81 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S1-TOOL-03: Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-TOOL-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S1-TOOL-03: Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S1-TOOL-03",
+            "skeleton/skills/tool_runtime.py",
+            "backend/services/tool_registry.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/services/tool_registry.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S1-TOOL-03",
+        "skeleton/skills/tool_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S2-CTX-01",
       "type": "queue_task",
       "title": "AIQ-S2-CTX-01 Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S2-CTX-01",
+          "skeleton/context/compiler.py",
+          "skeleton/context/sources/",
+          "skeleton/context/policy.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S2-CTX-01: Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19846,31 +20534,84 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S2-CTX-01: Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-CTX-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S2-CTX-01: Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-CTX-01",
+            "skeleton/context/compiler.py",
+            "skeleton/context/sources/",
+            "skeleton/context/policy.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S2-CTX-01",
+        "skeleton/context/compiler.py",
+        "skeleton/context/policy.py",
+        "skeleton/context/sources/"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S2-CTX-02",
       "type": "queue_task",
       "title": "AIQ-S2-CTX-02 Converge legacy route/service system prompts onto versioned instruction-policy identities.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S2-CTX-02",
+          "skeleton/context/instruction_policy.py",
+          "backend/routes/ai.py",
+          "backend/services/ai_assistant_svc.py",
+          "backend/routes/image_generation.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S2-CTX-02: Converge legacy route/service system prompts onto versioned instruction-policy identities.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19886,31 +20627,85 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S2-CTX-02: Converge legacy route/service system prompts onto versioned instruction-policy identities.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-CTX-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S2-CTX-02: Converge legacy route/service system prompts onto versioned instruction-policy identities.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-CTX-02",
+            "skeleton/context/instruction_policy.py",
+            "backend/routes/ai.py",
+            "backend/services/ai_assistant_svc.py",
+            "backend/routes/image_generation.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/routes/ai.py",
+        "backend/routes/image_generation.py",
+        "backend/services/ai_assistant_svc.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S2-CTX-02",
+        "skeleton/context/instruction_policy.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S2-CTX-03",
       "type": "queue_task",
       "title": "AIQ-S2-CTX-03 Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S2-CTX-03",
+          "skeleton/contracts/context.py",
+          "skeleton/provider_runtime.py",
+          "backend/routes/ai.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S2-CTX-03: Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19926,31 +20721,82 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S2-CTX-03: Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-CTX-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S2-CTX-03: Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-CTX-03",
+            "skeleton/contracts/context.py",
+            "skeleton/provider_runtime.py",
+            "backend/routes/ai.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/routes/ai.py",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S2-CTX-03",
+        "skeleton/contracts/context.py",
+        "skeleton/provider_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S2-PROTO-01",
       "type": "queue_task",
       "title": "AIQ-S2-PROTO-01 Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S2-PROTO-01",
+          "skeleton/provider_contract.py",
+          "machine/ai_runtime_schemas.json"
+        ],
+        "statement": "Implementation signoff for AIQ-S2-PROTO-01: Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -19966,31 +20812,79 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S2-PROTO-01: Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-PROTO-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S2-PROTO-01: Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-PROTO-01",
+            "skeleton/provider_contract.py",
+            "machine/ai_runtime_schemas.json"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S2-PROTO-01",
+        "machine/ai_runtime_schemas.json",
+        "skeleton/provider_contract.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S2-PROTO-02",
       "type": "queue_task",
       "title": "AIQ-S2-PROTO-02 Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S2-PROTO-02",
+          "skeleton/provider_runtime.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S2-PROTO-02: Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20006,31 +20900,77 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S2-PROTO-02: Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-PROTO-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S2-PROTO-02: Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-PROTO-02",
+            "skeleton/provider_runtime.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S2-PROTO-02",
+        "skeleton/provider_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S2-PROTO-03",
       "type": "queue_task",
       "title": "AIQ-S2-PROTO-03 Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S2-PROTO-03",
+          "skeleton/provider_runtime.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S2-PROTO-03: Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20046,31 +20986,78 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S2-PROTO-03: Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-PROTO-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S2-PROTO-03: Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S2-PROTO-03",
+            "skeleton/provider_runtime.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S2-PROTO-03",
+        "skeleton/provider_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S3-VER-01",
       "type": "queue_task",
       "title": "AIQ-S3-VER-01 Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S3-VER-01",
+          "skeleton/contracts/verification.py",
+          "skeleton/intelligence/verification_policy.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S3-VER-01: Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20086,31 +21073,81 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S3-VER-01: Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S3-VER-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S3-VER-01: Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S3-VER-01",
+            "skeleton/contracts/verification.py",
+            "skeleton/intelligence/verification_policy.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S3-VER-01",
+        "skeleton/contracts/verification.py",
+        "skeleton/intelligence/verification_policy.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S3-VER-02",
       "type": "queue_task",
       "title": "AIQ-S3-VER-02 Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S3-VER-02",
+          "skeleton/intelligence/verification_runtime.py",
+          "skeleton/retrieval",
+          "skeleton/skills"
+        ],
+        "statement": "Implementation signoff for AIQ-S3-VER-02: Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20126,31 +21163,81 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S3-VER-02: Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S3-VER-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S3-VER-02: Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S3-VER-02",
+            "skeleton/intelligence/verification_runtime.py",
+            "skeleton/retrieval",
+            "skeleton/skills"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S3-VER-02",
+        "skeleton/intelligence/verification_runtime.py",
+        "skeleton/retrieval",
+        "skeleton/skills"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S3-VER-03",
       "type": "queue_task",
       "title": "AIQ-S3-VER-03 Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S3-VER-03",
+          "skeleton/intelligence/verification_runtime.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S3-VER-03: Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20166,31 +21253,78 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S3-VER-03: Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S3-VER-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S3-VER-03: Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S3-VER-03",
+            "skeleton/intelligence/verification_runtime.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S3-VER-03",
+        "skeleton/intelligence/verification_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S4-EXEC-01",
       "type": "queue_task",
       "title": "AIQ-S4-EXEC-01 Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S4-EXEC-01",
+          "skeleton/contracts/ai_execution.py",
+          "skeleton/persistence/execution_repository.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S4-EXEC-01: Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20206,31 +21340,79 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S4-EXEC-01: Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S4-EXEC-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S4-EXEC-01: Materialize AIExecution/AgentTurn/Checkpoint/Result contracts and durable repository interfaces.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S4-EXEC-01",
+            "skeleton/contracts/ai_execution.py",
+            "skeleton/persistence/execution_repository.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S4-EXEC-01",
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S4-EXEC-02",
       "type": "queue_task",
       "title": "AIQ-S4-EXEC-02 Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S4-EXEC-02",
+          "skeleton/intelligence/execution_runtime.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S4-EXEC-02: Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20246,31 +21428,78 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S4-EXEC-02: Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S4-EXEC-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S4-EXEC-02: Implement the bounded model->tool->model execution loop with wait/resume/cancel/budget/deadline semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S4-EXEC-02",
+            "skeleton/intelligence/execution_runtime.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S4-EXEC-02",
+        "skeleton/intelligence/execution_runtime.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S4-EXEC-03",
       "type": "queue_task",
       "title": "AIQ-S4-EXEC-03 Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S4-EXEC-03",
+          "skeleton/intelligence/execution_runtime.py",
+          "skeleton/persistence/execution_repository.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S4-EXEC-03: Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20286,31 +21515,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S4-EXEC-03: Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S4-EXEC-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S4-EXEC-03: Implement crash recovery and atomic/transactional-outbox finalization binding verification, usage, memory, artifacts and terminal stream state.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S4-EXEC-03",
+            "skeleton/intelligence/execution_runtime.py",
+            "skeleton/persistence/execution_repository.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S4-EXEC-03",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/persistence/execution_repository.py"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S5-ENG-01",
       "type": "queue_task",
       "title": "AIQ-S5-ENG-01 Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S5-ENG-01",
+          "skeleton/api",
+          "machine/ai_runtime_schemas.json"
+        ],
+        "statement": "Implementation signoff for AIQ-S5-ENG-01: Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20326,31 +21604,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S5-ENG-01: Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S5-ENG-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S5-ENG-01: Implement authenticated engine submit/status/cancel/events endpoints and delegated authority validation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S5-ENG-01",
+            "skeleton/api",
+            "machine/ai_runtime_schemas.json"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S5-ENG-01",
+        "machine/ai_runtime_schemas.json",
+        "skeleton/api"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S5-ENG-02",
       "type": "queue_task",
       "title": "AIQ-S5-ENG-02 Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S5-ENG-02",
+          "backend/core/engine_client.py",
+          "backend/routes"
+        ],
+        "statement": "Implementation signoff for AIQ-S5-ENG-02: Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20366,31 +21693,81 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S5-ENG-02: Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S5-ENG-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S5-ENG-02: Implement backend engine client, idempotent retry/query and route canonical conversation AI execution through it.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S5-ENG-02",
+            "backend/core/engine_client.py",
+            "backend/routes"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/core/engine_client.py",
+        "backend/routes",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S5-ENG-02"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S5-ENG-03",
       "type": "queue_task",
       "title": "AIQ-S5-ENG-03 Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S5-ENG-03",
+          "docker-compose.yml",
+          "backend/core/ai_provider.py",
+          "skeleton/app/manifest.json"
+        ],
+        "statement": "Implementation signoff for AIQ-S5-ENG-03: Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20406,31 +21783,81 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S5-ENG-03: Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S5-ENG-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S5-ENG-03: Move runtime provider credentials to the Skeleton engine process and retire local backend provider execution after parity.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S5-ENG-03",
+            "docker-compose.yml",
+            "backend/core/ai_provider.py",
+            "skeleton/app/manifest.json"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/core/ai_provider.py",
+        "docker-compose.yml",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S5-ENG-03",
+        "skeleton/app/manifest.json"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S6-STREAM-01",
       "type": "queue_task",
       "title": "AIQ-S6-STREAM-01 Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S6-STREAM-01",
+          "frontend"
+        ],
+        "statement": "Implementation signoff for AIQ-S6-STREAM-01: Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20446,31 +21873,78 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S6-STREAM-01: Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S6-STREAM-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S6-STREAM-01: Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S6-STREAM-01",
+            "frontend"
+          ]
+        }
+      ],
+      "evidence": [
+        "frontend",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S6-STREAM-01"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S6-STREAM-02",
       "type": "queue_task",
       "title": "AIQ-S6-STREAM-02 Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S6-STREAM-02",
+          "frontend",
+          "backend/core/operation_stream_transport.py"
+        ],
+        "statement": "Implementation signoff for AIQ-S6-STREAM-02: Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20486,31 +21960,80 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S6-STREAM-02: Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S6-STREAM-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S6-STREAM-02: Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S6-STREAM-02",
+            "frontend",
+            "backend/core/operation_stream_transport.py"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/core/operation_stream_transport.py",
+        "frontend",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S6-STREAM-02"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S6-STREAM-03",
       "type": "queue_task",
       "title": "AIQ-S6-STREAM-03 Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S6-STREAM-03",
+          "backend/routes/operation_stream.py",
+          "frontend"
+        ],
+        "statement": "Implementation signoff for AIQ-S6-STREAM-03: Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20526,31 +22049,82 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S6-STREAM-03: Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S6-STREAM-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S6-STREAM-03: Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S6-STREAM-03",
+            "backend/routes/operation_stream.py",
+            "frontend"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend/routes/operation_stream.py",
+        "frontend",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S6-STREAM-03"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S7-E2E-01",
       "type": "queue_task",
       "title": "AIQ-S7-E2E-01 Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S7-E2E-01",
+          "tests",
+          "frontend",
+          "backend",
+          "skeleton"
+        ],
+        "statement": "Implementation signoff for AIQ-S7-E2E-01: Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20566,31 +22140,83 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S7-E2E-01: Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S7-E2E-01"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S7-E2E-01: Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S7-E2E-01",
+            "tests",
+            "frontend",
+            "backend",
+            "skeleton"
+          ]
+        }
+      ],
+      "evidence": [
+        "backend",
+        "frontend",
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S7-E2E-01",
+        "skeleton",
+        "tests"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S7-E2E-02",
       "type": "queue_task",
       "title": "AIQ-S7-E2E-02 Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S7-E2E-02",
+          "tests"
+        ],
+        "statement": "Implementation signoff for AIQ-S7-E2E-02: Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20606,31 +22232,78 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S7-E2E-02: Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S7-E2E-02"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S7-E2E-02: Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S7-E2E-02",
+            "tests"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S7-E2E-02",
+        "tests"
+      ],
       "baseline_status": "pending"
     },
     {
       "id": "ACC-AIQ-S7-E2E-03",
       "type": "queue_task",
       "title": "AIQ-S7-E2E-03 Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
-      "status": "pending",
+      "status": "evidence_pending",
       "checkbox": false,
       "checkbox_mark": "[ ]",
       "signing_required": true,
-      "started_at_utc": null,
+      "started_at_utc": "2026-09-23T23:12:50Z",
       "implementation_signoff": {
-        "signed": false,
-        "signer_id": null,
-        "signer_type": null,
-        "role": null,
-        "signed_at_utc": null,
-        "git_sha": null,
-        "evidence_refs": [],
-        "statement": null,
-        "signature_method": null,
-        "signature_ref": null
+        "signed": true,
+        "signer_id": "chatgpt:gpt-5.6-sol",
+        "signer_type": "agent",
+        "role": "implementation-agent",
+        "signed_at_utc": "2026-09-23T23:12:50Z",
+        "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "evidence_refs": [
+          "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "machine/ai_build_queue.json#AIQ-S7-E2E-03",
+          "tests",
+          "machine/ai_closure_evidence.json"
+        ],
+        "statement": "Implementation signoff for AIQ-S7-E2E-03: Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
+        "signature_method": "github_identity",
+        "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36"
       },
       "verification_signoff": {
         "signed": false,
@@ -20646,9 +22319,53 @@
       },
       "independence_exception": null,
       "completed_at_utc": null,
-      "last_event_at_utc": null,
-      "history": [],
-      "evidence": [],
+      "last_event_at_utc": "2026-09-23T23:12:50Z",
+      "history": [
+        {
+          "sequence": 1,
+          "event_type": "started",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Begin governed accountability reconciliation for implemented AIQ-S7-E2E-03: Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "pending",
+          "to_status": "in_progress",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S7-E2E-03"
+          ]
+        },
+        {
+          "sequence": 2,
+          "event_type": "implementation_signed",
+          "actor_id": "chatgpt:gpt-5.6-sol",
+          "actor_type": "agent",
+          "role": "implementation-agent",
+          "at_utc": "2026-09-23T23:12:50Z",
+          "git_sha": "6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "statement": "Implementation signoff for AIQ-S7-E2E-03: Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
+          "signature_method": "github_identity",
+          "signature_ref": "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+          "from_status": "in_progress",
+          "to_status": "evidence_pending",
+          "evidence_refs": [
+            "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+            "machine/ai_build_queue.json#AIQ-S7-E2E-03",
+            "tests",
+            "machine/ai_closure_evidence.json"
+          ]
+        }
+      ],
+      "evidence": [
+        "https://github.com/Apeloff1/Skeleton/commit/6b9ea8db990f9ab3a3ce75f836b027b6d0b7ea36",
+        "machine/ai_build_queue.json#AIQ-S7-E2E-03",
+        "machine/ai_closure_evidence.json",
+        "tests"
+      ],
       "baseline_status": "pending"
     },
     {
