@@ -198,23 +198,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
-            exit 1
-          fi
-
           role='secretary'
           if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_NAME" == 'push' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
             role='both'
           fi
 
-          if ! python -m core.shift_supervisor \
+          model_status=0
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo '::warning::OPENAI_API_KEY is unavailable; using deterministic authorized failover.'
+            model_status=78
+          elif ! timeout --signal=TERM --kill-after=15s 240s python -m core.shift_supervisor \
             --once \
             --role "$role" \
             --output .shift-supervisor-tmp/result.json \
             --state-in .shift-supervisor-tmp/state-in.txt \
             --state-out .shift-supervisor-tmp/state-out.txt; then
-            echo '::warning::Advisory model planning failed; compiling deterministic issue-backed failover plan.'
+            model_status=$?
+          fi
+
+          if (( model_status != 0 )); then
+            echo "::warning::Advisory model planning unavailable (status=${model_status}); compiling deterministic issue-backed failover plan."
             python - <<'PY'
           from pathlib import Path
           from core.shift_supervisor.__main__ import _read_state
