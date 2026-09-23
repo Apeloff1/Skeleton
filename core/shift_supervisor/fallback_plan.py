@@ -9,6 +9,8 @@ from typing import Any, Mapping
 PLAN_TITLE = "[Shift Supervisor] Canonical Night + Idle Plan"
 _STATUS_PREFIX = "[Shift Supervisor]"
 _ALLOWED_TEAMS = ("night", "idle")
+_BOOTSTRAP_ISSUES = frozenset({1685})
+_APPROVAL_LABELS = frozenset({"supervisor-ready", "build-approved", "security-approved"})
 
 
 def _priority(issue: Mapping[str, Any]) -> int:
@@ -27,7 +29,17 @@ def _priority(issue: Mapping[str, Any]) -> int:
 def _eligible(issue: Mapping[str, Any]) -> bool:
     title = str(issue.get("title", "")).strip()
     number = issue.get("number")
-    return bool(title and number and not title.startswith(_STATUS_PREFIX))
+    labels = {
+        str(item.get("name", item)).lower()
+        for item in issue.get("labels", [])
+        if isinstance(item, (str, Mapping))
+    }
+    try:
+        issue_number = int(number)
+    except (TypeError, ValueError):
+        return False
+    authorized = issue_number in _BOOTSTRAP_ISSUES or bool(labels & _APPROVAL_LABELS)
+    return bool(title and authorized and not title.startswith(_STATUS_PREFIX))
 
 
 def compile_fallback_state(context: Mapping[str, Any], previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
