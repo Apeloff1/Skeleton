@@ -766,4 +766,3 @@ Identity-bound signature methods: GitHub identity, GPG, SSH signing, Sigstore, o
 - [ ] `ACC-OBSCURE-028` — OBSCURE-028 Wall-clock timestamps cannot prove causality — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-OBSCURE-029` — OBSCURE-029 Hash-based CAS still needs metadata migrations — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
 - [ ] `ACC-OBSCURE-030` — OBSCURE-030 Reproducibility and repeatability differ — status: `planned` — builder: **UNSIGNED** — verifier: **UNSIGNED** — completed_at_utc: `—`
-
