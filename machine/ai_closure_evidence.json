@@ -142,9 +142,17 @@
       "plane": "model-provider",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "scripts/check_provider_bootstrap.py — AST/source discovery of credential, SDK client and raw provider network edges with declared-owner cross-check and secret-free current-head evidence receipt",
+        "skeleton/testing/test_provider_surface_inventory.py — current inventory classification, synthetic credential/SDK/network discovery, application delegation-only isolation and evidence receipt regression",
+        "scripts/check_provider_runtime_boundary.py and tests/test_provider_runtime_boundary.py — vendor SDK and dynamic-import isolation outside skeleton/provider_runtime.py",
+        "skeleton/testing/test_provider_contract.py — canonical async/sync provider normalization, Jeeves source credential/transport isolation and undeclared-provider denial",
+        "backend/tests/test_ai_provider_media.py — image/edit/variation/speech all delegate to canonical provider runtime and application surfaces own no provider credentials/SDKs",
+        "backend/tests/test_ai_service_provider_convergence.py — application AI service uses canonical provider request and contains no shadow runtime/provider SDK path",
+        ".github/workflows/app-assembly.yml — provider bootstrap gate emits provider-surface-evidence.json and runs provider inventory/runtime/media convergence suites"
+      ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
         "canonical synchronous provider transport regression suite",
@@ -155,15 +163,12 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "outstanding_evidence": [
-        "canonical async provider regression suite",
-        "canonical synchronous provider transport regression suite",
-        "Jeeves source has no model credentials or raw provider network I/O",
-        "provider-surface inventory gate reports only declared credential-bearing owners",
-        "SDK isolation scans backend and skeleton source",
-        "media provider boundary regression suite",
-        "application media surfaces contain no direct provider credentials or SDK imports"
+        "fresh App Assembly/provider-bootstrap run on the current branch head",
+        "current-head provider-surface evidence artifact/run id attached to closure ledger"
       ],
-      "blockers": [],
+      "blockers": [
+        "fresh current-head CI evidence is absent because this integration branch has no open PR-triggered workflow run"
+      ],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
