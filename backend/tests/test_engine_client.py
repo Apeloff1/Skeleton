@@ -89,7 +89,7 @@ async def test_engine_client_execute_uses_sealed_submit_status_and_result_events
                     "state": "admitted",
                 }
             )
-        if request.full_url.endswith("/events"):
+        if "/events?" in request.full_url:
             return _Response(
                 {
                     "execution_id": command.execution_request.execution_id,
@@ -132,6 +132,8 @@ async def test_engine_client_execute_uses_sealed_submit_status_and_result_events
     assert [call["method"] for call in calls] == ["POST", "GET", "GET"]
     submit = calls[0]
     assert submit["url"].endswith("/api/v1/engine/executions")
+    assert submit["body"]["actor_id"] == command.operation.actor_id
+    assert submit["body"]["tenant_id"] == command.operation.tenant_id
     assert submit["body"]["command"]["compiled_context"]["prompt"] == "hello"
     assert submit["body"]["command"]["compiled_context"]["history"] == [
         {"role": "user", "content": "older"}
@@ -435,10 +437,18 @@ async def test_wait_for_result_surfaces_approval_required_without_poll_loop(
     client = _client()
     calls = 0
 
-    async def fake_status(execution_id, *, deadline=None):
+    async def fake_status(
+        execution_id,
+        *,
+        actor_id,
+        tenant_id,
+        deadline=None,
+    ):
         nonlocal calls
         calls += 1
         assert execution_id == "exec-waiting"
+        assert actor_id == "actor-a"
+        assert tenant_id == "tenant-a"
         return {
             "execution_id": execution_id,
             "operation_state": "waiting_for_user",
@@ -450,6 +460,8 @@ async def test_wait_for_result_surfaces_approval_required_without_poll_loop(
     with pytest.raises(EngineApprovalRequired) as excinfo:
         await client.wait_for_result(
             "exec-waiting",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
             deadline=datetime.now(timezone.utc) + timedelta(seconds=30),
         )
 
