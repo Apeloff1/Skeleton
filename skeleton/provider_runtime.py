@@ -540,6 +540,20 @@ def _provider_tool_definitions(
     return tuple(definitions[key] for key in sorted(definitions))
 
 
+def provider_tool_definitions(
+    request: ProviderRequest,
+) -> tuple[ProviderToolDefinition, ...]:
+    """Return canonical typed tool definitions for a provider request.
+
+    This is the public migration boundary for callers that still populate the
+    temporary raw tool_schemas compatibility field.
+    """
+
+    if not isinstance(request, ProviderRequest):
+        raise TypeError("request must be ProviderRequest")
+    return _provider_tool_definitions(request)
+
+
 def _provider_tool_payloads(
     request: ProviderRequest,
 ) -> list[dict[str, Any]]:
@@ -2459,5 +2473,6 @@ __all__ = [
     "ProviderSpeechResponse",
     "ProviderUnavailableError",
     "normalize_history",
-    "provider_request_from_context",
+    "provider_request_from_context",    "provider_tool_definitions",
+
 ]
