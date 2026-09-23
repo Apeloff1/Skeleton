@@ -74,6 +74,7 @@ class ServerState:
         self.intelligence: Optional[Any] = None
         self.intelligence_core: Optional[Any] = None
         self.operation_runtime: Optional[Any] = None
+        self.engine_execution_service: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
@@ -331,6 +332,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_ingress_routes import router as swarm_ingress_router
     from skeleton.api.swarm_tenant_broker_routes import router as swarm_tenant_broker_router
     from skeleton.api.swarm_recovery_archive_routes import router as swarm_recovery_archive_router
+    from skeleton.api.engine_routes import router as engine_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -345,6 +347,7 @@ def create_app() -> Any:
     app.include_router(swarm_ingress_router, prefix="/api/v1")
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
+    app.include_router(engine_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import GatePolicy, install_gate
