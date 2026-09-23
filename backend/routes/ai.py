@@ -35,6 +35,7 @@ from core.engine_client import (
     EngineClientError,
     EngineDeadlineExceeded,
     EngineExecutionFailed,
+    EngineRequestConflict,
     EngineUnavailable,
     engine_command_from_context,
 )
