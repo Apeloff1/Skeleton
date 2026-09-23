@@ -203,3 +203,57 @@ def test_tombstone_hides_memory_but_preserves_lineage() -> None:
         include_tombstoned=True,
     )
     assert restored_view.payload_digest == created.payload_digest
+
+
+def test_old_idempotency_receipt_survives_later_versions_and_restart(tmp_path) -> None:
+    path = tmp_path / "memory.sqlite3"
+    repo = SQLiteMemoryRepository(path)
+    create = _proposal(key="create", content="v1")
+    created = repo.commit(create, now=_now())
+    repo.commit(
+        _proposal(
+            key="update",
+            content="v2",
+            target=created.memory_id,
+            expected_version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    repo.close()
+
+    reopened = SQLiteMemoryRepository(path)
+    replay = reopened.commit(create, now=_now() + timedelta(seconds=30))
+    current = reopened.get(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert replay.version == 1
+    assert replay.content == "v1"
+    assert current.version == 2
+    assert current.content == "v2"
+
+
+def test_old_idempotency_key_cannot_be_reused_for_other_target_or_payload() -> None:
+    repo = SQLiteMemoryRepository()
+    original = _proposal(key="stable", content="v1")
+    first = repo.commit(original, now=_now())
+    second = repo.commit(_proposal(key="other", content="separate"), now=_now())
+
+    with pytest.raises(MemoryConflict, match="different memory write intent"):
+        repo.commit(
+            _proposal(
+                key="stable",
+                content="v1",
+                target=second.memory_id,
+                expected_version=1,
+            ),
+            now=_now() + timedelta(seconds=2),
+        )
+
+    assert repo.get(
+        first.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    ).content == "v1"
