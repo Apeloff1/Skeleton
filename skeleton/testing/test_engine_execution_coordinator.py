@@ -491,7 +491,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         ),
         capability=operation.capability,
         issued_at=_now(),
-        expires_at=_now() + timedelta(minutes=5),
+        expires_at=operation.deadline,
         request_binding=engine_request_binding(operation, request),
     )
     command = EngineExecutionCommand(
