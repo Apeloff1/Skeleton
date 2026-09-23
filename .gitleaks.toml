@@ -44,4 +44,3 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   regexTarget = "line"
   regexes = ['''"idempotency_key"\s*:\s*"approval-decision-1"''']
   paths = ['''^backend/tests/test_ai_chat_conversation_authority\.py$''']
-
