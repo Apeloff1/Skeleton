@@ -656,6 +656,20 @@ class CognitiveExecutionRuntime:
         )
         tools = await self._provider_tools(payload)
         deadline = self._deadline(payload)
+        context_policy = dict(execution.request.context_policy)
+        raw_snapshot = context_policy.get("source_snapshot", [])
+        if not isinstance(raw_snapshot, list):
+            raise CognitiveExecutionError(
+                "execution context source snapshot is corrupt"
+            )
+        source_snapshot: list[tuple[str, str]] = []
+        for item in raw_snapshot:
+            if not isinstance(item, list) or len(item) != 2:
+                raise CognitiveExecutionError(
+                    "execution context source snapshot entry is corrupt"
+                )
+            source_snapshot.append((str(item[0]), str(item[1])))
+
         response = await self.provider.generate(
             ProviderRequest(
                 instructions=instructions,
@@ -674,7 +688,7 @@ class CognitiveExecutionRuntime:
                     else None
                 ),
                 data_class=str(
-                    execution.request.context_policy.get(
+                    context_policy.get(
                         "data_class",
                         "internal",
                     )
@@ -684,6 +698,18 @@ class CognitiveExecutionRuntime:
                 operation_id=execution.operation_id,
                 execution_id=execution.execution_id,
                 turn_id=turn_id,
+                context_id=(
+                    None
+                    if context_policy.get("context_id") is None
+                    else str(context_policy["context_id"])
+                ),
+                context_digest=str(context_digest),
+                context_source_snapshot=tuple(source_snapshot),
+                context_compiler_version=(
+                    None
+                    if context_policy.get("compiler_version") is None
+                    else str(context_policy["compiler_version"])
+                ),
                 tools=tools,
                 tool_choice="auto" if tools else "none",
                 deadline=deadline,
