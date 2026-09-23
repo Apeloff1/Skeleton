@@ -1,0 +1,96 @@
+{
+  "schema_id": "skeleton.ai.release-journeys",
+  "schema_version": 1,
+  "required": [
+    {
+      "evidence_id": "ai-journey.simple-chat",
+      "category": "golden",
+      "nodeid": "skeleton/testing/test_execution_runtime.py::test_direct_provider_completion_is_verified_and_atomically_finalized",
+      "rationale": "Direct provider completion must verify and atomically finalize."
+    },
+    {
+      "evidence_id": "ai-journey.retrieval-tool-approval",
+      "category": "golden",
+      "nodeid": "backend/tests/test_ai_golden_journey.py::test_deterministic_retrieval_tool_approval_golden_journey",
+      "rationale": "Compiled retrieval evidence, tool authority, approval, receipt lineage, verification and engine finalization."
+    },
+    {
+      "evidence_id": "ai-journey.conversation-retry",
+      "category": "golden",
+      "nodeid": "backend/tests/test_ai_chat_conversation_authority.py::test_chat_retry_reuses_same_engine_operation_and_execution_identity",
+      "rationale": "Canonical conversation retry must converge on one engine identity."
+    },
+    {
+      "evidence_id": "ai-journey.artifact-result",
+      "category": "golden",
+      "nodeid": "backend/tests/test_ai_artifact_result_journey.py::test_deterministic_artifact_is_bound_to_durable_execution_result",
+      "rationale": "Artifact digest/reference must survive durable result finalization and restart."
+    },
+    {
+      "evidence_id": "ai-journey.stream-resync",
+      "category": "golden",
+      "nodeid": "backend/tests/test_operation_stream_route.py::test_authoritative_resync_returns_compaction_floor_and_retained_events",
+      "rationale": "Reconnect after compaction must reset to authoritative retained-stream floor."
+    },
+    {
+      "evidence_id": "ai-fault.cross-tenant-retrieval",
+      "category": "fault",
+      "nodeid": "backend/tests/test_ai_golden_journey.py::test_retrieval_tenant_ambiguity_fails_before_compilation",
+      "rationale": "Cross-tenant retrieval must fail before context compilation."
+    },
+    {
+      "evidence_id": "ai-fault.provider-outage",
+      "category": "fault",
+      "nodeid": "skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_provider_unavailable_becomes_durable_failure",
+      "rationale": "Provider outage must become a durable, inspectable failure."
+    },
+    {
+      "evidence_id": "ai-fault.provider-checkpoint-crash",
+      "category": "fault",
+      "nodeid": "skeleton/testing/test_execution_runtime.py::test_crash_after_provider_checkpoint_resumes_without_second_provider_call",
+      "rationale": "Crash after provider checkpoint must resume without duplicate provider execution."
+    },
+    {
+      "evidence_id": "ai-fault.tool-effect-crash",
+      "category": "fault",
+      "nodeid": "skeleton/testing/test_execution_runtime.py::test_crash_after_tool_effect_resumes_without_duplicate_tool_effect",
+      "rationale": "Crash after side effect must not duplicate tool execution."
+    },
+    {
+      "evidence_id": "ai-fault.tool-outage",
+      "category": "fault",
+      "nodeid": "skeleton/testing/test_execution_runtime.py::test_tool_handler_outage_becomes_durable_execution_failure",
+      "rationale": "Tool handler outage must fail durably and visibly."
+    },
+    {
+      "evidence_id": "ai-fault.approval-expiry",
+      "category": "fault",
+      "nodeid": "skeleton/testing/test_engine_execution_service.py::test_expired_persisted_approval_is_not_replayed_into_resume",
+      "rationale": "Expired approval must not be replayed into execution resume."
+    },
+    {
+      "evidence_id": "ai-fault.slow-client-backpressure",
+      "category": "fault",
+      "nodeid": "backend/tests/test_operation_stream_transport.py::test_slow_consumer_backpressure_preserves_pending_outbox_until_ack",
+      "rationale": "Slow clients must not cause silent outbox/event loss."
+    },
+    {
+      "evidence_id": "ai-fault.complete-wins-cancel-race",
+      "category": "fault",
+      "nodeid": "backend/tests/test_operation_stream_transport.py::test_completion_wins_cancel_race_and_terminal_stream_remains_final",
+      "rationale": "Committed completion must remain the only terminal event."
+    },
+    {
+      "evidence_id": "ai-fault.cancel-wins-complete-race",
+      "category": "fault",
+      "nodeid": "backend/tests/test_operation_stream_transport.py::test_cancel_wins_completion_race_and_completion_cannot_reopen_operation",
+      "rationale": "Committed cancellation must fence later completion."
+    },
+    {
+      "evidence_id": "ai-fault.durable-approval-restart",
+      "category": "fault",
+      "nodeid": "skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_durable_approval_resumes_effect_once_after_restart",
+      "rationale": "Approval and tool effect must survive engine restart without duplication."
+    }
+  ]
+}
