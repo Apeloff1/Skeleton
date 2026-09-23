@@ -23,6 +23,7 @@ from skeleton.contracts.operation import (
     OperationEnvelope,
     OperationState,
 )
+from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
@@ -122,10 +123,254 @@ def _execution_request_from_dict(payload: Mapping[str, Any]) -> AIExecutionReque
 
 
 @dataclass(frozen=True, slots=True)
+class EngineContextHandoff:
+    """Digest-bound projection of one server-compiled context envelope."""
+
+    operation_id: str
+    execution_id: str
+    turn_id: str
+    tenant_id: str
+    context_id: str
+    context_digest: str
+    compiler_version: str
+    source_snapshot: tuple[tuple[str, str], ...]
+    data_class: str
+    instructions: str
+    prompt: str
+    history: tuple[tuple[str, str], ...] = ()
+    tools: tuple[ProviderToolDefinition, ...] = ()
+    handoff_digest: str | None = None
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        for name in (
+            "operation_id",
+            "execution_id",
+            "turn_id",
+            "tenant_id",
+            "context_id",
+            "compiler_version",
+        ):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise EngineServiceError(f"{name} is required")
+            object.__setattr__(self, name, value)
+        digest = str(self.context_digest).strip()
+        if (
+            len(digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in digest)
+        ):
+            raise EngineServiceError(
+                "compiled context digest must be lowercase sha256"
+            )
+        object.__setattr__(self, "context_digest", digest)
+        data_class = str(self.data_class).strip().lower()
+        if data_class not in {
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
+        }:
+            raise EngineServiceError("compiled context data_class is invalid")
+        object.__setattr__(self, "data_class", data_class)
+        instructions = str(self.instructions)
+        prompt = str(self.prompt)
+        if not instructions.strip() or not prompt.strip():
+            raise EngineServiceError(
+                "compiled context handoff requires instructions and prompt"
+            )
+        if instructions.strip() != instructions or prompt.strip() != prompt:
+            raise EngineServiceError(
+                "compiled context instructions/prompt must be normalized"
+            )
+        if len(instructions) > 1_000_000 or len(prompt) > 1_000_000:
+            raise EngineServiceError("compiled context handoff is too large")
+
+        snapshot: list[tuple[str, str]] = []
+        for item in self.source_snapshot:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise EngineServiceError(
+                    "compiled context source_snapshot entries must be pairs"
+                )
+            segment_id = str(item[0]).strip()
+            segment_digest = str(item[1]).strip()
+            if (
+                not segment_id
+                or len(segment_digest) != 64
+                or any(
+                    ch not in "0123456789abcdef"
+                    for ch in segment_digest
+                )
+            ):
+                raise EngineServiceError(
+                    "compiled context source_snapshot entry is invalid"
+                )
+            snapshot.append((segment_id, segment_digest))
+        if len(snapshot) != len(set(segment_id for segment_id, _ in snapshot)):
+            raise EngineServiceError(
+                "compiled context source_snapshot contains duplicate segment"
+            )
+        object.__setattr__(self, "source_snapshot", tuple(snapshot))
+
+        history: list[tuple[str, str]] = []
+        for item in self.history:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise EngineServiceError(
+                    "compiled context history entries must be pairs"
+                )
+            role = str(item[0]).strip()
+            content = str(item[1])
+            if role not in {"user", "assistant"}:
+                raise EngineServiceError(
+                    "compiled context history role is invalid"
+                )
+            if not content.strip() or content.strip() != content:
+                raise EngineServiceError(
+                    "compiled context history content is invalid"
+                )
+            history.append((role, content))
+            if len(history) > 1024:
+                raise EngineServiceError(
+                    "compiled context history exceeds maximum turns"
+                )
+        object.__setattr__(self, "history", tuple(history))
+
+        tools: list[ProviderToolDefinition] = []
+        seen_tools: set[str] = set()
+        for tool in self.tools:
+            if not isinstance(tool, ProviderToolDefinition):
+                raise EngineServiceError(
+                    "compiled context tools must be ProviderToolDefinition values"
+                )
+            if tool.tool_id in seen_tools:
+                raise EngineServiceError(
+                    "compiled context tools contain duplicate tool id"
+                )
+            seen_tools.add(tool.tool_id)
+            tools.append(tool)
+        object.__setattr__(self, "tools", tuple(tools))
+
+        expected = _digest(self._digest_payload())
+        if self.handoff_digest is not None and self.handoff_digest != expected:
+            raise EngineServiceError(
+                "compiled context handoff_digest does not match payload"
+            )
+        object.__setattr__(self, "handoff_digest", expected)
+        if self.schema_version != 1:
+            raise EngineServiceError(
+                "unsupported compiled context handoff schema version"
+            )
+
+    def _digest_payload(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "turn_id": self.turn_id,
+            "tenant_id": self.tenant_id,
+            "context_id": self.context_id,
+            "context_digest": self.context_digest,
+            "compiler_version": self.compiler_version,
+            "source_snapshot": [
+                [segment_id, digest]
+                for segment_id, digest in self.source_snapshot
+            ],
+            "data_class": self.data_class,
+            "instructions": self.instructions,
+            "prompt": self.prompt,
+            "history": [
+                {"role": role, "content": content}
+                for role, content in self.history
+            ],
+            "tools": [tool.as_dict() for tool in self.tools],
+        }
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            **self._digest_payload(),
+            "handoff_digest": self.handoff_digest,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "EngineContextHandoff":
+        data = _json_object(payload, "compiled_context")
+        raw_snapshot = data.get("source_snapshot", [])
+        raw_history = data.get("history", [])
+        raw_tools = data.get("tools", [])
+        if (
+            not isinstance(raw_snapshot, list)
+            or not isinstance(raw_history, list)
+            or not isinstance(raw_tools, list)
+        ):
+            raise EngineServiceError(
+                "compiled context arrays are malformed"
+            )
+        snapshot = tuple(
+            (str(item[0]), str(item[1]))
+            for item in raw_snapshot
+            if isinstance(item, list) and len(item) == 2
+        )
+        if len(snapshot) != len(raw_snapshot):
+            raise EngineServiceError(
+                "compiled context source_snapshot is malformed"
+            )
+        history: list[tuple[str, str]] = []
+        for item in raw_history:
+            if not isinstance(item, Mapping):
+                raise EngineServiceError(
+                    "compiled context history is malformed"
+                )
+            history.append(
+                (
+                    str(item.get("role") or ""),
+                    str(item.get("content") or ""),
+                )
+            )
+        tools: list[ProviderToolDefinition] = []
+        for item in raw_tools:
+            if not isinstance(item, Mapping):
+                raise EngineServiceError(
+                    "compiled context tool definition is malformed"
+                )
+            tools.append(
+                ProviderToolDefinition(
+                    tool_id=str(item.get("tool_id") or ""),
+                    description=str(item.get("description") or ""),
+                    input_schema=_json_object(
+                        item.get("input_schema"),
+                        "compiled tool input_schema",
+                    ),
+                )
+            )
+        return cls(
+            operation_id=str(data.get("operation_id") or ""),
+            execution_id=str(data.get("execution_id") or ""),
+            turn_id=str(data.get("turn_id") or ""),
+            tenant_id=str(data.get("tenant_id") or ""),
+            context_id=str(data.get("context_id") or ""),
+            context_digest=str(data.get("context_digest") or ""),
+            compiler_version=str(data.get("compiler_version") or ""),
+            source_snapshot=snapshot,
+            data_class=str(data.get("data_class") or ""),
+            instructions=str(data.get("instructions") or ""),
+            prompt=str(data.get("prompt") or ""),
+            history=tuple(history),
+            tools=tuple(tools),
+            handoff_digest=(
+                None
+                if data.get("handoff_digest") is None
+                else str(data["handoff_digest"])
+            ),
+            schema_version=int(data.get("schema_version", 1)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class EngineExecutionCommand:
     operation: OperationEnvelope
     execution_request: AIExecutionRequest
     delegated_authority: DelegatedAuthority
+    compiled_context: EngineContextHandoff
     context_seed_refs: tuple[str, ...]
     resource_budget: Mapping[str, Any]
     stream_preferences: Mapping[str, Any]
@@ -141,6 +386,44 @@ class EngineExecutionCommand:
         if not isinstance(self.delegated_authority, DelegatedAuthority):
             raise EngineServiceError(
                 "delegated_authority must be DelegatedAuthority"
+            )
+        if not isinstance(self.compiled_context, EngineContextHandoff):
+            raise EngineServiceError(
+                "compiled_context must be EngineContextHandoff"
+            )
+        handoff = self.compiled_context
+        if handoff.operation_id != self.operation.operation_id:
+            raise EngineServiceError(
+                "compiled context operation_id mismatch"
+            )
+        if handoff.execution_id != self.execution_request.execution_id:
+            raise EngineServiceError(
+                "compiled context execution_id mismatch"
+            )
+        if handoff.tenant_id != self.operation.tenant_id:
+            raise EngineServiceError(
+                "compiled context tenant_id mismatch"
+            )
+        context_policy = dict(self.execution_request.context_policy)
+        if context_policy.get("context_id") != handoff.context_id:
+            raise EngineServiceError(
+                "compiled context id does not match execution policy"
+            )
+        if context_policy.get("context_digest") != handoff.context_digest:
+            raise EngineServiceError(
+                "compiled context digest does not match execution policy"
+            )
+        if context_policy.get("handoff_digest") != handoff.handoff_digest:
+            raise EngineServiceError(
+                "compiled context handoff is not bound to execution identity"
+            )
+        expected_snapshot = [
+            [segment_id, digest]
+            for segment_id, digest in handoff.source_snapshot
+        ]
+        if context_policy.get("source_snapshot") != expected_snapshot:
+            raise EngineServiceError(
+                "compiled context source snapshot mismatch"
             )
         refs: list[str] = []
         for raw in self.context_seed_refs:
@@ -184,6 +467,7 @@ class EngineExecutionCommand:
             "operation": self.operation.as_dict(),
             "execution_request": self.execution_request.as_dict(),
             "delegated_authority": authority,
+            "compiled_context": self.compiled_context.as_dict(),
             "context_seed_refs": list(self.context_seed_refs),
             "resource_budget": dict(self.resource_budget),
             "stream_preferences": dict(self.stream_preferences),
@@ -197,6 +481,7 @@ class EngineExecutionCommand:
             "operation",
             "execution_request",
             "delegated_authority",
+            "compiled_context",
             "context_seed_refs",
             "resource_budget",
             "stream_preferences",
@@ -234,6 +519,12 @@ class EngineExecutionCommand:
                 _json_object(
                     data.get("delegated_authority"),
                     "delegated_authority",
+                )
+            ),
+            compiled_context=EngineContextHandoff.from_dict(
+                _json_object(
+                    data.get("compiled_context"),
+                    "compiled_context",
                 )
             ),
             context_seed_refs=tuple(refs),
@@ -816,6 +1107,7 @@ class EngineExecutionService:
 
 
 __all__ = [
+    "EngineContextHandoff",
     "EngineExecutionAck",
     "EngineExecutionCommand",
     "EngineExecutionService",
