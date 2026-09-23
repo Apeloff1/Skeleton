@@ -22,6 +22,7 @@ from skeleton.contracts.verification import (
     VerificationReceipt,
     VerificationRequest,
 )
+from skeleton.intelligence.admission import ResourceBudget
 from skeleton.intelligence.verification_runtime import (
     DeterministicVerificationInput,
     VerificationRuntime,
@@ -657,6 +658,42 @@ class CognitiveExecutionRuntime:
         tools = await self._provider_tools(payload)
         deadline = self._deadline(payload)
         context_policy = dict(execution.request.context_policy)
+        execution_budget = dict(execution.request.resource_budget)
+        provider_budget = ResourceBudget(
+            max_input_tokens=int(
+                execution_budget.get("max_input_tokens", 200_000)
+            ),
+            max_output_tokens=int(
+                execution_budget.get("max_output_tokens", 16_384)
+            ),
+            max_cost_usd=float(
+                execution_budget.get("max_cost_usd", 10.0)
+            ),
+            max_wall_seconds=float(
+                execution_budget.get(
+                    "max_wall_seconds",
+                    execution_budget.get("max_elapsed_seconds", 120.0),
+                )
+            ),
+            max_provider_attempts=int(
+                execution_budget.get("max_provider_attempts", 3)
+            ),
+            max_tool_calls=int(
+                execution_budget.get("max_tool_calls", 32)
+            ),
+            max_artifact_bytes=int(
+                execution_budget.get(
+                    "max_artifact_bytes",
+                    100 * 1024 * 1024,
+                )
+            ),
+            max_concurrency=int(
+                execution_budget.get("max_concurrency", 32)
+            ),
+            max_queue_depth=int(
+                execution_budget.get("max_queue_depth", 1_000)
+            ),
+        )
         raw_snapshot = context_policy.get("source_snapshot", [])
         if not isinstance(raw_snapshot, list):
             raise CognitiveExecutionError(
@@ -710,8 +747,34 @@ class CognitiveExecutionRuntime:
                     if context_policy.get("compiler_version") is None
                     else str(context_policy["compiler_version"])
                 ),
+                model=(
+                    None
+                    if context_policy.get("provider_model") is None
+                    else str(context_policy["provider_model"])
+                ),
+                estimated_cost_usd=float(
+                    context_policy.get("estimated_cost_usd", 0.0)
+                ),
+                resource_budget=provider_budget,
+                structured_output_schema=(
+                    None
+                    if context_policy.get("structured_output_schema") is None
+                    else dict(
+                        context_policy["structured_output_schema"]
+                    )
+                ),
                 tools=tools,
-                tool_choice="auto" if tools else "none",
+                tool_choice=str(
+                    context_policy.get(
+                        "tool_choice",
+                        "auto" if tools else "none",
+                    )
+                ),
+                specific_tool_id=(
+                    None
+                    if context_policy.get("specific_tool_id") is None
+                    else str(context_policy["specific_tool_id"])
+                ),
                 deadline=deadline,
             )
         )
