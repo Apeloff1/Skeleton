@@ -15,9 +15,7 @@ on:
       - "skeleton/release/ai_journey_evidence.py"
       - "skeleton/testing/test_ai_journey_evidence.py"
       - "skeleton/testing/test_artifact_usage_meter.py"
-      - "skeleton/release/ai_journey_evidence.py"
-      - "skeleton/testing/test_ai_journey_evidence.py"
-      - "skeleton/testing/test_artifact_usage_meter.py"
+      - "machine/ai_required_journeys.json"
       - "skeleton/testing/test_release_evidence.py"
       - "backend/core/engine_client.py"
       - "backend/core/operation_stream_transport.py"
@@ -66,6 +64,9 @@ on:
       - "scripts/testing/test_release_provenance.py"
       - "scripts/testing/test_ai_release_evidence.py"
       - "skeleton/release/evidence.py"
+      - "skeleton/release/ai_journey_evidence.py"
+      - "skeleton/testing/test_ai_journey_evidence.py"
+      - "machine/ai_required_journeys.json"
       - "skeleton/testing/test_release_evidence.py"
       - "backend/core/engine_client.py"
       - "backend/core/operation_stream_transport.py"
@@ -177,6 +178,7 @@ jobs:
             --junitxml=source-a/release-meta/release-tests.xml
           python -m pytest -q \
             source-a/backend/tests/test_ai_golden_journey.py \
+            source-a/backend/tests/test_ai_artifact_result_journey.py \
             source-a/backend/tests/test_ai_chat_conversation_authority.py \
             source-a/backend/tests/test_operation_stream_transport.py \
             source-a/backend/tests/test_operation_stream_route.py \
