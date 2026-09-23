@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "tree_version": "1.4.3",
+  "tree_version": "1.5.0",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
   "canonical_root": "skeleton/ai",
   "migration_mode": "strangler_mirror_then_explicit_cutover",
-  "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage and Jeeves into one governed file tree without breaking existing imports or fabricating completion.",
+  "purpose": "Consolidate build-plan-relevant AI engine, governance, shell/control-plane, agent, evaluation, reliability, build-control code, historical research lineage, Jeeves, and selected legacy backend/GameForge AI recovery surfaces into one governed file tree without breaking existing imports or fabricating completion.",
   "authorities": {
     "architecture": "machine/architecture.json",
     "master_plan": "machine/ai_master_plan.json",
@@ -442,7 +442,7 @@
       "source": "skeleton/automation",
       "destination": "skeleton/ai/build/automation",
       "kind": "tree",
-      "source_git_object_sha": "fac1338e8ee20de30ea2dbd60b91532ce03bdc35",
+      "source_git_object_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
       "role": "repository automation AI support plane",
       "work_package_refs": [
         "WP-W00",
@@ -2122,7 +2122,7 @@
       "source": "skeleton/economy",
       "destination": "skeleton/ai/simulation/economy",
       "kind": "tree",
-      "source_git_object_sha": "51a53f830e3223bc72520fe65a3e6451ad7c5eb1",
+      "source_git_object_sha": "ff47921c83321c4644ee8040fcb20604de5f72af",
       "role": "The GameForge-derived treasury/economy model is simulation-domain state and belongs under simulation rather than a parallel runtime root.",
       "work_package_refs": [
         "WP-W11",
@@ -3519,6 +3519,669 @@
       ],
       "move_batch": "B4-research-quarantine",
       "source_disposition": "retain_until_characterized_and_verified"
+    },
+    {
+      "id": "AIFT-V2-GAMEFORGE-EXOCORTEX-AGENTIC",
+      "source": "backend/gameforge/exocortex/agentic",
+      "destination": "skeleton/ai/research/legacy/gameforge/exocortex/agentic",
+      "kind": "tree",
+      "source_git_object_sha": "b0a5c6ba0f70bb106526eccdd523800b5f2ede5b",
+      "role": "Legacy agentic/RAG/model-internals prototypes retained for characterization and selective harvesting.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2-GAMEFORGE-EXOCORTEX-ZAIBATSU",
+      "source": "backend/gameforge/exocortex/zaibatsu",
+      "destination": "skeleton/ai/research/legacy/gameforge/exocortex/zaibatsu",
+      "kind": "tree",
+      "source_git_object_sha": "b34fead4ca36fcb16a9cb66c364b5beea2bd6f9a",
+      "role": "Legacy multi-agent governance/coordination lineage retained as non-authoritative research evidence.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2-GAMEFORGE-REASONING",
+      "source": "backend/gameforge/reasoning",
+      "destination": "skeleton/ai/research/legacy/gameforge/reasoning",
+      "kind": "tree",
+      "source_git_object_sha": "bf12d5c9b67fdc4139434c95a1679c4808841778",
+      "role": "Experimental reasoning and latent-loop implementations staged for evaluation against canonical reasoning owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2-GAMEFORGE-RAG",
+      "source": "backend/gameforge/rag",
+      "destination": "skeleton/ai/research/legacy/gameforge/rag",
+      "kind": "tree",
+      "source_git_object_sha": "077aaf27ca105f32810e5550cbba43467e8bd808",
+      "role": "Legacy RAG implementations staged as research evidence without retrieval-authority promotion.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2-GAMEFORGE-MATH-EXOCORTEX",
+      "source": "backend/gameforge/math_exocortex",
+      "destination": "skeleton/ai/research/legacy/gameforge/math_exocortex",
+      "kind": "tree",
+      "source_git_object_sha": "091b25c0b6ac9ddd31847e51e40ae3e2878526b0",
+      "role": "Legacy mathematical exocortex/tooling lineage staged for capability mining and verification.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W26"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2-GAMEFORGE-NEURO",
+      "source": "backend/gameforge/personal/neuro",
+      "destination": "skeleton/ai/research/legacy/gameforge/personal/neuro",
+      "kind": "tree",
+      "source_git_object_sha": "a05666ec580e5fa90a1c316b56260394ba4204ea",
+      "role": "Legacy neuro-inspired state/adaptation prototypes staged for characterization only.",
+      "work_package_refs": [
+        "WP-W07",
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_provenance_until_characterized_and_independently_verified"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-JEEVES-CAPABILITIES",
+      "source": "backend/core/jeeves_capabilities.py",
+      "destination": "skeleton/ai/compat/backend_core/jeeves_capabilities.py",
+      "kind": "file",
+      "source_git_object_sha": "56dcb18b03d63949ab0eba8ddf33b78a4b75ad8b",
+      "role": "Legacy Jeeves capability registry staged for convergence into canonical agent/skill owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W13"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-JEEVES-CONTROL-PLANE",
+      "source": "backend/core/jeeves_control_plane.py",
+      "destination": "skeleton/ai/compat/backend_core/jeeves_control_plane.py",
+      "kind": "file",
+      "source_git_object_sha": "3c929dd6807dfd8f6af7ba0bde77edc66f75dc53",
+      "role": "Legacy Jeeves control-plane implementation staged for convergence into canonical orchestration owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W15"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-JEEVES-EXECUTION-KERNEL",
+      "source": "backend/core/jeeves_execution_kernel.py",
+      "destination": "skeleton/ai/compat/backend_core/jeeves_execution_kernel.py",
+      "kind": "file",
+      "source_git_object_sha": "183ad26ca4d247d004c5f690e8ccb7cc1e79dfc9",
+      "role": "Legacy Jeeves execution kernel staged for convergence into canonical execution/runtime owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W17"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-JEEVES-MEMORY",
+      "source": "backend/core/jeeves_memory.py",
+      "destination": "skeleton/ai/compat/backend_core/jeeves_memory.py",
+      "kind": "file",
+      "source_git_object_sha": "3c8699b6ab6bd8c85e1a4b5af3ec9bdfd2c31822",
+      "role": "Legacy Jeeves memory surface staged for convergence into canonical memory authority.",
+      "work_package_refs": [
+        "WP-W07"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-KNOWLEDGE-AUGMENTED-JEEVES",
+      "source": "backend/core/knowledge_augmented_jeeves.py",
+      "destination": "skeleton/ai/compat/backend_core/knowledge_augmented_jeeves.py",
+      "kind": "file",
+      "source_git_object_sha": "55f1b12c0c50d67ec2082c0b63ede1ec88923bc1",
+      "role": "Legacy knowledge-augmented Jeeves surface staged for convergence into canonical retrieval/reasoning owners.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-MODEL-ROUTER",
+      "source": "backend/core/model_router.py",
+      "destination": "skeleton/ai/compat/backend_core/model_router.py",
+      "kind": "file",
+      "source_git_object_sha": "32b9f561cf7ab0aa44c01642191edb0e7ce78cc6",
+      "role": "Legacy backend model router staged for convergence; provider authority remains unchanged.",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-KNOWLEDGE-FABRIC",
+      "source": "backend/core/knowledge_fabric.py",
+      "destination": "skeleton/ai/compat/backend_core/knowledge_fabric.py",
+      "kind": "file",
+      "source_git_object_sha": "2c16c0074b16875d6b28fb79629d37e9785f1331",
+      "role": "Legacy knowledge fabric staged for convergence into canonical context/retrieval owners.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W10"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-GAME-KNOWLEDGE-VAULT",
+      "source": "backend/core/game_knowledge_vault.py",
+      "destination": "skeleton/ai/compat/backend_core/game_knowledge_vault.py",
+      "kind": "file",
+      "source_git_object_sha": "e66e0fef37899d8d716741433b798d139eeb2c64",
+      "role": "Legacy game knowledge vault staged for convergence without creating a second knowledge authority.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W10"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-SKILL-GRAPH",
+      "source": "backend/core/skill_graph.py",
+      "destination": "skeleton/ai/compat/backend_core/skill_graph.py",
+      "kind": "file",
+      "source_git_object_sha": "288cd3eb56abb12bb032cf1f19b5c54ead6eb532",
+      "role": "Legacy skill graph staged for convergence into canonical skill/runtime ownership.",
+      "work_package_refs": [
+        "WP-W13"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-SWARM-AGENTS",
+      "source": "backend/core/swarm_agents.py",
+      "destination": "skeleton/ai/compat/backend_core/swarm_agents.py",
+      "kind": "file",
+      "source_git_object_sha": "faf5202d68a2385f7fd1d0501211be84bc1d08eb",
+      "role": "Legacy swarm agent implementation staged for convergence into canonical agent owners.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W15"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-SWARM-PLANNER",
+      "source": "backend/core/swarm_planner.py",
+      "destination": "skeleton/ai/compat/backend_core/swarm_planner.py",
+      "kind": "file",
+      "source_git_object_sha": "0387783abf2ebd830aa20654a24f815073a8adc5",
+      "role": "Legacy swarm planner staged for convergence into canonical planning owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-SWARM-SCHEDULER",
+      "source": "backend/core/swarm_scheduler.py",
+      "destination": "skeleton/ai/compat/backend_core/swarm_scheduler.py",
+      "kind": "file",
+      "source_git_object_sha": "b6d6ffd66aa8246da7e02238f5b71c096a737713",
+      "role": "Legacy swarm scheduler staged for convergence into canonical scheduling/orchestration owners.",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W15"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-WORLD-AGENTS",
+      "source": "backend/core/world_agents.py",
+      "destination": "skeleton/ai/compat/backend_core/world_agents.py",
+      "kind": "file",
+      "source_git_object_sha": "7b114543cd6257079241963064e8a8e17e289a59",
+      "role": "Legacy world-agent implementation staged for convergence into canonical simulation/agent owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-WORLD-GRAPH",
+      "source": "backend/core/world_graph.py",
+      "destination": "skeleton/ai/compat/backend_core/world_graph.py",
+      "kind": "file",
+      "source_git_object_sha": "ccc8a943e395bab63fa2bb96f582ef491b240f1b",
+      "role": "Legacy world graph staged for convergence into canonical world-model/state owners.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-WORLD-GRAPH-PROJECTION",
+      "source": "backend/core/world_graph_projection.py",
+      "destination": "skeleton/ai/compat/backend_core/world_graph_projection.py",
+      "kind": "file",
+      "source_git_object_sha": "57d172f42f9e8fd3f72fc7be2a3cae405791b09e",
+      "role": "Legacy world-graph projection staged for convergence into canonical world-model owners.",
+      "work_package_refs": [
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-WORLD-RUNTIME",
+      "source": "backend/core/world_runtime.py",
+      "destination": "skeleton/ai/compat/backend_core/world_runtime.py",
+      "kind": "file",
+      "source_git_object_sha": "95d48d7898216a1f6a705761b443107adeec84b0",
+      "role": "Legacy world runtime staged for convergence into canonical simulation/runtime owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-WORLD-SYSTEM-COMPOSER",
+      "source": "backend/core/world_system_composer.py",
+      "destination": "skeleton/ai/compat/backend_core/world_system_composer.py",
+      "kind": "file",
+      "source_git_object_sha": "1f11b91ae645fe0b842b2f6f83c4381c2ceb7025",
+      "role": "Legacy world-system composer staged for convergence into canonical planning/simulation owners.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W12"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-RELATIONSHIP-MEMORY",
+      "source": "backend/core/relationship_memory.py",
+      "destination": "skeleton/ai/compat/backend_core/relationship_memory.py",
+      "kind": "file",
+      "source_git_object_sha": "b9428337017612cd0fdd7e7d3cc49957065d896a",
+      "role": "Legacy relationship-memory implementation staged for convergence into canonical memory authority.",
+      "work_package_refs": [
+        "WP-W07"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-PROGRESSION-INTELLIGENCE",
+      "source": "backend/core/progression_intelligence.py",
+      "destination": "skeleton/ai/compat/backend_core/progression_intelligence.py",
+      "kind": "file",
+      "source_git_object_sha": "e41a1ca008c4e0a2a5dd85b4232f47ced3f275ba",
+      "role": "Legacy progression intelligence staged for convergence/evaluation without promotion by relocation.",
+      "work_package_refs": [
+        "WP-W11",
+        "WP-W28"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-V2-BACKEND-CORE-SYSTEMS-KNOWLEDGE",
+      "source": "backend/core/systems_knowledge.py",
+      "destination": "skeleton/ai/compat/backend_core/systems_knowledge.py",
+      "kind": "file",
+      "source_git_object_sha": "148c49b40f51a5bb9ca3265795692e03d8bc8dd4",
+      "role": "Legacy systems knowledge implementation staged for convergence into canonical knowledge/retrieval owners.",
+      "work_package_refs": [
+        "WP-W08",
+        "WP-W10"
+      ],
+      "aiq_refs": [
+        "AIQ-S7-E2E-01"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:merge-required"
+      ],
+      "move_batch": "B3-compat-convergence",
+      "source_disposition": "retain_until_canonical_owner_convergence_and_regression_gates"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GAMING",
+      "source": "skeleton/acquired/gaming",
+      "destination": "skeleton/ai/research/acquired/gaming",
+      "kind": "tree",
+      "source_git_object_sha": "8bb0c27b4685d41fb3321afd87c945eb6751f4e6",
+      "role": "quarantined acquired gaming primitives, knowledge references, provenance, and deterministic simulation lineage",
+      "work_package_refs": [
+        "WP-W12",
+        "WP-W18"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-073",
+        "VOL-078"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GATES",
+      "source": "skeleton/acquired/gates",
+      "destination": "skeleton/ai/research/acquired/gates",
+      "kind": "tree",
+      "source_git_object_sha": "70ea65b5a92b366ce9f8fd76a7fbd0114ea79691",
+      "role": "quarantined provider/model gate catalogue lineage for characterization against canonical provider and routing contracts",
+      "work_package_refs": [
+        "WP-W05",
+        "WP-W20"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-008",
+        "VOL-026"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
+    },
+    {
+      "id": "AIFT-ACQUIRED-GENOS",
+      "source": "skeleton/acquired/genos",
+      "destination": "skeleton/ai/research/acquired/genos",
+      "kind": "tree",
+      "source_git_object_sha": "0bb01a0eeac6251de4fb97129738b52565b3d78a",
+      "role": "quarantined historical model pulse and evaluation lineage for research comparison only",
+      "work_package_refs": [
+        "WP-W26",
+        "WP-W28"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-024",
+        "VOL-035"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
+    },
+    {
+      "id": "AIFT-ACQUIRED-INGEST",
+      "source": "skeleton/acquired/ingest.py",
+      "destination": "skeleton/ai/research/acquired/ingest.py",
+      "kind": "file",
+      "source_git_object_sha": "7bf23a4d35d5cf3e61c07d8ca1c2c31ee77190f4",
+      "role": "quarantined asset ingestion and validation lineage for later artifact-plane characterization",
+      "work_package_refs": [
+        "WP-W13",
+        "WP-W26"
+      ],
+      "aiq_refs": [],
+      "volume_refs": [
+        "VOL-075",
+        "VOL-077"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:quarantine"
+      ],
+      "move_batch": "B4-research-quarantine",
+      "source_disposition": "retain_as_quarantine_source_until_characterization_and_independent_evidence"
     }
   ],
   "ci_enforcement": {
@@ -3535,15 +4198,17 @@
     "signer_id": "github:Apeloff1",
     "signer_type": "service",
     "role": "implementation",
-    "signed_at_utc": "2026-09-22T15:02:19Z",
-    "git_sha": "aafbd20a94e40ce302ce686581e87251c0ff4514",
+    "signed_at_utc": "2026-09-22T15:31:00Z",
+    "git_sha": "fab8888ce760274984b52cbb50733f943a909581",
     "evidence_refs": [
-      "git:aafbd20a94e40ce302ce686581e87251c0ff4514",
-      "git-tree:413bf013784f077f3908adb5dc77087a349faeaa",
-      "object-audit:104-mappings-zero-stale-zero-missing-zero-exact-drift",
-      "pr:1930"
+      "git:fab8888ce760274984b52cbb50733f943a909581",
+      "git-tree:1b44c743dfa667b7519adfb46756f9914cd36a94",
+      "object-audit:transfer-v2-26-mappings-89-files-exact-git-object-reuse",
+      "parity-repair:post-1930-automation-five-exact-mirrors",
+      "base:main@392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
+      "pr:1937"
     ],
-    "statement": "Move-preparation implementation is identity-bound to GitHub user Apeloff1 at the cited 104-mapping hygiene-repaired payload SHA. The governed set covers core/runtime, Jeeves, AI shell/control-plane, configuration, domain/build surfaces, compatibility convergence, historical architecture lineage, and research quarantine. The object audit found zero stale source Git objects, zero missing mappings, and zero exact-mirror drift. This implementation attestation records payload identity and preparation evidence only; import inversion, source retirement, production readiness, AIQ/work-package completion, and independent verification remain separately gated.",
+    "statement": "Transfer-v2 implementation is identity-bound to GitHub user Apeloff1 at the cited reconciled payload SHA. The payload adds six quarantined legacy GameForge AI trees and twenty backend-core compatibility-convergence mappings using exact source Git objects, and refreshes five non-exception automation mirrors that drifted after PR #1930 merged. This attestation records staged-mirror preparation only; canonical-owner convergence, import inversion, source retirement, full 130-mapping parity validation, green CI, AIQ/work-package completion, and independent verification remain separately gated.",
     "signature_method": "github_identity"
   },
   "verification_signoff": {
@@ -3554,7 +4219,7 @@
     "signed_at_utc": null,
     "git_sha": null,
     "evidence_refs": [],
-    "statement": "Pending distinct verification after BASE-FRONTEND-TSC-01 is closed and required cutover validation is green.",
+    "statement": "Pending distinct verification after the final transfer-v2 validation PR is green. BASE-FRONTEND-TSC-01 is resolved; BASE-FRONTEND-SSR-RAF-01 has a repair applied and awaits App Assembly proof.",
     "signature_method": null
   },
   "parity_policy": {
@@ -3657,14 +4322,14 @@
   },
   "next_move_assignments": [],
   "provider_boundary_note": "Credential-marker-bearing destination files are compatibility facades only; exact parity remains mandatory for all undeclared files.",
-  "validation_state": "104_mapping_preparation_signed_pending_fresh_ci_and_object_audit",
+  "validation_state": "130_mapping_transfer_v2_reconciled_current_main_pending_fresh_ci_and_object_audit",
   "validation_blockers": [
     {
       "id": "BASE-FRONTEND-TSC-01",
-      "status": "open",
+      "status": "resolved",
       "scope": "downstream_frontend_base_state",
       "detected_on_payload_sha": "ab6b68f6fe2231b47a2c77d3055ef7fe62779a5e",
-      "current_main_sha": "90ff896e8f18d8a472ce6b301156d461a8e8dc7f",
+      "current_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
       "app_assembly_run_id": 35732594976,
       "app_assembly_job_id": 106761777382,
       "failing_step": "Validate assembled frontend",
@@ -3686,14 +4351,72 @@
         "Validate state authority topology",
         "Validate mandatory provider bootstrap"
       ],
-      "evidence": "Current-main comparison shows zero frontend/* files changed by this branch. TypeScript failure is therefore inherited from the base/merged frontend state rather than introduced by the AI-tree migration.",
+      "evidence": "At detection time, the migration payload changed no frontend/* files. TypeScript failure is therefore inherited from the base/merged frontend state rather than introduced by the AI-tree migration.",
       "representative_errors": [
         "StatusBar backgroundColor/translucent props rejected by current types",
         "StyleSheet.absoluteFillObject missing from current React Native types",
         "ScrollView instance refs typed as component functions",
         "InteractionManager missing from current React Native exports"
       ],
-      "effect": "Blocks cutover_complete, compatibility-source deletion, and independent completion claim until App Assembly is green on a reconciled base."
+      "effect": "Historical blocker retained for provenance. TypeScript validation is green; the active inherited frontend gate is BASE-FRONTEND-SSR-RAF-01.",
+      "resolved_by_pr": 1936,
+      "resolved_merge_sha": "3ec4a71a53186887853a6c188bb3110701fed6d8",
+      "resolved_at_utc": "2026-09-22T15:25:46Z",
+      "resolution_evidence": {
+        "frontend_package_versions": {
+          "expo": "~54.0.35",
+          "react": "19.1.0",
+          "react_dom": "19.1.0",
+          "react_native": "0.81.6",
+          "react_types": "~19.1.0"
+        },
+        "note": "PR #1936 resolved the TypeScript declaration/toolchain blocker. The same run later failed in Expo static export for a different reason.",
+        "app_assembly_run_id": 35743872291,
+        "app_assembly_job_id": 106800300393,
+        "tsc_result": "`yarn tsc --noEmit` completed successfully",
+        "reducer_result": "operation-stream reducer tests passed 10/10"
+      },
+      "superseded_by": "BASE-FRONTEND-SSR-RAF-01"
+    },
+    {
+      "id": "BASE-FRONTEND-SSR-RAF-01",
+      "status": "repair_pending_validation",
+      "scope": "downstream_frontend_base_state",
+      "detected_on_payload_sha": "57d28bc4bd57b74330c5a2883f08c775c82a5f03",
+      "current_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
+      "app_assembly_run_id": 35743872291,
+      "app_assembly_job_id": 106800300393,
+      "failing_step": "Validate assembled frontend",
+      "prerequisites_passed": [
+        "yarn tsc --noEmit",
+        "operation-stream reducer tests: 10/10"
+      ],
+      "failing_command": "expo export --platform web",
+      "representative_error": "ReferenceError: requestAnimationFrame is not defined",
+      "failure_origin": "react-native-worklets/lib/module/threads.js under Node v24.20.0 during Expo static rendering",
+      "evidence": "PR #1936 merged the Expo 54 React/React Native alignment and closed BASE-FRONTEND-TSC-01. Its latest available App Assembly progressed through TypeScript and reducer validation, then failed during Node-side static web export. Transfer-v2 contains no frontend/* changes, so this is inherited base-state debt rather than a transfer-v2 regression.",
+      "effect": "Cutover remains blocked until App Assembly proves the guarded SSR repair closes the static export failure.",
+      "repair_branch": "integration/ai-file-tree-transfer-v2-validated",
+      "repair_head_sha": "72dd90cbac181daf5db40a83d283dc2fa2fc48a8",
+      "repair_commits": [
+        "e8af82c2ff14147996eefb8e66345ec7edfb2300",
+        "f35dd1cc0826586a7c42f4559332c838f84f78ff"
+      ],
+      "repair_summary": "Added an Expo Router custom entry point that installs requestAnimationFrame/cancelAnimationFrame only when absent before loading expo-router/entry; package main now points to index.js.",
+      "repair": {
+        "strategy": "version- and shape-guarded node_modules compatibility patch",
+        "package": "react-native-worklets",
+        "package_version": "0.13.0",
+        "target": "frontend/node_modules/react-native-worklets/lib/module/threads.js",
+        "repair_commit": "4737a8c8bdbc7fc3aab1e1b525ef677393d33153",
+        "behavior": "preserve browser/native requestAnimationFrame; use setTimeout(callback, 0) only when requestAnimationFrame is unavailable during Node static rendering",
+        "fail_closed": "patch script rejects unexpected package versions, missing targets, or changed vulnerable source shape",
+        "validation_required": [
+          "App Assembly: yarn typecheck",
+          "App Assembly: operation-stream reducer",
+          "App Assembly: expo export --platform web"
+        ]
+      }
     }
   ],
   "assignment_basis_git_sha": "2291e57f40c55b4aa705faa64a5e5c1ae34e437a",
@@ -3869,12 +4592,32 @@
       "path": "skeleton/turn",
       "owner": "package/compatibility boundary",
       "reason": "Top-level turn compatibility surface remains outside canonical AI implementation ownership during staged migration."
+    },
+    {
+      "path": "skeleton/parse",
+      "owner": "package/parsing compatibility boundary",
+      "reason": "top-level parsing surface remains outside canonical AI implementation ownership during staged migration; relocation requires an explicit architecture-approved owner/cutover"
+    },
+    {
+      "path": "skeleton/era",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level era compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/genos",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level genos compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/cue",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     }
   ],
   "classification_coverage": {
     "status": "closed_after_all_preclassified_moves",
     "rule": "Every first-level skeleton/* path is either a governed mapping source, a pending assignment source, an architecture-approved external path, an explicit exclusion, or retained_outside_ai_tree.",
-    "source_head": "6abe7d71becbf36595eec1131dc1c65ae8bbfa66"
+    "source_head": "0c867cca9131f14532b31fce627f176f9119ba17"
   },
   "priority_one_migration": {
     "status": "mirrored_governed_cutover_pending",
@@ -3944,42 +4687,105 @@
   },
   "object_audit": {
     "payload_git_sha": "c924e854ad94815080efb3b6c691c2641e4a0162",
-    "checked_mapping_count": 78,
+    "checked_mapping_count": 134,
     "pending_assignments": 0,
     "source_identity_errors": 0,
     "ungoverned_overlay_errors": 0,
     "frontend_changes_against_main": 0,
-    "note": "The last completed direct Git-object audit covered the first 78 mappings. The current 104-mapping prepared set preserves that evidence but requires a fresh full-object/parity audit before any cutover claim. Removed mappings are excluded from pending audit scope.",
-    "current_mapping_count": 104,
-    "audit_scope_status": "prior_78_mapping_audit_valid_current_104_mapping_set_requires_full_refresh",
-    "pending_mapping_ids": [
-      "AIFT-CONFIG",
-      "AIFT-AI-SHELL",
-      "AIFT-TURN-COMPAT",
-      "AIFT-TELEMETRY-COMPAT",
-      "AIFT-ARCHITECTURE-LEGACY",
-      "AIFT-ARCHITECTURE-INDEX-LEGACY",
-      "AIFT-ARCHITECTURE-R03",
-      "AIFT-ARCHITECTURE-R04",
-      "AIFT-ARCHITECTURE-R05",
-      "AIFT-ARCHITECTURE-R06",
-      "AIFT-ARCHITECTURE-R07",
-      "AIFT-ARCHITECTURE-R08",
-      "AIFT-ARCHITECTURE-R09",
-      "AIFT-ARCHITECTURE-R10",
-      "AIFT-ARCHITECTURE-R11",
-      "AIFT-ARCHITECTURE-R12",
-      "AIFT-ARCHITECTURE-R13",
-      "AIFT-ARCHITECTURE-R14",
-      "AIFT-ARCHITECTURE-R15",
-      "AIFT-ARCHITECTURE-R16",
-      "AIFT-ARCHITECTURE-R17",
-      "AIFT-ARCHITECTURE-R18",
-      "AIFT-ARCHITECTURE-R19",
-      "AIFT-ARCHITECTURE-R20",
-      "AIFT-ARCHITECTURE-R21",
-      "AIFT-ARCHITECTURE-R22"
-    ]
+    "note": "The prior full 130-mapping audit remains valid for unchanged scope. Three new acquired mappings retain exact Git-object identity; AIFT-ACQUIRED-INGEST has destination-only trailing-whitespace normalization and remains subject to the canonical Python AST-semantic parity validator.",
+    "current_mapping_count": 134,
+    "audit_scope_status": "full_134_mapping_object_and_parity_audit_current",
+    "pending_mapping_ids": [],
+    "post_1930_parity_repair": {
+      "base_main_sha": "392d0a6b675326632cd41ef56fbcb8aba6f5b75a",
+      "mapping_id": "AIFT-AUTOMATION",
+      "refreshed_source_tree_sha": "976553db0683707052aded3ee317a16ab8d4c93d",
+      "exact_mirror_files": [
+        "build_plane.py",
+        "build_repair.py",
+        "builder_plane.py",
+        "secretary.py",
+        "supervisor_runtime.py"
+      ],
+      "compatibility_facade_preserved": "specialist_bots.py",
+      "policy": "Only non-exception exact-parity files are mirrored. Credential-sensitive parity exceptions remain non-owning facades."
+    },
+    "transfer_v2": {
+      "payload_git_sha": "fab8888ce760274984b52cbb50733f943a909581",
+      "payload_tree_sha": "1b44c743dfa667b7519adfb46756f9914cd36a94",
+      "added_mapping_count": 26,
+      "mirrored_file_count": 89,
+      "post_1930_exact_parity_repairs": 5,
+      "source_identity_errors": 0,
+      "destination_object_drift": 0,
+      "method": "v2 destinations reuse exact source Git tree/blob objects; five inherited automation exact-parity files reuse current-main source blobs",
+      "scope": "transfer-v2 additions and identified post-1930 automation drift; full 130-mapping validator remains mandatory"
+    },
+    "full_130_mapping_audit": {
+      "mapping_count": 130,
+      "source_identity_errors": 0,
+      "missing_source_or_destination_errors": 0,
+      "membership_drift_errors": 0,
+      "facade_count": 16,
+      "facade_contract_errors": 0,
+      "forbidden_provider_marker_hits": 0,
+      "method": "Git tree/blob identity + governed overlay membership + compatibility-facade contract inspection; Python mirror parity additionally permits AST-equivalent whitespace-only normalization per scripts/check_ai_file_tree.py",
+      "audit_basis_head_sha": "a3d200375e6775e95ac50add5daaca30bbabe058",
+      "post_audit_semantic_normalization_commit": "8f076935c39fead4fbccef61872290bc68d50566",
+      "exact_object_identity_variances": 1,
+      "python_semantic_only_variances": 1,
+      "semantic_content_drift_errors": 0
+    },
+    "quarantine_hygiene_normalization": {
+      "normalized_mirror_file_count": 11,
+      "policy": "Trailing whitespace was stripped only from staged research-quarantine Python destinations. Legacy sources remain unchanged. The canonical validator permits Python AST-equivalent parity, so semantic migration parity is preserved while repository hygiene is restored.",
+      "destination_only": true,
+      "semantic_parity_required": true,
+      "byte_identity_required": false
+    },
+    "post_main_reconciliation": {
+      "base_main_sha": "0c867cca9131f14532b31fce627f176f9119ba17",
+      "economy_source_tree_sha": "ff47921c83321c4644ee8040fcb20604de5f72af",
+      "economy_mirror_files": [
+        "capabilities.py",
+        "harbor.py",
+        "law.py"
+      ],
+      "parse_classification": "retained_outside_ai_tree",
+      "retained_outside_ai_tree_count": 34,
+      "status": "reconciled_pending_fresh_validation"
+    },
+    "acquired_recovery": {
+      "payload_git_sha": "a5c7a8d309d0f88320de2ada521df98884430589",
+      "added_mapping_count": 4,
+      "destinations_reuse_source_git_objects": false,
+      "mapping_ids": [
+        "AIFT-ACQUIRED-GAMING",
+        "AIFT-ACQUIRED-GATES",
+        "AIFT-ACQUIRED-GENOS",
+        "AIFT-ACQUIRED-INGEST"
+      ],
+      "policy": "Acquired gaming, provider-gate catalog, Genos pulse data, and asset-ingest code are research-quarantine lineage only. Relocation grants no provider, runtime, model, or artifact authority.",
+      "exact_git_object_mapping_ids": [
+        "AIFT-ACQUIRED-GAMING",
+        "AIFT-ACQUIRED-GATES",
+        "AIFT-ACQUIRED-GENOS"
+      ],
+      "semantic_normalization_mapping_ids": [
+        "AIFT-ACQUIRED-INGEST"
+      ]
+    },
+    "full_134_mapping_audit": {
+      "mapping_count": 134,
+      "inherited_validated_mapping_count": 130,
+      "incremental_mapping_count": 4,
+      "incremental_exact_object_matches": 3,
+      "incremental_object_drift_errors": 0,
+      "audit_basis_head_sha": "d72161dcfd54d355b2e010432076f45d99e6fe65",
+      "method": "Prior 130-mapping audit retained for unchanged scope; direct Git tree/blob identity confirms three acquired mappings and the acquired ingest destination is destination-only trailing-whitespace normalized under the validator's Python AST-semantic parity rule.",
+      "ci_validator_required": true,
+      "incremental_python_semantic_only_matches": 1
+    }
   },
   "move_tag_contract": {
     "schema_version": 1,
@@ -4005,20 +4811,47 @@
   },
   "pre_move_readiness": {
     "status": "fully_classified_staged_mirror_cutover_not_authorized",
-    "governed_mapping_count": 104,
+    "governed_mapping_count": 134,
     "pending_assignment_count": 0,
-    "retained_outside_ai_tree_count": 33,
+    "retained_outside_ai_tree_count": 34,
     "batch_counts": {
       "B1-core-runtime": 54,
       "B3-owner-sensitive": 7,
       "B2-domain-build": 12,
-      "B4-research-quarantine": 29,
-      "B3-compat-convergence": 2
+      "B4-research-quarantine": 39,
+      "B3-compat-convergence": 22
     },
     "fresh_object_audit_required": true,
     "global_cutover_blockers": [
-      "BASE-FRONTEND-TSC-01"
+      "BASE-FRONTEND-SSR-RAF-01"
     ],
-    "invariant": "Preparation metadata and move tags authorize staging only; source retirement/import inversion requires fresh parity/object evidence, green affected-domain gates, and required signoffs."
+    "invariant": "Preparation metadata and move tags authorize staging only; the current 134-mapping set requires fresh/incremental parity-object evidence, green affected-domain gates, and required signoffs before source retirement/import inversion."
+  },
+  "validation_request": {
+    "requested_at_utc": "2026-09-22T15:47:00Z",
+    "requested_from_head": "7d4d4a64eddd2c0f52a55fb5d6a091f54d714b04",
+    "reason": "Force repository-native validation after transfer-v2 was assembled through Git object/ref operations that did not emit a PR Actions run for the resulting head.",
+    "required_gates": [
+      "canonical AI file-tree validator",
+      "App Assembly",
+      "Backend Quality",
+      "CI/CD",
+      "Merge Readiness"
+    ],
+    "expected_active_blocker": "BASE-FRONTEND-SSR-RAF-01",
+    "invariant": "This request records validation intent only and does not change cutover or completion authority."
+  },
+  "validation_repairs": {
+    "transfer_v2_pr": 1941,
+    "merge_readiness_contract": {
+      "commit": "ac55d02f4aab769e5699151c5c24de17e63e1089",
+      "state": "pending_ci",
+      "note": "Contract now matches the Expo remediation install lane: lifecycle scripts disabled and non-interactive; lock reconciliation is permitted until a canonical regenerated lock is committed."
+    },
+    "ssr_request_animation_frame": {
+      "commit": "4737a8c8bdbc7fc3aab1e1b525ef677393d33153",
+      "state": "pending_app_assembly",
+      "package": "react-native-worklets@0.13.0"
+    }
   }
 }

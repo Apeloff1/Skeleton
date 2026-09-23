@@ -179,3 +179,55 @@ def test_ai_file_tree_overlay_children_are_separately_governed() -> None:
             overlay_count += 1
             assert f"{item['destination']}/{child}" in destinations
     assert overlay_count >= 12
+
+
+def test_ai_file_tree_preserves_remaining_acquired_lineage() -> None:
+    import json
+
+    manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
+    mappings = {item["id"]: item for item in manifest["mappings"]}
+    expected = {
+        "AIFT-ACQUIRED-GAMING": (
+            "skeleton/acquired/gaming",
+            "skeleton/ai/research/acquired/gaming",
+        ),
+        "AIFT-ACQUIRED-GATES": (
+            "skeleton/acquired/gates",
+            "skeleton/ai/research/acquired/gates",
+        ),
+        "AIFT-ACQUIRED-GENOS": (
+            "skeleton/acquired/genos",
+            "skeleton/ai/research/acquired/genos",
+        ),
+        "AIFT-ACQUIRED-INGEST": (
+            "skeleton/acquired/ingest.py",
+            "skeleton/ai/research/acquired/ingest.py",
+        ),
+    }
+
+    for mapping_id, (source, destination) in expected.items():
+        item = mappings[mapping_id]
+        assert item["source"] == source
+        assert item["destination"] == destination
+        assert item["move_batch"] == "B4-research-quarantine"
+        assert "cutover:quarantine" in item["move_tags"]
+        assert (ROOT / destination).exists()
+
+    assert manifest["pre_move_readiness"]["governed_mapping_count"] == 134
+    assert manifest["pre_move_readiness"]["batch_counts"]["B4-research-quarantine"] == 39
+
+
+def test_ai_file_tree_ignores_runtime_generated_membership_noise(tmp_path: Path) -> None:
+    module = _module()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    (source / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (destination / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    generated = source / "__pycache__"
+    generated.mkdir()
+    (generated / "module.cpython-311.pyc").write_bytes(b"runtime-only")
+
+    assert module._compare(source, destination) == []

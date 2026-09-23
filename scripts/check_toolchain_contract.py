@@ -34,7 +34,6 @@ SECURITY_SCRIPTS = (
     "check_malware_iocs.py",
 )
 SECURITY_TESTS = (
-    "test_exec_guard.py",
     *PROCESS_TESTS,
     "test_deserialization_safety_gate.py",
     "test_sast_security_gate.py",

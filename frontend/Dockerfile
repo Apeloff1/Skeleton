@@ -10,6 +10,7 @@ ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine@sha256:50c8e8ca1d27439048670df5883f32d57cf81cff6233222c893fd0d9884cbd81 AS deps
 WORKDIR /app
 COPY package.json yarn.lock* ./
+COPY index.js ./index.js
 COPY scripts/patch-node-modules.js ./scripts/patch-node-modules.js
 RUN yarn install --frozen-lockfile --non-interactive --ignore-scripts \
     && node ./scripts/patch-node-modules.js

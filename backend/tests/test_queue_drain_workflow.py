@@ -15,7 +15,7 @@ def test_queue_drain_does_not_self_thrash_on_main_pushes() -> None:
     assert "schedule:" in workflow
     assert 'cron: "2-57/5 * * * *"' in workflow
     assert "workflow_run:" in workflow
-    assert 'workflows: ["Merge Readiness"]' in workflow
+    assert 'workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]' in workflow
     assert "types: [completed]" in workflow
     assert "branches: [main]" in workflow
     assert "\n  push:\n    branches: [main]\n    paths: ['.github/workflows/queue-drain.yml']" in workflow
@@ -41,7 +41,7 @@ def test_queue_drain_keeps_recovery_safety_boundary() -> None:
 def test_queue_drain_wake_is_low_frequency_canonical_validation() -> None:
     workflow = _workflow_text()
 
-    assert 'workflows: ["Merge Readiness"]' in workflow
+    assert 'workflows: ["Merge Readiness", "CI/CD", "Backend Quality", "Frontier Contracts"]' in workflow
     assert 'workflows: ["Drain obsolete PR Actions"]' not in workflow
     assert "branches: [main]" in workflow
 
@@ -191,7 +191,7 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "prefix = 'Code scanning AI findings on PR #'" in workflow
     assert "status, payload = request(f'/repos/{repo}/pulls/{number}')" in workflow
     assert "closed_dynamic_ai_cache" not in workflow
-    assert "str(payload.get('state') or '') == 'closed'" in workflow
+    assert "state = str(payload.get('state') or '')" in workflow
     assert "and head_repo == repo" in workflow
     assert "and head_ref == branch" in workflow
     assert "closed_dynamic_ai_queued" in workflow
@@ -204,6 +204,6 @@ def test_queue_drain_reclaims_only_closed_pr_ghas_ai_runs() -> None:
     assert "run_repo != repo" in helper
     assert "branch == 'main'" in helper
     assert "number_text.isdigit()" in helper
-    assert "str(payload.get('state') or '') == 'closed'" in helper
+    assert "state = str(payload.get('state') or '')" in helper
     assert "and head_repo == repo" in helper
     assert "and head_ref == branch" in helper

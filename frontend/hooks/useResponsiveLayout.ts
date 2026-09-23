@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Dimensions, Platform, type DimensionsValue } from 'react-native';
+import { Dimensions, Platform, type ScaledSize } from 'react-native';
 
 export interface LayoutConfig {
   // Screen dimensions
@@ -71,7 +71,7 @@ export function useResponsiveLayout(): LayoutConfig {
   });
 
   useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }: { window: DimensionsValue }) => {
+    const subscription = Dimensions.addEventListener('change', ({ window }: { window: ScaledSize }) => {
       setDimensions({ width: window.width, height: window.height });
     });
     return () => subscription?.remove();

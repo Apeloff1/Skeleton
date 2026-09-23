@@ -57,6 +57,32 @@ def test_api_adapter_may_depend_on_lower_level_contracts(tmp_path: Path) -> None
     assert collect_violations(tmp_path) == []
 
 
+def test_staged_ai_api_mirror_may_reference_declared_legacy_owner(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/ai/runtime/api/routes.py", "from skeleton.api import routes\n")
+    _write(
+        root,
+        "machine/ai_file_tree.json",
+        '{"status":"staged_mirror","mappings":[{"source":"skeleton/api","destination":"skeleton/ai/runtime/api"}]}',
+    )
+
+    assert collect_violations(root) == []
+
+
+def test_ai_api_mirror_exception_expires_after_cutover(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    _write(root, "skeleton/ai/runtime/api/routes.py", "from skeleton.api import routes\n")
+    _write(
+        root,
+        "machine/ai_file_tree.json",
+        '{"status":"cutover_complete","mappings":[{"source":"skeleton/api","destination":"skeleton/ai/runtime/api"}]}',
+    )
+
+    violations = collect_violations(root)
+    assert len(violations) == 1
+    assert "must not depend upward on skeleton.api" in violations[0].message
+
+
 def test_cli_entry_may_wire_the_api_adapter(tmp_path: Path) -> None:
     _write(tmp_path, "skeleton/__main__.py", "from skeleton.api import create_app\n")
 

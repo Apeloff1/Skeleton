@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from scripts import check_docker_secret_boundary as docker_boundary
+from backend.scripts import check_docker_secret_boundary as docker_boundary
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 

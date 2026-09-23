@@ -146,12 +146,12 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **104 governed source -> destination mappings**
+- **134 governed source -> destination mappings**
 - **1,997 changed files under `skeleton/ai`** in this migration PR
 - package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
   sources have been promoted into `mappings`
-- **33 top-level/package/deployment/authority surfaces** are explicitly retained
+- **34 top-level/package/deployment/authority surfaces** are explicitly retained
   outside the AI tree instead of being silently ignored
 
 Every governed mapping now carries three machine-enforced tags:
@@ -176,10 +176,10 @@ The prepared units are divided into five deterministic batches:
   parity exceptions. Provider credentials, network ownership, or other
   authority-bearing implementation stays at the legacy owner until an explicit
   owner/import cutover is approved.
-- **B4-research-quarantine (29 mappings):** historical and model-internals
+- **B4-research-quarantine (39 mappings):** historical and model-internals
   research lineage. These units remain characterization-gated and are not
   production cutover candidates.
-- **B3-compat-convergence (2 mappings):** Turn and Telemetry compatibility
+- **B3-compat-convergence (22 mappings):** Turn and Telemetry compatibility
   mirrors that must merge into existing canonical owners rather than become
   independent production authorities.
 
@@ -226,23 +226,23 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **104 mappings**. The prior direct Git-object
-audit covered the first **78 mappings**. The remaining **26 current mappings**
-are explicitly carried in the pending refresh scope; stale references to the
-removed legacy project-manifest mirror have been dropped.
+The current governed set contains **134 mappings**. A completed full-object/parity
+audit covers the prior 130-mapping set. Four newly recovered `skeleton/acquired`
+units are exact Git-object mirrors and form the current incremental audit scope.
 
 The preparation ledger is now internally consistent:
 
 - 54 mappings in `B1-core-runtime`
 - 12 mappings in `B2-domain-build`
 - 7 mappings in `B3-owner-sensitive`
-- 2 mappings in `B3-compat-convergence`
-- 29 mappings in `B4-research-quarantine`
+- 22 mappings in `B3-compat-convergence`
+- 39 mappings in `B4-research-quarantine`
 - 0 pending move assignments
-- 33 retained-outside classifications
+- 34 retained-outside classifications
 
-Fresh full-object/parity audit and CI evidence are still required before import
-inversion, source retirement, or any cutover-complete claim.
+Fresh incremental object/parity audit and CI evidence for the four acquired
+mappings are still required before import inversion, source retirement, or any
+cutover-complete claim.
 
 
 ## Compatibility convergence surfaces
@@ -279,3 +279,118 @@ against later designs. They are explicitly **non-authoritative**:
 No historical module can become a production owner through relocation alone;
 promotion requires an explicit masterplan adoption, evaluation evidence, and
 the normal signed-accountability process.
+
+
+## Transfer v2: legacy backend and GameForge AI recovery
+
+Transfer v2 is rebased onto current `main` after PR #1930 merged. It adds **26 governed mappings / 89 mirrored files**, extending the governed set from 104 to 130 without changing legacy imports or granting new runtime authority.
+
+### B4 research-quarantine recovery
+- `backend/gameforge/exocortex/agentic` -> `skeleton/ai/research/legacy/gameforge/exocortex/agentic`
+- `backend/gameforge/exocortex/zaibatsu` -> `skeleton/ai/research/legacy/gameforge/exocortex/zaibatsu`
+- `backend/gameforge/reasoning` -> `skeleton/ai/research/legacy/gameforge/reasoning`
+- `backend/gameforge/rag` -> `skeleton/ai/research/legacy/gameforge/rag`
+- `backend/gameforge/math_exocortex` -> `skeleton/ai/research/legacy/gameforge/math_exocortex`
+- `backend/gameforge/personal/neuro` -> `skeleton/ai/research/legacy/gameforge/personal/neuro`
+
+These trees are research evidence and historical implementation lineage. Relocation does not promote them into production authorities.
+
+### B3 compatibility-convergence recovery
+Twenty `backend/core` Jeeves/model/memory/swarm/world modules are mirrored under `skeleton/ai/compat/backend_core`. They must converge into existing canonical owners before any legacy retirement; relocation alone cannot create provider, memory, retrieval, planning, execution, agent, or simulation authority.
+
+### Post-#1930 parity reconciliation
+After #1930 merged, current `main` changed five exact-parity files under `skeleton/automation`: `build_plane.py`, `build_repair.py`, `builder_plane.py`, `secretary.py`, and `supervisor_runtime.py`. Transfer-v2 refreshes their `skeleton/ai/build/automation` mirrors and updates the mapping source-tree identity. `specialist_bots.py` remains an intentional compatibility facade and is not mirrored over.
+
+### Updated batch counts
+- B1-core-runtime: 54
+- B2-domain-build: 12
+- B3-owner-sensitive: 7
+- B3-compat-convergence: 22
+- B4-research-quarantine: 35
+
+Independent verification remains unsigned. Fresh full 130-mapping object/parity audit, the canonical file-tree validator, affected-domain validation, and required CI remain mandatory before any cutover or source retirement.
+
+
+### Transfer-v2 implementation attestation
+
+Implementation preparation is identity-bound to payload `fab8888ce760274984b52cbb50733f943a909581` and tree `1b44c743dfa667b7519adfb46756f9914cd36a94` by GitHub identity. This attestation does not authorize import inversion, source retirement, or production cutover. Independent verification remains unsigned.
+
+
+## Transfer-v2 reconciliation closure
+
+A fresh full-object/parity audit was completed on PR #1937 head `a3d200375e6775e95ac50add5daaca30bbabe058` after retargeting directly to `main`.
+
+- 130/130 mapping source identities current
+- zero missing source/destination objects
+- zero source/destination membership drift
+- zero undeclared exact-object drift
+- overlay mappings checked against governed child destinations
+- 16/16 declared compatibility facades contain the required re-export
+- zero forbidden OpenAI credential/provider-network markers in those facades
+
+The inherited `BASE-FRONTEND-TSC-01` blocker is closed by merged PR #1936 (`3ec4a71a53186887853a6c188bb3110701fed6d8`). Current `main` carries Expo 54 with React 19.1.0, React DOM 19.1.0, React Native 0.81.6, and matching React types. This closes the historical frontend dependency mismatch only; it does not substitute for fresh App Assembly/CI on transfer-v2.
+
+Remaining transfer-v2 gates are canonical CI/App Assembly and affected-domain validation on the PR head, independent verification signoff, and explicit owner convergence before any compatibility-source retirement.
+
+
+## Transfer-v2 frontend blocker transition
+
+`BASE-FRONTEND-TSC-01` is retained as resolved historical evidence. PR #1936 merged the Expo 54 React/React Native alignment, and App Assembly run `35743872291` / job `106800300393` shows `yarn tsc --noEmit` completing successfully. The operation-stream reducer suite also passes 10/10.
+
+The active inherited frontend gate is `BASE-FRONTEND-SSR-RAF-01`. The same App Assembly run advances into `expo export --platform web` and then fails during Node-side static rendering with `ReferenceError: requestAnimationFrame is not defined`, originating from `react-native-worklets/lib/module/threads.js` under Node v24.20.0.
+
+Transfer-v2 changes no `frontend/*` files. The SSR/export failure is therefore tracked as downstream base-state debt rather than transfer-v2 object/parity drift. The full 130-mapping object/parity audit remains green, but App Assembly must be green before source retirement, `cutover_complete`, or independent completion signoff.
+
+
+## Pull-request head synchronization
+
+The transfer-v2 branch has been reconciled directly onto `main`, completed its 130-mapping object/parity audit, and recorded the inherited Expo SSR export blocker. This checkpoint is intentionally documentation-only and exists to force a standard GitHub pull-request `synchronize` event from the current branch tip so App Assembly, CI/CD, Backend Quality, Frontier Contracts, and Merge Readiness evaluate the exact live transfer head.
+
+
+## Quarantine hygiene normalization
+
+Repository Hygiene exposed trailing whitespace inherited from 11 legacy GameForge Python sources after they were mirrored into the research-quarantine tree. The destination mirrors were normalized by stripping trailing spaces only; legacy sources were not modified. Python migration parity remains valid because the canonical file-tree validator accepts AST-equivalent Python content. These normalized research mirrors are therefore semantic-parity mirrors, not byte/object-identical mirrors.
+
+## Static-render RAF repair
+
+The inherited `BASE-FRONTEND-SSR-RAF-01` failure was reproduced from App Assembly run `35743872291`: TypeScript and the operation-stream reducer suite passed, then `expo export --platform web` failed in Node v24 while `react-native-worklets` called an undefined `requestAnimationFrame`.
+
+The validated transfer branch adds a supported Expo Router custom entry point that installs `requestAnimationFrame` / `cancelAnimationFrame` fallbacks only when missing and then loads `expo-router/entry`. `frontend/package.json` now points `main` at that entry. This is a repair-applied/pending-validation state until a fresh App Assembly run proves static export succeeds.
+
+
+### Transfer-v2 validation repair ledger
+
+The validated successor PR is **#1941**. The earlier #1937 lineage is superseded and must not be used for landing evidence.
+
+Two focused validation repairs are staged and deliberately remain **pending CI evidence**:
+
+- Merge Readiness contract alignment (`ac55d02f4aab769e5699151c5c24de17e63e1089`): the contract now matches the Expo remediation install lane, requiring lifecycle scripts to stay disabled and the install to remain non-interactive while lock reconciliation is temporarily allowed.
+- Expo static-render RAF compatibility (`4737a8c8bdbc7fc3aab1e1b525ef677393d33153`): the existing fail-closed node_modules patcher recognizes exactly `react-native-worklets@0.13.0` and falls back to `setTimeout(callback, 0)` only when Node static rendering has no `requestAnimationFrame`. Browser/native RAF behavior is unchanged.
+
+Commit `8f076935c39fead4fbccef61872290bc68d50566` normalized trailing whitespace in one quarantined Python mirror. The source/destination blob IDs therefore differ for that file, but the canonical validator's Python semantic-parity rule remains satisfied; this is not runtime drift or a custody promotion.
+
+Neither validation repair closes `BASE-FRONTEND-SSR-RAF-01` until current-head App Assembly succeeds through typecheck, reducer tests, and `expo export --platform web`. Independent verification and all source retirement remain blocked.
+
+
+## Remaining Skeleton acquired-source recovery
+
+The remaining characterized payload under `skeleton/acquired` is now preserved
+inside the governed AI tree as **research-quarantine lineage**:
+
+- `skeleton/acquired/gaming` -> `skeleton/ai/research/acquired/gaming`
+- `skeleton/acquired/gates` -> `skeleton/ai/research/acquired/gates`
+- `skeleton/acquired/genos` -> `skeleton/ai/research/acquired/genos`
+- `skeleton/acquired/ingest.py` -> `skeleton/ai/research/acquired/ingest.py`
+
+The gaming, gates, and Genos destinations reuse the original Git tree objects.
+The asset-ingest Python mirror was initially object-identical, then received a
+destination-only trailing-whitespace cleanup required by repository hygiene;
+the canonical migration validator therefore requires Python AST-semantic parity
+for that file. Source provenance remains unchanged.
+
+This is deliberately not a production-authority move. The mixed
+`skeleton/acquired` root remains a provenance/quarantine owner, while the four
+new mappings carry `cutover:quarantine` and `B4-research-quarantine`.
+Promotion into runtime, provider, model, simulation, or artifact ownership
+requires characterization, focused tests/evaluation, explicit convergence into
+the canonical owner, and independent evidence.

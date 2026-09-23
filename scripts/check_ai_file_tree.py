@@ -26,11 +26,52 @@ def _digest(path: Path) -> str:
 
 
 def _tree_files(root: Path) -> dict[str, Path]:
-    return {
-        path.relative_to(root).as_posix(): path
-        for path in root.rglob("*")
-        if path.is_file() and not path.is_symlink()
-    }
+    """Return governed source members without runtime/generated filesystem noise.
+
+    Repository migration parity is defined over Git-tracked source objects, not
+    transient files produced by imports/tests such as __pycache__/*.pyc.
+    Temporary paths outside the repository use a filtered filesystem fallback.
+    """
+    try:
+        relative_root = root.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return {
+            path.relative_to(root).as_posix(): path
+            for path in root.rglob("*")
+            if (
+                path.is_file()
+                and not path.is_symlink()
+                and "__pycache__" not in path.parts
+                and path.suffix not in {".pyc", ".pyo"}
+            )
+        }
+
+    try:
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z", "--", relative_root],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            f"cannot enumerate tracked migration tree {relative_root}: {exc}"
+        ) from exc
+
+    result: dict[str, Path] = {}
+    root_prefix = relative_root.rstrip("/") + "/"
+    for repo_relative in tracked.split("\0"):
+        if not repo_relative or repo_relative == relative_root:
+            continue
+        if not repo_relative.startswith(root_prefix):
+            continue
+        path = ROOT / repo_relative
+        if not path.is_file() or path.is_symlink():
+            continue
+        rel = repo_relative[len(root_prefix):]
+        result[rel] = path
+    return result
 
 
 def _python_semantically_equal(source: Path, destination: Path) -> bool:

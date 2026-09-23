@@ -83,7 +83,7 @@ export const Surface: React.FC<SurfaceProps> = ({
           intensity={blurIntensity}
           style={StyleSheet.absoluteFill}
         />
-        <View style={[{ backgroundColor: glassTint || 'rgba(15,23,42,0.45)', ...StyleSheet.absoluteFill }, { pointerEvents: 'none' }]} />
+        <View style={[{ backgroundColor: glassTint || 'rgba(15,23,42,0.45)', ...StyleSheet.absoluteFillObject }, { pointerEvents: 'none' }]} />
         {children}
       </View>
     );
