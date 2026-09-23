@@ -139,6 +139,11 @@ class EngineContextHandoff:
     prompt: str
     history: tuple[tuple[str, str], ...] = ()
     tools: tuple[ProviderToolDefinition, ...] = ()
+    model: str | None = None
+    structured_output_schema: Mapping[str, Any] | None = None
+    tool_choice: str = "auto"
+    specific_tool_id: str | None = None
+    estimated_cost_usd: float = 0.0
     handoff_digest: str | None = None
     schema_version: int = 1
 
@@ -250,6 +255,62 @@ class EngineContextHandoff:
             tools.append(tool)
         object.__setattr__(self, "tools", tuple(tools))
 
+        if self.model is not None:
+            model = str(self.model).strip()
+            if not model or len(model) > 256:
+                raise EngineServiceError(
+                    "compiled context provider model is invalid"
+                )
+            object.__setattr__(self, "model", model)
+        if self.structured_output_schema is not None:
+            object.__setattr__(
+                self,
+                "structured_output_schema",
+                _json_object(
+                    self.structured_output_schema,
+                    "structured_output_schema",
+                ),
+            )
+        choice = str(self.tool_choice).strip().lower()
+        if choice not in {"none", "auto", "required", "specific"}:
+            raise EngineServiceError(
+                "compiled context tool_choice is invalid"
+            )
+        object.__setattr__(self, "tool_choice", choice)
+        if self.specific_tool_id is not None:
+            specific = str(self.specific_tool_id).strip()
+            if not specific:
+                raise EngineServiceError(
+                    "compiled context specific_tool_id is invalid"
+                )
+            object.__setattr__(self, "specific_tool_id", specific)
+        if choice == "specific":
+            if self.specific_tool_id is None:
+                raise EngineServiceError(
+                    "specific tool choice requires specific_tool_id"
+                )
+            if self.specific_tool_id not in {
+                tool.tool_id for tool in tools
+            }:
+                raise EngineServiceError(
+                    "specific tool choice is not offered"
+                )
+        elif self.specific_tool_id is not None:
+            raise EngineServiceError(
+                "specific_tool_id requires tool_choice='specific'"
+            )
+        try:
+            estimated = float(self.estimated_cost_usd)
+        except (TypeError, ValueError) as exc:
+            raise EngineServiceError(
+                "compiled context estimated_cost_usd is invalid"
+            ) from exc
+        if estimated < 0 or estimated != estimated:
+            raise EngineServiceError(
+                "compiled context estimated_cost_usd is invalid"
+            )
+        object.__setattr__(self, "estimated_cost_usd", estimated)
+
         expected = _digest(self._digest_payload())
         if self.handoff_digest is not None and self.handoff_digest != expected:
             raise EngineServiceError(
@@ -282,6 +343,15 @@ class EngineContextHandoff:
                 for role, content in self.history
             ],
             "tools": [tool.as_dict() for tool in self.tools],
+            "model": self.model,
+            "structured_output_schema": (
+                None
+                if self.structured_output_schema is None
+                else dict(self.structured_output_schema)
+            ),
+            "tool_choice": self.tool_choice,
+            "specific_tool_id": self.specific_tool_id,
+            "estimated_cost_usd": self.estimated_cost_usd,
         }
 
     def as_dict(self) -> dict[str, Any]:
@@ -356,6 +426,28 @@ class EngineContextHandoff:
             prompt=str(data.get("prompt") or ""),
             history=tuple(history),
             tools=tuple(tools),
+            model=(
+                None
+                if data.get("model") is None
+                else str(data["model"])
+            ),
+            structured_output_schema=(
+                None
+                if data.get("structured_output_schema") is None
+                else _json_object(
+                    data["structured_output_schema"],
+                    "structured_output_schema",
+                )
+            ),
+            tool_choice=str(data.get("tool_choice", "auto")),
+            specific_tool_id=(
+                None
+                if data.get("specific_tool_id") is None
+                else str(data["specific_tool_id"])
+            ),
+            estimated_cost_usd=float(
+                data.get("estimated_cost_usd", 0.0)
+            ),
             handoff_digest=(
                 None
                 if data.get("handoff_digest") is None
