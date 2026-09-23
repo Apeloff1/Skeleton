@@ -2443,6 +2443,23 @@
       ]
     },
     {
+      "id": "repository-automation-chatgpt-adapter",
+      "family": "automation_model",
+      "role": "legacy advisory ChatGPT adapter for repository automation; explicitly separate from product runtime provider ownership",
+      "owner": "skeleton/automation/chatgpt_adapter.py",
+      "credential_bearing": true,
+      "receipt_required": true,
+      "status": "compatibility",
+      "surface_class": "automation_provider_explicitly_separate_and_receipt-gated",
+      "credential_owner": true,
+      "network_transport_owner": true,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": [
+        "credential",
+        "network_transport"
+      ]
+    },
+    {
       "id": "frontier-model-runtime",
       "family": "none",
       "role": "provider-neutral protocol/runtime primitives; no credential ownership",
