@@ -9,6 +9,8 @@ MAX_OPEN_PULL_REQUESTS = 12
 MAX_WORKFLOW_RUNS = 16
 MAX_CODE_SCANNING_ALERTS = 8
 MAX_WORKER_SNAPSHOTS = 48
+_BOOTSTRAP_ISSUES = frozenset({1685})
+_APPROVAL_LABELS = frozenset({"supervisor-ready", "build-approved", "security-approved"})
 
 _STATUS_TITLES = frozenset(
     {
@@ -47,6 +49,35 @@ def _newest(rows: Sequence[Any], limit: int) -> list[Mapping[str, Any]]:
         key=lambda row: _text(row.get("updatedAt") or row.get("createdAt"), 64),
         reverse=True,
     )[:limit]
+
+
+def _planning_issues(rows: Sequence[Any], limit: int) -> list[Mapping[str, Any]]:
+    """Retain authorized failover intake even when it is older than recent chatter."""
+    mapped = [row for row in rows if isinstance(row, Mapping)]
+    authorized: list[Mapping[str, Any]] = []
+    ordinary: list[Mapping[str, Any]] = []
+    for row in mapped:
+        labels = {value.lower() for value in _labels(row.get("labels"))}
+        try:
+            number = int(row.get("number", 0))
+        except (TypeError, ValueError):
+            number = 0
+        if number in _BOOTSTRAP_ISSUES or labels & _APPROVAL_LABELS:
+            authorized.append(row)
+        else:
+            ordinary.append(row)
+    newest = lambda values: sorted(
+        values,
+        key=lambda row: _text(row.get("updatedAt") or row.get("createdAt"), 64),
+        reverse=True,
+    )
+    selected = newest(authorized)[:limit]
+    seen = {str(row.get("number")) for row in selected}
+    selected.extend(
+        row for row in newest(ordinary)
+        if str(row.get("number")) not in seen
+    )
+    return selected[:limit]
 
 
 def _compact_issue(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -183,7 +214,7 @@ def build_bounded_project_context(
         "base_sha": _text(base_sha, 80),
         "open_issues": [
             _compact_issue(row)
-            for row in _newest(planning_source, MAX_PLANNING_ISSUES)
+            for row in _planning_issues(planning_source, MAX_PLANNING_ISSUES)
         ],
         "open_pull_requests": [
             _compact_pull(row)

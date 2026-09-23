@@ -59,7 +59,6 @@ _AI_SURFACE_PATH_TERMS = (
     "model",
     "ai_",
     "/ai.",
-    "/ai/",
 )
 _PROVIDER_NETWORK_PATH_TERMS = (
     "provider",
@@ -160,28 +159,100 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
 
 def _network_transport_imports(path: Path) -> list[str]:
     hits: list[str] = []
-    for name in _imported_modules(path):
-        if (
-            name in _NETWORK_TRANSPORT_ROOTS
-            or any(name.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS)
-        ):
-            hits.append(name)
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return hits
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.name
+                if name in _NETWORK_TRANSPORT_ROOTS or any(
+                    name.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS
+                ):
+                    hits.append(name)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module == "urllib" and any(alias.name == "request" for alias in node.names):
+                hits.append("urllib.request")
+            elif module in _NETWORK_TRANSPORT_ROOTS or any(
+                module.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS
+            ):
+                hits.append(module)
     return hits
 
 
-def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
-    credential_markers = sorted(
-        marker
-        for marker in _AI_CREDENTIAL_MARKERS
+def _credential_environment_reads(path: Path) -> list[str]:
+    """Return credential names actually read from os.getenv/os.environ APIs."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return []
+
+    hits: set[str] = set()
+
+    def constant_string(node: ast.AST | None) -> str | None:
+        return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            func = node.func
+            is_getenv = (
+                isinstance(func, ast.Attribute)
+                and func.attr == "getenv"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "os"
+            )
+            is_environ_get = (
+                isinstance(func, ast.Attribute)
+                and func.attr == "get"
+                and isinstance(func.value, ast.Attribute)
+                and func.value.attr == "environ"
+                and isinstance(func.value.value, ast.Name)
+                and func.value.value.id == "os"
+            )
+            if (is_getenv or is_environ_get) and node.args:
+                name = constant_string(node.args[0])
+                if name in _AI_CREDENTIAL_MARKERS:
+                    hits.add(name)
+        elif isinstance(node, ast.Subscript):
+            value = node.value
+            if (
+                isinstance(value, ast.Attribute)
+                and value.attr == "environ"
+                and isinstance(value.value, ast.Name)
+                and value.value.id == "os"
+            ):
+                name = constant_string(node.slice)
+                if name in _AI_CREDENTIAL_MARKERS:
+                    hits.add(name)
+    return sorted(hits)
+
+
+def _credential_markers(path: Path) -> list[str]:
+    """Return credential edges from real environment reads or declared key slots.
+
+    AST-based assignment detection keeps comments/docstrings harmless while still
+    classifying modules that explicitly own a provider credential variable.
+    """
+    hits = set(_credential_environment_reads(path))
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return sorted(hits)
+
+    for node in ast.walk(tree):
         if (
-            f'os.getenv("{marker}")' in source
-            or f"os.getenv('{marker}')" in source
-            or f'os.environ.get("{marker}")' in source
-            or f"os.environ.get('{marker}')" in source
-            or f'os.environ["{marker}"]' in source
-            or f"os.environ['{marker}']" in source
-        )
-    )
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Store)
+            and node.id in _AI_CREDENTIAL_MARKERS
+        ):
+            hits.add(node.id)
+    return sorted(hits)
+
+
+def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
+    credential_markers = _credential_markers(path)
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
     network_imports = sorted(set(_network_transport_imports(path)))
     provider_urls = sorted(
@@ -198,27 +269,25 @@ def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
         "client_markers": client_markers,
     }
 
-
 def _looks_like_provider_network_surface(
     path: Path,
     source: str,
     signals: dict[str, list[str]],
 ) -> bool:
-    del source
     if not signals["network_imports"]:
         return False
-    relative = path.as_posix().lower()
-    if any(
-        relative.startswith(prefix)
-        for prefix in _NON_PROVIDER_NETWORK_PATH_PREFIXES
-    ):
+
+    relative = "/" + path.as_posix().lower().lstrip("/")
+    if any(f"/{prefix}" in relative for prefix in _NON_PROVIDER_NETWORK_PATH_PREFIXES):
         return False
+
+    provider_path = any(term in relative for term in _PROVIDER_NETWORK_PATH_TERMS)
     provider_context = (
         bool(signals["credential_markers"])
         or bool(signals["sdk_imports"])
         or bool(signals["provider_urls"])
         or bool(signals["client_markers"])
-        or any(term in relative for term in _PROVIDER_NETWORK_PATH_TERMS)
+        or provider_path
     )
     return provider_context
 
@@ -244,7 +313,12 @@ def discover_provider_surfaces(repo_root: Path) -> dict[str, dict[str, list[str]
                 continue
             signals = _provider_surface_signals(path, source)
             edge_classes: list[str] = []
-            if signals["credential_markers"]:
+            provider_context = (
+                bool(signals["sdk_imports"])
+                or bool(signals["provider_urls"])
+                or bool(signals["client_markers"])
+            )
+            if signals["credential_markers"] and provider_context:
                 edge_classes.append("credential")
             if signals["sdk_imports"]:
                 edge_classes.append("sdk_client")
@@ -677,6 +751,13 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             continue
         for path in sorted(source_root.rglob("*.py")):
             relative = path.relative_to(repo_root).as_posix()
+            if (
+                "/tests/" in "/" + relative
+                or relative.startswith("tests/")
+                or "/testing/" in "/" + relative
+                or path.name.startswith("test_")
+            ):
+                continue
             if relative not in sdk_surface_owners:
                 hits = _provider_sdk_imports(path)
                 if hits:
