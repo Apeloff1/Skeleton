@@ -4264,6 +4264,71 @@
         "path": "skeleton/shells",
         "owner": "shell/product compatibility surfaces",
         "reason": "shell/UI adapters remain product-facing compatibility surfaces rather than canonical AI engine ownership"
+      },
+      {
+        "path": "skeleton/artifacts",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/audio",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/connectors",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/document",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/document_vision",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/education",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/plugins",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/product",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/product_shell",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/speech",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/storage",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/video",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
+      },
+      {
+        "path": "skeleton/vision",
+        "owner": "product/domain compatibility plane",
+        "reason": "masterplan construction root is a product/domain surface and remains outside canonical AI engine ownership during staged migration"
       }
     ],
     "covered_aliases": [
