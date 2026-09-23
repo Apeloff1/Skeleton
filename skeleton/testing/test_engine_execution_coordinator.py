@@ -559,7 +559,10 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         tool_id=pending[0]["tool_id"],
         arguments_digest=pending[0]["arguments_digest"],
         idempotency_key="approve-call-write",
-        expires_at=operation.deadline - timedelta(seconds=1),
+        expires_at=min(
+            operation.deadline,
+            command.delegated_authority.expires_at,
+        ) - timedelta(seconds=1),
         now=_now(),
     )
 
