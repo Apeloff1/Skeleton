@@ -199,22 +199,47 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
-            echo '::error::OPENAI_API_KEY repository secret is required for shift supervision.'
-            exit 1
-          fi
-
           role='secretary'
           if [[ "$EVENT_NAME" == 'workflow_dispatch' || "$EVENT_NAME" == 'push' || "$EVENT_SCHEDULE" == '2,32 * * * *' ]]; then
             role='both'
           fi
 
-          python -m core.shift_supervisor \
-            --once \
-            --role "$role" \
-            --output .shift-supervisor-tmp/result.json \
-            --state-in .shift-supervisor-tmp/state-in.txt \
-            --state-out .shift-supervisor-tmp/state-out.txt
+          model_status=0
+          if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+            echo '::warning::OPENAI_API_KEY is unavailable; using deterministic authorized failover.'
+            model_status=78
+          else
+            set +e
+            timeout --signal=TERM --kill-after=15s 240s python -m core.shift_supervisor \
+              --once \
+              --role "$role" \
+              --output .shift-supervisor-tmp/result.json \
+              --state-in .shift-supervisor-tmp/state-in.txt \
+              --state-out .shift-supervisor-tmp/state-out.txt
+            model_status=$?
+            set -e
+          fi
+
+          if (( model_status == 78 )); then
+            echo "::warning::Advisory model planning unavailable (status=${model_status}); compiling deterministic issue-backed failover plan."
+            python - <<'PY'
+          from pathlib import Path
+          from core.shift_supervisor.__main__ import _read_state
+          from core.shift_supervisor.fallback_plan import emit_failover_outputs
+
+          state_path = Path('.shift-supervisor-tmp/state-in.txt')
+          previous = _read_state(state_path) if state_path.exists() else None
+          emit_failover_outputs(
+              '.shift-supervisor-tmp/project-context.json',
+              previous,
+              '.shift-supervisor-tmp/result.json',
+              '.shift-supervisor-tmp/state-out.txt',
+          )
+          PY
+          elif (( model_status != 0 )); then
+            echo "::error::Shift Supervisor failed outside the model-unavailability boundary (status=${model_status}); refusing deterministic failover."
+            exit "$model_status"
+          fi
 
       - name: Publish canonical plan and machine state
         if: steps.fallback.outputs.run == 'true'

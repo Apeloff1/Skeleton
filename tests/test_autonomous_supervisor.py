@@ -524,6 +524,21 @@ class SupervisorEnvelopeTests(unittest.TestCase):
             )
 
 
+    def test_model_plan_delegates_provider_configuration_to_canonical_client(
+        self,
+    ) -> None:
+        snap = self.snapshot()
+        with patch.object(
+            supervisor,
+            "FreeModelClient",
+            side_effect=supervisor.ModelError("provider unavailable"),
+        ):
+            self.assertEqual(
+                supervisor.model_plan(snap),
+                supervisor.deterministic_plan(snap),
+            )
+
+
 class DurableWorkerHealthTests(unittest.TestCase):
     def test_open_specialist_pr_becomes_durable_health_evidence(self) -> None:
         snapshot = supervisor.SupervisorSnapshot(
