@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   OPERATION_STREAM_SCHEMA_VERSION,
   createOperationClientState,
+  reduceOperationAuthoritativeResync,
   reduceOperationEvent,
   reduceOperationReplay,
 } from '../services/operationStreamReducer.ts';
@@ -246,4 +247,50 @@ test('failed or cancelled terminal events discard provisional content status', (
   assert.equal(failed.contentState, 'discarded');
   assert.equal(failed.authoritativeContent, null);
   assert.equal(failed.terminal, true);
+});
+
+
+
+test('authoritative resync resets stale client cursor to compacted floor', () => {
+  let state = createOperationClientState('op-1', 1);
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.output.delta', { payload: { delta: 'stale' } }),
+  );
+  const next = reduceOperationAuthoritativeResync(state, {
+    ok: true,
+    operation: snapshot('running'),
+    events: [event(6, 'operation.running')],
+    after_sequence: 5,
+    reset_after_sequence: 5,
+    compacted_through: 5,
+    latest_sequence: 6,
+    stream_latest_sequence: 8,
+    terminal: false,
+  });
+
+  assert.equal(next.lastSequence, 6);
+  assert.equal(next.provisionalContent, '');
+  assert.equal(next.contentState, 'none');
+  assert.equal(next.operationState, 'running');
+  assert.equal(next.resyncRequired, false);
+});
+
+
+test('authoritative resync rejects inconsistent server watermark', () => {
+  const state = createOperationClientState('op-1', 9);
+  const next = reduceOperationAuthoritativeResync(state, {
+    ok: true,
+    operation: snapshot('running'),
+    events: [],
+    after_sequence: 5,
+    reset_after_sequence: 5,
+    compacted_through: 4,
+    latest_sequence: 5,
+    stream_latest_sequence: 5,
+    terminal: false,
+  });
+
+  assert.equal(next.resyncRequired, true);
+  assert.equal(next.error, 'invalid_resync_watermark');
 });
