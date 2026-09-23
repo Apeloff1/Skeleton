@@ -563,7 +563,7 @@
       "stage": 0,
       "parallel_lane": "provider-surface",
       "objective": "Run provider-surface discovery and classify every credential/network model edge.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [],
       "can_start_before_closure_dependencies_close": true,
@@ -599,7 +599,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -617,7 +617,7 @@
       "stage": 0,
       "parallel_lane": "provider-surface",
       "objective": "Migrate or retire any residual shadow provider SDK/network/credential path while preserving compatibility APIs.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S0-PROV-01"
       ],
@@ -658,7 +658,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -676,7 +676,7 @@
       "stage": 0,
       "parallel_lane": "provider-surface",
       "objective": "Produce current-head CI evidence that only declared source-level provider surfaces remain.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S0-PROV-02"
       ],
@@ -713,7 +713,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
