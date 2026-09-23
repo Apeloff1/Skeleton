@@ -208,12 +208,28 @@ jobs:
             role='both'
           fi
 
-          python -m core.shift_supervisor \
+          if ! python -m core.shift_supervisor \
             --once \
             --role "$role" \
             --output .shift-supervisor-tmp/result.json \
             --state-in .shift-supervisor-tmp/state-in.txt \
-            --state-out .shift-supervisor-tmp/state-out.txt
+            --state-out .shift-supervisor-tmp/state-out.txt; then
+            echo '::warning::Advisory model planning failed; compiling deterministic issue-backed failover plan.'
+            python - <<'PY'
+          from pathlib import Path
+          from core.shift_supervisor.__main__ import _read_state
+          from core.shift_supervisor.fallback_plan import emit_failover_outputs
+
+          state_path = Path('.shift-supervisor-tmp/state-in.txt')
+          previous = _read_state(state_path) if state_path.exists() else None
+          emit_failover_outputs(
+              '.shift-supervisor-tmp/project-context.json',
+              previous,
+              '.shift-supervisor-tmp/result.json',
+              '.shift-supervisor-tmp/state-out.txt',
+          )
+          PY
+          fi
 
       - name: Publish canonical plan and machine state
         if: steps.fallback.outputs.run == 'true'
