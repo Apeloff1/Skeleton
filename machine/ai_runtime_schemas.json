@@ -1253,11 +1253,15 @@
         },
         "stream_preferences": {
           "type": "JsonObject"
+        },
+        "compiled_context": {
+          "type": "EngineContextHandoff"
         }
       },
       "invariants": [
         "operation/execution tenant/capability/identity agree with delegated authority",
-        "command does not carry an untrusted full client transcript as authority"
+        "command does not carry an untrusted full client transcript as authority",
+        "compiled_context handoff digest is bound into execution_request identity"
       ]
     },
     "StreamEvent": {
@@ -2105,6 +2109,68 @@
         "sequence is monotonic within one provider response",
         "non-final deltas carry exactly one payload matching kind",
         "final delta carries finish_reason and grants no durable stream authority by itself"
+      ]
+    },
+    "EngineContextHandoff": {
+      "schema_version": 1,
+      "owner_plane": "engine-api",
+      "fields": {
+        "operation_id": {
+          "type": "OpaqueId"
+        },
+        "execution_id": {
+          "type": "OpaqueId"
+        },
+        "turn_id": {
+          "type": "OpaqueId"
+        },
+        "tenant_id": {
+          "type": "TenantId"
+        },
+        "context_id": {
+          "type": "OpaqueId"
+        },
+        "context_digest": {
+          "type": "Digest256"
+        },
+        "compiler_version": {
+          "type": "string",
+          "max_length": 128
+        },
+        "source_snapshot": {
+          "type": "array<[OpaqueId,Digest256]>",
+          "max_items": 4096
+        },
+        "data_class": {
+          "type": "DataClass"
+        },
+        "instructions": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 1000000
+        },
+        "prompt": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 1000000
+        },
+        "history": {
+          "type": "array<JsonObject>",
+          "max_items": 1024
+        },
+        "tools": {
+          "type": "array<ProviderToolDefinition>",
+          "max_items": 256
+        },
+        "handoff_digest": {
+          "type": "Digest256"
+        }
+      },
+      "invariants": [
+        "handoff is generated only from the canonical compiled ContextEnvelope",
+        "operation/execution/context identities and source snapshot agree with execution_request.context_policy",
+        "handoff_digest is included in execution_request identity before delegated authority is bound",
+        "history is a server-compiled projection and is never accepted from raw client transcript input"
       ]
     }
   },
