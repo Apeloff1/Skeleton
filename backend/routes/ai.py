@@ -547,9 +547,34 @@ async def ai_chat(
     chat_policy = INSTRUCTION_POLICIES.resolve("chat.jeeves")
     purpose = "model-inference"
     created_at = datetime.now(timezone.utc)
-    operation_id = str(uuid.uuid4())
-    execution_id = str(uuid.uuid4())
-    turn_id = str(uuid.uuid4())
+    # Stable engine identity comes from the canonical user message rather
+    # than the HTTP attempt. Retries of one idempotent conversation append
+    # must converge on the same operation/execution/turn.
+    identity_material = (
+        tenant_id
+        + ":"
+        + request.thread_id
+        + ":"
+        + user_message.message_id
+    )
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "codedock-chat-operation:" + identity_material,
+        )
+    )
+    execution_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "codedock-chat-execution:" + identity_material,
+        )
+    )
+    turn_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "codedock-chat-turn:" + identity_material,
+        )
+    )
     segments = [
         chat_policy.as_segment(
             tenant_id=tenant_id,
