@@ -68,6 +68,36 @@ class CancellationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class OperationResyncBatch:
+    operation: StoredOperation
+    events: tuple[StreamEvent, ...]
+    compacted_through: int
+    stream_latest_sequence: int
+
+    @property
+    def terminal(self) -> bool:
+        return self.operation.terminal
+
+    @property
+    def latest_sequence(self) -> int:
+        if self.events:
+            return self.events[-1].sequence
+        return self.compacted_through
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation": self.operation.as_dict(),
+            "events": [event.as_dict() for event in self.events],
+            "after_sequence": self.compacted_through,
+            "reset_after_sequence": self.compacted_through,
+            "compacted_through": self.compacted_through,
+            "latest_sequence": self.latest_sequence,
+            "stream_latest_sequence": self.stream_latest_sequence,
+            "terminal": self.terminal,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class OperationStreamBatch:
     operation: StoredOperation
     events: tuple[StreamEvent, ...]
@@ -273,6 +303,63 @@ class OperationStreamTransport:
             after_sequence=after_sequence,
         )
 
+    def resync(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        consumer_id: str,
+        limit: int = 1000,
+        consumer_lease_seconds: int = 300,
+    ) -> OperationResyncBatch:
+        """Reset one client to the authoritative retained-stream floor.
+
+        This is the only safe recovery when a persisted client cursor predates
+        compacted history. The durable operation snapshot remains authoritative;
+        retained events resume strictly after the compaction watermark.
+        """
+
+        operation = self._authorized_operation(
+            operation_id,
+            tenant_id=tenant_id,
+        )
+        self.dispatch_pending(
+            operation_id,
+            tenant_id=tenant_id,
+            limit=limit,
+        )
+        head = self.event_store.head(operation_id)
+        compacted_through = int(head["compacted_through"])
+        checkpoint = self.event_store.register_consumer(
+            operation_id,
+            consumer_id,
+            lease_seconds=consumer_lease_seconds,
+        )
+        if checkpoint.acknowledged_through < compacted_through:
+            raise OperationTransportConflict(
+                "consumer checkpoint is behind compacted history"
+            )
+        events = self.event_store.replay(
+            ReplayCursor(
+                operation_id=operation_id,
+                after_sequence=compacted_through,
+            ),
+            limit=limit,
+        )
+        operation = self._authorized_operation(
+            operation_id,
+            tenant_id=tenant_id,
+        )
+        refreshed_head = self.event_store.head(operation_id)
+        return OperationResyncBatch(
+            operation=operation,
+            events=events,
+            compacted_through=compacted_through,
+            stream_latest_sequence=int(
+                refreshed_head["latest_sequence"]
+            ),
+        )
+
     def acknowledge(
         self,
         operation_id: str,
@@ -344,6 +431,7 @@ class OperationStreamTransport:
 __all__ = [
     "CancellationResult",
     "OperationAccessDenied",
+    "OperationResyncBatch",
     "OperationStreamBatch",
     "OperationStreamTransport",
     "OperationTransportConflict",
