@@ -328,37 +328,49 @@ class OperationStreamTransport:
             tenant_id=tenant_id,
             limit=limit,
         )
-        head = self.event_store.head(operation_id)
-        compacted_through = int(head["compacted_through"])
-        checkpoint = self.event_store.register_consumer(
-            operation_id,
-            consumer_id,
-            lease_seconds=consumer_lease_seconds,
-        )
-        if checkpoint.acknowledged_through < compacted_through:
-            raise OperationTransportConflict(
-                "consumer checkpoint is behind compacted history"
+        last_gap: StreamReplayGapError | None = None
+        for _attempt in range(3):
+            head = self.event_store.head(operation_id)
+            compacted_through = int(head["compacted_through"])
+            checkpoint = self.event_store.register_consumer(
+                operation_id,
+                consumer_id,
+                lease_seconds=consumer_lease_seconds,
             )
-        events = self.event_store.replay(
-            ReplayCursor(
-                operation_id=operation_id,
-                after_sequence=compacted_through,
-            ),
-            limit=limit,
-        )
-        operation = self._authorized_operation(
-            operation_id,
-            tenant_id=tenant_id,
-        )
-        refreshed_head = self.event_store.head(operation_id)
-        return OperationResyncBatch(
-            operation=operation,
-            events=events,
-            compacted_through=compacted_through,
-            stream_latest_sequence=int(
-                refreshed_head["latest_sequence"]
-            ),
-        )
+            if checkpoint.acknowledged_through < compacted_through:
+                raise OperationTransportConflict(
+                    "consumer checkpoint is behind compacted history"
+                )
+            try:
+                events = self.event_store.replay(
+                    ReplayCursor(
+                        operation_id=operation_id,
+                        after_sequence=compacted_through,
+                    ),
+                    limit=limit,
+                )
+            except StreamReplayGapError as exc:
+                # Compaction may legitimately advance between head() and
+                # replay(). Refresh the authoritative floor and retry.
+                last_gap = exc
+                continue
+
+            operation = self._authorized_operation(
+                operation_id,
+                tenant_id=tenant_id,
+            )
+            refreshed_head = self.event_store.head(operation_id)
+            return OperationResyncBatch(
+                operation=operation,
+                events=events,
+                compacted_through=compacted_through,
+                stream_latest_sequence=int(
+                    refreshed_head["latest_sequence"]
+                ),
+            )
+        raise OperationTransportConflict(
+            "stream compaction advanced repeatedly during resync"
+        ) from last_gap
 
     def acknowledge(
         self,
