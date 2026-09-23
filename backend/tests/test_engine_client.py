@@ -8,6 +8,7 @@ import urllib.error
 import pytest
 
 from core.engine_client import (
+    EngineApprovalRequired,
     EngineClient,
     EngineClientConfig,
     EngineRequestConflict,
@@ -331,3 +332,159 @@ def test_engine_commands_delegate_scoped_tool_approval_authority() -> None:
     )
 
     assert "engine:approve" in command.delegated_authority.scopes
+
+
+
+@pytest.mark.asyncio
+async def test_engine_client_lists_and_submits_bound_tool_approval(
+    monkeypatch,
+) -> None:
+    client = _client()
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
+    calls = []
+
+    def fake_urlopen(request, timeout):
+        calls.append(
+            {
+                "url": request.full_url,
+                "method": request.get_method(),
+                "body": (
+                    None
+                    if request.data is None
+                    else json.loads(request.data.decode("utf-8"))
+                ),
+                "timeout": timeout,
+            }
+        )
+        if request.get_method() == "GET":
+            return _Response(
+                {
+                    "execution_id": "exec-approval",
+                    "pending": [
+                        {
+                            "call_id": "call-1",
+                            "tool_id": "repo.write",
+                            "arguments_digest": "a" * 64,
+                        }
+                    ],
+                }
+            )
+        return _Response(
+            {
+                "approval_id": "approval-1",
+                "approval_ref": "engine-tool-approval:approval-1",
+                "execution_id": "exec-approval",
+                "call_id": "call-1",
+                "tool_id": "repo.write",
+                "arguments_digest": "a" * 64,
+                "actor_id": "actor-a",
+                "tenant_id": "tenant-a",
+                "idempotency_key": "approve-1",
+                "issued_at": datetime.now(timezone.utc).isoformat(),
+                "expires_at": (
+                    datetime.now(timezone.utc) + timedelta(minutes=5)
+                ).isoformat(),
+                "schema_version": 1,
+            }
+        )
+
+    monkeypatch.setattr(
+        "core.engine_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    pending = await client.pending_tool_approvals(
+        "exec-approval",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        deadline=deadline,
+    )
+    assert pending == (
+        {
+            "call_id": "call-1",
+            "tool_id": "repo.write",
+            "arguments_digest": "a" * 64,
+        },
+    )
+
+    approval = await client.approve_tool_call(
+        "exec-approval",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        call_id="call-1",
+        tool_id="repo.write",
+        arguments_digest="a" * 64,
+        idempotency_key="approve-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        deadline=deadline,
+    )
+    assert approval["approval_ref"] == "engine-tool-approval:approval-1"
+    assert calls[0]["method"] == "GET"
+    assert "actor_id=actor-a" in calls[0]["url"]
+    assert "tenant_id=tenant-a" in calls[0]["url"]
+    assert calls[1]["method"] == "POST"
+    assert calls[1]["body"]["actor_id"] == "actor-a"
+    assert calls[1]["body"]["tenant_id"] == "tenant-a"
+    assert calls[1]["body"]["call_id"] == "call-1"
+
+
+@pytest.mark.asyncio
+async def test_wait_for_result_surfaces_approval_required_without_poll_loop(
+    monkeypatch,
+) -> None:
+    client = _client()
+    calls = 0
+
+    async def fake_status(execution_id, *, deadline=None):
+        nonlocal calls
+        calls += 1
+        assert execution_id == "exec-waiting"
+        return {
+            "execution_id": execution_id,
+            "operation_state": "waiting_for_user",
+            "execution_state": "waiting_for_user",
+        }
+
+    monkeypatch.setattr(client, "status", fake_status)
+
+    with pytest.raises(EngineApprovalRequired) as excinfo:
+        await client.wait_for_result(
+            "exec-waiting",
+            deadline=datetime.now(timezone.utc) + timedelta(seconds=30),
+        )
+
+    assert excinfo.value.execution_id == "exec-waiting"
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_engine_client_rejects_malformed_pending_approval_identity(
+    monkeypatch,
+) -> None:
+    client = _client()
+
+    def fake_urlopen(request, timeout):
+        return _Response(
+            {
+                "execution_id": "exec-approval",
+                "pending": [
+                    {
+                        "call_id": "call-1",
+                        "tool_id": "repo.write",
+                        "arguments_digest": "not-a-digest",
+                    }
+                ],
+            }
+        )
+
+    monkeypatch.setattr(
+        "core.engine_client.urllib.request.urlopen",
+        fake_urlopen,
+    )
+
+    with pytest.raises(Exception, match="approval identity is malformed"):
+        await client.pending_tool_approvals(
+            "exec-approval",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+        )
