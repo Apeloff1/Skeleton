@@ -4607,6 +4607,11 @@
       "path": "skeleton/genos",
       "owner": "package/compatibility boundary",
       "reason": "top-level genos compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
+    },
+    {
+      "path": "skeleton/cue",
+      "owner": "package/compatibility boundary",
+      "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     }
   ],
   "classification_coverage": {
