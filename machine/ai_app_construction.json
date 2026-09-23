@@ -2372,7 +2372,16 @@
       "owner": "skeleton/provider_runtime.py",
       "credential_bearing": true,
       "receipt_required": true,
-      "status": "canonical"
+      "status": "canonical",
+      "surface_class": "canonical_runtime",
+      "credential_owner": true,
+      "network_transport_owner": true,
+      "sdk_client_owner": true,
+      "discovery_edge_classes": [
+        "credential",
+        "network_transport",
+        "sdk_client"
+      ]
     },
     {
       "id": "backend-runtime-compat",
@@ -2381,7 +2390,12 @@
       "owner": "backend/core/ai_provider.py",
       "credential_bearing": false,
       "receipt_required": true,
-      "status": "compatibility"
+      "status": "compatibility",
+      "surface_class": "noncredential_compatibility_facade",
+      "credential_owner": false,
+      "network_transport_owner": false,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": []
     },
     {
       "id": "backend-legacy-compat",
@@ -2390,7 +2404,12 @@
       "owner": "backend/core/ai_provider_compat.py",
       "credential_bearing": false,
       "receipt_required": true,
-      "status": "compatibility"
+      "status": "compatibility",
+      "surface_class": "noncredential_compatibility_facade",
+      "credential_owner": false,
+      "network_transport_owner": false,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": []
     },
     {
       "id": "jeeves-runtime-compat",
@@ -2399,7 +2418,12 @@
       "owner": "skeleton/jeeves/providers.py",
       "credential_bearing": false,
       "receipt_required": true,
-      "status": "compatibility"
+      "status": "compatibility",
+      "surface_class": "noncredential_compatibility_facade",
+      "credential_owner": false,
+      "network_transport_owner": false,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": []
     },
     {
       "id": "repository-automation",
@@ -2408,7 +2432,32 @@
       "owner": "skeleton/automation/free_model.py",
       "credential_bearing": true,
       "receipt_required": true,
-      "status": "canonical"
+      "status": "canonical",
+      "surface_class": "automation_provider_explicitly_separate_and_receipt-gated",
+      "credential_owner": true,
+      "network_transport_owner": true,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": [
+        "credential",
+        "network_transport"
+      ]
+    },
+    {
+      "id": "repository-automation-chatgpt-adapter",
+      "family": "automation_model",
+      "role": "legacy advisory ChatGPT adapter for repository automation; explicitly separate from product runtime provider ownership",
+      "owner": "skeleton/automation/chatgpt_adapter.py",
+      "credential_bearing": true,
+      "receipt_required": true,
+      "status": "compatibility",
+      "surface_class": "automation_provider_explicitly_separate_and_receipt-gated",
+      "credential_owner": true,
+      "network_transport_owner": true,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": [
+        "credential",
+        "network_transport"
+      ]
     },
     {
       "id": "frontier-model-runtime",
@@ -2417,7 +2466,12 @@
       "owner": "skeleton/frontier/model_runtime.py",
       "credential_bearing": false,
       "receipt_required": false,
-      "status": "library"
+      "status": "library",
+      "surface_class": "provider_declaration",
+      "credential_owner": false,
+      "network_transport_owner": false,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": []
     },
     {
       "id": "jeeves-provider-router",
@@ -2426,7 +2480,12 @@
       "owner": "skeleton/jeeves/agent/provider.py",
       "credential_bearing": false,
       "receipt_required": false,
-      "status": "library"
+      "status": "library",
+      "surface_class": "provider_declaration",
+      "credential_owner": false,
+      "network_transport_owner": false,
+      "sdk_client_owner": false,
+      "discovery_edge_classes": []
     }
   ],
   "request_lifecycle": [
@@ -7141,7 +7200,17 @@
         "client constructor patterns"
       ],
       "allowlist": "machine contract declared provider surfaces only",
-      "result": "fail CI on unexplained credential-bearing/network provider surface"
+      "result": "fail CI on unexplained credential-bearing/network provider surface",
+      "inventory_fields": [
+        "surface_class",
+        "credential_owner",
+        "network_transport_owner",
+        "sdk_client_owner",
+        "discovery_edge_classes"
+      ],
+      "classification_rule": "Every discovered provider credential, raw provider transport, or vendor SDK client edge must map to exactly one declared provider surface owner and the matching ownership boolean must be true.",
+      "sdk_isolation_rule": "Vendor SDK imports are permitted only in declared sdk_client_owner surfaces.",
+      "network_isolation_rule": "Generic/raw network transport is permitted near provider credentials, provider URLs, provider model/client markers, or provider-path modules only in declared network_transport_owner surfaces."
     },
     "compatibility_migration": [
       "preserve public application signatures",
@@ -7161,7 +7230,61 @@
       "Jeeves/tool shadow provider denial",
       "undeclared provider denial",
       "compatibility application modules contain no provider credential reads or raw provider SDK/network transport"
-    ]
+    ],
+    "application_isolation_surfaces": [
+      {
+        "path": "backend/core/ai_provider.py",
+        "role": "runtime compatibility facade",
+        "required_tokens": [
+          "from skeleton import provider_runtime as _runtime"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "skeleton/jeeves/providers.py",
+        "role": "Jeeves compatibility facade",
+        "required_tokens": [
+          "OpenAISyncProviderAdapter",
+          "ProviderRequest"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "backend/routes/image_generation.py",
+        "role": "media request adapter delegating to canonical provider runtime",
+        "required_tokens": [
+          "ProviderRegistry",
+          "ProviderImageRequest"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "backend/core/expressive_tts.py",
+        "role": "provider-neutral speech cadence preparation",
+        "required_tokens": [
+          "shape_cadence",
+          "resolve_tone"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      }
+    ],
+    "application_isolation_rule": "Application, media, compatibility and presentation modules may prepare or delegate provider work but may not own provider credentials, vendor SDK clients, or raw provider transport."
   },
   "functional_ai_acceptance_matrix": {
     "schema_version": 1,

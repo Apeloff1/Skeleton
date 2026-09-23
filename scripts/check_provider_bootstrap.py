@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import argparse
 import ast
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -58,6 +60,44 @@ _AI_SURFACE_PATH_TERMS = (
     "ai_",
     "/ai.",
     "/ai/",
+)
+_NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
+_NETWORK_TRANSPORT_ROOTS = frozenset(
+    {
+        "urllib.request",
+        "requests",
+        "httpx",
+        "aiohttp",
+    }
+)
+_PROVIDER_URL_MARKERS = frozenset(
+    {
+        "api.openai.com",
+        "api.anthropic.com",
+        "generativelanguage.googleapis.com",
+        "api.groq.com",
+        "api.mistral.ai",
+        "api.cohere.ai",
+    }
+)
+_PROVIDER_CLIENT_MARKERS = frozenset(
+    {
+        "AsyncOpenAI",
+        "OpenAI(",
+        "Anthropic(",
+        "AsyncAnthropic",
+        "genai.Client",
+        "MODEL_API_URL",
+        "OPENAI_BASE_URL",
+    }
+)
+_ALLOWED_SURFACE_CLASSES = frozenset(
+    {
+        "canonical_runtime",
+        "provider_declaration",
+        "noncredential_compatibility_facade",
+        "automation_provider_explicitly_separate_and_receipt-gated",
+    }
 )
 
 
@@ -113,18 +153,66 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
     return hits
 
 
+def _network_transport_imports(path: Path) -> list[str]:
+    hits: list[str] = []
+    for name in _imported_modules(path):
+        if (
+            name in _NETWORK_TRANSPORT_ROOTS
+            or any(name.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS)
+        ):
+            hits.append(name)
+    return hits
 
-def _looks_like_ai_provider_surface(path: Path, source: str) -> bool:
-    relative = path.as_posix().lower()
-    if not any(term in relative for term in _AI_SURFACE_PATH_TERMS):
+
+def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
+    credential_markers = sorted(
+        marker
+        for marker in _AI_CREDENTIAL_MARKERS
+        if (
+            `os.getenv("${marker}")` in source
+            or `os.getenv('${marker}')` in source
+            or `os.environ.get("${marker}")` in source
+            or `os.environ.get('${marker}')` in source
+            or `os.environ["${marker}"]` in source
+            or `os.environ['${marker}']` in source
+        )
+    )
+    sdk_imports = sorted(set(_provider_sdk_imports(path)))
+    network_imports = sorted(set(_network_transport_imports(path)))
+    provider_urls = sorted(
+        marker for marker in _PROVIDER_URL_MARKERS if marker in source
+    )
+    client_markers = sorted(
+        marker for marker in _PROVIDER_CLIENT_MARKERS if marker in source
+    )
+    return {
+        "credential_markers": credential_markers,
+        "sdk_imports": sdk_imports,
+        "network_imports": network_imports,
+        "provider_urls": provider_urls,
+        "client_markers": client_markers,
+    }
+
+
+def _looks_like_provider_network_surface(
+    path: Path,
+    source: str,
+    signals: dict[str, list[str]],
+) -> bool:
+    if not signals["network_imports"]:
         return False
-    if any(marker in source for marker in _AI_CREDENTIAL_MARKERS):
-        return True
-    return bool(_provider_sdk_imports(path))
+    relative = path.as_posix().lower()
+    provider_context = (
+        bool(signals["credential_markers"])
+        or bool(signals["sdk_imports"])
+        or bool(signals["provider_urls"])
+        or bool(signals["client_markers"])
+    )
+    return provider_context
 
 
-def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
-    discovered: set[str] = set()
+def discover_provider_surfaces(repo_root: Path) -> dict[str, dict[str, list[str]]]:
+    discovered: dict[str, dict[str, list[str]]] = {}
     for root_name in ("backend", "skeleton"):
         root = repo_root / root_name
         if not root.is_dir():
@@ -142,9 +230,42 @@ def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
                 source = path.read_text(encoding="utf-8")
             except OSError:
                 continue
-            if _looks_like_ai_provider_surface(path, source):
-                discovered.add(relative)
+            signals = _provider_surface_signals(path, source)
+            edge_classes: list[str] = []
+            provider_context = (
+                bool(signals["sdk_imports"])
+                or bool(signals["provider_urls"])
+                or bool(signals["client_markers"])
+            )
+            if signals["credential_markers"] and provider_context:
+                edge_classes.append("credential")
+            if signals["sdk_imports"]:
+                edge_classes.append("sdk_client")
+            if _looks_like_provider_network_surface(path, source, signals):
+                edge_classes.append("network_transport")
+            if edge_classes:
+                discovered[relative] = {
+                    **signals,
+                    "edge_classes": sorted(edge_classes),
+                }
     return discovered
+
+
+def _looks_like_ai_provider_surface(path: Path, source: str) -> bool:
+    relative = path.as_posix().lower()
+    if not any(term in relative for term in _AI_SURFACE_PATH_TERMS):
+        return False
+    if any(marker in source for marker in _AI_CREDENTIAL_MARKERS):
+        return True
+    return bool(_provider_sdk_imports(path))
+
+
+def _discover_credential_bearing_ai_surfaces(repo_root: Path) -> set[str]:
+    return {
+        path
+        for path, signals in discover_provider_surfaces(repo_root).items()
+        if "credential" in signals["edge_classes"]
+    }
 
 
 def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
@@ -360,7 +481,10 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                     )
 
     surfaces = contract.get("provider_surfaces")
+    declared_by_owner: dict[str, dict] = {}
     credential_surface_owners: set[str] = set()
+    network_surface_owners: set[str] = set()
+    sdk_surface_owners: set[str] = set()
     if not isinstance(surfaces, list) or not surfaces:
         errors.append("provider surface inventory is missing")
     else:
@@ -380,12 +504,56 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             if not isinstance(owner, str) or not owner:
                 errors.append(f"provider surface {surface_id} owner is invalid")
                 continue
+            if owner in declared_by_owner:
+                errors.append(f"duplicate provider surface owner: {owner}")
+            declared_by_owner[owner] = item
             path = repo_root / owner
             if not path.is_file():
                 errors.append(f"provider surface owner missing: {owner}")
                 continue
-            if item.get("credential_bearing") is True:
+
+            surface_class = item.get("surface_class")
+            if surface_class not in _ALLOWED_SURFACE_CLASSES:
+                errors.append(
+                    f"provider surface {surface_id} has invalid surface_class: "
+                    f"{surface_class!r}"
+                )
+
+            ownership_fields = (
+                "credential_owner",
+                "network_transport_owner",
+                "sdk_client_owner",
+            )
+            for field in ownership_fields:
+                if not isinstance(item.get(field), bool):
+                    errors.append(
+                        f"provider surface {surface_id}.{field} must be boolean"
+                    )
+
+            expected_edges = item.get("discovery_edge_classes")
+            if not isinstance(expected_edges, list) or any(
+                edge not in {"credential", "network_transport", "sdk_client"}
+                for edge in expected_edges
+            ):
+                errors.append(
+                    f"provider surface {surface_id} discovery_edge_classes are invalid"
+                )
+                expected_edges = []
+
+            if item.get("credential_owner") is True:
                 credential_surface_owners.add(owner)
+            if item.get("network_transport_owner") is True:
+                network_surface_owners.add(owner)
+            if item.get("sdk_client_owner") is True:
+                sdk_surface_owners.add(owner)
+
+            if item.get("credential_bearing") is not item.get("credential_owner"):
+                errors.append(
+                    f"provider surface {surface_id} credential_bearing disagrees "
+                    "with credential_owner"
+                )
+
+            if item.get("credential_owner") is True:
                 if item.get("receipt_required") is not True:
                     errors.append(
                         f"credential-bearing provider surface lacks receipt: {surface_id}"
@@ -396,13 +564,105 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                         f"credential-bearing provider surface does not load architecture: {owner}"
                     )
 
-    discovered_surfaces = _discover_credential_bearing_ai_surfaces(repo_root)
-    undeclared_surfaces = sorted(discovered_surfaces - credential_surface_owners)
-    if undeclared_surfaces:
-        errors.append(
-            "credential-bearing AI provider surfaces missing from construction inventory: "
-            + ", ".join(undeclared_surfaces)
-        )
+    discovered = discover_provider_surfaces(repo_root)
+    for owner, signals in sorted(discovered.items()):
+        declaration = declared_by_owner.get(owner)
+        if declaration is None:
+            errors.append(
+                "provider edge surface missing from construction inventory: "
+                f"{owner}: {', '.join(signals['edge_classes'])}"
+            )
+            continue
+        expected = set(declaration.get("discovery_edge_classes", []))
+        actual = set(signals["edge_classes"])
+        if expected != actual:
+            errors.append(
+                f"provider surface edge classification drift: {owner}: "
+                f"declared={sorted(expected)} discovered={sorted(actual)}"
+            )
+        if "credential" in actual and declaration.get("credential_owner") is not True:
+            errors.append(f"provider credential edge lacks ownership: {owner}")
+        if (
+            "network_transport" in actual
+            and declaration.get("network_transport_owner") is not True
+        ):
+            errors.append(f"provider network edge lacks ownership: {owner}")
+        if "sdk_client" in actual and declaration.get("sdk_client_owner") is not True:
+            errors.append(f"provider SDK edge lacks ownership: {owner}")
+
+    for owner in sorted(credential_surface_owners):
+        if owner not in discovered or "credential" not in discovered[owner]["edge_classes"]:
+            errors.append(f"declared credential owner has no discovered credential edge: {owner}")
+    for owner in sorted(network_surface_owners):
+        if owner not in discovered or "network_transport" not in discovered[owner]["edge_classes"]:
+            errors.append(f"declared network owner has no discovered network edge: {owner}")
+    for owner in sorted(sdk_surface_owners):
+        if owner not in discovered or "sdk_client" not in discovered[owner]["edge_classes"]:
+            errors.append(f"declared SDK owner has no discovered SDK edge: {owner}")
+
+    convergence = contract.get("provider_surface_convergence_blueprint")
+    isolation_surfaces = (
+        convergence.get("application_isolation_surfaces", [])
+        if isinstance(convergence, dict)
+        else []
+    )
+    if not isinstance(isolation_surfaces, list) or not isolation_surfaces:
+        errors.append("provider application isolation surfaces are missing")
+    else:
+        for item in isolation_surfaces:
+            if not isinstance(item, dict):
+                errors.append("provider application isolation entry must be an object")
+                continue
+            relative = item.get("path")
+            if not isinstance(relative, str) or not relative:
+                errors.append("provider application isolation path is invalid")
+                continue
+            path = repo_root / relative
+            if not path.is_file():
+                errors.append(
+                    f"provider application isolation surface missing: {relative}"
+                )
+                continue
+            source = path.read_text(encoding="utf-8", errors="replace")
+            required_tokens = item.get("required_tokens")
+            if not isinstance(required_tokens, list):
+                errors.append(
+                    f"provider application isolation required_tokens invalid: {relative}"
+                )
+                required_tokens = []
+            for token in required_tokens:
+                if not isinstance(token, str) or not token:
+                    errors.append(
+                        f"provider application isolation token invalid: {relative}"
+                    )
+                elif token not in source:
+                    errors.append(
+                        f"provider application surface lost canonical delegation token: "
+                        f"{relative}: {token}"
+                    )
+
+            forbidden = item.get("forbidden_edge_classes")
+            if not isinstance(forbidden, list):
+                errors.append(
+                    f"provider application isolation forbidden_edge_classes invalid: "
+                    f"{relative}"
+                )
+                forbidden = []
+            signals = _provider_surface_signals(path, source)
+            edge_classes: set[str] = set()
+            if signals["credential_markers"]:
+                edge_classes.add("credential")
+            if signals["sdk_imports"]:
+                edge_classes.add("sdk_client")
+            if _looks_like_provider_network_surface(path, source, signals):
+                edge_classes.add("network_transport")
+            violations = sorted(edge_classes.intersection(forbidden))
+            if violations:
+                errors.append(
+                    "provider application surface owns forbidden provider edges: "
+                    f"{relative}: {', '.join(violations)}"
+                )
+
 
     for root_name in ("backend", "skeleton"):
         source_root = repo_root / root_name
@@ -410,13 +670,27 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
             continue
         for path in sorted(source_root.rglob("*.py")):
             relative = path.relative_to(repo_root).as_posix()
-            if relative not in _ALLOWED_PROVIDER_SDK_IMPORTERS:
+            if relative not in sdk_surface_owners:
                 hits = _provider_sdk_imports(path)
                 if hits:
                     errors.append(
-                        "provider SDK bypass outside canonical boundary: "
+                        "provider SDK bypass outside declared SDK owner: "
                         f"{relative}: {', '.join(hits)}"
                     )
+
+            try:
+                source = path.read_text(encoding="utf-8")
+            except OSError:
+                source = ""
+            signals = _provider_surface_signals(path, source)
+            if (
+                relative not in network_surface_owners
+                and _looks_like_provider_network_surface(path, source, signals)
+            ):
+                errors.append(
+                    "provider network bypass outside declared network owner: "
+                    f"{relative}: {', '.join(signals['network_imports'])}"
+                )
 
             # The frontier protocol/runtime is engine-local library code. Backend
             # feature code may not import it as an alternate model execution path.
@@ -431,8 +705,94 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
     return errors
 
 
-def main() -> int:
+def build_provider_surface_evidence(
+    repo_root: Path = ROOT,
+    *,
+    head_sha: str | None = None,
+    errors: list[str] | None = None,
+) -> dict:
+    """Return a secret-free current-head provider surface receipt."""
+
+    try:
+        contract = _load() if repo_root == ROOT else json.loads(
+            (repo_root / "machine/ai_app_construction.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    except (ValueError, OSError, json.JSONDecodeError):
+        contract = {}
+
+    declared: list[dict] = []
+    for item in contract.get("provider_surfaces", []):
+        if not isinstance(item, dict):
+            continue
+        declared.append(
+            {
+                "id": item.get("id"),
+                "owner": item.get("owner"),
+                "surface_class": item.get("surface_class"),
+                "credential_owner": item.get("credential_owner"),
+                "network_transport_owner": item.get("network_transport_owner"),
+                "sdk_client_owner": item.get("sdk_client_owner"),
+                "discovery_edge_classes": item.get(
+                    "discovery_edge_classes", []
+                ),
+            }
+        )
+
+    convergence = contract.get("provider_surface_convergence_blueprint", {})
+    isolated = []
+    if isinstance(convergence, dict):
+        for item in convergence.get("application_isolation_surfaces", []):
+            if isinstance(item, dict) and isinstance(item.get("path"), str):
+                isolated.append(item["path"])
+
+    return {
+        "schema_version": 1,
+        "head_sha": (
+            head_sha
+            if head_sha is not None
+            else os.environ.get("GITHUB_SHA", "").strip() or "unknown"
+        ),
+        "declared_surfaces": sorted(
+            declared,
+            key=lambda item: str(item.get("id") or ""),
+        ),
+        "discovered_surfaces": discover_provider_surfaces(repo_root),
+        "application_isolation_surfaces": sorted(isolated),
+        "validation_errors": list(errors or []),
+        "valid": not bool(errors),
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Validate and inventory provider execution surfaces."
+    )
+    parser.add_argument(
+        "--evidence-out",
+        type=Path,
+        default=None,
+        help="Write a secret-free JSON evidence receipt to this path.",
+    )
+    parser.add_argument(
+        "--print-evidence",
+        action="store_true",
+        help="Print the JSON evidence receipt after validation.",
+    )
+    args = parser.parse_args(argv)
+
     errors = validate_provider_bootstrap()
+    evidence = build_provider_surface_evidence(errors=errors)
+    if args.evidence_out is not None:
+        args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        args.evidence_out.write_text(
+            json.dumps(evidence, indent=2, sort_keys=True) + "\\n",
+            encoding="utf-8",
+        )
+    if args.print_evidence:
+        print(json.dumps(evidence, indent=2, sort_keys=True))
+
     if errors:
         print("provider-bootstrap: rejected", file=sys.stderr)
         for error in errors:
@@ -440,7 +800,7 @@ def main() -> int:
         return 1
     print(
         "provider-bootstrap: OK "
-        "(mandatory docs, shared receipts, provider families, surface inventory, SDK isolation)"
+        "(mandatory docs, shared receipts, provider families, classified surface inventory, network/SDK isolation)"
     )
     return 0
 

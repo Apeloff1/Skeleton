@@ -16,6 +16,10 @@ python scripts/check_quality_gate_parity.py
 
 printf '\n== Provider runtime boundary ==\n'
 python scripts/check_provider_runtime_boundary.py
+python scripts/check_provider_bootstrap.py
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
+  skeleton/testing/test_provider_contract.py \
+  skeleton/testing/test_provider_surface_inventory.py
 
 printf '\n== Architecture boundaries ==\n'
 python scripts/check_architecture_boundaries.py
