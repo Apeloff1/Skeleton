@@ -493,3 +493,84 @@ async def test_async_owner_cancellation_releases_reservation_for_retry() -> None
 
     assert retry.status is ToolExecutionStatus.SUCCEEDED
     assert calls == 2
+
+
+
+def test_sync_approval_required_denial_can_resume_with_approval() -> None:
+    calls = []
+    runtime = ToolRuntime()
+    runtime.register(
+        _manifest(
+            "repo.write",
+            effect=ToolEffect.REVERSIBLE,
+            approval_required=True,
+        ),
+        lambda request: calls.append(request.approval_ref) or "artifact:write",
+    )
+    operation_id = str(uuid4())
+    pending = _request(
+        operation_id=operation_id,
+        tool_id="repo.write",
+        key="approval-resume",
+    )
+
+    denied = runtime.execute(pending, now=_now())
+    approved = runtime.execute(
+        _request(
+            operation_id=operation_id,
+            request_id=pending.request_id,
+            tool_id="repo.write",
+            key="approval-resume",
+            approval_ref="approval:1",
+        ),
+        now=_now(),
+    )
+
+    assert denied.status is ToolExecutionStatus.DENIED
+    assert denied.error_code == "approval_required"
+    assert approved.status is ToolExecutionStatus.SUCCEEDED
+    assert approved.approval_ref == "approval:1"
+    assert calls == ["approval:1"]
+
+
+@pytest.mark.asyncio
+async def test_async_approval_required_denial_can_resume_with_approval() -> None:
+    calls = []
+    runtime = AsyncToolRuntime()
+
+    async def handler(request):
+        calls.append(request.approval_ref)
+        return "artifact:write"
+
+    await runtime.register(
+        _manifest(
+            "repo.write",
+            effect=ToolEffect.REVERSIBLE,
+            approval_required=True,
+        ),
+        handler,
+    )
+    operation_id = str(uuid4())
+    pending = _request(
+        operation_id=operation_id,
+        tool_id="repo.write",
+        key="approval-resume-async",
+    )
+
+    denied = await runtime.execute(pending, now=_now())
+    approved = await runtime.execute(
+        _request(
+            operation_id=operation_id,
+            request_id=pending.request_id,
+            tool_id="repo.write",
+            key="approval-resume-async",
+            approval_ref="approval:1",
+        ),
+        now=_now(),
+    )
+
+    assert denied.status is ToolExecutionStatus.DENIED
+    assert denied.error_code == "approval_required"
+    assert approved.status is ToolExecutionStatus.SUCCEEDED
+    assert approved.approval_ref == "approval:1"
+    assert calls == ["approval:1"]
