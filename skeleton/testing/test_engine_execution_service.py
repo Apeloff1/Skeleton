@@ -119,6 +119,7 @@ def _authority(
         "engine:read",
         "engine:cancel",
         "engine:events",
+        "engine:approve",
     ),
     expires_at: datetime | None = None,
 ) -> DelegatedAuthority:
@@ -164,6 +165,7 @@ def _registry(
         "engine:read",
         "engine:cancel",
         "engine:events",
+        "engine:approve",
     ),
 ) -> EngineAuthorityRegistry:
     return EngineAuthorityRegistry(
@@ -663,4 +665,142 @@ def test_expired_persisted_approval_is_not_replayed_into_resume(tmp_path) -> Non
     assert service.active_approval_refs(
         "exec-1",
         now=_now() + timedelta(seconds=2),
+    ) == {}
+
+
+
+def test_expired_delegation_blocks_mutating_access_but_allows_audit_reads(
+    tmp_path,
+) -> None:
+    operation = _operation()
+    request = _execution_request(operation)
+    authority = _authority(
+        operation,
+        request,
+        expires_at=_now() + timedelta(seconds=1),
+    )
+    command = _command(
+        operation=operation,
+        execution_request=request,
+        authority=authority,
+    )
+    service = _service_with_approval_scope(tmp_path)
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+
+    status = service.status(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now() + timedelta(seconds=2),
+    )
+    events = service.events(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now() + timedelta(seconds=2),
+    )
+    assert status.execution_state == "created"
+    assert events["events"]
+
+    with pytest.raises(EngineAuthorityError, match="expired"):
+        service.cancel(
+            "exec-1",
+            verified_service_principal="backend-service",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+            now=_now() + timedelta(seconds=2),
+        )
+
+
+def test_tool_approval_expiry_cannot_outlive_delegated_authority(
+    tmp_path,
+) -> None:
+    operation = _operation()
+    request = _execution_request(operation)
+    authority = _authority(
+        operation,
+        request,
+        expires_at=_now() + timedelta(minutes=2),
+    )
+    command = _command(
+        operation=operation,
+        execution_request=request,
+        authority=authority,
+    )
+    service = _service_with_approval_scope(tmp_path)
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(service)
+
+    with pytest.raises(Exception, match="exceeds delegated authority window"):
+        service.approve_tool_call(
+            "exec-1",
+            verified_service_principal="backend-service",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+            call_id=call.call_id,
+            tool_id=call.tool_id,
+            arguments_digest=call.arguments_digest,
+            idempotency_key="too-long",
+            expires_at=_now() + timedelta(minutes=3),
+            now=_now(),
+        )
+
+
+def test_active_approval_refs_fail_closed_after_delegation_expiry(
+    tmp_path,
+) -> None:
+    operation = _operation()
+    request = _execution_request(operation)
+    authority = _authority(
+        operation,
+        request,
+        expires_at=_now() + timedelta(minutes=2),
+    )
+    command = _command(
+        operation=operation,
+        execution_request=request,
+        authority=authority,
+    )
+    service = _service_with_approval_scope(tmp_path)
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(service)
+    approval = service.approve_tool_call(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        call_id=call.call_id,
+        tool_id=call.tool_id,
+        arguments_digest=call.arguments_digest,
+        idempotency_key="within-window",
+        expires_at=_now() + timedelta(seconds=90),
+        now=_now(),
+    )
+    assert service.active_approval_refs(
+        "exec-1",
+        now=_now() + timedelta(seconds=60),
+    ) == {call.call_id: approval.approval_ref}
+    assert service.active_approval_refs(
+        "exec-1",
+        now=_now() + timedelta(minutes=3),
     ) == {}
