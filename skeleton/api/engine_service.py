@@ -1046,7 +1046,29 @@ class SQLiteEngineSubmissionStore:
                 ).fetchone()
                 if row is not None:
                     existing = self._approval_from_row(row)
-                    if existing != approval:
+                    stable_existing = (
+                        existing.approval_id,
+                        existing.execution_id,
+                        existing.call_id,
+                        existing.tool_id,
+                        existing.arguments_digest,
+                        existing.actor_id,
+                        existing.tenant_id,
+                        existing.idempotency_key,
+                        existing.expires_at,
+                    )
+                    stable_candidate = (
+                        approval.approval_id,
+                        approval.execution_id,
+                        approval.call_id,
+                        approval.tool_id,
+                        approval.arguments_digest,
+                        approval.actor_id,
+                        approval.tenant_id,
+                        approval.idempotency_key,
+                        approval.expires_at,
+                    )
+                    if stable_existing != stable_candidate:
                         raise EngineSubmissionConflict(
                             "approval idempotency identity was reused differently"
                         )
