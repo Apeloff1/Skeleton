@@ -388,7 +388,7 @@ def test_reproducible_release_workflow_gates_bound_release_evidence() -> None:
     assert "source-a/backend/tests/test_ai_golden_journey.py" in workflow
     assert "source-a/backend/tests/test_ai_artifact_result_journey.py" in workflow
     assert "--junitxml=source-a/release-meta/ai-runtime-eval.xml" in workflow
-    assert "source-a/release-meta/frontend-runtime.xml" in workflow
+    assert "> ../release-meta/frontend-runtime.xml" in workflow
     assert "scripts/ai_release_evidence.py" in workflow
     assert "--stage7-report release-meta/ai-runtime-eval.xml" in workflow
     assert "--stage7-lane test" in workflow
