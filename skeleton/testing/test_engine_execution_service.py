@@ -193,6 +193,8 @@ def test_submit_is_idempotent_and_ack_survives_service_restart(tmp_path) -> None
     first = service.submit(
         command,
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
@@ -200,6 +202,8 @@ def test_submit_is_idempotent_and_ack_survives_service_restart(tmp_path) -> None
     replay = restarted.submit(
         command,
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now() + timedelta(seconds=30),
     )
 
@@ -222,6 +226,8 @@ def test_submit_conflicting_retry_is_rejected(tmp_path) -> None:
     service.submit(
         first,
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
@@ -329,12 +335,16 @@ def test_status_access_is_bound_to_owning_service_principal(tmp_path) -> None:
     service.submit(
         command,
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
     status = service.status(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now() + timedelta(hours=1),
     )
     assert status.operation_state == "admitted"
@@ -353,17 +363,23 @@ def test_cancel_is_idempotent_and_does_not_reopen_terminal_state(tmp_path) -> No
     service.submit(
         _command(),
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
     first = service.cancel(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     second = service.cancel(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now() + timedelta(seconds=1),
     )
 
@@ -378,6 +394,8 @@ def test_events_are_projected_only_from_durable_execution_state(tmp_path) -> Non
     service.submit(
         command,
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     repo = service.repository
@@ -409,6 +427,8 @@ def test_events_are_projected_only_from_durable_execution_state(tmp_path) -> Non
     snapshot = service.events(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
@@ -504,6 +524,8 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
     service.submit(
         command,
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     call, _ = _suspend_for_tool_approval(service)
@@ -511,6 +533,8 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
     pending = service.pending_tool_approvals(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     assert pending == (
@@ -524,6 +548,8 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
     approval = service.approve_tool_call(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
@@ -534,6 +560,8 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
     replay = service.approve_tool_call(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
@@ -560,6 +588,8 @@ def test_tool_approval_rejects_expired_and_mismatched_decisions(tmp_path) -> Non
     service.submit(
         _command(),
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     call, _ = _suspend_for_tool_approval(service)
@@ -608,12 +638,16 @@ def test_expired_persisted_approval_is_not_replayed_into_resume(tmp_path) -> Non
     service.submit(
         _command(),
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     call, _ = _suspend_for_tool_approval(service)
     approval = service.approve_tool_call(
         "exec-1",
         verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
