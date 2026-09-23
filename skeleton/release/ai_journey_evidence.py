@@ -78,8 +78,8 @@ MANDATORY_AI_JOURNEYS: tuple[AIJourneyRequirement, ...] = (
         "backend/tests/test_ai_golden_journey.py::test_deterministic_retrieval_tool_approval_golden_journey",
     ),
     AIJourneyRequirement(
-        "ai-artifact-budget",
-        "skeleton/testing/test_artifact_usage_meter.py::test_artifact_and_storage_actual_bytes_reconcile_into_same_budget",
+        "ai-artifact-result",
+        "backend/tests/test_ai_artifact_result_journey.py::test_deterministic_artifact_is_bound_to_durable_execution_result",
     ),
     AIJourneyRequirement(
         "ai-cancel",
@@ -92,6 +92,11 @@ MANDATORY_AI_JOURNEYS: tuple[AIJourneyRequirement, ...] = (
     AIJourneyRequirement(
         "ai-provider-outage",
         "skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_provider_unavailable_becomes_durable_failure",
+    ),
+    AIJourneyRequirement(
+        "ai-tool-outage",
+        "skeleton/testing/test_execution_runtime.py::test_tool_handler_outage_becomes_durable_execution_failure",
+        lane="eval",
     ),
     AIJourneyRequirement(
         "ai-crash-provider-resume",
