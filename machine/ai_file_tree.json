@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "tree_version": "1.6.0",
+  "tree_version": "1.6.1",
   "status": "staged_mirror",
   "architecture_tag": "arch-map/v3.7",
   "baseline_git_sha": "6834ce802d1492ca1dcfa388b93c24db013419c1",
@@ -129,6 +129,31 @@
       ],
       "overlay_children": [
         "legacy_persist"
+      ],
+      "move_tags": [
+        "ai-tree:mapped",
+        "migration:staged-mirror",
+        "cutover:parity-ready"
+      ],
+      "move_batch": "B1-core-runtime",
+      "source_disposition": "retain_until_import_inversion_and_regression_gates"
+    },
+    {
+      "id": "AIFT-EXECUTION-REPOSITORY",
+      "source": "skeleton/persistence/execution_repository.py",
+      "destination": "skeleton/ai/runtime/persistence/execution_repository.py",
+      "kind": "file",
+      "source_git_object_sha": "e5204892b2c8de620486af4f2c43da39be71253a",
+      "role": "durable cognitive execution state, checkpoints, results and finalization outbox",
+      "work_package_refs": [
+        "WP-W03",
+        "WP-W04",
+        "WP-W11"
+      ],
+      "aiq_refs": [
+        "AIQ-S4-EXEC-01",
+        "AIQ-S4-EXEC-03",
+        "AIQ-S7-E2E-01"
       ],
       "move_tags": [
         "ai-tree:mapped",
