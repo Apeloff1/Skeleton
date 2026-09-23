@@ -20,6 +20,7 @@ from skeleton.skills.tool_contract import (
     ToolManifest,
     validate_tool_arguments,
 )
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
 
 class ToolRuntimeError(RuntimeError):
@@ -84,8 +85,14 @@ class ToolRuntime:
     Tool handlers must persist large or sensitive results behind a result_ref.
     """
 
-    def __init__(self, *, admission_runtime: AdmissionRuntime | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        receipt_store: SQLiteToolReceiptStore | None = None,
+    ) -> None:
         self.admission_runtime = admission_runtime
+        self.receipt_store = receipt_store
         self._lock = threading.RLock()
         self._registry: dict[str, RegisteredTool] = {}
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
@@ -196,6 +203,33 @@ class ToolRuntime:
                     metered_tool_calls=0,
                 )
 
+            if self.receipt_store is not None:
+                reservation = self.receipt_store.reserve(
+                    request,
+                    now=started,
+                )
+                if reservation.status == "committed":
+                    assert reservation.receipt is not None
+                    self._request_fingerprints[key] = fingerprint
+                    self._receipts[key] = reservation.receipt
+                    return reservation.receipt
+                if reservation.status == "in_doubt":
+                    return ToolExecutionReceipt(
+                        receipt_id=_receipt_id(request, manifest),
+                        request_id=request.request_id,
+                        operation_id=request.operation_id,
+                        tenant_id=request.tenant_id,
+                        tool_id=request.tool_id,
+                        idempotency_key=request.idempotency_key,
+                        arguments_digest=request.arguments_digest,
+                        status=ToolExecutionStatus.DENIED,
+                        started_at=started,
+                        finished_at=started,
+                        error_code="execution_in_doubt",
+                        approval_ref=request.approval_ref,
+                        metered_tool_calls=0,
+                    )
+
             self._request_fingerprints[key] = fingerprint
 
             # Meter before invoking any side effect. AdmissionRuntime is expected
@@ -223,6 +257,12 @@ class ToolRuntime:
                         approval_ref=request.approval_ref,
                         metered_tool_calls=0,
                     )
+                    if self.receipt_store is not None:
+                        receipt = self.receipt_store.commit(
+                            request,
+                            receipt,
+                            now=started,
+                        )
                     self._receipts[key] = receipt
                     return receipt
 
@@ -265,6 +305,11 @@ class ToolRuntime:
                     approval_ref=request.approval_ref,
                     metered_tool_calls=1,
                 )
+            if self.receipt_store is not None:
+                receipt = self.receipt_store.commit(
+                    request,
+                    receipt,
+                )
             self._receipts[key] = receipt
             return receipt
 
@@ -303,8 +348,14 @@ class AsyncToolRuntime:
     before a failed receipt is published.
     """
 
-    def __init__(self, *, admission_runtime: AdmissionRuntime | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        receipt_store: SQLiteToolReceiptStore | None = None,
+    ) -> None:
         self.admission_runtime = admission_runtime
+        self.receipt_store = receipt_store
         self._lock = asyncio.Lock()
         self._registry: dict[str, RegisteredAsyncTool] = {}
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
@@ -448,6 +499,33 @@ class AsyncToolRuntime:
                         metered_tool_calls=0,
                     )
 
+                if self.receipt_store is not None:
+                    reservation = self.receipt_store.reserve(
+                        request,
+                        now=started,
+                    )
+                    if reservation.status == "committed":
+                        assert reservation.receipt is not None
+                        self._request_fingerprints[key] = fingerprint
+                        self._receipts[key] = reservation.receipt
+                        return reservation.receipt
+                    if reservation.status == "in_doubt":
+                        return ToolExecutionReceipt(
+                            receipt_id=_receipt_id(request, registered.manifest),
+                            request_id=request.request_id,
+                            operation_id=request.operation_id,
+                            tenant_id=request.tenant_id,
+                            tool_id=request.tool_id,
+                            idempotency_key=request.idempotency_key,
+                            arguments_digest=request.arguments_digest,
+                            status=ToolExecutionStatus.DENIED,
+                            started_at=started,
+                            finished_at=started,
+                            error_code="execution_in_doubt",
+                            approval_ref=request.approval_ref,
+                            metered_tool_calls=0,
+                        )
+
                 self._request_fingerprints[key] = fingerprint
                 waiter = asyncio.get_running_loop().create_future()
                 self._inflight[key] = waiter
@@ -492,6 +570,11 @@ class AsyncToolRuntime:
                     registered,
                     request,
                     started=started,
+                )
+            if self.receipt_store is not None:
+                receipt = self.receipt_store.commit(
+                    request,
+                    receipt,
                 )
         except BaseException as exc:
             async with self._lock:
