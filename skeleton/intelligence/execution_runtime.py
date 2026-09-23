@@ -450,7 +450,7 @@ class CognitiveExecutionRuntime:
                 )
 
             if execution.state is ExecutionState.WAITING_FOR_USER:
-                pending = self._pending_approvals(payload)
+                pending = self._pending_approvals(execution, payload)
                 missing = tuple(
                     item
                     for item in pending
@@ -1015,6 +1015,7 @@ class CognitiveExecutionRuntime:
 
     def _pending_approvals(
         self,
+        execution: AIExecution,
         payload: Mapping[str, object],
     ) -> tuple[PendingApproval, ...]:
         raw_ids = payload.get("pending_approval_call_ids", [])
@@ -1032,12 +1033,9 @@ class CognitiveExecutionRuntime:
                     PendingApproval(
                         call_id=call.call_id,
                         tool_id=call.tool_id,
-                        idempotency_key=(
-                            str(payload.get("execution_id") or "")
-                            + ":"
-                            + call.call_id
-                            + ":"
-                            + str(call.arguments_digest)
+                        idempotency_key=self._tool_idempotency_key(
+                            execution,
+                            call,
                         ),
                         arguments_digest=str(call.arguments_digest),
                     )
