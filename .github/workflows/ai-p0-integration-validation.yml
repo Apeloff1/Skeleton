@@ -9,6 +9,7 @@ on:
       - "frontend/services/operationStream*.ts"
       - "frontend/scripts/test-operation-stream-reducer.mjs"
       - "machine/ai_build_queue.json"
+      - "machine/ai_required_journeys.json"
       - "machine/ai_closure_evidence.json"
       - "machine/ai_runtime_schemas.json"
       - "scripts/ai_release_evidence.py"
