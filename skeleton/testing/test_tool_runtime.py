@@ -92,7 +92,7 @@ def test_request_digest_is_order_independent_and_secret_free() -> None:
         tenant_id="tenant-a",
         tool_id="repo.read",
         idempotency_key="k",
-        arguments={"b": 2, "a": 1},
+        arguments={"b": 2, "a": 1, "secret": "super-secret-marker"},
         requested_at=_now(),
     )
     right = ToolExecutionRequest(
@@ -101,11 +101,14 @@ def test_request_digest_is_order_independent_and_secret_free() -> None:
         tenant_id="tenant-a",
         tool_id="repo.read",
         idempotency_key="k2",
-        arguments={"a": 1, "b": 2},
+        arguments={"secret": "super-secret-marker", "a": 1, "b": 2},
         requested_at=_now(),
     )
     assert left.arguments_digest == right.arguments_digest
-    assert "a" not in left.arguments_digest
+    assert len(left.arguments_digest) == 64
+    assert set(left.arguments_digest) <= set("0123456789abcdef")
+    assert "super-secret-marker" not in left.arguments_digest
+    assert "secret" not in left.arguments_digest
 
 
 def test_exact_idempotent_replay_executes_once_and_returns_same_receipt() -> None:
