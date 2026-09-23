@@ -1,5 +1,11 @@
 """Release artifact plane: evidence manifests and fail-closed provenance gates."""
 
+from skeleton.release.ai_journey_evidence import (
+    AIJourneyEvidenceBundle,
+    AIJourneyRequirement,
+    MANDATORY_AI_JOURNEYS,
+    collect_ai_journey_evidence,
+)
 from skeleton.release.evidence import (
     SCHEMA_ID,
     SCHEMA_VERSION,
@@ -23,6 +29,10 @@ from skeleton.release.evidence import (
 )
 
 __all__ = [
+    "AIJourneyEvidenceBundle",
+    "AIJourneyRequirement",
+    "MANDATORY_AI_JOURNEYS",
+    "collect_ai_journey_evidence",
     "SCHEMA_ID",
     "SCHEMA_VERSION",
     "ArtifactLocator",
