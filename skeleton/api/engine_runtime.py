@@ -96,6 +96,16 @@ class EngineExecutionCoordinator:
         except asyncio.CancelledError:
             pass
 
+    async def ensure_execution(self, execution_id: str) -> None:
+        stored = self.service.submissions.get_by_execution_id(
+            str(execution_id),
+        )
+        if stored is None:
+            raise EngineExecutionCoordinatorError(
+                "engine submission is unavailable for execution"
+            )
+        await self.ensure_started(stored.command)
+
     async def recover(self) -> tuple[str, ...]:
         recovered: list[str] = []
         for execution in self.service.repository.recoverable():
