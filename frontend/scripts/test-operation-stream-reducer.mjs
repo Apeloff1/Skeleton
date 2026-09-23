@@ -168,3 +168,82 @@ test('unsupported stream schema forces resync instead of silent downgrade', () =
   assert.equal(state.resyncRequired, true);
   assert.equal(state.error, 'unsupported_schema_version');
 });
+
+
+
+test('provisional output deltas accumulate without becoming authoritative', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, 'operation.output.delta', { payload: { delta: 'Hel' } }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.output.delta', { payload: { delta: 'lo' } }),
+  );
+
+  assert.equal(state.provisionalContent, 'Hello');
+  assert.equal(state.authoritativeContent, null);
+  assert.equal(state.contentState, 'provisional');
+  assert.equal(state.terminal, false);
+});
+
+
+test('authoritative completion replaces provisional output exactly', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, 'operation.output.snapshot', {
+      payload: { content: 'draft answer' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', {
+      payload: {
+        state: 'completed',
+        final_output: 'verified final answer',
+      },
+    }),
+  );
+
+  assert.equal(state.provisionalContent, 'verified final answer');
+  assert.equal(state.authoritativeContent, 'verified final answer');
+  assert.equal(state.contentState, 'authoritative');
+  assert.equal(state.terminal, true);
+  assert.equal(state.resyncRequired, false);
+});
+
+
+test('completion after provisional content without final authority requires resync', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, 'operation.output.delta', { payload: { delta: 'draft' } }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', { payload: { state: 'completed' } }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'terminal_result_missing');
+  assert.equal(state.terminal, false);
+});
+
+
+test('failed or cancelled terminal events discard provisional content status', () => {
+  let failed = createOperationClientState('op-1');
+  failed = reduceOperationEvent(
+    failed,
+    event(1, 'operation.output.delta', { payload: { delta: 'draft' } }),
+  );
+  failed = reduceOperationEvent(
+    failed,
+    event(2, 'operation.failed', { payload: { state: 'failed' } }),
+  );
+
+  assert.equal(failed.contentState, 'discarded');
+  assert.equal(failed.authoritativeContent, null);
+  assert.equal(failed.terminal, true);
+});
