@@ -327,9 +327,34 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
         raise HTTPException(status_code=422, detail=f"Unsupported AI mode: {request.mode}")
 
     policy = INSTRUCTION_POLICIES.resolve(mode_info["policy_id"])
-    operation_id = str(uuid.uuid4())
-    execution_id = str(uuid.uuid4())
-    turn_id = str(uuid.uuid4())
+    # Stable execution identity is derived from the canonical user message,
+    # not the transport attempt. HTTP retries with the same conversation
+    # idempotency key must converge on the same engine submission/result.
+    identity_material = (
+        tenant_id
+        + ":"
+        + request.thread_id
+        + ":"
+        + user_message.message_id
+    )
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "codedock-chat-operation:" + identity_material,
+        )
+    )
+    execution_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "codedock-chat-execution:" + identity_material,
+        )
+    )
+    turn_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "codedock-chat-turn:" + identity_material,
+        )
+    )
     created_at = datetime.now(timezone.utc)
     purpose = "model-inference"
     envelope = ContextCompiler().compile(
