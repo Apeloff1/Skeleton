@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import sys
 
 import pytest
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_BACKEND_ROOT = _REPO_ROOT / "backend"
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
 
 from core.engine_client import engine_command_from_context
 from skeleton.api.engine_authority import (
@@ -317,8 +324,6 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     ack = service.submit(
         command,
         verified_service_principal=SERVICE_PRINCIPAL,
-        actor_id=ACTOR,
-        tenant_id=TENANT,
     )
     assert ack.execution_id == EXECUTION_ID
 
