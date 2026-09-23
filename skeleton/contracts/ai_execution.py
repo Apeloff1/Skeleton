@@ -528,6 +528,8 @@ class AIExecutionResult:
     completed_at: datetime
     final_output: str | None = None
     verification: str | None = None
+    verification_receipt: Mapping[str, Any] | None = None
+    evidence_refs: tuple[str, ...] = ()
     route_receipts: tuple[str, ...] = ()
     provider_receipts: tuple[str, ...] = ()
     tool_receipts: tuple[str, ...] = ()
@@ -546,7 +548,14 @@ class AIExecutionResult:
             raise AIExecutionContractError("completed result requires final_output")
         for name in ("final_output", "verification", "stream_terminal_event"):
             object.__setattr__(self, name, _optional_text(getattr(self, name), name))
+        if self.verification_receipt is not None:
+            object.__setattr__(
+                self,
+                "verification_receipt",
+                _json(self.verification_receipt, "verification_receipt"),
+            )
         for name, maximum in (
+            ("evidence_refs", 4096),
             ("route_receipts", 256),
             ("provider_receipts", 256),
             ("tool_receipts", 2048),
@@ -567,6 +576,12 @@ class AIExecutionResult:
             "status": self.status,
             "final_output": self.final_output,
             "verification": self.verification,
+            "verification_receipt": (
+                None
+                if self.verification_receipt is None
+                else dict(self.verification_receipt)
+            ),
+            "evidence_refs": list(self.evidence_refs),
             "route_receipts": list(self.route_receipts),
             "provider_receipts": list(self.provider_receipts),
             "tool_receipts": list(self.tool_receipts),
