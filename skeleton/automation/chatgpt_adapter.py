@@ -15,6 +15,7 @@ import re
 from typing import Any
 from urllib import error, request
 
+from skeleton.provider_contract import ProviderArchitectureError, load_provider_architecture
 from skeleton.security.activation_security import enforce_bot_activation_security
 
 _API_URL = "https://api.openai.com/v1/responses"
@@ -86,6 +87,15 @@ class ChatGPTReasoner:
         timeout: float = 20.0,
     ) -> None:
         enforce_bot_activation_security()
+        try:
+            self.architecture_receipt = load_provider_architecture(
+                "repository-automation-chatgpt-adapter",
+                provider_family="automation_model",
+            )
+        except ProviderArchitectureError as exc:
+            raise RuntimeError(
+                "ChatGPT automation provider architecture acknowledgement failed"
+            ) from exc
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
             raise TypeError("timeout must be a number")
         if not math.isfinite(float(timeout)):
