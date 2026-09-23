@@ -388,7 +388,12 @@ function authorityFixture(input = {}) {
       },
       async chat(request) {
         calls.chat.push({ ...request, signal: undefined });
-        if (input.chat) return input.chat(request, { threads, messages, calls });
+        if (input.chat) {
+          const state = { threads, messages, calls };
+          const response = await input.chat(request, state);
+          if (state.threads !== threads) threads = state.threads;
+          return response;
+        }
         throw new Error('chat fixture not configured');
       },
       async setState(request) {
