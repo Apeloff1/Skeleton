@@ -315,3 +315,120 @@ def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
 
     assert response.status_code == 409
     assert response.json()["detail"] == "thread version conflict"
+
+
+
+def test_chat_retry_reuses_same_engine_operation_and_execution_identity(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="stable-client-key",
+        content="retry-safe question",
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=initial.updated_at,
+        version=2,
+        message_sequence=1,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    after_assistant = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=initial.updated_at,
+        version=3,
+        message_sequence=2,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="stable-client-key:assistant",
+        content="retry-safe answer",
+        parent_message_id=user_message.message_id,
+        causal_user_message_id=user_message.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="execution-result:stable",
+    )
+    engine_identities = []
+
+    async def append_user_message(*args, **kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*args, **kwargs):
+        return (user_message,)
+
+    async def commit_assistant_message(*args, **kwargs):
+        return after_assistant, assistant
+
+    class FakeEngineClient:
+        config = SimpleNamespace(service_principal="codedock-backend")
+
+        async def execute(self, command, *, deadline):
+            engine_identities.append(
+                (
+                    command.operation.operation_id,
+                    command.execution_request.execution_id,
+                    command.compiled_context.turn_id,
+                    command.operation.idempotency_key,
+                )
+            )
+            return {
+                "status": "completed",
+                "final_output": "retry-safe answer",
+                "verification": "verification:test",
+                "verification_receipt": {"outcome": "verified"},
+                "evidence_refs": [],
+                "usage": {"model_turns": 1, "tool_calls": 0},
+            }
+
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+    monkeypatch.setattr(route, "_engine_client", lambda: FakeEngineClient())
+
+    payload = {
+        "message": "retry-safe question",
+        "thread_id": initial.thread_id,
+        "idempotency_key": "stable-client-key",
+        "expected_thread_version": 1,
+    }
+    first = client.post("/ai/chat", json=payload)
+    second = client.post("/ai/chat", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert len(engine_identities) == 2
+    assert engine_identities[0] == engine_identities[1]
+    assert engine_identities[0][3] == "stable-client-key"
+    assert first.json()["engine_execution_id"] == second.json()["engine_execution_id"]
