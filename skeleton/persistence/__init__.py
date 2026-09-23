@@ -14,6 +14,7 @@ from skeleton.persistence.conversation_repository import (
 )
 from skeleton.persistence.memory_repository import (
     MemoryConflict,
+    MongoMemoryRepository,
     MemoryNotFound,
     MemoryRepositoryError,
     SQLiteMemoryRepository,
@@ -52,6 +53,7 @@ __all__ = [
     "ConversationRepositoryError",
     "SQLiteConversationRepository",
     "MemoryConflict",
+    "MongoMemoryRepository",
     "MemoryNotFound",
     "MemoryRepositoryError",
     "SQLiteMemoryRepository",
