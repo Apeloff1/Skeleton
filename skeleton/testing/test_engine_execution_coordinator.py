@@ -86,13 +86,14 @@ class FakeRegistry:
 
 
 def _bundle(*, execution_id: str = "exec-golden"):
+    runtime_deadline = datetime.now(timezone.utc) + timedelta(minutes=10)
     operation = OperationEnvelope(
         operation_id=str(uuid4()),
         tenant_id="tenant-a",
         actor_id="actor-a",
         capability="assistant.chat",
         created_at=_now(),
-        deadline=_now() + timedelta(minutes=5),
+        deadline=runtime_deadline,
         idempotency_key="golden-idem",
         trace_id="trace-golden",
     )
@@ -170,7 +171,7 @@ def _bundle(*, execution_id: str = "exec-golden"):
         ),
         capability=operation.capability,
         issued_at=_now(),
-        expires_at=_now() + timedelta(minutes=5),
+        expires_at=operation.deadline,
         request_binding=engine_request_binding(operation, request),
     )
     command = EngineExecutionCommand(
@@ -462,11 +463,13 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
             ),
         ),
     )
+    approval_context_policy = dict(base.execution_request.context_policy)
+    approval_context_policy["handoff_digest"] = handoff.handoff_digest
     request = AIExecutionRequest(
         operation_id=base.execution_request.operation_id,
         execution_id=base.execution_request.execution_id,
         objective=base.execution_request.objective,
-        context_policy=dict(base.execution_request.context_policy),
+        context_policy=approval_context_policy,
         tool_policy={
             "tenant_id": operation.tenant_id,
             "allowed_tool_ids": ["repo.write"],
@@ -556,7 +559,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         tool_id=pending[0]["tool_id"],
         arguments_digest=pending[0]["arguments_digest"],
         idempotency_key="approve-call-write",
-        expires_at=_now() + timedelta(minutes=5),
+        expires_at=operation.deadline - timedelta(seconds=1),
         now=_now(),
     )
 
