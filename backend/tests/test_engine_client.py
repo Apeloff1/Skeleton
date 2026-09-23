@@ -274,7 +274,7 @@ def test_engine_command_normalizes_legacy_tool_schemas_before_handoff() -> None:
 
 
 def test_engine_command_identity_changes_with_resource_budget() -> None:
-    from skeleton.intelligence.cost_admission import ResourceBudget
+    from skeleton.intelligence.admission import ResourceBudget
 
     deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
     small = ProviderRequest(
