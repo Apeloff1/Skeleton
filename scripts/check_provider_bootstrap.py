@@ -199,14 +199,21 @@ def _looks_like_provider_network_surface(
     source: str,
     signals: dict[str, list[str]],
 ) -> bool:
+    del source
     if not signals["network_imports"]:
         return False
     relative = path.as_posix().lower()
+    if any(
+        relative.startswith(prefix)
+        for prefix in _NON_PROVIDER_NETWORK_PATH_PREFIXES
+    ):
+        return False
     provider_context = (
         bool(signals["credential_markers"])
         or bool(signals["sdk_imports"])
         or bool(signals["provider_urls"])
         or bool(signals["client_markers"])
+        or any(term in relative for term in _AI_SURFACE_PATH_TERMS)
     )
     return provider_context
 
