@@ -311,3 +311,308 @@ test('transcript export includes context, failure status and honest file omissio
   assert.match(output, /file not included/);
   assert.match(output, /Artifacts are not included/);
 });
+
+
+function serverThread(patch = {}) {
+  return {
+    thread_id: 'thread-1',
+    title: 'Server conversation',
+    created_at: '2026-09-24T00:00:00+00:00',
+    updated_at: '2026-09-24T00:01:00+00:00',
+    version: 1,
+    state: 'active',
+    data_class: 'confidential',
+    ...patch,
+  };
+}
+
+function serverMessage(patch = {}) {
+  return {
+    message_id: 'message-1',
+    sequence: 1,
+    author_type: 'user',
+    created_at: '2026-09-24T00:00:30+00:00',
+    idempotency_key: 'client-turn-1',
+    content: 'SERVER AUTHORITATIVE MESSAGE',
+    artifact_refs: [],
+    ...patch,
+  };
+}
+
+function authorityFixture(input = {}) {
+  let threads = input.threads || [serverThread()];
+  const messages = new Map(
+    input.messages || [['thread-1', [serverMessage()]]],
+  );
+  const calls = {
+    chat: [],
+    state: [],
+    deletion: [],
+    create: [],
+  };
+  return {
+    calls,
+    setThreads(next) { threads = next; },
+    setMessages(threadId, next) { messages.set(threadId, next); },
+    authority: {
+      async listThreads() {
+        return threads.map(item => ({ ...item }));
+      },
+      async createThread(title) {
+        calls.create.push(title);
+        const thread = serverThread({
+          thread_id: 'thread-created-' + calls.create.length,
+          title,
+          version: 1,
+        });
+        threads = [thread, ...threads];
+        messages.set(thread.thread_id, []);
+        return { ...thread };
+      },
+      async listMessages(threadId) {
+        return (messages.get(threadId) || []).map(item => ({ ...item }));
+      },
+      async chat(request) {
+        calls.chat.push({ ...request, signal: undefined });
+        if (input.chat) return input.chat(request, { threads, messages, calls });
+        throw new Error('chat fixture not configured');
+      },
+      async setState(request) {
+        calls.state.push({ ...request });
+        const index = threads.findIndex(item => item.thread_id === request.threadId);
+        const current = threads[index];
+        const next = {
+          ...current,
+          state: request.state,
+          version: current.version + 1,
+          updated_at: '2026-09-24T00:02:00+00:00',
+        };
+        threads = threads.map((item, i) => i === index ? next : item);
+        return { ...next };
+      },
+      async requestDeletion(request) {
+        calls.deletion.push({ ...request });
+        const index = threads.findIndex(item => item.thread_id === request.threadId);
+        const current = threads[index];
+        const next = {
+          ...current,
+          state: 'deleted',
+          version: current.version + 1,
+          updated_at: '2026-09-24T00:03:00+00:00',
+        };
+        threads = threads.map((item, i) => i === index ? next : item);
+        return { ...next };
+      },
+    },
+  };
+}
+
+async function authorityController(fixture, disk = storage()) {
+  let legacyCalls = 0;
+  const store = new WorkspaceController(
+    disk,
+    async () => {
+      legacyCalls++;
+      throw new Error('legacy transport must not run');
+    },
+    fixture.authority,
+  );
+  await store.initialize();
+  await tick();
+  return { store, disk, legacyCalls: () => legacyCalls };
+}
+
+test('server authority overwrites cached transcript while preserving local preferences', async () => {
+  const cached = W.createWorkspace();
+  cached.conversations[0] = {
+    ...cached.conversations[0],
+    id: 'thread-1',
+    title: 'LOCAL FORGED TITLE',
+    draft: 'keep draft',
+    context: 'keep context',
+    pinned: true,
+    messages: [message({ text: 'LOCAL FORGED MESSAGE' })],
+  };
+  cached.activeId = 'thread-1';
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(cached) });
+  const fixture = authorityFixture();
+
+  const { store, legacyCalls } = await authorityController(fixture, disk);
+
+  assert.equal(store.getSnapshot().serverSynced, true);
+  assert.equal(store.active.id, 'thread-1');
+  assert.equal(store.active.title, 'Server conversation');
+  assert.equal(store.active.draft, 'keep draft');
+  assert.equal(store.active.context, 'keep context');
+  assert.equal(store.active.pinned, true);
+  assert.deepEqual(store.active.messages.map(item => item.text), [
+    'SERVER AUTHORITATIVE MESSAGE',
+  ]);
+  assert.equal(store.active.messages[0].id, 'message-1');
+  assert.equal(store.active.messages[0].idempotencyKey, 'client-turn-1');
+  assert.equal(store.active.serverVersion, 1);
+  assert.equal(legacyCalls(), 0);
+});
+
+test('corrupt device transcript cache rebuilds from server authority', async () => {
+  const disk = storage({ [W.WORKSPACE_KEY]: '{corrupt' });
+  const fixture = authorityFixture();
+
+  const { store } = await authorityController(fixture, disk);
+
+  assert.equal(store.getSnapshot().ready, true);
+  assert.equal(store.getSnapshot().serverSynced, true);
+  assert.equal(store.active.id, 'thread-1');
+  assert.equal(store.active.messages[0].text, 'SERVER AUTHORITATIVE MESSAGE');
+});
+
+test('canonical send never sends client transcript and rebuilds from server result', async () => {
+  const fixture = authorityFixture({
+    chat: async (request, state) => {
+      assert.equal(request.threadId, 'thread-1');
+      assert.equal(request.expectedThreadVersion, 1);
+      assert.equal(request.message, 'new question');
+      assert.equal(typeof request.idempotencyKey, 'string');
+      assert.ok(!Object.prototype.hasOwnProperty.call(request, 'history'));
+      const user = serverMessage({
+        message_id: 'server-user-2',
+        sequence: 2,
+        idempotency_key: request.idempotencyKey,
+        content: request.message,
+      });
+      const assistant = serverMessage({
+        message_id: 'server-assistant-3',
+        sequence: 3,
+        author_type: 'assistant',
+        idempotency_key: request.idempotencyKey + ':assistant',
+        content: 'server answer',
+      });
+      state.messages.set('thread-1', [
+        serverMessage(),
+        user,
+        assistant,
+      ]);
+      const thread = serverThread({ version: 3 });
+      state.threads = [thread];
+      return {
+        success: true,
+        response: 'server answer',
+        thread,
+        user_message: user,
+        assistant_message: assistant,
+      };
+    },
+  });
+  const { store, legacyCalls } = await authorityController(fixture);
+  store.edit({ draft: 'new question', context: 'project context' });
+
+  await store.send();
+
+  assert.equal(fixture.calls.chat.length, 1);
+  assert.equal(fixture.calls.chat[0].context, 'project context');
+  assert.deepEqual(store.active.messages.map(item => item.text), [
+    'SERVER AUTHORITATIVE MESSAGE',
+    'new question',
+    'server answer',
+  ]);
+  assert.equal(store.active.serverVersion, 3);
+  assert.equal(store.getSnapshot().serverSynced, true);
+  assert.equal(legacyCalls(), 0);
+});
+
+test('canonical failed turn retries with identical append idempotency and precondition', async () => {
+  let attempt = 0;
+  const fixture = authorityFixture({
+    chat: async (request, state) => {
+      attempt++;
+      if (attempt === 1) throw new Error('temporary engine outage');
+      const user = serverMessage({
+        message_id: 'server-retry-user',
+        sequence: 2,
+        idempotency_key: request.idempotencyKey,
+        content: request.message,
+      });
+      const assistant = serverMessage({
+        message_id: 'server-retry-assistant',
+        sequence: 3,
+        author_type: 'assistant',
+        idempotency_key: request.idempotencyKey + ':assistant',
+        content: 'recovered',
+      });
+      state.messages.set('thread-1', [serverMessage(), user, assistant]);
+      const thread = serverThread({ version: 3 });
+      return {
+        success: true,
+        response: 'recovered',
+        thread,
+        user_message: user,
+        assistant_message: assistant,
+      };
+    },
+  });
+  const { store } = await authorityController(fixture);
+  store.edit({ draft: 'retry me' });
+
+  await store.send();
+  const failed = store.active.messages.at(-1);
+  assert.equal(failed.status, 'failed');
+  assert.equal(failed.expectedThreadVersion, 1);
+  assert.ok(failed.idempotencyKey);
+
+  await store.retry(failed.id);
+
+  assert.equal(fixture.calls.chat.length, 2);
+  assert.equal(
+    fixture.calls.chat[0].idempotencyKey,
+    fixture.calls.chat[1].idempotencyKey,
+  );
+  assert.equal(
+    fixture.calls.chat[0].expectedThreadVersion,
+    fixture.calls.chat[1].expectedThreadVersion,
+  );
+  assert.deepEqual(store.active.messages.map(item => item.text), [
+    'SERVER AUTHORITATIVE MESSAGE',
+    'retry me',
+    'recovered',
+  ]);
+});
+
+test('archive and delete mutate server authority before local projection', async () => {
+  const fixture = authorityFixture();
+  const { store } = await authorityController(fixture);
+
+  store.archive('thread-1', true);
+  await tick();
+  await tick();
+
+  assert.equal(fixture.calls.state.length, 1);
+  assert.equal(fixture.calls.state[0].state, 'archived');
+  assert.ok(fixture.calls.create.length >= 1, 'an active replacement is created server-side');
+
+  const created = store.active.id;
+  store.remove(created);
+  await tick();
+  await tick();
+
+  assert.equal(fixture.calls.deletion.length, 1);
+  assert.equal(fixture.calls.deletion[0].threadId, created);
+});
+
+test('server-authority mode keeps draft when server is unavailable', async () => {
+  const fixture = authorityFixture();
+  fixture.authority.listThreads = async () => {
+    throw new Error('offline');
+  };
+  const cached = W.createWorkspace();
+  cached.conversations[0].draft = 'offline draft';
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(cached) });
+
+  const { store } = await authorityController(fixture, disk);
+
+  assert.equal(store.getSnapshot().ready, true);
+  assert.equal(store.getSnapshot().serverSynced, false);
+  assert.equal(store.active.draft, 'offline draft');
+  await store.send();
+  assert.equal(store.active.draft, 'offline draft');
+  assert.match(store.getSnapshot().notice, /Server conversation state is unavailable/);
+});
