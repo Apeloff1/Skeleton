@@ -171,6 +171,9 @@ class EngineExecutionCoordinator:
             checkpoint = self.service.repository.latest_checkpoint(
                 execution_id
             )
+            approval_refs = self.service.active_approval_refs(
+                execution_id,
+            )
             if checkpoint is None:
                 await runtime.start(
                     command.execution_request,
@@ -178,9 +181,13 @@ class EngineExecutionCoordinator:
                     prompt=handoff.prompt,
                     history=history,
                     context_digest=handoff.context_digest,
+                    approval_refs=approval_refs,
                 )
             else:
-                await runtime.resume(execution_id)
+                await runtime.resume(
+                    execution_id,
+                    approval_refs=approval_refs,
+                )
         except asyncio.CancelledError:
             raise
         except Exception:
