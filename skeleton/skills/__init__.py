@@ -1,7 +1,39 @@
-"""Skills-as-files primitives: versioned, evaluable cognitive capabilities."""
+"""Skills and canonical governed tool-runtime primitives."""
+
 from .lifecycle import PromotionPolicy, SkillLifecycle
 from .manifest import SkillManifest, SkillState
 from .store import SkillStore
+from .tool_contract import (
+    ToolContractError,
+    ToolEffect,
+    ToolExecutionRequest,
+    ToolExecutionReceipt,
+    ToolExecutionStatus,
+    ToolManifest,
+)
+from .tool_runtime import (
+    ToolExecutionConflict,
+    ToolNotFound,
+    ToolRuntime,
+    ToolRuntimeError,
+)
 from .usage import SkillUsageMeter
 
-__all__ = ["PromotionPolicy", "SkillLifecycle", "SkillManifest", "SkillState", "SkillStore", "SkillUsageMeter"]
+__all__ = [
+    "PromotionPolicy",
+    "SkillLifecycle",
+    "SkillManifest",
+    "SkillState",
+    "SkillStore",
+    "SkillUsageMeter",
+    "ToolContractError",
+    "ToolEffect",
+    "ToolExecutionRequest",
+    "ToolExecutionReceipt",
+    "ToolExecutionStatus",
+    "ToolManifest",
+    "ToolExecutionConflict",
+    "ToolNotFound",
+    "ToolRuntime",
+    "ToolRuntimeError",
+]
