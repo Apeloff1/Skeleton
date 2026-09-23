@@ -1906,10 +1906,14 @@
         },
         "updated_at": {
           "type": "RFC3339"
+        },
+        "cancellation_requested": {
+          "type": "boolean"
         }
       },
       "invariants": [
-        "operation_state=completed requires result_ref"
+        "operation_state=completed requires result_ref",
+        "cancellation_requested is advisory until terminal cancellation commits"
       ]
     },
     "EngineCancelCommand": {
