@@ -61,7 +61,7 @@ _AI_SURFACE_PATH_TERMS = (
     "/ai.",
     "/ai/",
 )
-_NETWORK_TRANSPORT_ROOTS = frozenset(
+_NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)\n_NETWORK_TRANSPORT_ROOTS = frozenset(
     {
         "urllib.request",
         "requests",
