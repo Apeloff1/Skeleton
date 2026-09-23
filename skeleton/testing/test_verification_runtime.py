@@ -6,6 +6,7 @@ from uuid import uuid4
 from skeleton.contracts.verification import (
     Claim,
     ClaimKind,
+    ConfidenceBand,
     EvidenceReference,
     PostconditionCheck,
     RiskClass,
@@ -16,9 +17,12 @@ from skeleton.contracts.verification import (
 )
 from skeleton.intelligence.verification_policy import VerificationPolicy
 from skeleton.intelligence.verification_runtime import (
+    CanonicalProviderSemanticVerifier,
     DeterministicVerificationInput,
+    SemanticVerificationDecision,
     VerificationRuntime,
     tool_receipt_postcondition,
+    verify_with_semantic,
 )
 from skeleton.skills.tool_contract import (
     ToolExecutionReceipt,
@@ -303,3 +307,268 @@ def test_expired_verification_deadline_does_not_verify() -> None:
 
     assert receipt.outcome is VerificationOutcome.REPAIR
     assert "verification_deadline_expired" in receipt.reason_codes
+
+
+
+class _SemanticVerifier:
+    def __init__(self, decisions):
+        self.decisions = list(decisions)
+        self.calls = 0
+
+    async def verify(self, request, verification_input):
+        self.calls += 1
+        if not self.decisions:
+            raise RuntimeError("no decision")
+        decision = self.decisions.pop(0)
+        if isinstance(decision, Exception):
+            raise decision
+        return decision
+
+
+def _semantic_decision(
+    outcome: VerificationOutcome,
+    *,
+    reasons=("semantic_check",),
+    confidence=ConfidenceBand.HIGH,
+    repair_instruction=None,
+):
+    return SemanticVerificationDecision(
+        outcome=outcome,
+        reason_codes=tuple(reasons),
+        confidence_band=confidence,
+        route_ref="provider:test:resp-1",
+        repair_instruction=repair_instruction,
+    )
+
+
+@pytest.mark.asyncio
+async def test_high_impact_semantic_verifier_can_promote_after_deterministic_pass() -> None:
+    evidence = _evidence()
+    claim = Claim(
+        claim_id="claim-1",
+        text="High-impact claim.",
+        evidence_refs=("ev-1",),
+        citation_refs=("cite-1",),
+    )
+    verifier = _SemanticVerifier(
+        [_semantic_decision(VerificationOutcome.VERIFIED)]
+    )
+
+    result = await verify_with_semantic(
+        VerificationRuntime(),
+        _request(VerificationLevel.HIGH_IMPACT),
+        DeterministicVerificationInput(
+            candidate_text="High-impact answer",
+            claims=(claim,),
+            evidence=(evidence,),
+        ),
+        semantic_verifier=verifier,
+        now=_now(),
+    )
+
+    assert result.receipt.outcome is VerificationOutcome.VERIFIED
+    assert result.receipt.verifier_route_refs == ("provider:test:resp-1",)
+    assert result.receipt.confidence_band is ConfidenceBand.HIGH
+    assert verifier.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_semantic_high_confidence_cannot_override_explicit_block() -> None:
+    evidence = _evidence()
+    claim = Claim(
+        claim_id="claim-1",
+        text="High-impact claim.",
+        evidence_refs=("ev-1",),
+        citation_refs=("cite-1",),
+    )
+    verifier = _SemanticVerifier(
+        [
+            _semantic_decision(
+                VerificationOutcome.BLOCK,
+                reasons=("unsupported_high_impact_claim",),
+                confidence=ConfidenceBand.HIGH,
+            )
+        ]
+    )
+
+    result = await verify_with_semantic(
+        VerificationRuntime(),
+        _request(VerificationLevel.HIGH_IMPACT),
+        DeterministicVerificationInput(
+            candidate_text="High-impact answer",
+            claims=(claim,),
+            evidence=(evidence,),
+        ),
+        semantic_verifier=verifier,
+        now=_now(),
+    )
+
+    assert result.receipt.outcome is VerificationOutcome.BLOCK
+    assert result.receipt.confidence_band is ConfidenceBand.HIGH
+    assert "unsupported_high_impact_claim" in result.receipt.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_semantic_verifier_failure_blocks_high_impact() -> None:
+    evidence = _evidence()
+    claim = Claim(
+        claim_id="claim-1",
+        text="High-impact claim.",
+        evidence_refs=("ev-1",),
+        citation_refs=("cite-1",),
+    )
+    verifier = _SemanticVerifier([RuntimeError("provider unavailable")])
+
+    result = await verify_with_semantic(
+        VerificationRuntime(),
+        _request(VerificationLevel.HIGH_IMPACT),
+        DeterministicVerificationInput(
+            candidate_text="High-impact answer",
+            claims=(claim,),
+            evidence=(evidence,),
+        ),
+        semantic_verifier=verifier,
+        now=_now(),
+    )
+
+    assert result.receipt.outcome is VerificationOutcome.BLOCK
+    assert "semantic_verifier_failed" in result.receipt.reason_codes
+
+
+@pytest.mark.asyncio
+async def test_semantic_repair_is_bounded_and_records_lineage() -> None:
+    evidence = _evidence()
+    claim = Claim(
+        claim_id="claim-1",
+        text="High-impact claim.",
+        evidence_refs=("ev-1",),
+        citation_refs=("cite-1",),
+    )
+    verifier = _SemanticVerifier(
+        [
+            _semantic_decision(
+                VerificationOutcome.REPAIR,
+                reasons=("wording_needs_repair",),
+                repair_instruction="Use more precise wording.",
+            ),
+            _semantic_decision(
+                VerificationOutcome.VERIFIED,
+                reasons=("repaired_candidate_verified",),
+            ),
+        ]
+    )
+    repair_calls = []
+
+    async def repair(candidate, instruction, attempt):
+        repair_calls.append((candidate, instruction, attempt))
+        return "Repaired high-impact answer"
+
+    result = await verify_with_semantic(
+        VerificationRuntime(),
+        _request(VerificationLevel.HIGH_IMPACT),
+        DeterministicVerificationInput(
+            candidate_text="Original high-impact answer",
+            claims=(claim,),
+            evidence=(evidence,),
+        ),
+        semantic_verifier=verifier,
+        repair_callback=repair,
+        now=_now(),
+    )
+
+    assert result.receipt.outcome is VerificationOutcome.VERIFIED
+    assert result.candidate_text == "Repaired high-impact answer"
+    assert len(result.repair_lineage) == 1
+    assert result.repair_lineage[0].parent_candidate_ref == "candidate:1"
+    assert result.repair_lineage[0].repaired_candidate_ref == "candidate:1:repair:1"
+    assert repair_calls[0][2] == 1
+    assert verifier.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_semantic_repair_budget_exhaustion_blocks() -> None:
+    evidence = _evidence()
+    claim = Claim(
+        claim_id="claim-1",
+        text="High-impact claim.",
+        evidence_refs=("ev-1",),
+        citation_refs=("cite-1",),
+    )
+    verifier = _SemanticVerifier(
+        [
+            _semantic_decision(
+                VerificationOutcome.REPAIR,
+                repair_instruction="Repair it.",
+            ),
+            _semantic_decision(
+                VerificationOutcome.REPAIR,
+                repair_instruction="Repair again.",
+            ),
+        ]
+    )
+
+    async def repair(candidate, instruction, attempt):
+        return candidate + " repaired"
+
+    result = await verify_with_semantic(
+        VerificationRuntime(),
+        _request(VerificationLevel.HIGH_IMPACT),
+        DeterministicVerificationInput(
+            candidate_text="Original",
+            claims=(claim,),
+            evidence=(evidence,),
+        ),
+        semantic_verifier=verifier,
+        repair_callback=repair,
+        now=_now(),
+    )
+
+    assert result.receipt.outcome is VerificationOutcome.BLOCK
+    assert "repair_budget_exhausted" in result.receipt.reason_codes
+    assert len(result.repair_lineage) == 1
+
+
+@pytest.mark.asyncio
+async def test_canonical_provider_semantic_verifier_requests_structured_no_tools() -> None:
+    captured = {}
+
+    class FakeResponse:
+        provider = "openai"
+        request_id = "req-1"
+        response_id = "resp-1"
+        structured_output = {
+            "outcome": "verified",
+            "reason_codes": ["supported"],
+            "confidence_band": "medium",
+            "repair_instruction": None,
+        }
+
+    class FakeProvider:
+        async def generate(self, request):
+            captured["request"] = request
+            return FakeResponse()
+
+    evidence = _evidence()
+    claim = Claim(
+        claim_id="claim-1",
+        text="Claim.",
+        evidence_refs=("ev-1",),
+    )
+    verifier = CanonicalProviderSemanticVerifier(FakeProvider())
+
+    decision = await verifier.verify(
+        _request(VerificationLevel.HIGH_IMPACT),
+        DeterministicVerificationInput(
+            candidate_text="Candidate",
+            claims=(claim,),
+            evidence=(evidence,),
+            evidence_content={"ev-1": "supported fact"},
+        ),
+    )
+
+    assert decision.outcome is VerificationOutcome.VERIFIED
+    assert decision.route_ref == "provider:openai:resp-1"
+    request = captured["request"]
+    assert request.purpose == "verification"
+    assert request.tool_choice == "none"
+    assert request.structured_output_schema["type"] == "object"
