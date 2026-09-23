@@ -61,7 +61,8 @@ _AI_SURFACE_PATH_TERMS = (
     "/ai.",
     "/ai/",
 )
-_NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)\n_NETWORK_TRANSPORT_ROOTS = frozenset(
+_NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
+_NETWORK_TRANSPORT_ROOTS = frozenset(
     {
         "urllib.request",
         "requests",
@@ -779,7 +780,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence_out is not None:
         args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
         args.evidence_out.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
+            json.dumps(evidence, indent=2, sort_keys=True) + "
+",
             encoding="utf-8",
         )
     if args.print_evidence:
