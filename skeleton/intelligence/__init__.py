@@ -94,9 +94,15 @@ from skeleton.intelligence.shared_pressure import (
 )
 from skeleton.intelligence.verification_policy import VerificationPolicy
 from skeleton.intelligence.verification_runtime import (
+    CanonicalProviderSemanticVerifier,
     DeterministicVerificationInput,
+    RepairAttempt,
+    SemanticVerificationDecision,
+    SemanticVerifierError,
+    VerificationRunResult,
     VerificationRuntime,
     tool_receipt_postcondition,
+    verify_with_semantic,
 )
 from skeleton.intelligence.quests import (
     QuestObjective,
@@ -180,7 +186,13 @@ __all__ = [
     "SharedQueueTicket",
     "SqliteSharedPressureLedger",
     "VerificationPolicy",
+    "CanonicalProviderSemanticVerifier",
     "DeterministicVerificationInput",
+    "RepairAttempt",
+    "SemanticVerificationDecision",
+    "SemanticVerifierError",
+    "VerificationRunResult",
     "VerificationRuntime",
     "tool_receipt_postcondition",
+    "verify_with_semantic",
 ]
