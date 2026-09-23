@@ -1636,6 +1636,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             ]
             messages.append({"role": "user", "content": request.prompt})
 
+            tools = _provider_tool_definitions(request)
             kwargs: dict[str, Any] = {
                 "model": model,
                 "instructions": request.instructions,
@@ -1643,19 +1644,45 @@ class OpenAIProviderAdapter(ProviderAdapter):
             }
             if request.max_output_tokens is not None:
                 kwargs["max_output_tokens"] = request.max_output_tokens
-            if request.tool_schemas:
-                kwargs["tools"] = [dict(schema) for schema in request.tool_schemas]
+            if tools:
+                kwargs["tools"] = [
+                    tool.as_openai_tool()
+                    for tool in tools
+                ]
+                kwargs["tool_choice"] = _provider_tool_choice_payload(
+                    request,
+                    tools,
+                )
+            structured_payload = _provider_structured_output_payload(request)
+            if structured_payload is not None:
+                kwargs["text"] = structured_payload
 
+            timeout_seconds = _remaining_provider_timeout(
+                request,
+                self.timeout_seconds,
+            )
             try:
-                response = await client.responses.create(**kwargs)
+                response = await asyncio.wait_for(
+                    client.responses.create(**kwargs),
+                    timeout=timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                raise ProviderInvocationError(
+                    "model provider deadline exceeded"
+                ) from exc
             except ProviderError:
                 raise
             except Exception as exc:
                 raise ProviderInvocationError("model provider request failed") from exc
 
-            text = str(getattr(response, "output_text", "") or "").strip()
-            if not text:
-                raise ProviderInvocationError("model provider returned an empty response")
+            raw_text = getattr(response, "output_text", None)
+            text, structured_output, tool_calls, finish_reason, usage = (
+                _normalize_provider_interaction(
+                    response,
+                    request,
+                    text=(str(raw_text) if raw_text is not None else None),
+                )
+            )
         except BaseException:
             _release_provider_lease(self.admission_runtime, lease)
             raise
@@ -1674,12 +1701,18 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 "model provider usage reconciliation failed"
             ) from exc
 
-        request_id = getattr(response, "id", None)
+        response_id = getattr(response, "id", None)
+        normalized_response_id = str(response_id) if response_id else None
         return ProviderResponse(
             text=text,
             provider=self.provider_id,
             model=model,
-            request_id=str(request_id) if request_id else None,
+            request_id=normalized_response_id,
+            response_id=normalized_response_id,
+            structured_output=structured_output,
+            tool_calls=tool_calls,
+            finish_reason=finish_reason,
+            usage=usage,
             latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
             admission_decision_id=lease.decision.decision_id,
