@@ -120,6 +120,33 @@ async def get_conversation(
     return {"thread": thread.as_dict()}
 
 
+@router.get("/{thread_id}/snapshot")
+async def get_conversation_snapshot(
+    thread_id: str,
+    active_only: bool = False,
+    user=Depends(require_role("viewer")),
+):
+    """Return one server-authoritative thread/message projection."""
+
+    tenant_id, owner_id = _identity(user)
+    try:
+        thread, messages = await conversation_authority.snapshot(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            active_only=active_only,
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+    return {
+        "thread": thread.as_dict(),
+        "messages": [message.as_dict() for message in messages],
+        "projection": "active" if active_only else "all",
+        "snapshot_version": thread.version,
+        "snapshot_sequence": thread.message_sequence,
+    }
+
+
 @router.post("/{thread_id}/messages")
 async def append_user_message(
     thread_id: str,
