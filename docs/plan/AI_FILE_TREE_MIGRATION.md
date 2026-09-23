@@ -146,8 +146,8 @@ actual destination mirror under `skeleton/ai`.
 
 Current preparation state:
 
-- **134 governed source -> destination mappings**
-- **1,997 changed files under `skeleton/ai`** in this migration PR
+- **154 governed source -> destination mappings**
+- **148 additional exact-object mirror files staged by Wave 2B** on top of current `main`
 - package scaffolding remains assembly metadata rather than a separate move source
 - `next_move_assignments` is empty because all previously assigned extant
   sources have been promoted into `mappings`
@@ -176,10 +176,10 @@ The prepared units are divided into five deterministic batches:
   parity exceptions. Provider credentials, network ownership, or other
   authority-bearing implementation stays at the legacy owner until an explicit
   owner/import cutover is approved.
-- **B4-research-quarantine (39 mappings):** historical and model-internals
+- **B4-research-quarantine (53 mappings):** historical and model-internals
   research lineage. These units remain characterization-gated and are not
   production cutover candidates.
-- **B3-compat-convergence (22 mappings):** Turn and Telemetry compatibility
+- **B3-compat-convergence (28 mappings):** Turn and Telemetry compatibility
   mirrors that must merge into existing canonical owners rather than become
   independent production authorities.
 
@@ -226,23 +226,24 @@ itself fail-closed.
 
 ### Latest extension audit status
 
-The current governed set contains **134 mappings**. A completed full-object/parity
-audit covers the prior 130-mapping set. Four newly recovered `skeleton/acquired`
-units are exact Git-object mirrors and form the current incremental audit scope.
+The current governed set contains **154 mappings**. The current-main ledger retains
+the recorded 134-mapping audit line, including the four acquired-recovery mappings.
+Wave 2B adds 20 exact current-source Git-object mappings (14 GameForge research
+quarantine trees and 6 backend-core compatibility mirrors) as the new incremental scope.
 
 The preparation ledger is now internally consistent:
 
 - 54 mappings in `B1-core-runtime`
 - 12 mappings in `B2-domain-build`
 - 7 mappings in `B3-owner-sensitive`
-- 22 mappings in `B3-compat-convergence`
-- 39 mappings in `B4-research-quarantine`
+- 28 mappings in `B3-compat-convergence`
+- 53 mappings in `B4-research-quarantine`
 - 0 pending move assignments
 - 34 retained-outside classifications
 
-Fresh incremental object/parity audit and CI evidence for the four acquired
-mappings are still required before import inversion, source retirement, or any
-cutover-complete claim.
+Fresh full 154-mapping object/parity validation plus exact-head CI evidence for
+Wave 2B are required before import inversion, source retirement, implementation
+signoff refresh, independent verification, or any cutover-complete claim.
 
 
 ## Compatibility convergence surfaces
@@ -394,3 +395,12 @@ new mappings carry `cutover:quarantine` and `B4-research-quarantine`.
 Promotion into runtime, provider, model, simulation, or artifact ownership
 requires characterization, focused tests/evaluation, explicit convergence into
 the canonical owner, and independent evidence.
+
+
+## Transfer v2 Wave 2B — current-main reconciliation
+
+Wave 2B is reconciled onto current `main` as **20 additional governed mappings**, taking the live ledger from **134 to 154 mappings** while preserving all four newer acquired-recovery mappings already present on `main`.
+
+The 20 Wave 2B sources were re-read from the current-main Git tree before staging. All **20/20 source tree/blob IDs exactly match** the Wave 2B custody records, and the destination mirrors reuse those exact objects. The payload adds **148 mirrored files**: fourteen GameForge research-quarantine trees under `skeleton/ai/research/legacy/gameforge` and six backend-core compatibility files under `skeleton/ai/compat/backend_core`.
+
+The historical 150-map Wave 2B implementation attestation is **not** reused because this reconciliation has a different 154-map payload and current-main ancestry. Implementation signoff is reset pending exact-head CI and a fresh full 154-map object/parity audit. Independent verification and all source retirement/import inversion remain blocked.

@@ -1,0 +1,14 @@
+{
+  "room_skill_tree": {
+    "room_id": "TEMPLATE",
+    "category": "TEMPLATE",
+    "unlocked_skills": [],
+    "skill_tree_structure": {
+      "tier_1_basic": [],
+      "tier_2_intermediate": [],
+      "tier_3_advanced": [],
+      "tier_4_master": []
+    },
+    "unlock_conditions": "performance + coherence + judge_approval + github_contribution"
+  }
+}
