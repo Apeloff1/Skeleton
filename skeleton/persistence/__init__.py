@@ -15,6 +15,13 @@ from skeleton.persistence.conversation_repository import (
     ConversationRepositoryError,
     SQLiteConversationRepository,
 )
+from skeleton.persistence.memory_repository import (
+    MemoryConflict,
+    MemoryNotFound,
+    MemoryRepositoryError,
+    MongoMemoryRepository,
+    SQLiteMemoryRepository,
+)
 from skeleton.persistence.operation_store import (
     OperationOutboxEvent,
     OperationStoreConflict,
@@ -48,6 +55,11 @@ __all__ = [
     "ConversationRepositoryCorruption",
     "ConversationRepositoryError",
     "SQLiteConversationRepository",
+    "MemoryConflict",
+    "MemoryNotFound",
+    "MemoryRepositoryError",
+    "MongoMemoryRepository",
+    "SQLiteMemoryRepository",
     "OperationOutboxEvent",
     "OperationStoreConflict",
     "OperationStoreCorruptionError",
