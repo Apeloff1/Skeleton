@@ -324,6 +324,8 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     ack = service.submit(
         command,
         verified_service_principal=SERVICE_PRINCIPAL,
+        actor_id=ACTOR,
+        tenant_id=TENANT,
     )
     assert ack.execution_id == EXECUTION_ID
 
@@ -352,6 +354,8 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     pending = service.pending_tool_approvals(
         EXECUTION_ID,
         verified_service_principal=SERVICE_PRINCIPAL,
+        actor_id=ACTOR,
+        tenant_id=TENANT,
     )
     assert len(pending) == 1
     assert pending[0]["call_id"] == "golden-call-write"
@@ -362,6 +366,8 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     approval = service.approve_tool_call(
         EXECUTION_ID,
         verified_service_principal=SERVICE_PRINCIPAL,
+        actor_id=ACTOR,
+        tenant_id=TENANT,
         call_id=pending[0]["call_id"],
         tool_id=pending[0]["tool_id"],
         arguments_digest=pending[0]["arguments_digest"],
@@ -399,6 +405,8 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     events = service.events(
         EXECUTION_ID,
         verified_service_principal=SERVICE_PRINCIPAL,
+        actor_id=ACTOR,
+        tenant_id=TENANT,
     )
     assert any(
         event["type"] == "execution.result"
