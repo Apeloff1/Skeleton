@@ -245,10 +245,62 @@ def _parse_record(value: str) -> tuple[str, Path]:
     return evidence_id.strip(), Path(raw_path.strip())
 
 
+def _stage7_records(
+    path: Path,
+    *,
+    lane: str,
+) -> list[dict[str, str]]:
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    lowered = path.name.lower()
+    if lowered.endswith(".xml"):
+        report_format = "junit"
+    elif lowered.endswith(".json"):
+        report_format = "pytest-json"
+    else:
+        raise AIReleaseEvidenceError(
+            "Stage-7 report must be JUnit .xml or pytest-json-report .json"
+        )
+
+    try:
+        from skeleton.release.ai_journey_evidence import (
+            collect_ai_journey_evidence,
+        )
+        bundle = collect_ai_journey_evidence(
+            report_name=_canonical_name(path),
+            report_bytes=path.read_bytes(),
+            report_format=report_format,
+        )
+    except Exception as exc:
+        if isinstance(exc, (AIReleaseEvidenceError, FileNotFoundError)):
+            raise
+        raise AIReleaseEvidenceError(
+            f"Stage-7 journey matrix failed: {exc}"
+        ) from exc
+
+    selected = (
+        bundle.test_evidence
+        if lane == "test"
+        else bundle.eval_evidence
+    )
+    return [item.to_payload() for item in selected]
+
+
 def collect(args: argparse.Namespace) -> int:
-    if not args.record:
-        raise AIReleaseEvidenceError("at least one --record is required")
-    records = []
+    if not args.record and args.stage7_report is None:
+        raise AIReleaseEvidenceError(
+            "at least one --record or --stage7-report is required"
+        )
+    if args.stage7_report is None and args.stage7_lane is not None:
+        raise AIReleaseEvidenceError(
+            "--stage7-lane requires --stage7-report"
+        )
+    if args.stage7_report is not None and args.stage7_lane is None:
+        raise AIReleaseEvidenceError(
+            "--stage7-report requires --stage7-lane"
+        )
+
+    records: list[dict[str, str]] = []
     seen: set[str] = set()
     for raw in args.record:
         evidence_id, path = _parse_record(raw)
@@ -263,6 +315,20 @@ def collect(args: argparse.Namespace) -> int:
                 path=path,
             )
         )
+
+    if args.stage7_report is not None:
+        for record in _stage7_records(
+            Path(args.stage7_report),
+            lane=str(args.stage7_lane),
+        ):
+            evidence_id = record["evidence_id"]
+            if evidence_id in seen:
+                raise AIReleaseEvidenceError(
+                    f"duplicate evidence_id: {evidence_id}"
+                )
+            seen.add(evidence_id)
+            records.append(record)
+
     records.sort(key=lambda item: item["evidence_id"])
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -280,6 +346,15 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="passing report as evidence_id=repository/relative/report.xml|json",
+    )
+    parser.add_argument(
+        "--stage7-report",
+        help="full AI runtime JUnit/pytest JSON report for mandatory Stage-7 matrix validation",
+    )
+    parser.add_argument(
+        "--stage7-lane",
+        choices=("test", "eval"),
+        help="release evidence lane emitted from --stage7-report",
     )
     parser.add_argument("--output", required=True)
     parser.set_defaults(func=collect)
