@@ -8,6 +8,8 @@ import sys
 
 import pytest
 
+from skeleton.release.ai_journey_evidence import MANDATORY_AI_JOURNEYS
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "ai_release_evidence.py"
@@ -60,6 +62,39 @@ def _write_pytest_json(
                 }
             },
             sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_stage7_junit(
+    path: Path,
+    *,
+    prefix: str = "",
+    omit_nodeid: str | None = None,
+    fail_nodeid: str | None = None,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cases: list[str] = []
+    failures = 0
+    for requirement in MANDATORY_AI_JOURNEYS:
+        if requirement.nodeid == omit_nodeid:
+            continue
+        file_name, function_name = requirement.nodeid.split("::", 1)
+        body = ""
+        if requirement.nodeid == fail_nodeid:
+            body = "<failure message=\"boom\"/>"
+            failures += 1
+        cases.append(
+            f'<testcase file="{prefix}{file_name}" '
+            f'name="{function_name}">{body}</testcase>'
+        )
+    path.write_text(
+        (
+            f'<testsuite name="stage7" tests="{len(cases)}" '
+            f'failures="{failures}" errors="0" skipped="0">'
+            + "".join(cases)
+            + "</testsuite>"
         ),
         encoding="utf-8",
     )
@@ -273,3 +308,116 @@ def test_collect_writes_sorted_release_gate_records(
         "z-faults",
     ]
     assert all(item["result"] == "pass" for item in payload)
+
+
+
+def test_stage7_matrix_mode_emits_only_selected_release_lane(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    release_report = Path("reports/release.xml")
+    _write_junit(release_report)
+    stage7_report = Path("reports/stage7.xml")
+    _write_stage7_junit(stage7_report, prefix="source-a/")
+
+    test_args = ai_release_evidence.build_parser().parse_args(
+        [
+            "--record",
+            "release-tests=reports/release.xml",
+            "--stage7-report",
+            "reports/stage7.xml",
+            "--stage7-lane",
+            "test",
+            "--output",
+            "out/test-evidence.json",
+        ]
+    )
+    assert ai_release_evidence.collect(test_args) == 0
+    test_records = json.loads(
+        Path("out/test-evidence.json").read_text(encoding="utf-8")
+    )
+    test_ids = {item["evidence_id"] for item in test_records}
+    assert "release-tests" in test_ids
+    assert {
+        item.evidence_id
+        for item in MANDATORY_AI_JOURNEYS
+        if item.lane == "test"
+    }.issubset(test_ids)
+    assert not {
+        item.evidence_id
+        for item in MANDATORY_AI_JOURNEYS
+        if item.lane == "eval"
+    }.intersection(test_ids)
+
+    eval_args = ai_release_evidence.build_parser().parse_args(
+        [
+            "--stage7-report",
+            "reports/stage7.xml",
+            "--stage7-lane",
+            "eval",
+            "--output",
+            "out/eval-evidence.json",
+        ]
+    )
+    assert ai_release_evidence.collect(eval_args) == 0
+    eval_records = json.loads(
+        Path("out/eval-evidence.json").read_text(encoding="utf-8")
+    )
+    assert {item["evidence_id"] for item in eval_records} == {
+        item.evidence_id
+        for item in MANDATORY_AI_JOURNEYS
+        if item.lane == "eval"
+    }
+
+
+def test_stage7_matrix_mode_rejects_missing_required_journey(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    report = Path("reports/stage7.xml")
+    omitted = MANDATORY_AI_JOURNEYS[0].nodeid
+    _write_stage7_junit(report, omit_nodeid=omitted)
+    args = ai_release_evidence.build_parser().parse_args(
+        [
+            "--stage7-report",
+            "reports/stage7.xml",
+            "--stage7-lane",
+            "eval",
+            "--output",
+            "out.json",
+        ]
+    )
+
+    with pytest.raises(
+        ai_release_evidence.AIReleaseEvidenceError,
+        match="missing required AI journeys",
+    ):
+        ai_release_evidence.collect(args)
+
+
+def test_stage7_matrix_mode_rejects_named_journey_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    report = Path("reports/stage7.xml")
+    failed = MANDATORY_AI_JOURNEYS[-1].nodeid
+    _write_stage7_junit(report, fail_nodeid=failed)
+    args = ai_release_evidence.build_parser().parse_args(
+        [
+            "--stage7-report",
+            "reports/stage7.xml",
+            "--stage7-lane",
+            "eval",
+            "--output",
+            "out.json",
+        ]
+    )
+
+    with pytest.raises(
+        ai_release_evidence.AIReleaseEvidenceError,
+        match="non-passing required AI journeys",
+    ):
+        ai_release_evidence.collect(args)
