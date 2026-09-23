@@ -262,3 +262,55 @@ def test_route_ack_is_tenant_bound(
 
     operations.close()
     events.close()
+
+
+
+def test_authoritative_resync_returns_compaction_floor_and_retained_events(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        ("validated", "authorized"),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+    transport.dispatch_pending(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+    events.compact_through(operation.operation_id, 2)
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    payload = route.authoritative_operation_resync(
+        operation.operation_id,
+        consumer_id="route-resync-client",
+        limit=250,
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    assert payload["ok"] is True
+    assert payload["reset_after_sequence"] == 2
+    assert payload["compacted_through"] == 2
+    assert payload["after_sequence"] == 2
+    assert payload["latest_sequence"] == 3
+    assert payload["stream_latest_sequence"] == 3
+    assert [event["sequence"] for event in payload["events"]] == [3]
+    assert payload["operation"]["state"] == "authorized"
+
+    checkpoint = next(
+        item
+        for item in events.active_consumers(operation.operation_id)
+        if item.consumer_id == "route-resync-client"
+    )
+    assert checkpoint.acknowledged_through == 2
+
+    operations.close()
+    events.close()
