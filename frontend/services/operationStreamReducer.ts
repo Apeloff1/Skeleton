@@ -38,6 +38,12 @@ export interface OperationReplayPayload {
   terminal: boolean;
 }
 
+export interface OperationResyncPayload extends OperationReplayPayload {
+  reset_after_sequence: number;
+  compacted_through: number;
+  stream_latest_sequence: number;
+}
+
 export type OperationConnectionState =
   | 'idle'
   | 'replaying'
@@ -265,4 +271,44 @@ export function reduceOperationReplay(
     terminal: next.terminal || serverTerminal,
     connection: next.terminal || serverTerminal ? 'terminal' : 'following',
   };
+}
+
+
+export function reduceOperationAuthoritativeResync(
+  state: OperationClientState,
+  payload: OperationResyncPayload,
+): OperationClientState {
+  if (!payload || payload.ok !== true || !payload.operation) {
+    return { ...state, connection: 'error', error: 'invalid_resync_payload' };
+  }
+  const reset = payload.reset_after_sequence;
+  if (
+    !Number.isSafeInteger(reset)
+    || reset < 0
+    || payload.compacted_through !== reset
+    || !Number.isSafeInteger(payload.stream_latest_sequence)
+    || payload.stream_latest_sequence < reset
+  ) {
+    return failOperationResync(state, 'invalid_resync_watermark');
+  }
+  if (payload.operation.operation_id !== state.operationId) {
+    return failOperationResync(state, 'cross_operation_snapshot');
+  }
+
+  const baseline = createOperationClientState(state.operationId, reset);
+  return reduceOperationReplay(
+    {
+      ...baseline,
+      operationState: payload.operation.state || null,
+      connection: 'replaying',
+    },
+    {
+      ok: true,
+      operation: payload.operation,
+      events: payload.events || [],
+      after_sequence: reset,
+      latest_sequence: payload.latest_sequence,
+      terminal: payload.terminal,
+    },
+  );
 }
