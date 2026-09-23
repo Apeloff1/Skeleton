@@ -86,6 +86,44 @@ export async function getConversation(threadId: string): Promise<ConversationThr
   return data.thread;
 }
 
+export async function getConversationSnapshot(
+  threadId: string,
+  input: { activeOnly?: boolean } = {},
+): Promise<{
+  thread: ConversationThread;
+  messages: ConversationMessage[];
+  projection: 'active' | 'all';
+  snapshotVersion: number;
+  snapshotSequence: number;
+}> {
+  const suffix = input.activeOnly ? '?active_only=true' : '';
+  const data = await requireData(
+    api.get<{
+      thread: ConversationThread;
+      messages: ConversationMessage[];
+      projection: 'active' | 'all';
+      snapshot_version: number;
+      snapshot_sequence: number;
+    }>(
+      '/api/v1/conversations/' + encodeURIComponent(threadId) + '/snapshot' + suffix,
+    ),
+    'Could not load conversation snapshot.',
+  );
+  if (
+    data.snapshot_version !== data.thread.version
+    || data.snapshot_sequence !== data.thread.message_sequence
+  ) {
+    throw new Error('Conversation snapshot metadata is inconsistent.');
+  }
+  return {
+    thread: data.thread,
+    messages: data.messages,
+    projection: data.projection,
+    snapshotVersion: data.snapshot_version,
+    snapshotSequence: data.snapshot_sequence,
+  };
+}
+
 export async function listConversationMessages(
   threadId: string,
   input: { afterSequence?: number; limit?: number; activeOnly?: boolean } = {},
@@ -335,9 +373,11 @@ export async function exportConversationSnapshot(
   thread: ConversationThread;
   messages: ConversationMessage[];
 }> {
-  const [thread, messages] = await Promise.all([
-    getConversation(threadId),
-    listAllConversationMessages(threadId, { activeOnly: false }),
-  ]);
-  return { thread, messages };
+  const snapshot = await getConversationSnapshot(threadId, {
+    activeOnly: false,
+  });
+  return {
+    thread: snapshot.thread,
+    messages: snapshot.messages,
+  };
 }
