@@ -543,9 +543,453 @@ class SQLiteMemoryRepository:
             self._connection.close()
 
 
+
+
+class MongoMemoryRepository:
+    """Async Mongo-backed canonical memory authority with injected database.
+
+    The class intentionally depends only on the database/collection protocol,
+    not Motor/PyMongo imports, so the core package remains bootable without a
+    Mongo driver while backend deployments can inject an AsyncIOMotorDatabase.
+    """
+
+    def __init__(
+        self,
+        database,
+        *,
+        repository_namespace: str = "memory",
+        collection_prefix: str = "canonical_memory",
+    ) -> None:
+        namespace = str(repository_namespace).strip()
+        prefix = str(collection_prefix).strip()
+        if not namespace or not prefix:
+            raise ValueError("repository_namespace and collection_prefix are required")
+        self.repository_namespace = namespace
+        self.records = database[f"{prefix}_records"]
+        self.idempotency = database[f"{prefix}_idempotency"]
+
+    async def ensure_indexes(self) -> None:
+        await self.records.create_index(
+            [
+                ("repository_namespace", 1),
+                ("memory_id", 1),
+            ],
+            unique=True,
+            name="canonical_memory_identity",
+        )
+        await self.records.create_index(
+            [
+                ("repository_namespace", 1),
+                ("tenant_id", 1),
+                ("namespace", 1),
+                ("subject_id", 1),
+                ("state", 1),
+                ("updated_at", 1),
+            ],
+            name="canonical_memory_subject",
+        )
+        await self.idempotency.create_index(
+            [
+                ("repository_namespace", 1),
+                ("tenant_id", 1),
+                ("namespace", 1),
+                ("idempotency_key", 1),
+            ],
+            unique=True,
+            name="canonical_memory_idempotency",
+        )
+
+    @staticmethod
+    def _record_from_doc(doc: dict) -> MemoryRecord:
+        return MemoryRecord(
+            memory_id=doc["memory_id"],
+            tenant_id=doc["tenant_id"],
+            namespace=doc["namespace"],
+            subject_id=doc["subject_id"],
+            kind=MemoryKind(doc["kind"]),
+            version=int(doc["version"]),
+            created_at=_parse_time(doc["created_at"], "created_at"),
+            updated_at=_parse_time(doc["updated_at"], "updated_at"),
+            idempotency_key=doc["idempotency_key"],
+            payload_digest=doc["payload_digest"],
+            content=doc.get("content"),
+            content_ref=doc.get("content_ref"),
+            provenance_refs=tuple(doc.get("provenance_refs") or ()),
+            source_operation_id=doc.get("source_operation_id"),
+            expires_at=_parse_time(doc.get("expires_at"), "expires_at"),
+            state=MemoryState(doc["state"]),
+            data_class=doc["data_class"],
+            schema_version=int(doc.get("schema_version", 1)),
+        )
+
+    def _record_doc(self, record: MemoryRecord) -> dict:
+        return {
+            "repository_namespace": self.repository_namespace,
+            "memory_id": record.memory_id,
+            "tenant_id": record.tenant_id,
+            "namespace": record.namespace,
+            "subject_id": record.subject_id,
+            "kind": record.kind.value,
+            "version": record.version,
+            "created_at": _iso(record.created_at),
+            "updated_at": _iso(record.updated_at),
+            "idempotency_key": record.idempotency_key,
+            "payload_digest": record.payload_digest,
+            "content": record.content,
+            "content_ref": record.content_ref,
+            "provenance_refs": list(record.provenance_refs),
+            "source_operation_id": record.source_operation_id,
+            "expires_at": _iso(record.expires_at),
+            "state": record.state.value,
+            "data_class": record.data_class,
+            "schema_version": record.schema_version,
+        }
+
+    def _scope(self, *, tenant_id: str, namespace: str) -> dict:
+        return {
+            "repository_namespace": self.repository_namespace,
+            "tenant_id": str(tenant_id),
+            "namespace": str(namespace),
+        }
+
+    def _idempotency_filter(self, proposal: MemoryWriteProposal) -> dict:
+        return {
+            **self._scope(
+                tenant_id=proposal.tenant_id,
+                namespace=proposal.namespace,
+            ),
+            "idempotency_key": proposal.idempotency_key,
+        }
+
+    async def _recover_reservation(
+        self,
+        proposal: MemoryWriteProposal,
+        reservation: dict,
+    ) -> MemoryRecord | None:
+        if reservation.get("status") == "committed":
+            snapshot = reservation.get("result")
+            if not isinstance(snapshot, dict):
+                raise MemoryRepositoryError("committed idempotency receipt is corrupt")
+            return _record_from_json(
+                json.dumps(snapshot, separators=(",", ":"), allow_nan=False)
+            )
+
+        memory_id = str(reservation.get("memory_id") or "").strip()
+        if not memory_id:
+            return None
+        doc = await self.records.find_one(
+            {
+                **self._scope(
+                    tenant_id=proposal.tenant_id,
+                    namespace=proposal.namespace,
+                ),
+                "memory_id": memory_id,
+            }
+        )
+        if doc is None:
+            return None
+        record = self._record_from_doc(doc)
+        if (
+            record.idempotency_key != proposal.idempotency_key
+            or record.payload_digest != proposal.payload_digest
+            or record.source_operation_id != proposal.source_operation_id
+        ):
+            return None
+        await self.idempotency.update_one(
+            {
+                **self._idempotency_filter(proposal),
+                "request_digest": _proposal_digest(proposal),
+            },
+            {
+                "$set": {
+                    "status": "committed",
+                    "result": record.as_dict(),
+                    "committed_at": _iso(record.updated_at),
+                }
+            },
+        )
+        return record
+
+    async def _reserve(
+        self,
+        proposal: MemoryWriteProposal,
+        *,
+        memory_id: str,
+        instant: datetime,
+    ) -> tuple[str, dict]:
+        owner_token = str(uuid4())
+        reservation = await self.idempotency.find_one_and_update(
+            self._idempotency_filter(proposal),
+            {
+                "$setOnInsert": {
+                    **self._idempotency_filter(proposal),
+                    "request_digest": _proposal_digest(proposal),
+                    "status": "pending",
+                    "owner_token": owner_token,
+                    "memory_id": memory_id,
+                    "created_at": _iso(instant),
+                }
+            },
+            upsert=True,
+            return_document=True,
+        )
+        if reservation is None:
+            reservation = await self.idempotency.find_one(
+                self._idempotency_filter(proposal)
+            )
+        if reservation is None:
+            raise MemoryRepositoryError("idempotency reservation was not persisted")
+        if reservation.get("request_digest") != _proposal_digest(proposal):
+            raise MemoryConflict(
+                "idempotency_key replayed with different memory write intent"
+            )
+        if reservation.get("status") == "committed":
+            return "replay", reservation
+        if reservation.get("owner_token") == owner_token:
+            return owner_token, reservation
+        recovered = await self._recover_reservation(proposal, reservation)
+        if recovered is not None:
+            return "replay", {
+                **reservation,
+                "status": "committed",
+                "result": recovered.as_dict(),
+            }
+        raise MemoryConflict("memory write with this idempotency_key is in progress")
+
+    async def _release_failed_reservation(
+        self,
+        proposal: MemoryWriteProposal,
+        owner_token: str,
+    ) -> None:
+        if owner_token in {"replay", ""}:
+            return
+        await self.idempotency.delete_one(
+            {
+                **self._idempotency_filter(proposal),
+                "owner_token": owner_token,
+                "status": "pending",
+            }
+        )
+
+    async def _commit_reservation(
+        self,
+        proposal: MemoryWriteProposal,
+        owner_token: str,
+        record: MemoryRecord,
+    ) -> None:
+        result = await self.idempotency.update_one(
+            {
+                **self._idempotency_filter(proposal),
+                "owner_token": owner_token,
+                "status": "pending",
+            },
+            {
+                "$set": {
+                    "status": "committed",
+                    "result": record.as_dict(),
+                    "committed_at": _iso(record.updated_at),
+                }
+            },
+        )
+        if int(getattr(result, "matched_count", 1)) != 1:
+            raise MemoryRepositoryError("idempotency receipt finalization failed")
+
+    async def commit(
+        self,
+        proposal: MemoryWriteProposal,
+        *,
+        now: datetime | None = None,
+    ) -> MemoryRecord:
+        if not isinstance(proposal, MemoryWriteProposal):
+            raise TypeError("proposal must be MemoryWriteProposal")
+        instant = _utc(now)
+        memory_id = proposal.target_memory_id or str(uuid4())
+        owner_token, reservation = await self._reserve(
+            proposal,
+            memory_id=memory_id,
+            instant=instant,
+        )
+        if owner_token == "replay":
+            snapshot = reservation.get("result")
+            if not isinstance(snapshot, dict):
+                raise MemoryRepositoryError("committed idempotency receipt is corrupt")
+            return _record_from_json(
+                json.dumps(snapshot, separators=(",", ":"), allow_nan=False)
+            )
+
+        try:
+            if proposal.target_memory_id is None:
+                record = MemoryRecord(
+                    memory_id=memory_id,
+                    tenant_id=proposal.tenant_id,
+                    namespace=proposal.namespace,
+                    subject_id=proposal.subject_id,
+                    kind=proposal.kind,
+                    version=1,
+                    created_at=instant,
+                    updated_at=instant,
+                    idempotency_key=proposal.idempotency_key,
+                    payload_digest=proposal.payload_digest,
+                    content=proposal.content,
+                    content_ref=proposal.content_ref,
+                    provenance_refs=proposal.provenance_refs,
+                    source_operation_id=proposal.source_operation_id,
+                    expires_at=proposal.expires_at,
+                    state=MemoryState.ACTIVE,
+                    data_class=proposal.data_class,
+                )
+                await self.records.insert_one(self._record_doc(record))
+            else:
+                current_doc = await self.records.find_one(
+                    {
+                        **self._scope(
+                            tenant_id=proposal.tenant_id,
+                            namespace=proposal.namespace,
+                        ),
+                        "memory_id": proposal.target_memory_id,
+                    }
+                )
+                if current_doc is None:
+                    raise MemoryNotFound("target memory not found in authority scope")
+                current = self._record_from_doc(current_doc)
+                if current.state is not MemoryState.ACTIVE:
+                    raise MemoryConflict("tombstoned memory is not writable")
+                if proposal.expected_version is None:
+                    raise MemoryConflict("update requires expected_version")
+                if current.version != proposal.expected_version:
+                    raise MemoryConflict("memory version conflict")
+                if current.subject_id != proposal.subject_id:
+                    raise MemoryConflict("memory subject cannot change")
+                record = MemoryRecord(
+                    memory_id=current.memory_id,
+                    tenant_id=current.tenant_id,
+                    namespace=current.namespace,
+                    subject_id=current.subject_id,
+                    kind=proposal.kind,
+                    version=current.version + 1,
+                    created_at=current.created_at,
+                    updated_at=instant,
+                    idempotency_key=proposal.idempotency_key,
+                    payload_digest=proposal.payload_digest,
+                    content=proposal.content,
+                    content_ref=proposal.content_ref,
+                    provenance_refs=proposal.provenance_refs,
+                    source_operation_id=proposal.source_operation_id,
+                    expires_at=proposal.expires_at,
+                    state=MemoryState.ACTIVE,
+                    data_class=proposal.data_class,
+                )
+                updated = await self.records.find_one_and_update(
+                    {
+                        **self._scope(
+                            tenant_id=proposal.tenant_id,
+                            namespace=proposal.namespace,
+                        ),
+                        "memory_id": current.memory_id,
+                        "version": proposal.expected_version,
+                        "state": MemoryState.ACTIVE.value,
+                    },
+                    {"$set": self._record_doc(record)},
+                    return_document=True,
+                )
+                if updated is None:
+                    raise MemoryConflict("memory version conflict")
+                record = self._record_from_doc(updated)
+            await self._commit_reservation(proposal, owner_token, record)
+            return record
+        except (MemoryNotFound, MemoryConflict):
+            await self._release_failed_reservation(proposal, owner_token)
+            raise
+
+    async def get(
+        self,
+        memory_id: str,
+        *,
+        tenant_id: str,
+        namespace: str,
+        include_tombstoned: bool = False,
+    ) -> MemoryRecord:
+        doc = await self.records.find_one(
+            {
+                **self._scope(tenant_id=tenant_id, namespace=namespace),
+                "memory_id": str(memory_id),
+            }
+        )
+        if doc is None:
+            raise MemoryNotFound("memory not found in authority scope")
+        record = self._record_from_doc(doc)
+        if record.state is MemoryState.TOMBSTONED and not include_tombstoned:
+            raise MemoryNotFound("memory not found in authority scope")
+        return record
+
+    async def list_subject(
+        self,
+        *,
+        tenant_id: str,
+        namespace: str,
+        subject_id: str,
+        include_tombstoned: bool = False,
+    ) -> tuple[MemoryRecord, ...]:
+        query = {
+            **self._scope(tenant_id=tenant_id, namespace=namespace),
+            "subject_id": str(subject_id),
+        }
+        if not include_tombstoned:
+            query["state"] = MemoryState.ACTIVE.value
+        cursor = self.records.find(query).sort(
+            [("updated_at", 1), ("memory_id", 1)]
+        )
+        if hasattr(cursor, "to_list"):
+            docs = await cursor.to_list(length=None)
+        else:
+            docs = [doc async for doc in cursor]
+        return tuple(self._record_from_doc(doc) for doc in docs)
+
+    async def tombstone(
+        self,
+        memory_id: str,
+        *,
+        tenant_id: str,
+        namespace: str,
+        expected_version: int,
+        now: datetime | None = None,
+    ) -> MemoryRecord:
+        instant = _utc(now)
+        current = await self.get(
+            memory_id,
+            tenant_id=tenant_id,
+            namespace=namespace,
+            include_tombstoned=True,
+        )
+        if current.version != expected_version:
+            raise MemoryConflict("memory version conflict")
+        if current.state is MemoryState.TOMBSTONED:
+            return current
+        updated = await self.records.find_one_and_update(
+            {
+                **self._scope(tenant_id=tenant_id, namespace=namespace),
+                "memory_id": current.memory_id,
+                "version": expected_version,
+                "state": MemoryState.ACTIVE.value,
+            },
+            {
+                "$set": {
+                    "version": current.version + 1,
+                    "updated_at": _iso(instant),
+                    "state": MemoryState.TOMBSTONED.value,
+                }
+            },
+            return_document=True,
+        )
+        if updated is None:
+            raise MemoryConflict("memory version conflict")
+        return self._record_from_doc(updated)
+
+
 __all__ = [
     "MemoryConflict",
     "MemoryNotFound",
     "MemoryRepositoryError",
+    "MongoMemoryRepository",
     "SQLiteMemoryRepository",
 ]
