@@ -88,3 +88,11 @@ jobs:
       - name: Run operation stream reducer contract tests
         working-directory: frontend
         run: npm run test:operation-stream
+
+      - name: Run Jeeves server-authority workspace tests
+        working-directory: frontend
+        run: npm run test:jeeves
+
+      - name: Typecheck Jeeves conversation surfaces
+        working-directory: frontend
+        run: npm run typecheck:jeeves
