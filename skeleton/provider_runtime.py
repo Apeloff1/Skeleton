@@ -2473,6 +2473,7 @@ __all__ = [
     "ProviderSpeechResponse",
     "ProviderUnavailableError",
     "normalize_history",
-    "provider_request_from_context",    "provider_tool_definitions",
+    "provider_request_from_context",
+    "provider_tool_definitions",
 
 ]
