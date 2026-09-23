@@ -249,6 +249,7 @@ def _stage7_records(
     path: Path,
     *,
     lane: str,
+    manifest: Path,
 ) -> list[dict[str, str]]:
     if not path.is_file():
         raise FileNotFoundError(path)
@@ -265,11 +266,18 @@ def _stage7_records(
     try:
         from skeleton.release.ai_journey_evidence import (
             collect_ai_journey_evidence,
+            requirements_from_manifest,
         )
+        manifest_path = manifest
+        manifest_payload = json.loads(
+            manifest_path.read_text(encoding="utf-8")
+        )
+        requirements = requirements_from_manifest(manifest_payload)
         bundle = collect_ai_journey_evidence(
             report_name=_canonical_name(path),
             report_bytes=path.read_bytes(),
             report_format=report_format,
+            requirements=requirements,
         )
     except Exception as exc:
         if isinstance(exc, (AIReleaseEvidenceError, FileNotFoundError)):
@@ -320,6 +328,7 @@ def collect(args: argparse.Namespace) -> int:
         for record in _stage7_records(
             Path(args.stage7_report),
             lane=str(args.stage7_lane),
+            manifest=Path(args.stage7_manifest),
         ):
             evidence_id = record["evidence_id"]
             if evidence_id in seen:
@@ -350,6 +359,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--stage7-report",
         help="full AI runtime JUnit/pytest JSON report for mandatory Stage-7 matrix validation",
+    )
+    parser.add_argument(
+        "--stage7-manifest",
+        default="machine/ai_required_journeys.json",
+        help="machine contract defining the mandatory Stage-7 AI journey matrix",
     )
     parser.add_argument(
         "--stage7-lane",
