@@ -175,8 +175,7 @@ def test_artifact_meter_rejects_actual_bytes_above_operation_budget_before_growt
             now_wall=12.0,
         )
 
-    reservation = runtime.snapshot()["active_operations"][0]
-    assert reservation["operation_id"] == "op-budget"
+    assert runtime.snapshot()["active_operations"] == ("op-budget",)
     quota_snapshot = ledger.snapshot("tenant-a")
     assert quota_snapshot["metered_by_category"]["artifact"][
         "artifact_bytes"
