@@ -707,24 +707,11 @@ class MongoConversationAuthority:
             ) from exc
         return tuple(_message_from_doc(doc) for doc in docs)
 
-    async def active_transcript(
-        self,
-        thread_id: str,
-        *,
-        tenant_id: str,
-        owner_id: str,
+    @staticmethod
+    def _active_projection(
+        thread: ConversationThread,
+        messages: tuple[ConversationMessage, ...],
     ) -> tuple[ConversationMessage, ...]:
-        thread = await self.get_thread(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        messages = await self.list_messages(
-            thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-            limit=500,
-        )
         if not messages:
             return ()
         by_id = {message.message_id: message for message in messages}
@@ -751,6 +738,92 @@ class MongoConversationAuthority:
             )
         lineage.reverse()
         return tuple(lineage)
+
+    async def snapshot(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        active_only: bool = False,
+        max_attempts: int = 3,
+    ) -> tuple[ConversationThread, tuple[ConversationMessage, ...]]:
+        """Return one stable thread/message snapshot for refresh or export.
+
+        Mongo standalone deployments cannot rely on multi-document snapshot
+        transactions. This uses an optimistic version fence: read the thread,
+        read committed messages only through its sequence, then re-read the
+        thread. Any concurrent append/state change retries rather than emitting
+        a mixed-version transcript.
+        """
+
+        if (
+            isinstance(max_attempts, bool)
+            or not isinstance(max_attempts, int)
+            or not 1 <= max_attempts <= 8
+        ):
+            raise ValueError("max_attempts must be between 1 and 8")
+
+        for _attempt in range(max_attempts):
+            before = await self._recover_prepared(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            try:
+                docs = await (
+                    self.messages.find(
+                        {
+                            "thread_id": thread_id,
+                            "sequence": {"$lte": before.message_sequence},
+                        }
+                    )
+                    .sort("sequence", ASCENDING)
+                    .to_list(length=max(1, before.message_sequence))
+                )
+            except PyMongoError as exc:
+                raise ConversationStorageUnavailable(
+                    "conversation snapshot is unavailable"
+                ) from exc
+            messages = tuple(_message_from_doc(doc) for doc in docs)
+            after = await self.get_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+            stable = (
+                before.version == after.version
+                and before.message_sequence == after.message_sequence
+                and before.active_branch_id == after.active_branch_id
+                and before.state == after.state
+            )
+            if not stable:
+                continue
+            projection = (
+                self._active_projection(after, messages)
+                if active_only
+                else messages
+            )
+            return after, projection
+
+        raise ConversationConflict(
+            "conversation changed while building snapshot"
+        )
+
+    async def active_transcript(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> tuple[ConversationMessage, ...]:
+        _thread, messages = await self.snapshot(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            active_only=True,
+        )
+        return messages
 
     async def edit_user_message(
         self,
