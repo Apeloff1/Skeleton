@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest, normalize_history
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from routes.gameforge_auth import require_role
+from skeleton.context.instruction_policy import INSTRUCTION_POLICIES
 from skeleton.contracts.conversation import ConversationAuthorType
 from skeleton.persistence.conversation_repository import ConversationConflict, ConversationNotFound
 
@@ -36,100 +37,70 @@ AI_MODES = {
         "name": "Explain Code",
         "description": "Get detailed explanations of code with AI",
         "icon": "📖",
-        "system_prompt": (
-            "You are an expert programming tutor. Explain code clearly and thoroughly, "
-            "covering behavior, important design choices, risks, and concrete improvements."
-        ),
+        "policy_id": "code.explain",
     },
     "debug": {
         "id": "debug",
         "name": "Debug Code",
         "description": "Find and fix bugs with AI analysis",
         "icon": "🐛",
-        "system_prompt": (
-            "You are an expert debugger. Analyze code for reproducible bugs, edge cases, "
-            "incorrect assumptions, and failure modes. Separate confirmed defects from hypotheses."
-        ),
+        "policy_id": "code.debug",
     },
     "optimize": {
         "id": "optimize",
         "name": "Optimize Code",
         "description": "AI-powered performance optimization",
         "icon": "⚡",
-        "system_prompt": (
-            "You are a performance optimization expert. Identify measurable bottlenecks, explain "
-            "time and space tradeoffs, and prefer changes that preserve behavior and readability."
-        ),
+        "policy_id": "code.optimize",
     },
     "complete": {
         "id": "complete",
         "name": "Complete Code",
         "description": "AI auto-completion for partial code",
         "icon": "✨",
-        "system_prompt": (
-            "You are an AI code completion assistant. Complete partial code using the surrounding "
-            "patterns and constraints. Return working code and call out assumptions briefly."
-        ),
+        "policy_id": "code.complete",
     },
     "refactor": {
         "id": "refactor",
         "name": "Refactor Code",
         "description": "AI-powered code restructuring",
         "icon": "🔄",
-        "system_prompt": (
-            "You are a senior software architect. Refactor code for clarity, maintainability, testability, "
-            "and appropriate separation of concerns without changing externally visible behavior."
-        ),
+        "policy_id": "code.refactor",
     },
     "document": {
         "id": "document",
         "name": "Document Code",
         "description": "Generate comprehensive documentation",
         "icon": "📝",
-        "system_prompt": (
-            "You are a technical writer for software teams. Generate accurate documentation from the "
-            "provided code, and do not invent behavior that is not supported by the implementation."
-        ),
+        "policy_id": "code.document",
     },
     "test_gen": {
         "id": "test_gen",
         "name": "Generate Tests",
         "description": "AI-generated unit tests",
         "icon": "🧪",
-        "system_prompt": (
-            "You are a senior QA engineer. Generate focused tests for normal behavior, boundaries, "
-            "failures, and regressions using the language's conventional testing framework."
-        ),
+        "policy_id": "code.test_gen",
     },
     "security_audit": {
         "id": "security_audit",
         "name": "Security Audit",
         "description": "AI security vulnerability scan",
         "icon": "🔒",
-        "system_prompt": (
-            "You are a defensive application-security reviewer. Audit the supplied code for concrete "
-            "security weaknesses, rank findings by severity and confidence, and give safe remediations."
-        ),
+        "policy_id": "code.security_audit",
     },
     "convert": {
         "id": "convert",
         "name": "Convert Language",
         "description": "AI language translation",
         "icon": "🔀",
-        "system_prompt": (
-            "You are a polyglot programmer. Translate code while preserving observable behavior, "
-            "using idiomatic target-language constructs and explicitly noting unavoidable differences."
-        ),
+        "policy_id": "code.convert",
     },
     "review": {
         "id": "review",
         "name": "Code Review",
         "description": "AI code review feedback",
         "icon": "👁️",
-        "system_prompt": (
-            "You are a senior code reviewer. Prioritize correctness, security, maintainability, and "
-            "test gaps. Distinguish blocking issues from optional improvements."
-        ),
+        "policy_id": "code.review",
     },
 }
 
@@ -293,7 +264,8 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
     if mode_info is None:
         raise HTTPException(status_code=422, detail=f"Unsupported AI mode: {request.mode}")
 
-    result = await call_llm(mode_info["system_prompt"], _assist_prompt(request))
+    policy = INSTRUCTION_POLICIES.resolve(mode_info["policy_id"])
+    result = await call_llm(policy.content, _assist_prompt(request))
     if result["success"]:
         suggestion = str(result["response"])
         return AIAssistResponse(
@@ -364,11 +336,8 @@ async def ai_chat(
     except Exception as exc:
         raise _chat_error(exc) from exc
 
-    system_prompt = (
-        "You are Jeeves, a practical coding assistant for Tutolage Academy. Help with programming, "
-        "debugging, architecture, and learning. Be concise, distinguish facts from assumptions, and "
-        "prefer concrete examples when they improve the answer."
-    )
+    chat_policy = INSTRUCTION_POLICIES.resolve("chat.jeeves")
+    system_prompt = chat_policy.content
 
     sections = [request.message]
     if request.context:
