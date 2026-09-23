@@ -37,6 +37,7 @@ from skeleton.intelligence.quota import (
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_UNKNOWN_USAGE_PREFIX = "unknown:"
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS tenant_quota (
@@ -683,6 +684,227 @@ class SqliteTenantQuotaLedger:
             assert inserted is not None
             return self._usage_event(inserted)
 
+    def mark_usage_unknown(
+        self,
+        reservation_id: str,
+        event_id: str,
+        category: str,
+        *,
+        now: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Persist an unresolved actual-usage marker across process restart."""
+
+        key = _required_id(reservation_id, "reservation_id")
+        event = _required_id(event_id, "event_id")
+        normalized_category = str(category).strip().lower()
+        if normalized_category not in _USAGE_CATEGORIES:
+            raise QuotaError("unsupported usage category")
+        timestamp = time.time() if now is None else _finite_nonnegative(now, "now")
+        unknown_category = _UNKNOWN_USAGE_PREFIX + normalized_category
+
+        with self._write() as conn:
+            row = conn.execute(
+                "SELECT * FROM quota_reservations WHERE reservation_id = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                completed = conn.execute(
+                    "SELECT 1 FROM quota_completions WHERE reservation_id = ?",
+                    (key,),
+                ).fetchone()
+                if completed is not None:
+                    raise QuotaConflict("cannot meter a completed quota reservation")
+                raise QuotaError("unknown active quota reservation")
+            reservation = self._reservation(row)
+
+            existing = conn.execute(
+                "SELECT * FROM quota_usage_events WHERE event_id = ?",
+                (event,),
+            ).fetchone()
+            if existing is not None:
+                replay = self._usage_event(existing)
+                if (
+                    replay.reservation_id != key
+                    or replay.category != unknown_category
+                    or replay.delta != QuotaUsage()
+                ):
+                    raise QuotaConflict(
+                        "usage event id replayed with different inputs"
+                    )
+                return replay
+
+            conn.execute(
+                """
+                INSERT INTO quota_usage_events (
+                    event_id, reservation_id, tenant_id, window_id,
+                    operation_id, category,
+                    delta_operations, delta_input_tokens, delta_output_tokens,
+                    delta_cost_usd, delta_tool_calls, delta_artifact_bytes,
+                    recorded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?)
+                """,
+                (
+                    event,
+                    reservation.reservation_id,
+                    reservation.tenant_id,
+                    reservation.window_id,
+                    reservation.operation_id,
+                    unknown_category,
+                    timestamp,
+                ),
+            )
+            inserted = conn.execute(
+                "SELECT * FROM quota_usage_events WHERE event_id = ?",
+                (event,),
+            ).fetchone()
+            assert inserted is not None
+            return self._usage_event(inserted)
+
+    def resolve_unknown_usage(
+        self,
+        reservation_id: str,
+        event_id: str,
+        delta: UsageEstimate,
+        *,
+        max_tool_calls: int | None = None,
+        max_artifact_bytes: int | None = None,
+        now: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Replace one durable unknown marker with conservative actual usage."""
+
+        key = _required_id(reservation_id, "reservation_id")
+        event = _required_id(event_id, "event_id")
+        if not isinstance(delta, UsageEstimate):
+            raise QuotaError("delta must be UsageEstimate")
+        for field, value in (
+            ("max_tool_calls", max_tool_calls),
+            ("max_artifact_bytes", max_artifact_bytes),
+        ):
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+            ):
+                raise QuotaError(f"{field} must be a non-negative integer")
+        timestamp = time.time() if now is None else _finite_nonnegative(now, "now")
+        delta_usage = QuotaUsage(
+            operations=0,
+            input_tokens=delta.input_tokens,
+            output_tokens=delta.output_tokens,
+            cost_usd=delta.cost_usd,
+            tool_calls=delta.tool_calls,
+            artifact_bytes=delta.artifact_bytes,
+        )
+
+        with self._write() as conn:
+            reservation_row = conn.execute(
+                "SELECT * FROM quota_reservations WHERE reservation_id = ?",
+                (key,),
+            ).fetchone()
+            if reservation_row is None:
+                raise QuotaError("unknown active quota reservation")
+            reservation = self._reservation(reservation_row)
+
+            marker_row = conn.execute(
+                "SELECT * FROM quota_usage_events WHERE event_id = ?",
+                (event,),
+            ).fetchone()
+            if marker_row is None:
+                raise QuotaError("unknown usage marker does not exist")
+            marker = self._usage_event(marker_row)
+            if marker.reservation_id != key:
+                raise QuotaConflict(
+                    "usage event belongs to a different reservation"
+                )
+            if not marker.category.startswith(_UNKNOWN_USAGE_PREFIX):
+                raise QuotaConflict("usage event is not unresolved")
+            category = marker.category[len(_UNKNOWN_USAGE_PREFIX):]
+
+            observed = self._metered_usage(conn, key)
+            prospective = observed.plus(delta_usage)
+            if max_tool_calls is not None and prospective.tool_calls > max_tool_calls:
+                raise QuotaExceeded("operation_budget_exceeded:tool_calls")
+            if (
+                max_artifact_bytes is not None
+                and prospective.artifact_bytes > max_artifact_bytes
+            ):
+                raise QuotaExceeded("operation_budget_exceeded:artifact_bytes")
+
+            quota_row = self._quota_row(conn, reservation.tenant_id)
+            quota = self._quota(quota_row)
+            committed = self._committed(quota_row)
+            other_reserved = self._reserved_usage_excluding(
+                conn,
+                reservation.tenant_id,
+                key,
+            )
+            effective_current = self._usage_max(
+                reservation.estimate,
+                prospective,
+            )
+            projected = committed.plus(other_reserved).plus(effective_current)
+            excess = _quota_excess(quota, projected)
+            if excess:
+                raise QuotaExceeded(
+                    "tenant_quota_exceeded:" + ",".join(excess)
+                )
+
+            values = delta_usage.as_dict()
+            conn.execute(
+                """
+                UPDATE quota_usage_events SET
+                    category = ?,
+                    delta_operations = ?,
+                    delta_input_tokens = ?,
+                    delta_output_tokens = ?,
+                    delta_cost_usd = ?,
+                    delta_tool_calls = ?,
+                    delta_artifact_bytes = ?,
+                    recorded_at = ?
+                WHERE event_id = ?
+                """,
+                (
+                    category,
+                    values["operations"],
+                    values["input_tokens"],
+                    values["output_tokens"],
+                    values["cost_usd"],
+                    values["tool_calls"],
+                    values["artifact_bytes"],
+                    timestamp,
+                    event,
+                ),
+            )
+            updated = conn.execute(
+                "SELECT * FROM quota_usage_events WHERE event_id = ?",
+                (event,),
+            ).fetchone()
+            assert updated is not None
+            return self._usage_event(updated)
+
+    def unresolved_usage(self, reservation_id: str) -> tuple[QuotaUsageEvent, ...]:
+        key = _required_id(reservation_id, "reservation_id")
+        with self._read() as conn:
+            active = conn.execute(
+                "SELECT 1 FROM quota_reservations WHERE reservation_id = ?",
+                (key,),
+            ).fetchone()
+            completed = conn.execute(
+                "SELECT 1 FROM quota_completions WHERE reservation_id = ?",
+                (key,),
+            ).fetchone()
+            if active is None and completed is None:
+                raise QuotaError("unknown quota reservation")
+            rows = conn.execute(
+                """
+                SELECT * FROM quota_usage_events
+                WHERE reservation_id = ? AND category LIKE ?
+                ORDER BY event_id
+                """,
+                (key, _UNKNOWN_USAGE_PREFIX + "%"),
+            ).fetchall()
+            return tuple(self._usage_event(row) for row in rows)
+
     def metered_usage(self, reservation_id: str) -> QuotaUsage:
         key = _required_id(reservation_id, "reservation_id")
         with self._read() as conn:
@@ -756,6 +978,24 @@ class SqliteTenantQuotaLedger:
                     )
                 raise QuotaError("unknown active quota reservation")
             reservation = self._reservation(row)
+            unresolved_rows = conn.execute(
+                """
+                SELECT category FROM quota_usage_events
+                WHERE reservation_id = ? AND category LIKE ?
+                """,
+                (key, _UNKNOWN_USAGE_PREFIX + "%"),
+            ).fetchall()
+            if unresolved_rows:
+                categories = sorted(
+                    {
+                        str(item["category"])[len(_UNKNOWN_USAGE_PREFIX):]
+                        for item in unresolved_rows
+                    }
+                )
+                raise QuotaConflict(
+                    "actual_usage_unknown:" + ",".join(categories)
+                )
+
             observed_usage = self._metered_usage(conn, key)
             actual_usage = self._usage_max(reported_usage, observed_usage)
             quota_row = self._quota_row(conn, reservation.tenant_id)
@@ -863,6 +1103,15 @@ class SqliteTenantQuotaLedger:
                     (tenant,),
                 ).fetchone()[0]
             )
+            unknown_usage_events = int(
+                conn.execute(
+                    """
+                    SELECT COUNT(*) FROM quota_usage_events
+                    WHERE tenant_id = ? AND category LIKE ?
+                    """,
+                    (tenant, _UNKNOWN_USAGE_PREFIX + "%"),
+                ).fetchone()[0]
+            )
             category_rows = conn.execute(
                 """
                 SELECT category,
@@ -899,6 +1148,7 @@ class SqliteTenantQuotaLedger:
                 "active_reservations": active,
                 "completions": completions,
                 "usage_events": usage_events,
+                "unknown_usage_events": unknown_usage_events,
                 "metered_by_category": metered_by_category,
                 "over_quota_dimensions": list(
                     _quota_excess(quota, projected)
