@@ -199,18 +199,20 @@ async def _tool_mongo_query(params: dict) -> dict:
 
 
 async def _tool_llm_chat(params: dict) -> dict:
-    """Call the Emergent LLM key via the same path the rest of the app uses."""
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        key = os.environ.get("EMERGENT_LLM_KEY", "")
-        if not key:
-            return {"ok": False, "error": "EMERGENT_LLM_KEY not set"}
-        model = params.get("model", "gpt-4o")
-        chat = LlmChat(api_key=key, session_id=params.get("session_id", "tool"), system_message=params.get("system", "You are a helpful assistant.")).with_model("openai", model)
-        msg = await chat.send_message(UserMessage(text=params.get("prompt", "")))
-        return {"ok": True, "response": str(msg)[:8000], "model": model}
-    except Exception:
-        return {"ok": False, "error": "llm_request_failed"}
+    """Retired nested model-execution compatibility surface.
+
+    Tool execution must never own model credentials or start a second provider
+    runtime inside the canonical cognitive loop. Keep the legacy tool name
+    discoverable for callers during migration, but fail closed and direct model
+    work back through the engine/provider boundary.
+    """
+
+    del params
+    return {
+        "ok": False,
+        "disabled": True,
+        "error": "nested_llm_tool_retired_use_engine_provider",
+    }
 
 
 async def _tool_web_search(params: dict) -> dict:
@@ -370,7 +372,7 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
     "llm_chat": ToolManifest(
         tool_id="llm_chat",
         version="1.0.0",
-        description="Compatibility LLM call through configured provider credentials.",
+        description="Retired compatibility LLM tool; model execution belongs to the engine provider boundary.",
         input_schema=_object_schema(
             {
                 "prompt": {"type": "string", "maxLength": 100000},
