@@ -187,6 +187,13 @@
       "cancelled",
       "corruption",
       "internal"
+    ],
+    "ProviderDeltaKind": [
+      "text",
+      "structured",
+      "tool_call",
+      "usage",
+      "final"
     ]
   },
   "records": {
@@ -2050,6 +2057,51 @@
       "invariants": [
         "reference identifies immutable active/evaluated instruction content"
       ]
+    },
+    "ProviderDelta": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "sequence": {
+          "type": "NonNegativeInt"
+        },
+        "kind": {
+          "type": "ProviderDeltaKind"
+        },
+        "response_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "text": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 1000000
+        },
+        "structured_fragment": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "tool_call": {
+          "type": "ProviderToolCall",
+          "nullable": true
+        },
+        "usage": {
+          "type": "ProviderUsage",
+          "nullable": true
+        },
+        "finish_reason": {
+          "type": "FinishReason",
+          "nullable": true
+        },
+        "emitted_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "sequence is monotonic within one provider response",
+        "non-final deltas carry exactly one payload matching kind",
+        "final delta carries finish_reason and grants no durable stream authority by itself"
+      ]
     }
   },
   "cross_record_invariants": [
@@ -2060,6 +2112,7 @@
     "ToolExecutionReceipt.arguments_digest must equal ProviderToolCall/ToolCallProposal digest after canonical normalization",
     "VerificationReceipt selected by AIExecutionResult must verify the same candidate/result lineage",
     "assistant ConversationMessage.execution_result_id points to the canonical AIExecutionResult used for its content",
-    "completed StreamEvent references a terminal operation whose AIExecutionResult already exists"
+    "completed StreamEvent references a terminal operation whose AIExecutionResult already exists",
+    "ProviderDelta is ephemeral provider protocol state; durable replay authority remains the canonical operation stream"
   ]
 }
