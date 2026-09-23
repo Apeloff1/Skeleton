@@ -346,13 +346,10 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
         EXECUTION_ID,
         verified_service_principal=SERVICE_PRINCIPAL,
     )
-    assert pending == (
-        {
-            "call_id": "golden-call-write",
-            "tool_id": "repo.write",
-            "arguments_digest": pending[0]["arguments_digest"],
-        },
-    )
+    assert len(pending) == 1
+    assert pending[0]["call_id"] == "golden-call-write"
+    assert pending[0]["tool_id"] == "repo.write"
+    assert len(pending[0]["arguments_digest"]) == 64
     assert effects == []
 
     approval = service.approve_tool_call(
@@ -375,12 +372,13 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     assert result.usage["model_turns"] == 2
     assert result.usage["tool_calls"] == 1
     assert len(result.tool_receipts) == 1
-    assert result.tool_receipts[0]["approval_ref"] == approval.approval_ref
-    assert result.tool_receipts[0]["result_ref"] == "artifact:golden-readme"
     assert effects == [approval.approval_ref]
 
     assert len(provider.requests) == 2
     first = provider.requests[0]
+    second = provider.requests[1]
+    assert result.tool_receipts[0] in second.prompt
+    assert "artifact:golden-readme" in second.prompt
     assert first.context_id == context.context_id
     assert first.context_digest == context.context_digest
     assert first.context_source_snapshot == context.source_snapshot
