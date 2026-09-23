@@ -591,6 +591,75 @@ class MongoConversationAuthority:
             expected_thread_version=expected_thread_version,
         )
 
+    async def regenerate_assistant_message(
+        self,
+        thread_id: str,
+        prior_assistant_message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        content: str,
+        idempotency_key: str,
+        expected_thread_version: int,
+        operation_id: str,
+        ai_result_id: str,
+        tool_receipt_refs: tuple[str, ...] = (),
+        citation_refs: tuple[str, ...] = (),
+        artifact_refs: tuple[str, ...] = (),
+    ) -> tuple[ConversationThread, ConversationMessage]:
+        """Commit a regenerated assistant result as a new active branch.
+
+        This is intentionally server-only: callers must already possess a
+        canonical execution/result pair. The prior assistant is immutable and
+        remains available through all-message history while the regenerated
+        message supersedes it on a fresh branch rooted at the same causal user.
+        """
+
+        thread = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        try:
+            doc = await self.messages.find_one(
+                {
+                    "_id": prior_assistant_message_id,
+                    "thread_id": thread_id,
+                    "sequence": {"$lte": thread.message_sequence},
+                }
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "conversation storage is unavailable"
+            ) from exc
+        if doc is None:
+            raise ConversationNotFound(prior_assistant_message_id)
+        prior = _message_from_doc(doc)
+        if prior.author_type is not ConversationAuthorType.ASSISTANT:
+            raise ConversationConflict("only assistant messages can be regenerated")
+        if prior.causal_user_message_id is None:
+            raise ConversationConflict(
+                "assistant message is missing causal user lineage"
+            )
+
+        return await self.commit_assistant_message(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content=content,
+            idempotency_key=idempotency_key,
+            expected_thread_version=expected_thread_version,
+            causal_user_message_id=prior.causal_user_message_id,
+            operation_id=operation_id,
+            ai_result_id=ai_result_id,
+            branch_id=str(uuid4()),
+            supersedes_message_id=prior.message_id,
+            tool_receipt_refs=tool_receipt_refs,
+            citation_refs=citation_refs,
+            artifact_refs=artifact_refs,
+            data_class=prior.data_class,
+        )
+
     async def list_messages(
         self,
         thread_id: str,
