@@ -18,11 +18,15 @@ from skeleton.api.engine_authority import (
     DelegatedAuthority,
     engine_request_binding,
 )
-from skeleton.api.engine_service import EngineExecutionCommand
+from skeleton.api.engine_service import (
+    EngineContextHandoff,
+    EngineExecutionCommand,
+)
 from skeleton.api.hmac_seal import mint_seal
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.context import ContextEnvelope
 from skeleton.contracts.operation import OperationEnvelope
+from skeleton.provider_runtime import provider_request_from_context
 
 
 class EngineClientError(RuntimeError):
@@ -435,23 +439,29 @@ def engine_command_from_context(
         idempotency_key=str(idempotency_key).strip(),
         trace_id=str(uuid4()),
     )
-    classification_rank = {
-        "public": 0,
-        "internal": 1,
-        "confidential": 2,
-        "restricted": 3,
-    }
-    selected_segments = (
-        context.instruction_segments
-        + context.evidence_segments
-        + context.tool_schema_segments
+    provider_seed = provider_request_from_context(
+        context,
+        purpose="model-inference",
+        max_output_tokens=max_output_tokens,
     )
-    data_class = "internal"
-    if selected_segments:
-        data_class = max(
-            (segment.data_class for segment in selected_segments),
-            key=lambda value: classification_rank.get(value, 99),
-        )
+    handoff = EngineContextHandoff(
+        operation_id=context.operation_id,
+        execution_id=context.execution_id,
+        turn_id=context.turn_id,
+        tenant_id=context.tenant_id,
+        context_id=context.context_id,
+        context_digest=context.context_digest,
+        compiler_version=context.compiler_version,
+        source_snapshot=context.source_snapshot,
+        data_class=provider_seed.data_class,
+        instructions=provider_seed.instructions,
+        prompt=provider_seed.prompt,
+        history=tuple(
+            (message.role, message.content)
+            for message in provider_seed.history
+        ),
+        tools=provider_seed.tools,
+    )
 
     budget = {
         "max_model_turns": int(max_model_turns),
@@ -469,10 +479,11 @@ def engine_command_from_context(
         context_policy={
             "tenant_id": context.tenant_id,
             "capability": operation.capability,
-            "data_class": data_class,
+            "data_class": handoff.data_class,
             "context_id": context.context_id,
             "context_digest": context.context_digest,
             "compiler_version": context.compiler_version,
+            "handoff_digest": handoff.handoff_digest,
             "source_snapshot": [
                 [segment_id, digest]
                 for segment_id, digest in context.source_snapshot
@@ -480,7 +491,9 @@ def engine_command_from_context(
         },
         tool_policy={
             "tenant_id": context.tenant_id,
-            "allowed_tool_ids": [],
+            "allowed_tool_ids": [
+                tool.tool_id for tool in handoff.tools
+            ],
         },
         resource_budget=budget,
         stop_policy={
@@ -515,6 +528,7 @@ def engine_command_from_context(
         operation=operation,
         execution_request=execution_request,
         delegated_authority=authority,
+        compiled_context=handoff,
         context_seed_refs=seed_refs,
         resource_budget=budget,
         stream_preferences={
