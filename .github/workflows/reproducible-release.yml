@@ -9,6 +9,8 @@ on:
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
       - "scripts/ai_release_evidence.py"
+      - "scripts/testing/test_ai_release_evidence.py"
+      - "scripts/ai_release_evidence.py"
       - "scripts/testing/test_release_provenance.py"
       - "scripts/testing/test_ai_release_evidence.py"
       - "skeleton/release/evidence.py"
@@ -35,7 +37,8 @@ on:
       - "pyproject.toml"
       - "requirements.txt"
       - "requirements-build.txt"
-      - "scripts/release_provenance.py"
+      - "scripts/ai_release_evidence.py"
+      - "scripts/testing/test_ai_release_evidence.py"
       - "scripts/testing/test_release_provenance.py"
       - "skeleton/release/evidence.py"
       - "skeleton/testing/test_release_evidence.py"
@@ -109,7 +112,9 @@ jobs:
             "pytest==8.4.2" \
             "pytest-asyncio==1.4.0" \
             "pydantic==2.13.5" \
-            "pydantic-settings==2.15.0"
+            "pydantic-settings==2.15.0" \
+            "fastapi>=0.110,<1" \
+            "httpx>=0.27,<1"
           mkdir -p source-a/release-meta
           python -m pytest -q \
             source-a/scripts/testing/test_release_provenance.py \
