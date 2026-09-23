@@ -549,6 +549,11 @@ def engine_command_from_provider_request(
             for message in request.history
         ),
         tools=tools,
+        model=request.model,
+        structured_output_schema=request.structured_output_schema,
+        tool_choice=request.tool_choice,
+        specific_tool_id=request.specific_tool_id,
+        estimated_cost_usd=request.estimated_cost_usd,
     )
     budget = {
         **request.resource_budget.as_dict(),
@@ -596,6 +601,15 @@ def engine_command_from_provider_request(
             "context_digest": handoff.context_digest,
             "compiler_version": handoff.compiler_version,
             "handoff_digest": handoff.handoff_digest,
+            "provider_model": handoff.model,
+            "structured_output_schema": (
+                None
+                if handoff.structured_output_schema is None
+                else dict(handoff.structured_output_schema)
+            ),
+            "tool_choice": handoff.tool_choice,
+            "specific_tool_id": handoff.specific_tool_id,
+            "estimated_cost_usd": handoff.estimated_cost_usd,
             "source_snapshot": [
                 [segment_id, digest]
                 for segment_id, digest in handoff.source_snapshot
@@ -701,6 +715,11 @@ def engine_command_from_context(
             for message in provider_seed.history
         ),
         tools=provider_seed.tools,
+        model=provider_seed.model,
+        structured_output_schema=provider_seed.structured_output_schema,
+        tool_choice=provider_seed.tool_choice,
+        specific_tool_id=provider_seed.specific_tool_id,
+        estimated_cost_usd=provider_seed.estimated_cost_usd,
     )
 
     budget = {
@@ -724,6 +743,15 @@ def engine_command_from_context(
             "context_digest": context.context_digest,
             "compiler_version": context.compiler_version,
             "handoff_digest": handoff.handoff_digest,
+            "provider_model": handoff.model,
+            "structured_output_schema": (
+                None
+                if handoff.structured_output_schema is None
+                else dict(handoff.structured_output_schema)
+            ),
+            "tool_choice": handoff.tool_choice,
+            "specific_tool_id": handoff.specific_tool_id,
+            "estimated_cost_usd": handoff.estimated_cost_usd,
             "source_snapshot": [
                 [segment_id, digest]
                 for segment_id, digest in context.source_snapshot
