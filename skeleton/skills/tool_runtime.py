@@ -200,11 +200,30 @@ class ToolRuntime:
             # Meter before invoking any side effect. AdmissionRuntime is expected
             # to have an active operation lease when budget enforcement is used.
             if self.admission_runtime is not None:
-                self.admission_runtime.meter_tool_call(
-                    request.operation_id,
-                    f"tool:{request.request_id}",
-                    now_wall=started.timestamp(),
-                )
+                try:
+                    self.admission_runtime.meter_tool_call(
+                        request.operation_id,
+                        f"tool:{request.request_id}",
+                        now_wall=started.timestamp(),
+                    )
+                except Exception:
+                    receipt = ToolExecutionReceipt(
+                        receipt_id=_receipt_id(request, manifest),
+                        request_id=request.request_id,
+                        operation_id=request.operation_id,
+                        tenant_id=request.tenant_id,
+                        tool_id=request.tool_id,
+                        idempotency_key=request.idempotency_key,
+                        arguments_digest=request.arguments_digest,
+                        status=ToolExecutionStatus.DENIED,
+                        started_at=started,
+                        finished_at=_utc(),
+                        error_code="budget_denied",
+                        approval_ref=request.approval_ref,
+                        metered_tool_calls=0,
+                    )
+                    self._receipts[key] = receipt
+                    return receipt
 
             try:
                 result_ref = registered.handler(request)
@@ -478,7 +497,10 @@ class AsyncToolRuntime:
                 pending = self._inflight.pop(key, None)
                 self._request_fingerprints.pop(key, None)
                 if pending is not None and not pending.done():
-                    pending.set_exception(exc)
+                    if isinstance(exc, asyncio.CancelledError):
+                        pending.cancel()
+                    else:
+                        pending.set_exception(exc)
             raise
 
         async with self._lock:
