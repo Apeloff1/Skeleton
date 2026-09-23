@@ -245,6 +245,20 @@ def _parse_record(value: str) -> tuple[str, Path]:
     return evidence_id.strip(), Path(raw_path.strip())
 
 
+def _resolve_manifest_path(path: Path) -> Path:
+    """Resolve the machine journey contract without depending on cwd."""
+
+    if path.is_file():
+        return path
+    if not path.is_absolute():
+        repository_candidate = (
+            Path(__file__).resolve().parents[1] / path
+        )
+        if repository_candidate.is_file():
+            return repository_candidate
+    raise FileNotFoundError(path)
+
+
 def _stage7_records(
     path: Path,
     *,
@@ -268,7 +282,7 @@ def _stage7_records(
             collect_ai_journey_evidence,
             requirements_from_manifest,
         )
-        manifest_path = manifest
+        manifest_path = _resolve_manifest_path(manifest)
         manifest_payload = json.loads(
             manifest_path.read_text(encoding="utf-8")
         )
