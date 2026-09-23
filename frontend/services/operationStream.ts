@@ -42,6 +42,22 @@ function newConsumerId(): string {
  */
 export const OPERATION_CONSUMER_ID = newConsumerId();
 
+const AUTHORITATIVE_RESYNC_ERRORS = new Set([
+  'replay_gap',
+  'sequence_gap',
+  'server_events_missing',
+  'server_cursor_regressed',
+  'cursor_mismatch',
+]);
+
+function shouldAuthoritativelyResync(
+  state: OperationClientState,
+): boolean {
+  return state.resyncRequired
+    && state.error !== null
+    && AUTHORITATIVE_RESYNC_ERRORS.has(state.error);
+}
+
 export interface FollowOperationOptions {
   signal?: AbortSignal;
   pollMs?: number;
@@ -196,10 +212,14 @@ export async function resumeOperation(
   signal?: AbortSignal,
 ): Promise<OperationClientState> {
   const cursor = await loadOperationCursor(operationId);
-  return replayOperation(
+  const replayed = await replayOperation(
     createOperationClientState(operationId, cursor),
     signal,
   );
+  if (shouldAuthoritativelyResync(replayed)) {
+    return resyncOperation(operationId, signal);
+  }
+  return replayed;
 }
 
 export async function followOperation(
@@ -219,6 +239,11 @@ export async function followOperation(
     const before = state.lastSequence;
     state = await replayOperation(state, options.signal);
     options.onState?.(state);
+
+    if (shouldAuthoritativelyResync(state) && !options.signal?.aborted) {
+      state = await resyncOperation(operationId, options.signal);
+      options.onState?.(state);
+    }
 
     if (
       state.terminal
