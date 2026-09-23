@@ -55,6 +55,41 @@ class CapacityPlanner:
     def resize(self, pool: str, new_capacity: float) -> None:
         self._pools[pool].capacity = new_capacity
 
+    def record_shared_pressure(self, snapshot: Any) -> Dict[str, float]:
+        """Feed durable shared queue/concurrency pressure into capacity history."""
+
+        required = (
+            "scope",
+            "active",
+            "queued",
+            "max_concurrency",
+            "max_queue_depth",
+        )
+        if any(not hasattr(snapshot, name) for name in required):
+            raise TypeError("snapshot must expose the shared-pressure contract")
+        scope = str(snapshot.scope).strip()
+        if not scope:
+            raise ValueError("shared pressure scope must not be empty")
+        dimensions = {
+            f"shared.{scope}.concurrency": (
+                float(snapshot.active),
+                float(snapshot.max_concurrency),
+            ),
+            f"shared.{scope}.queue": (
+                float(snapshot.queued),
+                float(snapshot.max_queue_depth),
+            ),
+        }
+        result: Dict[str, float] = {}
+        for name, (usage, capacity_value) in dimensions.items():
+            if name not in self._pools:
+                self.define_pool(name, capacity_value, "slots")
+            elif self._pools[name].capacity != capacity_value:
+                self.resize(name, capacity_value)
+            self.record_usage(name, usage)
+            result[name] = round(self._pools[name].utilization(), 6)
+        return result
+
     def saturation_estimate(self, pool: str) -> Dict[str, Any]:
         p = self._pools.get(pool)
         if not p:
