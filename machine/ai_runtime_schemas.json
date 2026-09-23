@@ -2164,13 +2164,39 @@
         },
         "handoff_digest": {
           "type": "Digest256"
+        },
+        "model": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 256
+        },
+        "structured_output_schema": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "tool_choice": {
+          "type": "string",
+          "enum": [
+            "none",
+            "auto",
+            "required",
+            "specific"
+          ]
+        },
+        "specific_tool_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "estimated_cost_usd": {
+          "type": "NonNegativeDecimal"
         }
       },
       "invariants": [
         "handoff is generated only from the canonical compiled ContextEnvelope",
         "operation/execution/context identities and source snapshot agree with execution_request.context_policy",
         "handoff_digest is included in execution_request identity before delegated authority is bound",
-        "history is a server-compiled projection and is never accepted from raw client transcript input"
+        "history is a server-compiled projection and is never accepted from raw client transcript input",
+        "provider model, structured output, tool choice, and cost intent survive the backend-to-engine boundary"
       ]
     }
   },
