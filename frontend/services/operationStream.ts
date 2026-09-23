@@ -13,9 +13,11 @@ import api from '../src/utils/apiClient';
 import {
   OperationClientState,
   OperationReplayPayload,
+  OperationResyncPayload,
   OperationSnapshot,
   createOperationClientState,
   failOperationResync,
+  reduceOperationAuthoritativeResync,
   reduceOperationReplay,
 } from './operationStreamReducer';
 
@@ -277,8 +279,53 @@ export async function resyncOperation(
   signal?: AbortSignal,
 ): Promise<OperationClientState> {
   await clearOperationCursor(operationId);
-  return replayOperation(
-    createOperationClientState(operationId, 0),
+  const initial = createOperationClientState(operationId, 0);
+  if (signal?.aborted) {
+    return { ...initial, connection: 'idle', error: 'aborted' };
+  }
+
+  const path =
+    `/api/operations/${encodeURIComponent(operationId)}/events/resync`
+    + `?consumer_id=${encodeURIComponent(OPERATION_CONSUMER_ID)}&limit=250`;
+  const result = await api.get<OperationResyncPayload>(path, {
     signal,
-  );
+    headers: authHeaders(),
+    retries: 2,
+    timeoutMs: 15_000,
+  });
+  if (!result.ok || !result.data) {
+    if (result.error === 'aborted') {
+      return { ...initial, connection: 'idle', error: 'aborted' };
+    }
+    return {
+      ...initial,
+      connection: 'error',
+      error: result.error || `HTTP ${result.status}`,
+    };
+  }
+
+  const next = reduceOperationAuthoritativeResync(initial, result.data);
+  if (next.resyncRequired || next.connection === 'error') return next;
+
+  try {
+    await saveOperationCursor(next.operationId, next.lastSequence);
+  } catch {
+    return {
+      ...next,
+      connection: 'error',
+      error: 'cursor_persistence_failed',
+    };
+  }
+
+  const acknowledgement = await acknowledgeOperationCursor(next, signal);
+  if (!acknowledgement.ok) {
+    return {
+      ...next,
+      connection: signal?.aborted ? 'idle' : 'error',
+      error: signal?.aborted
+        ? 'aborted'
+        : `cursor_ack_failed:${acknowledgement.error || 'unknown'}`,
+    };
+  }
+  return next;
 }
