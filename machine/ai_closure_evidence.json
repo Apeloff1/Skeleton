@@ -245,7 +245,7 @@
       "plane": "application-api",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/conversation.py and skeleton/persistence/conversation_repository.py — canonical thread/message/branch authority",
@@ -254,7 +254,11 @@
         "backend/tests/test_conversations_api.py — projection identity, cross-owner denial, append conflict/idempotency, active transcript, edit and delete intent",
         "backend/tests/test_conversation_regeneration.py — causal-user branch regeneration",
         "backend/tests/test_ai_chat_conversation_authority.py — client-history injection denial, server transcript, retry-stable engine identity, assistant lineage and approval/resume flow",
-        "frontend/src/product/conversationClient.ts — canonical frontend conversation client"
+        "frontend/src/product/conversationClient.ts — canonical frontend conversation client",
+        "frontend/features/Jeeves/WorkspaceController.ts — product-mode server authority hydration, retry-stable canonical sends, archive/delete and cache-only offline behavior",
+        "frontend/features/Jeeves/ChatWorkspace.tsx — active product UI uses canonical conversation/AI endpoints with no legacy /api/jeeves/chat fallback; export refreshes server authority first",
+        "frontend/scripts/test-jeeves-workspace.cjs — server-over-cache reconstruction, corrupt-cache rebuild, canonical send/retry, archive/delete and product cutover tests",
+        ".github/workflows/ci.yml and .github/workflows/reproducible-release.yml — Jeeves authority tests/typecheck included in CI/release evidence lanes"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -269,9 +273,8 @@
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
       "outstanding_evidence": [
-        "frontend/browser refresh reconstructs canonical transcript from server authority",
-        "conversation export/retention propagation browser/API evidence",
-        "fresh CI execution of conversation repository/API/chat suites on current head",
+        "browser-level refresh/reconnect reconstruction evidence",
+        "fresh CI execution of conversation frontend/backend suites on current branch head",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry"
       ],
