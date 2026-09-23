@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 import threading
 from typing import Any, Mapping
+from uuid import NAMESPACE_URL, uuid5
 
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
@@ -696,6 +697,87 @@ class EngineExecutionStatus:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineToolApproval:
+    approval_id: str
+    execution_id: str
+    call_id: str
+    tool_id: str
+    arguments_digest: str
+    actor_id: str
+    tenant_id: str
+    idempotency_key: str
+    issued_at: datetime
+    expires_at: datetime
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        for name in (
+            "approval_id",
+            "execution_id",
+            "call_id",
+            "tool_id",
+            "actor_id",
+            "tenant_id",
+            "idempotency_key",
+        ):
+            value = str(getattr(self, name)).strip()
+            if not value:
+                raise EngineServiceError(f"{name} is required")
+            if len(value) > 2048:
+                raise EngineServiceError(f"{name} exceeds maximum length")
+            object.__setattr__(self, name, value)
+        digest = str(self.arguments_digest).strip()
+        if (
+            len(digest) != 64
+            or any(ch not in "0123456789abcdef" for ch in digest)
+        ):
+            raise EngineServiceError(
+                "arguments_digest must be lowercase sha256"
+            )
+        object.__setattr__(self, "arguments_digest", digest)
+        issued = _aware(self.issued_at, "approval.issued_at")
+        expires = _aware(self.expires_at, "approval.expires_at")
+        if expires <= issued:
+            raise EngineServiceError(
+                "approval expires_at must be later than issued_at"
+            )
+        object.__setattr__(self, "issued_at", issued)
+        object.__setattr__(self, "expires_at", expires)
+        if self.schema_version != 1:
+            raise EngineServiceError(
+                "unsupported engine tool approval schema version"
+            )
+
+    @property
+    def approval_ref(self) -> str:
+        return "engine-tool-approval:" + self.approval_id
+
+    def expired(self, *, now: datetime | None = None) -> bool:
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "approval.now")
+        )
+        return instant >= self.expires_at
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "approval_id": self.approval_id,
+            "approval_ref": self.approval_ref,
+            "execution_id": self.execution_id,
+            "call_id": self.call_id,
+            "tool_id": self.tool_id,
+            "arguments_digest": self.arguments_digest,
+            "actor_id": self.actor_id,
+            "tenant_id": self.tenant_id,
+            "idempotency_key": self.idempotency_key,
+            "issued_at": self.issued_at.isoformat(),
+            "expires_at": self.expires_at.isoformat(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class _StoredSubmission:
     principal: str
     command: EngineExecutionCommand
@@ -741,6 +823,29 @@ class SQLiteEngineSubmissionStore:
                         operation_id, idempotency_key
                     ),
                     UNIQUE(namespace, execution_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS engine_tool_approval (
+                    namespace TEXT NOT NULL,
+                    approval_id TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    call_id TEXT NOT NULL,
+                    tool_id TEXT NOT NULL,
+                    arguments_digest TEXT NOT NULL,
+                    actor_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    issued_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, approval_id),
+                    UNIQUE(
+                        namespace, execution_id, call_id, idempotency_key
+                    )
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_engine_tool_approval_active
+                ON engine_tool_approval(
+                    namespace, execution_id, call_id, expires_at
                 );
                 """
             )
@@ -899,6 +1004,131 @@ class SQLiteEngineSubmissionStore:
                 self._connection.execute("ROLLBACK")
                 raise
 
+
+    @staticmethod
+    def _approval_from_row(row: sqlite3.Row) -> EngineToolApproval:
+        return EngineToolApproval(
+            approval_id=row["approval_id"],
+            execution_id=row["execution_id"],
+            call_id=row["call_id"],
+            tool_id=row["tool_id"],
+            arguments_digest=row["arguments_digest"],
+            actor_id=row["actor_id"],
+            tenant_id=row["tenant_id"],
+            idempotency_key=row["idempotency_key"],
+            issued_at=_aware(row["issued_at"], "approval.issued_at"),
+            expires_at=_aware(row["expires_at"], "approval.expires_at"),
+        )
+
+    def remember_approval(
+        self,
+        approval: EngineToolApproval,
+    ) -> EngineToolApproval:
+        if not isinstance(approval, EngineToolApproval):
+            raise TypeError("approval must be EngineToolApproval")
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT * FROM engine_tool_approval
+                    WHERE namespace = ?
+                      AND execution_id = ?
+                      AND call_id = ?
+                      AND idempotency_key = ?
+                    """,
+                    (
+                        self.namespace,
+                        approval.execution_id,
+                        approval.call_id,
+                        approval.idempotency_key,
+                    ),
+                ).fetchone()
+                if row is not None:
+                    existing = self._approval_from_row(row)
+                    if existing != approval:
+                        raise EngineSubmissionConflict(
+                            "approval idempotency identity was reused differently"
+                        )
+                    self._connection.execute("COMMIT")
+                    return existing
+                self._connection.execute(
+                    """
+                    INSERT INTO engine_tool_approval(
+                        namespace, approval_id, execution_id, call_id,
+                        tool_id, arguments_digest, actor_id, tenant_id,
+                        idempotency_key, issued_at, expires_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.namespace,
+                        approval.approval_id,
+                        approval.execution_id,
+                        approval.call_id,
+                        approval.tool_id,
+                        approval.arguments_digest,
+                        approval.actor_id,
+                        approval.tenant_id,
+                        approval.idempotency_key,
+                        approval.issued_at.isoformat(),
+                        approval.expires_at.isoformat(),
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return approval
+            except sqlite3.IntegrityError as exc:
+                self._connection.execute("ROLLBACK")
+                raise EngineSubmissionConflict(
+                    "engine tool approval identity conflict"
+                ) from exc
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def approvals(
+        self,
+        execution_id: str,
+        *,
+        now: datetime | None = None,
+        include_expired: bool = False,
+    ) -> tuple[EngineToolApproval, ...]:
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "approval.now")
+        )
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM engine_tool_approval
+                WHERE namespace = ? AND execution_id = ?
+                ORDER BY issued_at DESC, approval_id DESC
+                """,
+                (self.namespace, str(execution_id)),
+            ).fetchall()
+        approvals = tuple(self._approval_from_row(row) for row in rows)
+        if include_expired:
+            return approvals
+        return tuple(
+            approval
+            for approval in approvals
+            if not approval.expired(now=instant)
+        )
+
+    def active_approval_refs(
+        self,
+        execution_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> dict[str, str]:
+        refs: dict[str, str] = {}
+        for approval in self.approvals(
+            execution_id,
+            now=now,
+            include_expired=False,
+        ):
+            refs.setdefault(approval.call_id, approval.approval_ref)
+        return refs
 
     def close(self) -> None:
         with self._lock:
@@ -1220,5 +1450,6 @@ __all__ = [
     "EngineExecutionStatus",
     "EngineServiceError",
     "EngineSubmissionConflict",
+    "EngineToolApproval",
     "SQLiteEngineSubmissionStore",
 ]
