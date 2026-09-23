@@ -94,7 +94,8 @@ class EngineClientConfig:
         base_url = (
             env.get("CODEDOCK_ENGINE_URL")
             or env.get("SKELETON_ENGINE_URL")
-            or "http://skeleton:8000"
+            or env.get("SKELETON_INTERNAL_URL")
+            or "http://skeleton:8001"
         )
         principal = (
             env.get("CODEDOCK_ENGINE_SERVICE_PRINCIPAL")
