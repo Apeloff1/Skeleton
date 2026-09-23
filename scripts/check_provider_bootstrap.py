@@ -64,7 +64,6 @@ _AI_SURFACE_PATH_TERMS = (
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
-        "urllib",
         "urllib.request",
         "requests",
         "httpx",
@@ -156,12 +155,26 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
 
 def _network_transport_imports(path: Path) -> list[str]:
     hits: list[str] = []
-    for name in _imported_modules(path):
-        if (
-            name in _NETWORK_TRANSPORT_ROOTS
-            or any(name.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS)
-        ):
-            hits.append(name)
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return hits
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                name = alias.name
+                if name in _NETWORK_TRANSPORT_ROOTS or any(
+                    name.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS
+                ):
+                    hits.append(name)
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module == "urllib" and any(alias.name == "request" for alias in node.names):
+                hits.append("urllib.request")
+            elif module in _NETWORK_TRANSPORT_ROOTS or any(
+                module.startswith(root + ".") for root in _NETWORK_TRANSPORT_ROOTS
+            ):
+                hits.append(module)
     return hits
 
 
