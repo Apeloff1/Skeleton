@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -119,7 +119,7 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         branch_id=initial.active_branch_id,
         sequence=1,
         author_type=ConversationAuthorType.USER,
-        created_at=_now(),
+        created_at=_now() - timedelta(minutes=2),
         idempotency_key="older-user",
         content="older question",
     )
@@ -129,7 +129,7 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         branch_id=initial.active_branch_id,
         sequence=2,
         author_type=ConversationAuthorType.ASSISTANT,
-        created_at=_now(),
+        created_at=_now() - timedelta(minutes=1),
         idempotency_key="older-assistant",
         content="older answer",
         parent_message_id=prior_user.message_id,
@@ -178,8 +178,8 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         captured["commit"] = {"thread_id": thread_id, **kwargs}
         return after_assistant, assistant
 
-    async def call_llm(system_prompt, user_prompt, *, history=None, max_output_tokens=None):
-        captured["provider_history"] = history
+    async def execute_provider_request(provider_request):
+        captured["provider_request"] = provider_request
         return {
             "success": True,
             "response": "canonical answer",
@@ -187,6 +187,12 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             "model": "test-model",
             "provider_request_id": "provider-1",
             "latency_ms": 1.0,
+            "context_id": provider_request.context_id,
+            "context_digest": provider_request.context_digest,
+            "context_source_snapshot": list(
+                provider_request.context_source_snapshot
+            ),
+            "context_compiler_version": provider_request.context_compiler_version,
         }
 
     monkeypatch.setattr(
@@ -198,7 +204,11 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             commit_assistant_message=commit_assistant_message,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", call_llm)
+    monkeypatch.setattr(
+        route,
+        "_execute_provider_request",
+        execute_provider_request,
+    )
 
     response = client.post(
         "/ai/chat",
@@ -214,15 +224,24 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     assert captured["append"]["expected_thread_version"] == 1
     assert captured["append"]["tenant_id"] == "default"
     assert captured["append"]["owner_id"] == "anonymous"
-    assert captured["provider_history"] == [
-        {"role": "user", "content": "older question"},
-        {"role": "assistant", "content": "older answer"},
+    provider_request = captured["provider_request"]
+    assert [(item.role, item.content) for item in provider_request.history] == [
+        ("user", "older question"),
+        ("assistant", "older answer"),
     ]
+    assert provider_request.prompt == "new question"
+    assert provider_request.context_id
+    assert provider_request.context_digest
+    assert provider_request.context_source_snapshot
+    assert provider_request.context_compiler_version
+    assert captured["commit"]["operation_id"] == provider_request.operation_id
     assert captured["commit"]["expected_thread_version"] == 2
     assert captured["commit"]["causal_user_message_id"] == user_message.message_id
     assert captured["commit"]["idempotency_key"] == "client-1:assistant"
     assert response.json()["thread"]["version"] == 3
     assert response.json()["assistant_message"]["content"] == "canonical answer"
+    assert response.json()["context_id"] == provider_request.context_id
+    assert response.json()["context_digest"] == provider_request.context_digest
 
 
 def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
