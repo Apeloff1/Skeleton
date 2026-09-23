@@ -813,6 +813,7 @@ def engine_command_from_context(
             "engine:read",
             "engine:cancel",
             "engine:events",
+            "engine:approve",
         ),
         capability=operation.capability,
         issued_at=created_at,
