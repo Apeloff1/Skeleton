@@ -25,6 +25,7 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
     ProviderToolCall,
+    ProviderToolDefinition,
     ProviderUsage,
 )
 from skeleton.provider_runtime import ProviderResponse
@@ -437,10 +438,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         prompt=base.compiled_context.prompt,
         history=base.compiled_context.history,
         tools=(
-            __import__(
-                "skeleton.provider_contract",
-                fromlist=["ProviderToolDefinition"],
-            ).ProviderToolDefinition(
+            ProviderToolDefinition(
                 tool_id="repo.write",
                 description="Write one repository file.",
                 input_schema={
