@@ -13,6 +13,7 @@ from skeleton.skills.tool_contract import (
     ToolExecutionStatus,
     ToolManifest,
 )
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import (
     AsyncToolRuntime,
     ToolExecutionConflict,
@@ -574,3 +575,147 @@ async def test_async_approval_required_denial_can_resume_with_approval() -> None
     assert approved.status is ToolExecutionStatus.SUCCEEDED
     assert approved.approval_ref == "approval:1"
     assert calls == ["approval:1"]
+
+
+
+def test_sync_durable_receipt_replays_after_runtime_restart(tmp_path) -> None:
+    path = tmp_path / "tool-receipts.sqlite3"
+    operation_id = str(uuid4())
+    request = _request(
+        operation_id=operation_id,
+        key="restart-sync",
+    )
+    calls: list[str] = []
+
+    first_store = SQLiteToolReceiptStore(path)
+    first_runtime = ToolRuntime(receipt_store=first_store)
+    first_runtime.register(
+        _manifest(),
+        lambda _request: calls.append("first") or "artifact:1",
+    )
+    first = first_runtime.execute(request, now=_now())
+    first_store.close()
+
+    second_store = SQLiteToolReceiptStore(path)
+    second_runtime = ToolRuntime(receipt_store=second_store)
+    second_runtime.register(
+        _manifest(),
+        lambda _request: calls.append("duplicate") or "artifact:2",
+    )
+    replay = second_runtime.execute(request, now=_now())
+
+    assert first.status is ToolExecutionStatus.SUCCEEDED
+    assert replay == first
+    assert calls == ["first"]
+    assert (
+        second_runtime.receipt(
+            tenant_id="tenant-a",
+            operation_id=operation_id,
+            idempotency_key="restart-sync",
+        )
+        == first
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_durable_receipt_replays_after_runtime_restart(tmp_path) -> None:
+    path = tmp_path / "tool-receipts.sqlite3"
+    operation_id = str(uuid4())
+    request = _request(
+        operation_id=operation_id,
+        key="restart-async",
+    )
+    calls: list[str] = []
+
+    first_store = SQLiteToolReceiptStore(path)
+    first_runtime = AsyncToolRuntime(receipt_store=first_store)
+
+    async def first_handler(_request):
+        calls.append("first")
+        return "artifact:1"
+
+    await first_runtime.register(_manifest(), first_handler)
+    first = await first_runtime.execute(request, now=_now())
+    first_store.close()
+
+    second_store = SQLiteToolReceiptStore(path)
+    second_runtime = AsyncToolRuntime(receipt_store=second_store)
+
+    async def duplicate_handler(_request):
+        calls.append("duplicate")
+        return "artifact:2"
+
+    await second_runtime.register(_manifest(), duplicate_handler)
+    replay = await second_runtime.execute(request, now=_now())
+
+    assert first.status is ToolExecutionStatus.SUCCEEDED
+    assert replay == first
+    assert calls == ["first"]
+    assert (
+        await second_runtime.receipt(
+            tenant_id="tenant-a",
+            operation_id=operation_id,
+            idempotency_key="restart-async",
+        )
+        == first
+    )
+
+
+def test_sync_pending_durable_reservation_fails_closed_without_effect(tmp_path) -> None:
+    path = tmp_path / "tool-receipts.sqlite3"
+    operation_id = str(uuid4())
+    request = _request(
+        operation_id=operation_id,
+        key="in-doubt-sync",
+    )
+    store = SQLiteToolReceiptStore(path)
+    reservation = store.reserve(request, now=_now())
+    assert reservation.status == "owner"
+    store.close()
+
+    calls: list[str] = []
+    reopened = SQLiteToolReceiptStore(path)
+    runtime = ToolRuntime(receipt_store=reopened)
+    runtime.register(
+        _manifest(),
+        lambda _request: calls.append("effect") or "artifact:1",
+    )
+
+    receipt = runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "execution_in_doubt"
+    assert receipt.metered_tool_calls == 0
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_async_pending_durable_reservation_fails_closed_without_effect(
+    tmp_path,
+) -> None:
+    path = tmp_path / "tool-receipts.sqlite3"
+    operation_id = str(uuid4())
+    request = _request(
+        operation_id=operation_id,
+        key="in-doubt-async",
+    )
+    store = SQLiteToolReceiptStore(path)
+    reservation = store.reserve(request, now=_now())
+    assert reservation.status == "owner"
+    store.close()
+
+    calls: list[str] = []
+    reopened = SQLiteToolReceiptStore(path)
+    runtime = AsyncToolRuntime(receipt_store=reopened)
+
+    async def handler(_request):
+        calls.append("effect")
+        return "artifact:1"
+
+    await runtime.register(_manifest(), handler)
+    receipt = await runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "execution_in_doubt"
+    assert receipt.metered_tool_calls == 0
+    assert calls == []
