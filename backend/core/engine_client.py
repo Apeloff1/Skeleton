@@ -29,6 +29,7 @@ from skeleton.contracts.operation import OperationEnvelope
 from skeleton.provider_runtime import (
     ProviderRequest,
     provider_request_from_context,
+    provider_tool_definitions,
 )
 
 
@@ -419,7 +420,7 @@ def _stable_uuid(namespace: str, value: str) -> str:
 def _provider_request_digest(request: ProviderRequest) -> str:
     tools = [
         tool.as_dict()
-        for tool in request.tools
+        for tool in provider_tool_definitions(request)
     ]
     payload = {
         "instructions": request.instructions,
@@ -436,6 +437,8 @@ def _provider_request_digest(request: ProviderRequest) -> str:
         "operation_id": request.operation_id,
         "execution_id": request.execution_id,
         "turn_id": request.turn_id,
+        "estimated_cost_usd": request.estimated_cost_usd,
+        "resource_budget": request.resource_budget.as_dict(),
         "context_id": request.context_id,
         "context_digest": request.context_digest,
         "context_source_snapshot": [
@@ -444,8 +447,18 @@ def _provider_request_digest(request: ProviderRequest) -> str:
         ],
         "context_compiler_version": request.context_compiler_version,
         "tools": tools,
+        "structured_output_schema": (
+            None
+            if request.structured_output_schema is None
+            else dict(request.structured_output_schema)
+        ),
         "tool_choice": request.tool_choice,
         "specific_tool_id": request.specific_tool_id,
+        "deadline": (
+            None
+            if request.deadline is None
+            else request.deadline.astimezone(timezone.utc).isoformat()
+        ),
     }
     return hashlib.sha256(
         json.dumps(
@@ -546,7 +559,7 @@ def engine_command_from_provider_request(
     effective_capability = str(
         capability or ("provider." + request.purpose)
     ).strip()
-    tools = tuple(request.tools)
+    tools = provider_tool_definitions(request)
 
     handoff = EngineContextHandoff(
         operation_id=operation_id,
