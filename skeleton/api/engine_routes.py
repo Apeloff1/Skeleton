@@ -25,10 +25,14 @@ router = APIRouter(prefix="/engine", tags=["engine"])
 
 
 class EngineSubmitBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
     command: dict[str, Any]
 
 
 class EngineCancelBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
     reason: str = Field(min_length=1, max_length=2048)
 
 
@@ -119,6 +123,8 @@ async def submit_execution(
         ack = service.submit(
             command,
             verified_service_principal=principal,
+            actor_id=body.actor_id,
+            tenant_id=body.tenant_id,
         )
         if coordinator is not None:
             await coordinator.ensure_started(command)
@@ -132,6 +138,8 @@ async def submit_execution(
 def execution_status(
     execution_id: str,
     request: Request,
+    actor_id: str = Query(..., min_length=1, max_length=512),
+    tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
 ) -> dict[str, Any]:
     principal = _verified_service_principal(request)
@@ -139,6 +147,8 @@ def execution_status(
         return service.status(
             execution_id,
             verified_service_principal=principal,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
         ).as_dict()
     except Exception as exc:
         _raise_engine_error(exc)
@@ -152,12 +162,13 @@ def cancel_execution(
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
 ) -> dict[str, Any]:
-    del body
     principal = _verified_service_principal(request)
     try:
         return service.cancel(
             execution_id,
             verified_service_principal=principal,
+            actor_id=body.actor_id,
+            tenant_id=body.tenant_id,
         ).as_dict()
     except Exception as exc:
         _raise_engine_error(exc)
@@ -225,6 +236,8 @@ async def approve_tool_call(
 def execution_events(
     execution_id: str,
     request: Request,
+    actor_id: str = Query(..., min_length=1, max_length=512),
+    tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
 ) -> dict[str, Any]:
     principal = _verified_service_principal(request)
@@ -232,6 +245,8 @@ def execution_events(
         return service.events(
             execution_id,
             verified_service_principal=principal,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
         )
     except Exception as exc:
         _raise_engine_error(exc)
