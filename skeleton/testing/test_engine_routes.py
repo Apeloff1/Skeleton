@@ -150,7 +150,11 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
 
     missing = client.post(
         "/api/v1/engine/executions",
-        json={"command": command.as_dict()},
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "command": command.as_dict(),
+        },
     )
     assert missing.status_code == 401
 
@@ -172,14 +176,20 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
     assert replay.json() == submitted.json()
 
     status = client.get(
-        "/api/v1/engine/executions/route-exec",
+        (
+            "/api/v1/engine/executions/route-exec"
+            "?actor_id=actor-a&tenant_id=tenant-a"
+        ),
         headers=headers,
     )
     assert status.status_code == 200
     assert status.json()["execution_state"] == "created"
 
     events = client.get(
-        "/api/v1/engine/executions/route-exec/events",
+        (
+            "/api/v1/engine/executions/route-exec/events"
+            "?actor_id=actor-a&tenant_id=tenant-a"
+        ),
         headers=headers,
     )
     assert events.status_code == 200
@@ -187,8 +197,58 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
 
     cancelled = client.post(
         "/api/v1/engine/executions/route-exec/cancel",
-        json={"reason": "user requested cancellation"},
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "reason": "user requested cancellation",
+        },
         headers=headers,
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["cancellation_requested"] is True
+
+
+
+def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
+    service, command = _service_and_command(tmp_path)
+    client = _client(service)
+    headers = {"x-zaibatsu-attester": "backend-service"}
+    submitted = client.post(
+        "/api/v1/engine/executions",
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "command": command.as_dict(),
+        },
+        headers=headers,
+    )
+    assert submitted.status_code == 202
+
+    wrong_status = client.get(
+        (
+            "/api/v1/engine/executions/route-exec"
+            "?actor_id=actor-b&tenant_id=tenant-a"
+        ),
+        headers=headers,
+    )
+    assert wrong_status.status_code == 422
+
+    wrong_events = client.get(
+        (
+            "/api/v1/engine/executions/route-exec/events"
+            "?actor_id=actor-b&tenant_id=tenant-a"
+        ),
+        headers=headers,
+    )
+    assert wrong_events.status_code == 422
+
+    wrong_cancel = client.post(
+        "/api/v1/engine/executions/route-exec/cancel",
+        json={
+            "actor_id": "actor-b",
+            "tenant_id": "tenant-a",
+            "reason": "wrong actor",
+        },
+        headers=headers,
+    )
+    assert wrong_cancel.status_code == 422
