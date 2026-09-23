@@ -248,6 +248,7 @@ class CognitiveExecutionRuntime:
         instructions: str,
         prompt: str,
         context_digest: str,
+        history: tuple[AIMessage, ...] = (),
     ) -> dict[str, object]:
         if not isinstance(instructions, str) or not instructions.strip():
             raise CognitiveExecutionError("instructions must be non-empty")
@@ -259,6 +260,28 @@ class CognitiveExecutionRuntime:
             or any(ch not in "0123456789abcdef" for ch in context_digest)
         ):
             raise CognitiveExecutionError("context_digest must be lowercase sha256")
+
+        normalized_history: list[dict[str, str]] = []
+        for message in history:
+            if not isinstance(message, AIMessage):
+                raise CognitiveExecutionError(
+                    "history must contain AIMessage values"
+                )
+            if message.role not in {"user", "assistant"}:
+                raise CognitiveExecutionError(
+                    "history contains unsupported role"
+                )
+            if not isinstance(message.content, str) or not message.content.strip():
+                raise CognitiveExecutionError(
+                    "history contains empty content"
+                )
+            normalized_history.append(
+                {"role": message.role, "content": message.content}
+            )
+        if len(normalized_history) > 1024:
+            raise CognitiveExecutionError(
+                "history exceeds maximum turn count"
+            )
 
         allowed = request.tool_policy.get("allowed_tool_ids", [])
         if not isinstance(allowed, list) or any(
@@ -280,7 +303,7 @@ class CognitiveExecutionRuntime:
         return {
             "instructions": instructions.strip(),
             "next_prompt": prompt.strip(),
-            "history": [],
+            "history": normalized_history,
             "context_digest": context_digest,
             "allowed_tool_ids": list(dict.fromkeys(item.strip() for item in allowed)),
             "tenant_id": tenant_id.strip(),
@@ -366,6 +389,7 @@ class CognitiveExecutionRuntime:
         instructions: str,
         prompt: str,
         context_digest: str,
+        history: tuple[AIMessage, ...] = (),
         approval_refs: Mapping[str, str] | None = None,
         now: datetime | None = None,
     ) -> ExecutionRunResult:
@@ -386,6 +410,7 @@ class CognitiveExecutionRuntime:
                 instructions=instructions,
                 prompt=prompt,
                 context_digest=context_digest,
+                history=history,
             )
             execution, _ = self._checkpoint(execution, payload, now=now)
         return await self._drive(
