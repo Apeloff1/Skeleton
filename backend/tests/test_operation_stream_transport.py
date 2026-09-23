@@ -494,6 +494,7 @@ def test_slow_consumer_backpressure_preserves_pending_outbox_until_ack(
     assert transport.compact_acknowledged(
         operation.operation_id,
         tenant_id="tenant-a",
+        now=BASE_TIME + timedelta(seconds=4),
     ) == 1
     delivered = transport.dispatch_pending(
         operation.operation_id,
