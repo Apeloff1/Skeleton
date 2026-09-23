@@ -30,6 +30,7 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import ProviderToolCall, ProviderToolDefinition
 from skeleton.provider_runtime import AIMessage, ProviderAdapter, ProviderRequest
 from skeleton.skills.tool_contract import (
+    ToolEffect,
     ToolExecutionRequest,
     ToolExecutionReceipt,
     ToolExecutionStatus,
@@ -571,6 +572,13 @@ class CognitiveExecutionRuntime:
         tools: list[ProviderToolDefinition] = []
         for tool_id in raw:
             manifest = await self.tool_runtime.manifest(str(tool_id))
+            if (
+                manifest.effect is not ToolEffect.READ_ONLY
+                and self.tool_runtime.receipt_store is None
+            ):
+                raise CognitiveExecutionError(
+                    "side-effect tools require a durable receipt store"
+                )
             tools.append(
                 ProviderToolDefinition(
                     tool_id=manifest.tool_id,
