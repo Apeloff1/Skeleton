@@ -62,7 +62,7 @@ export type Workspace = {
 export type Attachment = { modality: 'image' | 'pdf'; base64: string; name: string };
 export type ChatBody = {
   message: string;
-  session_id: string;
+  session_id?: string;
   client_message_id?: string;
   force_all_forms: boolean;
   context: string;
@@ -261,10 +261,10 @@ export function buildChatBody(
     conversation.sessionId
     && now >= conversation.sessionUpdatedAt
     && now - conversation.sessionUpdatedAt <= SESSION_TTL
-  ) ? conversation.sessionId : conversation.id;
+  ) ? conversation.sessionId : undefined;
   return {
     message,
-    session_id: serverSessionId,
+    ...(serverSessionId ? { session_id: serverSessionId } : {}),
     ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
     force_all_forms: conversation.allForms,
     context: conversation.context,
