@@ -508,7 +508,8 @@ class SQLiteOperationEventStore:
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
-                self._ensure_head(operation_id)
+                head = self._ensure_head(operation_id)
+                compacted_through = int(head["compacted_through"])
                 row = self._connection.execute(
                     """
                     SELECT operation_id, consumer_id, acknowledged_through,
@@ -518,7 +519,14 @@ class SQLiteOperationEventStore:
                     """,
                     (self.namespace, operation_id, consumer),
                 ).fetchone()
-                acknowledged = 0 if row is None else int(row["acknowledged_through"])
+                acknowledged = (
+                    compacted_through
+                    if row is None
+                    else max(
+                        compacted_through,
+                        int(row["acknowledged_through"]),
+                    )
+                )
                 self._connection.execute(
                     """
                     INSERT INTO operation_stream_consumer(
