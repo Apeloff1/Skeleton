@@ -178,22 +178,36 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         captured["commit"] = {"thread_id": thread_id, **kwargs}
         return after_assistant, assistant
 
-    async def execute_provider_request(provider_request):
-        captured["provider_request"] = provider_request
-        return {
-            "success": True,
-            "response": "canonical answer",
-            "provider": "test-provider",
-            "model": "test-model",
-            "provider_request_id": "provider-1",
-            "latency_ms": 1.0,
-            "context_id": provider_request.context_id,
-            "context_digest": provider_request.context_digest,
-            "context_source_snapshot": list(
-                provider_request.context_source_snapshot
-            ),
-            "context_compiler_version": provider_request.context_compiler_version,
-        }
+    real_command_builder = route.engine_command_from_context
+
+    def build_engine_command(**kwargs):
+        captured["context_envelope"] = kwargs["context"]
+        command = real_command_builder(**kwargs)
+        captured["engine_command"] = command
+        return command
+
+    class FakeEngineClient:
+        config = SimpleNamespace(service_principal="codedock-backend")
+
+        async def execute(self, command, *, deadline):
+            captured["engine_execute"] = {
+                "command": command,
+                "deadline": deadline,
+            }
+            return {
+                "status": "completed",
+                "final_output": "canonical answer",
+                "verification": "verification:test",
+                "verification_receipt": {
+                    "outcome": "verified",
+                    "verification_id": "ver-1",
+                },
+                "evidence_refs": ["evidence:1"],
+                "usage": {"model_turns": 1, "tool_calls": 0},
+            }
+
+    async def provider_must_not_execute(*args, **kwargs):
+        raise AssertionError("canonical /ai/chat must not use backend-local provider")
 
     monkeypatch.setattr(
         route,
@@ -206,8 +220,18 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     )
     monkeypatch.setattr(
         route,
+        "engine_command_from_context",
+        build_engine_command,
+    )
+    monkeypatch.setattr(
+        route,
+        "_engine_client",
+        lambda: FakeEngineClient(),
+    )
+    monkeypatch.setattr(
+        route,
         "_execute_provider_request",
-        execute_provider_request,
+        provider_must_not_execute,
     )
 
     response = client.post(
@@ -224,24 +248,44 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     assert captured["append"]["expected_thread_version"] == 1
     assert captured["append"]["tenant_id"] == "default"
     assert captured["append"]["owner_id"] == "anonymous"
-    provider_request = captured["provider_request"]
-    assert [(item.role, item.content) for item in provider_request.history] == [
-        ("user", "older question"),
-        ("assistant", "older answer"),
+    envelope = captured["context_envelope"]
+    command = captured["engine_command"]
+    assert envelope.context_id
+    assert envelope.context_digest
+    assert envelope.source_snapshot
+    assert envelope.compiler_version
+    selected_content = [
+        segment.content
+        for segment in (
+            envelope.instruction_segments
+            + envelope.evidence_segments
+            + envelope.tool_schema_segments
+        )
+        if segment.content is not None
     ]
-    assert provider_request.prompt == "new question"
-    assert provider_request.context_id
-    assert provider_request.context_digest
-    assert provider_request.context_source_snapshot
-    assert provider_request.context_compiler_version
-    assert captured["commit"]["operation_id"] == provider_request.operation_id
+    assert "older question" in selected_content
+    assert "older answer" in selected_content
+    assert "new question" in selected_content
+    assert command.operation.tenant_id == "default"
+    assert command.operation.actor_id == "anonymous"
+    assert command.operation.capability == "assistant.chat"
+    assert command.execution_request.operation_id == envelope.operation_id
+    assert command.execution_request.execution_id == envelope.execution_id
+    assert command.execution_request.context_policy["context_id"] == envelope.context_id
+    assert command.execution_request.context_policy["context_digest"] == envelope.context_digest
+    assert captured["commit"]["operation_id"] == envelope.operation_id
     assert captured["commit"]["expected_thread_version"] == 2
     assert captured["commit"]["causal_user_message_id"] == user_message.message_id
     assert captured["commit"]["idempotency_key"] == "client-1:assistant"
     assert response.json()["thread"]["version"] == 3
     assert response.json()["assistant_message"]["content"] == "canonical answer"
-    assert response.json()["context_id"] == provider_request.context_id
-    assert response.json()["context_digest"] == provider_request.context_digest
+    body = response.json()
+    assert body["context_id"] == envelope.context_id
+    assert body["context_digest"] == envelope.context_digest
+    assert body["provider"] == "skeleton-engine"
+    assert body["engine_execution_id"] == envelope.execution_id
+    assert body["engine_result_ref"] == "execution-result:" + envelope.execution_id
+    assert body["verification"] == "verification:test"
 
 
 def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
