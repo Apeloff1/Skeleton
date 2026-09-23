@@ -21,6 +21,14 @@ import { consumeHandoff } from './workbench/handoff';
 import CaptureEditor from './workbench/CaptureEditor';
 import { captureInput } from './workbench/capture';
 import type { CaptureInput } from './workbench/capture';
+import {
+  createConversation as createServerConversation,
+  listAllConversationMessages,
+  listConversations as listServerConversations,
+  requestConversationDeletionById,
+  sendCanonicalConversationTurn,
+  setConversationStateById,
+} from '../../src/product/conversationClient';
 
 const C = { bg: '#0b1220', card: '#111a2e', edge: '#28364e', text: '#e2e8f0', muted: '#94a3b8', purple: '#a78bfa', green: '#86efac', red: '#fca5a5' };
 type Icon = keyof typeof Ionicons.glyphMap;
@@ -89,7 +97,7 @@ function Library({ controller, close }: { controller: WorkspaceController; close
   const chats = searchConversations(snapshot.workspace, query, archived);
   const remove = (conversation: Conversation) => {
     const action = () => controller.remove(conversation.id);
-    const question = `Delete "${conversation.title}" from this device? Export it first if you want to keep a copy.`;
+    const question = `Request deletion of "${conversation.title}" from server conversation storage? Export it first if you want to keep a copy.`;
     if (Platform.OS === 'web') { if (globalThis.confirm(question)) action(); }
     else Alert.alert('Delete conversation?', question, [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: action }]);
   };
@@ -101,7 +109,7 @@ function Library({ controller, close }: { controller: WorkspaceController; close
       <Button icon="chatbubbles-outline" label="Active" selected={!archived} onPress={() => setArchived(false)} />
       <Button icon="archive-outline" label="Archived" selected={archived} onPress={() => setArchived(true)} />
     </View>
-    <Text style={s.small}>{snapshot.workspace.conversations.length} / 30 saved on this device</Text>
+    <Text style={s.small}>{snapshot.workspace.conversations.length} / 30 server conversations</Text>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.libraryList}>
       {!chats.length && <Text style={s.emptyText}>{query ? 'No matching conversations.' : 'No conversations here yet.'}</Text>}
       {chats.map(conversation => <View key={conversation.id} style={[s.chatItem, conversation.id === snapshot.workspace.activeId && s.selected]}>
@@ -116,26 +124,57 @@ function Library({ controller, close }: { controller: WorkspaceController; close
         </View>
       </View>)}
     </ScrollView>
-    <Text style={s.small}>Text and drafts stay on this device. Attachments are kept only during the current visit.</Text>
+    <Text style={s.small}>Transcript history is server-authoritative. Drafts and UI preferences are cached on this device; attachment bytes stay only for the current visit.</Text>
   </View>;
 }
 
 export default function ChatWorkspace() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const [controller] = useState(() => new WorkspaceController(AsyncStorage, async (body, signal) => {
-    const result = await api.post<ChatResponse>('/api/jeeves/chat', body, { signal, timeoutMs: 60000, retries: 0 });
-    if (!result.ok || !result.data) {
-      const message = result.status === 429 ? 'Jeeves is busy. Wait a moment and retry.'
-        : result.status === 408 ? 'Jeeves took too long to answer. Try again.'
-          : result.status >= 500 ? 'Jeeves is temporarily unavailable on the server.'
-            : result.status === 413 ? 'This attachment is too large.'
-              : result.status === 422 ? 'Jeeves could not accept this message. Check its length and attachments.'
-                : 'The connection to Jeeves was interrupted. Check your connection and retry.';
-      throw new Error(message);
-    }
-    return result.data;
-  }));
+  const [controller] = useState(() => new WorkspaceController(
+    AsyncStorage,
+    // Compatibility transport remains injectable for legacy/offline controller
+    // tests. The active product path below uses canonical server authority.
+    async (body, signal) => {
+      const result = await api.post<ChatResponse>(
+        '/api/jeeves/chat',
+        body,
+        { signal, timeoutMs: 60000, retries: 0 },
+      );
+      if (!result.ok || !result.data) {
+        throw new Error('Legacy Jeeves transport is unavailable.');
+      }
+      return result.data;
+    },
+    {
+      listThreads: () => listServerConversations({
+        includeArchived: true,
+        limit: 30,
+      }),
+      createThread: title => createServerConversation({ title }),
+      listMessages: threadId => listAllConversationMessages(
+        threadId,
+        { activeOnly: true, pageSize: 200 },
+      ),
+      chat: input => sendCanonicalConversationTurn({
+        threadId: input.threadId,
+        expectedThreadVersion: input.expectedThreadVersion,
+        message: input.message,
+        idempotencyKey: input.idempotencyKey,
+        context: input.context,
+        signal: input.signal,
+      }),
+      setState: input => setConversationStateById(
+        input.threadId,
+        input.expectedThreadVersion,
+        input.state,
+      ),
+      requestDeletion: input => requestConversationDeletionById(
+        input.threadId,
+        input.expectedThreadVersion,
+      ),
+    },
+  ));
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
   const conversation = controller.active;
   const busy = snapshot.busyId !== null;
@@ -167,7 +206,15 @@ export default function ChatWorkspace() {
     return () => clearTimeout(timer);
   }, [conversation.id, conversation.messages.length, busy]);
 
-  const storageLabel = useMemo(() => ({ loading: 'Opening saved chats…', saving: 'Saving…', saved: 'Saved on this device', error: 'Changes not saved' })[snapshot.saveState], [snapshot.saveState]);
+  const storageLabel = useMemo(() => {
+    if (!snapshot.serverSynced) return 'Server history unavailable · cached view';
+    return ({
+      loading: 'Opening conversation cache…',
+      saving: 'Caching drafts…',
+      saved: 'Server transcript synced',
+      error: 'Draft cache not saved',
+    })[snapshot.saveState];
+  }, [snapshot.saveState, snapshot.serverSynced]);
 
   const pick = async (kind: 'image' | 'pdf') => {
     if (picking || busy) return;
@@ -274,8 +321,12 @@ export default function ChatWorkspace() {
       <Text style={s.small}>{context.length} / {MAX_CONTEXT}</Text>
       <Button icon="checkmark-outline" label="Save details" onPress={() => { controller.edit({ title, context }); setSettings(false); }} />
       <View style={s.divider} /><Text style={s.label}>Keep a copy</Text><Text style={s.small}>Export a Markdown transcript. Attachment and generated file contents are excluded.</Text>
-      <Button icon="download-outline" label="Export transcript" onPress={() => { void exportTranscript(conversation).catch(() => controller.notify('Could not export the transcript. Try copying individual messages.')); }} />
-      <Text style={s.small}>Chats are stored on this device, without account synchronization. Server history depends on backend availability.</Text>
+      <Button icon="download-outline" label="Export transcript" onPress={() => {
+        void controller.refreshFromServer()
+          .then(() => exportTranscript(controller.active))
+          .catch(() => controller.notify('Could not refresh and export the server transcript. Try again when the connection is available.'));
+      }} />
+      <Text style={s.small}>Conversation history is stored by the server authority. This device caches drafts, display state and preferences for recovery.</Text>
     </ScrollView></SafeAreaView></Modal>
   </SafeAreaView>;
 }
