@@ -460,3 +460,34 @@ async def test_expired_deadline_fails_before_provider_io() -> None:
     assert result.result.status == "failed"
     assert result.result.usage["error_code"] == "execution_deadline_exceeded"
     assert provider.requests == []
+
+
+
+@pytest.mark.asyncio
+async def test_tool_handler_outage_becomes_durable_execution_failure() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def unavailable_handler(_request):
+        raise RuntimeError("tool unavailable")
+
+    await tools.register(_manifest(), unavailable_handler)
+    provider = FakeProvider([_tool_response("call-outage")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+    request = _request(allowed_tools=("repo.read",))
+
+    result = await runtime.start(
+        request,
+        instructions="Use the tool if required.",
+        prompt="Read the file.",
+        context_digest="3" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.usage["error_code"] == "RuntimeError"
+    assert len(result.result.tool_receipts) == 1
+    assert len(provider.requests) == 1
+    assert repo.result("exec-1") == result.result
