@@ -13,7 +13,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 import re
-from typing import Iterable, Mapping
+from typing import Any, Iterable, Mapping
 import xml.etree.ElementTree as ET
 
 from skeleton.release.evidence import EvidenceSchemaError, TestEvidence
@@ -64,73 +64,142 @@ class AIJourneyEvidenceBundle:
         }
 
 
+def requirements_from_manifest(
+    payload: Mapping[str, Any],
+) -> tuple[AIJourneyRequirement, ...]:
+    """Convert the machine Stage-7 journey contract into typed requirements."""
+
+    if not isinstance(payload, Mapping):
+        raise EvidenceSchemaError(
+            "AI journey manifest must be an object"
+        )
+    if payload.get("schema_id") != "skeleton.ai.release-journeys":
+        raise EvidenceSchemaError(
+            "AI journey manifest schema_id is invalid"
+        )
+    if payload.get("schema_version") != 1:
+        raise EvidenceSchemaError(
+            "AI journey manifest schema_version is unsupported"
+        )
+    raw = payload.get("required")
+    if not isinstance(raw, list) or not raw:
+        raise EvidenceSchemaError(
+            "AI journey manifest required must be a non-empty list"
+        )
+
+    requirements: list[AIJourneyRequirement] = []
+    seen_ids: set[str] = set()
+    seen_nodes: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, Mapping):
+            raise EvidenceSchemaError(
+                f"AI journey manifest required[{index}] must be an object"
+            )
+        category = str(item.get("category") or "").strip().lower()
+        lane = {
+            "golden": "test",
+            "fault": "eval",
+        }.get(category)
+        if lane is None:
+            raise EvidenceSchemaError(
+                "AI journey category must be golden or fault"
+            )
+        requirement = AIJourneyRequirement(
+            evidence_id=str(item.get("evidence_id") or ""),
+            nodeid=str(item.get("nodeid") or ""),
+            lane=lane,
+        )
+        if requirement.evidence_id in seen_ids:
+            raise EvidenceSchemaError(
+                "AI journey evidence ids must be unique"
+            )
+        if requirement.nodeid in seen_nodes:
+            raise EvidenceSchemaError(
+                "AI journey nodeids must be unique"
+            )
+        seen_ids.add(requirement.evidence_id)
+        seen_nodes.add(requirement.nodeid)
+        requirements.append(requirement)
+    return tuple(requirements)
+
+
+# Fallback typed matrix retained for library callers that do not have the
+# repository machine manifest available. The release CLI loads the machine
+# manifest and passes it explicitly, preventing workflow drift.
 MANDATORY_AI_JOURNEYS: tuple[AIJourneyRequirement, ...] = (
     AIJourneyRequirement(
-        "ai-prompt-basic",
+        "ai-journey.simple-chat",
         "skeleton/testing/test_execution_runtime.py::test_direct_provider_completion_is_verified_and_atomically_finalized",
+        lane="test",
     ),
     AIJourneyRequirement(
-        "ai-conversation-authority",
-        "backend/tests/test_ai_chat_conversation_authority.py::test_chat_uses_server_transcript_and_commits_assistant_lineage",
-    ),
-    AIJourneyRequirement(
-        "ai-retrieval-tool-approval",
+        "ai-journey.retrieval-tool-approval",
         "backend/tests/test_ai_golden_journey.py::test_deterministic_retrieval_tool_approval_golden_journey",
+        lane="test",
     ),
     AIJourneyRequirement(
-        "ai-artifact-result",
+        "ai-journey.conversation-retry",
+        "backend/tests/test_ai_chat_conversation_authority.py::test_chat_retry_reuses_same_engine_operation_and_execution_identity",
+        lane="test",
+    ),
+    AIJourneyRequirement(
+        "ai-journey.artifact-result",
         "backend/tests/test_ai_artifact_result_journey.py::test_deterministic_artifact_is_bound_to_durable_execution_result",
+        lane="test",
     ),
     AIJourneyRequirement(
-        "ai-cancel",
-        "skeleton/testing/test_execution_runtime.py::test_cancellation_while_waiting_for_approval_finalizes_without_effect",
-    ),
-    AIJourneyRequirement(
-        "ai-reconnect",
+        "ai-journey.stream-resync",
         "backend/tests/test_operation_stream_route.py::test_authoritative_resync_returns_compaction_floor_and_retained_events",
+        lane="test",
     ),
     AIJourneyRequirement(
-        "ai-provider-outage",
-        "skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_provider_unavailable_becomes_durable_failure",
-    ),
-    AIJourneyRequirement(
-        "ai-tool-outage",
-        "skeleton/testing/test_execution_runtime.py::test_tool_handler_outage_becomes_durable_execution_failure",
-        lane="eval",
-    ),
-    AIJourneyRequirement(
-        "ai-crash-provider-resume",
-        "skeleton/testing/test_execution_runtime.py::test_crash_after_provider_checkpoint_resumes_without_second_provider_call",
-        lane="eval",
-    ),
-    AIJourneyRequirement(
-        "ai-crash-tool-no-duplicate",
-        "skeleton/testing/test_execution_runtime.py::test_crash_after_tool_effect_resumes_without_duplicate_tool_effect",
-        lane="eval",
-    ),
-    AIJourneyRequirement(
-        "ai-retrieval-ambiguity",
+        "ai-fault.cross-tenant-retrieval",
         "backend/tests/test_ai_golden_journey.py::test_retrieval_tenant_ambiguity_fails_before_compilation",
         lane="eval",
     ),
     AIJourneyRequirement(
-        "ai-approval-expiry",
+        "ai-fault.provider-outage",
+        "skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_provider_unavailable_becomes_durable_failure",
+        lane="eval",
+    ),
+    AIJourneyRequirement(
+        "ai-fault.provider-checkpoint-crash",
+        "skeleton/testing/test_execution_runtime.py::test_crash_after_provider_checkpoint_resumes_without_second_provider_call",
+        lane="eval",
+    ),
+    AIJourneyRequirement(
+        "ai-fault.tool-effect-crash",
+        "skeleton/testing/test_execution_runtime.py::test_crash_after_tool_effect_resumes_without_duplicate_tool_effect",
+        lane="eval",
+    ),
+    AIJourneyRequirement(
+        "ai-fault.tool-outage",
+        "skeleton/testing/test_execution_runtime.py::test_tool_handler_outage_becomes_durable_execution_failure",
+        lane="eval",
+    ),
+    AIJourneyRequirement(
+        "ai-fault.approval-expiry",
         "skeleton/testing/test_engine_execution_service.py::test_expired_persisted_approval_is_not_replayed_into_resume",
         lane="eval",
     ),
     AIJourneyRequirement(
-        "ai-backpressure",
+        "ai-fault.slow-client-backpressure",
         "backend/tests/test_operation_stream_transport.py::test_slow_consumer_backpressure_preserves_pending_outbox_until_ack",
         lane="eval",
     ),
     AIJourneyRequirement(
-        "ai-terminal-race-complete",
+        "ai-fault.complete-wins-cancel-race",
         "backend/tests/test_operation_stream_transport.py::test_completion_wins_cancel_race_and_terminal_stream_remains_final",
         lane="eval",
     ),
     AIJourneyRequirement(
-        "ai-terminal-race-cancel",
+        "ai-fault.cancel-wins-complete-race",
         "backend/tests/test_operation_stream_transport.py::test_cancel_wins_completion_race_and_completion_cannot_reopen_operation",
+        lane="eval",
+    ),
+    AIJourneyRequirement(
+        "ai-fault.durable-approval-restart",
+        "skeleton/testing/test_engine_execution_coordinator.py::test_coordinator_durable_approval_resumes_effect_once_after_restart",
         lane="eval",
     ),
 )
@@ -391,4 +460,5 @@ __all__ = [
     "AIJourneyRequirement",
     "MANDATORY_AI_JOURNEYS",
     "collect_ai_journey_evidence",
+    "requirements_from_manifest",
 ]
