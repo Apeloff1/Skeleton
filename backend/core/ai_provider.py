@@ -25,6 +25,7 @@ ProviderSpeechRequest = _runtime.ProviderSpeechRequest
 ProviderSpeechResponse = _runtime.ProviderSpeechResponse
 ProviderUnavailableError = _runtime.ProviderUnavailableError
 normalize_history = _runtime.normalize_history
+provider_request_from_context = _runtime.provider_request_from_context
 
 # Historical compatibility exports used by focused tests and older callers.
 ProviderArchitectureError = _runtime.ProviderArchitectureError
