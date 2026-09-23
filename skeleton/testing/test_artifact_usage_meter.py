@@ -242,7 +242,7 @@ def test_artifact_meter_requires_one_existing_admission_lease(
     runtime, _ = _runtime(tmp_path / "quota.sqlite3", configure=True)
     meter = ArtifactUsageMeter(runtime)
 
-    with pytest.raises(Exception, match="unknown active operation"):
+    with pytest.raises(Exception, match="operation has no active admission lease"):
         meter.meter_artifact(
             "missing-operation",
             "artifact-1",
