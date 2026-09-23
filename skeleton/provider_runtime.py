@@ -2437,6 +2437,13 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
 
 __all__ = [
     "AIMessage",
+    "FinishReason",
+    "ProviderDelta",
+    "ProviderDeltaKind",
+    "ProviderStructuredOutput",
+    "ProviderToolCall",
+    "ProviderToolDefinition",
+    "ProviderUsage",
     "OpenAIProviderAdapter",
     "OpenAISyncProviderAdapter",
     "ProviderAdapter",
