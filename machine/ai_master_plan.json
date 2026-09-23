@@ -4168,7 +4168,7 @@
         "ArtifactManifest"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "machine",
         "skeleton/persistence"
       ],
@@ -4220,7 +4220,7 @@
         "ReachabilityRoot"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "skeleton/persistence",
         "planned:skeleton/storage/cas"
       ],
@@ -7264,7 +7264,7 @@
         "DigestPolicy"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "planned:skeleton/storage/cas"
       ],
       "tests": [
@@ -7688,7 +7688,7 @@
       ],
       "implementation_paths": [
         "training",
-        "skeleton/artifacts"
+        "planned:skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_training_checkpointing.py"
@@ -8064,7 +8064,7 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/artifacts"
+        "planned:skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_multimodal_ingestion.py"
@@ -10695,7 +10695,7 @@
         "ReviewDecision"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "skeleton/ai"
       ],
       "tests": [
@@ -10884,7 +10884,7 @@
       ],
       "implementation_paths": [
         "experiments",
-        "skeleton/artifacts"
+        "planned:skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_reproduction_packages.py"
@@ -12857,7 +12857,7 @@
         "ArtifactQualityResult"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "skeleton/eval"
       ],
       "tests": [
@@ -16429,7 +16429,7 @@
         "WorkspaceResource"
       ],
       "implementation_paths": [
-        "skeleton/product",
+        "planned:skeleton/product",
         "skeleton/persistence"
       ],
       "tests": [
@@ -16570,7 +16570,7 @@
         "ArtifactGraph"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "machine"
       ],
       "tests": [
@@ -16617,7 +16617,7 @@
         "RebuildEvidence"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "scripts"
       ],
       "tests": [
@@ -17793,7 +17793,7 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/artifacts"
+        "planned:skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_knowledge_snapshots.py"
@@ -19437,8 +19437,8 @@
         "TierMove"
       ],
       "implementation_paths": [
-        "skeleton/storage",
-        "skeleton/artifacts"
+        "planned:skeleton/storage",
+        "planned:skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_storage_tiering.py"
@@ -20002,7 +20002,7 @@
       ],
       "implementation_paths": [
         "machine",
-        "skeleton/artifacts"
+        "planned:skeleton/artifacts"
       ],
       "tests": [
         "planned:skeleton/testing/test_license_intelligence.py"
@@ -20095,7 +20095,7 @@
         "AttributionBundle"
       ],
       "implementation_paths": [
-        "skeleton/artifacts",
+        "planned:skeleton/artifacts",
         "docs"
       ],
       "tests": [
