@@ -522,6 +522,22 @@ def engine_command_from_provider_request(
         "skeleton-provider-context",
         context_digest,
     )
+    if request.context_source_snapshot:
+        source_snapshot = request.context_source_snapshot
+    elif request.context_id is not None:
+        raise EngineClientError(
+            "provider request context_id requires immutable source snapshot"
+        )
+    else:
+        source_snapshot = (
+            (
+                _stable_uuid(
+                    "skeleton-provider-source",
+                    request_digest,
+                ),
+                request_digest,
+            ),
+        )
     compiler_version = (
         request.context_compiler_version
         or "provider-compat/v1"
@@ -540,7 +556,7 @@ def engine_command_from_provider_request(
         context_id=context_id,
         context_digest=context_digest,
         compiler_version=compiler_version,
-        source_snapshot=request.context_source_snapshot,
+        source_snapshot=source_snapshot,
         data_class=request.data_class,
         instructions=request.instructions,
         prompt=request.prompt,
