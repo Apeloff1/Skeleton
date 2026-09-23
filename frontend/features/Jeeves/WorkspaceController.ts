@@ -694,13 +694,18 @@ export class WorkspaceController {
       });
       if (this.running !== running) return;
 
-      const messages = await this.authority.listMessages(conversationId);
+      const stable = this.authority.snapshot
+        ? await this.authority.snapshot(conversationId, true)
+        : {
+            thread: response.thread,
+            messages: await this.authority.listMessages(conversationId),
+          };
       const latestCached = this.snapshot.workspace.conversations.find(
         item => item.id === conversationId,
       );
       const canonical = this.authorityConversation(
-        response.thread,
-        messages,
+        stable.thread,
+        stable.messages,
         latestCached,
       );
       this.change(updateConversation(
