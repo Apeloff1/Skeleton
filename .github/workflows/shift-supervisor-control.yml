@@ -106,7 +106,8 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check --no-input \
-            'pydantic>=2,<3'
+            'pydantic>=2,<3' \
+            'pydantic-settings>=2,<3'
 
       - name: Snapshot planning, staffing, and research evidence
         if: steps.fallback.outputs.run == 'true'
