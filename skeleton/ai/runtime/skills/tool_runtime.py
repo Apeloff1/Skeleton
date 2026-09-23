@@ -176,10 +176,11 @@ class ToolRuntime:
                 self._receipts[key] = receipt
                 return receipt
 
-            self._request_fingerprints[key] = fingerprint
-
             if manifest.approval_required and request.approval_ref is None:
-                receipt = ToolExecutionReceipt(
+                # Missing approval is a resumable wait state. Do not persist it
+                # under the idempotency key or an approved resume would replay
+                # this denial forever.
+                return ToolExecutionReceipt(
                     receipt_id=_receipt_id(request, manifest),
                     request_id=request.request_id,
                     operation_id=request.operation_id,
@@ -194,8 +195,8 @@ class ToolRuntime:
                     approval_ref=None,
                     metered_tool_calls=0,
                 )
-                self._receipts[key] = receipt
-                return receipt
+
+            self._request_fingerprints[key] = fingerprint
 
             # Meter before invoking any side effect. AdmissionRuntime is expected
             # to have an active operation lease when budget enforcement is used.
@@ -428,7 +429,10 @@ class AsyncToolRuntime:
                     registered.manifest.approval_required
                     and request.approval_ref is None
                 ):
-                    receipt = ToolExecutionReceipt(
+                    # Missing approval is a resumable wait state. It is returned
+                    # to orchestration but intentionally not published as the
+                    # idempotent terminal receipt for this call.
+                    return ToolExecutionReceipt(
                         receipt_id=_receipt_id(request, registered.manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
@@ -443,9 +447,6 @@ class AsyncToolRuntime:
                         approval_ref=None,
                         metered_tool_calls=0,
                     )
-                    self._request_fingerprints[key] = fingerprint
-                    self._receipts[key] = receipt
-                    return receipt
 
                 self._request_fingerprints[key] = fingerprint
                 waiter = asyncio.get_running_loop().create_future()
