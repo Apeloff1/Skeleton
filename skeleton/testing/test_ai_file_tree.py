@@ -265,3 +265,19 @@ def test_planned_but_absent_roots_are_really_absent() -> None:
     manifest = json.loads((ROOT / "machine/ai_file_tree.json").read_text(encoding="utf-8"))
     for path in manifest["planned_path_audit"]["planned_but_absent"]:
         assert not (ROOT / path).exists(), path
+
+
+def test_cost_usage_metering_mirrors_remain_in_semantic_parity() -> None:
+    module = _module()
+    pairs = (
+        ("skeleton/intelligence/admission_runtime.py", "skeleton/ai/runtime/intelligence/admission_runtime.py"),
+        ("skeleton/intelligence/quota.py", "skeleton/ai/runtime/intelligence/quota.py"),
+        ("skeleton/intelligence/quota_sqlite.py", "skeleton/ai/runtime/intelligence/quota_sqlite.py"),
+        ("skeleton/skills/__init__.py", "skeleton/ai/runtime/skills/__init__.py"),
+        ("skeleton/skills/usage.py", "skeleton/ai/runtime/skills/usage.py"),
+        ("skeleton/artifact_plane/__init__.py", "skeleton/ai/runtime/artifact_plane/__init__.py"),
+        ("skeleton/artifact_plane/usage.py", "skeleton/ai/runtime/artifact_plane/usage.py"),
+        ("skeleton/turn/delta.py", "skeleton/ai/compat/turn/delta.py"),
+    )
+    for source, destination in pairs:
+        assert module._content_equivalent(ROOT / source, ROOT / destination), (source, destination)

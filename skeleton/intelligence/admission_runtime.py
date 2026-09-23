@@ -46,6 +46,9 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
     """Operation admission state conflicts with an active lease."""
 
 
+_USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+
+
 def _wall_time(value: float | None, *, field: str) -> float:
     number = time.time() if value is None else float(value)
     if not math.isfinite(number) or number < 0:
@@ -129,10 +132,20 @@ class AdmissionCompletion:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class UnknownUsageMarker:
+    event_id: str
+    operation_id: str
+    category: str
+    reason: str
+    recorded_at: float
+
+
 @dataclass(slots=True)
 class _ActiveLease:
     lease: AdmissionLease
     request_fingerprint: str
+    unknown_usage: dict[str, UnknownUsageMarker]
 
 
 class AdmissionRuntime:
@@ -224,6 +237,7 @@ class AdmissionRuntime:
             self._active[request.operation_id] = _ActiveLease(
                 lease=lease,
                 request_fingerprint=fingerprint,
+                unknown_usage={},
             )
             return lease
 
@@ -352,6 +366,158 @@ class AdmissionRuntime:
             now_wall=now_wall,
         )
 
+    def mark_usage_unknown(
+        self,
+        operation_id: str,
+        event_id: str,
+        category: str,
+        reason: str,
+        *,
+        now_wall: float | None = None,
+    ) -> UnknownUsageMarker:
+        """Record unresolved actual usage and block completion/release.
+
+        Unknown usage is never treated as zero. Callers must resolve it with a
+        conservative measured charge before the operation can reach a terminal
+        accounting state.
+        """
+
+        operation = str(operation_id).strip()
+        event = str(event_id).strip()
+        normalized_category = str(category).strip().lower()
+        normalized_reason = str(reason).strip()
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        if not event:
+            raise AdmissionRuntimeError("event_id is required")
+        if normalized_category not in _USAGE_CATEGORIES:
+            raise AdmissionRuntimeError("unsupported usage category")
+        if not normalized_reason:
+            raise AdmissionRuntimeError("unknown usage reason is required")
+        wall = _wall_time(now_wall, field="now_wall")
+
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            reservation = active.lease.quota_reservation
+            if reservation is not None:
+                if self.quota_ledger is None:
+                    raise AdmissionRuntimeError(
+                        "quota reservation exists without a quota ledger"
+                    )
+                marker_writer = getattr(self.quota_ledger, "mark_usage_unknown", None)
+                if not callable(marker_writer):
+                    raise AdmissionRuntimeError(
+                        "quota ledger does not support durable unknown usage"
+                    )
+                try:
+                    marker_writer(
+                        reservation.reservation_id,
+                        event,
+                        normalized_category,
+                        now=wall,
+                    )
+                except QuotaConflict as exc:
+                    raise AdmissionRuntimeConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise AdmissionRuntimeError(
+                        "unknown_usage_marker_unavailable"
+                    ) from exc
+
+            existing = active.unknown_usage.get(event)
+            if existing is not None:
+                if (
+                    existing.category != normalized_category
+                    or existing.reason != normalized_reason
+                ):
+                    raise AdmissionRuntimeConflict(
+                        "unknown usage event replayed with different inputs"
+                    )
+                return existing
+            marker = UnknownUsageMarker(
+                event_id=event,
+                operation_id=operation,
+                category=normalized_category,
+                reason=normalized_reason,
+                recorded_at=wall,
+            )
+            active.unknown_usage[event] = marker
+            return marker
+
+    def resolve_unknown_usage(
+        self,
+        operation_id: str,
+        event_id: str,
+        delta: UsageEstimate,
+        *,
+        now_wall: float | None = None,
+    ) -> QuotaUsageEvent:
+        """Resolve an unknown-usage marker with a conservative metered charge."""
+
+        operation = str(operation_id).strip()
+        event = str(event_id).strip()
+        if not isinstance(delta, UsageEstimate):
+            raise TypeError("delta must be a UsageEstimate")
+        if not operation:
+            raise AdmissionRuntimeError("operation_id is required")
+        if not event:
+            raise AdmissionRuntimeError("event_id is required")
+
+        with self._lock:
+            active = self._active.get(operation)
+            if active is None:
+                raise AdmissionRuntimeError(
+                    "operation has no active admission lease"
+                )
+            reservation = active.lease.quota_reservation
+            if reservation is None or self.quota_ledger is None:
+                raise AdmissionRuntimeError(
+                    "operation has no durable quota reservation"
+                )
+            resolver = getattr(self.quota_ledger, "resolve_unknown_usage", None)
+            if not callable(resolver):
+                raise AdmissionRuntimeError(
+                    "quota ledger does not support durable unknown usage"
+                )
+            decision = active.lease.decision
+            max_tool_calls = int(
+                decision.estimated.tool_calls
+                + int(decision.remaining["tool_calls"])
+            )
+            max_artifact_bytes = int(
+                decision.estimated.artifact_bytes
+                + int(decision.remaining["artifact_bytes"])
+            )
+            try:
+                recorded = resolver(
+                    reservation.reservation_id,
+                    event,
+                    delta,
+                    max_tool_calls=max_tool_calls,
+                    max_artifact_bytes=max_artifact_bytes,
+                    now=_wall_time(now_wall, field="now_wall"),
+                )
+            except QuotaExceeded as exc:
+                raise AdmissionError(str(exc)) from exc
+            except QuotaConflict as exc:
+                raise AdmissionRuntimeConflict(str(exc)) from exc
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "unknown_usage_resolution_unavailable"
+                ) from exc
+            active.unknown_usage.pop(event, None)
+            return recorded
+
+    @staticmethod
+    def _unknown_usage_error(active: _ActiveLease) -> str | None:
+        if not active.unknown_usage:
+            return None
+        categories = sorted({item.category for item in active.unknown_usage.values()})
+        return "actual_usage_unknown:" + ",".join(categories)
+
     def complete(
         self,
         operation_id: str,
@@ -370,6 +536,9 @@ class AdmissionRuntime:
             active = self._active.get(operation)
             if active is None:
                 raise AdmissionRuntimeError("operation has no active admission lease")
+            unknown_error = self._unknown_usage_error(active)
+            if unknown_error is not None:
+                raise AdmissionRuntimeError(unknown_error)
 
             quota_completion: QuotaCompletion | None = None
             reservation = active.lease.quota_reservation
@@ -378,11 +547,20 @@ class AdmissionRuntime:
                     raise AdmissionRuntimeError(
                         "quota reservation exists without a quota ledger"
                     )
-                quota_completion = self.quota_ledger.complete(
-                    reservation.reservation_id,
-                    actual,
-                    now=wall,
-                )
+                try:
+                    quota_completion = self.quota_ledger.complete(
+                        reservation.reservation_id,
+                        actual,
+                        now=wall,
+                    )
+                except QuotaConflict as exc:
+                    if str(exc).startswith("actual_usage_unknown:"):
+                        raise AdmissionRuntimeError(str(exc)) from exc
+                    raise AdmissionRuntimeConflict(str(exc)) from exc
+                except QuotaError as exc:
+                    raise AdmissionRuntimeError(
+                        "quota_completion_unavailable"
+                    ) from exc
 
             self._active.pop(operation)
             return AdmissionCompletion(
@@ -403,6 +581,9 @@ class AdmissionRuntime:
             active = self._active.get(operation)
             if active is None:
                 raise AdmissionRuntimeError("operation has no active admission lease")
+            unknown_error = self._unknown_usage_error(active)
+            if unknown_error is not None:
+                raise AdmissionRuntimeError(unknown_error)
             reservation = active.lease.quota_reservation
             if reservation is not None:
                 if self.quota_ledger is None:
@@ -421,6 +602,17 @@ class AdmissionRuntime:
                     "queue_depth": self._queue_depth,
                 },
                 "active_operations": tuple(sorted(self._active)),
+                "unknown_usage_events": sum(
+                    len(active.unknown_usage)
+                    for active in self._active.values()
+                ),
+                "unknown_usage_operations": tuple(
+                    sorted(
+                        operation_id
+                        for operation_id, active in self._active.items()
+                        if active.unknown_usage
+                    )
+                ),
                 "quota_enabled": self.quota_ledger is not None,
             }
 
@@ -431,4 +623,5 @@ __all__ = [
     "AdmissionRuntime",
     "AdmissionRuntimeConflict",
     "AdmissionRuntimeError",
+    "UnknownUsageMarker",
 ]
