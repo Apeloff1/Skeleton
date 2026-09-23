@@ -317,6 +317,8 @@ class SQLiteExecutionRepository:
                 status=payload["status"],
                 final_output=payload.get("final_output"),
                 verification=payload.get("verification"),
+                verification_receipt=payload.get("verification_receipt"),
+                evidence_refs=tuple(payload.get("evidence_refs") or ()),
                 route_receipts=tuple(payload.get("route_receipts") or ()),
                 provider_receipts=tuple(payload.get("provider_receipts") or ()),
                 tool_receipts=tuple(payload.get("tool_receipts") or ()),
@@ -813,6 +815,8 @@ class SQLiteExecutionRepository:
                     "result_ref": f"execution-result:{result.execution_id}",
                     "stream_terminal_event": result.stream_terminal_event,
                     "verification": result.verification,
+                    "verification_receipt": result.verification_receipt,
+                    "evidence_refs": list(result.evidence_refs),
                 }
                 self._connection.execute(
                     """
