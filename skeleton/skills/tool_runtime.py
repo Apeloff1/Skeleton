@@ -20,7 +20,10 @@ from skeleton.skills.tool_contract import (
     ToolManifest,
     validate_tool_arguments,
 )
-from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
+from skeleton.skills.tool_receipt_store import (
+    SQLiteToolReceiptStore,
+    ToolReceiptConflict,
+)
 
 
 class ToolRuntimeError(RuntimeError):
@@ -131,8 +134,27 @@ class ToolRuntime:
         operation_id: str,
         idempotency_key: str,
     ) -> ToolExecutionReceipt | None:
+        key = (tenant_id, operation_id, idempotency_key)
         with self._lock:
-            return self._receipts.get((tenant_id, operation_id, idempotency_key))
+            cached = self._receipts.get(key)
+            if cached is not None:
+                return cached
+            if self.receipt_store is None:
+                return None
+            durable = self.receipt_store.get(
+                tenant_id=tenant_id,
+                operation_id=operation_id,
+                idempotency_key=idempotency_key,
+            )
+            if durable is None or durable.status != "committed":
+                return None
+            assert durable.receipt is not None
+            self._receipts[key] = durable.receipt
+            self._request_fingerprints[key] = (
+                durable.receipt.tool_id,
+                durable.receipt.arguments_digest,
+            )
+            return durable.receipt
 
     def execute(
         self,
@@ -204,10 +226,13 @@ class ToolRuntime:
                 )
 
             if self.receipt_store is not None:
-                reservation = self.receipt_store.reserve(
-                    request,
-                    now=started,
-                )
+                try:
+                    reservation = self.receipt_store.reserve(
+                        request,
+                        now=started,
+                    )
+                except ToolReceiptConflict as exc:
+                    raise ToolExecutionConflict(str(exc)) from exc
                 if reservation.status == "committed":
                     assert reservation.receipt is not None
                     self._request_fingerprints[key] = fingerprint
@@ -417,8 +442,27 @@ class AsyncToolRuntime:
         operation_id: str,
         idempotency_key: str,
     ) -> ToolExecutionReceipt | None:
+        key = (tenant_id, operation_id, idempotency_key)
         async with self._lock:
-            return self._receipts.get((tenant_id, operation_id, idempotency_key))
+            cached = self._receipts.get(key)
+            if cached is not None:
+                return cached
+            if self.receipt_store is None:
+                return None
+            durable = self.receipt_store.get(
+                tenant_id=tenant_id,
+                operation_id=operation_id,
+                idempotency_key=idempotency_key,
+            )
+            if durable is None or durable.status != "committed":
+                return None
+            assert durable.receipt is not None
+            self._receipts[key] = durable.receipt
+            self._request_fingerprints[key] = (
+                durable.receipt.tool_id,
+                durable.receipt.arguments_digest,
+            )
+            return durable.receipt
 
     async def execute(
         self,
@@ -500,10 +544,13 @@ class AsyncToolRuntime:
                     )
 
                 if self.receipt_store is not None:
-                    reservation = self.receipt_store.reserve(
-                        request,
-                        now=started,
-                    )
+                    try:
+                        reservation = self.receipt_store.reserve(
+                            request,
+                            now=started,
+                        )
+                    except ToolReceiptConflict as exc:
+                        raise ToolExecutionConflict(str(exc)) from exc
                     if reservation.status == "committed":
                         assert reservation.receipt is not None
                         self._request_fingerprints[key] = fingerprint
