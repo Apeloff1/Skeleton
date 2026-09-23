@@ -15,6 +15,11 @@ import re
 from typing import Any
 from urllib import error, request
 
+from skeleton.provider_contract import (
+    ProviderArchitectureError,
+    ProviderArchitectureReceipt,
+    load_provider_architecture,
+)
 from skeleton.security.activation_security import enforce_bot_activation_security
 
 _API_URL = "https://api.openai.com/v1/responses"
@@ -104,6 +109,18 @@ class ChatGPTReasoner:
         resolved_model = resolved_model.strip() or "gpt-5.6"
         if len(resolved_model) > 200:
             raise ValueError("model identifier is too long")
+
+        self.architecture_receipt: ProviderArchitectureReceipt | None = None
+        if resolved_key:
+            try:
+                self.architecture_receipt = load_provider_architecture(
+                    "repository-automation",
+                    provider_family="automation_model",
+                )
+            except ProviderArchitectureError as exc:
+                raise RuntimeError(
+                    "repository automation architecture acknowledgement failed"
+                ) from exc
 
         self.api_key = resolved_key
         self.model = resolved_model
