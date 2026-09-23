@@ -323,3 +323,73 @@ def test_delete_is_explicit_deletion_intent_not_false_completion(
     assert response.json()["complete"] is False
     assert response.json()["deletion_state"] == "deleting"
     assert captured["state"] is ConversationThreadState.DELETING
+
+
+
+def test_snapshot_endpoint_returns_one_authoritative_projection(
+    route,
+    app_client,
+    monkeypatch,
+):
+    thread = _thread(version=4, sequence=2)
+    first = _message(thread, sequence=1)
+    second = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=datetime(2026, 9, 21, 12, 1, tzinfo=timezone.utc),
+        idempotency_key="assistant-snapshot",
+        content="answer",
+        parent_message_id=first.message_id,
+        causal_user_message_id=first.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="result-snapshot",
+    )
+    captured = {}
+
+    async def snapshot(thread_id, **kwargs):
+        captured.update({"thread_id": thread_id, **kwargs})
+        return thread, (first, second)
+
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(snapshot=snapshot),
+    )
+
+    response = app_client.get(
+        f"/api/v1/conversations/{thread.thread_id}/snapshot?active_only=true"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert captured["thread_id"] == thread.thread_id
+    assert captured["tenant_id"] == "default"
+    assert captured["owner_id"] == "anonymous"
+    assert captured["active_only"] is True
+    assert payload["projection"] == "active"
+    assert payload["snapshot_version"] == thread.version
+    assert payload["snapshot_sequence"] == thread.message_sequence
+    assert [item["sequence"] for item in payload["messages"]] == [1, 2]
+
+
+def test_snapshot_conflict_maps_to_http_409(route, app_client, monkeypatch):
+    async def snapshot(*args, **kwargs):
+        raise ConversationConflict(
+            "conversation changed while building snapshot"
+        )
+
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(snapshot=snapshot),
+    )
+
+    response = app_client.get(
+        f"/api/v1/conversations/{uuid4()}/snapshot"
+    )
+
+    assert response.status_code == 409
+    assert "changed while building snapshot" in response.json()["detail"]
