@@ -226,3 +226,18 @@ def test_registry_describe_declares_canonical_authority(registry):
     assert description["authority"] == "canonical-tool-runtime"
     assert description["count"] == len(registry.TOOLS)
     assert all("effect" in item for item in description["tools"])
+
+
+
+@pytest.mark.asyncio
+async def test_nested_llm_compat_tool_is_retired_without_credential_access(
+    registry,
+    monkeypatch,
+):
+    monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)
+
+    result = await registry.invoke("llm_chat", {"prompt": "hello"})
+
+    assert result["ok"] is False
+    assert result["disabled"] is True
+    assert result["error"] == "nested_llm_tool_retired_use_engine_provider"
