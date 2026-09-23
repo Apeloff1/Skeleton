@@ -3141,6 +3141,45 @@
         "idempotency_key"
       ],
       "owner_plane": "engine-api"
+    },
+    "memory_record": {
+      "required_fields": [
+        "memory_id",
+        "tenant_id",
+        "owner_id",
+        "content_digest",
+        "data_class",
+        "provenance",
+        "created_at",
+        "updated_at"
+      ],
+      "owner_plane": "memory"
+    },
+    "memory_write_proposal": {
+      "required_fields": [
+        "proposal_id",
+        "operation_id",
+        "tenant_id",
+        "memory_id",
+        "content_digest",
+        "reason",
+        "provenance",
+        "created_at"
+      ],
+      "owner_plane": "memory"
+    },
+    "memory_write_receipt": {
+      "required_fields": [
+        "receipt_id",
+        "proposal_id",
+        "operation_id",
+        "memory_id",
+        "status",
+        "content_digest",
+        "created_at",
+        "completed_at"
+      ],
+      "owner_plane": "memory"
     }
   },
   "release_evidence_bundle": [
