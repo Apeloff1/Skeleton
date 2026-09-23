@@ -181,6 +181,34 @@ def operation_event_replay(
     return {"ok": True, **batch.as_dict()}
 
 
+@router.get("/{operation_id}/events/resync")
+def authoritative_operation_resync(
+    operation_id: str,
+    consumer_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=_CONSUMER_PATTERN,
+    ),
+    limit: int = Query(default=250, ge=1, le=1000),
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    """Reset a stale client to the durable stream compaction watermark."""
+
+    tenant_id = _principal_tenant(user)
+    try:
+        batch = _transport().resync(
+            operation_id,
+            tenant_id=tenant_id,
+            consumer_id=consumer_id,
+            limit=limit,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, **batch.as_dict()}
+
+
 @router.post("/{operation_id}/events/ack")
 def acknowledge_operation_events(
     operation_id: str,
@@ -302,6 +330,7 @@ async def operation_events(
 __all__ = [
     "router",
     "operation_event_replay",
+    "authoritative_operation_resync",
     "acknowledge_operation_events",
     "_last_event_sequence",
     "_principal_tenant",
