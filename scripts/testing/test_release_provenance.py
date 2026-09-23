@@ -384,6 +384,11 @@ def test_reproducible_release_workflow_gates_bound_release_evidence() -> None:
     assert '"skeleton/release/evidence.py"' in workflow
     assert '"skeleton/testing/test_release_evidence.py"' in workflow
     assert "--junitxml=source-a/release-meta/release-tests.xml" in workflow
+    assert "source-a/skeleton/testing/test_ai_golden_journey.py" in workflow
+    assert "--junitxml=source-a/release-meta/ai-golden-tests.xml" in workflow
+    assert "ai-golden-engine-tool-approval" in workflow
+    assert "ai-golden-tests" in workflow
+    assert "ai-golden-eval.json" in workflow
     assert "reproducibility-eval.json" in workflow
     assert "scripts/release_provenance.py evidence" in workflow
     assert "--test-evidence release-meta/test-evidence.json" in workflow
