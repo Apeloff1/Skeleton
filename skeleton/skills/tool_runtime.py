@@ -20,6 +20,7 @@ from skeleton.skills.tool_contract import (
     ToolManifest,
     validate_tool_arguments,
 )
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
 
 class ToolRuntimeError(RuntimeError):
@@ -84,8 +85,14 @@ class ToolRuntime:
     Tool handlers must persist large or sensitive results behind a result_ref.
     """
 
-    def __init__(self, *, admission_runtime: AdmissionRuntime | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        receipt_store: SQLiteToolReceiptStore | None = None,
+    ) -> None:
         self.admission_runtime = admission_runtime
+        self.receipt_store = receipt_store
         self._lock = threading.RLock()
         self._registry: dict[str, RegisteredTool] = {}
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
@@ -303,8 +310,14 @@ class AsyncToolRuntime:
     before a failed receipt is published.
     """
 
-    def __init__(self, *, admission_runtime: AdmissionRuntime | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        receipt_store: SQLiteToolReceiptStore | None = None,
+    ) -> None:
         self.admission_runtime = admission_runtime
+        self.receipt_store = receipt_store
         self._lock = asyncio.Lock()
         self._registry: dict[str, RegisteredAsyncTool] = {}
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
