@@ -571,6 +571,11 @@ class AsyncToolRuntime:
                     request,
                     started=started,
                 )
+            if self.receipt_store is not None:
+                receipt = self.receipt_store.commit(
+                    request,
+                    receipt,
+                )
         except BaseException as exc:
             async with self._lock:
                 pending = self._inflight.pop(key, None)
@@ -581,12 +586,6 @@ class AsyncToolRuntime:
                     else:
                         pending.set_exception(exc)
             raise
-
-        if self.receipt_store is not None:
-            receipt = self.receipt_store.commit(
-                request,
-                receipt,
-            )
 
         async with self._lock:
             self._receipts[key] = receipt
