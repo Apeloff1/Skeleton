@@ -186,3 +186,106 @@ export async function requestConversationDeletion(
   );
   return data.thread;
 }
+
+
+export type CanonicalChatResult = {
+  success: boolean;
+  approval_required?: boolean;
+  response?: string;
+  provider?: string;
+  model?: string;
+  engine_execution_id?: string;
+  engine_result_ref?: string;
+  verification?: string | null;
+  verification_receipt?: Record<string, unknown> | null;
+  evidence_refs?: string[];
+  usage?: Record<string, unknown>;
+  thread: ConversationThread;
+  user_message: ConversationMessage;
+  assistant_message?: ConversationMessage;
+  pending_approvals?: Array<{
+    call_id: string;
+    tool_id: string;
+    arguments_digest: string;
+  }>;
+};
+
+export async function listAllConversationMessages(
+  threadId: string,
+  input: { activeOnly?: boolean; pageSize?: number } = {},
+): Promise<ConversationMessage[]> {
+  const pageSize = Math.max(1, Math.min(500, input.pageSize || 200));
+  const messages: ConversationMessage[] = [];
+  let afterSequence = 0;
+  const seen = new Set<number>();
+
+  for (;;) {
+    const page = await listConversationMessages(threadId, {
+      afterSequence,
+      limit: pageSize,
+      activeOnly: input.activeOnly,
+    });
+    for (const message of page.messages) {
+      if (seen.has(message.sequence)) continue;
+      seen.add(message.sequence);
+      messages.push(message);
+    }
+    if (page.nextAfterSequence === null) break;
+    if (
+      !Number.isSafeInteger(page.nextAfterSequence)
+      || page.nextAfterSequence <= afterSequence
+    ) {
+      throw new Error('Conversation pagination did not advance.');
+    }
+    afterSequence = page.nextAfterSequence;
+  }
+
+  return messages.sort((left, right) => left.sequence - right.sequence);
+}
+
+export async function sendCanonicalConversationMessage(
+  thread: ConversationThread,
+  input: {
+    message: string;
+    idempotencyKey: string;
+    context?: string;
+    signal?: AbortSignal;
+  },
+): Promise<CanonicalChatResult> {
+  const data = await requireData(
+    api.post<CanonicalChatResult>(
+      '/api/ai/chat',
+      {
+        message: input.message,
+        thread_id: thread.thread_id,
+        idempotency_key: input.idempotencyKey,
+        expected_thread_version: thread.version,
+        context: input.context || undefined,
+        conversation_history: [],
+      },
+      {
+        signal: input.signal,
+        timeoutMs: 95_000,
+        retries: 0,
+      },
+    ),
+    'Could not complete the conversation turn.',
+  );
+  if (!data.thread || !data.user_message) {
+    throw new Error('Conversation response is missing canonical lineage.');
+  }
+  return data;
+}
+
+export async function exportConversationSnapshot(
+  threadId: string,
+): Promise<{
+  thread: ConversationThread;
+  messages: ConversationMessage[];
+}> {
+  const [thread, messages] = await Promise.all([
+    getConversation(threadId),
+    listAllConversationMessages(threadId, { activeOnly: false }),
+  ]);
+  return { thread, messages };
+}
