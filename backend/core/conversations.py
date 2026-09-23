@@ -458,6 +458,14 @@ class MongoConversationAuthority:
                     raise ConversationConflict(
                         "superseding message must preserve author type"
                     )
+                if (
+                    prior.author_type is ConversationAuthorType.ASSISTANT
+                    and prior.causal_user_message_id
+                    != message.causal_user_message_id
+                ):
+                    raise ConversationConflict(
+                        "assistant regeneration must preserve causal user lineage"
+                    )
 
             prepared = _message_doc(message)
             prepared["_commit_state"] = "prepared"
