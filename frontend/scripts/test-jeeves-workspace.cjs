@@ -616,3 +616,48 @@ test('server-authority mode keeps draft when server is unavailable', async () =>
   assert.equal(store.active.draft, 'offline draft');
   assert.match(store.getSnapshot().notice, /Server conversation state is unavailable/);
 });
+
+
+test('product Jeeves screen has no legacy chat endpoint and exports after server refresh', () => {
+  const source = fs.readFileSync(
+    require('node:path').join(
+      __dirname,
+      '../features/Jeeves/ChatWorkspace.tsx',
+    ),
+    'utf8',
+  );
+  assert.ok(!source.includes("'/api/jeeves/chat'"));
+  assert.ok(source.includes('sendCanonicalConversationTurn'));
+  assert.ok(source.includes('listAllConversationMessages'));
+  assert.ok(source.includes('controller.refreshFromServer()'));
+  assert.ok(source.includes('requestConversationDeletionById'));
+});
+
+test('server-authority cache metadata survives local persistence without changing authority', async () => {
+  const fixture = authorityFixture();
+  const { store, disk } = await authorityController(fixture);
+  store.edit({ draft: 'cached draft', context: 'cached context', pinned: true });
+  await store.whenSaved();
+
+  const restoredCache = W.decodeWorkspace(disk.data.get(W.WORKSPACE_KEY));
+  assert.equal(restoredCache.conversations[0].serverVersion, 1);
+  assert.equal(restoredCache.conversations[0].serverState, 'active');
+  assert.equal(restoredCache.conversations[0].draft, 'cached draft');
+
+  fixture.setMessages('thread-1', [
+    serverMessage({ content: 'NEW SERVER MESSAGE' }),
+  ]);
+  const rebuilt = new WorkspaceController(
+    disk,
+    async () => { throw new Error('legacy transport must not run'); },
+    fixture.authority,
+  );
+  await rebuilt.initialize();
+
+  assert.equal(rebuilt.active.draft, 'cached draft');
+  assert.equal(rebuilt.active.context, 'cached context');
+  assert.equal(rebuilt.active.pinned, true);
+  assert.deepEqual(rebuilt.active.messages.map(item => item.text), [
+    'NEW SERVER MESSAGE',
+  ]);
+});
