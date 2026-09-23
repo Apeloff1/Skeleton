@@ -4612,16 +4612,6 @@
       "path": "skeleton/cue",
       "owner": "package/compatibility boundary",
       "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/product",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/storage",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     }
   ],
   "classification_coverage": {
