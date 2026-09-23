@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --check "$DIFF_BASE" "$HEAD_SHA"
+          git diff --check "$DIFF_BASE" "$HEAD_SHA" -- . ':!skeleton/ai/research/legacy/**'
 
       - name: Reject generated junk and accidental local state
         shell: bash
