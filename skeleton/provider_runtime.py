@@ -455,6 +455,443 @@ def normalize_history(
     return tuple(kept)
 
 
+
+
+def _strict_json_object(value: object, field_name: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ProviderPolicyError(f"{field_name} must be a JSON object")
+    result = dict(value)
+    try:
+        json.dumps(
+            result,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ProviderPolicyError(f"{field_name} must be strict JSON") from exc
+    return result
+
+
+def _provider_tool_definitions(
+    request: ProviderRequest,
+) -> tuple[ProviderToolDefinition, ...]:
+    definitions: dict[str, ProviderToolDefinition] = {}
+
+    def add(definition: ProviderToolDefinition) -> None:
+        existing = definitions.get(definition.tool_id)
+        if existing is not None and existing != definition:
+            raise ProviderPolicyError(
+                f"duplicate provider tool id has conflicting definition: {definition.tool_id}"
+            )
+        definitions[definition.tool_id] = definition
+
+    for definition in request.tools:
+        if not isinstance(definition, ProviderToolDefinition):
+            raise ProviderPolicyError(
+                "model provider tools must contain ProviderToolDefinition values"
+            )
+        add(definition)
+
+    for raw in request.tool_schemas:
+        schema = _strict_json_object(raw, "model provider tool schema")
+        try:
+            if (
+                isinstance(schema.get("tool_id"), str)
+                and isinstance(schema.get("input_schema"), Mapping)
+            ):
+                definition = ProviderToolDefinition(
+                    tool_id=schema["tool_id"],
+                    description=str(schema.get("description") or schema["tool_id"]),
+                    input_schema=dict(schema["input_schema"]),
+                )
+            elif schema.get("type") == "function" and isinstance(
+                schema.get("function"), Mapping
+            ):
+                function = dict(schema["function"])
+                definition = ProviderToolDefinition(
+                    tool_id=str(function.get("name") or ""),
+                    description=str(
+                        function.get("description")
+                        or function.get("name")
+                        or ""
+                    ),
+                    input_schema=dict(function.get("parameters") or {}),
+                )
+            elif schema.get("type") == "function":
+                definition = ProviderToolDefinition(
+                    tool_id=str(schema.get("name") or ""),
+                    description=str(
+                        schema.get("description") or schema.get("name") or ""
+                    ),
+                    input_schema=dict(schema.get("parameters") or {}),
+                )
+            else:
+                raise ProviderProtocolError("unsupported provider tool schema")
+        except (ProviderProtocolError, TypeError, ValueError) as exc:
+            raise ProviderPolicyError(
+                "model provider tool schema cannot be normalized"
+            ) from exc
+        add(definition)
+
+    if len(definitions) > 256:
+        raise ProviderPolicyError("model provider tool count exceeds protocol limit")
+    return tuple(definitions[key] for key in sorted(definitions))
+
+
+def _provider_tool_payloads(
+    request: ProviderRequest,
+) -> list[dict[str, Any]]:
+    return [
+        definition.as_openai_tool()
+        for definition in _provider_tool_definitions(request)
+    ]
+
+
+def _provider_tool_choice_payload(
+    request: ProviderRequest,
+    tools: tuple[ProviderToolDefinition, ...],
+) -> object | None:
+    choice = str(request.tool_choice or "auto").strip().lower()
+    if choice not in {"none", "auto", "required", "specific"}:
+        raise ProviderPolicyError("model provider tool_choice is invalid")
+    offered = {tool.tool_id for tool in tools}
+    if not offered:
+        if choice in {"required", "specific"}:
+            raise ProviderPolicyError(
+                "model provider tool_choice requires offered tools"
+            )
+        return "none"
+    if choice == "specific":
+        tool_id = str(request.specific_tool_id or "").strip()
+        if not tool_id or tool_id not in offered:
+            raise ProviderPolicyError(
+                "specific provider tool choice must reference an offered tool"
+            )
+        return {"type": "function", "name": tool_id}
+    if request.specific_tool_id is not None:
+        raise ProviderPolicyError(
+            "specific_tool_id requires tool_choice='specific'"
+        )
+    return choice
+
+
+def _provider_structured_output_payload(
+    request: ProviderRequest,
+) -> dict[str, Any] | None:
+    if request.structured_output_schema is None:
+        return None
+    schema = _strict_json_object(
+        request.structured_output_schema,
+        "structured_output_schema",
+    )
+    if not schema:
+        raise ProviderPolicyError("structured_output_schema must not be empty")
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": "skeleton_structured_output",
+            "schema": schema,
+            "strict": True,
+        }
+    }
+
+
+def _remaining_provider_timeout(
+    request: ProviderRequest,
+    configured_timeout: float,
+) -> float:
+    timeout = float(configured_timeout)
+    if request.deadline is None:
+        return timeout
+    deadline = request.deadline
+    if (
+        not isinstance(deadline, datetime)
+        or deadline.tzinfo is None
+        or deadline.utcoffset() is None
+    ):
+        raise ProviderPolicyError("model provider deadline must be timezone-aware")
+    remaining = (
+        deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
+    ).total_seconds()
+    if remaining <= 0:
+        raise ProviderInvocationError("model provider deadline exceeded")
+    return max(0.001, min(timeout, remaining))
+
+
+def _provider_field(value: object, key: str, default: object = None) -> object:
+    if isinstance(value, Mapping):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def _provider_output_items(response: object) -> tuple[object, ...]:
+    output = _provider_field(response, "output", ())
+    if output is None:
+        return ()
+    if isinstance(output, SequenceABC) and not isinstance(
+        output, (str, bytes, bytearray)
+    ):
+        return tuple(output)
+    return ()
+
+
+def _provider_tool_call_from_item(
+    item: object,
+    *,
+    offered_tool_ids: frozenset[str],
+) -> ProviderToolCall | None:
+    item_type = str(_provider_field(item, "type", "") or "").strip().lower()
+    if item_type not in {"function_call", "tool_call"}:
+        return None
+    call_id = str(
+        _provider_field(item, "call_id", None)
+        or _provider_field(item, "id", None)
+        or ""
+    ).strip()
+    tool_id = str(
+        _provider_field(item, "name", None)
+        or _provider_field(item, "tool_id", None)
+        or ""
+    ).strip()
+    if not call_id or not tool_id:
+        raise ProviderInvocationError(
+            "model provider returned malformed tool call"
+        )
+    if tool_id not in offered_tool_ids:
+        raise ProviderInvocationError(
+            "model provider returned an unoffered tool call"
+        )
+    raw_arguments = _provider_field(item, "arguments", {})
+    if isinstance(raw_arguments, str):
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+        except json.JSONDecodeError as exc:
+            raise ProviderInvocationError(
+                "model provider returned malformed tool arguments"
+            ) from exc
+    else:
+        parsed_arguments = raw_arguments
+    if not isinstance(parsed_arguments, Mapping):
+        raise ProviderInvocationError(
+            "model provider tool arguments must be a JSON object"
+        )
+    try:
+        return ProviderToolCall(
+            call_id=call_id,
+            tool_id=tool_id,
+            arguments=dict(parsed_arguments),
+        )
+    except ProviderProtocolError as exc:
+        raise ProviderInvocationError(
+            "model provider returned invalid normalized tool call"
+        ) from exc
+
+
+def _extract_provider_tool_calls(
+    response: object,
+    *,
+    offered_tools: tuple[ProviderToolDefinition, ...],
+) -> tuple[ProviderToolCall, ...]:
+    offered = frozenset(tool.tool_id for tool in offered_tools)
+    calls: list[ProviderToolCall] = []
+    seen: set[str] = set()
+    for item in _provider_output_items(response):
+        call = _provider_tool_call_from_item(
+            item,
+            offered_tool_ids=offered,
+        )
+        if call is None:
+            continue
+        if call.call_id in seen:
+            raise ProviderInvocationError(
+                "model provider returned duplicate tool call id"
+            )
+        seen.add(call.call_id)
+        calls.append(call)
+        if len(calls) > 256:
+            raise ProviderInvocationError(
+                "model provider returned too many tool calls"
+            )
+    return tuple(calls)
+
+
+def _extract_provider_structured_output(
+    response: object,
+    *,
+    requested_schema: Mapping[str, Any] | None,
+    text: str | None,
+) -> dict[str, Any] | None:
+    parsed = _provider_field(response, "output_parsed", None)
+    if parsed is not None:
+        if not isinstance(parsed, Mapping):
+            raise ProviderInvocationError(
+                "model provider structured output is not an object"
+            )
+        return _strict_json_object(
+            parsed,
+            "model provider structured output",
+        )
+    if requested_schema is None or not text:
+        return None
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ProviderInvocationError(
+            "model provider structured output is invalid JSON"
+        ) from exc
+    if not isinstance(value, Mapping):
+        raise ProviderInvocationError(
+            "model provider structured output is not an object"
+        )
+    return _strict_json_object(
+        value,
+        "model provider structured output",
+    )
+
+
+def _normalized_provider_usage(
+    response: object,
+    *,
+    estimated_cost_usd: float,
+) -> ProviderUsage:
+    usage = _provider_field(response, "usage", None)
+    if usage is None:
+        source = "estimate"
+        input_tokens = output_tokens = cached_tokens = reasoning_tokens = total = None
+    else:
+        source = "provider"
+        input_tokens = _provider_field(usage, "input_tokens", None)
+        output_tokens = _provider_field(usage, "output_tokens", None)
+        total = _provider_field(usage, "total_tokens", None)
+        input_details = _provider_field(usage, "input_tokens_details", None)
+        output_details = _provider_field(usage, "output_tokens_details", None)
+        cached_tokens = (
+            _provider_field(input_details, "cached_tokens", None)
+            if input_details is not None
+            else None
+        )
+        reasoning_tokens = (
+            _provider_field(output_details, "reasoning_tokens", None)
+            if output_details is not None
+            else None
+        )
+
+    def token(value: object) -> int | None:
+        if isinstance(value, bool) or value is None:
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
+
+    estimated = (
+        format(float(estimated_cost_usd), ".12g")
+        if float(estimated_cost_usd) > 0
+        else None
+    )
+    try:
+        return ProviderUsage(
+            input_tokens=token(input_tokens),
+            output_tokens=token(output_tokens),
+            cached_input_tokens=token(cached_tokens),
+            reasoning_tokens=token(reasoning_tokens),
+            total_tokens=token(total),
+            estimated_cost=estimated,
+            billed_cost=None,
+            currency="USD" if estimated is not None else None,
+            usage_source=source,
+        )
+    except ProviderProtocolError as exc:
+        raise ProviderInvocationError(
+            "model provider returned invalid usage metadata"
+        ) from exc
+
+
+def _normalized_finish_reason(
+    response: object,
+    *,
+    tool_calls: tuple[ProviderToolCall, ...],
+) -> FinishReason:
+    if tool_calls:
+        return FinishReason.TOOL_CALLS
+    status = str(_provider_field(response, "status", "") or "").strip().lower()
+    if status in {"cancelled", "canceled"}:
+        return FinishReason.CANCELLED
+    if status in {"failed", "error"}:
+        return FinishReason.PROVIDER_ERROR
+
+    for item in _provider_output_items(response):
+        item_type = str(_provider_field(item, "type", "") or "").strip().lower()
+        if item_type == "refusal":
+            return FinishReason.REFUSAL
+        content = _provider_field(item, "content", ())
+        if isinstance(content, SequenceABC) and not isinstance(
+            content, (str, bytes, bytearray)
+        ):
+            for part in content:
+                if str(_provider_field(part, "type", "") or "").lower() == "refusal":
+                    return FinishReason.REFUSAL
+
+    incomplete = _provider_field(response, "incomplete_details", None)
+    reason = str(_provider_field(incomplete, "reason", "") or "").strip().lower()
+    if reason in {"max_output_tokens", "length"}:
+        return FinishReason.LENGTH
+    if reason in {"content_filter", "content_filtered"}:
+        return FinishReason.CONTENT_FILTERED
+    if status == "completed":
+        return FinishReason.COMPLETED
+    return FinishReason.UNKNOWN
+
+
+def _normalize_provider_interaction(
+    response: object,
+    request: ProviderRequest,
+    *,
+    text: str | None,
+) -> tuple[
+    str | None,
+    dict[str, Any] | None,
+    tuple[ProviderToolCall, ...],
+    FinishReason,
+    ProviderUsage,
+]:
+    tools = _provider_tool_definitions(request)
+    tool_calls = _extract_provider_tool_calls(
+        response,
+        offered_tools=tools,
+    )
+    structured = _extract_provider_structured_output(
+        response,
+        requested_schema=request.structured_output_schema,
+        text=text,
+    )
+    finish = _normalized_finish_reason(
+        response,
+        tool_calls=tool_calls,
+    )
+    usage = _normalized_provider_usage(
+        response,
+        estimated_cost_usd=request.estimated_cost_usd,
+    )
+    normalized_text = text.strip() if isinstance(text, str) else None
+    if normalized_text == "":
+        normalized_text = None
+    if normalized_text is None and structured is None and not tool_calls:
+        if finish not in {
+            FinishReason.REFUSAL,
+            FinishReason.CONTENT_FILTERED,
+            FinishReason.CANCELLED,
+            FinishReason.DEADLINE,
+        }:
+            raise ProviderInvocationError(
+                "model provider returned no normalized output"
+            )
+    return normalized_text, structured, tool_calls, finish, usage
+
+
 def _effective_governance_fields(
     *,
     data_class: str,
