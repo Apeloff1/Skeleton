@@ -440,3 +440,56 @@ async def test_async_budget_denial_happens_before_handler() -> None:
     assert receipt.error_code == "budget_denied"
     assert receipt.metered_tool_calls == 0
     assert events == ["meter"]
+
+
+def test_sync_budget_denial_is_receipted_before_handler() -> None:
+    events: list[str] = []
+
+    class Meter:
+        def meter_tool_call(self, operation_id, event_id, *, now_wall=None):
+            events.append("meter")
+            raise RuntimeError("budget exhausted")
+
+    runtime = ToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+    runtime.register(
+        _manifest(),
+        lambda request: events.append("handler") or "artifact:1",
+    )
+
+    receipt = runtime.execute(_request(), now=_now())
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "budget_denied"
+    assert receipt.metered_tool_calls == 0
+    assert events == ["meter"]
+
+
+@pytest.mark.asyncio
+async def test_async_owner_cancellation_releases_reservation_for_retry() -> None:
+    runtime = AsyncToolRuntime()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def handler(_request):
+        nonlocal calls
+        calls += 1
+        entered.set()
+        await release.wait()
+        return "artifact:1"
+
+    await runtime.register(_manifest(), handler)
+    operation_id = str(uuid4())
+    request = _request(operation_id=operation_id, key="cancel-retry")
+
+    owner = asyncio.create_task(runtime.execute(request, now=_now()))
+    await entered.wait()
+    owner.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await owner
+
+    release.set()
+    retry = await runtime.execute(request, now=_now())
+
+    assert retry.status is ToolExecutionStatus.SUCCEEDED
+    assert calls == 2
