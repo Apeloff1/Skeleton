@@ -8,7 +8,9 @@ on:
       - "requirements.txt"
       - "requirements-build.txt"
       - "scripts/release_provenance.py"
+      - "scripts/ai_release_evidence.py"
       - "scripts/testing/test_release_provenance.py"
+      - "scripts/testing/test_ai_release_evidence.py"
       - "skeleton/release/evidence.py"
       - "skeleton/testing/test_release_evidence.py"
       - "backend/core/engine_client.py"
@@ -18,7 +20,10 @@ on:
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/skills/tool_*.py"
-      - "skeleton/testing/test_ai_golden_journey.py"
+      - "backend/tests/test_ai_golden_journey.py"
+      - "backend/tests/test_ai_chat_conversation_authority.py"
+      - "backend/tests/test_operation_stream_transport.py"
+      - "backend/tests/test_operation_stream_route.py"
       - "skeleton/testing/test_engine_execution_*.py"
       - "skeleton/testing/test_execution_runtime.py"
       - ".github/workflows/reproducible-release.yml"
@@ -41,7 +46,10 @@ on:
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/skills/tool_*.py"
-      - "skeleton/testing/test_ai_golden_journey.py"
+      - "backend/tests/test_ai_golden_journey.py"
+      - "backend/tests/test_ai_chat_conversation_authority.py"
+      - "backend/tests/test_operation_stream_transport.py"
+      - "backend/tests/test_operation_stream_route.py"
       - "skeleton/testing/test_engine_execution_*.py"
       - "skeleton/testing/test_execution_runtime.py"
       - ".github/workflows/reproducible-release.yml"
@@ -105,16 +113,24 @@ jobs:
           mkdir -p source-a/release-meta
           python -m pytest -q \
             source-a/scripts/testing/test_release_provenance.py \
+            source-a/scripts/testing/test_ai_release_evidence.py \
             source-a/skeleton/testing/test_release_evidence.py \
             --junitxml=source-a/release-meta/release-tests.xml
           python -m pytest -q \
-            source-a/skeleton/testing/test_ai_golden_journey.py \
+            source-a/backend/tests/test_ai_golden_journey.py \
+            source-a/backend/tests/test_ai_chat_conversation_authority.py \
+            source-a/backend/tests/test_operation_stream_transport.py \
+            source-a/backend/tests/test_operation_stream_route.py \
+            source-a/backend/tests/test_engine_client.py \
+            source-a/backend/tests/test_engine_provider_adapter.py \
+            source-a/skeleton/testing/test_provider_contract.py \
+            source-a/skeleton/testing/test_verification_runtime.py \
+            source-a/skeleton/testing/test_execution_repository.py \
+            source-a/skeleton/testing/test_execution_runtime.py \
+            source-a/skeleton/testing/test_tool_runtime.py \
             source-a/skeleton/testing/test_engine_execution_service.py \
             source-a/skeleton/testing/test_engine_execution_coordinator.py \
-            source-a/skeleton/testing/test_execution_runtime.py \
-            --junitxml=source-a/release-meta/ai-golden-tests.xml
-          printf '{"source_commit":"%s","result":"pass","check":"ai-golden-engine-tool-approval"}\n' \
-            "$GITHUB_SHA" > source-a/release-meta/ai-golden-eval.json
+            --junitxml=source-a/release-meta/ai-runtime-eval.xml
 
       - name: Build release A
         working-directory: source-a
@@ -188,64 +204,18 @@ jobs:
             source-a/release-meta/release-provenance.json \
             source-b/release-meta/release-provenance.json
           diff -u source-a/release-meta/SHA256SUMS source-b/release-meta/SHA256SUMS
-          printf '{"source_commit":"%s","result":"pass","check":"byte-for-byte-reproducibility"}\n' \
-            "$GITHUB_SHA" > source-a/release-meta/reproducibility-eval.json
 
       - name: Bind tests, evaluation and artifact bytes into release evidence
         working-directory: source-a
         shell: bash
         run: |
           set -euo pipefail
-          python - <<'PY'
-          from __future__ import annotations
-
-          import hashlib
-          import json
-          from pathlib import Path
-
-          root = Path("release-meta")
-
-          def evidence_record(evidence_id: str, name: str) -> dict[str, str]:
-              path = root / name
-              payload = path.read_bytes()
-              return {
-                  "evidence_id": evidence_id,
-                  "name": name,
-                  "sha256": hashlib.sha256(payload).hexdigest(),
-                  "result": "pass",
-              }
-
-          (root / "test-evidence.json").write_text(
-              json.dumps(
-                  [
-                      evidence_record("release-tests", "release-tests.xml"),
-                      evidence_record("ai-golden-tests", "ai-golden-tests.xml"),
-                  ],
-                  indent=2,
-                  sort_keys=True,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          (root / "eval-evidence.json").write_text(
-              json.dumps(
-                  [
-                      evidence_record(
-                          "reproducibility-eval",
-                          "reproducibility-eval.json",
-                      ),
-                      evidence_record(
-                          "ai-golden-eval",
-                          "ai-golden-eval.json",
-                      )
-                  ],
-                  indent=2,
-                  sort_keys=True,
-              )
-              + "\n",
-              encoding="utf-8",
-          )
-          PY
+          python scripts/ai_release_evidence.py \
+            --record release-tests=release-meta/release-tests.xml \
+            --output release-meta/test-evidence.json
+          python scripts/ai_release_evidence.py \
+            --record ai-runtime-eval=release-meta/ai-runtime-eval.xml \
+            --output release-meta/eval-evidence.json
 
           mapfile -t artifact_names < <(
             find dist -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort
