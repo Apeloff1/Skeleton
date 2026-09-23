@@ -59,7 +59,7 @@ jobs:
           python-version: "3.11.16"
 
       - name: Install focused verifier
-        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt "pytest>=8,<9"
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt "pytest>=8,<9" pytest-asyncio
 
       - name: Verify canonical RAG state authority
         env:
