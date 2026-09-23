@@ -558,6 +558,7 @@ def engine_command_from_provider_request(
         compiler_version=compiler_version,
         source_snapshot=source_snapshot,
         data_class=request.data_class,
+        purpose=request.purpose,
         instructions=request.instructions,
         prompt=request.prompt,
         history=tuple(
@@ -613,6 +614,7 @@ def engine_command_from_provider_request(
             "tenant_id": tenant_id,
             "capability": effective_capability,
             "data_class": handoff.data_class,
+            "provider_purpose": handoff.purpose,
             "context_id": handoff.context_id,
             "context_digest": handoff.context_digest,
             "compiler_version": handoff.compiler_version,
@@ -724,6 +726,7 @@ def engine_command_from_context(
         compiler_version=context.compiler_version,
         source_snapshot=context.source_snapshot,
         data_class=provider_seed.data_class,
+        purpose=provider_seed.purpose,
         instructions=provider_seed.instructions,
         prompt=provider_seed.prompt,
         history=tuple(
@@ -755,6 +758,7 @@ def engine_command_from_context(
             "tenant_id": context.tenant_id,
             "capability": operation.capability,
             "data_class": handoff.data_class,
+            "provider_purpose": handoff.purpose,
             "context_id": context.context_id,
             "context_digest": context.context_digest,
             "compiler_version": context.compiler_version,
