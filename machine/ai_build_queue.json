@@ -731,7 +731,7 @@
       "stage": 1,
       "parallel_lane": "conversation",
       "objective": "Finish canonical thread/message ingress by replacing raw conversation_history authority with thread_id + idempotent new-message append.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-state-authority-convergence",
@@ -775,7 +775,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -795,7 +795,7 @@
       "stage": 1,
       "parallel_lane": "conversation",
       "objective": "Bind assistant messages to canonical operation/execution results and edit/regenerate branch lineage.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S1-CONV-01"
       ],
@@ -838,7 +838,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -858,7 +858,7 @@
       "stage": 1,
       "parallel_lane": "conversation",
       "objective": "Make frontend transcript state rebuildable from server authority and wire delete/export/retention.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S1-CONV-02"
       ],
@@ -921,7 +921,7 @@
       "stage": 1,
       "parallel_lane": "memory",
       "objective": "Materialize durable MemoryRecord/WriteProposal contracts and Mongo repository behind the canonical memory boundary.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-state-authority-convergence",
@@ -962,7 +962,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -982,7 +982,7 @@
       "stage": 1,
       "parallel_lane": "memory",
       "objective": "Implement governed staged memory writeback, dedupe/version conflict handling and provenance policy.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S1-MEM-01"
       ],
@@ -1025,7 +1025,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1045,7 +1045,7 @@
       "stage": 1,
       "parallel_lane": "memory",
       "objective": "Convert vector/MAG/CAG/process stores to derived projections and prove delete/export/rebuild/degraded behavior.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S1-MEM-02"
       ],
@@ -1089,7 +1089,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1109,7 +1109,7 @@
       "stage": 1,
       "parallel_lane": "tool-runtime",
       "objective": "Freeze ToolManifest, ToolExecutionRequest and ToolExecutionReceipt contracts and canonical registry/runtime.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-governance-registry",
@@ -1150,7 +1150,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1169,7 +1169,7 @@
       "stage": 1,
       "parallel_lane": "tool-runtime",
       "objective": "Adapt database/network/code/build/artifact tools behind scoped repository, egress and sandbox adapters.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S1-TOOL-01"
       ],
@@ -1213,7 +1213,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1232,7 +1232,7 @@
       "stage": 1,
       "parallel_lane": "tool-runtime",
       "objective": "Add approval/idempotency reservation, compensation/postconditions and make backend flat registry delegate-only.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S1-TOOL-02"
       ],
@@ -1276,7 +1276,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1295,7 +1295,7 @@
       "stage": 2,
       "parallel_lane": "context",
       "objective": "Complete ContextCompiler source adapters for memory, artifacts, tools and skills with deterministic budget/trust selection.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-conversation-state-authority",
@@ -1337,7 +1337,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1354,7 +1354,7 @@
       "stage": 2,
       "parallel_lane": "context",
       "objective": "Converge legacy route/service system prompts onto versioned instruction-policy identities.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S2-CTX-01"
       ],
@@ -1398,7 +1398,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1415,7 +1415,7 @@
       "stage": 2,
       "parallel_lane": "context",
       "objective": "Bind immutable context snapshot/digest to AgentTurn/ProviderRequest and migrate remaining direct feature prompt/history assembly.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S2-CTX-02"
       ],
@@ -1459,7 +1459,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1476,7 +1476,7 @@
       "stage": 2,
       "parallel_lane": "provider-protocol",
       "objective": "Materialize provider-neutral tool definition/call, structured output, usage, finish-reason and delta contracts.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-provider-surface-convergence",
@@ -1517,7 +1517,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1535,7 +1535,7 @@
       "stage": 2,
       "parallel_lane": "provider-protocol",
       "objective": "Extend provider_runtime request/response translation and normalize tool calls, usage, finish reasons, deadline/cancellation.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S2-PROTO-01"
       ],
@@ -1579,7 +1579,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1597,7 +1597,7 @@
       "stage": 2,
       "parallel_lane": "provider-protocol",
       "objective": "Add optional normalized provider streaming deltas without making provider stream the durable operation stream.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S2-PROTO-02"
       ],
@@ -1639,7 +1639,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1657,7 +1657,7 @@
       "stage": 3,
       "parallel_lane": "verification",
       "objective": "Materialize verification/claim/evidence/postcondition contracts and risk-to-level policy.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-context-compiler-convergence",
@@ -1698,7 +1698,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1717,7 +1717,7 @@
       "stage": 3,
       "parallel_lane": "verification",
       "objective": "Implement deterministic claim grounding, citation integrity and tool postcondition adapters.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S3-VER-01"
       ],
@@ -1762,7 +1762,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -1781,7 +1781,7 @@
       "stage": 3,
       "parallel_lane": "verification",
       "objective": "Add bounded canonical-provider semantic verifier and repair/qualified/abstain/block finalization semantics.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S3-VER-02"
       ],
@@ -1825,7 +1825,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
