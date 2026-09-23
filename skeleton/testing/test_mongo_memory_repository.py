@@ -110,26 +110,6 @@ class FakeCollection:
 
 
 
-
-class FakeProjectionStore(MemoryStore):
-    def __init__(self):
-        self.items: dict[str, MemoryChunk] = {}
-
-    def add(self, chunk: MemoryChunk) -> None:
-        self.items[chunk.id] = chunk
-
-    def query(self, query_text, *, top_k=5, metadata_filter=None, min_score=0.0):
-        return [
-            MemoryQueryResult(chunk=item, score=1.0, rank=index + 1)
-            for index, item in enumerate(self.items.values())
-        ][:top_k]
-
-    def delete(self, chunk_id: str) -> bool:
-        return self.items.pop(chunk_id, None) is not None
-
-    def health(self):
-        return {"ok": True}
-
 class FakeDatabase:
     def __init__(self):
         self.collections: dict[str, FakeCollection] = {}
