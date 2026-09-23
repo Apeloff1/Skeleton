@@ -970,10 +970,14 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         tenant_id=request.tenant_id,
         governance_context=request.governance_context,
     )
-    if request.operation_id is not None and (
-        not isinstance(request.operation_id, str) or not request.operation_id.strip()
-    ):
-        raise ProviderPolicyError("model provider operation identity is invalid")
+    for identity_name in ("operation_id", "execution_id", "turn_id"):
+        identity = getattr(request, identity_name)
+        if identity is not None and (
+            not isinstance(identity, str) or not identity.strip()
+        ):
+            raise ProviderPolicyError(
+                f"model provider {identity_name} is invalid"
+            )
     if (request.context_id is None) != (request.context_digest is None):
         raise ProviderPolicyError(
             "model provider context_id and context_digest must be supplied together"
@@ -1043,23 +1047,11 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         raise ProviderPolicyError(
             "context snapshot/compiler version require context identity and digest"
         )
-    for schema in request.tool_schemas:
-        if not isinstance(schema, Mapping) or not schema:
-            raise ProviderPolicyError(
-                "model provider tool schema must be a non-empty mapping"
-            )
-        try:
-            json.dumps(
-                dict(schema),
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            )
-        except (TypeError, ValueError) as exc:
-            raise ProviderPolicyError(
-                "model provider tool schema must be strict JSON"
-            ) from exc
+    tools = _provider_tool_definitions(request)
+    _provider_tool_choice_payload(request, tools)
+    _provider_structured_output_payload(request)
+    if request.deadline is not None:
+        _remaining_provider_timeout(request, 3600.0)
     if isinstance(request.estimated_cost_usd, bool):
         raise ProviderPolicyError("model provider estimated cost is invalid")
     try:
@@ -1079,13 +1071,13 @@ def _estimated_input_tokens(request: ProviderRequest) -> int:
     characters += sum(
         len(
             json.dumps(
-                dict(schema),
+                tool.as_dict(),
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
             )
         )
-        for schema in request.tool_schemas
+        for tool in _provider_tool_definitions(request)
     )
     return max(1, math.ceil(characters / 4))
 
@@ -1162,7 +1154,7 @@ def provider_request_from_context(
     if not isinstance(resource_budget, ResourceBudget):
         raise ProviderPolicyError("model provider resource budget is invalid")
 
-    parsed_tools: list[Mapping[str, Any]] = []
+    parsed_tools: list[ProviderToolDefinition] = []
     for raw in projection.tool_schema_contents:
         try:
             schema = json.loads(raw)
@@ -1172,7 +1164,22 @@ def provider_request_from_context(
             raise ProviderPolicyError(
                 "compiled tool schema must be a non-empty JSON object"
             )
-        parsed_tools.append(dict(schema))
+        try:
+            parsed_tools.append(
+                ProviderToolDefinition(
+                    tool_id=str(schema.get("tool_id") or ""),
+                    description=str(
+                        schema.get("description")
+                        or schema.get("tool_id")
+                        or ""
+                    ),
+                    input_schema=dict(schema.get("input_schema") or {}),
+                )
+            )
+        except (ProviderProtocolError, TypeError, ValueError) as exc:
+            raise ProviderPolicyError(
+                "compiled tool schema cannot become provider tool definition"
+            ) from exc
 
     request = ProviderRequest(
         instructions=projection.instructions,
@@ -1187,6 +1194,8 @@ def provider_request_from_context(
         purpose=normalized_purpose,
         tenant_id=envelope.tenant_id,
         operation_id=envelope.operation_id,
+        execution_id=envelope.execution_id,
+        turn_id=envelope.turn_id,
         estimated_cost_usd=estimated_cost_usd,
         resource_budget=resource_budget,
         governance_context=governance_context,
@@ -1194,11 +1203,11 @@ def provider_request_from_context(
         context_digest=envelope.context_digest,
         context_source_snapshot=envelope.source_snapshot,
         context_compiler_version=envelope.compiler_version,
-        tool_schemas=tuple(parsed_tools),
+        tools=tuple(parsed_tools),
     )
     projected_tokens = _estimated_input_tokens(request)
     input_capacity = envelope.budget.input_capacity(
-        tools_enabled=bool(request.tool_schemas)
+        tools_enabled=bool(_provider_tool_definitions(request))
     )
     if projected_tokens > input_capacity:
         raise ProviderPolicyError(
