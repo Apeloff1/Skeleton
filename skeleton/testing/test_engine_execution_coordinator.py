@@ -232,6 +232,8 @@ async def test_coordinator_golden_trace_preserves_compiled_context_lineage(
     service.submit(
         command,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     provider = FakeProvider()
@@ -271,12 +273,16 @@ async def test_coordinator_golden_trace_preserves_compiled_context_lineage(
     status = service.status(
         command.execution_request.execution_id,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     assert status.operation_state == "completed"
     events = service.events(
         command.execution_request.execution_id,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     assert any(event["type"] == "execution.result" for event in events["events"])
@@ -290,6 +296,8 @@ async def test_coordinator_duplicate_launch_runs_one_provider_turn(tmp_path) -> 
     service.submit(
         command,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     gate = asyncio.Event()
@@ -318,6 +326,8 @@ async def test_coordinator_restart_recovery_uses_durable_submission(tmp_path) ->
     service.submit(
         command,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
@@ -345,6 +355,8 @@ async def test_coordinator_provider_unavailable_becomes_durable_failure(
     service.submit(
         command,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     coordinator = EngineExecutionCoordinator(
@@ -491,6 +503,8 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     service.submit(
         command,
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
 
@@ -524,6 +538,8 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     pending = service.pending_tool_approvals(
         "exec-approval",
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         now=_now(),
     )
     assert len(pending) == 1
@@ -534,6 +550,8 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     approval = service.approve_tool_call(
         "exec-approval",
         verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
         call_id=pending[0]["call_id"],
         tool_id=pending[0]["tool_id"],
         arguments_digest=pending[0]["arguments_digest"],
