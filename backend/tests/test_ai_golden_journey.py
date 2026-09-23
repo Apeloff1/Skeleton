@@ -370,7 +370,10 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
         tool_id=pending[0]["tool_id"],
         arguments_digest=pending[0]["arguments_digest"],
         idempotency_key="golden-approval-1",
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+        expires_at=min(
+            command.delegated_authority.expires_at,
+            command.operation.deadline,
+        ) - timedelta(seconds=1),
     )
     await coordinator.ensure_execution(EXECUTION_ID)
     result = await _wait_result(service, EXECUTION_ID)
