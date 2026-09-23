@@ -129,6 +129,7 @@ def _proposal(
     namespace: str = "assistant",
     target: str | None = None,
     version: int | None = None,
+    expires_at: datetime | None = None,
 ):
     return MemoryWriteProposal(
         proposal_id=str(uuid4()),
@@ -143,6 +144,7 @@ def _proposal(
         source_operation_id=str(uuid4()),
         target_memory_id=target,
         expected_version=version,
+        expires_at=expires_at,
     )
 
 
@@ -292,3 +294,47 @@ async def test_mongo_idempotency_key_reuse_with_different_intent_conflicts() -> 
     conflicting = _proposal(key="stable", content="two")
     with pytest.raises(MemoryConflict, match="different memory write intent"):
         await repo.commit(conflicting, now=_now())
+
+
+@pytest.mark.asyncio
+async def test_mongo_expire_due_tombstones_only_elapsed_records() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    due = await repo.commit(
+        _proposal(
+            key="due",
+            content="old",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+    future = await repo.commit(
+        _proposal(
+            key="future",
+            content="new",
+            expires_at=_now() + timedelta(seconds=50),
+        ),
+        now=_now(),
+    )
+
+    expired = await repo.expire_due(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        now=_now() + timedelta(seconds=10),
+    )
+
+    assert [item.memory_id for item in expired] == [due.memory_id]
+    assert expired[0].version == 2
+    with pytest.raises(MemoryNotFound):
+        await repo.get(
+            due.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    assert (
+        await repo.get(
+            future.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    ).version == 1
