@@ -356,8 +356,54 @@ export class WorkspaceController {
     this.change(updateConversation(this.snapshot.workspace, this.active.id, c => ({ ...c, ...safe })));
   }
 
+  private async createOnServer(input: {
+    title?: string;
+    handoff?: ChatHandoff;
+  } = {}): Promise<void> {
+    if (!this.authority) return;
+    if (this.snapshot.workspace.conversations.length >= 30) {
+      this.notify('You have 30 conversations. Export and delete one to make room.');
+      return;
+    }
+    try {
+      const thread = await this.authority.createThread(
+        input.title?.slice(0, 100) || 'New conversation',
+      );
+      const conversation = this.authorityConversation(thread, [], undefined);
+      if (input.handoff) {
+        conversation.handoffId = input.handoff.id;
+        conversation.draft = input.handoff.draft.slice(0, MAX_TEXT);
+        conversation.context = input.handoff.context.slice(0, MAX_CONTEXT);
+      }
+      this.cancel();
+      this.change({
+        ...this.snapshot.workspace,
+        activeId: conversation.id,
+        conversations: [
+          conversation,
+          ...this.snapshot.workspace.conversations.filter(
+            item => item.id !== conversation.id,
+          ),
+        ],
+      });
+      this.emit({ serverSynced: true });
+      if (input.handoff) {
+        this.notify(
+          'Project draft opened. Review its context in Details, then send when ready.',
+        );
+      }
+    } catch {
+      this.emit({ serverSynced: false });
+      this.notify('Could not create the server conversation. Retry when the connection is restored.');
+    }
+  }
+
   create(): void {
     if (!this.snapshot.ready) return;
+    if (this.authority) {
+      void this.createOnServer();
+      return;
+    }
     try {
       const workspace = addConversation(this.snapshot.workspace);
       this.cancel();
@@ -377,6 +423,13 @@ export class WorkspaceController {
     const existing = this.snapshot.workspace.conversations.find(item => item.handoffId === handoff.id);
     if (existing) {
       this.select(existing.id);
+      return true;
+    }
+    if (this.authority) {
+      void this.createOnServer({
+        title: handoff.projectTitle || 'Project discussion',
+        handoff,
+      });
       return true;
     }
     try {
@@ -412,18 +465,93 @@ export class WorkspaceController {
   select(id: string): void {
     if (!this.snapshot.workspace.conversations.some(c => c.id === id)) return;
     if (id !== this.active.id) this.cancel();
-    this.change({ ...updateConversation(this.snapshot.workspace, id, c => ({ ...c, archived: false })), activeId: id });
+    this.change({
+      ...updateConversation(
+        this.snapshot.workspace,
+        id,
+        c => ({ ...c, archived: false }),
+      ),
+      activeId: id,
+    });
+    if (this.authority) void this.refreshFromServer();
+  }
+
+  private async removeOnServer(id: string): Promise<void> {
+    if (!this.authority) return;
+    const conversation = this.snapshot.workspace.conversations.find(
+      item => item.id === id,
+    );
+    if (!conversation?.serverVersion || !this.snapshot.serverSynced) {
+      await this.refreshFromServer();
+    }
+    const current = this.snapshot.workspace.conversations.find(
+      item => item.id === id,
+    );
+    if (!current?.serverVersion) {
+      this.notify('Conversation server version is unavailable; delete was not sent.');
+      return;
+    }
+    try {
+      await this.authority.requestDeletion({
+        threadId: id,
+        expectedThreadVersion: current.serverVersion,
+      });
+      current.messages.forEach(message => this.attachments.delete(message.id));
+      await this.refreshFromServer();
+    } catch {
+      this.notify('Could not request conversation deletion. Refresh and retry.');
+      await this.refreshFromServer();
+    }
   }
 
   remove(id: string): void {
     if (this.running?.conversationId === id) this.cancel();
+    if (this.authority) {
+      void this.removeOnServer(id);
+      return;
+    }
     const removed = this.snapshot.workspace.conversations.find(c => c.id === id);
     removed?.messages.forEach(m => this.attachments.delete(m.id));
     this.change(deleteConversation(this.snapshot.workspace, id));
   }
 
+  private async archiveOnServer(
+    id: string,
+    archived: boolean,
+  ): Promise<void> {
+    if (!this.authority) return;
+    const conversation = this.snapshot.workspace.conversations.find(
+      item => item.id === id,
+    );
+    if (!conversation?.serverVersion || !this.snapshot.serverSynced) {
+      await this.refreshFromServer();
+    }
+    const current = this.snapshot.workspace.conversations.find(
+      item => item.id === id,
+    );
+    if (!current?.serverVersion) {
+      this.notify('Conversation server version is unavailable; archive state was not changed.');
+      return;
+    }
+    try {
+      await this.authority.setState({
+        threadId: id,
+        expectedThreadVersion: current.serverVersion,
+        state: archived ? 'archived' : 'active',
+      });
+      await this.refreshFromServer();
+    } catch {
+      this.notify('Could not update conversation archive state. Refresh and retry.');
+      await this.refreshFromServer();
+    }
+  }
+
   archive(id: string, archived: boolean): void {
     if (this.running?.conversationId === id) this.cancel();
+    if (this.authority) {
+      void this.archiveOnServer(id, archived);
+      return;
+    }
     let workspace = updateConversation(this.snapshot.workspace, id, c => ({ ...c, archived }));
     if (archived && workspace.activeId === id) {
       const next = workspace.conversations.find(c => !c.archived);
