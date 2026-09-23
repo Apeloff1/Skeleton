@@ -12,7 +12,11 @@ from skeleton.api.engine_authority import (
     EngineServiceGrant,
     engine_request_binding,
 )
-from skeleton.api.engine_routes import _engine_service, router
+from skeleton.api.engine_routes import (
+    _engine_coordinator,
+    _engine_service,
+    router,
+)
 from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
@@ -136,6 +140,7 @@ def _client(service: EngineExecutionService) -> TestClient:
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[_engine_service] = lambda: service
+    app.dependency_overrides[_engine_coordinator] = lambda: None
     return TestClient(app)
 
 
