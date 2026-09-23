@@ -31,6 +31,7 @@ def _proposal(
     content: str = "remember this",
     target: str | None = None,
     expected_version: int | None = None,
+    expires_at: datetime | None = None,
 ) -> MemoryWriteProposal:
     return MemoryWriteProposal(
         proposal_id=str(uuid4()),
@@ -45,6 +46,7 @@ def _proposal(
         source_operation_id=str(uuid4()),
         target_memory_id=target,
         expected_version=expected_version,
+        expires_at=expires_at,
     )
 
 
@@ -257,3 +259,43 @@ def test_old_idempotency_key_cannot_be_reused_for_other_target_or_payload() -> N
         tenant_id="tenant-a",
         namespace="assistant",
     ).content == "v1"
+
+
+def test_expire_due_tombstones_only_elapsed_records() -> None:
+    repo = SQLiteMemoryRepository()
+    due = repo.commit(
+        _proposal(
+            key="due",
+            content="old",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+    future = repo.commit(
+        _proposal(
+            key="future",
+            content="new",
+            expires_at=_now() + timedelta(seconds=50),
+        ),
+        now=_now(),
+    )
+
+    expired = repo.expire_due(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        now=_now() + timedelta(seconds=10),
+    )
+
+    assert [item.memory_id for item in expired] == [due.memory_id]
+    assert expired[0].version == 2
+    with pytest.raises(MemoryNotFound):
+        repo.get(
+            due.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    assert repo.get(
+        future.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    ).version == 1
