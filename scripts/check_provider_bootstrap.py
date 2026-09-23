@@ -223,7 +223,13 @@ def discover_provider_surfaces(repo_root: Path) -> dict[str, dict[str, list[str]
                 continue
             signals = _provider_surface_signals(path, source)
             edge_classes: list[str] = []
-            if signals["credential_markers"]:
+            provider_context = (
+                bool(signals["sdk_imports"])
+                or bool(signals["provider_urls"])
+                or bool(signals["client_markers"])
+                or any(term in relative.lower() for term in _AI_SURFACE_PATH_TERMS)
+            )
+            if signals["credential_markers"] and provider_context:
                 edge_classes.append("credential")
             if signals["sdk_imports"]:
                 edge_classes.append("sdk_client")
