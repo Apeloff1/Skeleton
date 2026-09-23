@@ -235,3 +235,81 @@ def test_registry_rejects_manifest_redefinition() -> None:
             ),
             lambda request: "two",
         )
+
+
+def test_manifest_rejects_malformed_schema_shapes() -> None:
+    with pytest.raises(ToolContractError, match="required references unknown"):
+        ToolManifest(
+            tool_id="repo.bad",
+            version="1.0.0",
+            description="bad schema",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["missing"],
+            },
+        )
+
+    with pytest.raises(ToolContractError, match="nesting depth"):
+        schema = {"type": "object"}
+        cursor = schema
+        for _ in range(18):
+            child = {"type": "object"}
+            cursor["properties"] = {"x": child}
+            cursor = child
+        ToolManifest(
+            tool_id="repo.deep",
+            version="1.0.0",
+            description="too deep",
+            input_schema=schema,
+        )
+
+
+def test_schema_invalid_request_is_denied_before_handler_or_meter() -> None:
+    events: list[str] = []
+
+    class Meter:
+        def meter_tool_call(self, operation_id, event_id, *, now_wall=None):
+            events.append("meter")
+            return object()
+
+    runtime = ToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+    runtime.register(
+        _manifest(),
+        lambda request: events.append("handler") or "artifact:1",
+    )
+    request = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="bad-args",
+        arguments={},
+        requested_at=_now(),
+    )
+
+    receipt = runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "arguments_invalid"
+    assert receipt.metered_tool_calls == 0
+    assert events == []
+
+
+def test_schema_rejects_additional_arguments_when_closed() -> None:
+    runtime = ToolRuntime()
+    runtime.register(_manifest(), lambda request: "artifact:1")
+    request = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="extra-args",
+        arguments={"path": "README.md", "unexpected": True},
+        requested_at=_now(),
+    )
+
+    receipt = runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "arguments_invalid"
