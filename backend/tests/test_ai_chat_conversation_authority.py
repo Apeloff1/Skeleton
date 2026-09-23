@@ -273,6 +273,11 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     assert command.execution_request.execution_id == envelope.execution_id
     assert command.execution_request.context_policy["context_id"] == envelope.context_id
     assert command.execution_request.context_policy["context_digest"] == envelope.context_digest
+    assert command.compiled_context.history == (
+        ("user", "older question"),
+        ("assistant", "older answer"),
+    )
+    assert command.compiled_context.prompt == "new question"
     assert captured["commit"]["operation_id"] == envelope.operation_id
     assert captured["commit"]["expected_thread_version"] == 2
     assert captured["commit"]["causal_user_message_id"] == user_message.message_id
