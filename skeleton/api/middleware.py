@@ -155,6 +155,7 @@ DEFAULT_DOMAIN_MAP: Tuple[Tuple[str, str], ...] = (
     ("/api/v1/retrieval", "retrieval"),
     ("/api/v1/pipeline", "pipeline"),
     ("/api/v1/intelligence", "intelligence"),
+    ("/api/v1/engine", "intelligence"),
     ("/api/v1/resilience", "resilience"),
     ("/api/v1/context", "context"),
     ("/api/v1/ledger", "ledger"),
