@@ -637,9 +637,17 @@
       "plane": "engine-api",
       "stage": 5,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "backend/tests/test_engine_client.py — sealed submit/status/result flow, conflict mapping, full request identity, provider credential isolation, delegated approval scope",
+        "backend/tests/test_engine_provider_adapter.py — backend compatibility adapter routes model execution only through Skeleton engine",
+        "backend/tests/test_ai_chat_conversation_authority.py — canonical chat context -> engine command -> durable assistant lineage with retry-stable execution identity",
+        "skeleton/testing/test_engine_execution_service.py — delegated tenant/scope validation, durable submit idempotency, status/cancel/events, durable call-bound tool approvals and expiry",
+        "skeleton/testing/test_engine_execution_coordinator.py — provider execution ownership, restart recovery, provider outage durable failure, approval resume with one tool effect",
+        "backend/tests/test_ai_golden_journey.py — compiled retrieval/tool context crossing engine boundary with approval, receipt lineage and verified final result",
+        "docker-compose.yml — runtime provider credential is owned by Skeleton engine service; backend retains only engine seal/service identity"
+      ],
       "closure_evidence_required": [
         "backend->engine authenticated submit test",
         "delegated tenant/user/scope validation test",
@@ -653,16 +661,11 @@
         "cross-service golden journey preserves operation/turn/receipt lineage"
       ],
       "outstanding_evidence": [
-        "backend->engine authenticated submit test",
-        "delegated tenant/user/scope validation test",
-        "submit retry returns same operation/execution rather than duplicate work",
-        "deadline/trace/budget propagation test",
-        "query/result binding test",
-        "idempotent cancel and late-result fencing test",
-        "engine outage produces explicit backend degraded behavior",
-        "backend contains no runtime model credential after cutover",
-        "provider execution occurs only in Skeleton service in production topology",
-        "cross-service golden journey preserves operation/turn/receipt lineage"
+        "fresh CI execution of focused Stage 5/7 suites on current branch head",
+        "production deployment proof that only Skeleton engine process receives runtime provider credentials",
+        "dependency closure: gap-cognitive-execution-loop",
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-provider-surface-convergence"
       ],
       "blockers": [
         "dependency must close: gap-cognitive-execution-loop",
@@ -688,7 +691,7 @@
       "plane": "streaming-realtime",
       "stage": 6,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented",
       "closure_decision": "open",
       "evidence_present": [
         "canonical operation identity and lifecycle state machine",
@@ -713,7 +716,13 @@
         "cancellation bridge into durable OperationEnvelope state",
         "transactional outbox drain before replay",
         "explicit post-header replay-gap resync event",
-        "focused tenant-isolation/cancel/replay/terminal SSE tests"
+        "focused tenant-isolation/cancel/replay/terminal SSE tests",
+        "frontend/services/operationStreamReducer.ts — sequence/event-id dedupe, provisional output and terminal reconciliation",
+        "frontend/scripts/test-operation-stream-reducer.mjs — duplicate/out-of-order/gap/provisional/resync reducer regressions",
+        "frontend/services/operationStream.ts — persisted cursor, automatic authoritative replay-gap resync and ACK",
+        "backend/core/operation_stream_transport.py — compaction-floor resync, multi-consumer ACK safety and terminal cancellation bridge",
+        "backend/tests/test_operation_stream_transport.py — slow-client backpressure, multi-client compaction, replay-gap recovery and cancel/complete races",
+        "backend/tests/test_operation_stream_route.py — authenticated HTTP replay/ACK/resync contract"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -725,21 +734,20 @@
         "slow-client/backpressure test"
       ],
       "outstanding_evidence": [
-        "frontend reducer with sequence and event-id dedupe",
-        "frontend reconnect/resume cursor",
-        "multi-client acknowledgement/compaction strategy",
-        "distributed stream ownership for multi-worker deployment",
-        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+        "distributed stream ownership/coordination for multi-worker deployment",
+        "browser-level disconnect/reconnect/slow-client/cancel-race journey",
+        "fresh CI execution of frontend reducer and backend stream suites on current branch head",
+        "dependency closure: gap-cognitive-execution-loop",
+        "dependency closure: gap-engine-application-execution-boundary",
+        "dependency closure: gap-state-authority-convergence"
       ],
       "blockers": [
         "dependency must close: gap-cognitive-execution-loop",
         "dependency must close: gap-engine-application-execution-boundary",
         "dependency must close: gap-state-authority-convergence",
-        "frontend reducer with sequence and event-id dedupe",
-        "frontend reconnect/resume cursor",
-        "multi-client acknowledgement/compaction strategy",
         "distributed stream ownership for multi-worker deployment",
-        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+        "browser-level disconnect/reconnect/slow-client/cancel-race evidence",
+        "fresh CI evidence is absent on the current branch head"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -760,9 +768,17 @@
       "plane": "product-experience",
       "stage": 7,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "backend/tests/test_ai_golden_journey.py — deterministic assembled retrieval -> context compiler -> engine -> approval-required tool -> verification/result journey with no live provider secret",
+        "backend/tests/test_ai_chat_conversation_authority.py — server-authoritative conversation continuation and cross-service result lineage",
+        "skeleton/testing/test_engine_execution_coordinator.py — engine restart recovery, duplicate-launch fencing, provider outage and durable approval resume",
+        "skeleton/testing/test_execution_runtime.py — provider checkpoint crash recovery, tool-effect crash recovery without duplicate side effect, cancellation and deadline faults",
+        "backend/tests/test_operation_stream_transport.py and backend/tests/test_operation_stream_route.py — replay/resync/cancel/backpressure transport journeys",
+        "frontend/scripts/test-operation-stream-reducer.mjs — client ordering/reconciliation/resync semantics",
+        "skeleton/testing/test_engine_execution_service.py — approval expiry/mismatch/idempotency fault coverage"
+      ],
       "closure_evidence_required": [
         "browser E2E suite",
         "API trace continuity",
@@ -770,10 +786,11 @@
         "degraded-mode assertions"
       ],
       "outstanding_evidence": [
-        "browser E2E suite",
-        "API trace continuity",
-        "artifact/result assertions",
-        "degraded-mode assertions"
+        "browser E2E suite spanning actual frontend -> backend -> engine topology",
+        "fresh execution of the deterministic golden journey and fault suites on current branch head",
+        "assembled release evidence with run IDs/artifacts/log references",
+        "full mandatory journey matrix execution including conversation, retrieval, tool, artifact, cancel/reconnect and outage under one CI release run",
+        "all Stage 0-6 dependency gaps must close before this gap can close"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
@@ -788,7 +805,10 @@
         "dependency must close: gap-verification-evidence-contract",
         "dependency must close: gap-cognitive-execution-loop",
         "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-streaming-protocol"
+        "dependency must close: gap-streaming-protocol",
+        "browser E2E evidence is not yet present",
+        "current branch head has no attached PR-triggered workflow run",
+        "release evidence bundle has implementation references but no fresh run IDs yet"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
