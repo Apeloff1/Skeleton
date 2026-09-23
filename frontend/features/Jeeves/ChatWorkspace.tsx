@@ -21,6 +21,7 @@ import { captureInput } from './workbench/capture';
 import type { CaptureInput } from './workbench/capture';
 import {
   createConversation as createServerConversation,
+  getConversationSnapshot,
   listAllConversationMessages,
   listConversations as listServerConversations,
   requestConversationDeletionById,
@@ -147,6 +148,16 @@ export default function ChatWorkspace() {
         threadId,
         { activeOnly: true, pageSize: 200 },
       ),
+      snapshot: async (threadId, activeOnly) => {
+        const stable = await getConversationSnapshot(
+          threadId,
+          { activeOnly },
+        );
+        return {
+          thread: stable.thread,
+          messages: stable.messages,
+        };
+      },
       chat: input => sendCanonicalConversationTurn({
         threadId: input.threadId,
         expectedThreadVersion: input.expectedThreadVersion,
@@ -313,11 +324,14 @@ export default function ChatWorkspace() {
       <Button icon="checkmark-outline" label="Save details" onPress={() => { controller.edit({ title, context }); setSettings(false); }} />
       <View style={s.divider} /><Text style={s.label}>Keep a copy</Text><Text style={s.small}>Export a Markdown transcript. Attachment and generated file contents are excluded.</Text>
       <Button icon="download-outline" label="Export transcript" onPress={() => {
-        void controller.refreshFromServer()
-          .then(() => exportTranscript(controller.active))
-          .catch(() => controller.notify('Could not refresh and export the server transcript. Try again when the connection is available.'));
+        void controller.exportAuthoritativeConversation()
+          .then(exportTranscript)
+          .catch(() => controller.notify(
+            'Could not export a stable server transcript. Try again when the connection is available.',
+          ));
       }} />
       <Text style={s.small}>Conversation history is stored by the server authority. This device caches drafts, display state and preferences for recovery.</Text>
+      {conversation.serverState === 'deleting' && <Text accessibilityRole="alert" style={s.error}>Deletion is pending governance retention. This conversation is read-only while lifecycle propagation completes.</Text>}
     </ScrollView></SafeAreaView></Modal>
   </SafeAreaView>;
 }
