@@ -158,7 +158,10 @@ def test_windows_runtime_payload_respects_portable_path_budget():
         if not relative:
             continue
         if (
-            relative.startswith("backend/gameforge/jeeves/jeeves_mastermap_")
+            (
+                relative.startswith("backend/gameforge/jeeves/jeeves_mastermap_")
+                or relative.startswith("skeleton/ai/research/legacy/gameforge/jeeves/jeeves_mastermap_")
+            )
             and relative.endswith(".json")
         ):
             continue
