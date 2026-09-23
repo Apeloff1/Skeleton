@@ -170,3 +170,25 @@ def test_provider_surface_evidence_records_validation_failure() -> None:
 
     assert evidence["valid"] is False
     assert evidence["validation_errors"] == ["synthetic failure"]
+
+
+
+def test_ai_credential_read_is_classified_without_provider_filename_or_sdk(
+    tmp_path: Path,
+) -> None:
+    module = _checker()
+    root = tmp_path / "backend" / "services"
+    root.mkdir(parents=True)
+    (root / "tool_registry.py").write_text(
+        "import os\nkey = os.environ.get('EMERGENT_LLM_KEY', '')\n",
+        encoding="utf-8",
+    )
+
+    discovered = module.discover_provider_surfaces(tmp_path)
+
+    assert discovered["backend/services/tool_registry.py"]["edge_classes"] == [
+        "credential"
+    ]
+    assert discovered["backend/services/tool_registry.py"][
+        "credential_markers"
+    ] == ["EMERGENT_LLM_KEY"]
