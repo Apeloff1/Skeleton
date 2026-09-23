@@ -169,12 +169,12 @@ def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
         marker
         for marker in _AI_CREDENTIAL_MARKERS
         if (
-            `os.getenv("${marker}")` in source
-            or `os.getenv('${marker}')` in source
-            or `os.environ.get("${marker}")` in source
-            or `os.environ.get('${marker}')` in source
-            or `os.environ["${marker}"]` in source
-            or `os.environ['${marker}']` in source
+            f'os.getenv("{marker}")' in source
+            or f"os.getenv('{marker}')" in source
+            or f'os.environ.get("{marker}")' in source
+            or f"os.environ.get('{marker}')" in source
+            or f'os.environ["{marker}"]' in source
+            or f"os.environ['{marker}']" in source
         )
     )
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
@@ -192,7 +192,6 @@ def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
         "provider_urls": provider_urls,
         "client_markers": client_markers,
     }
-
 
 def _looks_like_provider_network_surface(
     path: Path,
