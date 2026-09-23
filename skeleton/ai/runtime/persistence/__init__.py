@@ -1,10 +1,7 @@
 """
 Skeleton Persistence Package
 
-Exports:
-- SnapshotStore: File-based snapshot registry
-- snapshot_genesis_state / restore_genesis_state: whole-system capture
-- Plane serializers for VectorStore, MAGStore, KnowledgeGraph, matrices
+Exports canonical durable repositories and whole-system snapshot helpers.
 """
 
 from skeleton.persistence.conversation_repository import (
@@ -14,6 +11,12 @@ from skeleton.persistence.conversation_repository import (
     ConversationRepositoryCorruption,
     ConversationRepositoryError,
     SQLiteConversationRepository,
+)
+from skeleton.persistence.memory_repository import (
+    MemoryConflict,
+    MemoryNotFound,
+    MemoryRepositoryError,
+    SQLiteMemoryRepository,
 )
 from skeleton.persistence.operation_store import (
     OperationOutboxEvent,
@@ -48,6 +51,10 @@ __all__ = [
     "ConversationRepositoryCorruption",
     "ConversationRepositoryError",
     "SQLiteConversationRepository",
+    "MemoryConflict",
+    "MemoryNotFound",
+    "MemoryRepositoryError",
+    "SQLiteMemoryRepository",
     "OperationOutboxEvent",
     "OperationStoreConflict",
     "OperationStoreCorruptionError",
