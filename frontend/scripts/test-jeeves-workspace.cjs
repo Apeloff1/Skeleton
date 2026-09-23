@@ -349,6 +349,7 @@ function authorityFixture(input = {}) {
     state: [],
     deletion: [],
     create: [],
+    snapshot: [],
   };
   return {
     calls,
@@ -371,6 +372,19 @@ function authorityFixture(input = {}) {
       },
       async listMessages(threadId) {
         return (messages.get(threadId) || []).map(item => ({ ...item }));
+      },
+      async snapshot(threadId, activeOnly) {
+        calls.snapshot.push({ threadId, activeOnly });
+        const thread = threads.find(
+          item => item.thread_id === threadId,
+        );
+        if (!thread) throw new Error('conversation not found');
+        return {
+          thread: { ...thread },
+          messages: (messages.get(threadId) || []).map(
+            item => ({ ...item }),
+          ),
+        };
       },
       async chat(request) {
         calls.chat.push({ ...request, signal: undefined });
@@ -618,7 +632,7 @@ test('server-authority mode keeps draft when server is unavailable', async () =>
 });
 
 
-test('product Jeeves screen has no legacy chat endpoint and exports after server refresh', () => {
+test('product Jeeves screen has no legacy chat endpoint and exports stable server snapshots', () => {
   const source = fs.readFileSync(
     require('node:path').join(
       __dirname,
@@ -629,7 +643,9 @@ test('product Jeeves screen has no legacy chat endpoint and exports after server
   assert.ok(!source.includes("'/api/jeeves/chat'"));
   assert.ok(source.includes('sendCanonicalConversationTurn'));
   assert.ok(source.includes('listAllConversationMessages'));
-  assert.ok(source.includes('controller.refreshFromServer()'));
+  assert.ok(source.includes('getConversationSnapshot'));
+  assert.ok(source.includes('controller.exportAuthoritativeConversation()'));
+  assert.ok(!source.includes('.then(() => exportTranscript(controller.active))'));
   assert.ok(source.includes('requestConversationDeletionById'));
 });
 
@@ -660,4 +676,102 @@ test('server-authority cache metadata survives local persistence without changin
   assert.deepEqual(rebuilt.active.messages.map(item => item.text), [
     'NEW SERVER MESSAGE',
   ]);
+});
+
+
+
+test('authoritative export ignores stale local projection and requests full snapshot', async () => {
+  const fixture = authorityFixture();
+  const { store } = await authorityController(fixture);
+
+  assert.deepEqual(store.active.messages.map(item => item.text), [
+    'SERVER AUTHORITATIVE MESSAGE',
+  ]);
+
+  fixture.setMessages('thread-1', [
+    serverMessage({ content: 'FRESH EXPORT MESSAGE' }),
+    serverMessage({
+      message_id: 'assistant-export',
+      sequence: 2,
+      author_type: 'assistant',
+      idempotency_key: 'assistant-export-key',
+      content: 'FRESH EXPORT ANSWER',
+    }),
+  ]);
+
+  const exported = await store.exportAuthoritativeConversation('thread-1');
+
+  assert.deepEqual(exported.messages.map(item => item.text), [
+    'FRESH EXPORT MESSAGE',
+    'FRESH EXPORT ANSWER',
+  ]);
+  assert.deepEqual(store.active.messages.map(item => item.text), [
+    'SERVER AUTHORITATIVE MESSAGE',
+  ]);
+  assert.deepEqual(fixture.calls.snapshot.at(-1), {
+    threadId: 'thread-1',
+    activeOnly: false,
+  });
+});
+
+
+test('deleting server conversation is never selected as active and is read-only', async () => {
+  const deleting = serverThread({
+    thread_id: 'thread-deleting',
+    state: 'deleting',
+    version: 4,
+    title: 'Deleting chat',
+  });
+  const active = serverThread({
+    thread_id: 'thread-active',
+    state: 'active',
+    version: 2,
+    title: 'Active chat',
+  });
+  const fixture = authorityFixture({
+    threads: [deleting, active],
+    messages: [
+      ['thread-deleting', [serverMessage({
+        message_id: 'deleting-message',
+        content: 'DELETE ME',
+      })]],
+      ['thread-active', [serverMessage({
+        message_id: 'active-message',
+        content: 'KEEP ME',
+      })]],
+    ],
+  });
+  const { store } = await authorityController(fixture);
+
+  assert.equal(store.active.id, 'thread-active');
+  const deletingProjection = store.getSnapshot().workspace.conversations.find(
+    item => item.id === 'thread-deleting',
+  );
+  assert.equal(deletingProjection.serverState, 'deleting');
+  assert.equal(deletingProjection.archived, true);
+
+  store.select('thread-deleting');
+  await tick();
+  store.edit({ draft: 'must not send' });
+  await store.send();
+
+  assert.equal(fixture.calls.chat.length, 0);
+  assert.match(
+    store.getSnapshot().notice || '',
+    /pending deletion|Only an active server conversation/,
+  );
+
+  store.archive('thread-deleting', false);
+  await tick();
+  assert.equal(
+    fixture.calls.state.some(call => call.threadId === 'thread-deleting'),
+    false,
+  );
+
+  store.remove('thread-deleting');
+  await tick();
+  assert.equal(
+    fixture.calls.deletion.some(call => call.threadId === 'thread-deleting'),
+    false,
+  );
 });
