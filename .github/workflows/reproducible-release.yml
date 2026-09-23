@@ -12,6 +12,12 @@ on:
       - "scripts/testing/test_release_provenance.py"
       - "scripts/testing/test_ai_release_evidence.py"
       - "skeleton/release/evidence.py"
+      - "skeleton/release/ai_journey_evidence.py"
+      - "skeleton/testing/test_ai_journey_evidence.py"
+      - "skeleton/testing/test_artifact_usage_meter.py"
+      - "skeleton/release/ai_journey_evidence.py"
+      - "skeleton/testing/test_ai_journey_evidence.py"
+      - "skeleton/testing/test_artifact_usage_meter.py"
       - "skeleton/testing/test_release_evidence.py"
       - "backend/core/engine_client.py"
       - "backend/core/operation_stream_transport.py"
@@ -145,6 +151,7 @@ jobs:
             source-a/scripts/testing/test_release_provenance.py \
             source-a/scripts/testing/test_ai_release_evidence.py \
             source-a/skeleton/testing/test_release_evidence.py \
+            source-a/skeleton/testing/test_ai_journey_evidence.py \
             --junitxml=source-a/release-meta/release-tests.xml
           python -m pytest -q \
             source-a/backend/tests/test_ai_golden_journey.py \
@@ -160,6 +167,7 @@ jobs:
             source-a/skeleton/testing/test_tool_runtime.py \
             source-a/skeleton/testing/test_engine_execution_service.py \
             source-a/skeleton/testing/test_engine_execution_coordinator.py \
+            source-a/skeleton/testing/test_artifact_usage_meter.py \
             --junitxml=source-a/release-meta/ai-runtime-eval.xml
 
       - name: Build release A
@@ -242,9 +250,12 @@ jobs:
           set -euo pipefail
           python scripts/ai_release_evidence.py \
             --record release-tests=release-meta/release-tests.xml \
+            --stage7-report release-meta/ai-runtime-eval.xml \
+            --stage7-lane test \
             --output release-meta/test-evidence.json
           python scripts/ai_release_evidence.py \
-            --record ai-runtime-eval=release-meta/ai-runtime-eval.xml \
+            --stage7-report release-meta/ai-runtime-eval.xml \
+            --stage7-lane eval \
             --output release-meta/eval-evidence.json
 
           mapfile -t artifact_names < <(
