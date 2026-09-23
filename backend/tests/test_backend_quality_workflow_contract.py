@@ -20,7 +20,7 @@ def test_repository_wide_adversarial_regressions_run_from_workspace_root() -> No
     assert "working-directory: ${{ github.workspace }}" in step_header
     assert "working-directory: ." not in step_header
     assert "working-directory: .." not in step_header
-    assert "PYTHONPATH=backend:. python -m pytest" in step
+    assert "PYTHONPATH=.:backend python -m pytest" in step
     assert "--rootdir=." in step
     assert "--import-mode=importlib" in step
     assert "tests/test_architecture_boundaries.py" in step
