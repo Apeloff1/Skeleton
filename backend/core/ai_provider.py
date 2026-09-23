@@ -24,6 +24,8 @@ from core.engine_client import (
 )
 
 AIMessage = _runtime.AIMessage
+FinishReason = _runtime.FinishReason
+ProviderUsage = _runtime.ProviderUsage
 OpenAIProviderAdapter = _runtime.OpenAIProviderAdapter
 ProviderAdapter = _runtime.ProviderAdapter
 ProviderError = _runtime.ProviderError
