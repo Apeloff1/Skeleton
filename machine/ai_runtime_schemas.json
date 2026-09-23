@@ -1292,7 +1292,11 @@
       "invariants": [
         "sequence strictly monotonic per operation",
         "event_id content is immutable",
-        "no event accepted after terminal event"
+        "no event accepted after terminal event",
+        "operation.output.delta and operation.output.snapshot are provisional client content only",
+        "operation.completed final_output is authoritative and must replace provisional content",
+        "failed or cancelled terminal events never promote provisional content to authoritative output",
+        "replay-gap recovery resets clients to the durable compacted_through watermark before retained replay"
       ]
     },
     "AIError": {
