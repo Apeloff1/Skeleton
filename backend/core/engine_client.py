@@ -12,7 +12,7 @@ import time
 from typing import Any, Mapping
 import urllib.error
 import urllib.request
-from uuid import uuid4
+from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
@@ -26,7 +26,10 @@ from skeleton.api.hmac_seal import mint_seal
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.context import ContextEnvelope
 from skeleton.contracts.operation import OperationEnvelope
-from skeleton.provider_runtime import provider_request_from_context
+from skeleton.provider_runtime import (
+    ProviderRequest,
+    provider_request_from_context,
+)
 
 
 class EngineClientError(RuntimeError):
@@ -409,6 +412,243 @@ class EngineClient:
         )
 
 
+def _stable_uuid(namespace: str, value: str) -> str:
+    return str(uuid5(NAMESPACE_URL, namespace + ":" + value))
+
+
+def _provider_request_digest(request: ProviderRequest) -> str:
+    tools = [
+        tool.as_dict()
+        for tool in request.tools
+    ]
+    payload = {
+        "instructions": request.instructions,
+        "prompt": request.prompt,
+        "history": [
+            {"role": item.role, "content": item.content}
+            for item in request.history
+        ],
+        "max_output_tokens": request.max_output_tokens,
+        "model": request.model,
+        "data_class": request.data_class,
+        "purpose": request.purpose,
+        "tenant_id": request.tenant_id,
+        "operation_id": request.operation_id,
+        "execution_id": request.execution_id,
+        "turn_id": request.turn_id,
+        "context_id": request.context_id,
+        "context_digest": request.context_digest,
+        "context_source_snapshot": [
+            [segment_id, digest]
+            for segment_id, digest in request.context_source_snapshot
+        ],
+        "context_compiler_version": request.context_compiler_version,
+        "tools": tools,
+        "tool_choice": request.tool_choice,
+        "specific_tool_id": request.specific_tool_id,
+    }
+    return hashlib.sha256(
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def engine_command_from_provider_request(
+    request: ProviderRequest,
+    *,
+    service_principal: str,
+    actor_id: str = "backend-provider-compat",
+    capability: str | None = None,
+    idempotency_key: str | None = None,
+    deadline: datetime | None = None,
+) -> EngineExecutionCommand:
+    """Wrap one neutral ProviderRequest as a canonical engine command.
+
+    This is the migration seam for backend services that already speak the
+    provider-neutral request contract but must no longer own provider
+    credentials or provider network I/O.
+    """
+
+    if not isinstance(request, ProviderRequest):
+        raise TypeError("request must be ProviderRequest")
+    request_digest = _provider_request_digest(request)
+    now = datetime.now(timezone.utc)
+    effective_deadline = deadline or request.deadline
+    if effective_deadline is None:
+        effective_deadline = now + timedelta(
+            seconds=float(request.resource_budget.max_wall_seconds)
+        )
+    if (
+        effective_deadline.tzinfo is None
+        or effective_deadline.utcoffset() is None
+    ):
+        raise EngineClientError("provider request deadline must be timezone-aware")
+    effective_deadline = effective_deadline.astimezone(timezone.utc)
+    if effective_deadline <= now:
+        raise EngineDeadlineExceeded("engine deadline exceeded")
+
+    raw_operation = str(request.operation_id or "").strip()
+    try:
+        operation_id = str(UUID(raw_operation))
+    except (ValueError, AttributeError):
+        operation_id = _stable_uuid(
+            "skeleton-provider-operation",
+            raw_operation or request_digest,
+        )
+    raw_execution = str(request.execution_id or "").strip()
+    try:
+        execution_id = str(UUID(raw_execution))
+    except (ValueError, AttributeError):
+        execution_id = _stable_uuid(
+            "skeleton-provider-execution",
+            raw_execution or (operation_id + ":" + request_digest),
+        )
+    raw_turn = str(request.turn_id or "").strip()
+    try:
+        turn_id = str(UUID(raw_turn))
+    except (ValueError, AttributeError):
+        turn_id = _stable_uuid(
+            "skeleton-provider-turn",
+            raw_turn or (execution_id + ":0"),
+        )
+
+    context_digest = request.context_digest or request_digest
+    context_id = request.context_id or _stable_uuid(
+        "skeleton-provider-context",
+        context_digest,
+    )
+    compiler_version = (
+        request.context_compiler_version
+        or "provider-compat/v1"
+    )
+    tenant_id = str(request.tenant_id or "default").strip()
+    effective_capability = str(
+        capability or ("provider." + request.purpose)
+    ).strip()
+    tools = tuple(request.tools)
+
+    handoff = EngineContextHandoff(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id=tenant_id,
+        context_id=context_id,
+        context_digest=context_digest,
+        compiler_version=compiler_version,
+        source_snapshot=request.context_source_snapshot,
+        data_class=request.data_class,
+        instructions=request.instructions,
+        prompt=request.prompt,
+        history=tuple(
+            (message.role, message.content)
+            for message in request.history
+        ),
+        tools=tools,
+    )
+    budget = {
+        **request.resource_budget.as_dict(),
+        "max_model_turns": max(
+            1,
+            int(request.resource_budget.max_provider_attempts) + 1,
+        ),
+        "max_tool_calls": int(request.resource_budget.max_tool_calls),
+        "max_output_tokens": int(
+            request.max_output_tokens
+            or request.resource_budget.max_output_tokens
+        ),
+        "max_elapsed_seconds": max(
+            1,
+            int(
+                (
+                    effective_deadline - now
+                ).total_seconds()
+            ),
+        ),
+    }
+    operation = OperationEnvelope(
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        actor_id=str(actor_id).strip(),
+        capability=effective_capability,
+        created_at=now,
+        deadline=effective_deadline,
+        idempotency_key=(
+            str(idempotency_key).strip()
+            if idempotency_key is not None
+            else "provider:" + request_digest
+        ),
+        trace_id="provider-trace:" + request_digest[:32],
+    )
+    execution_request = AIExecutionRequest(
+        operation_id=operation.operation_id,
+        execution_id=execution_id,
+        objective=request.prompt,
+        context_policy={
+            "tenant_id": tenant_id,
+            "capability": effective_capability,
+            "data_class": handoff.data_class,
+            "context_id": handoff.context_id,
+            "context_digest": handoff.context_digest,
+            "compiler_version": handoff.compiler_version,
+            "handoff_digest": handoff.handoff_digest,
+            "source_snapshot": [
+                [segment_id, digest]
+                for segment_id, digest in handoff.source_snapshot
+            ],
+        },
+        tool_policy={
+            "tenant_id": tenant_id,
+            "allowed_tool_ids": [
+                tool.tool_id for tool in tools
+            ],
+        },
+        resource_budget=budget,
+        stop_policy={
+            "deadline": effective_deadline.isoformat(),
+            "max_repeat_tool_batches": 1,
+        },
+        created_at=now,
+    )
+    authority = DelegatedAuthority(
+        service_principal=str(service_principal).strip(),
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+        ),
+        capability=operation.capability,
+        issued_at=now,
+        expires_at=effective_deadline,
+        request_binding=engine_request_binding(
+            operation,
+            execution_request,
+        ),
+    )
+    return EngineExecutionCommand(
+        operation=operation,
+        execution_request=execution_request,
+        delegated_authority=authority,
+        compiled_context=handoff,
+        context_seed_refs=tuple(
+            "context-segment:" + segment_id
+            for segment_id, _ in handoff.source_snapshot
+        ),
+        resource_budget=budget,
+        stream_preferences={
+            "mode": "events",
+            "context_id": handoff.context_id,
+        },
+    )
+
+
 def engine_command_from_context(
     *,
     context: ContextEnvelope,
@@ -547,4 +787,5 @@ __all__ = [
     "EngineRequestConflict",
     "EngineUnavailable",
     "engine_command_from_context",
+    "engine_command_from_provider_request",
 ]
