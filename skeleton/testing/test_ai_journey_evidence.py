@@ -244,3 +244,70 @@ def test_mandatory_journey_matrix_references_real_test_functions() -> None:
             missing.append(requirement.nodeid + ":missing-function")
 
     assert missing == []
+
+
+
+def test_full_mandatory_matrix_emits_only_when_every_journey_passes() -> None:
+    report = json.dumps(
+        {
+            "tests": [
+                {
+                    "nodeid": requirement.nodeid,
+                    "outcome": "passed",
+                }
+                for requirement in MANDATORY_AI_JOURNEYS
+            ]
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+
+    bundle = collect_ai_journey_evidence(
+        report_name="artifacts/ai-mandatory-journeys.json",
+        report_bytes=report,
+        report_format="pytest-json",
+    )
+
+    expected_test = sorted(
+        requirement.evidence_id
+        for requirement in MANDATORY_AI_JOURNEYS
+        if requirement.lane == "test"
+    )
+    expected_eval = sorted(
+        requirement.evidence_id
+        for requirement in MANDATORY_AI_JOURNEYS
+        if requirement.lane == "eval"
+    )
+    assert [item.evidence_id for item in bundle.test_evidence] == expected_test
+    assert [item.evidence_id for item in bundle.eval_evidence] == expected_eval
+    assert set(bundle.observed_cases) >= {
+        requirement.nodeid
+        for requirement in MANDATORY_AI_JOURNEYS
+    }
+
+
+def test_full_mandatory_matrix_fails_if_one_required_fault_is_missing() -> None:
+    missing = MANDATORY_AI_JOURNEYS[-1]
+    report = json.dumps(
+        {
+            "tests": [
+                {
+                    "nodeid": requirement.nodeid,
+                    "outcome": "passed",
+                }
+                for requirement in MANDATORY_AI_JOURNEYS[:-1]
+            ]
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+
+    with pytest.raises(
+        EvidenceSchemaError,
+        match="missing required AI journeys",
+    ) as exc:
+        collect_ai_journey_evidence(
+            report_name="artifacts/ai-mandatory-journeys.json",
+            report_bytes=report,
+            report_format="pytest-json",
+        )
+
+    assert missing.nodeid in str(exc.value)
