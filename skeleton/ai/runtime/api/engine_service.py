@@ -1304,8 +1304,8 @@ class EngineExecutionService:
         verified_service_principal: str,
         scope: str,
         now: datetime | None = None,
+        require_live_delegation: bool = False,
     ) -> _StoredSubmission:
-        del now
         stored = self.submissions.get_by_execution_id(execution_id)
         if stored is None:
             raise EngineServiceError("unknown engine execution")
@@ -1321,6 +1321,13 @@ class EngineExecutionService:
             raise EngineServiceError("tenant is outside engine service grant")
         if not grant.allows_capability(operation.capability):
             raise EngineServiceError("capability is outside engine service grant")
+        if require_live_delegation:
+            self._validate(
+                stored.command,
+                verified_service_principal=verified_service_principal,
+                required_scope=scope,
+                now=now,
+            )
         return stored
 
     def pending_tool_approvals(
@@ -1328,14 +1335,24 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str,
+        tenant_id: str,
         now: datetime | None = None,
     ) -> tuple[dict[str, str], ...]:
-        self._stored_for_access(
+        stored = self._stored_for_access(
             execution_id,
             verified_service_principal=verified_service_principal,
             scope="engine:read",
             now=now,
         )
+        operation = stored.command.operation
+        if (
+            str(actor_id).strip() != operation.actor_id
+            or str(tenant_id).strip() != operation.tenant_id
+        ):
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         execution = self.repository.get(execution_id)
         if execution.state is not ExecutionState.WAITING_FOR_USER:
             return ()
@@ -1397,6 +1414,8 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str,
+        tenant_id: str,
         call_id: str,
         tool_id: str,
         arguments_digest: str,
@@ -1409,7 +1428,16 @@ class EngineExecutionService:
             verified_service_principal=verified_service_principal,
             scope="engine:approve",
             now=now,
+            require_live_delegation=True,
         )
+        operation = stored.command.operation
+        if (
+            str(actor_id).strip() != operation.actor_id
+            or str(tenant_id).strip() != operation.tenant_id
+        ):
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         instant = (
             datetime.now(timezone.utc)
             if now is None
@@ -1420,11 +1448,20 @@ class EngineExecutionService:
             raise EngineServiceError(
                 "tool approval is already expired"
             )
+        delegation_expiry = stored.command.delegated_authority.expires_at
+        operation_deadline = stored.command.operation.deadline
+        authority_ceiling = min(delegation_expiry, operation_deadline)
+        if expiry > authority_ceiling:
+            raise EngineServiceError(
+                "tool approval expiry exceeds delegated authority window"
+            )
         pending = {
             row["call_id"]: row
             for row in self.pending_tool_approvals(
                 execution_id,
                 verified_service_principal=verified_service_principal,
+                actor_id=operation.actor_id,
+                tenant_id=operation.tenant_id,
                 now=instant,
             )
         }
@@ -1479,9 +1516,21 @@ class EngineExecutionService:
         *,
         now: datetime | None = None,
     ) -> dict[str, str]:
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "approval.now")
+        )
+        stored = self.submissions.get_by_execution_id(execution_id)
+        if stored is None:
+            return {}
+        if stored.command.delegated_authority.expired(now=instant):
+            return {}
+        if instant >= stored.command.operation.deadline:
+            return {}
         return self.submissions.active_approval_refs(
             execution_id,
-            now=now,
+            now=instant,
         )
 
     def status(
@@ -1532,6 +1581,7 @@ class EngineExecutionService:
             verified_service_principal=verified_service_principal,
             scope="engine:cancel",
             now=now,
+            require_live_delegation=True,
         )
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
