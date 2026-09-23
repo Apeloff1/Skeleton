@@ -287,3 +287,149 @@ def test_transport_acknowledgement_is_tenant_bound(
 
     operations.close()
     events.close()
+
+
+
+def test_resync_restarts_returning_consumer_at_compacted_floor(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+            OperationState.ADMITTED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+
+    transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="returning-client",
+        after_sequence=0,
+    )
+    transport.acknowledge(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="returning-client",
+        sequence=2,
+    )
+    events.compact_through(operation.operation_id, 2)
+
+    batch = transport.resync(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="returning-client",
+        limit=250,
+    )
+
+    assert batch.compacted_through == 2
+    assert [event.sequence for event in batch.events] == [3, 4]
+    assert batch.latest_sequence == 4
+    checkpoint = next(
+        item
+        for item in events.active_consumers(operation.operation_id)
+        if item.consumer_id == "returning-client"
+    )
+    assert checkpoint.acknowledged_through >= 2
+
+    operations.close()
+    events.close()
+
+
+def test_new_consumer_after_compaction_starts_at_retained_floor(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        OperationState.VALIDATED,
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.compact_through(operation.operation_id, 1)
+
+    checkpoint = events.register_consumer(
+        operation.operation_id,
+        "new-client",
+        now=BASE_TIME + timedelta(seconds=2),
+    )
+
+    assert checkpoint.acknowledged_through == 1
+    operations.close()
+    events.close()
+
+
+def test_slowest_active_consumer_controls_safe_compaction(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.register_consumer(
+        operation.operation_id,
+        "fast",
+        now=BASE_TIME,
+        lease_seconds=300,
+    )
+    events.register_consumer(
+        operation.operation_id,
+        "slow",
+        now=BASE_TIME,
+        lease_seconds=300,
+    )
+    events.acknowledge_consumer(
+        operation.operation_id,
+        "fast",
+        3,
+        now=BASE_TIME,
+        lease_seconds=300,
+    )
+    events.acknowledge_consumer(
+        operation.operation_id,
+        "slow",
+        1,
+        now=BASE_TIME,
+        lease_seconds=300,
+    )
+
+    assert events.safe_compaction_sequence(
+        operation.operation_id,
+        now=BASE_TIME + timedelta(seconds=1),
+    ) == 1
+    removed = events.compact_acknowledged(
+        operation.operation_id,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    assert removed == 1
+    assert events.head(operation.operation_id)["compacted_through"] == 1
+
+    operations.close()
+    events.close()
