@@ -23,9 +23,8 @@ async def test_ai_assist_resolves_canonical_policy_content(monkeypatch) -> None:
 
     captured = {}
 
-    async def call_llm(system_prompt, user_prompt, **kwargs):
-        captured["system_prompt"] = system_prompt
-        captured["user_prompt"] = user_prompt
+    async def execute_provider_request(provider_request):
+        captured["provider_request"] = provider_request
         return {
             "success": True,
             "response": "analysis",
@@ -33,9 +32,19 @@ async def test_ai_assist_resolves_canonical_policy_content(monkeypatch) -> None:
             "model": "test-model",
             "provider_request_id": "req-1",
             "latency_ms": 1.0,
+            "context_id": provider_request.context_id,
+            "context_digest": provider_request.context_digest,
+            "context_source_snapshot": list(
+                provider_request.context_source_snapshot
+            ),
+            "context_compiler_version": provider_request.context_compiler_version,
         }
 
-    monkeypatch.setattr(ai, "call_llm", call_llm)
+    monkeypatch.setattr(
+        ai,
+        "_execute_provider_request",
+        execute_provider_request,
+    )
     request = ai.AIAssistRequest(
         code="print('hello')",
         language="python",
@@ -45,8 +54,13 @@ async def test_ai_assist_resolves_canonical_policy_content(monkeypatch) -> None:
     response = await ai.ai_assist(request)
 
     policy = INSTRUCTION_POLICIES.resolve("code.explain")
-    assert captured["system_prompt"] == policy.content
-    assert "print('hello')" in captured["user_prompt"]
+    provider_request = captured["provider_request"]
+    assert policy.content in provider_request.instructions
+    assert "print('hello')" in provider_request.prompt
+    assert provider_request.context_id
+    assert provider_request.context_digest
+    assert provider_request.context_source_snapshot
+    assert provider_request.context_compiler_version
     assert response.ai_generated is True
 
 
