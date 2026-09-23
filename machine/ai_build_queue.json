@@ -2413,7 +2413,7 @@
       "stage": 7,
       "parallel_lane": "golden-journeys",
       "objective": "Build deterministic full-stack provider/tool/retrieval harness without live provider secrets.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-state-authority-convergence",
@@ -2474,7 +2474,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -2502,7 +2502,7 @@
       "stage": 7,
       "parallel_lane": "golden-journeys",
       "objective": "Run all mandatory prompt, conversation, retrieval, tool, artifact, cancel/reconnect and outage journeys.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S7-E2E-01"
       ],
@@ -2592,7 +2592,7 @@
       "stage": 7,
       "parallel_lane": "golden-journeys",
       "objective": "Inject crash/restart/ambiguity/approval-expiry faults and assemble final release evidence bundle.",
-      "status": "pending",
+      "status": "in_progress",
       "task_dependencies": [
         "AIQ-S7-E2E-02"
       ],
