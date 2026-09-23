@@ -668,6 +668,7 @@ def engine_command_from_provider_request(
             "engine:read",
             "engine:cancel",
             "engine:events",
+            "engine:approve",
         ),
         capability=operation.capability,
         issued_at=now,
