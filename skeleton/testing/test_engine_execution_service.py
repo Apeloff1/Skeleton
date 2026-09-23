@@ -13,6 +13,7 @@ from skeleton.api.engine_authority import (
     engine_request_binding,
 )
 from skeleton.api.engine_service import (
+    EngineContextHandoff,
     EngineExecutionCommand,
     EngineExecutionService,
     EngineSubmissionConflict,
@@ -51,6 +52,26 @@ def _operation(
     )
 
 
+def _handoff(
+    operation: OperationEnvelope,
+    *,
+    execution_id: str = "exec-1",
+) -> EngineContextHandoff:
+    return EngineContextHandoff(
+        operation_id=operation.operation_id,
+        execution_id=execution_id,
+        turn_id="turn-1",
+        tenant_id=operation.tenant_id,
+        context_id="context-1",
+        context_digest="a" * 64,
+        compiler_version="test-compiler",
+        source_snapshot=(("segment-1", "b" * 64),),
+        data_class="internal",
+        instructions="Follow the canonical policy.",
+        prompt="Answer the canonical request.",
+    )
+
+
 def _execution_request(
     operation: OperationEnvelope,
     *,
@@ -65,6 +86,14 @@ def _execution_request(
             "tenant_id": operation.tenant_id,
             "capability": operation.capability,
             "data_class": "internal",
+            "context_id": "context-1",
+            "context_digest": "a" * 64,
+            "compiler_version": "test-compiler",
+            "handoff_digest": _handoff(
+                operation,
+                execution_id=execution_id,
+            ).handoff_digest,
+            "source_snapshot": [["segment-1", "b" * 64]],
         },
         tool_policy={
             "tenant_id": operation.tenant_id,
@@ -117,6 +146,10 @@ def _command(
         operation=operation,
         execution_request=execution_request,
         delegated_authority=authority,
+        compiled_context=_handoff(
+            operation,
+            execution_id=execution_request.execution_id,
+        ),
         context_seed_refs=("conversation:thread-1",),
         resource_budget=dict(execution_request.resource_budget),
         stream_preferences={"mode": "events"},
