@@ -90,6 +90,7 @@ printf '\n== Durable tenant quota persistence ==\n'
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_tenant_quota.py \
   skeleton/testing/test_tenant_quota_sqlite.py \
+  skeleton/testing/test_actual_usage_metering.py
   skeleton/testing/test_admission_runtime.py
 
 printf '\n== Authoritative-first recovery contract ==\n'
