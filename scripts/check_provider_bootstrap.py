@@ -225,8 +225,30 @@ def _credential_environment_reads(path: Path) -> list[str]:
     return sorted(hits)
 
 
+def _credential_markers(path: Path) -> list[str]:
+    """Return credential edges from real environment reads or declared key slots.
+
+    AST-based assignment detection keeps comments/docstrings harmless while still
+    classifying modules that explicitly own a provider credential variable.
+    """
+    hits = set(_credential_environment_reads(path))
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError):
+        return sorted(hits)
+
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Store)
+            and node.id in _AI_CREDENTIAL_MARKERS
+        ):
+            hits.add(node.id)
+    return sorted(hits)
+
+
 def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
-    credential_markers = _credential_environment_reads(path)
+    credential_markers = _credential_markers(path)
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
     network_imports = sorted(set(_network_transport_imports(path)))
     provider_urls = sorted(
@@ -250,12 +272,18 @@ def _looks_like_provider_network_surface(
 ) -> bool:
     if not signals["network_imports"]:
         return False
-    relative = path.as_posix().lower()
+
+    relative = "/" + path.as_posix().lower().lstrip("/")
+    if any(f"/{prefix}" in relative for prefix in _NON_PROVIDER_NETWORK_PATH_PREFIXES):
+        return False
+
+    provider_path = any(term in relative for term in _AI_SURFACE_PATH_TERMS)
     provider_context = (
         bool(signals["credential_markers"])
         or bool(signals["sdk_imports"])
         or bool(signals["provider_urls"])
         or bool(signals["client_markers"])
+        or provider_path
     )
     return provider_context
 
