@@ -1301,6 +1301,167 @@ class EngineExecutionService:
             raise EngineServiceError("capability is outside engine service grant")
         return stored
 
+    def pending_tool_approvals(
+        self,
+        execution_id: str,
+        *,
+        verified_service_principal: str,
+        now: datetime | None = None,
+    ) -> tuple[dict[str, str], ...]:
+        self._stored_for_access(
+            execution_id,
+            verified_service_principal=verified_service_principal,
+            scope="engine:read",
+            now=now,
+        )
+        execution = self.repository.get(execution_id)
+        if execution.state is not ExecutionState.WAITING_FOR_USER:
+            return ()
+        checkpoint = self.repository.latest_checkpoint(execution_id)
+        if checkpoint is None:
+            raise EngineServiceError(
+                "waiting execution has no durable approval checkpoint"
+            )
+        payload = checkpoint.payload
+        pending_ids = payload.get("pending_approval_call_ids", [])
+        calls = payload.get("pending_tool_calls", [])
+        if (
+            not isinstance(pending_ids, list)
+            or not isinstance(calls, list)
+        ):
+            raise EngineServiceError(
+                "durable approval checkpoint is malformed"
+            )
+        wanted = {
+            str(item)
+            for item in pending_ids
+            if isinstance(item, str) and item.strip()
+        }
+        rows: list[dict[str, str]] = []
+        for raw in calls:
+            if not isinstance(raw, Mapping):
+                raise EngineServiceError(
+                    "durable pending tool call is malformed"
+                )
+            call_id = str(raw.get("call_id") or "").strip()
+            if call_id not in wanted:
+                continue
+            tool_id = str(raw.get("tool_id") or "").strip()
+            digest = str(raw.get("arguments_digest") or "").strip()
+            if (
+                not call_id
+                or not tool_id
+                or len(digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in digest)
+            ):
+                raise EngineServiceError(
+                    "durable pending tool call identity is malformed"
+                )
+            rows.append(
+                {
+                    "call_id": call_id,
+                    "tool_id": tool_id,
+                    "arguments_digest": digest,
+                }
+            )
+        if len(rows) != len(wanted):
+            raise EngineServiceError(
+                "durable approval checkpoint is incomplete"
+            )
+        return tuple(rows)
+
+    def approve_tool_call(
+        self,
+        execution_id: str,
+        *,
+        verified_service_principal: str,
+        call_id: str,
+        tool_id: str,
+        arguments_digest: str,
+        idempotency_key: str,
+        expires_at: datetime,
+        now: datetime | None = None,
+    ) -> EngineToolApproval:
+        stored = self._stored_for_access(
+            execution_id,
+            verified_service_principal=verified_service_principal,
+            scope="engine:approve",
+            now=now,
+        )
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "approval.now")
+        )
+        expiry = _aware(expires_at, "approval.expires_at")
+        if expiry <= instant:
+            raise EngineServiceError(
+                "tool approval is already expired"
+            )
+        pending = {
+            row["call_id"]: row
+            for row in self.pending_tool_approvals(
+                execution_id,
+                verified_service_principal=verified_service_principal,
+                now=instant,
+            )
+        }
+        call_key = str(call_id).strip()
+        expected = pending.get(call_key)
+        if expected is None:
+            raise EngineServiceError(
+                "tool call is not awaiting approval"
+            )
+        tool_key = str(tool_id).strip()
+        digest = str(arguments_digest).strip()
+        if (
+            expected["tool_id"] != tool_key
+            or expected["arguments_digest"] != digest
+        ):
+            raise EngineServiceError(
+                "tool approval does not match pending call identity"
+            )
+        idem = str(idempotency_key).strip()
+        if not idem or len(idem) > 1024:
+            raise EngineServiceError(
+                "approval idempotency_key is invalid"
+            )
+        approval_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                "skeleton-engine-tool-approval:"
+                + execution_id
+                + ":"
+                + call_key
+                + ":"
+                + idem,
+            )
+        )
+        approval = EngineToolApproval(
+            approval_id=approval_id,
+            execution_id=execution_id,
+            call_id=call_key,
+            tool_id=tool_key,
+            arguments_digest=digest,
+            actor_id=stored.command.operation.actor_id,
+            tenant_id=stored.command.operation.tenant_id,
+            idempotency_key=idem,
+            issued_at=instant,
+            expires_at=expiry,
+        )
+        return self.submissions.remember_approval(approval)
+
+    def active_approval_refs(
+        self,
+        execution_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> dict[str, str]:
+        return self.submissions.active_approval_refs(
+            execution_id,
+            now=now,
+        )
+
     def status(
         self,
         execution_id: str,
