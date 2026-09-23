@@ -327,6 +327,22 @@ class ToolExecutionRequest:
         return canonical_json_digest(self.arguments)
 
 
+def approval_ref_for_request(request: ToolExecutionRequest) -> str:
+    """Bind approval identity to the exact authority-relevant request shape."""
+
+    if not isinstance(request, ToolExecutionRequest):
+        raise TypeError("request must be ToolExecutionRequest")
+    material = "\x1f".join(
+        (
+            request.operation_id,
+            request.tenant_id,
+            request.tool_id,
+            request.arguments_digest,
+        )
+    ).encode("utf-8")
+    return "approval:" + hashlib.sha256(material).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class ToolExecutionReceipt:
     receipt_id: str
@@ -415,6 +431,7 @@ __all__ = [
     "ToolExecutionReceipt",
     "ToolExecutionStatus",
     "ToolManifest",
+    "approval_ref_for_request",
     "canonical_json_digest",
     "validate_tool_arguments",
 ]
