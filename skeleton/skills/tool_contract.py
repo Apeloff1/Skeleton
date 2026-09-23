@@ -81,7 +81,161 @@ def _schema(value: object, field: str) -> dict[str, Any]:
         json.dumps(normalized, sort_keys=True, allow_nan=False)
     except (TypeError, ValueError) as exc:
         raise ToolContractError(f"{field} must be deterministic JSON") from exc
+    if field == "input_schema":
+        _validate_schema_shape(normalized)
     return normalized
+
+
+_JSON_TYPES = frozenset({"object", "array", "string", "integer", "number", "boolean", "null"})
+
+
+def _validate_schema_shape(schema: Mapping[str, Any], *, depth: int = 0) -> None:
+    if depth > 16:
+        raise ToolContractError("input_schema exceeds maximum nesting depth")
+    schema_type = schema.get("type")
+    if schema_type is not None:
+        if not isinstance(schema_type, str) or schema_type not in _JSON_TYPES:
+            raise ToolContractError("input_schema type is invalid")
+    properties = schema.get("properties")
+    if properties is not None:
+        if schema_type not in {None, "object"} or not isinstance(properties, Mapping):
+            raise ToolContractError("input_schema properties require object schema")
+        if len(properties) > 256:
+            raise ToolContractError("input_schema has too many properties")
+        for name, child in properties.items():
+            if not isinstance(name, str) or not name:
+                raise ToolContractError("input_schema property names must be non-empty strings")
+            if not isinstance(child, Mapping):
+                raise ToolContractError("input_schema property must be an object")
+            _validate_schema_shape(child, depth=depth + 1)
+    required = schema.get("required")
+    if required is not None:
+        if not isinstance(required, list) or any(not isinstance(item, str) or not item for item in required):
+            raise ToolContractError("input_schema required must be a string list")
+        if len(set(required)) != len(required):
+            raise ToolContractError("input_schema required contains duplicates")
+        if properties is not None and any(item not in properties for item in required):
+            raise ToolContractError("input_schema required references unknown property")
+    additional = schema.get("additionalProperties")
+    if additional is not None and not isinstance(additional, (bool, Mapping)):
+        raise ToolContractError("input_schema additionalProperties is invalid")
+    if isinstance(additional, Mapping):
+        _validate_schema_shape(additional, depth=depth + 1)
+    items = schema.get("items")
+    if items is not None:
+        if schema_type not in {None, "array"} or not isinstance(items, Mapping):
+            raise ToolContractError("input_schema items require array schema")
+        _validate_schema_shape(items, depth=depth + 1)
+    enum = schema.get("enum")
+    if enum is not None:
+        if not isinstance(enum, list) or not enum:
+            raise ToolContractError("input_schema enum must be a non-empty list")
+        try:
+            json.dumps(enum, sort_keys=True, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ToolContractError("input_schema enum must be deterministic JSON") from exc
+    for field in ("minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum"):
+        if field not in schema:
+            continue
+        value = schema[field]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise ToolContractError(f"input_schema {field} must be finite numeric")
+        if field in {"minLength", "maxLength", "minItems", "maxItems"} and (
+            not isinstance(value, int) or value < 0
+        ):
+            raise ToolContractError(f"input_schema {field} must be a non-negative integer")
+    if (
+        "minimum" in schema
+        and "maximum" in schema
+        and float(schema["minimum"]) > float(schema["maximum"])
+    ):
+        raise ToolContractError("input_schema minimum exceeds maximum")
+    if (
+        "minLength" in schema
+        and "maxLength" in schema
+        and int(schema["minLength"]) > int(schema["maxLength"])
+    ):
+        raise ToolContractError("input_schema minLength exceeds maxLength")
+    if (
+        "minItems" in schema
+        and "maxItems" in schema
+        and int(schema["minItems"]) > int(schema["maxItems"])
+    ):
+        raise ToolContractError("input_schema minItems exceeds maxItems")
+
+
+def _matches_type(expected: str, value: object) -> bool:
+    if expected == "object":
+        return isinstance(value, Mapping)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "null":
+        return value is None
+    return False
+
+
+def _validate_value(schema: Mapping[str, Any], value: object, *, path: str) -> None:
+    expected = schema.get("type")
+    if expected is not None and not _matches_type(str(expected), value):
+        raise ToolContractError(f"{path} does not match schema type {expected}")
+    if "enum" in schema and value not in schema["enum"]:
+        raise ToolContractError(f"{path} is outside schema enum")
+    if isinstance(value, str):
+        if "minLength" in schema and len(value) < int(schema["minLength"]):
+            raise ToolContractError(f"{path} is shorter than schema minimum")
+        if "maxLength" in schema and len(value) > int(schema["maxLength"]):
+            raise ToolContractError(f"{path} exceeds schema maximum")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if "minimum" in schema and float(value) < float(schema["minimum"]):
+            raise ToolContractError(f"{path} is below schema minimum")
+        if "maximum" in schema and float(value) > float(schema["maximum"]):
+            raise ToolContractError(f"{path} exceeds schema maximum")
+    if isinstance(value, list):
+        if "minItems" in schema and len(value) < int(schema["minItems"]):
+            raise ToolContractError(f"{path} has too few items")
+        if "maxItems" in schema and len(value) > int(schema["maxItems"]):
+            raise ToolContractError(f"{path} has too many items")
+        child = schema.get("items")
+        if isinstance(child, Mapping):
+            for index, item in enumerate(value):
+                _validate_value(child, item, path=f"{path}[{index}]")
+    if isinstance(value, Mapping):
+        properties = schema.get("properties")
+        properties = dict(properties) if isinstance(properties, Mapping) else {}
+        required = schema.get("required") or []
+        for name in required:
+            if name not in value:
+                raise ToolContractError(f"{path}.{name} is required")
+        additional = schema.get("additionalProperties", True)
+        for name, item in value.items():
+            child = properties.get(name)
+            if child is not None:
+                _validate_value(child, item, path=f"{path}.{name}")
+            elif additional is False:
+                raise ToolContractError(f"{path}.{name} is not allowed")
+            elif isinstance(additional, Mapping):
+                _validate_value(additional, item, path=f"{path}.{name}")
+
+
+def validate_tool_arguments(
+    schema: Mapping[str, Any],
+    arguments: Mapping[str, Any],
+) -> None:
+    """Validate runtime arguments against the supported canonical schema subset."""
+
+    normalized_schema = _schema(schema, "input_schema")
+    _validate_schema_shape(normalized_schema)
+    if not isinstance(arguments, Mapping):
+        raise ToolContractError("arguments must be an object")
+    _validate_value(normalized_schema, dict(arguments), path="arguments")
 
 
 def canonical_json_digest(value: Mapping[str, Any]) -> str:
@@ -262,4 +416,5 @@ __all__ = [
     "ToolExecutionStatus",
     "ToolManifest",
     "canonical_json_digest",
+    "validate_tool_arguments",
 ]
