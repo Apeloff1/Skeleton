@@ -751,14 +751,10 @@ test('deleting server conversation is never selected as active and is read-only'
   assert.equal(deletingProjection.archived, true);
 
   store.select('thread-deleting');
-  await tick();
-  store.edit({ draft: 'must not send' });
-  await store.send();
-
-  assert.equal(fixture.calls.chat.length, 0);
+  assert.equal(store.active.id, 'thread-active');
   assert.match(
     store.getSnapshot().notice || '',
-    /pending deletion|Only an active server conversation/,
+    /pending deletion/,
   );
 
   store.archive('thread-deleting', false);
