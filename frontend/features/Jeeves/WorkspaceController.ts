@@ -24,6 +24,66 @@ export type ChatResponse = {
 
 export type Transport = (body: ChatBody, signal: AbortSignal) => Promise<ChatResponse>;
 
+
+export type AuthorityThread = {
+  thread_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  version: number;
+  state: 'active' | 'archived' | 'deleting' | 'deleted';
+  data_class: 'public' | 'internal' | 'confidential' | 'restricted';
+};
+
+export type AuthorityMessage = {
+  message_id: string;
+  sequence: number;
+  author_type: 'user' | 'assistant' | 'tool' | 'system-derived';
+  created_at: string;
+  content?: string | null;
+  operation_id?: string | null;
+  ai_result_id?: string | null;
+  artifact_refs?: string[];
+};
+
+export type AuthorityChatResult = {
+  success: boolean;
+  approval_required?: boolean;
+  response?: string;
+  engine_execution_id?: string;
+  thread: AuthorityThread;
+  user_message: AuthorityMessage;
+  assistant_message?: AuthorityMessage;
+  pending_approvals?: Array<{
+    call_id: string;
+    tool_id: string;
+    arguments_digest: string;
+  }>;
+};
+
+export interface ConversationAuthority {
+  listThreads(): Promise<AuthorityThread[]>;
+  createThread(title: string): Promise<AuthorityThread>;
+  listMessages(threadId: string): Promise<AuthorityMessage[]>;
+  chat(input: {
+    threadId: string;
+    expectedThreadVersion: number;
+    message: string;
+    idempotencyKey: string;
+    context?: string;
+    signal: AbortSignal;
+  }): Promise<AuthorityChatResult>;
+  setState(input: {
+    threadId: string;
+    expectedThreadVersion: number;
+    state: 'active' | 'archived' | 'deleting';
+  }): Promise<AuthorityThread>;
+  requestDeletion(input: {
+    threadId: string;
+    expectedThreadVersion: number;
+  }): Promise<AuthorityThread>;
+}
+
 export type WorkspaceSnapshot = {
   workspace: Workspace;
   ready: boolean;
@@ -31,6 +91,7 @@ export type WorkspaceSnapshot = {
   saveState: 'loading' | 'saving' | 'saved' | 'error';
   notice: string | null;
   busyId: string | null;
+  serverSynced: boolean;
 };
 
 type Running = {
@@ -43,7 +104,7 @@ type Running = {
 export class WorkspaceController {
   private snapshot: WorkspaceSnapshot = {
     workspace: createWorkspace(), ready: false, loadError: null,
-    saveState: 'loading', notice: null, busyId: null,
+    saveState: 'loading', notice: null, busyId: null, serverSynced: false,
   };
   private listeners = new Set<() => void>();
   private running: Running | null = null;
@@ -52,7 +113,11 @@ export class WorkspaceController {
   private loading: Promise<void> | null = null;
   private attachments = new Map<string, Attachment>();
 
-  constructor(private storage: WorkspaceStorage, private transport: Transport) {}
+  constructor(
+    private storage: WorkspaceStorage,
+    private transport: Transport,
+    private authority?: ConversationAuthority,
+  ) {}
 
   getSnapshot = (): WorkspaceSnapshot => this.snapshot;
 
