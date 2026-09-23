@@ -4614,67 +4614,12 @@
       "reason": "top-level cue compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     },
     {
-      "path": "skeleton/artifacts",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/audio",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/connectors",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/document",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/document_vision",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/education",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/plugins",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
       "path": "skeleton/product",
       "owner": "package/compatibility boundary",
       "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     },
     {
-      "path": "skeleton/product_shell",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/speech",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
       "path": "skeleton/storage",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/video",
-      "owner": "package/compatibility boundary",
-      "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
-    },
-    {
-      "path": "skeleton/vision",
       "owner": "package/compatibility boundary",
       "reason": "top-level compatibility surface remains outside canonical AI implementation ownership during staged migration; relocation requires explicit architecture-approved ownership and cutover"
     }
