@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from core.ai_provider import (
@@ -28,6 +29,7 @@ from core.ai_provider import (
 )
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
+    EngineApprovalRequired,
     EngineClient,
     EngineClientConfig,
     EngineClientError,
@@ -154,6 +156,19 @@ class AIAssistResponse(BaseModel):
     latency_ms: Optional[float] = None
     ai_generated: bool = True
     timestamp: str
+
+
+class AIChatToolApprovalRequest(BaseModel):
+    call_id: str = Field(..., min_length=1, max_length=256)
+    tool_id: str = Field(..., min_length=1, max_length=128)
+    arguments_digest: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    idempotency_key: str = Field(..., min_length=1, max_length=1024)
+    expires_in_seconds: int = Field(default=30, ge=1, le=60)
 
 
 class AIChatRequest(BaseModel):
@@ -419,6 +434,79 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
     )
 
 
+@router.post("/chat/{execution_id}/tool-approvals")
+async def approve_chat_tool_call(
+    execution_id: str,
+    request: AIChatToolApprovalRequest,
+    user=Depends(require_role("viewer")),
+) -> Dict[str, Any]:
+    """Approve one exact suspended engine tool call for the signed-in actor."""
+
+    tenant_id, owner_id = _chat_identity(user)
+    client = _engine_client()
+    now = datetime.now(timezone.utc)
+    deadline = now + timedelta(seconds=15)
+    try:
+        pending = await client.pending_tool_approvals(
+            execution_id,
+            actor_id=owner_id,
+            tenant_id=tenant_id,
+            deadline=deadline,
+        )
+        match = next(
+            (
+                item
+                for item in pending
+                if item["call_id"] == request.call_id
+            ),
+            None,
+        )
+        if match is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Tool call is not awaiting approval",
+            )
+        if (
+            match["tool_id"] != request.tool_id
+            or match["arguments_digest"] != request.arguments_digest
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Tool approval identity does not match pending call",
+            )
+        approval = await client.approve_tool_call(
+            execution_id,
+            actor_id=owner_id,
+            tenant_id=tenant_id,
+            call_id=request.call_id,
+            tool_id=request.tool_id,
+            arguments_digest=request.arguments_digest,
+            idempotency_key=request.idempotency_key,
+            expires_at=now + timedelta(seconds=request.expires_in_seconds),
+            deadline=deadline,
+        )
+    except HTTPException:
+        raise
+    except EngineRequestConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (EngineDeadlineExceeded, EngineUnavailable, EngineClientError) as exc:
+        logger.warning(
+            "Canonical AI engine approval failed: %s",
+            exc.__class__.__name__,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="AI engine approval failed",
+        ) from exc
+
+    return {
+        "success": True,
+        "approval": approval,
+        "engine_execution_id": execution_id,
+        "retry_required": True,
+    }
+
+
 @router.post("/chat")
 async def ai_chat(
     request: AIChatRequest,
@@ -526,6 +614,40 @@ async def ai_chat(
         engine_result = await client.execute(
             command,
             deadline=deadline,
+        )
+    except EngineApprovalRequired as exc:
+        try:
+            pending = await client.pending_tool_approvals(
+                exc.execution_id,
+                actor_id=owner_id,
+                tenant_id=tenant_id,
+                deadline=deadline,
+            )
+        except (EngineDeadlineExceeded, EngineUnavailable, EngineClientError) as pending_exc:
+            logger.warning(
+                "Canonical AI engine approval lookup failed: %s",
+                pending_exc.__class__.__name__,
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="AI engine approval state is unavailable",
+            ) from pending_exc
+        return JSONResponse(
+            status_code=202,
+            content={
+                "success": False,
+                "approval_required": True,
+                "provider": "skeleton-engine",
+                "engine_execution_id": exc.execution_id,
+                "pending_approvals": [dict(item) for item in pending],
+                "thread": thread.as_dict(),
+                "user_message": user_message.as_dict(),
+                "retry": {
+                    "thread_id": request.thread_id,
+                    "idempotency_key": request.idempotency_key,
+                    "expected_thread_version": request.expected_thread_version,
+                },
+            },
         )
     except EngineExecutionFailed as exc:
         logger.warning(
