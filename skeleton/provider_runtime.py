@@ -2114,7 +2114,7 @@ class OpenAISyncProviderAdapter:
         return {"id": self.provider_id, "model": self.model, "available": self.available}
 
     @staticmethod
-    def _extract_response_text(payload: Any) -> str:
+    def _extract_response_text(payload: Any) -> str | None:
         if not isinstance(payload, Mapping):
             raise ProviderInvocationError("model provider returned malformed JSON")
 
@@ -2143,9 +2143,7 @@ class OpenAISyncProviderAdapter:
                     fragments.append(text.strip())
 
         joined = "\n".join(fragments).strip()
-        if not joined:
-            raise ProviderInvocationError("model provider returned an empty response")
-        return joined
+        return joined or None
 
     @staticmethod
     def _decode_response(response: Any) -> Mapping[str, Any]:
@@ -2200,6 +2198,7 @@ class OpenAISyncProviderAdapter:
             message.as_openai_input() for message in request.history
         ]
         messages.append({"role": "user", "content": request.prompt})
+        tools = _provider_tool_definitions(request)
         body: dict[str, Any] = {
             "model": model,
             "instructions": request.instructions,
@@ -2207,8 +2206,18 @@ class OpenAISyncProviderAdapter:
         }
         if request.max_output_tokens is not None:
             body["max_output_tokens"] = request.max_output_tokens
-        if request.tool_schemas:
-            body["tools"] = [dict(schema) for schema in request.tool_schemas]
+        if tools:
+            body["tools"] = [
+                tool.as_openai_tool()
+                for tool in tools
+            ]
+            body["tool_choice"] = _provider_tool_choice_payload(
+                request,
+                tools,
+            )
+        structured_payload = _provider_structured_output_payload(request)
+        if structured_payload is not None:
+            body["text"] = structured_payload
 
         outbound = urllib.request.Request(
             self._responses_url(),
@@ -2228,12 +2237,27 @@ class OpenAISyncProviderAdapter:
             for _attempt in range(self.max_retries + 1):
                 attempts_used += 1
                 try:
+                    timeout_seconds = _remaining_provider_timeout(
+                        request,
+                        self.timeout_seconds,
+                    )
                     with urllib.request.urlopen(
                         outbound,
-                        timeout=self.timeout_seconds,
+                        timeout=timeout_seconds,
                     ) as response:
                         payload = self._decode_response(response)
-                    text = self._extract_response_text(payload)
+                    raw_text = self._extract_response_text(payload)
+                    (
+                        text,
+                        structured_output,
+                        tool_calls,
+                        finish_reason,
+                        usage,
+                    ) = _normalize_provider_interaction(
+                        payload,
+                        request,
+                        text=raw_text,
+                    )
                     request_id = payload.get("id")
                     latency_seconds = max(0.0, time.perf_counter() - started)
                     actual = _actual_provider_usage(
@@ -2252,15 +2276,21 @@ class OpenAISyncProviderAdapter:
                         raise ProviderPolicyError(
                             "model provider usage reconciliation failed"
                         ) from exc
+                    normalized_id = (
+                        str(request_id)
+                        if isinstance(request_id, (str, int))
+                        else None
+                    )
                     return ProviderResponse(
                         text=text,
                         provider=self.provider_id,
                         model=model,
-                        request_id=(
-                            str(request_id)
-                            if isinstance(request_id, (str, int))
-                            else None
-                        ),
+                        request_id=normalized_id,
+                        response_id=normalized_id,
+                        structured_output=structured_output,
+                        tool_calls=tool_calls,
+                        finish_reason=finish_reason,
+                        usage=usage,
                         latency_ms=round(latency_seconds * 1000, 2),
                         governance_decision_id=governance.decision_id,
                         admission_decision_id=lease.decision.decision_id,
@@ -2272,9 +2302,17 @@ class OpenAISyncProviderAdapter:
                     )
                 except ProviderError:
                     raise
+                except TimeoutError as exc:
+                    last_error = exc
+                    if request.deadline is not None:
+                        deadline = request.deadline.astimezone(timezone.utc)
+                        if datetime.now(timezone.utc) >= deadline:
+                            raise ProviderInvocationError(
+                                "model provider deadline exceeded"
+                            ) from exc
+                    continue
                 except (
                     urllib.error.URLError,
-                    TimeoutError,
                     OSError,
                     ValueError,
                 ) as exc:
