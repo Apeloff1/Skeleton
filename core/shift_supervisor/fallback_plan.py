@@ -98,6 +98,24 @@ def compile_fallback_state(context: Mapping[str, Any], previous: Mapping[str, An
     }
 
 
+def emit_failover_outputs(context_path: str, previous: Mapping[str, Any] | None, result_path: str, state_path: str) -> dict[str, Any]:
+    from .__main__ import _write_state
+
+    context = json.loads(Path(context_path).read_text(encoding="utf-8"))
+    state = compile_fallback_state(context, previous)
+    result = {
+        "actors": ["supervisor-failover"],
+        "plan_items": state["plan_items"],
+        "workers": state["workers"],
+        "revisions": {"supervisor-failover": {"summary": "Deterministic issue-backed failover plan; advisory model unavailable."}},
+        "planner_mode": state["planner_mode"],
+        "plan_fingerprint": state["plan_fingerprint"],
+    }
+    Path(result_path).write_text(json.dumps(result, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+    _write_state(Path(state_path), state)
+    return result
+
+
 def main(context_path: str, state_path: str, output_path: str) -> None:
     context = json.loads(Path(context_path).read_text(encoding="utf-8"))
     previous: dict[str, Any] = {}
