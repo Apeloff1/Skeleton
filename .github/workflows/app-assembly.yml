@@ -53,10 +53,15 @@ on:
       - "skeleton/persistence/operation_store.py"
       - "skeleton/persistence/operation_runtime.py"
       - "skeleton/persistence/conversation_repository.py"
+      - "skeleton/skills/tool_contract.py"
+      - "skeleton/skills/tool_runtime.py"
+      - "skeleton/skills/tool_receipt_store.py"
       - "skeleton/testing/test_operation_store.py"
       - "skeleton/testing/test_operation_runtime.py"
       - "skeleton/testing/test_operation_server_binding.py"
       - "skeleton/testing/test_conversation_repository.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
@@ -332,6 +337,7 @@ jobs:
           skeleton/contracts/conversation.py skeleton/contracts/context.py
           skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py
+          skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py
           skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
           backend/core/operation_stream_transport.py backend/routes/operation_stream.py backend/routes/app_runtime.py
@@ -412,6 +418,8 @@ jobs:
           skeleton/testing/test_operation_runtime.py
           skeleton/testing/test_operation_server_binding.py
           skeleton/testing/test_conversation_repository.py
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_receipt_store.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_operation_stream.py
           skeleton/testing/test_operation_stream_store.py
