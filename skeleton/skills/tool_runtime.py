@@ -499,6 +499,33 @@ class AsyncToolRuntime:
                         metered_tool_calls=0,
                     )
 
+                if self.receipt_store is not None:
+                    reservation = self.receipt_store.reserve(
+                        request,
+                        now=started,
+                    )
+                    if reservation.status == "committed":
+                        assert reservation.receipt is not None
+                        self._request_fingerprints[key] = fingerprint
+                        self._receipts[key] = reservation.receipt
+                        return reservation.receipt
+                    if reservation.status == "in_doubt":
+                        return ToolExecutionReceipt(
+                            receipt_id=_receipt_id(request, registered.manifest),
+                            request_id=request.request_id,
+                            operation_id=request.operation_id,
+                            tenant_id=request.tenant_id,
+                            tool_id=request.tool_id,
+                            idempotency_key=request.idempotency_key,
+                            arguments_digest=request.arguments_digest,
+                            status=ToolExecutionStatus.DENIED,
+                            started_at=started,
+                            finished_at=started,
+                            error_code="execution_in_doubt",
+                            approval_ref=request.approval_ref,
+                            metered_tool_calls=0,
+                        )
+
                 self._request_fingerprints[key] = fingerprint
                 waiter = asyncio.get_running_loop().create_future()
                 self._inflight[key] = waiter
@@ -554,6 +581,12 @@ class AsyncToolRuntime:
                     else:
                         pending.set_exception(exc)
             raise
+
+        if self.receipt_store is not None:
+            receipt = self.receipt_store.commit(
+                request,
+                receipt,
+            )
 
         async with self._lock:
             self._receipts[key] = receipt
