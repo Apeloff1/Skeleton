@@ -10,10 +10,8 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import api from '../../src/utils/apiClient';
 import { WorkspaceController } from './WorkspaceController';
 import MessageContent from './MessageContent';
-import type { ChatResponse } from './WorkspaceController';
 import { MAX_CONTEXT, MAX_TEXT, searchConversations } from './workspace';
 import type { Artifact, Attachment, Conversation, Message } from './workspace';
 import { exportTranscript, MAX_ATTACHMENT_BYTES, saveArtifact, validateAttachment } from './chatFiles';
@@ -133,18 +131,11 @@ export default function ChatWorkspace() {
   const { width } = useWindowDimensions();
   const [controller] = useState(() => new WorkspaceController(
     AsyncStorage,
-    // Compatibility transport remains injectable for legacy/offline controller
-    // tests. The active product path below uses canonical server authority.
-    async (body, signal) => {
-      const result = await api.post<ChatResponse>(
-        '/api/jeeves/chat',
-        body,
-        { signal, timeoutMs: 60000, retries: 0 },
-      );
-      if (!result.ok || !result.data) {
-        throw new Error('Legacy Jeeves transport is unavailable.');
-      }
-      return result.data;
+    // Production UI has no legacy provider/chat network fallback. The
+    // compatibility transport exists only because WorkspaceController keeps a
+    // hermetic legacy mode for old tests and migration tooling.
+    async () => {
+      throw new Error('Legacy Jeeves transport is disabled in the product UI.');
     },
     {
       listThreads: () => listServerConversations({
