@@ -110,7 +110,6 @@ def test_request_digest_is_order_independent_and_secret_free() -> None:
     assert "super-secret-marker" not in left.arguments_digest
     assert "secret" not in left.arguments_digest
 
-
 def test_exact_idempotent_replay_executes_once_and_returns_same_receipt() -> None:
     calls: list[str] = []
     runtime = ToolRuntime()
