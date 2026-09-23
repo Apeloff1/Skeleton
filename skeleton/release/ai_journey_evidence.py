@@ -182,7 +182,10 @@ def collect_ai_journey_evidence(
     nonpassing: list[str] = []
 
     for requirement in required:
-        outcome = outcomes.get(requirement.nodeid)
+        outcome = _resolve_required_outcome(
+            outcomes,
+            requirement.nodeid,
+        )
         if outcome is None:
             missing.append(requirement.nodeid)
             continue
@@ -226,6 +229,29 @@ def collect_ai_journey_evidence(
         eval_evidence=tuple(sorted(evals, key=lambda item: item.evidence_id)),
         observed_cases=tuple(sorted(outcomes)),
     )
+
+
+def _resolve_required_outcome(
+    outcomes: Mapping[str, str],
+    nodeid: str,
+) -> str | None:
+    direct = outcomes.get(nodeid)
+    if direct is not None:
+        return direct
+
+    suffix = "/" + nodeid
+    matches = {
+        outcome
+        for candidate, outcome in outcomes.items()
+        if candidate.endswith(suffix)
+    }
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise EvidenceSchemaError(
+            f"AI journey report has ambiguous prefixed results for {nodeid}"
+        )
+    return next(iter(matches))
 
 
 def _canonical_report_name(value: object) -> str:
