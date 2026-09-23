@@ -166,7 +166,16 @@ def _network_transport_imports(path: Path) -> list[str]:
 
 def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
     credential_markers = sorted(
-        marker for marker in _AI_CREDENTIAL_MARKERS if marker in source
+        marker
+        for marker in _AI_CREDENTIAL_MARKERS
+        if (
+            `os.getenv("${marker}")` in source
+            or `os.getenv('${marker}')` in source
+            or `os.environ.get("${marker}")` in source
+            or `os.environ.get('${marker}')` in source
+            or `os.environ["${marker}"]` in source
+            or `os.environ['${marker}']` in source
+        )
     )
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
     network_imports = sorted(set(_network_transport_imports(path)))
@@ -198,7 +207,6 @@ def _looks_like_provider_network_surface(
         or bool(signals["sdk_imports"])
         or bool(signals["provider_urls"])
         or bool(signals["client_markers"])
-        or any(term in relative for term in _AI_SURFACE_PATH_TERMS)
     )
     return provider_context
 
