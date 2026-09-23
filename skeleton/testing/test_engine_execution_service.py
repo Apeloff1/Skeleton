@@ -539,7 +539,7 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
         arguments_digest=call.arguments_digest,
         idempotency_key="approve-1",
         expires_at=_now() + timedelta(minutes=5),
-        now=_now(),
+        now=_now() + timedelta(seconds=30),
     )
 
     assert replay == approval
