@@ -388,6 +388,7 @@ jobs:
           skeleton/testing/test_admission_runtime.py
           skeleton/testing/test_tenant_quota.py
           skeleton/testing/test_tenant_quota_sqlite.py
+          skeleton/testing/test_actual_usage_metering.py
           skeleton/testing/test_operation_contract.py
           skeleton/testing/test_operation_store.py
           skeleton/testing/test_operation_runtime.py
