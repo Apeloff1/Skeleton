@@ -324,8 +324,6 @@ async def test_deterministic_retrieval_tool_approval_golden_journey(tmp_path) ->
     ack = service.submit(
         command,
         verified_service_principal=SERVICE_PRINCIPAL,
-        actor_id=ACTOR,
-        tenant_id=TENANT,
     )
     assert ack.execution_id == EXECUTION_ID
 
