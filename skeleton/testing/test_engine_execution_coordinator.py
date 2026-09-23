@@ -22,8 +22,14 @@ from skeleton.api.engine_service import (
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
-from skeleton.provider_contract import FinishReason, ProviderUsage
+from skeleton.provider_contract import (
+    FinishReason,
+    ProviderToolCall,
+    ProviderUsage,
+)
 from skeleton.provider_runtime import ProviderResponse
+from skeleton.skills.tool_contract import ToolEffect, ToolManifest
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
@@ -159,6 +165,7 @@ def _bundle(*, execution_id: str = "exec-golden"):
             "engine:read",
             "engine:cancel",
             "engine:events",
+            "engine:approve",
         ),
         capability=operation.capability,
         issued_at=_now(),
@@ -195,6 +202,7 @@ def _service(tmp_path):
                         "engine:read",
                         "engine:cancel",
                         "engine:events",
+                        "engine:approve",
                     }
                 ),
                 tenant_ids=frozenset({"tenant-a"}),
@@ -350,3 +358,236 @@ async def test_coordinator_provider_unavailable_becomes_durable_failure(
     assert result.status == "failed"
     assert result.usage["error_code"] == "provider_unavailable"
     await coordinator.shutdown()
+
+
+
+class SequenceProvider:
+    provider_id = "fake"
+    model = "fake-model"
+    available = True
+
+    def __init__(self, responses) -> None:
+        self.responses = list(responses)
+        self.requests = []
+
+    async def generate(self, request):
+        self.requests.append(request)
+        if not self.responses:
+            raise AssertionError("provider called more times than expected")
+        return self.responses.pop(0)
+
+
+def _approval_tool_response(call_id: str) -> ProviderResponse:
+    return ProviderResponse(
+        text=None,
+        provider="fake",
+        model="fake-model",
+        request_id="provider-tool",
+        response_id="provider-tool",
+        tool_calls=(
+            ProviderToolCall(
+                call_id=call_id,
+                tool_id="repo.write",
+                arguments={"path": "README.md"},
+            ),
+        ),
+        finish_reason=FinishReason.TOOL_CALLS,
+        usage=ProviderUsage(
+            input_tokens=10,
+            output_tokens=3,
+            total_tokens=13,
+            usage_source="provider",
+        ),
+    )
+
+
+def _approval_tool_manifest() -> ToolManifest:
+    return ToolManifest(
+        tool_id="repo.write",
+        version="1.0.0",
+        description="Write one repository file.",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        effect=ToolEffect.REVERSIBLE,
+        approval_required=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
+    tmp_path,
+) -> None:
+    service = _service(tmp_path)
+    operation, base = _bundle(execution_id="exec-approval")
+    handoff = EngineContextHandoff(
+        operation_id=base.compiled_context.operation_id,
+        execution_id=base.compiled_context.execution_id,
+        turn_id=base.compiled_context.turn_id,
+        tenant_id=base.compiled_context.tenant_id,
+        context_id=base.compiled_context.context_id,
+        context_digest=base.compiled_context.context_digest,
+        compiler_version=base.compiled_context.compiler_version,
+        source_snapshot=base.compiled_context.source_snapshot,
+        data_class=base.compiled_context.data_class,
+        instructions=base.compiled_context.instructions,
+        prompt=base.compiled_context.prompt,
+        history=base.compiled_context.history,
+        tools=(
+            __import__(
+                "skeleton.provider_contract",
+                fromlist=["ProviderToolDefinition"],
+            ).ProviderToolDefinition(
+                tool_id="repo.write",
+                description="Write one repository file.",
+                input_schema={
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                    "additionalProperties": False,
+                },
+            ),
+        ),
+    )
+    request = AIExecutionRequest(
+        operation_id=base.execution_request.operation_id,
+        execution_id=base.execution_request.execution_id,
+        objective=base.execution_request.objective,
+        context_policy=dict(base.execution_request.context_policy),
+        tool_policy={
+            "tenant_id": operation.tenant_id,
+            "allowed_tool_ids": ["repo.write"],
+        },
+        resource_budget=dict(base.execution_request.resource_budget),
+        stop_policy=dict(base.execution_request.stop_policy),
+        created_at=base.execution_request.created_at,
+    )
+    authority = DelegatedAuthority(
+        service_principal="codedock-backend",
+        actor_id=operation.actor_id,
+        tenant_id=operation.tenant_id,
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+        ),
+        capability=operation.capability,
+        issued_at=_now(),
+        expires_at=_now() + timedelta(minutes=5),
+        request_binding=engine_request_binding(operation, request),
+    )
+    command = EngineExecutionCommand(
+        operation=operation,
+        execution_request=request,
+        delegated_authority=authority,
+        compiled_context=handoff,
+        context_seed_refs=base.context_seed_refs,
+        resource_budget=dict(request.resource_budget),
+        stream_preferences={"mode": "events"},
+    )
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        now=_now(),
+    )
+
+    receipt_path = tmp_path / "tool-receipts.sqlite3"
+    effects: list[str | None] = []
+    tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(receipt_path)
+    )
+
+    async def handler(tool_request):
+        effects.append(tool_request.approval_ref)
+        return "artifact:approved-write"
+
+    await tools.register(_approval_tool_manifest(), handler)
+    first_provider = SequenceProvider([_approval_tool_response("call-write")])
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(first_provider),
+        tool_runtime=tools,
+    )
+
+    await coordinator.ensure_started(command)
+    for _ in range(100):
+        current = service.repository.get("exec-approval")
+        if current.state.value == "waiting_for_user":
+            break
+        await asyncio.sleep(0)
+    else:
+        raise AssertionError("execution did not suspend for approval")
+
+    pending = service.pending_tool_approvals(
+        "exec-approval",
+        verified_service_principal="codedock-backend",
+        now=_now(),
+    )
+    assert len(pending) == 1
+    assert pending[0]["call_id"] == "call-write"
+    assert effects == []
+    await coordinator.shutdown()
+
+    approval = service.approve_tool_call(
+        "exec-approval",
+        verified_service_principal="codedock-backend",
+        call_id=pending[0]["call_id"],
+        tool_id=pending[0]["tool_id"],
+        arguments_digest=pending[0]["arguments_digest"],
+        idempotency_key="approve-call-write",
+        expires_at=_now() + timedelta(minutes=5),
+        now=_now(),
+    )
+
+    restarted_tools = AsyncToolRuntime(
+        receipt_store=SQLiteToolReceiptStore(receipt_path)
+    )
+
+    async def restarted_handler(tool_request):
+        effects.append(tool_request.approval_ref)
+        return "artifact:approved-write"
+
+    await restarted_tools.register(
+        _approval_tool_manifest(),
+        restarted_handler,
+    )
+    final_provider = SequenceProvider(
+        [
+            ProviderResponse(
+                text="write confirmed",
+                provider="fake",
+                model="fake-model",
+                request_id="provider-final",
+                response_id="provider-final",
+                finish_reason=FinishReason.COMPLETED,
+                usage=ProviderUsage(
+                    input_tokens=8,
+                    output_tokens=4,
+                    total_tokens=12,
+                    usage_source="provider",
+                ),
+            )
+        ]
+    )
+    restarted = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(final_provider),
+        tool_runtime=restarted_tools,
+    )
+
+    await restarted.ensure_execution("exec-approval")
+    result = await _wait_result(service, "exec-approval")
+
+    assert result.status == "completed"
+    assert result.final_output == "write confirmed"
+    assert result.verification_receipt["outcome"] == "verified"
+    assert effects == [approval.approval_ref]
+    assert result.usage["tool_calls"] == 1
+    assert len(result.tool_receipts) == 1
+    assert final_provider.requests
+    await restarted.shutdown()
