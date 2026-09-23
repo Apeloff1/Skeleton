@@ -13,7 +13,11 @@ from core.operation_stream_transport import (
     encode_sse_heartbeat,
 )
 from skeleton.contracts.operation import OperationEnvelope, OperationState
-from skeleton.frontier.operation_stream import ReplayCursor, StreamReplayGapError
+from skeleton.frontier.operation_stream import (
+    ReplayCursor,
+    StreamBackpressureError,
+    StreamReplayGapError,
+)
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
 from skeleton.persistence.operation_store import SQLiteOperationStore
 
@@ -430,6 +434,160 @@ def test_slowest_active_consumer_controls_safe_compaction(
     )
     assert removed == 1
     assert events.head(operation.operation_id)["compacted_through"] == 1
+
+    operations.close()
+    events.close()
+
+
+
+def test_slow_consumer_backpressure_preserves_pending_outbox_until_ack(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "operations.sqlite")
+    events = SQLiteOperationEventStore(
+        tmp_path / "events.sqlite",
+        capacity_per_operation=1,
+    )
+    transport = OperationStreamTransport(operations, events)
+    operation = _operation()
+    created = operations.create(operation, now=BASE_TIME)
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.register_consumer(
+        operation.operation_id,
+        "slow-client",
+        now=BASE_TIME,
+        lease_seconds=300,
+    )
+    operations.transition(
+        operation.operation_id,
+        OperationState.VALIDATED,
+        expected_version=created.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+
+    assert events.safe_compaction_sequence(
+        operation.operation_id,
+        now=BASE_TIME + timedelta(seconds=2),
+    ) == 0
+    with pytest.raises(StreamBackpressureError):
+        transport.dispatch_pending(
+            operation.operation_id,
+            tenant_id="tenant-a",
+        )
+
+    pending = operations.pending_outbox(
+        operation_id=operation.operation_id,
+    )
+    assert len(pending) == 1
+    assert pending[0].event_type == "operation.validated"
+    assert [event.sequence for event in events.replay(
+        ReplayCursor(operation.operation_id)
+    )] == [1]
+
+    events.acknowledge_consumer(
+        operation.operation_id,
+        "slow-client",
+        1,
+        now=BASE_TIME + timedelta(seconds=3),
+        lease_seconds=300,
+    )
+    assert transport.compact_acknowledged(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    ) == 1
+    delivered = transport.dispatch_pending(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+    assert [event.type for event in delivered] == [
+        "operation.validated"
+    ]
+    assert operations.pending_outbox(
+        operation_id=operation.operation_id,
+    ) == ()
+
+    operations.close()
+    events.close()
+
+
+def _running_operation_for_race(
+    operations: SQLiteOperationStore,
+    operation: OperationEnvelope,
+):
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+            OperationState.ADMITTED,
+            OperationState.RUNNING,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+    return current
+
+
+def test_completion_wins_cancel_race_and_terminal_stream_remains_final(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = _running_operation_for_race(operations, operation)
+    completed = operations.transition(
+        operation.operation_id,
+        OperationState.COMPLETED,
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=10),
+    )
+
+    cancelled = transport.cancel(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+
+    assert cancelled.changed is False
+    assert cancelled.operation.envelope.state is OperationState.COMPLETED
+    assert cancelled.operation.version == completed.version
+    replay = events.replay(ReplayCursor(operation.operation_id))
+    terminal = [event for event in replay if event.terminal]
+    assert len(terminal) == 1
+    assert terminal[0].type == "operation.completed"
+
+    operations.close()
+    events.close()
+
+
+def test_cancel_wins_completion_race_and_completion_cannot_reopen_operation(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = _running_operation_for_race(operations, operation)
+
+    cancelled = transport.cancel(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+
+    assert cancelled.changed is True
+    assert cancelled.operation.envelope.state is OperationState.CANCELLED
+    with pytest.raises(Exception, match="illegal operation transition"):
+        operations.transition(
+            operation.operation_id,
+            OperationState.COMPLETED,
+            expected_version=cancelled.operation.version,
+            now=BASE_TIME + timedelta(seconds=10),
+        )
+    replay = events.replay(ReplayCursor(operation.operation_id))
+    terminal = [event for event in replay if event.terminal]
+    assert len(terminal) == 1
+    assert terminal[0].type == "operation.cancelled"
 
     operations.close()
     events.close()
