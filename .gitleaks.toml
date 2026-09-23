@@ -37,3 +37,11 @@ description = "Inherited generic API key rule with Skeleton documentation false-
   regexTarget = "line"
   regexes = ['''fencing tokens, sequence/correlation/causation IDs and explicit dedupe windows''']
   paths = ['''^docs/BUILD_PLAN\.md$''']
+
+  [[rules.allowlists]]
+  description = "Synthetic chat approval idempotency key in deterministic route tests is not a credential"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''"idempotency_key"\s*:\s*"approval-decision-1"''']
+  paths = ['''^backend/tests/test_ai_chat_conversation_authority\.py$''']
+
