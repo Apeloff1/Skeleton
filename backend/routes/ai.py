@@ -218,10 +218,14 @@ async def _execute_provider_request(request: ProviderRequest) -> Dict[str, Any]:
             "model": response.model,
             "provider_request_id": response.request_id,
             "latency_ms": response.latency_ms,
-            "context_id": response.context_id,
-            "context_digest": response.context_digest,
-            "context_source_snapshot": list(response.context_source_snapshot),
-            "context_compiler_version": response.context_compiler_version,
+            "context_id": getattr(response, "context_id", None),
+            "context_digest": getattr(response, "context_digest", None),
+            "context_source_snapshot": list(
+                getattr(response, "context_source_snapshot", ())
+            ),
+            "context_compiler_version": getattr(
+                response, "context_compiler_version", None
+            ),
         }
     except ProviderError as exc:
         logger.warning("AI provider unavailable or failed: %s", exc.__class__.__name__)
