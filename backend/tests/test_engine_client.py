@@ -197,3 +197,121 @@ def test_compose_moves_provider_credentials_to_engine_process_only() -> None:
     assert "GF_SEAL_SECRET=" in backend_block
     assert "SKELETON_INTERNAL_URL=" in backend_block
     assert "CODEDOCK_ENGINE_SERVICE_PRINCIPAL=" in backend_block
+
+
+
+def test_engine_command_identity_changes_with_structured_output_contract() -> None:
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
+    base = ProviderRequest(
+        instructions="rules",
+        prompt="hello",
+        tenant_id="tenant-a",
+    )
+    structured = ProviderRequest(
+        instructions="rules",
+        prompt="hello",
+        tenant_id="tenant-a",
+        structured_output_schema={
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"],
+            "additionalProperties": False,
+        },
+    )
+
+    left = engine_command_from_provider_request(
+        base,
+        service_principal="codedock-backend",
+        deadline=deadline,
+    )
+    right = engine_command_from_provider_request(
+        structured,
+        service_principal="codedock-backend",
+        deadline=deadline,
+    )
+
+    assert left.operation.operation_id != right.operation.operation_id
+    assert (
+        left.execution_request.execution_id
+        != right.execution_request.execution_id
+    )
+    assert left.operation.idempotency_key != right.operation.idempotency_key
+
+
+def test_engine_command_normalizes_legacy_tool_schemas_before_handoff() -> None:
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
+    request = ProviderRequest(
+        instructions="rules",
+        prompt="read the file",
+        tenant_id="tenant-a",
+        tool_schemas=(
+            {
+                "type": "function",
+                "name": "repo.read",
+                "description": "Read a repository file",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                    "additionalProperties": False,
+                },
+            },
+        ),
+    )
+
+    command = engine_command_from_provider_request(
+        request,
+        service_principal="codedock-backend",
+        deadline=deadline,
+    )
+
+    assert [tool.tool_id for tool in command.compiled_context.tools] == [
+        "repo.read"
+    ]
+    assert command.execution_request.tool_policy["allowed_tool_ids"] == [
+        "repo.read"
+    ]
+
+
+def test_engine_command_identity_changes_with_resource_budget() -> None:
+    from skeleton.intelligence.cost_admission import ResourceBudget
+
+    deadline = datetime.now(timezone.utc) + timedelta(seconds=30)
+    small = ProviderRequest(
+        instructions="rules",
+        prompt="hello",
+        tenant_id="tenant-a",
+        resource_budget=ResourceBudget(
+            max_input_tokens=1000,
+            max_output_tokens=500,
+            max_tool_calls=2,
+            max_provider_attempts=1,
+            max_wall_seconds=30,
+        ),
+    )
+    larger = ProviderRequest(
+        instructions="rules",
+        prompt="hello",
+        tenant_id="tenant-a",
+        resource_budget=ResourceBudget(
+            max_input_tokens=2000,
+            max_output_tokens=500,
+            max_tool_calls=2,
+            max_provider_attempts=1,
+            max_wall_seconds=30,
+        ),
+    )
+
+    left = engine_command_from_provider_request(
+        small,
+        service_principal="codedock-backend",
+        deadline=deadline,
+    )
+    right = engine_command_from_provider_request(
+        larger,
+        service_principal="codedock-backend",
+        deadline=deadline,
+    )
+
+    assert left.operation.operation_id != right.operation.operation_id
+    assert left.operation.idempotency_key != right.operation.idempotency_key
