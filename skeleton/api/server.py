@@ -284,6 +284,7 @@ class ServerState:
                             "engine:read",
                             "engine:cancel",
                             "engine:events",
+                            "engine:approve",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,
