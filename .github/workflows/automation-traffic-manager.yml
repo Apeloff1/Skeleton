@@ -84,6 +84,14 @@ jobs:
         with:
           python-version: "3.11.16"
 
+      - name: Install traffic manager runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input \
+            'pydantic>=2,<3' \
+            'pydantic-settings>=2,<3'
+
       - name: Evaluate bounded automation pressure
         id: traffic
         run: >-
