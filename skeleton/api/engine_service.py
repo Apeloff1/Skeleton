@@ -1231,6 +1231,8 @@ class EngineExecutionService:
         command: EngineExecutionCommand,
         *,
         verified_service_principal: str,
+        actor_id: str | None = None,
+        tenant_id: str | None = None,
         now: datetime | None = None,
     ) -> EngineExecutionAck:
         instant = (
@@ -1244,6 +1246,14 @@ class EngineExecutionService:
             required_scope="engine:submit",
             now=instant,
         )
+        if actor_id is not None and str(actor_id).strip() != command.operation.actor_id:
+            raise EngineAuthorityError(
+                "submitted actor does not match delegated operation actor"
+            )
+        if tenant_id is not None and str(tenant_id).strip() != command.operation.tenant_id:
+            raise EngineAuthorityError(
+                "submitted tenant does not match delegated operation tenant"
+            )
         existing = self.submissions.get(
             service_principal=verified_service_principal,
             tenant_id=command.operation.tenant_id,
@@ -1538,6 +1548,8 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str | None = None,
+        tenant_id: str | None = None,
         now: datetime | None = None,
     ) -> EngineExecutionStatus:
         stored = self._stored_for_access(
@@ -1546,6 +1558,15 @@ class EngineExecutionService:
             scope="engine:read",
             now=now,
         )
+        operation = stored.command.operation
+        if actor_id is not None and str(actor_id).strip() != operation.actor_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
+        if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         execution = self.repository.get(execution_id)
         result = self.repository.result(execution_id)
         failure_code = None
@@ -1574,15 +1595,26 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str | None = None,
+        tenant_id: str | None = None,
         now: datetime | None = None,
     ) -> EngineExecutionStatus:
-        self._stored_for_access(
+        stored = self._stored_for_access(
             execution_id,
             verified_service_principal=verified_service_principal,
             scope="engine:cancel",
             now=now,
             require_live_delegation=True,
         )
+        operation = stored.command.operation
+        if actor_id is not None and str(actor_id).strip() != operation.actor_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
+        if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         current = self.repository.get(execution_id)
         if not current.terminal and not current.cancellation_requested:
             self.repository.request_cancel(
@@ -1593,6 +1625,8 @@ class EngineExecutionService:
         return self.status(
             execution_id,
             verified_service_principal=verified_service_principal,
+            actor_id=actor_id,
+            tenant_id=tenant_id,
             now=now,
         )
 
@@ -1601,14 +1635,25 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str | None = None,
+        tenant_id: str | None = None,
         now: datetime | None = None,
     ) -> dict[str, Any]:
-        self._stored_for_access(
+        stored = self._stored_for_access(
             execution_id,
             verified_service_principal=verified_service_principal,
             scope="engine:events",
             now=now,
         )
+        operation = stored.command.operation
+        if actor_id is not None and str(actor_id).strip() != operation.actor_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
+        if tenant_id is not None and str(tenant_id).strip() != operation.tenant_id:
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         execution = self.repository.get(execution_id)
         turns = self.repository.turns(execution_id)
         checkpoint = self.repository.latest_checkpoint(execution_id)
