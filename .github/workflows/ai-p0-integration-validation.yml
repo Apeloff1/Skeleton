@@ -1,0 +1,88 @@
+name: AI P0 Integration Validation
+
+on:
+  push:
+    branches:
+      - integration/p0-massive-batch-s0-s1
+    paths:
+      - "backend/**"
+      - "frontend/services/operationStream*.ts"
+      - "frontend/scripts/test-operation-stream-reducer.mjs"
+      - "machine/ai_build_queue.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_runtime_schemas.json"
+      - "scripts/ai_release_evidence.py"
+      - "scripts/testing/test_ai_release_evidence.py"
+      - "skeleton/api/**"
+      - "skeleton/context/**"
+      - "skeleton/contracts/**"
+      - "skeleton/frontier/**"
+      - "skeleton/intelligence/**"
+      - "skeleton/persistence/**"
+      - "skeleton/provider_contract.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/release/**"
+      - "skeleton/skills/**"
+      - "skeleton/testing/**"
+      - ".github/workflows/ai-p0-integration-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-p0-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-runtime:
+    name: Python runtime + Stage 7 matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install focused validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check             "pytest==8.4.2"             "pytest-asyncio==1.4.0"             "pydantic==2.13.5"             "pydantic-settings==2.15.0"             "fastapi>=0.110,<1"             "httpx>=0.27,<1"
+
+      - name: Run canonical AI integration suites
+        run: |
+          mkdir -p validation-artifacts
+          python -m pytest -q             scripts/testing/test_ai_release_evidence.py             skeleton/testing/test_ai_journey_evidence.py             backend/tests/test_ai_golden_journey.py             backend/tests/test_ai_chat_conversation_authority.py             backend/tests/test_operation_stream_transport.py             backend/tests/test_operation_stream_route.py             backend/tests/test_engine_client.py             backend/tests/test_engine_provider_adapter.py             skeleton/testing/test_provider_contract.py             skeleton/testing/test_verification_runtime.py             skeleton/testing/test_execution_repository.py             skeleton/testing/test_execution_runtime.py             skeleton/testing/test_tool_runtime.py             skeleton/testing/test_engine_execution_service.py             skeleton/testing/test_engine_execution_coordinator.py             skeleton/testing/test_artifact_usage_meter.py             --junitxml=validation-artifacts/ai-p0-junit.xml
+
+      - name: Enforce mandatory Stage 7 journey matrix
+        run: |
+          python scripts/ai_release_evidence.py             --stage7-report validation-artifacts/ai-p0-junit.xml             --stage7-lane test             --output validation-artifacts/stage7-test-evidence.json
+          python scripts/ai_release_evidence.py             --stage7-report validation-artifacts/ai-p0-junit.xml             --stage7-lane eval             --output validation-artifacts/stage7-eval-evidence.json
+
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-p0-python-validation
+          path: validation-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  frontend-stream:
+    name: Frontend operation stream reducer
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Run operation stream reducer contract tests
+        working-directory: frontend
+        run: npm run test:operation-stream
