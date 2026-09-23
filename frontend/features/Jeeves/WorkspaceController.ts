@@ -40,6 +40,7 @@ export type AuthorityMessage = {
   sequence: number;
   author_type: 'user' | 'assistant' | 'tool' | 'system-derived';
   created_at: string;
+  idempotency_key?: string;
   content?: string | null;
   operation_id?: string | null;
   ai_result_id?: string | null;
@@ -152,6 +153,7 @@ export class WorkspaceController {
       createdAt: Number.isFinite(createdAt) ? createdAt : Date.now(),
       status: 'complete',
       artifactCount: message.artifact_refs?.length || 0,
+      idempotencyKey: message.idempotency_key,
     };
   }
 
