@@ -1328,14 +1328,24 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str,
+        tenant_id: str,
         now: datetime | None = None,
     ) -> tuple[dict[str, str], ...]:
-        self._stored_for_access(
+        stored = self._stored_for_access(
             execution_id,
             verified_service_principal=verified_service_principal,
             scope="engine:read",
             now=now,
         )
+        operation = stored.command.operation
+        if (
+            str(actor_id).strip() != operation.actor_id
+            or str(tenant_id).strip() != operation.tenant_id
+        ):
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         execution = self.repository.get(execution_id)
         if execution.state is not ExecutionState.WAITING_FOR_USER:
             return ()
@@ -1397,6 +1407,8 @@ class EngineExecutionService:
         execution_id: str,
         *,
         verified_service_principal: str,
+        actor_id: str,
+        tenant_id: str,
         call_id: str,
         tool_id: str,
         arguments_digest: str,
@@ -1410,6 +1422,14 @@ class EngineExecutionService:
             scope="engine:approve",
             now=now,
         )
+        operation = stored.command.operation
+        if (
+            str(actor_id).strip() != operation.actor_id
+            or str(tenant_id).strip() != operation.tenant_id
+        ):
+            raise EngineServiceError(
+                "engine execution belongs to a different actor or tenant"
+            )
         instant = (
             datetime.now(timezone.utc)
             if now is None
@@ -1425,6 +1445,8 @@ class EngineExecutionService:
             for row in self.pending_tool_approvals(
                 execution_id,
                 verified_service_principal=verified_service_principal,
+                actor_id=operation.actor_id,
+                tenant_id=operation.tenant_id,
                 now=instant,
             )
         }
