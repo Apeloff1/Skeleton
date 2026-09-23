@@ -2229,7 +2229,7 @@
       "stage": 6,
       "parallel_lane": "realtime",
       "objective": "Implement frontend operation reducer with event-id dedupe, sequence checks, provisional content and terminal reconciliation.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [],
       "closure_dependencies": [
         "gap-cognitive-execution-loop",
@@ -2268,7 +2268,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -2287,7 +2287,7 @@
       "stage": 6,
       "parallel_lane": "realtime",
       "objective": "Persist reconnect cursor and implement replay-gap authoritative resync plus multi-client compaction semantics.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S6-STREAM-01"
       ],
@@ -2331,7 +2331,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
@@ -2350,7 +2350,7 @@
       "stage": 6,
       "parallel_lane": "realtime",
       "objective": "Prove slow-client backpressure, cancel/complete race and browser/API recovery end to end.",
-      "status": "pending",
+      "status": "evidence_pending",
       "task_dependencies": [
         "AIQ-S6-STREAM-02"
       ],
@@ -2394,7 +2394,7 @@
       "accountability_required": true,
       "completion_checkbox": false,
       "completion_checkbox_mark": "[ ]",
-      "implementation_signed": false,
+      "implementation_signed": true,
       "verification_signed": false,
       "engineering_inheritance": {
         "source": "machine/ai_engineering_task_matrix.json",
