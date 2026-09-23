@@ -243,9 +243,10 @@ export async function listAllConversationMessages(
   return messages.sort((left, right) => left.sequence - right.sequence);
 }
 
-export async function sendCanonicalConversationMessage(
-  thread: ConversationThread,
+export async function sendCanonicalConversationTurn(
   input: {
+    threadId: string;
+    expectedThreadVersion: number;
     message: string;
     idempotencyKey: string;
     context?: string;
@@ -257,9 +258,9 @@ export async function sendCanonicalConversationMessage(
       '/api/ai/chat',
       {
         message: input.message,
-        thread_id: thread.thread_id,
+        thread_id: input.threadId,
         idempotency_key: input.idempotencyKey,
-        expected_thread_version: thread.version,
+        expected_thread_version: input.expectedThreadVersion,
         context: input.context || undefined,
         conversation_history: [],
       },
@@ -275,6 +276,57 @@ export async function sendCanonicalConversationMessage(
     throw new Error('Conversation response is missing canonical lineage.');
   }
   return data;
+}
+
+export async function sendCanonicalConversationMessage(
+  thread: ConversationThread,
+  input: {
+    message: string;
+    idempotencyKey: string;
+    context?: string;
+    signal?: AbortSignal;
+  },
+): Promise<CanonicalChatResult> {
+  return sendCanonicalConversationTurn({
+    threadId: thread.thread_id,
+    expectedThreadVersion: thread.version,
+    message: input.message,
+    idempotencyKey: input.idempotencyKey,
+    context: input.context,
+    signal: input.signal,
+  });
+}
+
+export async function setConversationStateById(
+  threadId: string,
+  expectedThreadVersion: number,
+  state: 'active' | 'archived' | 'deleting',
+): Promise<ConversationThread> {
+  const data = await requireData(
+    api.patch<{ thread: ConversationThread }>(
+      '/api/v1/conversations/' + encodeURIComponent(threadId) + '/state',
+      {
+        state,
+        expected_thread_version: expectedThreadVersion,
+      },
+    ),
+    'Could not update conversation state.',
+  );
+  return data.thread;
+}
+
+export async function requestConversationDeletionById(
+  threadId: string,
+  expectedThreadVersion: number,
+): Promise<ConversationThread> {
+  const path = '/api/v1/conversations/' + encodeURIComponent(threadId)
+    + '?expected_thread_version='
+    + encodeURIComponent(String(expectedThreadVersion));
+  const data = await requireData(
+    api.delete<{ thread: ConversationThread }>(path),
+    'Could not request conversation deletion.',
+  );
+  return data.thread;
 }
 
 export async function exportConversationSnapshot(
