@@ -15,6 +15,7 @@ def test_failover_is_issue_backed_bounded_and_deterministic():
     assert [item["source_issue"] for item in first["plan_items"]] == [540, 1685]
     assert first["plan_fingerprint"] == second["plan_fingerprint"]
     assert all(item["planner"] == "deterministic-failover-v1" for item in first["plan_items"])
+    assert all(item["owner"] is None for item in first["plan_items"])
 
 
 def test_failover_preserves_unfinished_prior_custody():
@@ -27,3 +28,11 @@ def test_failover_refuses_to_invent_work():
     import pytest
     with pytest.raises(RuntimeError, match="no authorized open issue"):
         compile_fallback_state({"issues": []})
+
+
+def test_failover_rejects_unapproved_open_issue():
+    import pytest
+    with pytest.raises(RuntimeError, match="no authorized open issue"):
+        compile_fallback_state({
+            "issues": [{"number": 999, "title": "Unapproved", "body": "Must not become work", "labels": []}]
+        })
