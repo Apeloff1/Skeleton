@@ -600,6 +600,8 @@ def test_tool_approval_rejects_expired_and_mismatched_decisions(tmp_path) -> Non
         service.approve_tool_call(
             "exec-1",
             verified_service_principal="backend-service",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
             call_id=call.call_id,
             tool_id=call.tool_id,
             arguments_digest=call.arguments_digest,
@@ -612,6 +614,8 @@ def test_tool_approval_rejects_expired_and_mismatched_decisions(tmp_path) -> Non
         service.approve_tool_call(
             "exec-1",
             verified_service_principal="backend-service",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
             call_id=call.call_id,
             tool_id="repo.other",
             arguments_digest=call.arguments_digest,
@@ -624,6 +628,8 @@ def test_tool_approval_rejects_expired_and_mismatched_decisions(tmp_path) -> Non
         service.approve_tool_call(
             "exec-1",
             verified_service_principal="backend-service",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
             call_id=call.call_id,
             tool_id=call.tool_id,
             arguments_digest="0" * 64,
