@@ -61,6 +61,7 @@ on:
       - "skeleton/testing/test_tool_receipt_store.py"
       - "skeleton/testing/test_tool_adapters.py"
       - "backend/tests/test_tool_registry_scoped_adapters.py"
+      - "backend/tests/test_tool_registry_canonical_delegate.py"
       - "skeleton/persistence/operation_store.py"
       - "skeleton/persistence/operation_runtime.py"
       - "skeleton/persistence/conversation_repository.py"
@@ -468,6 +469,7 @@ jobs:
           backend/tests/test_operation_stream_route.py
           backend/tests/test_conversations_api.py
           backend/tests/test_tool_registry_scoped_adapters.py
+          backend/tests/test_tool_registry_canonical_delegate.py
           backend/tests/test_ai_chat_conversation_authority.py
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py

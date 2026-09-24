@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
-from uuid import uuid4
+from types import SimpleNamespace
+import sys
 
 import pytest
 
@@ -9,37 +9,25 @@ import pytest
 @pytest.fixture
 def registry():
     import services.tool_registry as tool_registry
-
     return tool_registry
-
-
-def _assert_canonical_denial(result: dict, *, tool_id: str) -> None:
-    assert result["ok"] is False
-    assert result["error"] == "tool_denied"
-    assert result["receipt"]["status"] == "denied"
-    assert result["receipt"]["tool_id"] == tool_id
-    assert result["receipt"]["metered_tool_calls"] == 0
-    assert result["receipt"]["error_code"] == "tool_denied"
 
 
 @pytest.mark.asyncio
 async def test_compile_denial_happens_before_subprocess(registry, monkeypatch):
     called = {"subprocess": 0}
-
     monkeypatch.setattr(registry, "code_execution_enabled", lambda: True)
 
-    def run(*args, **kwargs):
+    def popen(*args, **kwargs):
         called["subprocess"] += 1
         raise AssertionError("subprocess must not run")
 
-    monkeypatch.setattr(registry.subprocess, "run", run)
-
+    monkeypatch.setattr(registry.subprocess, "Popen", popen)
     result = await registry.invoke(
         "compile_code",
-        {"language": "c", "code": "int main(void){return 0;}\x00"},
+        {"language": "python", "code": "print('escape')"},
     )
 
-    _assert_canonical_denial(result, tool_id="compile_code")
+    assert result == {"ok": False, "error": "tool_denied"}
     assert called["subprocess"] == 0
 
 
@@ -52,13 +40,12 @@ async def test_database_scope_denial_happens_before_database_access(registry, mo
         raise AssertionError("database must not be reached")
 
     monkeypatch.setattr(registry, "_db", db)
-
     result = await registry.invoke(
         "mongo_query",
         {"collection": "system.users", "filter": {}},
     )
 
-    _assert_canonical_denial(result, tool_id="mongo_query")
+    assert result == {"ok": False, "error": "tool_denied"}
     assert called["db"] == 0
 
 
@@ -71,7 +58,6 @@ async def test_mongo_server_side_javascript_is_denied_before_database(registry, 
         raise AssertionError("database must not be reached")
 
     monkeypatch.setattr(registry, "_db", db)
-
     result = await registry.invoke(
         "mongo_query",
         {
@@ -80,7 +66,7 @@ async def test_mongo_server_side_javascript_is_denied_before_database(registry, 
         },
     )
 
-    _assert_canonical_denial(result, tool_id="mongo_query")
+    assert result == {"ok": False, "error": "tool_denied"}
     assert called["db"] == 0
 
 
@@ -105,133 +91,96 @@ async def test_artifact_scope_denial_happens_before_database_or_builder(registry
         {"build_id": "../escape", "kinds": ["zip"]},
     )
 
-    _assert_canonical_denial(result, tool_id="package_build")
+    assert result == {"ok": False, "error": "tool_denied"}
     assert called == {"db": 0, "builder": 0}
+
+
+@pytest.mark.asyncio
+async def test_artifact_byte_ceiling_rejects_before_metadata_persistence(registry, monkeypatch):
+    monkeypatch.setattr(registry, "code_execution_enabled", lambda: True)
+    persisted = []
+
+    class Builds:
+        async def find_one(self, *args, **kwargs):
+            return {"build_id": "build-1"}
+
+    class Artifacts:
+        async def update_one(self, *args, **kwargs):
+            persisted.append((args, kwargs))
+
+    db = SimpleNamespace(galaxy_builds=Builds(), build_artifacts=Artifacts())
+    monkeypatch.setattr(registry, "_db", lambda: db)
+
+    async def package_build(*args, **kwargs):
+        return {
+            "artifacts": [
+                {
+                    "artifact_id": "zip_build-1",
+                    "kind": "zip",
+                    "size_bytes": 2048,
+                    "path": "/definitely/not/a/real/artifact.zip",
+                }
+            ],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(registry.binary_builder, "package_build", package_build)
+    result = await registry.invoke(
+        "package_build",
+        {
+            "build_id": "build-1",
+            "kinds": ["zip"],
+            "max_output_bytes": 1024,
+            "retention_days": 3,
+        },
+    )
+
+    assert result["ok"] is False
+    assert result["error"] == "artifact_too_large"
+    assert result["artifacts_rejected"] == ["zip_build-1"]
+    assert persisted == []
 
 
 @pytest.mark.asyncio
 async def test_egress_query_bound_denies_before_network_import(registry):
     result = await registry.invoke(
         "web_search",
-        {"query": " "},
+        {"query": "x" * 513},
     )
-
-    _assert_canonical_denial(result, tool_id="web_search")
-
-
-def _reset_canonical(registry):
-    registry._CANONICAL_RUNTIME = registry.AsyncToolRuntime()
-    registry._CANONICAL_RESULT_STORE = registry._CompatibilityResultStore()
-    registry._CANONICAL_INIT_LOCK = asyncio.Lock()
-    registry._CANONICAL_READY = False
+    assert result == {"ok": False, "error": "tool_denied"}
 
 
 @pytest.mark.asyncio
-async def test_canonical_delegate_coalesces_concurrent_exact_retries(
-    registry,
-    monkeypatch,
-):
-    _reset_canonical(registry)
-    calls = 0
-    entered = asyncio.Event()
-    release = asyncio.Event()
+async def test_web_search_drops_private_loopback_and_userinfo_results(registry, monkeypatch):
+    class FakeDDGS:
+        def __enter__(self):
+            return self
 
-    async def fake_vault(params):
-        nonlocal calls
-        calls += 1
-        entered.set()
-        await release.wait()
-        return {"ok": True, "value": params.get("topic")}
+        def __exit__(self, exc_type, exc, tb):
+            return False
 
-    monkeypatch.setitem(registry.TOOLS, "vault_query", fake_vault)
-    operation_id = str(uuid4())
-    first = asyncio.create_task(
-        registry.invoke_canonical(
-            "vault_query",
-            {"topic": "memory"},
-            operation_id=operation_id,
-            tenant_id="tenant-a",
-            idempotency_key="same",
-            request_id=str(uuid4()),
-        )
-    )
-    await entered.wait()
-    second = asyncio.create_task(
-        registry.invoke_canonical(
-            "vault_query",
-            {"topic": "memory"},
-            operation_id=operation_id,
-            tenant_id="tenant-a",
-            idempotency_key="same",
-            request_id=str(uuid4()),
-        )
-    )
-    await asyncio.sleep(0)
+        def text(self, query, max_results):
+            return [
+                {"title": "loop", "href": "http://127.0.0.1/admin", "body": "x"},
+                {"title": "private", "href": "http://10.0.0.2/a", "body": "x"},
+                {"title": "creds", "href": "https://u:p@example.com/a", "body": "x"},
+                {"title": "ok", "href": "https://example.com/a", "body": "safe"},
+            ]
 
-    assert calls == 1
-    release.set()
-    left, right = await asyncio.gather(first, second)
+        def news(self, query, max_results):
+            return self.text(query, max_results)
 
-    assert left["ok"] is True
-    assert right["ok"] is True
-    assert left["value"] == right["value"] == "memory"
-    assert left["receipt"]["receipt_id"] == right["receipt"]["receipt_id"]
-    assert calls == 1
+        def images(self, query, max_results):
+            return self.text(query, max_results)
 
-
-@pytest.mark.asyncio
-async def test_canonical_schema_denial_prevents_legacy_handler_execution(
-    registry,
-    monkeypatch,
-):
-    _reset_canonical(registry)
-    calls = 0
-
-    async def fake_compile(params):
-        nonlocal calls
-        calls += 1
-        return {"ok": True}
-
-    monkeypatch.setitem(registry.TOOLS, "compile_code", fake_compile)
-
-    result = await registry.invoke_canonical(
-        "compile_code",
-        {"language": "python", "code": "print(1)"},
-        operation_id=str(uuid4()),
-        tenant_id="tenant-a",
-        idempotency_key="bad-schema",
-    )
-
-    assert result["ok"] is False
-    assert result["error"] == "arguments_invalid"
-    assert result["receipt"]["metered_tool_calls"] == 0
-    assert calls == 0
-
-
-@pytest.mark.asyncio
-async def test_legacy_invoke_returns_canonical_receipt(registry, monkeypatch):
-    _reset_canonical(registry)
-
-    async def fake_consult(params):
-        return {"ok": True, "answer": params.get("topic")}
-
-    monkeypatch.setitem(registry.TOOLS, "jeeves_consult", fake_consult)
-
+    monkeypatch.setitem(sys.modules, "ddgs", SimpleNamespace(DDGS=FakeDDGS))
     result = await registry.invoke(
-        "jeeves_consult",
-        {"context": "lesson", "topic": "graphs"},
+        "web_search",
+        {"query": "safe query", "max_results": 4},
     )
 
     assert result["ok"] is True
-    assert result["answer"] == "graphs"
-    assert result["receipt"]["status"] == "succeeded"
-    assert result["receipt"]["tool_id"] == "jeeves_consult"
-    assert result["receipt"]["arguments_digest"]
-
-
-def test_registry_describe_declares_canonical_authority(registry):
-    description = registry.describe()
-
-    assert description["authority"] == "canonical-tool-runtime"
-    assert description["count"] == len(registry.TOOLS)
-    assert all("effect" in item for item in description["tools"])
+    assert result["count"] == 1
+    assert result["results"] == [
+        {"title": "ok", "url": "https://example.com/a", "snippet": "safe"}
+    ]

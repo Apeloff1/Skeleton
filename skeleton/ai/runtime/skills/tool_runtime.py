@@ -18,6 +18,7 @@ from skeleton.skills.tool_contract import (
     ToolExecutionReceipt,
     ToolExecutionStatus,
     ToolManifest,
+    approval_ref_for_request,
     validate_tool_arguments,
 )
 from skeleton.skills.tool_receipt_store import (
@@ -205,25 +206,43 @@ class ToolRuntime:
                 self._receipts[key] = receipt
                 return receipt
 
-            if manifest.approval_required and request.approval_ref is None:
-                # Missing approval is a resumable wait state. Do not persist it
-                # under the idempotency key or an approved resume would replay
-                # this denial forever.
-                return ToolExecutionReceipt(
-                    receipt_id=_receipt_id(request, manifest),
-                    request_id=request.request_id,
-                    operation_id=request.operation_id,
-                    tenant_id=request.tenant_id,
-                    tool_id=request.tool_id,
-                    idempotency_key=request.idempotency_key,
-                    arguments_digest=request.arguments_digest,
-                    status=ToolExecutionStatus.DENIED,
-                    started_at=started,
-                    finished_at=started,
-                    error_code="approval_required",
-                    approval_ref=None,
-                    metered_tool_calls=0,
-                )
+            if manifest.approval_required:
+                expected_approval = approval_ref_for_request(request)
+                if request.approval_ref is None:
+                    # Missing approval is a resumable wait state. Do not persist it
+                    # under the idempotency key or an approved resume would replay
+                    # this denial forever.
+                    return ToolExecutionReceipt(
+                        receipt_id=_receipt_id(request, manifest),
+                        request_id=request.request_id,
+                        operation_id=request.operation_id,
+                        tenant_id=request.tenant_id,
+                        tool_id=request.tool_id,
+                        idempotency_key=request.idempotency_key,
+                        arguments_digest=request.arguments_digest,
+                        status=ToolExecutionStatus.DENIED,
+                        started_at=started,
+                        finished_at=started,
+                        error_code="approval_required",
+                        approval_ref=None,
+                        metered_tool_calls=0,
+                    )
+                if request.approval_ref != expected_approval:
+                    return ToolExecutionReceipt(
+                        receipt_id=_receipt_id(request, manifest),
+                        request_id=request.request_id,
+                        operation_id=request.operation_id,
+                        tenant_id=request.tenant_id,
+                        tool_id=request.tool_id,
+                        idempotency_key=request.idempotency_key,
+                        arguments_digest=request.arguments_digest,
+                        status=ToolExecutionStatus.DENIED,
+                        started_at=started,
+                        finished_at=started,
+                        error_code="approval_binding_mismatch",
+                        approval_ref=request.approval_ref,
+                        metered_tool_calls=0,
+                    )
 
             if self.receipt_store is not None:
                 try:
@@ -312,23 +331,6 @@ class ToolRuntime:
                     result_ref=result_ref,
                     approval_ref=request.approval_ref,
                     metered_tool_calls=1,
-                )
-            except ToolExecutionDenied as exc:
-                finished = _utc()
-                receipt = ToolExecutionReceipt(
-                    receipt_id=_receipt_id(request, manifest),
-                    request_id=request.request_id,
-                    operation_id=request.operation_id,
-                    tenant_id=request.tenant_id,
-                    tool_id=request.tool_id,
-                    idempotency_key=request.idempotency_key,
-                    arguments_digest=request.arguments_digest,
-                    status=ToolExecutionStatus.DENIED,
-                    started_at=started,
-                    finished_at=max(started, finished),
-                    error_code=str(exc).strip() or "tool_denied",
-                    approval_ref=request.approval_ref,
-                    metered_tool_calls=0,
                 )
             except Exception as exc:
                 finished = _utc()
@@ -537,28 +539,43 @@ class AsyncToolRuntime:
                     self._receipts[key] = receipt
                     return receipt
 
-                if (
-                    registered.manifest.approval_required
-                    and request.approval_ref is None
-                ):
-                    # Missing approval is a resumable wait state. It is returned
-                    # to orchestration but intentionally not published as the
-                    # idempotent terminal receipt for this call.
-                    return ToolExecutionReceipt(
-                        receipt_id=_receipt_id(request, registered.manifest),
-                        request_id=request.request_id,
-                        operation_id=request.operation_id,
-                        tenant_id=request.tenant_id,
-                        tool_id=request.tool_id,
-                        idempotency_key=request.idempotency_key,
-                        arguments_digest=request.arguments_digest,
-                        status=ToolExecutionStatus.DENIED,
-                        started_at=started,
-                        finished_at=started,
-                        error_code="approval_required",
-                        approval_ref=None,
-                        metered_tool_calls=0,
-                    )
+                if registered.manifest.approval_required:
+                    expected_approval = approval_ref_for_request(request)
+                    if request.approval_ref is None:
+                        # Missing approval is a resumable wait state. It is returned
+                        # to orchestration but intentionally not published as the
+                        # idempotent terminal receipt for this call.
+                        return ToolExecutionReceipt(
+                            receipt_id=_receipt_id(request, registered.manifest),
+                            request_id=request.request_id,
+                            operation_id=request.operation_id,
+                            tenant_id=request.tenant_id,
+                            tool_id=request.tool_id,
+                            idempotency_key=request.idempotency_key,
+                            arguments_digest=request.arguments_digest,
+                            status=ToolExecutionStatus.DENIED,
+                            started_at=started,
+                            finished_at=started,
+                            error_code="approval_required",
+                            approval_ref=None,
+                            metered_tool_calls=0,
+                        )
+                    if request.approval_ref != expected_approval:
+                        return ToolExecutionReceipt(
+                            receipt_id=_receipt_id(request, registered.manifest),
+                            request_id=request.request_id,
+                            operation_id=request.operation_id,
+                            tenant_id=request.tenant_id,
+                            tool_id=request.tool_id,
+                            idempotency_key=request.idempotency_key,
+                            arguments_digest=request.arguments_digest,
+                            status=ToolExecutionStatus.DENIED,
+                            started_at=started,
+                            finished_at=started,
+                            error_code="approval_binding_mismatch",
+                            approval_ref=request.approval_ref,
+                            metered_tool_calls=0,
+                        )
 
                 if self.receipt_store is not None:
                     try:
@@ -723,22 +740,6 @@ class AsyncToolRuntime:
                 result_ref=result_ref,
                 approval_ref=request.approval_ref,
                 metered_tool_calls=1,
-            )
-        except ToolExecutionDenied as exc:
-            return ToolExecutionReceipt(
-                receipt_id=_receipt_id(request, manifest),
-                request_id=request.request_id,
-                operation_id=request.operation_id,
-                tenant_id=request.tenant_id,
-                tool_id=request.tool_id,
-                idempotency_key=request.idempotency_key,
-                arguments_digest=request.arguments_digest,
-                status=ToolExecutionStatus.DENIED,
-                started_at=started,
-                finished_at=max(started, _utc()),
-                error_code=str(exc).strip() or "tool_denied",
-                approval_ref=request.approval_ref,
-                metered_tool_calls=0,
             )
         except Exception as exc:
             return ToolExecutionReceipt(

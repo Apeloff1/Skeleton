@@ -85,6 +85,18 @@ def test_network_egress_bounds_query_count_and_result_scheme() -> None:
         {"title": "bad", "url": "file:///etc/passwd", "body": "x"}
     ) is None
     assert policy.sanitize_result(
+        {"title": "loopback", "url": "http://127.0.0.1/admin", "body": "x"}
+    ) is None
+    assert policy.sanitize_result(
+        {"title": "private", "url": "http://10.0.0.2/admin", "body": "x"}
+    ) is None
+    assert policy.sanitize_result(
+        {"title": "local", "url": "https://service.internal/a", "body": "x"}
+    ) is None
+    assert policy.sanitize_result(
+        {"title": "userinfo", "url": "https://user:pass@example.com/a", "body": "x"}
+    ) is None
+    assert policy.sanitize_result(
         {"title": "ok", "url": "https://example.com/a", "body": "snippet"}
     ) == {
         "title": "ok",
@@ -102,6 +114,43 @@ def test_artifact_scope_rejects_invalid_build_ids_and_unapproved_kinds() -> None
     with pytest.raises(ToolAdapterDenied, match="not allowed"):
         policy.package_request({"build_id": "build-1", "kinds": ["exe"]})
 
-    assert policy.package_request(
+    scoped = policy.package_request(
         {"build_id": "build-1", "kinds": ["zip", "zip", "apk"]}
-    ) == {"build_id": "build-1", "kinds": ["zip", "apk"]}
+    )
+    assert scoped["build_id"] == "build-1"
+    assert scoped["kinds"] == ["zip", "apk"]
+    assert scoped["max_output_bytes"] == policy.max_artifact_bytes
+    assert scoped["retention_days"] == 7
+
+    with pytest.raises(ToolAdapterDenied, match="max_output_bytes"):
+        policy.package_request(
+            {
+                "build_id": "build-1",
+                "kinds": ["zip"],
+                "max_output_bytes": policy.max_artifact_bytes + 1,
+            }
+        )
+
+    with pytest.raises(ToolAdapterDenied, match="retention_days"):
+        policy.package_request(
+            {
+                "build_id": "build-1",
+                "kinds": ["zip"],
+                "retention_days": policy.max_retention_days + 1,
+            }
+        )
+
+
+def test_sandbox_scope_emits_enforced_resource_ceiling_metadata() -> None:
+    policy = SandboxAdapterPolicy(
+        max_source_chars=100,
+        max_compile_seconds=2.0,
+        max_output_bytes=4096,
+        max_memory_mb=128,
+    )
+
+    scoped = policy.compile_request({"language": "c", "code": "int main(void){return 0;}"})
+
+    assert scoped["timeout_seconds"] == 2.0
+    assert scoped["max_output_bytes"] == 4096
+    assert scoped["max_memory_mb"] == 128
