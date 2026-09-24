@@ -182,6 +182,7 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     async def fake_call_llm(system_prompt, user_prompt, *, history=None, **kwargs):
         captured["history"] = history
         captured["user_prompt"] = user_prompt
+        captured["envelope"] = kwargs.get("context_envelope")
         return {
             "success": True,
             "response": "canonical answer",
@@ -223,6 +224,12 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
     assert captured["commit"]["idempotency_key"] == "client-1:assistant"
     assert captured["commit"]["ai_result_id"] == "provider-result:test-provider:provider-request-1"
     assert captured["commit"]["operation_id"]
+    assert captured["commit"]["context_id"] == captured["envelope"].context_id
+    assert captured["commit"]["context_digest"] == captured["envelope"].context_digest
+    assert (
+        captured["commit"]["context_source_snapshot"]
+        == captured["envelope"].source_snapshot
+    )
     body = response.json()
     assert body["thread"]["version"] == 3
     assert body["assistant_message"]["content"] == "canonical answer"

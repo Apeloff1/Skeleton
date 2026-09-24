@@ -599,6 +599,10 @@ async def ai_chat(
                 causal_user_message_id=user_message.message_id,
                 operation_id=operation_id,
                 ai_result_id=ai_result_id,
+                context_id=context_envelope.context_id,
+                context_digest=context_envelope.context_digest,
+                context_source_snapshot=context_envelope.source_snapshot,
+                context_compiler_version=context_envelope.compiler_version,
             )
         )
     except Exception as exc:

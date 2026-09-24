@@ -57,6 +57,37 @@ def _json_refs(values: Iterable[str]) -> str:
     return json.dumps(list(values), ensure_ascii=False, allow_nan=False, separators=(",", ":"))
 
 
+def _json_context_snapshot(values: Iterable[tuple[str, str]]) -> str:
+    return json.dumps(
+        [list(item) for item in values],
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+    )
+
+
+def _parse_context_snapshot(
+    raw: object,
+    field: str,
+) -> tuple[tuple[str, str], ...]:
+    if not isinstance(raw, str):
+        raise ConversationRepositoryCorruption(f"{field} must be JSON text")
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ConversationRepositoryCorruption(f"{field} contains invalid JSON") from exc
+    if not isinstance(value, list):
+        raise ConversationRepositoryCorruption(f"{field} must contain a pair list")
+    result: list[tuple[str, str]] = []
+    for item in value:
+        if not isinstance(item, list) or len(item) != 2:
+            raise ConversationRepositoryCorruption(f"{field} entries must be pairs")
+        if any(not isinstance(part, str) for part in item):
+            raise ConversationRepositoryCorruption(f"{field} entries must contain strings")
+        result.append((item[0], item[1]))
+    return tuple(result)
+
+
 def _parse_refs(raw: object, field: str) -> tuple[str, ...]:
     if not isinstance(raw, str):
         raise ConversationRepositoryCorruption(f"{field} must be JSON text")
@@ -138,6 +169,10 @@ class SQLiteConversationRepository:
                     causal_user_message_id TEXT,
                     operation_id TEXT,
                     ai_result_id TEXT,
+                    context_id TEXT,
+                    context_digest TEXT,
+                    context_source_snapshot_json TEXT NOT NULL DEFAULT '[]',
+                    context_compiler_version TEXT,
                     attachment_refs_json TEXT NOT NULL,
                     tool_receipt_refs_json TEXT NOT NULL,
                     citation_refs_json TEXT NOT NULL,
@@ -156,6 +191,25 @@ class SQLiteConversationRepository:
                 ON conversation_message(namespace, thread_id, sequence);
                 """
             )
+            columns = {
+                row["name"]
+                for row in self._connection.execute(
+                    "PRAGMA table_info(conversation_message)"
+                ).fetchall()
+            }
+            migrations = {
+                "context_id": "context_id TEXT",
+                "context_digest": "context_digest TEXT",
+                "context_source_snapshot_json": (
+                    "context_source_snapshot_json TEXT NOT NULL DEFAULT '[]'"
+                ),
+                "context_compiler_version": "context_compiler_version TEXT",
+            }
+            for column, declaration in migrations.items():
+                if column not in columns:
+                    self._connection.execute(
+                        f"ALTER TABLE conversation_message ADD COLUMN {declaration}"
+                    )
 
     @staticmethod
     def _thread_from_row(row: sqlite3.Row) -> ConversationThread:
@@ -199,6 +253,13 @@ class SQLiteConversationRepository:
                 causal_user_message_id=row["causal_user_message_id"],
                 operation_id=row["operation_id"],
                 ai_result_id=row["ai_result_id"],
+                context_id=row["context_id"],
+                context_digest=row["context_digest"],
+                context_source_snapshot=_parse_context_snapshot(
+                    row["context_source_snapshot_json"],
+                    "context_source_snapshot_json",
+                ),
+                context_compiler_version=row["context_compiler_version"],
                 attachment_refs=_parse_refs(row["attachment_refs_json"], "attachment_refs_json"),
                 tool_receipt_refs=_parse_refs(row["tool_receipt_refs_json"], "tool_receipt_refs_json"),
                 citation_refs=_parse_refs(row["citation_refs_json"], "citation_refs_json"),
@@ -340,6 +401,10 @@ class SQLiteConversationRepository:
             and existing.causal_user_message_id == candidate.causal_user_message_id
             and existing.operation_id == candidate.operation_id
             and existing.ai_result_id == candidate.ai_result_id
+            and existing.context_id == candidate.context_id
+            and existing.context_digest == candidate.context_digest
+            and existing.context_source_snapshot == candidate.context_source_snapshot
+            and existing.context_compiler_version == candidate.context_compiler_version
             and existing.attachment_refs == candidate.attachment_refs
             and existing.tool_receipt_refs == candidate.tool_receipt_refs
             and existing.citation_refs == candidate.citation_refs
@@ -425,9 +490,11 @@ class SQLiteConversationRepository:
                         namespace, message_id, thread_id, branch_id, sequence, author_type,
                         created_at, idempotency_key, content, content_ref, parent_message_id,
                         supersedes_message_id, causal_user_message_id, operation_id,
-                        ai_result_id, attachment_refs_json, tool_receipt_refs_json,
+                        ai_result_id, context_id, context_digest,
+                        context_source_snapshot_json, context_compiler_version,
+                        attachment_refs_json, tool_receipt_refs_json,
                         citation_refs_json, artifact_refs_json, data_class, schema_version
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
@@ -445,6 +512,10 @@ class SQLiteConversationRepository:
                         message.causal_user_message_id,
                         message.operation_id,
                         message.ai_result_id,
+                        message.context_id,
+                        message.context_digest,
+                        _json_context_snapshot(message.context_source_snapshot),
+                        message.context_compiler_version,
                         _json_refs(message.attachment_refs),
                         _json_refs(message.tool_receipt_refs),
                         _json_refs(message.citation_refs),
