@@ -52,6 +52,13 @@ class EvidenceKind(str, Enum):
     POSTCONDITION = "postcondition"
 
 
+class EvidenceRelation(str, Enum):
+    SUPPORTS = "supports"
+    CONTRADICTS = "contradicts"
+    CONTEXT = "context"
+    POSTCONDITION = "postcondition"
+
+
 class PostconditionState(str, Enum):
     SATISFIED = "satisfied"
     FAILED = "failed"
@@ -309,6 +316,8 @@ class VerificationEvidence:
     population_scope: tuple[str, ...] = ()
     environment_scope: tuple[str, ...] = ()
     provenance_refs: tuple[str, ...] = ()
+    bound_claim_ids: tuple[str, ...] = ()
+    relation: EvidenceRelation = EvidenceRelation.CONTEXT
     derived_from_claim_ids: tuple[str, ...] = ()
     data_class: str = "internal"
     schema_version: int = VERIFICATION_SCHEMA_VERSION
@@ -356,6 +365,20 @@ class VerificationEvidence:
         )
         object.__setattr__(
             self,
+            "bound_claim_ids",
+            _uuid_refs(self.bound_claim_ids, "bound_claim_ids"),
+        )
+        try:
+            relation = EvidenceRelation(self.relation)
+        except ValueError as exc:
+            raise VerificationContractError("relation is invalid") from exc
+        object.__setattr__(self, "relation", relation)
+        if relation in {EvidenceRelation.SUPPORTS, EvidenceRelation.CONTRADICTS} and not self.bound_claim_ids:
+            raise VerificationContractError(
+                "supporting/contradicting evidence requires bound_claim_ids"
+            )
+        object.__setattr__(
+            self,
             "derived_from_claim_ids",
             _uuid_refs(self.derived_from_claim_ids, "derived_from_claim_ids"),
         )
@@ -385,6 +408,8 @@ class VerificationEvidence:
                 "population_scope": self.population_scope,
                 "environment_scope": self.environment_scope,
                 "provenance_refs": self.provenance_refs,
+                "bound_claim_ids": self.bound_claim_ids,
+                "relation": self.relation.value,
                 "derived_from_claim_ids": self.derived_from_claim_ids,
                 "data_class": self.data_class,
             }
@@ -418,6 +443,8 @@ class VerificationEvidence:
             "population_scope": list(self.population_scope),
             "environment_scope": list(self.environment_scope),
             "provenance_refs": list(self.provenance_refs),
+            "bound_claim_ids": list(self.bound_claim_ids),
+            "relation": self.relation.value,
             "derived_from_claim_ids": list(self.derived_from_claim_ids),
             "data_class": self.data_class,
             "evidence_digest": self.evidence_digest,
@@ -554,6 +581,14 @@ class VerificationBundle:
             item.tenant_id != self.claim.tenant_id for item in self.postconditions
         ):
             raise VerificationContractError("postcondition tenant mismatch")
+        if any(
+            bound_id != self.claim.claim_id
+            for item in self.evidence
+            for bound_id in item.bound_claim_ids
+        ):
+            raise VerificationContractError(
+                "evidence binds a claim outside verification bundle"
+            )
         known_evidence = set(evidence_ids)
         if any(
             evidence_id not in known_evidence
@@ -604,6 +639,7 @@ __all__ = [
     "MAX_VERIFICATION_REFS",
     "ClaimKind",
     "EvidenceKind",
+    "EvidenceRelation",
     "PostconditionState",
     "ProvenanceOrigin",
     "VerificationBundle",
