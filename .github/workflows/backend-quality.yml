@@ -197,6 +197,44 @@ jobs:
           tests/test_container_digest_refresh_workflow.py
           tests/test_generated_code_sandbox.py
 
+      - name: Canonical backend security regressions
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+          PYTHONPATH: "."
+        run: >-
+          python -m pytest -q --noconftest
+          backend/tests/test_dynamic_import_safety.py
+          backend/tests/test_archive_extraction_safety.py
+          backend/tests/test_security_scan_surface.py
+          backend/tests/test_live_scraper_network_security.py
+          backend/tests/test_sast_security_gate.py
+          backend/tests/test_repository_python_sast_scope.py
+          backend/tests/test_workflow_security_gate.py
+          backend/tests/test_workflow_action_allowlist.py
+          backend/tests/test_workflow_permissions_gate.py
+          backend/tests/test_workflow_security_checkout_credentials.py
+          backend/tests/test_workflow_input_security_gate.py
+          backend/tests/test_workflow_event_shell_security.py
+          backend/tests/test_workflow_flow_style_security.py
+          backend/tests/test_workflow_event_context_security.py
+          backend/tests/test_workflow_quoted_key_security.py
+          backend/tests/test_workflow_flow_uses_security.py
+          backend/tests/test_workflow_trigger_security.py
+          backend/tests/test_workflow_trigger_fanout_gate.py
+          backend/tests/test_workflow_concurrency_gate.py
+          backend/tests/test_workflow_run_branch_completions_contract.py
+          backend/tests/test_auth_security.py
+          backend/tests/test_developer_tooling_security.py
+          backend/tests/test_dependency_security_workflow_contract.py
+          backend/tests/test_api_middleware_adversarial.py
+          backend/tests/test_api_middleware_regression_gaps.py
+          backend/tests/test_proxy_header_bounds.py
+          backend/tests/test_request_identity_logging_security.py
+          backend/tests/test_security_middleware_properties.py
+          backend/tests/test_live_service_test_boundaries.py
+
       - name: Process invocation safety gate
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_process_safety.py
@@ -249,6 +287,10 @@ jobs:
       - name: GitHub Actions workflow_run branch-completion contract
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_workflow_run_branch_completions.py
+
+      - name: Live-service backend test boundary
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_live_service_test_boundaries.py
 
       - name: Repository secret hygiene gate
         if: steps.scope.outputs.full == 'true'
