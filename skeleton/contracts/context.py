@@ -403,6 +403,19 @@ class ContextEnvelope:
             + self.tool_schema_segments
         )
 
+    def binding_dict(self) -> dict[str, Any]:
+        """Return the immutable identity that must cross execution boundaries."""
+
+        return {
+            "context_id": self.context_id,
+            "context_digest": self.context_digest,
+            "source_snapshot": [list(item) for item in self.source_snapshot],
+            "compiler_version": self.compiler_version,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "turn_id": self.turn_id,
+        }
+
     def audit_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,

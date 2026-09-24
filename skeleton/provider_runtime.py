@@ -1279,6 +1279,27 @@ def provider_request_from_context(
     return request
 
 
+def require_provider_response_context(
+    response: ProviderResponse,
+    envelope: ContextEnvelope,
+) -> ProviderResponse:
+    """Fail closed if a provider response is detached from its compiled context."""
+
+    if not isinstance(response, ProviderResponse):
+        raise TypeError("response must be ProviderResponse")
+    if not isinstance(envelope, ContextEnvelope):
+        raise TypeError("envelope must be ContextEnvelope")
+    if response.context_id != envelope.context_id:
+        raise ProviderPolicyError("model provider response context identity mismatch")
+    if response.context_digest != envelope.context_digest:
+        raise ProviderPolicyError("model provider response context digest mismatch")
+    if response.context_source_snapshot != envelope.source_snapshot:
+        raise ProviderPolicyError("model provider response context snapshot mismatch")
+    if response.context_compiler_version != envelope.compiler_version:
+        raise ProviderPolicyError("model provider response compiler version mismatch")
+    return response
+
+
 def _provider_operation_id(request: ProviderRequest) -> str:
     if request.operation_id is not None:
         return request.operation_id.strip()
@@ -2524,4 +2545,5 @@ __all__ = [
     "normalize_history",
     "provider_request_from_context",
     "provider_response_deltas",
+    "require_provider_response_context",
 ]
