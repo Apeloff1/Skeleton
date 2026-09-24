@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -8,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
-def test_chat_binds_ephemeral_context_digest_into_user_idempotency(route=None, monkeypatch=None):
+def test_chat_binds_ephemeral_context_digest_into_user_idempotency(monkeypatch):
     import routes.gameforge_auth as auth
     import routes.ai as ai
 
