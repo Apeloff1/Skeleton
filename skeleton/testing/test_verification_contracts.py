@@ -8,6 +8,7 @@ import pytest
 from skeleton.contracts.verification import (
     ClaimKind,
     EvidenceKind,
+    EvidenceRelation,
     PostconditionState,
     ProvenanceOrigin,
     VerificationBundle,
@@ -60,6 +61,8 @@ def _evidence(
         population_scope=("deployment:alpha",),
         environment_scope=("prod-eu",),
         provenance_refs=("ledger:source",),
+        bound_claim_ids=(claim.claim_id,),
+        relation=EvidenceRelation.SUPPORTS,
         derived_from_claim_ids=derived_from,
     )
 
@@ -135,6 +138,8 @@ def test_correlated_citations_count_as_one_origin():
         content_digest="d" * 64,
         observed_at=NOW,
         locator="page:2",
+        bound_claim_ids=(claim.claim_id,),
+        relation=EvidenceRelation.SUPPORTS,
     )
     bundle = VerificationBundle(
         bundle_id=str(uuid4()),
@@ -221,6 +226,49 @@ def test_bundle_rejects_cross_tenant_evidence_and_unknown_postcondition_evidence
             claim=claim,
             evidence=(),
             postconditions=(postcondition,),
+            requested_level=VerificationLevel.GROUNDED,
+            created_at=NOW,
+        )
+
+
+
+def test_support_relation_requires_explicit_claim_binding():
+    claim = _claim()
+    with pytest.raises(VerificationContractError, match="bound_claim_ids"):
+        VerificationEvidence(
+            evidence_id=str(uuid4()),
+            tenant_id=claim.tenant_id,
+            kind=EvidenceKind.CITATION,
+            origin_type=ProvenanceOrigin.PRIMARY_SOURCE,
+            source_id="source:unbound",
+            origin_id="origin:unbound",
+            content_digest="9" * 64,
+            observed_at=NOW,
+            relation=EvidenceRelation.SUPPORTS,
+        )
+
+
+def test_bundle_rejects_evidence_bound_to_another_claim():
+    claim = _claim()
+    other_claim_id = str(uuid4())
+    evidence = VerificationEvidence(
+        evidence_id=str(uuid4()),
+        tenant_id=claim.tenant_id,
+        kind=EvidenceKind.SOURCE,
+        origin_type=ProvenanceOrigin.PRIMARY_SOURCE,
+        source_id="source:other",
+        origin_id="origin:other",
+        content_digest="8" * 64,
+        observed_at=NOW,
+        bound_claim_ids=(other_claim_id,),
+        relation=EvidenceRelation.SUPPORTS,
+    )
+    with pytest.raises(VerificationContractError, match="outside verification bundle"):
+        VerificationBundle(
+            bundle_id=str(uuid4()),
+            claim=claim,
+            evidence=(evidence,),
+            postconditions=(),
             requested_level=VerificationLevel.GROUNDED,
             created_at=NOW,
         )
