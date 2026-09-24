@@ -77,6 +77,7 @@ on:
       - "backend/core/engine_client.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_engine_execution_service.py"
+      - "skeleton/testing/test_ai_golden_journeys.py"
       - "backend/tests/test_engine_client.py"
       - "backend/core/ai_provider.py"
       - "backend/tests/test_engine_provider_adapter.py"
@@ -485,6 +486,7 @@ jobs:
           skeleton/testing/test_execution_schema_parity.py
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_engine_execution_service.py
+          skeleton/testing/test_ai_golden_journeys.py
           skeleton/testing/test_instruction_policy.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
