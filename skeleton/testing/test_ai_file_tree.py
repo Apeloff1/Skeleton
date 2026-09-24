@@ -284,3 +284,31 @@ def test_cost_usage_metering_mirrors_remain_in_semantic_parity() -> None:
     )
     for source, destination in pairs:
         assert module._content_equivalent(ROOT / source, ROOT / destination), (source, destination)
+
+
+
+def test_planned_implementation_file_is_governed_by_parent_tree_mapping() -> None:
+    module = _module()
+    tree_mapping = {
+        "source": "skeleton/persistence",
+        "destination": "skeleton/ai/runtime/persistence",
+        "kind": "tree",
+    }
+    file_mapping = {
+        "source": "skeleton/provider_runtime.py",
+        "destination": "skeleton/ai/providers/runtime.py",
+        "kind": "file",
+    }
+
+    assert module._mapping_covers_planned_source(
+        tree_mapping, "skeleton/persistence/execution_repository.py"
+    )
+    assert module._mapping_covers_planned_source(
+        file_mapping, "skeleton/provider_runtime.py"
+    )
+    assert not module._mapping_covers_planned_source(
+        file_mapping, "skeleton/provider_runtime.py/child"
+    )
+    assert not module._mapping_covers_planned_source(
+        tree_mapping, "skeleton/persist/execution_repository.py"
+    )

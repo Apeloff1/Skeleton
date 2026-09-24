@@ -204,6 +204,20 @@ def _source_exists(relative: str) -> bool:
     return path.exists()
 
 
+def _mapping_covers_planned_source(mapping: object, planned_source: str) -> bool:
+    """Return whether one manifest mapping governs a planned source path."""
+    if not isinstance(mapping, dict):
+        return False
+    source = mapping.get("source")
+    if not isinstance(source, str) or not source:
+        return False
+    if planned_source == source:
+        return True
+    if mapping.get("kind") != "tree":
+        return False
+    return planned_source.startswith(source.rstrip("/") + "/")
+
+
 def validate() -> list[str]:
     errors: list[str] = []
     required = [
@@ -273,13 +287,12 @@ def validate() -> list[str]:
         errors.append(f"cannot parse AI master plan for file-tree coverage: {exc}")
         master_plan = {}
 
-    mapped_sources = {
-        item.get("source")
-        for item in mappings
-        if isinstance(item, dict) and isinstance(item.get("source"), str)
-    }
     for planned_source in sorted(_planned_implementation_sources(master_plan)):
-        if _source_exists(planned_source) and planned_source not in mapped_sources:
+        governed = any(
+            _mapping_covers_planned_source(mapping, planned_source)
+            for mapping in mappings
+        )
+        if _source_exists(planned_source) and not governed:
             errors.append(
                 "extant planned implementation path is not governed by AI file tree: "
                 f"{planned_source}"
