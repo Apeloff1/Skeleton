@@ -36,6 +36,10 @@ Master build sequence: [`MASTER_BUILD_SEQUENCE.md`](MASTER_BUILD_SEQUENCE.md)
 
 Machine build sequence: [`machine/ai_master_build_sequence.json`](../../machine/ai_master_build_sequence.json)
 
+Current execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONTIER_2026-09-24.md)
+
+Machine execution frontier: [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
+
 Foundational volume depth pass: [`VOLUME_DEPTH_000_040.md`](VOLUME_DEPTH_000_040.md)
 
 Sequential volume depth pass: [`VOLUME_DEPTH_041_080.md`](VOLUME_DEPTH_041_080.md)
@@ -126,8 +130,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 38. `machine/ai_exotic_systems_catalog.json`
 39. `docs/plan/ENGINEERING_TASK_MATRIX.md`
 40. `machine/ai_engineering_task_matrix.json`
+41. `docs/plan/EXECUTION_FRONTIER_2026-09-24.md`
+42. `machine/ai_execution_frontier_20260924.json`
 
-The first ten remain the present implementation/construction authority. Items 11–30 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the current implementation-depth frontier and its machine-checkable reconciliation contract.
 
 ## Index laws
 
@@ -174,6 +180,8 @@ The first ten remain the present implementation/construction authority. Items 11
 The master build sequence provides the canonical middle layer between frozen architecture breadth and atomic implementation. It assigns W00–W30 to MBW-00..07, preserves AIQ task authority, and makes dependency/promotion/stop conditions explicit without creating a second completion mechanism.
 
 The engineering pass then binds those packages to explicit interfaces, invariants, failure/recovery semantics, quantitative budgets, compatibility rules, evidence and release proof. It deepens the frozen plan; it does not expand it.
+
+The current execution frontier then binds live implementation candidates back to signed AIQ lifecycle state. It deliberately refuses to treat merged code as completion and orders the next construction waves from Stage-0 evidence reconciliation through full-stack closure.
 
 The task matrix propagates those obligations into every atomic AIQ item, preserving queue completion semantics while preventing task-local acceptance from narrowing package-level engineering proof.
 

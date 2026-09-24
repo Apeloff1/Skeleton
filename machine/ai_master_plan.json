@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_version": "1.5.0",
+  "plan_version": "1.6.0",
   "status": "active",
   "architecture_lane": "PR-1904",
   "architecture_branch": "integration/architecture-map-v1",
@@ -21064,5 +21064,34 @@
       "production"
     ],
     "closure_rule": "Strong maturity claims require applicable adversarial axes, pairwise interaction coverage, compound campaigns, replayable recovery, and independent artifact-bound evidence."
+  },
+  "execution_frontier": {
+    "status": "active",
+    "frontier_id": "EF-2026-09-24",
+    "human_contract": "docs/plan/EXECUTION_FRONTIER_2026-09-24.md",
+    "machine_contract": "machine/ai_execution_frontier_20260924.json",
+    "validator": "scripts/check_ai_execution_frontier.py",
+    "accountability_authority": "machine/ai_build_accountability.json",
+    "baseline_git_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0",
+    "queue_snapshot": {
+      "done": 1,
+      "evidence_pending": 6,
+      "in_progress": 1,
+      "pending": 34,
+      "total": 42
+    },
+    "wave_order": [
+      "EF-W0",
+      "EF-W1",
+      "EF-W2",
+      "EF-W3",
+      "EF-W4",
+      "EF-W5",
+      "EF-W6"
+    ],
+    "promotion_rule": "merged implementation is candidate evidence; signed accountability lifecycle state changes only after exact-head acceptance evidence and independent verification",
+    "landed_candidate_task_count": 22,
+    "landed_candidate_through_stage": 3,
+    "latest_candidate_merge_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0"
   }
 }

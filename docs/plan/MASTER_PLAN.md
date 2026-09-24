@@ -1,6 +1,6 @@
 # Skeleton AI Master Plan
 
-Plan version: **1.5.0**
+Plan version: **1.6.0**
 
 Architecture lane: `PR #1904 / integration/architecture-map-v1`
 
@@ -11,6 +11,8 @@ Machine mirror: [`machine/ai_master_plan.json`](../../machine/ai_master_plan.jso
 Exotic systems depth: [`EXOTIC_SYSTEMS_DEPTH.md`](EXOTIC_SYSTEMS_DEPTH.md) / [`machine/ai_exotic_systems_catalog.json`](../../machine/ai_exotic_systems_catalog.json)
 
 Existing construction manual: [`docs/AI_APP_CONSTRUCTION_MANUAL.md`](../AI_APP_CONSTRUCTION_MANUAL.md)
+
+Current execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONTIER_2026-09-24.md) / [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
 
 ## 1. Authority and relationship to existing PR #1904 contracts
 
@@ -677,6 +679,30 @@ Every exotic item must remain mapped to existing Volume 000–420 domains and co
 
 The machine validator rejects unknown volume/work-package references, missing fallback/kill-switch semantics, insufficient evidence requirements, production-authority defaults, category-depth regressions, and breadth-freeze violations.
 
+
+## 24.5 Current execution frontier and ledger reconciliation
+
+Sequential planning depth is complete, so the canonical continuation is now the execution frontier documented in `docs/plan/EXECUTION_FRONTIER_2026-09-24.md` with machine contract `machine/ai_execution_frontier_20260924.json`.
+
+The frontier exists to prevent implementation from outrunning accountability. It snapshots the 42-task P0 queue as **1 done / 6 evidence-pending / 1 in-progress / 34 pending**, records landed implementation candidates without auto-promoting them, and defines a dependency-ordered construction sequence `EF-W0` through `EF-W6`.
+
+The first obligation is reconciliation, not new breadth:
+
+```text
+landed implementation
+  -> exact AIQ identity
+  -> exact-head acceptance evidence
+  -> implementation lifecycle event/signoff
+  -> independent verification lifecycle event/signoff
+  -> completion digest
+  -> ledger promotion
+```
+
+This explicitly covers Stage-0 drift and the larger implementation/accountability gap now visible through Stage 3. Landed candidate evidence includes conversation authority, durable memory plus derived projections, governed tool execution, provider/context convergence and the verification plane. A merged commit may be evidence, but it is not by itself a completion claim.
+
+After reconciliation of the landed Stage-0 through Stage-3 candidates, the next net-new build frontier is bounded cognitive execution -> engine boundary -> stream reconciliation -> full-stack evidence. Lower-stage evidence remains dependency-authoritative and can invalidate downstream promotion.
+
+The frontier validator `scripts/check_ai_execution_frontier.py` cross-checks the snapshot and candidate lifecycle states against `machine/ai_build_accountability.json`. Any subsequent ledger promotion therefore requires this frontier snapshot to be deliberately advanced rather than silently becoming stale.
 
 ## 25. Scope freeze and future plan evolution
 

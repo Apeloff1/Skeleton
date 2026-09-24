@@ -1,0 +1,544 @@
+{
+  "schema_version": "ai-execution-frontier/v1",
+  "frontier_id": "EF-2026-09-24",
+  "plan_version": "1.6.0",
+  "baseline_git_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0",
+  "prepared_at_utc": "2026-09-24T20:41:34Z",
+  "prepared_by": "chatgpt:gpt-5.6-sol",
+  "authority": {
+    "breadth_freeze": "VOL-420",
+    "completion_authority": "machine/ai_build_accountability.json",
+    "construction_authority": "machine/ai_app_construction.json",
+    "rule": "this frontier can require evidence and sequencing but cannot fabricate implementation or verification signoff"
+  },
+  "queue_snapshot": {
+    "done": 1,
+    "evidence_pending": 6,
+    "in_progress": 1,
+    "pending": 34,
+    "total": 42
+  },
+  "promotion_candidates": [
+    {
+      "task_id": "AIQ-S0-COST-02",
+      "accountability_id": "ACC-AIQ-S0-COST-02",
+      "ledger_status": "in_progress",
+      "landed_commits": [
+        "ab1ecae1e1b89ed43d23f395aada24cd7b68c00d"
+      ],
+      "source_prs": [],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "focused actual-usage metering tests",
+        "restart/unknown-usage reconciliation",
+        "operation and tenant budget ceiling enforcement",
+        "exact-head required CI",
+        "implementation lifecycle event/signoff"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-COST-03",
+      "accountability_id": "ACC-AIQ-S0-COST-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "029a852d6d42278adf65699ef90a3d5012131ba7"
+      ],
+      "source_prs": [],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "shared pressure authority tests",
+        "cross-process concurrency/queue ceilings",
+        "tenant fairness and owner fencing",
+        "stale lease recovery and overload shedding",
+        "exact-head required CI",
+        "start + implementation lifecycle events/signoff"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-PROV-01",
+      "accountability_id": "ACC-AIQ-S0-PROV-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "1f58a5d1c58fd1cb73634d3a1c56be68c2230db8"
+      ],
+      "source_prs": [],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "deterministic provider-edge discovery",
+        "complete credential/network/SDK classification",
+        "exact-head evidence binding"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-PROV-02",
+      "accountability_id": "ACC-AIQ-S0-PROV-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "1f58a5d1c58fd1cb73634d3a1c56be68c2230db8"
+      ],
+      "source_prs": [],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "shadow provider denial",
+        "single credential-bearing runtime owner",
+        "compatibility facade non-credential proof"
+      ]
+    },
+    {
+      "task_id": "AIQ-S0-PROV-03",
+      "accountability_id": "ACC-AIQ-S0-PROV-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "1f58a5d1c58fd1cb73634d3a1c56be68c2230db8"
+      ],
+      "source_prs": [],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "current-head CI evidence",
+        "provider-surface regression evidence",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-CONV-01",
+      "accountability_id": "ACC-AIQ-S1-CONV-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "d80713b71b1b07f818d602628dfd0b017295822c"
+      ],
+      "source_prs": [
+        1980
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "server-authoritative conversation regression evidence",
+        "idempotency and version-fencing evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-CONV-02",
+      "accountability_id": "ACC-AIQ-S1-CONV-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "d80713b71b1b07f818d602628dfd0b017295822c"
+      ],
+      "source_prs": [
+        1980
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "branch/regeneration lineage evidence",
+        "provider-failure replay evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-MEM-01",
+      "accountability_id": "ACC-AIQ-S1-MEM-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "39f4b48424133d3823c1d9dc17952135778852fc"
+      ],
+      "source_prs": [
+        1978
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "durable SQLite/Mongo authority evidence",
+        "tenant namespace and lifecycle isolation",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-MEM-02",
+      "accountability_id": "ACC-AIQ-S1-MEM-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "39f4b48424133d3823c1d9dc17952135778852fc"
+      ],
+      "source_prs": [
+        1978
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "governed writeback evidence",
+        "replay/version conflict evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-MEM-03",
+      "accountability_id": "ACC-AIQ-S1-MEM-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0"
+      ],
+      "source_prs": [
+        1979
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "projection rebuild and tombstone propagation evidence",
+        "projection degradation must not mutate canonical authority",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-01",
+      "accountability_id": "ACC-AIQ-S1-TOOL-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "780be93964e5bfd65359e660fad0090c78b777d0"
+      ],
+      "source_prs": [
+        1981
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "durable receipt/reservation replay evidence",
+        "admission-before-side-effect evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-02",
+      "accountability_id": "ACC-AIQ-S1-TOOL-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "780be93964e5bfd65359e660fad0090c78b777d0"
+      ],
+      "source_prs": [
+        1981
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "scoped database/network/compiler/artifact adapter evidence",
+        "resource and egress fail-closed evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S1-TOOL-03",
+      "accountability_id": "ACC-AIQ-S1-TOOL-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "780be93964e5bfd65359e660fad0090c78b777d0",
+        "2df70c44e8667509f6755d0ddcdc7fc51cd50458"
+      ],
+      "source_prs": [
+        1981,
+        1984
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "delegate-only backend registry evidence",
+        "approval/idempotency/compensation/postcondition evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-01",
+      "accountability_id": "ACC-AIQ-S2-PROTO-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "f233fc0449084bf19dcf119297180d8d0bbeb161"
+      ],
+      "source_prs": [
+        1986
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "provider-neutral request/response contract evidence",
+        "native object boundary evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-02",
+      "accountability_id": "ACC-AIQ-S2-PROTO-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "f233fc0449084bf19dcf119297180d8d0bbeb161"
+      ],
+      "source_prs": [
+        1986
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "stream-delta normalization evidence",
+        "terminal/usage semantics evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-PROTO-03",
+      "accountability_id": "ACC-AIQ-S2-PROTO-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "f233fc0449084bf19dcf119297180d8d0bbeb161"
+      ],
+      "source_prs": [
+        1986
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "immutable context identity propagation evidence",
+        "timeout/tool-choice/structured-output bounds",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-CTX-01",
+      "accountability_id": "ACC-AIQ-S2-CTX-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "ded171c318d1b6e9ad57c6324f7070fbe6cf4e27"
+      ],
+      "source_prs": [
+        1988
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "canonical source-adapter lifecycle/trust evidence",
+        "deterministic source identity evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-CTX-02",
+      "accountability_id": "ACC-AIQ-S2-CTX-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "f274f601b94557ae2f520884816f0c990a21d0e1"
+      ],
+      "source_prs": [
+        1989
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "versioned instruction-policy digest evidence",
+        "rollback/redefinition evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S2-CTX-03",
+      "accountability_id": "ACC-AIQ-S2-CTX-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "13d6c55b566eae2134875afb4bc3b066b6aa143c"
+      ],
+      "source_prs": [
+        1990
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "immutable per-turn context snapshot evidence",
+        "server-authoritative transcript/context binding evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S3-VER-01",
+      "accountability_id": "ACC-AIQ-S3-VER-01",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "d37e079b777e8b2ce0de377d4f07cd301c005107"
+      ],
+      "source_prs": [
+        1993
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "claim/evidence/postcondition contract evidence",
+        "risk-to-assurance selection evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S3-VER-02",
+      "accountability_id": "ACC-AIQ-S3-VER-02",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "6825f5ca3a80de129a3311188524dceeb99fa1e9"
+      ],
+      "source_prs": [
+        1994
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "grounding/citation/postcondition runtime evidence",
+        "same-origin and wrong-scope rejection evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    },
+    {
+      "task_id": "AIQ-S3-VER-03",
+      "accountability_id": "ACC-AIQ-S3-VER-03",
+      "ledger_status": "pending",
+      "landed_commits": [
+        "9296af0437716e501f52ce46e8e301806e7a933e"
+      ],
+      "source_prs": [
+        1995
+      ],
+      "target_next_lifecycle_state": "evidence_pending",
+      "required_checks": [
+        "bounded semantic verifier evidence",
+        "high-impact finalization and digest-tamper evidence",
+        "implementation lifecycle event/signoff",
+        "independent verification before completion"
+      ]
+    }
+  ],
+  "waves": [
+    {
+      "id": "EF-W0",
+      "stage": 0,
+      "depends_on": [],
+      "tasks": [
+        "AIQ-S0-COST-02",
+        "AIQ-S0-COST-03",
+        "AIQ-S0-PROV-01",
+        "AIQ-S0-PROV-02",
+        "AIQ-S0-PROV-03"
+      ],
+      "purpose": "reconcile landed Stage-0 implementation with signed accountability before widening dependencies"
+    },
+    {
+      "id": "EF-W1",
+      "stage": 1,
+      "depends_on": [
+        "EF-W0"
+      ],
+      "tasks": [
+        "AIQ-S1-CONV-01",
+        "AIQ-S1-CONV-02",
+        "AIQ-S1-MEM-01",
+        "AIQ-S1-MEM-02",
+        "AIQ-S1-MEM-03",
+        "AIQ-S1-TOOL-01"
+      ],
+      "purpose": "canonical conversation, durable memory including derived projections, and canonical tool authority"
+    },
+    {
+      "id": "EF-W2",
+      "stage": 1,
+      "depends_on": [
+        "EF-W1"
+      ],
+      "tasks": [
+        "AIQ-S1-TOOL-02",
+        "AIQ-S1-TOOL-03"
+      ],
+      "purpose": "scoped database/network/code/build/artifact adapters plus approval/idempotency/compensation/postconditions"
+    },
+    {
+      "id": "EF-W3",
+      "stage": 2,
+      "depends_on": [
+        "EF-W2"
+      ],
+      "tasks": [
+        "AIQ-S2-CTX-01",
+        "AIQ-S2-CTX-02",
+        "AIQ-S2-CTX-03",
+        "AIQ-S2-PROTO-01",
+        "AIQ-S2-PROTO-02",
+        "AIQ-S2-PROTO-03"
+      ],
+      "purpose": "context and provider-neutral protocol convergence"
+    },
+    {
+      "id": "EF-W4",
+      "stage": 3,
+      "depends_on": [
+        "EF-W3"
+      ],
+      "tasks": [
+        "AIQ-S3-VER-01",
+        "AIQ-S3-VER-02",
+        "AIQ-S3-VER-03"
+      ],
+      "purpose": "verification and finalization semantics"
+    },
+    {
+      "id": "EF-W5",
+      "stage": 4,
+      "depends_on": [
+        "EF-W4"
+      ],
+      "tasks": [
+        "AIQ-S4-EXEC-01",
+        "AIQ-S4-EXEC-02",
+        "AIQ-S4-EXEC-03"
+      ],
+      "purpose": "bounded durable cognitive execution and crash-safe finalization"
+    },
+    {
+      "id": "EF-W6",
+      "stage": 5,
+      "depends_on": [
+        "EF-W5"
+      ],
+      "tasks": [
+        "AIQ-S5-ENG-01",
+        "AIQ-S5-ENG-02",
+        "AIQ-S5-ENG-03",
+        "AIQ-S6-STREAM-01",
+        "AIQ-S6-STREAM-02",
+        "AIQ-S6-STREAM-03",
+        "AIQ-S7-E2E-01",
+        "AIQ-S7-E2E-02",
+        "AIQ-S7-E2E-03"
+      ],
+      "purpose": "engine boundary, frontend stream reconciliation and full-stack closure"
+    }
+  ],
+  "required_fault_families": [
+    "duplicate-replay-idempotency-conflict",
+    "restart-after-reservation-before-reconciliation",
+    "crash-after-side-effect-before-receipt",
+    "approval-expiry-or-argument-digest-mismatch",
+    "provider-unknown-outcome",
+    "dns-rebinding-redirect-private-range-egress",
+    "sandbox-resource-exhaustion",
+    "stale-lease-aba-owner-fencing",
+    "multi-tenant-pressure-fairness",
+    "event-duplication-reordering-gap",
+    "reconnect-during-terminal-commit",
+    "stale-context-or-policy-digest",
+    "tombstone-projection-rebuild",
+    "verifier-evidence-head-mismatch"
+  ],
+  "lifecycle_rules": [
+    "landed code does not automatically change accountability state",
+    "evidence_pending requires implementation evidence but not completion",
+    "done requires implementation signoff, independent verification signoff and completion event",
+    "breaking a lower-stage contract invalidates dependent evidence",
+    "stage-7 mocks may replace external dependencies but not product boundaries under proof"
+  ],
+  "landed_candidate_summary": {
+    "task_count": 22,
+    "through_stage": 3,
+    "latest_merge_sha": "a2cb66b9847ff893d750aafbf6ba61d3f1a8eba0",
+    "note": "implementation evidence is ahead of the signed accountability ledger; no lifecycle state is promoted by this frontier"
+  }
+}
