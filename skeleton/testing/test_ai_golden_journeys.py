@@ -17,7 +17,11 @@ from skeleton.provider_contract import (
     ProviderToolCall,
     ProviderUsage,
 )
-from skeleton.provider_runtime import ProviderResponse, provider_request_from_context
+from skeleton.provider_runtime import (
+    ProviderResponse,
+    ProviderUnavailableError,
+    provider_request_from_context,
+)
 from skeleton.skills.tool_contract import ToolEffect, ToolManifest
 from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
@@ -38,7 +42,10 @@ class ScriptedProvider:
         self.requests.append(request)
         if not self.responses:
             raise AssertionError("provider called more times than scripted")
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 def _context_budget() -> ContextBudget:
@@ -239,3 +246,199 @@ async def test_golden_context_tool_execution_restart_journey(tmp_path) -> None:
 
     reopened_repository.close()
     reopened_tools.receipt_store.close()
+
+
+
+@pytest.mark.asyncio
+async def test_golden_provider_outage_is_resumable_without_tool_effect(tmp_path) -> None:
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    envelope, projected = _compile_context(operation_id, execution_id)
+    path = tmp_path / "outage-execution.sqlite3"
+
+    request = AIExecutionRequest(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        objective="Recover safely from provider outage.",
+        context_policy={
+            "tenant_id": "tenant-a",
+            "data_class": "internal",
+            "context_id": envelope.context_id,
+            "source_snapshot": [list(item) for item in envelope.source_snapshot],
+            "compiler_version": COMPILER_VERSION,
+            "provider_purpose": "model-inference",
+        },
+        tool_policy={"tenant_id": "tenant-a", "allowed_tool_ids": []},
+        resource_budget={"max_model_turns": 3, "max_tool_calls": 1},
+        stop_policy={"max_repeat_tool_batches": 1},
+        created_at=NOW,
+    )
+
+    first_repo = SQLiteExecutionRepository(path)
+    first_provider = ScriptedProvider(
+        [ProviderUnavailableError("simulated provider outage")]
+    )
+    runtime = CognitiveExecutionRuntime(
+        first_repo,
+        first_provider,
+        AsyncToolRuntime(),
+    )
+
+    with pytest.raises(ProviderUnavailableError, match="simulated provider outage"):
+        await runtime.start(
+            request,
+            instructions=projected.instructions,
+            prompt=projected.prompt,
+            context_digest=envelope.context_digest,
+            history=projected.history,
+            now=NOW,
+        )
+
+    persisted = first_repo.get(execution_id)
+    assert persisted.state is ExecutionState.PROVIDER_PENDING
+    assert first_repo.latest_checkpoint(execution_id) is not None
+    first_repo.close()
+
+    second_repo = SQLiteExecutionRepository(path)
+    second_provider = ScriptedProvider([_final_response()])
+    resumed_runtime = CognitiveExecutionRuntime(
+        second_repo,
+        second_provider,
+        AsyncToolRuntime(),
+    )
+
+    resumed = await resumed_runtime.resume(execution_id, now=NOW)
+
+    assert resumed.completed is True
+    assert resumed.result.final_output == "README inspected; canonical answer ready."
+    assert len(first_provider.requests) == 1
+    assert len(second_provider.requests) == 1
+    second_repo.close()
+
+
+@pytest.mark.asyncio
+async def test_golden_approval_wait_survives_restart_and_effect_runs_once(
+    tmp_path,
+) -> None:
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    envelope, projected = _compile_context(operation_id, execution_id)
+    execution_path = tmp_path / "approval-execution.sqlite3"
+    receipt_path = tmp_path / "approval-receipts.sqlite3"
+
+    request = AIExecutionRequest(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        objective="Run one approved repository mutation.",
+        context_policy={
+            "tenant_id": "tenant-a",
+            "data_class": "internal",
+            "context_id": envelope.context_id,
+            "source_snapshot": [list(item) for item in envelope.source_snapshot],
+            "compiler_version": COMPILER_VERSION,
+            "provider_purpose": "model-inference",
+        },
+        tool_policy={
+            "tenant_id": "tenant-a",
+            "allowed_tool_ids": ["repo.read"],
+        },
+        resource_budget={"max_model_turns": 4, "max_tool_calls": 2},
+        stop_policy={"max_repeat_tool_batches": 1},
+        created_at=NOW,
+    )
+
+    first_repo = SQLiteExecutionRepository(execution_path)
+    first_receipts = SQLiteToolReceiptStore(receipt_path)
+    first_tools = AsyncToolRuntime(receipt_store=first_receipts)
+    effects: list[str] = []
+
+    async def first_handler(_request):
+        effects.append("unexpected-before-approval")
+        return "artifact:mutation"
+
+    await first_tools.register(
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Approval-gated repository action.",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+            effect=ToolEffect.REVERSIBLE,
+            approval_required=True,
+        ),
+        first_handler,
+    )
+    first_provider = ScriptedProvider([_tool_response()])
+    first_runtime = CognitiveExecutionRuntime(
+        first_repo,
+        first_provider,
+        first_tools,
+    )
+
+    waiting = await first_runtime.start(
+        request,
+        instructions=projected.instructions,
+        prompt=projected.prompt,
+        context_digest=envelope.context_digest,
+        history=projected.history,
+        now=NOW,
+    )
+
+    assert waiting.state is ExecutionState.WAITING_FOR_USER
+    assert len(waiting.pending_approvals) == 1
+    call_id = waiting.pending_approvals[0].call_id
+    assert effects == []
+
+    first_repo.close()
+    first_receipts.close()
+
+    second_repo = SQLiteExecutionRepository(execution_path)
+    second_receipts = SQLiteToolReceiptStore(receipt_path)
+    second_tools = AsyncToolRuntime(receipt_store=second_receipts)
+
+    async def approved_handler(_request):
+        effects.append("approved")
+        return "artifact:mutation"
+
+    await second_tools.register(
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Approval-gated repository action.",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+            effect=ToolEffect.REVERSIBLE,
+            approval_required=True,
+        ),
+        approved_handler,
+    )
+    second_provider = ScriptedProvider([_final_response()])
+    resumed_runtime = CognitiveExecutionRuntime(
+        second_repo,
+        second_provider,
+        second_tools,
+    )
+
+    completed = await resumed_runtime.resume(
+        execution_id,
+        approval_refs={call_id: "approval:golden-1"},
+        now=NOW,
+    )
+
+    assert completed.completed is True
+    assert completed.state is ExecutionState.COMPLETED
+    assert effects == ["approved"]
+    assert len(first_provider.requests) == 1
+    assert len(second_provider.requests) == 1
+    assert completed.result.tool_receipts
+
+    second_repo.close()
+    second_receipts.close()
