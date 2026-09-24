@@ -15,6 +15,13 @@ from skeleton.persistence.conversation_repository import (
     ConversationRepositoryError,
     SQLiteConversationRepository,
 )
+from skeleton.persistence.execution_repository import (
+    ExecutionOutboxEvent,
+    ExecutionRepositoryConflict,
+    ExecutionRepositoryCorruption,
+    ExecutionRepositoryError,
+    SQLiteExecutionRepository,
+)
 from skeleton.persistence.memory_repository import (
     MemoryConflict,
     MemoryNotFound,
@@ -55,6 +62,11 @@ __all__ = [
     "ConversationRepositoryCorruption",
     "ConversationRepositoryError",
     "SQLiteConversationRepository",
+    "ExecutionOutboxEvent",
+    "ExecutionRepositoryConflict",
+    "ExecutionRepositoryCorruption",
+    "ExecutionRepositoryError",
+    "SQLiteExecutionRepository",
     "MemoryConflict",
     "MemoryNotFound",
     "MemoryRepositoryError",

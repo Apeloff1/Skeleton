@@ -6,6 +6,18 @@ from .canonical import (
     EvidenceRef,
     Identity,
 )
+from .ai_execution import (
+    AI_EXECUTION_SCHEMA_VERSION,
+    AIExecution,
+    AIExecutionContractError,
+    AIExecutionRequest,
+    AIExecutionResult,
+    AgentTurn,
+    ExecutionCheckpoint,
+    ExecutionState,
+    TERMINAL_EXECUTION_STATES,
+    execution_payload_digest,
+)
 from .context import (
     CONTEXT_SCHEMA_VERSION,
     ContextBudget,
@@ -59,6 +71,16 @@ from .operation import (
 )
 
 __all__ = [
+    "AI_EXECUTION_SCHEMA_VERSION",
+    "AIExecution",
+    "AIExecutionContractError",
+    "AIExecutionRequest",
+    "AIExecutionResult",
+    "AgentTurn",
+    "ExecutionCheckpoint",
+    "ExecutionState",
+    "TERMINAL_EXECUTION_STATES",
+    "execution_payload_digest",
     "CanonicalContractError",
     "CanonicalEnvelope",
     "EvidenceRef",
