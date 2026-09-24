@@ -1,15 +1,32 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 import sys
+from uuid import uuid4
 
 import pytest
+
+from skeleton.skills.tool_contract import approval_ref_for_request
 
 
 @pytest.fixture
 def registry():
     import services.tool_registry as tool_registry
     return tool_registry
+
+
+def _approval_for(registry, *, params: dict, operation_id: str, idempotency_key: str) -> str:
+    request = registry.ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=operation_id,
+        tenant_id="legacy-backend",
+        tool_id="package_build",
+        idempotency_key=idempotency_key,
+        arguments=dict(params),
+        requested_at=datetime.now(timezone.utc),
+    )
+    return approval_ref_for_request(request)
 
 
 @pytest.mark.asyncio
@@ -125,14 +142,25 @@ async def test_artifact_byte_ceiling_rejects_before_metadata_persistence(registr
         }
 
     monkeypatch.setattr(registry.binary_builder, "package_build", package_build)
+    params = {
+        "build_id": "build-1",
+        "kinds": ["zip"],
+        "max_output_bytes": 1024,
+        "retention_days": 3,
+    }
+    operation_id = str(uuid4())
+    idempotency_key = "artifact-ceiling"
     result = await registry.invoke(
         "package_build",
-        {
-            "build_id": "build-1",
-            "kinds": ["zip"],
-            "max_output_bytes": 1024,
-            "retention_days": 3,
-        },
+        params,
+        operation_id=operation_id,
+        idempotency_key=idempotency_key,
+        approval_ref=_approval_for(
+            registry,
+            params=params,
+            operation_id=operation_id,
+            idempotency_key=idempotency_key,
+        ),
     )
 
     assert result["ok"] is False
