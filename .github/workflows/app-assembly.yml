@@ -68,6 +68,8 @@ on:
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
+      - "backend/tests/test_ai_chat_conversation_authority.py"
+      - "backend/tests/test_conversation_regeneration.py"
       - "skeleton/vault/data_governance.py"
       - "skeleton/vault/data_lifecycle.py"
       - "skeleton/vault/governance_registry.py"
@@ -449,6 +451,8 @@ jobs:
           backend/tests/test_operation_stream_transport.py
           backend/tests/test_operation_stream_route.py
           backend/tests/test_conversations_api.py
+          backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
 
