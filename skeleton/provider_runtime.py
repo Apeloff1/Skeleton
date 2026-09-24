@@ -9,9 +9,11 @@ must not create a second credential-bearing provider runtime.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import asyncio
 from collections import deque
 from collections.abc import Sequence as SequenceABC
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_address
 import base64
 import hashlib
@@ -24,14 +26,22 @@ import socket
 import time
 import urllib.error
 import urllib.request
-from typing import Any, Callable, Iterable, Mapping, Sequence
+from typing import Any, AsyncIterator, Callable, Iterable, Mapping, Sequence
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from skeleton.contracts.context import ContextEnvelope
 from skeleton.provider_contract import (
+    FinishReason,
     ProviderArchitectureError,
     ProviderArchitectureReceipt,
+    ProviderDelta,
+    ProviderDeltaKind,
+    ProviderProtocolError,
+    ProviderStructuredOutput,
+    ProviderToolCall,
+    ProviderToolDefinition,
+    ProviderUsage,
     load_provider_architecture,
 )
 from skeleton.intelligence.admission import (
@@ -198,28 +208,46 @@ class ProviderRequest:
     purpose: str = "model-inference"
     tenant_id: str | None = None
     operation_id: str | None = None
+    execution_id: str | None = None
+    turn_id: str | None = None
     estimated_cost_usd: float = 0.0
     resource_budget: ResourceBudget = field(default_factory=ResourceBudget)
     governance_context: GovernanceContext | None = None
     context_id: str | None = None
     context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    context_compiler_version: str | None = None
+    tools: tuple[ProviderToolDefinition, ...] = field(default_factory=tuple)
+    # Temporary compatibility field. It is normalized into ProviderToolDefinition
+    # before provider I/O and must never escape as provider-native authority.
     tool_schemas: tuple[Mapping[str, Any], ...] = field(default_factory=tuple)
+    structured_output_schema: Mapping[str, Any] | None = None
+    tool_choice: str = "auto"
+    specific_tool_id: str | None = None
+    deadline: datetime | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderResponse:
     """Normalized provider result returned to application code."""
 
-    text: str
+    text: str | None
     provider: str
     model: str
     request_id: str | None = None
+    response_id: str | None = None
+    structured_output: Mapping[str, Any] | None = None
+    tool_calls: tuple[ProviderToolCall, ...] = field(default_factory=tuple)
+    finish_reason: FinishReason = FinishReason.UNKNOWN
+    usage: ProviderUsage = field(default_factory=ProviderUsage)
     latency_ms: float | None = None
     governance_decision_id: str | None = None
     admission_decision_id: str | None = None
     data_class: str | None = None
     context_id: str | None = None
     context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    context_compiler_version: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +315,56 @@ class ProviderSpeechResponse:
     data_class: str | None = None
 
 
+def provider_response_deltas(
+    response: ProviderResponse,
+    *,
+    emitted_at: datetime | None = None,
+) -> tuple[ProviderDelta, ...]:
+    """Convert one normalized provider response into ordered neutral deltas.
+
+    This is deliberately a transport projection, not a durable event log. A
+    caller that needs durable replay must persist its own operation events.
+    Providers without native streaming can still expose the same delta contract
+    by decomposing their normalized final response here.
+    """
+
+    if not isinstance(response, ProviderResponse):
+        raise TypeError("response must be ProviderResponse")
+    instant = (
+        datetime.now(timezone.utc)
+        if emitted_at is None
+        else emitted_at.astimezone(timezone.utc)
+    )
+    sequence = 0
+    deltas: list[ProviderDelta] = []
+
+    def append(kind: ProviderDeltaKind, **payload: Any) -> None:
+        nonlocal sequence
+        deltas.append(
+            ProviderDelta(
+                sequence=sequence,
+                kind=kind,
+                response_id=response.response_id,
+                emitted_at=instant,
+                **payload,
+            )
+        )
+        sequence += 1
+
+    if response.text is not None:
+        append(ProviderDeltaKind.TEXT, text=response.text)
+    if response.structured_output is not None:
+        append(
+            ProviderDeltaKind.STRUCTURED,
+            structured_fragment=dict(response.structured_output),
+        )
+    for tool_call in response.tool_calls:
+        append(ProviderDeltaKind.TOOL_CALL, tool_call=tool_call)
+    append(ProviderDeltaKind.USAGE, usage=response.usage)
+    append(ProviderDeltaKind.FINAL, finish_reason=response.finish_reason)
+    return tuple(deltas)
+
+
 class ProviderAdapter(ABC):
     """Minimal contract implemented by concrete model providers."""
 
@@ -301,6 +379,19 @@ class ProviderAdapter(ABC):
     @abstractmethod
     async def generate(self, request: ProviderRequest) -> ProviderResponse:
         """Execute one generation request and normalize the provider response."""
+
+    async def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderDelta]:
+        """Yield provider-neutral deltas without granting durable-stream authority.
+
+        The default implementation is buffered and therefore works for every
+        adapter. A provider-specific adapter may override this with native
+        streaming so long as it emits the same neutral contract and preserves
+        request governance/deadline semantics.
+        """
+
+        response = await self.generate(request)
+        for delta in provider_response_deltas(response):
+            yield delta
 
     def status(self) -> dict[str, Any]:
         return {"id": self.provider_id, "model": self.model, "available": self.available}
@@ -427,6 +518,443 @@ def normalize_history(
     return tuple(kept)
 
 
+
+
+def _strict_json_object(value: object, field_name: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ProviderPolicyError(f"{field_name} must be a JSON object")
+    result = dict(value)
+    try:
+        json.dumps(
+            result,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ProviderPolicyError(f"{field_name} must be strict JSON") from exc
+    return result
+
+
+def _provider_tool_definitions(
+    request: ProviderRequest,
+) -> tuple[ProviderToolDefinition, ...]:
+    definitions: dict[str, ProviderToolDefinition] = {}
+
+    def add(definition: ProviderToolDefinition) -> None:
+        existing = definitions.get(definition.tool_id)
+        if existing is not None and existing != definition:
+            raise ProviderPolicyError(
+                f"duplicate provider tool id has conflicting definition: {definition.tool_id}"
+            )
+        definitions[definition.tool_id] = definition
+
+    for definition in request.tools:
+        if not isinstance(definition, ProviderToolDefinition):
+            raise ProviderPolicyError(
+                "model provider tools must contain ProviderToolDefinition values"
+            )
+        add(definition)
+
+    for raw in request.tool_schemas:
+        schema = _strict_json_object(raw, "model provider tool schema")
+        try:
+            if (
+                isinstance(schema.get("tool_id"), str)
+                and isinstance(schema.get("input_schema"), Mapping)
+            ):
+                definition = ProviderToolDefinition(
+                    tool_id=schema["tool_id"],
+                    description=str(schema.get("description") or schema["tool_id"]),
+                    input_schema=dict(schema["input_schema"]),
+                )
+            elif schema.get("type") == "function" and isinstance(
+                schema.get("function"), Mapping
+            ):
+                function = dict(schema["function"])
+                definition = ProviderToolDefinition(
+                    tool_id=str(function.get("name") or ""),
+                    description=str(
+                        function.get("description")
+                        or function.get("name")
+                        or ""
+                    ),
+                    input_schema=dict(function.get("parameters") or {}),
+                )
+            elif schema.get("type") == "function":
+                definition = ProviderToolDefinition(
+                    tool_id=str(schema.get("name") or ""),
+                    description=str(
+                        schema.get("description") or schema.get("name") or ""
+                    ),
+                    input_schema=dict(schema.get("parameters") or {}),
+                )
+            else:
+                raise ProviderProtocolError("unsupported provider tool schema")
+        except (ProviderProtocolError, TypeError, ValueError) as exc:
+            raise ProviderPolicyError(
+                "model provider tool schema cannot be normalized"
+            ) from exc
+        add(definition)
+
+    if len(definitions) > 256:
+        raise ProviderPolicyError("model provider tool count exceeds protocol limit")
+    return tuple(definitions[key] for key in sorted(definitions))
+
+
+def _provider_tool_payloads(
+    request: ProviderRequest,
+) -> list[dict[str, Any]]:
+    return [
+        definition.as_openai_tool()
+        for definition in _provider_tool_definitions(request)
+    ]
+
+
+def _provider_tool_choice_payload(
+    request: ProviderRequest,
+    tools: tuple[ProviderToolDefinition, ...],
+) -> object | None:
+    choice = str(request.tool_choice or "auto").strip().lower()
+    if choice not in {"none", "auto", "required", "specific"}:
+        raise ProviderPolicyError("model provider tool_choice is invalid")
+    offered = {tool.tool_id for tool in tools}
+    if not offered:
+        if choice in {"required", "specific"}:
+            raise ProviderPolicyError(
+                "model provider tool_choice requires offered tools"
+            )
+        return "none"
+    if choice == "specific":
+        tool_id = str(request.specific_tool_id or "").strip()
+        if not tool_id or tool_id not in offered:
+            raise ProviderPolicyError(
+                "specific provider tool choice must reference an offered tool"
+            )
+        return {"type": "function", "name": tool_id}
+    if request.specific_tool_id is not None:
+        raise ProviderPolicyError(
+            "specific_tool_id requires tool_choice='specific'"
+        )
+    return choice
+
+
+def _provider_structured_output_payload(
+    request: ProviderRequest,
+) -> dict[str, Any] | None:
+    if request.structured_output_schema is None:
+        return None
+    schema = _strict_json_object(
+        request.structured_output_schema,
+        "structured_output_schema",
+    )
+    if not schema:
+        raise ProviderPolicyError("structured_output_schema must not be empty")
+    return {
+        "format": {
+            "type": "json_schema",
+            "name": "skeleton_structured_output",
+            "schema": schema,
+            "strict": True,
+        }
+    }
+
+
+def _remaining_provider_timeout(
+    request: ProviderRequest,
+    configured_timeout: float,
+) -> float:
+    timeout = float(configured_timeout)
+    if request.deadline is None:
+        return timeout
+    deadline = request.deadline
+    if (
+        not isinstance(deadline, datetime)
+        or deadline.tzinfo is None
+        or deadline.utcoffset() is None
+    ):
+        raise ProviderPolicyError("model provider deadline must be timezone-aware")
+    remaining = (
+        deadline.astimezone(timezone.utc) - datetime.now(timezone.utc)
+    ).total_seconds()
+    if remaining <= 0:
+        raise ProviderInvocationError("model provider deadline exceeded")
+    return max(0.001, min(timeout, remaining))
+
+
+def _provider_field(value: object, key: str, default: object = None) -> object:
+    if isinstance(value, Mapping):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def _provider_output_items(response: object) -> tuple[object, ...]:
+    output = _provider_field(response, "output", ())
+    if output is None:
+        return ()
+    if isinstance(output, SequenceABC) and not isinstance(
+        output, (str, bytes, bytearray)
+    ):
+        return tuple(output)
+    return ()
+
+
+def _provider_tool_call_from_item(
+    item: object,
+    *,
+    offered_tool_ids: frozenset[str],
+) -> ProviderToolCall | None:
+    item_type = str(_provider_field(item, "type", "") or "").strip().lower()
+    if item_type not in {"function_call", "tool_call"}:
+        return None
+    call_id = str(
+        _provider_field(item, "call_id", None)
+        or _provider_field(item, "id", None)
+        or ""
+    ).strip()
+    tool_id = str(
+        _provider_field(item, "name", None)
+        or _provider_field(item, "tool_id", None)
+        or ""
+    ).strip()
+    if not call_id or not tool_id:
+        raise ProviderInvocationError(
+            "model provider returned malformed tool call"
+        )
+    if tool_id not in offered_tool_ids:
+        raise ProviderInvocationError(
+            "model provider returned an unoffered tool call"
+        )
+    raw_arguments = _provider_field(item, "arguments", {})
+    if isinstance(raw_arguments, str):
+        try:
+            parsed_arguments = json.loads(raw_arguments)
+        except json.JSONDecodeError as exc:
+            raise ProviderInvocationError(
+                "model provider returned malformed tool arguments"
+            ) from exc
+    else:
+        parsed_arguments = raw_arguments
+    if not isinstance(parsed_arguments, Mapping):
+        raise ProviderInvocationError(
+            "model provider tool arguments must be a JSON object"
+        )
+    try:
+        return ProviderToolCall(
+            call_id=call_id,
+            tool_id=tool_id,
+            arguments=dict(parsed_arguments),
+        )
+    except ProviderProtocolError as exc:
+        raise ProviderInvocationError(
+            "model provider returned invalid normalized tool call"
+        ) from exc
+
+
+def _extract_provider_tool_calls(
+    response: object,
+    *,
+    offered_tools: tuple[ProviderToolDefinition, ...],
+) -> tuple[ProviderToolCall, ...]:
+    offered = frozenset(tool.tool_id for tool in offered_tools)
+    calls: list[ProviderToolCall] = []
+    seen: set[str] = set()
+    for item in _provider_output_items(response):
+        call = _provider_tool_call_from_item(
+            item,
+            offered_tool_ids=offered,
+        )
+        if call is None:
+            continue
+        if call.call_id in seen:
+            raise ProviderInvocationError(
+                "model provider returned duplicate tool call id"
+            )
+        seen.add(call.call_id)
+        calls.append(call)
+        if len(calls) > 256:
+            raise ProviderInvocationError(
+                "model provider returned too many tool calls"
+            )
+    return tuple(calls)
+
+
+def _extract_provider_structured_output(
+    response: object,
+    *,
+    requested_schema: Mapping[str, Any] | None,
+    text: str | None,
+) -> dict[str, Any] | None:
+    parsed = _provider_field(response, "output_parsed", None)
+    if parsed is not None:
+        if not isinstance(parsed, Mapping):
+            raise ProviderInvocationError(
+                "model provider structured output is not an object"
+            )
+        return _strict_json_object(
+            parsed,
+            "model provider structured output",
+        )
+    if requested_schema is None or not text:
+        return None
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ProviderInvocationError(
+            "model provider structured output is invalid JSON"
+        ) from exc
+    if not isinstance(value, Mapping):
+        raise ProviderInvocationError(
+            "model provider structured output is not an object"
+        )
+    return _strict_json_object(
+        value,
+        "model provider structured output",
+    )
+
+
+def _normalized_provider_usage(
+    response: object,
+    *,
+    estimated_cost_usd: float,
+) -> ProviderUsage:
+    usage = _provider_field(response, "usage", None)
+    if usage is None:
+        source = "estimate"
+        input_tokens = output_tokens = cached_tokens = reasoning_tokens = total = None
+    else:
+        source = "provider"
+        input_tokens = _provider_field(usage, "input_tokens", None)
+        output_tokens = _provider_field(usage, "output_tokens", None)
+        total = _provider_field(usage, "total_tokens", None)
+        input_details = _provider_field(usage, "input_tokens_details", None)
+        output_details = _provider_field(usage, "output_tokens_details", None)
+        cached_tokens = (
+            _provider_field(input_details, "cached_tokens", None)
+            if input_details is not None
+            else None
+        )
+        reasoning_tokens = (
+            _provider_field(output_details, "reasoning_tokens", None)
+            if output_details is not None
+            else None
+        )
+
+    def token(value: object) -> int | None:
+        if isinstance(value, bool) or value is None:
+            return None
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if parsed >= 0 else None
+
+    estimated = (
+        format(float(estimated_cost_usd), ".12g")
+        if float(estimated_cost_usd) > 0
+        else None
+    )
+    try:
+        return ProviderUsage(
+            input_tokens=token(input_tokens),
+            output_tokens=token(output_tokens),
+            cached_input_tokens=token(cached_tokens),
+            reasoning_tokens=token(reasoning_tokens),
+            total_tokens=token(total),
+            estimated_cost=estimated,
+            billed_cost=None,
+            currency="USD" if estimated is not None else None,
+            usage_source=source,
+        )
+    except ProviderProtocolError as exc:
+        raise ProviderInvocationError(
+            "model provider returned invalid usage metadata"
+        ) from exc
+
+
+def _normalized_finish_reason(
+    response: object,
+    *,
+    tool_calls: tuple[ProviderToolCall, ...],
+) -> FinishReason:
+    if tool_calls:
+        return FinishReason.TOOL_CALLS
+    status = str(_provider_field(response, "status", "") or "").strip().lower()
+    if status in {"cancelled", "canceled"}:
+        return FinishReason.CANCELLED
+    if status in {"failed", "error"}:
+        return FinishReason.PROVIDER_ERROR
+
+    for item in _provider_output_items(response):
+        item_type = str(_provider_field(item, "type", "") or "").strip().lower()
+        if item_type == "refusal":
+            return FinishReason.REFUSAL
+        content = _provider_field(item, "content", ())
+        if isinstance(content, SequenceABC) and not isinstance(
+            content, (str, bytes, bytearray)
+        ):
+            for part in content:
+                if str(_provider_field(part, "type", "") or "").lower() == "refusal":
+                    return FinishReason.REFUSAL
+
+    incomplete = _provider_field(response, "incomplete_details", None)
+    reason = str(_provider_field(incomplete, "reason", "") or "").strip().lower()
+    if reason in {"max_output_tokens", "length"}:
+        return FinishReason.LENGTH
+    if reason in {"content_filter", "content_filtered"}:
+        return FinishReason.CONTENT_FILTERED
+    if status == "completed":
+        return FinishReason.COMPLETED
+    return FinishReason.UNKNOWN
+
+
+def _normalize_provider_interaction(
+    response: object,
+    request: ProviderRequest,
+    *,
+    text: str | None,
+) -> tuple[
+    str | None,
+    dict[str, Any] | None,
+    tuple[ProviderToolCall, ...],
+    FinishReason,
+    ProviderUsage,
+]:
+    tools = _provider_tool_definitions(request)
+    tool_calls = _extract_provider_tool_calls(
+        response,
+        offered_tools=tools,
+    )
+    structured = _extract_provider_structured_output(
+        response,
+        requested_schema=request.structured_output_schema,
+        text=text,
+    )
+    finish = _normalized_finish_reason(
+        response,
+        tool_calls=tool_calls,
+    )
+    usage = _normalized_provider_usage(
+        response,
+        estimated_cost_usd=request.estimated_cost_usd,
+    )
+    normalized_text = text.strip() if isinstance(text, str) else None
+    if normalized_text == "":
+        normalized_text = None
+    if normalized_text is None and structured is None and not tool_calls:
+        if finish not in {
+            FinishReason.REFUSAL,
+            FinishReason.CONTENT_FILTERED,
+            FinishReason.CANCELLED,
+            FinishReason.DEADLINE,
+        }:
+            raise ProviderInvocationError(
+                "model provider returned no normalized output"
+            )
+    return normalized_text, structured, tool_calls, finish, usage
+
+
 def _effective_governance_fields(
     *,
     data_class: str,
@@ -505,10 +1033,14 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
         tenant_id=request.tenant_id,
         governance_context=request.governance_context,
     )
-    if request.operation_id is not None and (
-        not isinstance(request.operation_id, str) or not request.operation_id.strip()
-    ):
-        raise ProviderPolicyError("model provider operation identity is invalid")
+    for identity_name in ("operation_id", "execution_id", "turn_id"):
+        identity = getattr(request, identity_name)
+        if identity is not None and (
+            not isinstance(identity, str) or not identity.strip()
+        ):
+            raise ProviderPolicyError(
+                f"model provider {identity_name} is invalid"
+            )
     if (request.context_id is None) != (request.context_digest is None):
         raise ProviderPolicyError(
             "model provider context_id and context_digest must be supplied together"
@@ -527,23 +1059,62 @@ def _validate_request(request: ProviderRequest, *, default_model: str) -> str:
             or any(ch not in "0123456789abcdef" for ch in digest)
         ):
             raise ProviderPolicyError("model provider context digest is invalid")
-    for schema in request.tool_schemas:
-        if not isinstance(schema, Mapping) or not schema:
+        if not request.context_source_snapshot:
             raise ProviderPolicyError(
-                "model provider tool schema must be a non-empty mapping"
+                "compiled provider context requires immutable source snapshot"
             )
-        try:
-            json.dumps(
-                dict(schema),
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-                allow_nan=False,
-            )
-        except (TypeError, ValueError) as exc:
+        seen_snapshot_ids: set[str] = set()
+        previous_snapshot_id: str | None = None
+        for item in request.context_source_snapshot:
+            if not isinstance(item, tuple) or len(item) != 2:
+                raise ProviderPolicyError(
+                    "model provider context snapshot entries must be pairs"
+                )
+            segment_id, content_digest = item
+            try:
+                parsed_segment_id = UUID(segment_id)
+            except (ValueError, AttributeError) as exc:
+                raise ProviderPolicyError(
+                    "model provider context snapshot segment identity is invalid"
+                ) from exc
+            if str(parsed_segment_id) != segment_id:
+                raise ProviderPolicyError(
+                    "model provider context snapshot segment identity is invalid"
+                )
+            if segment_id in seen_snapshot_ids:
+                raise ProviderPolicyError(
+                    "model provider context snapshot contains duplicate segment"
+                )
+            if previous_snapshot_id is not None and segment_id < previous_snapshot_id:
+                raise ProviderPolicyError(
+                    "model provider context snapshot must be deterministically ordered"
+                )
+            seen_snapshot_ids.add(segment_id)
+            previous_snapshot_id = segment_id
+            if (
+                not isinstance(content_digest, str)
+                or len(content_digest) != 64
+                or any(ch not in "0123456789abcdef" for ch in content_digest)
+            ):
+                raise ProviderPolicyError(
+                    "model provider context snapshot digest is invalid"
+                )
+        if (
+            not isinstance(request.context_compiler_version, str)
+            or not request.context_compiler_version.strip()
+        ):
             raise ProviderPolicyError(
-                "model provider tool schema must be strict JSON"
-            ) from exc
+                "compiled provider context requires compiler version"
+            )
+    elif request.context_source_snapshot or request.context_compiler_version is not None:
+        raise ProviderPolicyError(
+            "context snapshot/compiler version require context identity and digest"
+        )
+    tools = _provider_tool_definitions(request)
+    _provider_tool_choice_payload(request, tools)
+    _provider_structured_output_payload(request)
+    if request.deadline is not None:
+        _remaining_provider_timeout(request, 3600.0)
     if isinstance(request.estimated_cost_usd, bool):
         raise ProviderPolicyError("model provider estimated cost is invalid")
     try:
@@ -563,13 +1134,13 @@ def _estimated_input_tokens(request: ProviderRequest) -> int:
     characters += sum(
         len(
             json.dumps(
-                dict(schema),
+                tool.as_dict(),
                 sort_keys=True,
                 separators=(",", ":"),
                 ensure_ascii=False,
             )
         )
-        for schema in request.tool_schemas
+        for tool in _provider_tool_definitions(request)
     )
     return max(1, math.ceil(characters / 4))
 
@@ -646,7 +1217,7 @@ def provider_request_from_context(
     if not isinstance(resource_budget, ResourceBudget):
         raise ProviderPolicyError("model provider resource budget is invalid")
 
-    parsed_tools: list[Mapping[str, Any]] = []
+    parsed_tools: list[ProviderToolDefinition] = []
     for raw in projection.tool_schema_contents:
         try:
             schema = json.loads(raw)
@@ -656,7 +1227,22 @@ def provider_request_from_context(
             raise ProviderPolicyError(
                 "compiled tool schema must be a non-empty JSON object"
             )
-        parsed_tools.append(dict(schema))
+        try:
+            parsed_tools.append(
+                ProviderToolDefinition(
+                    tool_id=str(schema.get("tool_id") or ""),
+                    description=str(
+                        schema.get("description")
+                        or schema.get("tool_id")
+                        or ""
+                    ),
+                    input_schema=dict(schema.get("input_schema") or {}),
+                )
+            )
+        except (ProviderProtocolError, TypeError, ValueError) as exc:
+            raise ProviderPolicyError(
+                "compiled tool schema cannot become provider tool definition"
+            ) from exc
 
     request = ProviderRequest(
         instructions=projection.instructions,
@@ -671,16 +1257,20 @@ def provider_request_from_context(
         purpose=normalized_purpose,
         tenant_id=envelope.tenant_id,
         operation_id=envelope.operation_id,
+        execution_id=envelope.execution_id,
+        turn_id=envelope.turn_id,
         estimated_cost_usd=estimated_cost_usd,
         resource_budget=resource_budget,
         governance_context=governance_context,
         context_id=envelope.context_id,
         context_digest=envelope.context_digest,
-        tool_schemas=tuple(parsed_tools),
+        context_source_snapshot=envelope.source_snapshot,
+        context_compiler_version=envelope.compiler_version,
+        tools=tuple(parsed_tools),
     )
     projected_tokens = _estimated_input_tokens(request)
     input_capacity = envelope.budget.input_capacity(
-        tools_enabled=bool(request.tool_schemas)
+        tools_enabled=bool(_provider_tool_definitions(request))
     )
     if projected_tokens > input_capacity:
         raise ProviderPolicyError(
@@ -1109,6 +1699,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
             ]
             messages.append({"role": "user", "content": request.prompt})
 
+            tools = _provider_tool_definitions(request)
             kwargs: dict[str, Any] = {
                 "model": model,
                 "instructions": request.instructions,
@@ -1116,19 +1707,45 @@ class OpenAIProviderAdapter(ProviderAdapter):
             }
             if request.max_output_tokens is not None:
                 kwargs["max_output_tokens"] = request.max_output_tokens
-            if request.tool_schemas:
-                kwargs["tools"] = [dict(schema) for schema in request.tool_schemas]
+            if tools:
+                kwargs["tools"] = [
+                    tool.as_openai_tool()
+                    for tool in tools
+                ]
+                kwargs["tool_choice"] = _provider_tool_choice_payload(
+                    request,
+                    tools,
+                )
+            structured_payload = _provider_structured_output_payload(request)
+            if structured_payload is not None:
+                kwargs["text"] = structured_payload
 
+            timeout_seconds = _remaining_provider_timeout(
+                request,
+                self.timeout_seconds,
+            )
             try:
-                response = await client.responses.create(**kwargs)
+                response = await asyncio.wait_for(
+                    client.responses.create(**kwargs),
+                    timeout=timeout_seconds,
+                )
+            except asyncio.TimeoutError as exc:
+                raise ProviderInvocationError(
+                    "model provider deadline exceeded"
+                ) from exc
             except ProviderError:
                 raise
             except Exception as exc:
                 raise ProviderInvocationError("model provider request failed") from exc
 
-            text = str(getattr(response, "output_text", "") or "").strip()
-            if not text:
-                raise ProviderInvocationError("model provider returned an empty response")
+            raw_text = getattr(response, "output_text", None)
+            text, structured_output, tool_calls, finish_reason, usage = (
+                _normalize_provider_interaction(
+                    response,
+                    request,
+                    text=(str(raw_text) if raw_text is not None else None),
+                )
+            )
         except BaseException:
             _release_provider_lease(self.admission_runtime, lease)
             raise
@@ -1147,18 +1764,26 @@ class OpenAIProviderAdapter(ProviderAdapter):
                 "model provider usage reconciliation failed"
             ) from exc
 
-        request_id = getattr(response, "id", None)
+        response_id = getattr(response, "id", None)
+        normalized_response_id = str(response_id) if response_id else None
         return ProviderResponse(
             text=text,
             provider=self.provider_id,
             model=model,
-            request_id=str(request_id) if request_id else None,
+            request_id=normalized_response_id,
+            response_id=normalized_response_id,
+            structured_output=structured_output,
+            tool_calls=tool_calls,
+            finish_reason=finish_reason,
+            usage=usage,
             latency_ms=round(latency_seconds * 1000, 2),
             governance_decision_id=governance.decision_id,
             admission_decision_id=lease.decision.decision_id,
             data_class=governance.data_class,
             context_id=request.context_id,
             context_digest=request.context_digest,
+            context_source_snapshot=request.context_source_snapshot,
+            context_compiler_version=request.context_compiler_version,
         )
 
 
@@ -1552,7 +2177,7 @@ class OpenAISyncProviderAdapter:
         return {"id": self.provider_id, "model": self.model, "available": self.available}
 
     @staticmethod
-    def _extract_response_text(payload: Any) -> str:
+    def _extract_response_text(payload: Any) -> str | None:
         if not isinstance(payload, Mapping):
             raise ProviderInvocationError("model provider returned malformed JSON")
 
@@ -1581,9 +2206,7 @@ class OpenAISyncProviderAdapter:
                     fragments.append(text.strip())
 
         joined = "\n".join(fragments).strip()
-        if not joined:
-            raise ProviderInvocationError("model provider returned an empty response")
-        return joined
+        return joined or None
 
     @staticmethod
     def _decode_response(response: Any) -> Mapping[str, Any]:
@@ -1638,6 +2261,7 @@ class OpenAISyncProviderAdapter:
             message.as_openai_input() for message in request.history
         ]
         messages.append({"role": "user", "content": request.prompt})
+        tools = _provider_tool_definitions(request)
         body: dict[str, Any] = {
             "model": model,
             "instructions": request.instructions,
@@ -1645,8 +2269,18 @@ class OpenAISyncProviderAdapter:
         }
         if request.max_output_tokens is not None:
             body["max_output_tokens"] = request.max_output_tokens
-        if request.tool_schemas:
-            body["tools"] = [dict(schema) for schema in request.tool_schemas]
+        if tools:
+            body["tools"] = [
+                tool.as_openai_tool()
+                for tool in tools
+            ]
+            body["tool_choice"] = _provider_tool_choice_payload(
+                request,
+                tools,
+            )
+        structured_payload = _provider_structured_output_payload(request)
+        if structured_payload is not None:
+            body["text"] = structured_payload
 
         outbound = urllib.request.Request(
             self._responses_url(),
@@ -1666,12 +2300,27 @@ class OpenAISyncProviderAdapter:
             for _attempt in range(self.max_retries + 1):
                 attempts_used += 1
                 try:
+                    timeout_seconds = _remaining_provider_timeout(
+                        request,
+                        self.timeout_seconds,
+                    )
                     with urllib.request.urlopen(
                         outbound,
-                        timeout=self.timeout_seconds,
+                        timeout=timeout_seconds,
                     ) as response:
                         payload = self._decode_response(response)
-                    text = self._extract_response_text(payload)
+                    raw_text = self._extract_response_text(payload)
+                    (
+                        text,
+                        structured_output,
+                        tool_calls,
+                        finish_reason,
+                        usage,
+                    ) = _normalize_provider_interaction(
+                        payload,
+                        request,
+                        text=raw_text,
+                    )
                     request_id = payload.get("id")
                     latency_seconds = max(0.0, time.perf_counter() - started)
                     actual = _actual_provider_usage(
@@ -1690,27 +2339,43 @@ class OpenAISyncProviderAdapter:
                         raise ProviderPolicyError(
                             "model provider usage reconciliation failed"
                         ) from exc
+                    normalized_id = (
+                        str(request_id)
+                        if isinstance(request_id, (str, int))
+                        else None
+                    )
                     return ProviderResponse(
                         text=text,
                         provider=self.provider_id,
                         model=model,
-                        request_id=(
-                            str(request_id)
-                            if isinstance(request_id, (str, int))
-                            else None
-                        ),
+                        request_id=normalized_id,
+                        response_id=normalized_id,
+                        structured_output=structured_output,
+                        tool_calls=tool_calls,
+                        finish_reason=finish_reason,
+                        usage=usage,
                         latency_ms=round(latency_seconds * 1000, 2),
                         governance_decision_id=governance.decision_id,
                         admission_decision_id=lease.decision.decision_id,
                         data_class=governance.data_class,
                         context_id=request.context_id,
                         context_digest=request.context_digest,
+                        context_source_snapshot=request.context_source_snapshot,
+                        context_compiler_version=request.context_compiler_version,
                     )
                 except ProviderError:
                     raise
+                except TimeoutError as exc:
+                    last_error = exc
+                    if request.deadline is not None:
+                        deadline = request.deadline.astimezone(timezone.utc)
+                        if datetime.now(timezone.utc) >= deadline:
+                            raise ProviderInvocationError(
+                                "model provider deadline exceeded"
+                            ) from exc
+                    continue
                 except (
                     urllib.error.URLError,
-                    TimeoutError,
                     OSError,
                     ValueError,
                 ) as exc:
@@ -1835,6 +2500,13 @@ def _env_int(name: str, default: int, *, minimum: int) -> int:
 
 __all__ = [
     "AIMessage",
+    "FinishReason",
+    "ProviderDelta",
+    "ProviderDeltaKind",
+    "ProviderStructuredOutput",
+    "ProviderToolCall",
+    "ProviderToolDefinition",
+    "ProviderUsage",
     "OpenAIProviderAdapter",
     "OpenAISyncProviderAdapter",
     "ProviderAdapter",
@@ -1851,4 +2523,5 @@ __all__ = [
     "ProviderUnavailableError",
     "normalize_history",
     "provider_request_from_context",
+    "provider_response_deltas",
 ]

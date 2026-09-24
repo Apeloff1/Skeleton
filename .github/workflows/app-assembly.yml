@@ -35,6 +35,8 @@ on:
       - "skeleton/testing/test_state_topology.py"
       - "skeleton/testing/test_state_recovery_drill.py"
       - "skeleton/testing/test_provider_contract.py"
+      - "skeleton/testing/test_provider_runtime_schema_parity.py"
+      - "machine/ai_runtime_schemas.json"
       - "skeleton/testing/test_provider_surface_inventory.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
@@ -415,6 +417,7 @@ jobs:
           skeleton/testing/test_state_topology.py
           skeleton/testing/test_state_recovery_drill.py
           skeleton/testing/test_provider_contract.py
+          skeleton/testing/test_provider_runtime_schema_parity.py
           skeleton/testing/test_provider_surface_inventory.py
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_data_lifecycle.py
