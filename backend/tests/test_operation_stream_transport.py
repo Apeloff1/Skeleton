@@ -287,3 +287,73 @@ def test_transport_acknowledgement_is_tenant_bound(
 
     operations.close()
     events.close()
+
+
+def test_transport_snapshot_returns_safe_cursor_after_compaction(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    created = operations.create(operation, now=BASE_TIME)
+    validated = operations.transition(
+        operation.operation_id,
+        OperationState.VALIDATED,
+        expected_version=created.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    operations.transition(
+        operation.operation_id,
+        OperationState.RUNNING,
+        expected_version=validated.version,
+        now=BASE_TIME + timedelta(seconds=2),
+    )
+    transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+    )
+    events.acknowledge_consumer(
+        operation.operation_id,
+        "client-a",
+        2,
+        lease_seconds=300,
+        now=BASE_TIME + timedelta(seconds=3),
+    )
+    compacted = transport.compact_acknowledged(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+
+    snapshot = transport.snapshot(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+    )
+
+    assert compacted == 2
+    assert snapshot.compacted_through == 2
+    assert snapshot.latest_sequence >= 3
+    assert snapshot.latest_sequence >= snapshot.compacted_through
+    assert snapshot.operation.envelope.operation_id == operation.operation_id
+    assert snapshot.operation.state is OperationState.RUNNING
+    assert snapshot.terminal is False
+
+    operations.close()
+    events.close()
+
+
+def test_transport_snapshot_is_tenant_bound(tmp_path: Path) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation(tenant_id="tenant-a")
+    operations.create(operation, now=BASE_TIME)
+
+    try:
+        with pytest.raises(OperationAccessDenied, match="not accessible"):
+            transport.snapshot(
+                operation.operation_id,
+                tenant_id="tenant-b",
+                consumer_id="client-b",
+            )
+    finally:
+        operations.close()
+        events.close()

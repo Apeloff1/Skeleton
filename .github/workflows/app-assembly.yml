@@ -100,6 +100,8 @@ on:
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
+      - "frontend/services/operationStreamClient.ts"
+      - "scripts/test-operation-stream-client.mjs"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
       - "skeleton/vault/data_governance.py"
@@ -223,7 +225,7 @@ jobs:
           frontend=false
           for path in "${changed[@]}"; do
             case "$path" in
-              frontend/*|skeleton/frontier/operation_stream.py|skeleton/frontier/operation_stream_store.py|backend/core/operation_stream_transport.py|backend/routes/operation_stream.py|.github/workflows/app-assembly.yml)
+              frontend/*|scripts/test-operation-stream-client.mjs|skeleton/frontier/operation_stream.py|skeleton/frontier/operation_stream_store.py|backend/core/operation_stream_transport.py|backend/routes/operation_stream.py|.github/workflows/app-assembly.yml)
                 frontend=true
                 ;;
             esac
@@ -363,6 +365,10 @@ jobs:
           yarn typecheck
           yarn test:operation-stream
           yarn export:web
+
+      - name: Run operation stream client contract tests
+        if: steps.scope.outputs.frontend == 'true'
+        run: node --test scripts/test-operation-stream-client.mjs
 
       - name: Compile assembly surface
         if: steps.scope.outputs.full == 'true'

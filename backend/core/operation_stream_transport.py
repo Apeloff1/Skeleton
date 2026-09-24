@@ -68,6 +68,22 @@ class CancellationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class OperationStreamSnapshot:
+    operation: StoredOperation
+    compacted_through: int
+    latest_sequence: int
+    terminal: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation": self.operation.as_dict(),
+            "compacted_through": self.compacted_through,
+            "latest_sequence": self.latest_sequence,
+            "terminal": self.terminal,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class OperationStreamBatch:
     operation: StoredOperation
     events: tuple[StreamEvent, ...]
@@ -273,6 +289,33 @@ class OperationStreamTransport:
             after_sequence=after_sequence,
         )
 
+    def snapshot(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        consumer_id: str | None = None,
+        consumer_lease_seconds: int = 300,
+    ) -> OperationStreamSnapshot:
+        """Return canonical current state plus a safe stream cursor for resync."""
+
+        self._authorized_operation(operation_id, tenant_id=tenant_id)
+        if consumer_id is not None:
+            self.event_store.register_consumer(
+                operation_id,
+                consumer_id,
+                lease_seconds=consumer_lease_seconds,
+            )
+        self.dispatch_pending(operation_id, tenant_id=tenant_id)
+        head = self.event_store.head(operation_id)
+        operation = self._authorized_operation(operation_id, tenant_id=tenant_id)
+        return OperationStreamSnapshot(
+            operation=operation,
+            compacted_through=int(head["compacted_through"]),
+            latest_sequence=int(head["latest_sequence"]),
+            terminal=bool(operation.terminal or head["terminal"]),
+        )
+
     def acknowledge(
         self,
         operation_id: str,
@@ -345,6 +388,7 @@ __all__ = [
     "CancellationResult",
     "OperationAccessDenied",
     "OperationStreamBatch",
+    "OperationStreamSnapshot",
     "OperationStreamTransport",
     "OperationTransportConflict",
     "StreamConsumerCheckpoint",
