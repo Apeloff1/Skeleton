@@ -22,6 +22,7 @@ from core.ai_provider import (
     ProviderRegistry,
     ProviderRequest,
 )
+from skeleton.context.instruction_policy import InstructionPolicy
 import uuid
 import base64
 import asyncio
@@ -32,6 +33,12 @@ ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
 router = APIRouter(prefix="/imagine", tags=["Image Generation"])
+
+IMAGE_PROMPT_ENHANCEMENT_POLICY = InstructionPolicy(
+    policy_id="backend.image.prompt-enhancement",
+    version="1",
+    instructions="You are an expert at creating detailed image prompts.",
+)
 
 # ── Style presets for one-tap, on-brand cover/key-art generation ──────────────
 STYLE_PRESETS = {
@@ -450,7 +457,7 @@ Output only the enhanced prompt, no explanations."""
         adapter = ProviderRegistry.from_env().require_active()
         response = await adapter.generate(
             ProviderRequest(
-                instructions="You are an expert at creating detailed image prompts.",
+                instructions=IMAGE_PROMPT_ENHANCEMENT_POLICY.instructions,
                 prompt=enhancement_prompt,
                 purpose="image-prompt-enhancement",
             )
