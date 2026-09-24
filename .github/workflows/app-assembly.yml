@@ -74,6 +74,8 @@ on:
       - "skeleton/api/engine_routes.py"
       - "skeleton/config/settings.py"
       - "skeleton/api/server.py"
+      - "skeleton/api/middleware.py"
+      - "skeleton/testing/test_engine_gate_policy.py"
       - "backend/core/engine_client.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_engine_execution_service.py"
@@ -384,7 +386,7 @@ jobs:
           skeleton/contracts/verification.py skeleton/intelligence/verification_policy.py skeleton/intelligence/verification_runtime.py
           skeleton/contracts/ai_execution.py skeleton/persistence/execution_repository.py skeleton/intelligence/execution_runtime.py
           skeleton/api/engine_authority.py skeleton/api/engine_runtime.py skeleton/api/engine_service.py skeleton/api/engine_routes.py
-          skeleton/config/settings.py skeleton/api/server.py backend/core/engine_client.py backend/core/ai_provider.py
+          skeleton/config/settings.py skeleton/api/server.py skeleton/api/middleware.py backend/core/engine_client.py backend/core/ai_provider.py
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py
@@ -483,6 +485,7 @@ jobs:
           skeleton/testing/test_execution_schema_parity.py
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_engine_execution_service.py
+          skeleton/testing/test_engine_gate_policy.py
           skeleton/testing/test_instruction_policy.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
