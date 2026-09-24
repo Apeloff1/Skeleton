@@ -108,6 +108,8 @@ on:
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
+      - "frontend/services/operationStreamClient.ts"
+      - "scripts/test-operation-stream-client.mjs"
       - "backend/tests/test_operation_stream_route.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
