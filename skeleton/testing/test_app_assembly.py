@@ -34,6 +34,9 @@ def test_manifest_is_self_consistent():
     assert manifest.construction["operation_contract"] == "skeleton/contracts/operation.py"
     assert manifest.construction["stream_contract"] == "skeleton/frontier/operation_stream.py"
     assert manifest.construction["stream_store"] == "skeleton/frontier/operation_stream_store.py"
+    assert manifest.construction["engine_execution_owner"] == "skeleton"
+    assert manifest.construction["provider_credential_owner"] == "skeleton"
+    assert manifest.construction["backend_provider_mode"] == "engine-client-only"
 
     for service in manifest.services:
         assert set(service.depends_on).issubset(manifest.service_names)
@@ -72,6 +75,7 @@ def test_runtime_preflight_reports_missing_environment_without_mutating_process(
     assert "env:SKL_MONGO_URI" in failures
     assert "env:MONGO_INITDB_ROOT_PASSWORD" in failures
     assert "env:JWT_SECRET" in failures
+    assert "env:GF_SEAL_SECRET" in failures
     assert "runtime:docker" not in failures
 
 
