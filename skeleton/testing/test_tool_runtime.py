@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -12,6 +13,7 @@ from skeleton.skills.tool_contract import (
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
+    approval_ref_for_request,
 )
 from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import (
@@ -67,6 +69,13 @@ def _request(
     )
 
 
+def _approved(request: ToolExecutionRequest) -> ToolExecutionRequest:
+    return replace(
+        request,
+        approval_ref=approval_ref_for_request(request),
+    )
+
+
 @pytest.mark.parametrize(
     "tool_id",
     ["", "Repo.Read", "../escape", "has space", "x" * 129],
@@ -92,7 +101,7 @@ def test_request_digest_is_order_independent_and_secret_free() -> None:
         tenant_id="tenant-a",
         tool_id="repo.read",
         idempotency_key="k",
-        arguments={"b": 2, "a": 1},
+        arguments={"token": "super-secret", "b": 2, "a": 1},
         requested_at=_now(),
     )
     right = ToolExecutionRequest(
@@ -101,11 +110,13 @@ def test_request_digest_is_order_independent_and_secret_free() -> None:
         tenant_id="tenant-a",
         tool_id="repo.read",
         idempotency_key="k2",
-        arguments={"a": 1, "b": 2},
+        arguments={"a": 1, "b": 2, "token": "super-secret"},
         requested_at=_now(),
     )
     assert left.arguments_digest == right.arguments_digest
-    assert "a" not in left.arguments_digest
+    assert len(left.arguments_digest) == 64
+    assert all(char in "0123456789abcdef" for char in left.arguments_digest)
+    assert "super-secret" not in left.arguments_digest
 
 
 def test_exact_idempotent_replay_executes_once_and_returns_same_receipt() -> None:
@@ -175,15 +186,12 @@ def test_approved_irreversible_tool_retains_approval_lineage() -> None:
         ),
         lambda request: "deletion-receipt:1",
     )
-    request = _request(
-        tool_id="repo.delete",
-        approval_ref="approval:abc",
-    )
+    request = _approved(_request(tool_id="repo.delete"))
 
     receipt = runtime.execute(request, now=_now())
 
     assert receipt.status is ToolExecutionStatus.SUCCEEDED
-    assert receipt.approval_ref == "approval:abc"
+    assert receipt.approval_ref == approval_ref_for_request(request)
     assert receipt.arguments_digest == request.arguments_digest
 
 
@@ -516,22 +524,21 @@ def test_sync_approval_required_denial_can_resume_with_approval() -> None:
     )
 
     denied = runtime.execute(pending, now=_now())
-    approved = runtime.execute(
+    approved_request = _approved(
         _request(
             operation_id=operation_id,
             request_id=pending.request_id,
             tool_id="repo.write",
             key="approval-resume",
-            approval_ref="approval:1",
-        ),
-        now=_now(),
+        )
     )
+    approved = runtime.execute(approved_request, now=_now())
 
     assert denied.status is ToolExecutionStatus.DENIED
     assert denied.error_code == "approval_required"
     assert approved.status is ToolExecutionStatus.SUCCEEDED
-    assert approved.approval_ref == "approval:1"
-    assert calls == ["approval:1"]
+    assert approved.approval_ref == approval_ref_for_request(approved_request)
+    assert calls == [approved_request.approval_ref]
 
 
 @pytest.mark.asyncio
@@ -559,22 +566,21 @@ async def test_async_approval_required_denial_can_resume_with_approval() -> None
     )
 
     denied = await runtime.execute(pending, now=_now())
-    approved = await runtime.execute(
+    approved_request = _approved(
         _request(
             operation_id=operation_id,
             request_id=pending.request_id,
             tool_id="repo.write",
             key="approval-resume-async",
-            approval_ref="approval:1",
-        ),
-        now=_now(),
+        )
     )
+    approved = await runtime.execute(approved_request, now=_now())
 
     assert denied.status is ToolExecutionStatus.DENIED
     assert denied.error_code == "approval_required"
     assert approved.status is ToolExecutionStatus.SUCCEEDED
-    assert approved.approval_ref == "approval:1"
-    assert calls == ["approval:1"]
+    assert approved.approval_ref == approval_ref_for_request(approved_request)
+    assert calls == [approved_request.approval_ref]
 
 
 
