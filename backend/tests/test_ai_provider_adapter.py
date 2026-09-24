@@ -94,7 +94,7 @@ async def test_openai_adapter_rejects_empty_model_output() -> None:
         client=_FakeClient(_FakeResponses(text="   ")),
     )
 
-    with pytest.raises(ProviderInvocationError, match="empty response"):
+    with pytest.raises(ProviderInvocationError, match="no normalized output"):
         await adapter.generate(ProviderRequest(instructions="rules", prompt="hello"))
 
 

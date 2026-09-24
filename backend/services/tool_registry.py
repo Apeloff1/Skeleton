@@ -499,10 +499,22 @@ class _CompatibilityResultStore:
             return dict(item)
 
 
-_CANONICAL_RUNTIME = AsyncToolRuntime()
-_CANONICAL_RESULT_STORE = _CompatibilityResultStore()
-_CANONICAL_INIT_LOCK = asyncio.Lock()
+_CANONICAL_RUNTIME: AsyncToolRuntime | None = None
+_CANONICAL_RESULT_STORE: _CompatibilityResultStore | None = None
+_CANONICAL_INIT_LOCK: asyncio.Lock | None = None
+_CANONICAL_INIT_LOOP: asyncio.AbstractEventLoop | None = None
 _CANONICAL_READY = False
+
+
+def _get_canonical_init_lock() -> asyncio.Lock:
+    """Create the initialization lock only inside the active event loop."""
+
+    global _CANONICAL_INIT_LOCK, _CANONICAL_INIT_LOOP
+    loop = asyncio.get_running_loop()
+    if _CANONICAL_INIT_LOCK is None or _CANONICAL_INIT_LOOP is not loop:
+        _CANONICAL_INIT_LOCK = asyncio.Lock()
+        _CANONICAL_INIT_LOOP = loop
+    return _CANONICAL_INIT_LOCK
 
 
 async def _result_postcondition(
@@ -511,7 +523,10 @@ async def _result_postcondition(
 ) -> bool:
     if result_ref is None:
         return False
-    result = await _CANONICAL_RESULT_STORE.get(result_ref)
+    store = _CANONICAL_RESULT_STORE
+    if store is None:
+        return False
+    result = await store.get(result_ref)
     return bool(result is not None and result.get("ok") is not False)
 
 
@@ -520,7 +535,8 @@ async def _package_compensator(
     result_ref: str | None,
 ) -> str:
     if result_ref is not None:
-        result = await _CANONICAL_RESULT_STORE.get(result_ref)
+        store = _CANONICAL_RESULT_STORE
+        result = await store.get(result_ref) if store is not None else None
         if result is not None:
             for artifact in result.get("artifacts", []):
                 if not isinstance(artifact, dict):
@@ -542,12 +558,18 @@ async def _package_compensator(
 
 
 async def _ensure_canonical_runtime() -> None:
-    global _CANONICAL_READY
+    global _CANONICAL_RUNTIME, _CANONICAL_RESULT_STORE, _CANONICAL_READY
     if _CANONICAL_READY:
         return
-    async with _CANONICAL_INIT_LOCK:
+    async with _get_canonical_init_lock():
         if _CANONICAL_READY:
             return
+        if _CANONICAL_RUNTIME is None:
+            _CANONICAL_RUNTIME = AsyncToolRuntime()
+        if _CANONICAL_RESULT_STORE is None:
+            _CANONICAL_RESULT_STORE = _CompatibilityResultStore()
+        runtime = _CANONICAL_RUNTIME
+        store = _CANONICAL_RESULT_STORE
         for name, fn in TOOLS.items():
             manifest = _TOOL_MANIFESTS[name]
 
@@ -562,9 +584,9 @@ async def _ensure_canonical_runtime() -> None:
                     result = {"ok": False, "error": "tool_denied"}
                 except Exception:
                     result = {"ok": False, "error": "tool_failed"}
-                return await _CANONICAL_RESULT_STORE.put(request, result)
+                return await store.put(request, result)
 
-            await _CANONICAL_RUNTIME.register(
+            await runtime.register(
                 manifest,
                 handler,
                 postcondition=_result_postcondition,
@@ -608,7 +630,10 @@ async def invoke_canonical(
         approval_ref=approval_ref,
         delegated_authority_ref=delegated_authority_ref,
     )
-    receipt = await _CANONICAL_RUNTIME.execute(request)
+    runtime = _CANONICAL_RUNTIME
+    if runtime is None:
+        raise RuntimeError("canonical tool runtime failed to initialize")
+    receipt = await runtime.execute(request)
 
     if receipt.status is ToolExecutionStatus.DENIED:
         return {
@@ -639,6 +664,23 @@ async def invoke_canonical(
     return result
 
 
+def _legacy_policy_preflight(tool: str, params: dict) -> dict | None:
+    """Preserve deterministic adapter denials before any compatibility side effect."""
+
+    try:
+        if tool == "compile_code":
+            _SANDBOX_POLICY.compile_request(params)
+        elif tool == "package_build":
+            _ARTIFACT_POLICY.package_request(params)
+        elif tool == "mongo_query":
+            _DATABASE_POLICY.query_request(params)
+        elif tool == "web_search":
+            _NETWORK_POLICY.search_request(params)
+    except ToolAdapterDenied:
+        return {"ok": False, "error": "tool_denied"}
+    return None
+
+
 async def invoke(
     tool: str,
     params: dict,
@@ -660,6 +702,11 @@ async def invoke(
             "available": list(TOOLS.keys()),
         }
 
+    normalized_params = dict(params or {})
+    denied = _legacy_policy_preflight(tool, normalized_params)
+    if denied is not None:
+        return denied
+
     rid = request_id or str(uuid4())
     op_id = operation_id or str(uuid4())
     if manifest.effect is not ToolEffect.READ_ONLY and not idempotency_key:
@@ -671,7 +718,7 @@ async def invoke(
     key = idempotency_key or rid
     return await invoke_canonical(
         tool,
-        params or {},
+        normalized_params,
         operation_id=op_id,
         tenant_id=tenant_id,
         idempotency_key=key,

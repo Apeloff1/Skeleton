@@ -410,7 +410,7 @@ async def test_provider_failure_releases_shared_admission_lease() -> None:
         admission_runtime=runtime,
     )
 
-    with pytest.raises(ProviderInvocationError, match="request failed"):
+    with pytest.raises(ProviderInvocationError, match="deadline exceeded") as excinfo:
         await adapter.generate(
             ProviderRequest(
                 instructions="rules",
@@ -421,6 +421,7 @@ async def test_provider_failure_releases_shared_admission_lease() -> None:
             )
         )
 
+    assert "upstream timeout detail" not in str(excinfo.value)
     assert failing.calls == 1
     assert runtime.pressure.active_operations == 0
 

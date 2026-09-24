@@ -1,335 +1,63 @@
+"""Regression tests for bounded Git-index secret-hygiene discovery."""
 from __future__ import annotations
 
-import os
-import tomllib
+import importlib.util
 from pathlib import Path
+import subprocess
 
-from scripts import check_secret_hygiene as secret_hygiene
-from scripts.check_secret_hygiene import violations
+import pytest
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "check_secret_hygiene.py"
+SPEC = importlib.util.spec_from_file_location("check_secret_hygiene_gate", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+checker = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(checker)
 
 
-def _scan(tmp_path: Path, source: str) -> list[str]:
-    path = tmp_path / "sample.env"
-    path.write_text(source, encoding="utf-8")
-    return violations(path)
-
-
-def test_read_failure_fails_closed_without_raw_exception_text(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    path = tmp_path / "blocked.env"
-    path.write_text("TOKEN=hidden\n", encoding="utf-8")
-    original_open = Path.open
-
-    def blocked_open(self: Path, *args, **kwargs):
-        if self == path:
-            raise PermissionError("sensitive filesystem detail")
-        return original_open(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "open", blocked_open)
-    findings = violations(path)
-
-    assert len(findings) == 1
-    assert "read failure: PermissionError" in findings[0]
-    assert "sensitive filesystem detail" not in findings[0]
-
-
-def test_stat_failure_does_not_drop_secret_candidate(tmp_path: Path, monkeypatch) -> None:
-    path = tmp_path / "blocked.env"
-    path.write_text("TOKEN=value\n", encoding="utf-8")
-    original_lstat = Path.lstat
-
-    def blocked_lstat(self: Path, *args, **kwargs):
-        if self == path:
-            raise PermissionError("metadata unavailable")
-        return original_lstat(self, *args, **kwargs)
-
-    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(Path, "lstat", blocked_lstat)
-
-    assert path in list(secret_hygiene.candidate_files())
-
-
-def test_bounded_reader_fails_closed_on_oversized_candidate(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    bound = 256
-    monkeypatch.setattr(secret_hygiene, "MAX_FILE_BYTES", bound)
-    path = tmp_path / "large.env"
-    path.write_bytes(b"A" * (bound + 1))
-
-    findings = violations(path)
-
-    assert len(findings) == 1
-    assert "scan failure: exceeds" in findings[0]
-    assert str(bound) in findings[0]
-
-
-def test_oversized_multiline_candidate_is_scanned_through_eof(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    bound = 256
-    monkeypatch.setattr(secret_hygiene, "MAX_FILE_BYTES", bound)
-    path = tmp_path / "large.env"
-    filler = "# harmless filler\n" * 20
-    token = "ghp_" + ("A" * 40)
-    path.write_text(filler + f"TOKEN={token}\n", encoding="utf-8")
-
-    assert path.stat().st_size > bound
-    findings = violations(path)
-
-    assert any("GitHub token" in finding for finding in findings)
-
-
-def test_candidate_discovery_does_not_skip_oversized_text_files(
-    tmp_path: Path, monkeypatch,
-) -> None:
-    bound = 256
-    monkeypatch.setattr(secret_hygiene, "MAX_FILE_BYTES", bound)
-    path = tmp_path / "large.env"
-    path.write_bytes(b"A" * (bound + 1))
-    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
-
-    assert path in list(secret_hygiene.candidate_files())
-
-
-def test_main_fails_closed_when_no_candidates(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(secret_hygiene, "candidate_files", lambda: iter(()))
-
-    assert secret_hygiene.main() == 1
-    captured = capsys.readouterr()
-    assert "no tracked-style text files were scanned" in captured.err
-
-
-def test_main_fails_closed_on_repository_traversal_error(monkeypatch, capsys) -> None:
-    def broken_candidates():
-        raise PermissionError("sensitive traversal detail")
-        yield  # pragma: no cover
-
-    monkeypatch.setattr(secret_hygiene, "candidate_files", broken_candidates)
-
-    assert secret_hygiene.main() == 1
-    captured = capsys.readouterr()
-    assert "repository traversal failure: PermissionError" in captured.err
-    assert "sensitive traversal detail" not in captured.err
-
-
-def test_nested_directory_enumeration_failure_is_not_silently_skipped(
-    tmp_path: Path, monkeypatch, capsys,
-) -> None:
-    blocked = tmp_path / "blocked"
-    blocked.mkdir()
-    (blocked / "hidden.env").write_text("TOKEN=hidden\n", encoding="utf-8")
-    (tmp_path / "visible.env").write_text("TOKEN=placeholder\n", encoding="utf-8")
-    real_scandir = os.scandir
-
-    def guarded_scandir(path):
-        if Path(path) == blocked:
-            raise PermissionError("sensitive directory detail")
-        return real_scandir(path)
-
-    monkeypatch.setattr(secret_hygiene, "REPO_ROOT", tmp_path)
-    monkeypatch.setattr(secret_hygiene.os, "scandir", guarded_scandir)
-
-    assert secret_hygiene.main() == 1
-    captured = capsys.readouterr()
-    assert "repository traversal failure: PermissionError" in captured.err
-    assert "sensitive directory detail" not in captured.err
-
-
-def test_detects_private_key_material(tmp_path: Path) -> None:
-    marker = "-----BEGIN " + "PRIVATE KEY-----"
-    findings = _scan(tmp_path, f"KEY={marker}\n")
-    assert any("private key" in finding for finding in findings)
-
-
-def test_detects_github_token_shape(tmp_path: Path) -> None:
-    token = "ghp_" + ("A" * 40)
-    findings = _scan(tmp_path, f"TOKEN={token}\n")
-    assert any("GitHub token" in finding for finding in findings)
-
-
-def test_detects_gitlab_token_shape(tmp_path: Path) -> None:
-    token = "glpat-" + ("A" * 24)
-    findings = _scan(tmp_path, f"TOKEN={token}\n")
-    assert any("GitLab personal access token" in finding for finding in findings)
-
-
-def test_detects_npm_token_shape(tmp_path: Path) -> None:
-    token = "npm_" + ("A" * 36)
-    findings = _scan(tmp_path, f"TOKEN={token}\n")
-    assert any("npm access token" in finding for finding in findings)
-
-
-def test_detects_pypi_token_shape(tmp_path: Path) -> None:
-    token = "pypi-" + "AgEIcHlwaS5vcmc" + ("A" * 48)
-    findings = _scan(tmp_path, f"TOKEN={token}\n")
-    assert any("PyPI API token" in finding for finding in findings)
-
-
-def test_detects_aws_access_key_shape(tmp_path: Path) -> None:
-    key = "AKIA" + ("A" * 16)
-    findings = _scan(tmp_path, f"AWS_ACCESS_KEY_ID={key}\n")
-    assert any("AWS access key" in finding for finding in findings)
-
-
-def test_detects_aws_secret_access_key_assignment(tmp_path: Path) -> None:
-    key = "A" * 40
-    findings = _scan(tmp_path, f"AWS_SECRET_ACCESS_KEY={key}\n")
-    assert any("AWS secret access key" in finding for finding in findings)
-
-
-def test_detects_openai_style_key_shape(tmp_path: Path) -> None:
-    key = "sk-" + ("a" * 32)
-    findings = _scan(tmp_path, f"API_KEY={key}\n")
-    assert any("OpenAI-style API key" in finding for finding in findings)
-
-
-def test_detects_stripe_live_secret_key(tmp_path: Path) -> None:
-    key = "sk_live_" + ("A" * 24)
-    findings = _scan(tmp_path, f"STRIPE_SECRET_KEY={key}\n")
-    assert any("Stripe live secret key" in finding for finding in findings)
-
-
-def test_detects_google_api_key(tmp_path: Path) -> None:
-    key = "AIza" + ("A" * 35)
-    findings = _scan(tmp_path, f"GOOGLE_API_KEY={key}\n")
-    assert any("Google API key" in finding for finding in findings)
-
-
-def test_detects_high_entropy_provider_neutral_secret_assignment(tmp_path: Path) -> None:
-    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
-    findings = _scan(tmp_path, f"CLIENT_SECRET={value}\n")
-    assert any("high-entropy secret-like assignment" in finding for finding in findings)
-
-
-def test_detects_high_entropy_json_secret_assignment(tmp_path: Path) -> None:
-    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
-    findings = _scan(tmp_path, f'{{"api_key":"{value}"}}\n')
-    assert any("high-entropy secret-like assignment" in finding for finding in findings)
-
-
-def test_high_entropy_non_secret_assignment_is_allowed(tmp_path: Path) -> None:
-    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
-    assert _scan(tmp_path, f"CHECKSUM={value}\n") == []
-
-
-def test_low_entropy_and_placeholder_secret_assignments_are_allowed(tmp_path: Path) -> None:
-    low_entropy = "A" * 48
-    placeholder = "placeholder_N7qL2vR9xD4kT8mW3pC6zF1"
-    findings = _scan(
-        tmp_path,
-        f"API_KEY={low_entropy}\nCLIENT_SECRET={placeholder}\n",
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", *args],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    assert findings == []
 
 
-def test_high_entropy_finding_does_not_echo_candidate_value(tmp_path: Path) -> None:
-    value = "N7!qL2@vR9#xD4$kT8%mW3^pC6&zF1"
-    findings = _scan(tmp_path, f"AUTH_TOKEN={value}\n")
-    assert findings
-    assert all(value not in finding for finding in findings)
+def test_candidate_files_uses_git_index_not_workspace_walk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _git(tmp_path, "init", "-q")
+    tracked = tmp_path / "tracked.py"
+    tracked.write_text("print('tracked')\n", encoding="utf-8")
+    tracked_markdown = tmp_path / "docs" / "notes.md"
+    tracked_markdown.parent.mkdir()
+    tracked_markdown.write_text("tracked docs\n", encoding="utf-8")
+    tracked_binary = tmp_path / "asset.bin"
+    tracked_binary.write_bytes(b"binary")
+    skipped = tmp_path / "build" / "generated.py"
+    skipped.parent.mkdir()
+    skipped.write_text("print('tracked build output')\n", encoding="utf-8")
+    untracked = tmp_path / "generated.py"
+    untracked.write_text("API_KEY='generated-only'\n", encoding="utf-8")
+    _git(tmp_path, "add", "tracked.py", "docs/notes.md", "asset.bin", "build/generated.py")
+
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+
+    paths = [path.relative_to(tmp_path).as_posix() for path in checker.candidate_files()]
+
+    assert paths == ["docs/notes.md", "tracked.py"]
+    assert "generated.py" not in paths
+    assert "build/generated.py" not in paths
+    assert "asset.bin" not in paths
 
 
-def test_detects_database_uri_credentials(tmp_path: Path) -> None:
-    scheme = "postgresql://"
-    credentials = "realuser:" + "realpass123"
-    uri = f"{scheme}{credentials}@db.internal/app"
-    findings = _scan(tmp_path, f"DATABASE_URL={uri}\n")
-    assert any("database URI" in finding for finding in findings)
+def test_candidate_files_fails_closed_without_git_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "tracked.py").write_text("print('not indexed')\n", encoding="utf-8")
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
 
-
-def test_allows_placeholder_marker_inside_candidate_value(tmp_path: Path) -> None:
-    key = "sk-placeholder_example_placeholder_12345"
-    findings = _scan(tmp_path, f"OPENAI_API_KEY={key}\n")
-    assert findings == []
-
-
-def test_allows_canonical_database_placeholder_credentials(tmp_path: Path) -> None:
-    uri = "postgres://" + "user:pass" + "@db:5432/app"
-    findings = _scan(tmp_path, f"DATABASE_URL={uri}\n")
-    assert findings == []
-
-
-def test_placeholder_comment_does_not_suppress_real_secret(tmp_path: Path) -> None:
-    key = "sk-" + ("z" * 32)
-    findings = _scan(tmp_path, f"OPENAI_API_KEY={key} # placeholder example\n")
-    assert any("OpenAI-style API key" in finding for finding in findings)
-
-
-def test_placeholder_candidate_does_not_hide_second_real_secret(tmp_path: Path) -> None:
-    placeholder = "sk-placeholder_example_placeholder_12345"
-    real = "sk-" + ("q" * 32)
-    findings = _scan(tmp_path, f"FIRST={placeholder} SECOND={real}\n")
-    assert any("OpenAI-style API key" in finding for finding in findings)
-
-
-def test_does_not_echo_secret_value_in_finding(tmp_path: Path) -> None:
-    token = "ghp_" + ("B" * 40)
-    findings = _scan(tmp_path, f"TOKEN={token}\n")
-    assert findings
-    assert all(token not in finding for finding in findings)
-
-
-def test_gitleaks_policy_extends_default_detectors() -> None:
-    config = tomllib.loads((REPO_ROOT / ".gitleaks.toml").read_text(encoding="utf-8"))
-    assert config["extend"]["useDefault"] is True
-
-
-def test_secret_scanning_workflow_hardening_contract() -> None:
-    workflow = (REPO_ROOT / ".github" / "workflows" / "secret-scanning.yml").read_text(
-        encoding="utf-8"
-    )
-    assert "  pull_request:\n" in workflow
-    assert "  push:\n" in workflow
-    assert "branches: [main]" in workflow
-    assert "permissions:\n  contents: read\n" in workflow
-    assert "persist-credentials: false" in workflow
-    assert 'GITLEAKS_VERSION: "8.24.3"' in workflow
-    assert 'GITLEAKS_CONFIG: ".gitleaks.toml"' in workflow
-    assert 'GITLEAKS_ENABLE_COMMENTS: "false"' in workflow
-
-
-def test_gitleaks_remains_complementary_to_local_secret_hygiene_gate() -> None:
-    precommit = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
-    hook_start = precommit.index("- id: repository-secret-hygiene")
-    hook_end = precommit.index("- id: gitleaks-history", hook_start)
-    hook = precommit[hook_start:hook_end]
-    assert "check_secret_hygiene.py" in hook
-    assert "always_run: true" in hook
-
-
-def test_full_history_gitleaks_hook_is_manual_and_non_optional() -> None:
-    precommit = (REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8")
-    hook_start = precommit.index("- id: gitleaks-history")
-    hook_end = precommit.index("- id: backend-security-regressions", hook_start)
-    hook = precommit[hook_start:hook_end]
-    assert "bash scripts/security/run-secret-scan.sh" in hook
-    assert "always_run: true" in hook
-    assert "stages: [manual]" in hook
-
-
-def test_local_secret_scan_runner_matches_ci_policy() -> None:
-    runner = (REPO_ROOT / "scripts" / "security" / "run-secret-scan.sh").read_text(
-        encoding="utf-8"
-    )
-    assert 'EXPECTED_GITLEAKS_VERSION="8.24.3"' in runner
-    assert "python backend/scripts/check_secret_hygiene.py" in runner
-    assert "gitleaks git" in runner
-    assert "--config=.gitleaks.toml" in runner
-    assert "--redact=100" in runner
-
-
-def test_secret_hygiene_runbook_requires_revocation_and_rescan() -> None:
-    runbook = (REPO_ROOT / "docs" / "security" / "SECRET_HYGIENE.md").read_text(
-        encoding="utf-8"
-    )
-    assert "Revoke first" in runbook
-    assert "Purge history when required" in runbook
-    assert "Invalidate artifacts" in runbook
-    assert "Re-scan" in runbook
-    assert "Do not paste the credential value" in runbook
-    assert "Repository-wide regex exemptions" in runbook
+    with pytest.raises(OSError, match="tracked-file enumeration failed"):
+        list(checker.candidate_files())

@@ -66,7 +66,7 @@ def test_timeout_burst_is_bounded_and_sanitized() -> None:
     assert responses.calls == 32
     assert len(outcomes) == 32
     assert all(isinstance(outcome, ProviderInvocationError) for outcome in outcomes)
-    assert all(str(outcome) == "model provider request failed" for outcome in outcomes)
+    assert all(str(outcome) == "model provider deadline exceeded" for outcome in outcomes)
     assert all(secret not in str(outcome) for outcome in outcomes)
 
 

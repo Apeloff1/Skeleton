@@ -1,4 +1,4 @@
-"""Fail CI when tracked-style text files contain high-confidence secret material.
+"""Fail CI when Git-tracked text files contain high-confidence secret material.
 
 This repository-native gate intentionally focuses on patterns with low false
 positive rates so it can run on every pull request without external services.
@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
 from typing import Iterable
 
@@ -178,39 +179,57 @@ def _is_text_candidate(path: Path) -> bool:
 
 
 def candidate_files() -> Iterable[Path]:
-    """Yield bounded text candidates without hiding traversal or metadata loss.
+    """Yield Git-tracked text candidates with bounded, fail-closed discovery.
 
-    Directory enumeration uses ``os.scandir`` instead of ``Path.rglob`` so an
-    unreadable subtree raises into ``main`` and blocks the gate. Symlinks are not
-    followed. If metadata for an entry cannot be read, that path is still yielded
-    so ``violations`` produces a sanitized fail-closed finding.
+    Security scanning is concerned with material that can land in the repository.
+    Enumerating the Git index avoids recursively walking generated CI workspace
+    state while preserving coverage of every tracked candidate. Index discovery
+    itself is fail closed: an unavailable or malformed repository cannot silently
+    produce an empty scan.
     """
-    pending = [REPO_ROOT]
-    while pending:
-        directory = pending.pop()
-        with os.scandir(directory) as entries:
-            for entry in entries:
-                path = Path(entry.path)
-                if path.name in SKIP_DIRS:
-                    continue
-                try:
-                    metadata = path.lstat()
-                except OSError:
-                    yield path
-                    continue
-                if stat.S_ISLNK(metadata.st_mode):
-                    continue
-                if stat.S_ISDIR(metadata.st_mode):
-                    pending.append(path)
-                    continue
-                if not stat.S_ISREG(metadata.st_mode):
-                    continue
-                if not _is_text_candidate(path):
-                    continue
-                # Oversized tracked-style candidates must still reach the
-                # bounded reader. Silently skipping them lets file padding
-                # suppress secret scanning.
-                yield path
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "-z", "--cached"],
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise OSError("tracked-file enumeration failed") from exc
+
+    if completed.returncode != 0:
+        raise OSError("tracked-file enumeration failed")
+
+    root = REPO_ROOT.resolve()
+    for raw_relative in completed.stdout.split(b"\0"):
+        if not raw_relative:
+            continue
+        relative_text = os.fsdecode(raw_relative)
+        relative = Path(relative_text)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise OSError("tracked-file enumeration produced an unsafe path")
+        if any(part in SKIP_DIRS for part in relative.parts[:-1]):
+            continue
+
+        path = root / relative
+        try:
+            metadata = path.lstat()
+        except OSError:
+            # Preserve fail-closed handling in ``violations`` for tracked paths
+            # whose checkout metadata cannot be read.
+            yield path
+            continue
+
+        # A tracked symlink's target is not repository file content and following
+        # it could escape the trusted checkout. Gitlink/directories are likewise
+        # outside this file scanner's responsibility.
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+            continue
+        if not _is_text_candidate(path):
+            continue
+        yield path
 
 
 def _is_placeholder(candidate: str) -> bool:
@@ -287,7 +306,7 @@ def main() -> int:
         findings.append(f"repository traversal failure: {type(exc).__name__}")
 
     if scanned == 0:
-        findings.append("scanner coverage failure: no tracked-style text files were scanned")
+        findings.append("scanner coverage failure: no Git-tracked text files were scanned")
 
     if findings:
         print("Potential committed secrets detected:", file=sys.stderr)
@@ -298,7 +317,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    print(f"Secret hygiene gate passed across {scanned} tracked-style text files.")
+    print(f"Secret hygiene gate passed across {scanned} Git-tracked text files.")
     return 0
 
 
