@@ -26,7 +26,13 @@ from typing import Optional
 from core.exec_guard import execution_disabled_message, require_execution_allowed
 
 ARTIFACTS_ROOT = Path("/app/backend/data/build_artifacts")
-ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
+
+
+def _ensure_artifacts_root() -> Path:
+    """Create the artifact root only when an artifact write is authorized."""
+
+    ARTIFACTS_ROOT.mkdir(parents=True, exist_ok=True)
+    return ARTIFACTS_ROOT
 
 # ─── Android toolchain detection ───
 ANDROID_SDK = Path(os.environ.get("ANDROID_SDK_ROOT", "/opt/android-sdk"))
@@ -152,7 +158,7 @@ def build_zip(build: dict) -> dict:
             "error": execution_disabled_message("Binary artifact packaging"),
         }
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    out_path = ARTIFACTS_ROOT / f"{build_id}.zip"
+    out_path = _ensure_artifacts_root() / f"{build_id}.zip"
     file_count = 0
     total_bytes = 0
     sha256 = hashlib.sha256()
@@ -810,7 +816,7 @@ def build_apk(build: dict) -> dict:
             "error": execution_disabled_message("APK packaging"),
         }
     build_id = _safe_build_id(build.get("build_id", "unknown"))
-    out_path = ARTIFACTS_ROOT / f"{build_id}.apk"
+    out_path = _ensure_artifacts_root() / f"{build_id}.apk"
     is_real = False
     sig_info = ""
     file_count = 0
