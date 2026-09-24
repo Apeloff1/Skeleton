@@ -10,6 +10,7 @@ clients.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import logging
 import re
 from typing import Any, Dict, List, Optional
@@ -482,6 +483,12 @@ async def ai_chat(
 
     tenant_id, owner_id = _chat_identity(user)
     try:
+        context_attachment_refs: tuple[str, ...] = ()
+        if request.context:
+            context_attachment_refs = (
+                "ephemeral-context-sha256:"
+                + hashlib.sha256(request.context.encode("utf-8")).hexdigest(),
+            )
         thread, user_message = await conversation_authority.append_user_message(
             request.thread_id,
             tenant_id=tenant_id,
@@ -489,6 +496,7 @@ async def ai_chat(
             content=request.message,
             idempotency_key=request.idempotency_key,
             expected_thread_version=request.expected_thread_version,
+            attachment_refs=context_attachment_refs,
         )
         transcript = await conversation_authority.active_transcript(
             request.thread_id,
