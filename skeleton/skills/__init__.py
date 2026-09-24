@@ -20,6 +20,7 @@ from .tool_receipt_store import (
 from .tool_runtime import (
     AsyncToolRuntime,
     ToolExecutionConflict,
+    ToolExecutionDenied,
     ToolNotFound,
     ToolRuntime,
     ToolRuntimeError,
@@ -45,6 +46,7 @@ __all__ = [
     "ToolManifest",
     "AsyncToolRuntime",
     "ToolExecutionConflict",
+    "ToolExecutionDenied",
     "ToolNotFound",
     "ToolRuntime",
     "ToolRuntimeError",
