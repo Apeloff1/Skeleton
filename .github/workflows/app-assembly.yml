@@ -57,6 +57,11 @@ on:
       - "skeleton/context/sources/**"
       - "skeleton/testing/test_context_source_adapters.py"
       - "skeleton/testing/test_context_provider_binding.py"
+      - "skeleton/contracts/verification.py"
+      - "skeleton/intelligence/verification_policy.py"
+      - "skeleton/intelligence/verification_runtime.py"
+      - "skeleton/testing/test_verification_runtime.py"
+      - "skeleton/testing/test_verification_schema_parity.py"
       - "skeleton/testing/test_instruction_policy.py"
       - "backend/tests/test_instruction_policy_convergence.py"
       - "skeleton/skills/tool_contract.py"
@@ -356,6 +361,7 @@ jobs:
           skeleton/provider_runtime.py skeleton/contracts/operation.py
           skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py
           skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/instruction_policy.py skeleton/context/sources
+          skeleton/contracts/verification.py skeleton/intelligence/verification_policy.py skeleton/intelligence/verification_runtime.py
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py
@@ -447,6 +453,8 @@ jobs:
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_context_source_adapters.py
           skeleton/testing/test_context_provider_binding.py
+          skeleton/testing/test_verification_runtime.py
+          skeleton/testing/test_verification_schema_parity.py
           skeleton/testing/test_instruction_policy.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
