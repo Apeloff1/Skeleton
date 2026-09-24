@@ -1,16 +1,40 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
+
+from skeleton.skills.tool_contract import approval_ref_for_request
 
 
 @pytest.fixture
 def registry():
     import services.tool_registry as tool_registry
     return tool_registry
+
+
+def _approval_for(
+    registry,
+    *,
+    tool: str,
+    params: dict,
+    operation_id: str,
+    idempotency_key: str,
+    tenant_id: str = "legacy-backend",
+) -> str:
+    request = registry.ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        tool_id=tool,
+        idempotency_key=idempotency_key,
+        arguments=dict(params),
+        requested_at=datetime.now(timezone.utc),
+    )
+    return approval_ref_for_request(request)
 
 
 def _reset_canonical(registry):
@@ -157,16 +181,25 @@ async def test_side_effecting_legacy_invoke_requires_idempotency_and_approval(
     assert denied["error"] == "approval_required"
     assert calls == 0
 
+    approved_operation_id = str(uuid4())
+    approved_params = {"build_id": "build-1", "kinds": ["zip"]}
+    approved_ref = _approval_for(
+        registry,
+        tool="package_build",
+        params=approved_params,
+        operation_id=approved_operation_id,
+        idempotency_key="package-approved",
+    )
     approved = await registry.invoke(
         "package_build",
-        {"build_id": "build-1", "kinds": ["zip"]},
-        operation_id=str(uuid4()),
+        approved_params,
+        operation_id=approved_operation_id,
         idempotency_key="package-approved",
-        approval_ref="approval:operator-1",
+        approval_ref=approved_ref,
     )
     assert approved["ok"] is True
     assert approved["receipt"]["status"] == "succeeded"
-    assert approved["receipt"]["approval_ref"] == "approval:operator-1"
+    assert approved["receipt"]["approval_ref"] == approved_ref
     assert calls == 1
 
 
@@ -209,12 +242,21 @@ async def test_failed_package_postcondition_runs_compensation(
         }
 
     monkeypatch.setitem(registry.TOOLS, "package_build", fake_package)
+    operation_id = str(uuid4())
+    params = {"build_id": "build-1", "kinds": ["zip"]}
+    approval_ref = _approval_for(
+        registry,
+        tool="package_build",
+        params=params,
+        operation_id=operation_id,
+        idempotency_key="package-compensate",
+    )
     result = await registry.invoke(
         "package_build",
-        {"build_id": "build-1", "kinds": ["zip"]},
-        operation_id=str(uuid4()),
+        params,
+        operation_id=operation_id,
         idempotency_key="package-compensate",
-        approval_ref="approval:operator-1",
+        approval_ref=approval_ref,
     )
 
     assert result["ok"] is False
