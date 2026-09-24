@@ -124,6 +124,43 @@ def _data_class(value: object) -> str:
     return normalized
 
 
+def _context_snapshot(
+    values: Iterable[tuple[str, str]],
+) -> tuple[tuple[str, str], ...]:
+    if isinstance(values, (str, bytes)):
+        raise ConversationContractError("context_source_snapshot must be an iterable")
+    result: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    previous: str | None = None
+    for raw in values:
+        if not isinstance(raw, (tuple, list)) or len(raw) != 2:
+            raise ConversationContractError(
+                "context_source_snapshot entries must be pairs"
+            )
+        segment_id = _uuid(raw[0], "context_source_snapshot segment_id")
+        digest = _text(
+            raw[1],
+            "context_source_snapshot digest",
+            max_length=64,
+        )
+        if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise ConversationContractError(
+                "context_source_snapshot digest must be lowercase sha256"
+            )
+        if segment_id in seen:
+            raise ConversationContractError(
+                "context_source_snapshot contains duplicate segment ids"
+            )
+        if previous is not None and segment_id <= previous:
+            raise ConversationContractError(
+                "context_source_snapshot must be strictly ordered by segment id"
+            )
+        seen.add(segment_id)
+        previous = segment_id
+        result.append((segment_id, digest))
+    return tuple(result)
+
+
 @dataclass(frozen=True, slots=True)
 class ConversationThread:
     thread_id: str
@@ -197,6 +234,10 @@ class ConversationMessage:
     causal_user_message_id: str | None = None
     operation_id: str | None = None
     ai_result_id: str | None = None
+    context_id: str | None = None
+    context_digest: str | None = None
+    context_source_snapshot: tuple[tuple[str, str], ...] = ()
+    context_compiler_version: str | None = None
     attachment_refs: tuple[str, ...] = ()
     tool_receipt_refs: tuple[str, ...] = ()
     citation_refs: tuple[str, ...] = ()
@@ -245,6 +286,36 @@ class ConversationMessage:
         if self.ai_result_id is not None:
             _text(self.ai_result_id, "ai_result_id", max_length=512)
 
+        if (self.context_id is None) != (self.context_digest is None):
+            raise ConversationContractError(
+                "context_id and context_digest must be supplied together"
+            )
+        if self.context_id is not None:
+            object.__setattr__(self, "context_id", _uuid(self.context_id, "context_id"))
+            digest = _text(self.context_digest, "context_digest", max_length=64)
+            if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+                raise ConversationContractError(
+                    "context_digest must be lowercase sha256"
+                )
+            snapshot = _context_snapshot(self.context_source_snapshot)
+            if not snapshot:
+                raise ConversationContractError(
+                    "context-bound message requires source snapshot"
+                )
+            object.__setattr__(self, "context_source_snapshot", snapshot)
+            version = _text(
+                self.context_compiler_version,
+                "context_compiler_version",
+                max_length=128,
+            )
+            object.__setattr__(self, "context_compiler_version", version)
+        else:
+            if self.context_source_snapshot or self.context_compiler_version is not None:
+                raise ConversationContractError(
+                    "context snapshot/compiler version require context identity"
+                )
+            object.__setattr__(self, "context_source_snapshot", ())
+
         if self.parent_message_id == self.message_id:
             raise ConversationContractError("message cannot parent itself")
         if self.supersedes_message_id == self.message_id:
@@ -291,6 +362,10 @@ class ConversationMessage:
             raise ConversationContractError(
                 "user message cannot bind an AI execution result"
             )
+        if author is ConversationAuthorType.USER and self.context_id is not None:
+            raise ConversationContractError(
+                "user message cannot bind provider context identity"
+            )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -309,6 +384,12 @@ class ConversationMessage:
             "causal_user_message_id": self.causal_user_message_id,
             "operation_id": self.operation_id,
             "ai_result_id": self.ai_result_id,
+            "context_id": self.context_id,
+            "context_digest": self.context_digest,
+            "context_source_snapshot": [
+                list(item) for item in self.context_source_snapshot
+            ],
+            "context_compiler_version": self.context_compiler_version,
             "attachment_refs": list(self.attachment_refs),
             "tool_receipt_refs": list(self.tool_receipt_refs),
             "citation_refs": list(self.citation_refs),

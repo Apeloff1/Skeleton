@@ -93,6 +93,12 @@ def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
         causal_user_message_id=doc.get("causal_user_message_id"),
         operation_id=doc.get("operation_id"),
         ai_result_id=doc.get("ai_result_id"),
+        context_id=doc.get("context_id"),
+        context_digest=doc.get("context_digest"),
+        context_source_snapshot=tuple(
+            tuple(item) for item in (doc.get("context_source_snapshot") or ())
+        ),
+        context_compiler_version=doc.get("context_compiler_version"),
         attachment_refs=tuple(doc.get("attachment_refs") or ()),
         tool_receipt_refs=tuple(doc.get("tool_receipt_refs") or ()),
         citation_refs=tuple(doc.get("citation_refs") or ()),
@@ -266,6 +272,10 @@ class MongoConversationAuthority:
             and existing.causal_user_message_id == candidate.causal_user_message_id
             and existing.operation_id == candidate.operation_id
             and existing.ai_result_id == candidate.ai_result_id
+            and existing.context_id == candidate.context_id
+            and existing.context_digest == candidate.context_digest
+            and existing.context_source_snapshot == candidate.context_source_snapshot
+            and existing.context_compiler_version == candidate.context_compiler_version
             and existing.attachment_refs == candidate.attachment_refs
             and existing.tool_receipt_refs == candidate.tool_receipt_refs
             and existing.citation_refs == candidate.citation_refs
@@ -561,6 +571,10 @@ class MongoConversationAuthority:
         causal_user_message_id: str,
         operation_id: str,
         ai_result_id: str,
+        context_id: str | None = None,
+        context_digest: str | None = None,
+        context_source_snapshot: tuple[tuple[str, str], ...] = (),
+        context_compiler_version: str | None = None,
         branch_id: str | None = None,
         supersedes_message_id: str | None = None,
         tool_receipt_refs: tuple[str, ...] = (),
@@ -587,6 +601,10 @@ class MongoConversationAuthority:
             causal_user_message_id=causal_user_message_id,
             operation_id=operation_id,
             ai_result_id=ai_result_id,
+            context_id=context_id,
+            context_digest=context_digest,
+            context_source_snapshot=context_source_snapshot,
+            context_compiler_version=context_compiler_version,
             tool_receipt_refs=tool_receipt_refs,
             citation_refs=citation_refs,
             artifact_refs=artifact_refs,
@@ -611,6 +629,10 @@ class MongoConversationAuthority:
         expected_thread_version: int,
         operation_id: str,
         ai_result_id: str,
+        context_id: str | None = None,
+        context_digest: str | None = None,
+        context_source_snapshot: tuple[tuple[str, str], ...] = (),
+        context_compiler_version: str | None = None,
         tool_receipt_refs: tuple[str, ...] = (),
         citation_refs: tuple[str, ...] = (),
         artifact_refs: tuple[str, ...] = (),
@@ -659,6 +681,10 @@ class MongoConversationAuthority:
             causal_user_message_id=prior.causal_user_message_id,
             operation_id=operation_id,
             ai_result_id=ai_result_id,
+            context_id=context_id,
+            context_digest=context_digest,
+            context_source_snapshot=context_source_snapshot,
+            context_compiler_version=context_compiler_version,
             branch_id=str(uuid4()),
             supersedes_message_id=prior.message_id,
             tool_receipt_refs=tool_receipt_refs,
