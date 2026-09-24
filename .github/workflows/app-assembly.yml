@@ -52,6 +52,11 @@ on:
       - "skeleton/contracts/ai_execution.py"
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/api/engine_authority.py"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/api/engine_routes.py"
+      - "backend/core/engine_client.py"
       - "skeleton/contracts/memory_record.py"
       - "skeleton/context/compiler.py"
       - "skeleton/context/policy.py"
@@ -66,6 +71,9 @@ on:
       - "skeleton/testing/test_execution_repository.py"
       - "skeleton/testing/test_execution_runtime.py"
       - "skeleton/testing/test_execution_schema_parity.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "backend/tests/test_engine_client.py"
       - "backend/tests/test_instruction_policy_convergence.py"
       - "skeleton/skills/tool_contract.py"
       - "skeleton/skills/tool_runtime.py"
@@ -365,6 +373,8 @@ jobs:
           skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py skeleton/contracts/verification.py skeleton/contracts/ai_execution.py
           skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/instruction_policy.py skeleton/context/sources
           skeleton/intelligence/verification_policy.py skeleton/intelligence/verification_runtime.py skeleton/intelligence/execution_runtime.py
+          skeleton/api/engine_authority.py skeleton/api/engine_runtime.py skeleton/api/engine_service.py skeleton/api/engine_routes.py
+          backend/core/engine_client.py
           skeleton/persistence/execution_repository.py
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
@@ -463,6 +473,8 @@ jobs:
           skeleton/testing/test_execution_repository.py
           skeleton/testing/test_execution_runtime.py
           skeleton/testing/test_execution_schema_parity.py
+          skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_engine_execution_service.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
           skeleton/testing/test_tool_adapters.py
@@ -494,6 +506,7 @@ jobs:
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_ai_chat_conversation_authority.py
           backend/tests/test_instruction_policy_convergence.py
+          backend/tests/test_engine_client.py
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
