@@ -32,6 +32,7 @@ from core.exec_guard import code_execution_enabled, execution_disabled_response,
 from skeleton.skills import (
     AsyncToolRuntime,
     ToolEffect,
+    ToolExecutionDenied,
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
@@ -465,8 +466,8 @@ async def _ensure_canonical_runtime() -> None:
             ) -> str:
                 try:
                     result = await _fn(dict(request.arguments))
-                except ToolAdapterDenied:
-                    result = {"ok": False, "error": "tool_denied"}
+                except ToolAdapterDenied as exc:
+                    raise ToolExecutionDenied("tool_denied") from exc
                 except Exception:
                     result = {"ok": False, "error": "tool_failed"}
                 return await _CANONICAL_RESULT_STORE.put(request, result)
