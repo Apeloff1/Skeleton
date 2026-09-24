@@ -19,12 +19,31 @@ This registry is consumed by agents.py (each agent step can declare a list
 of tool calls to run before producing its output).
 """
 from __future__ import annotations
+from collections import OrderedDict
+from datetime import datetime, timezone
+import hashlib
 import os, asyncio, json, subprocess, tempfile
 from typing import Any, Callable, Coroutine
+from uuid import uuid4
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.exec_guard import code_execution_enabled, execution_disabled_response, execution_disabled_message
+from skeleton.skills import (
+    AsyncToolRuntime,
+    ToolEffect,
+    ToolExecutionDenied,
+    ToolExecutionRequest,
+    ToolExecutionStatus,
+    ToolManifest,
+)
+from skeleton.skills.tool_adapters import (
+    ArtifactAdapterPolicy,
+    DatabaseAdapterPolicy,
+    NetworkEgressPolicy,
+    SandboxAdapterPolicy,
+    ToolAdapterDenied,
+)
 
 from . import vault_loader
 from . import jeeves_consultant
@@ -33,6 +52,18 @@ from . import binary_builder
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
 _client: AsyncIOMotorClient | None = None
+
+_db_scope_raw = tuple(
+    item.strip()
+    for item in os.environ.get("TOOL_DB_ALLOWED_COLLECTIONS", "").split(",")
+    if item.strip()
+)
+_SANDBOX_POLICY = SandboxAdapterPolicy()
+_DATABASE_POLICY = DatabaseAdapterPolicy(
+    allowed_collections=frozenset(_db_scope_raw) if _db_scope_raw else None
+)
+_NETWORK_POLICY = NetworkEgressPolicy()
+_ARTIFACT_POLICY = ArtifactAdapterPolicy()
 
 
 def _db():
@@ -67,10 +98,10 @@ async def _tool_compile_code(params: dict) -> dict:
     if not code_execution_enabled():
         return execution_disabled_response("Tool compile execution")
 
-    lang = params.get("language", "c")
-    code = params.get("code", "")
-    if not code:
-        return {"error": "empty code", "ok": False}
+    scoped = _SANDBOX_POLICY.compile_request(params)
+    lang = scoped["language"]
+    code = scoped["code"]
+    timeout_seconds = scoped["timeout_seconds"]
     # Lightweight inline compile — defers to /api/compiler/compile semantics
     # by spawning a subprocess for compiled langs we can support locally.
     suffix_map = {"c": ".c", "cpp": ".cpp", "cxx": ".cpp", "go": ".go", "rust": ".rs"}
@@ -88,7 +119,12 @@ async def _tool_compile_code(params: dict) -> dict:
         outp = os.path.join(td, "a.out")
         with open(src, "w") as fh: fh.write(code)
         try:
-            proc = subprocess.run(cmd_map[lang](src, outp), capture_output=True, text=True, timeout=30)
+            proc = subprocess.run(
+                cmd_map[lang](src, outp),
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
             return {
                 "ok": proc.returncode == 0,
                 "stdout": proc.stdout[-4000:],
@@ -132,14 +168,13 @@ async def _tool_package_build(params: dict) -> dict:
     if not code_execution_enabled():
         return execution_disabled_response("Tool binary packaging")
 
-    build_id = params.get("build_id")
-    if not build_id:
-        return {"ok": False, "error": "build_id required"}
+    scoped = _ARTIFACT_POLICY.package_request(params)
+    build_id = scoped["build_id"]
     db = _db()
     doc = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
     if not doc:
         return {"ok": False, "error": f"build_id not found: {build_id}"}
-    kinds = params.get("kinds", ["zip", "apk"])
+    kinds = scoped["kinds"]
     out = await binary_builder.package_build(doc, kinds=kinds)
     # Persist artifact metadata
     try:
@@ -154,13 +189,12 @@ async def _tool_package_build(params: dict) -> dict:
 
 
 async def _tool_mongo_query(params: dict) -> dict:
-    coll = params.get("collection")
-    if not coll:
-        return {"ok": False, "error": "collection required"}
+    scoped = _DATABASE_POLICY.query_request(params)
+    coll = scoped["collection"]
     db = _db()
-    q = params.get("filter", {})
-    proj = params.get("project", {"_id": 0})
-    limit = int(params.get("limit", 10))
+    q = scoped["filter"]
+    proj = scoped["project"]
+    limit = scoped["limit"]
     rows = await db[coll].find(q, proj).limit(limit).to_list(length=limit)
     return {"ok": True, "collection": coll, "rows": rows, "count": len(rows)}
 
@@ -181,20 +215,18 @@ async def _tool_llm_chat(params: dict) -> dict:
 
 
 async def _tool_web_search(params: dict) -> dict:
-    """Live web search via DuckDuckGo (no API key needed)."""
-    query = params.get("query") or params.get("q") or ""
-    if not query:
-        return {"ok": False, "error": "query required"}
+    """Live web search through a bounded egress/result policy."""
+    scoped = _NETWORK_POLICY.search_request(params)
+    query = scoped["query"]
+    max_results = scoped["max_results"]
+    kind = scoped["kind"]
     try:
         from ddgs import DDGS
     except Exception:
         return {"ok": False, "error": "ddgs_not_installed"}
     try:
-        max_results = int(params.get("max_results", 5))
-        kind = params.get("kind", "text")  # text | news | images
-        results: list[dict] = []
-        # ddgs is sync — run in executor to avoid blocking
         loop = asyncio.get_running_loop()
+
         def _search():
             with DDGS() as d:
                 if kind == "news":
@@ -202,23 +234,32 @@ async def _tool_web_search(params: dict) -> dict:
                 if kind == "images":
                     return list(d.images(query, max_results=max_results))
                 return list(d.text(query, max_results=max_results))
+
         results = await loop.run_in_executor(None, _search)
-        # Normalise — keep only the fields agents care about
-        clean = []
-        for r in results:
-            if not isinstance(r, dict): continue
-            clean.append({
-                "title":   r.get("title", "")[:200],
-                "url":     r.get("href") or r.get("url", ""),
-                "snippet": (r.get("body") or r.get("description") or "")[:600],
-            })
-        return {"ok": True, "query": query, "kind": kind, "results": clean, "count": len(clean)}
+        clean: list[dict[str, str]] = []
+        for raw in results:
+            if not isinstance(raw, dict):
+                continue
+            normalized = _NETWORK_POLICY.sanitize_result(raw)
+            if normalized is not None:
+                clean.append(normalized)
+            if len(clean) >= max_results:
+                break
+        return {
+            "ok": True,
+            "query": query,
+            "kind": kind,
+            "results": clean,
+            "count": len(clean),
+        }
+    except ToolAdapterDenied:
+        raise
     except Exception:
         return {"ok": False, "error": "web_search_failed"}
 
 
 # ─────────────────────────────────────────────────────────────────
-# Registry
+# Registry and canonical compatibility delegation
 # ─────────────────────────────────────────────────────────────────
 ToolFn = Callable[[dict], Coroutine[Any, Any, dict]]
 TOOLS: dict[str, ToolFn] = {
@@ -233,34 +274,319 @@ TOOLS: dict[str, ToolFn] = {
 }
 
 
+def _object_schema(properties: dict, *, required: list[str] | None = None) -> dict:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": required or [],
+        "additionalProperties": False,
+    }
+
+
+_TOOL_MANIFESTS: dict[str, ToolManifest] = {
+    "vault_query": ToolManifest(
+        tool_id="vault_query",
+        version="1.0.0",
+        description="Read bounded samples from approved vault collections.",
+        input_schema=_object_schema(
+            {
+                "topic": {"type": "string", "maxLength": 512},
+                "collection": {"type": "string", "maxLength": 128},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                "contains": {"type": "string", "maxLength": 512},
+            }
+        ),
+    ),
+    "jeeves_consult": ToolManifest(
+        tool_id="jeeves_consult",
+        version="1.0.0",
+        description="Read bounded Jeeves guidance.",
+        input_schema=_object_schema(
+            {
+                "context": {"type": "string", "maxLength": 128},
+                "topic": {"type": "string", "maxLength": 1024},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+            }
+        ),
+    ),
+    "compile_code": ToolManifest(
+        tool_id="compile_code",
+        version="1.0.0",
+        description="Compile bounded source in an approved local toolchain.",
+        input_schema=_object_schema(
+            {
+                "language": {
+                    "type": "string",
+                    "enum": ["c", "cpp", "cxx", "go", "rust"],
+                },
+                "code": {"type": "string", "minLength": 1, "maxLength": 200000},
+            },
+            required=["code"],
+        ),
+    ),
+    "run_code": ToolManifest(
+        tool_id="run_code",
+        version="1.0.0",
+        description="Compatibility surface for sandboxed code execution.",
+        input_schema=_object_schema(
+            {
+                "language": {"type": "string", "maxLength": 64},
+                "code": {"type": "string", "minLength": 1, "maxLength": 200000},
+            },
+            required=["code"],
+        ),
+    ),
+    "package_build": ToolManifest(
+        tool_id="package_build",
+        version="1.0.0",
+        description="Create bounded package artifacts for an existing build.",
+        input_schema=_object_schema(
+            {
+                "build_id": {"type": "string", "minLength": 1, "maxLength": 128},
+                "kinds": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["zip", "apk"]},
+                    "minItems": 1,
+                    "maxItems": 2,
+                },
+            },
+            required=["build_id"],
+        ),
+        effect=ToolEffect.REVERSIBLE,
+    ),
+    "mongo_query": ToolManifest(
+        tool_id="mongo_query",
+        version="1.0.0",
+        description="Read bounded data from an approved database collection.",
+        input_schema=_object_schema(
+            {
+                "collection": {"type": "string", "minLength": 1, "maxLength": 128},
+                "filter": {"type": "object"},
+                "project": {"type": "object"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+            },
+            required=["collection"],
+        ),
+    ),
+    "llm_chat": ToolManifest(
+        tool_id="llm_chat",
+        version="1.0.0",
+        description="Compatibility LLM call through configured provider credentials.",
+        input_schema=_object_schema(
+            {
+                "prompt": {"type": "string", "maxLength": 100000},
+                "model": {"type": "string", "maxLength": 128},
+                "system": {"type": "string", "maxLength": 100000},
+                "session_id": {"type": "string", "maxLength": 256},
+            }
+        ),
+    ),
+    "web_search": ToolManifest(
+        tool_id="web_search",
+        version="1.0.0",
+        description="Bounded web search through approved egress policy.",
+        input_schema=_object_schema(
+            {
+                "query": {"type": "string", "minLength": 1, "maxLength": 512},
+                "q": {"type": "string", "minLength": 1, "maxLength": 512},
+                "kind": {
+                    "type": "string",
+                    "enum": ["text", "news", "images"],
+                },
+                "max_results": {"type": "integer", "minimum": 1, "maximum": 10},
+            }
+        ),
+    ),
+}
+
+
+class _CompatibilityResultStore:
+    """Bounded transient projection of canonical tool receipts for legacy callers."""
+
+    def __init__(self, max_entries: int = 1024) -> None:
+        self.max_entries = max_entries
+        self._lock = asyncio.Lock()
+        self._items: OrderedDict[str, dict] = OrderedDict()
+
+    async def put(self, request: ToolExecutionRequest, result: dict) -> str:
+        if not isinstance(result, dict):
+            raise TypeError("legacy tool result must be an object")
+        encoded = json.dumps(
+            result,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        ).encode("utf-8")
+        identity = "\x1f".join(
+            (
+                request.operation_id,
+                request.tool_id,
+                request.idempotency_key,
+                request.arguments_digest,
+            )
+        ).encode("utf-8")
+        ref = "legacy-tool-result:" + hashlib.sha256(identity + b"\x1f" + encoded).hexdigest()
+        async with self._lock:
+            self._items[ref] = dict(result)
+            self._items.move_to_end(ref)
+            while len(self._items) > self.max_entries:
+                self._items.popitem(last=False)
+        return ref
+
+    async def get(self, ref: str) -> dict | None:
+        async with self._lock:
+            item = self._items.get(ref)
+            if item is None:
+                return None
+            self._items.move_to_end(ref)
+            return dict(item)
+
+
+_CANONICAL_RUNTIME = AsyncToolRuntime()
+_CANONICAL_RESULT_STORE = _CompatibilityResultStore()
+_CANONICAL_INIT_LOCK = asyncio.Lock()
+_CANONICAL_READY = False
+
+
+async def _ensure_canonical_runtime() -> None:
+    global _CANONICAL_READY
+    if _CANONICAL_READY:
+        return
+    async with _CANONICAL_INIT_LOCK:
+        if _CANONICAL_READY:
+            return
+        for name, fn in TOOLS.items():
+            manifest = _TOOL_MANIFESTS[name]
+
+            async def handler(
+                request: ToolExecutionRequest,
+                *,
+                _fn=fn,
+            ) -> str:
+                try:
+                    result = await _fn(dict(request.arguments))
+                except ToolAdapterDenied as exc:
+                    raise ToolExecutionDenied("tool_denied") from exc
+                except Exception:
+                    result = {"ok": False, "error": "tool_failed"}
+                return await _CANONICAL_RESULT_STORE.put(request, result)
+
+            await _CANONICAL_RUNTIME.register(manifest, handler)
+        _CANONICAL_READY = True
+
+
+async def invoke_canonical(
+    tool: str,
+    params: dict,
+    *,
+    operation_id: str,
+    tenant_id: str,
+    idempotency_key: str,
+    request_id: str | None = None,
+    approval_ref: str | None = None,
+    delegated_authority_ref: str | None = None,
+) -> dict:
+    """Execute through canonical request/receipt authority.
+
+    The returned payload preserves legacy result fields and attaches a sanitized
+    canonical receipt. Exact concurrent retries share one execution reservation.
+    """
+
+    if tool not in TOOLS:
+        return {
+            "ok": False,
+            "error": f"unknown tool: {tool}",
+            "available": list(TOOLS.keys()),
+        }
+    await _ensure_canonical_runtime()
+    request = ToolExecutionRequest(
+        request_id=request_id or str(uuid4()),
+        operation_id=operation_id,
+        tenant_id=tenant_id,
+        tool_id=tool,
+        idempotency_key=idempotency_key,
+        arguments=dict(params or {}),
+        requested_at=datetime.now(timezone.utc),
+        approval_ref=approval_ref,
+        delegated_authority_ref=delegated_authority_ref,
+    )
+    receipt = await _CANONICAL_RUNTIME.execute(request)
+    if receipt.status is ToolExecutionStatus.DENIED:
+        return {
+            "ok": False,
+            "error": receipt.error_code or "tool_denied",
+            "receipt": receipt.as_dict(),
+        }
+    if receipt.status is ToolExecutionStatus.FAILED:
+        return {
+            "ok": False,
+            "error": receipt.error_code or "tool_failed",
+            "receipt": receipt.as_dict(),
+        }
+    if receipt.result_ref is None:
+        return {
+            "ok": False,
+            "error": "result_unavailable",
+            "receipt": receipt.as_dict(),
+        }
+    result = await _CANONICAL_RESULT_STORE.get(receipt.result_ref)
+    if result is None:
+        return {
+            "ok": False,
+            "error": "result_unavailable",
+            "receipt": receipt.as_dict(),
+        }
+    result["receipt"] = receipt.as_dict()
+    return result
+
+
 async def invoke(tool: str, params: dict) -> dict:
-    """Single-entry dispatch."""
-    fn = TOOLS.get(tool)
-    if fn is None:
-        return {"ok": False, "error": f"unknown tool: {tool}", "available": list(TOOLS.keys())}
-    try:
-        return await fn(params or {})
-    except Exception:
-        return {"ok": False, "error": "tool_failed"}
+    """Legacy-compatible dispatch delegated through canonical tool authority."""
+
+    request_id = str(uuid4())
+    return await invoke_canonical(
+        tool,
+        params or {},
+        operation_id=str(uuid4()),
+        tenant_id="legacy-backend",
+        idempotency_key=request_id,
+        request_id=request_id,
+        delegated_authority_ref="legacy:backend/services/tool_registry.invoke",
+    )
 
 
 async def invoke_many(calls: list[dict]) -> list[dict]:
-    """Parallel multi-call. Each call: {tool, params}."""
-    coros = [invoke(c.get("tool"), c.get("params", {})) for c in calls]
+    """Parallel compatibility calls, each delegated through canonical authority."""
+
+    coros = [
+        invoke(c.get("tool"), c.get("params", {}))
+        for c in calls
+    ]
     return await asyncio.gather(*coros, return_exceptions=False)
 
 
 def describe() -> dict:
-    return {
-        "tools": [
-            {"name": "vault_query",    "params": ["topic|collection", "limit", "contains?"]},
-            {"name": "jeeves_consult", "params": ["context", "topic?"]},
-            {"name": "compile_code",   "params": ["language", "code"]},
-            {"name": "run_code",       "params": ["language=python", "code"]},
-            {"name": "package_build",  "params": ["build_id", "kinds=[zip,apk]"]},
-            {"name": "mongo_query",    "params": ["collection", "filter", "limit"]},
-            {"name": "llm_chat",       "params": ["prompt", "model?", "system?"]},
-            {"name": "web_search",     "params": ["query"]},
-        ],
-        "count": len(TOOLS),
+    tools = []
+    legacy_params = {
+        "vault_query": ["topic|collection", "limit", "contains?"],
+        "jeeves_consult": ["context", "topic?"],
+        "compile_code": ["language", "code"],
+        "run_code": ["language=python", "code"],
+        "package_build": ["build_id", "kinds=[zip,apk]"],
+        "mongo_query": ["collection", "filter", "limit"],
+        "llm_chat": ["prompt", "model?", "system?"],
+        "web_search": ["query"],
     }
+    for name in TOOLS:
+        manifest = _TOOL_MANIFESTS[name]
+        tools.append(
+            {
+                "name": name,
+                "params": legacy_params[name],
+                "effect": manifest.effect.value,
+                "approval_required": manifest.approval_required,
+                "canonical_version": manifest.version,
+            }
+        )
+    return {"tools": tools, "count": len(tools), "authority": "canonical-tool-runtime"}
