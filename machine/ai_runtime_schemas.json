@@ -70,6 +70,20 @@
       "type": "string",
       "min_length": 1,
       "max_length": 2048
+    },
+    "SourceSnapshot": {
+      "type": "array",
+      "max_items": 4096,
+      "items": {
+        "type": "array",
+        "min_items": 2,
+        "max_items": 2,
+        "items": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 2048
+        }
+      }
     }
   },
   "enums": {
@@ -187,6 +201,13 @@
       "cancelled",
       "corruption",
       "internal"
+    ],
+    "ProviderDeltaKind": [
+      "text",
+      "structured",
+      "tool_call",
+      "usage",
+      "final"
     ]
   },
   "records": {
@@ -558,7 +579,7 @@
           "max_items": 4096
         },
         "source_snapshot": {
-          "type": "JsonObject"
+          "type": "SourceSnapshot"
         },
         "context_digest": {
           "type": "Digest256"
@@ -787,10 +808,12 @@
           "max_length": 256
         },
         "request_id": {
-          "type": "OpaqueId"
+          "type": "OpaqueId",
+          "nullable": true
         },
         "response_id": {
-          "type": "OpaqueId"
+          "type": "OpaqueId",
+          "nullable": true
         },
         "text": {
           "type": "string",
@@ -812,21 +835,43 @@
           "type": "ProviderUsage"
         },
         "latency_ms": {
-          "type": "NonNegativeNumber"
+          "type": "NonNegativeNumber",
+          "nullable": true
         },
         "governance_decision_id": {
-          "type": "OpaqueId"
+          "type": "OpaqueId",
+          "nullable": true
         },
         "admission_decision_id": {
-          "type": "OpaqueId"
+          "type": "OpaqueId",
+          "nullable": true
         },
         "data_class": {
-          "type": "DataClass"
+          "type": "DataClass",
+          "nullable": true
+        },
+        "context_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "context_digest": {
+          "type": "Digest256",
+          "nullable": true
+        },
+        "context_source_snapshot": {
+          "type": "SourceSnapshot"
+        },
+        "context_compiler_version": {
+          "type": "string",
+          "nullable": true,
+          "min_length": 1,
+          "max_length": 64
         }
       },
       "invariants": [
         "provider-native SDK objects are not fields",
-        "tool calls are normalized before this record leaves provider boundary"
+        "tool calls are normalized before this record leaves provider boundary",
+        "context identity fields echo the admitted ProviderRequest and never create a second context authority"
       ]
     },
     "ToolExecutionRequest": {
@@ -1409,12 +1454,26 @@
         "deadline": {
           "type": "RFC3339",
           "nullable": true
+        },
+        "context_source_snapshot": {
+          "type": "SourceSnapshot"
+        },
+        "context_compiler_version": {
+          "type": "string",
+          "min_length": 1,
+          "max_length": 64
+        },
+        "specific_tool_id": {
+          "type": "OpaqueId",
+          "nullable": true
         }
       },
       "invariants": [
-        "context_id/context_digest bind request to ContextEnvelope",
+        "context_id/context_digest/context_source_snapshot/context_compiler_version bind request to one immutable ContextEnvelope",
         "tools are already admitted minimal projections",
-        "deadline cannot exceed operation deadline"
+        "specific_tool_id is present only when tool_choice=specific",
+        "deadline cannot exceed operation deadline",
+        "provider-native SDK objects, credentials and transport handles are not fields"
       ]
     },
     "RouteDecision": {
@@ -2049,6 +2108,51 @@
       },
       "invariants": [
         "reference identifies immutable active/evaluated instruction content"
+      ]
+    },
+    "ProviderDelta": {
+      "schema_version": 1,
+      "owner_plane": "model-provider",
+      "fields": {
+        "sequence": {
+          "type": "NonNegativeInt"
+        },
+        "kind": {
+          "type": "ProviderDeltaKind"
+        },
+        "response_id": {
+          "type": "OpaqueId",
+          "nullable": true
+        },
+        "text": {
+          "type": "string",
+          "nullable": true,
+          "max_length": 1000000
+        },
+        "structured_fragment": {
+          "type": "JsonObject",
+          "nullable": true
+        },
+        "tool_call": {
+          "type": "ProviderToolCall",
+          "nullable": true
+        },
+        "usage": {
+          "type": "ProviderUsage",
+          "nullable": true
+        },
+        "finish_reason": {
+          "type": "FinishReason",
+          "nullable": true
+        },
+        "emitted_at": {
+          "type": "RFC3339"
+        }
+      },
+      "invariants": [
+        "sequence is monotonic within one provider response",
+        "non-final deltas carry exactly one payload matching kind",
+        "final delta carries finish_reason and grants no durable stream authority by itself"
       ]
     }
   },
