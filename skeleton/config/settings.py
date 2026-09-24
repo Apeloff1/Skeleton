@@ -71,6 +71,41 @@ class OperationSettings(BaseSettings):
     default_deadline_s: float = Field(default=120.0, gt=0.0, le=86_400.0)
 
 
+class EngineSettings(BaseSettings):
+    """Canonical cognitive-execution engine boundary settings."""
+
+    model_config = SettingsConfigDict(env_prefix="SKL_ENGINE_")
+
+    execution_state_path: str = ":memory:"
+    submission_state_path: str = ":memory:"
+    tool_receipt_path: str = ":memory:"
+    service_principal: str = "codedock-backend"
+    allowed_tenants_csv: str = "*"
+    allowed_capabilities_csv: str = "*"
+
+    @property
+    def allowed_tenants(self) -> frozenset[str]:
+        values = frozenset(
+            item.strip()
+            for item in self.allowed_tenants_csv.split(",")
+            if item.strip()
+        )
+        if not values:
+            raise ValueError("engine allowed_tenants_csv must not be empty")
+        return values
+
+    @property
+    def allowed_capabilities(self) -> frozenset[str]:
+        values = frozenset(
+            item.strip()
+            for item in self.allowed_capabilities_csv.split(",")
+            if item.strip()
+        )
+        if not values:
+            raise ValueError("engine allowed_capabilities_csv must not be empty")
+        return values
+
+
 class ObservabilitySettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="SKL_OBS_")
 
@@ -100,6 +135,7 @@ class Settings(BaseSettings):
     jeeves: JeevesSettings = Field(default_factory=JeevesSettings)
     pipeline: PipelineSettings = Field(default_factory=PipelineSettings)
     operation: OperationSettings = Field(default_factory=OperationSettings)
+    engine: EngineSettings = Field(default_factory=EngineSettings)
     observability: ObservabilitySettings = Field(default_factory=ObservabilitySettings)
 
     @field_validator("environment")
@@ -124,6 +160,9 @@ class Settings(BaseSettings):
             "jeeves_model": self.jeeves.model,
             "operation_state_path": self.operation.state_path,
             "operation_stream_path": self.operation.stream_path,
+            "engine_execution_state_path": self.engine.execution_state_path,
+            "engine_submission_state_path": self.engine.submission_state_path,
+            "engine_tool_receipt_path": self.engine.tool_receipt_path,
         }
 
 
