@@ -10,6 +10,7 @@ clients.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import logging
 import re
 from typing import Any, Dict, List, Optional
@@ -18,11 +19,22 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest, normalize_history
+from core.ai_provider import (
+    ProviderError,
+    ProviderPolicyError,
+    ProviderRegistry,
+    ProviderRequest,
+    normalize_history,
+    provider_request_from_context,
+    require_provider_response_context,
+)
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from routes.gameforge_auth import require_role
+from skeleton.contracts.context import ContextBudget, ContextEnvelope
 from skeleton.contracts.conversation import ConversationAuthorType
+from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
+from skeleton.context.sources import artifact_segment, conversation_message_segment
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
@@ -158,6 +170,17 @@ CHAT_INSTRUCTION_POLICY = InstructionPolicy(
     ),
 )
 
+CHAT_CONTEXT_BUDGET = ContextBudget(
+    max_context_tokens=128_000,
+    reserved_output_tokens=4_096,
+    reserved_tool_result_tokens=0,
+    reserved_policy_tokens=2_048,
+    safety_margin_tokens=1_024,
+    max_segment_tokens=40_000,
+    max_artifact_tokens=16_000,
+    max_tool_result_tokens=16_000,
+)
+
 
 class AIAssistRequest(BaseModel):
     code: str = Field(..., min_length=1, max_length=500_000, description="Code to analyze")
@@ -235,6 +258,63 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _compile_chat_context(
+    *,
+    thread,
+    transcript,
+    user_message,
+    tenant_id: str,
+    operation_id: str,
+    execution_id: str,
+    request_context: str | None,
+) -> ContextEnvelope:
+    """Compile the one authoritative immutable context snapshot for a chat turn."""
+
+    purpose = "model-inference"
+    segments = [
+        CHAT_INSTRUCTION_POLICY.to_segment(
+            tenant_id="*",
+            purpose=purpose,
+            created_at=user_message.created_at,
+            mandatory=True,
+        )
+    ]
+    segments.extend(
+        conversation_message_segment(
+            thread,
+            message,
+            purpose=purpose,
+        )
+        for message in transcript
+    )
+    if request_context:
+        segments.append(
+            artifact_segment(
+                artifact_id="chat-context:" + user_message.message_id,
+                content=request_context,
+                tenant_id=tenant_id,
+                purpose=purpose,
+                created_at=user_message.created_at,
+                data_class=thread.data_class,
+                retention_class="ephemeral-chat-context",
+                priority=600,
+                relevance=0.8,
+            )
+        )
+
+    return ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=user_message.message_id,
+        tenant_id=tenant_id,
+        purpose=purpose,
+        budget=CHAT_CONTEXT_BUDGET,
+        segments=segments,
+        tools_enabled=False,
+        compiled_at=user_message.created_at,
+    )
+
+
 def _active_model() -> str:
     active = AI_REGISTRY.active
     return active.model if active is not None else "unavailable"
@@ -273,21 +353,40 @@ async def call_llm(
     history: List[Dict[str, str]] | None = None,
     max_output_tokens: int | None = None,
     instruction_policy: InstructionPolicy | None = None,
+    context_envelope: ContextEnvelope | None = None,
 ) -> Dict[str, Any]:
     """Execute one model request without exposing provider exception details."""
 
     try:
         adapter = AI_REGISTRY.require_active()
         policy = instruction_policy
-        instructions = policy.instructions if policy is not None else system_prompt
-        response = await adapter.generate(
-            ProviderRequest(
-                instructions=instructions,
-                prompt=user_prompt,
-                history=normalize_history(history),
+        if context_envelope is not None:
+            if policy is not None:
+                expected_source = policy.policy_id + "@" + policy.version
+                if not any(
+                    segment.source_id == expected_source
+                    for segment in context_envelope.instruction_segments
+                ):
+                    raise ProviderPolicyError(
+                        "compiled context is not bound to requested instruction policy"
+                    )
+            provider_request = provider_request_from_context(
+                context_envelope,
+                purpose="model-inference",
                 max_output_tokens=max_output_tokens,
             )
-        )
+            response = await adapter.generate(provider_request)
+            require_provider_response_context(response, context_envelope)
+        else:
+            instructions = policy.instructions if policy is not None else system_prompt
+            response = await adapter.generate(
+                ProviderRequest(
+                    instructions=instructions,
+                    prompt=user_prompt,
+                    history=normalize_history(history),
+                    max_output_tokens=max_output_tokens,
+                )
+            )
         return {
             "success": True,
             "response": response.text,
@@ -298,6 +397,10 @@ async def call_llm(
             "instruction_policy_id": policy.policy_id if policy is not None else None,
             "instruction_policy_version": policy.version if policy is not None else None,
             "instruction_policy_digest": policy.digest if policy is not None else None,
+            "context_id": response.context_id,
+            "context_digest": response.context_digest,
+            "context_source_snapshot": response.context_source_snapshot,
+            "context_compiler_version": response.context_compiler_version,
         }
     except ProviderError as exc:
         logger.warning("AI provider unavailable or failed: %s", exc.__class__.__name__)
@@ -380,6 +483,12 @@ async def ai_chat(
 
     tenant_id, owner_id = _chat_identity(user)
     try:
+        context_attachment_refs: tuple[str, ...] = ()
+        if request.context:
+            context_attachment_refs = (
+                "ephemeral-context-sha256:"
+                + hashlib.sha256(request.context.encode("utf-8")).hexdigest(),
+            )
         thread, user_message = await conversation_authority.append_user_message(
             request.thread_id,
             tenant_id=tenant_id,
@@ -387,6 +496,7 @@ async def ai_chat(
             content=request.message,
             idempotency_key=request.idempotency_key,
             expected_thread_version=request.expected_thread_version,
+            attachment_refs=context_attachment_refs,
         )
         transcript = await conversation_authority.active_transcript(
             request.thread_id,
@@ -437,13 +547,34 @@ async def ai_chat(
         transcript,
         exclude_message_id=user_message.message_id,
     )
-    operation_id = str(uuid.uuid4())
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "skeleton-ai-chat:" + thread.thread_id + ":" + user_message.message_id,
+        )
+    )
+    execution_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "skeleton-ai-chat-execution:" + operation_id,
+        )
+    )
+    context_envelope = _compile_chat_context(
+        thread=thread,
+        transcript=transcript,
+        user_message=user_message,
+        tenant_id=tenant_id,
+        operation_id=operation_id,
+        execution_id=execution_id,
+        request_context=request.context,
+    )
 
     result = await call_llm(
         system_prompt,
         user_prompt,
         history=history,
         instruction_policy=CHAT_INSTRUCTION_POLICY,
+        context_envelope=context_envelope,
     )
     if not result["success"]:
         return {
@@ -456,6 +587,7 @@ async def ai_chat(
             "error_code": result["error_code"],
             "thread": thread.as_dict(),
             "user_message": user_message.as_dict(),
+            "context": context_envelope.binding_dict(),
             "timestamp": _utcnow(),
         }
 
@@ -475,6 +607,10 @@ async def ai_chat(
                 causal_user_message_id=user_message.message_id,
                 operation_id=operation_id,
                 ai_result_id=ai_result_id,
+                context_id=context_envelope.context_id,
+                context_digest=context_envelope.context_digest,
+                context_source_snapshot=context_envelope.source_snapshot,
+                context_compiler_version=context_envelope.compiler_version,
             )
         )
     except Exception as exc:
@@ -494,6 +630,7 @@ async def ai_chat(
         "thread": committed_thread.as_dict(),
         "user_message": user_message.as_dict(),
         "assistant_message": assistant_message.as_dict(),
+        "context": context_envelope.binding_dict(),
         "timestamp": _utcnow(),
     }
 
