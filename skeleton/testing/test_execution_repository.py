@@ -299,3 +299,126 @@ def test_stale_transition_is_rejected() -> None:
             expected_version=created.version,
             now=_now(),
         )
+
+
+def test_staged_finalization_survives_restart_and_binds_terminal_lineage(tmp_path) -> None:
+    path = tmp_path / "execution-finalization.sqlite3"
+    repo = SQLiteExecutionRepository(path)
+    repo.create(_request(), now=_now())
+    current = _advance_to_provider_completed(repo, "exec-1")
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.VERIFYING,
+        expected_version=current.version,
+        now=_now(),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="artifact:final-answer",
+        verification="verification:ver-1",
+        verification_receipt={
+            "outcome": "passed",
+            "policy_satisfied": True,
+        },
+        evidence_refs=("evidence:e1",),
+        provider_receipts=("provider:resp-1",),
+        tool_receipts=("tool:receipt-1",),
+        memory_refs=("memory:m1",),
+        artifact_refs=("artifact:a1",),
+        usage={
+            "model_turns": 2,
+            "tool_calls": 1,
+            "provider_usage": [{"total_tokens": 23}],
+        },
+        stream_terminal_event="stream:terminal:exec-1",
+        completed_at=_now(),
+    )
+    staged = repo.stage_finalization(
+        result,
+        expected_execution_version=current.version,
+        now=_now(),
+    )
+    digest = staged.intent_digest
+    repo.close()
+
+    reopened = SQLiteExecutionRepository(path)
+    recovered = reopened.finalization_intent("exec-1")
+
+    assert recovered is not None
+    assert recovered.intent_digest == digest
+    assert recovered.result.memory_refs == ("memory:m1",)
+    assert recovered.result.artifact_refs == ("artifact:a1",)
+    assert recovered.result.verification_receipt["policy_satisfied"] is True
+    assert recovered.result.usage["provider_usage"][0]["total_tokens"] == 23
+    assert recovered.result.stream_terminal_event == "stream:terminal:exec-1"
+
+    terminal = reopened.finalize_staged("exec-1", now=_now())
+    assert terminal.state is ExecutionState.COMPLETED
+    assert reopened.finalization_intent("exec-1") is None
+    assert reopened.result("exec-1") == result
+    pending = reopened.pending_outbox(execution_id="exec-1")
+    assert len(pending) == 1
+    assert pending[0].payload["memory_refs"] == ["memory:m1"]
+    assert pending[0].payload["artifact_refs"] == ["artifact:a1"]
+    assert pending[0].payload["usage"]["model_turns"] == 2
+    assert pending[0].payload["stream_terminal_event"] == "stream:terminal:exec-1"
+
+
+def test_staged_finalization_is_idempotent_and_rejects_changed_terminal_payload() -> None:
+    repo = SQLiteExecutionRepository()
+    repo.create(_request(), now=_now())
+    current = _advance_to_provider_completed(repo, "exec-1")
+    current = repo.transition(
+        "exec-1",
+        ExecutionState.VERIFYING,
+        expected_version=current.version,
+        now=_now(),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="stable",
+        verification="verification:stable",
+        memory_refs=("memory:m1",),
+        artifact_refs=("artifact:a1",),
+        usage={"model_turns": 1},
+        stream_terminal_event="stream:stable",
+        completed_at=_now(),
+    )
+
+    first = repo.stage_finalization(
+        result,
+        expected_execution_version=current.version,
+        now=_now(),
+    )
+    replay = repo.stage_finalization(
+        result,
+        expected_execution_version=current.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    assert replay.intent_digest == first.intent_digest
+
+    changed = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="changed",
+        verification="verification:stable",
+        memory_refs=("memory:m1",),
+        artifact_refs=("artifact:a1",),
+        usage={"model_turns": 1},
+        stream_terminal_event="stream:stable",
+        completed_at=_now(),
+    )
+    with pytest.raises(
+        ExecutionRepositoryConflict,
+        match="staged finalization intent already differs",
+    ):
+        repo.stage_finalization(
+            changed,
+            expected_execution_version=current.version,
+            now=_now(),
+        )

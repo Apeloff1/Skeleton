@@ -593,6 +593,49 @@ class AIExecutionResult:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutionFinalizationIntent:
+    """Durable pre-commit terminal payload used for crash-safe finalization."""
+
+    result: AIExecutionResult
+    expected_execution_version: int
+    staged_at: datetime
+    schema_version: int = AI_EXECUTION_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.result, AIExecutionResult):
+            raise AIExecutionContractError("result must be AIExecutionResult")
+        if (
+            isinstance(self.expected_execution_version, bool)
+            or not isinstance(self.expected_execution_version, int)
+            or self.expected_execution_version < 1
+        ):
+            raise AIExecutionContractError(
+                "expected_execution_version must be a positive integer"
+            )
+        object.__setattr__(self, "staged_at", _aware(self.staged_at, "staged_at"))
+        if self.schema_version != AI_EXECUTION_SCHEMA_VERSION:
+            raise AIExecutionContractError("unsupported AI execution schema version")
+
+    @property
+    def intent_digest(self) -> str:
+        return execution_payload_digest(
+            {
+                "result": self.result.as_dict(),
+                "expected_execution_version": self.expected_execution_version,
+            }
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "result": self.result.as_dict(),
+            "expected_execution_version": self.expected_execution_version,
+            "staged_at": self.staged_at.isoformat(),
+            "intent_digest": self.intent_digest,
+        }
+
+
 __all__ = [
     "AI_EXECUTION_SCHEMA_VERSION",
     "AIExecution",
@@ -601,6 +644,7 @@ __all__ = [
     "AIExecutionResult",
     "AgentTurn",
     "ExecutionCheckpoint",
+    "ExecutionFinalizationIntent",
     "ExecutionState",
     "TERMINAL_EXECUTION_STATES",
     "execution_payload_digest",

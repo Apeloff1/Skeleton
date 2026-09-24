@@ -23,6 +23,7 @@ from skeleton.contracts.ai_execution import (
     AIExecutionResult,
     AgentTurn,
     ExecutionCheckpoint,
+    ExecutionFinalizationIntent,
     ExecutionState,
 )
 
@@ -202,6 +203,19 @@ class SQLiteExecutionRepository:
                         ON DELETE CASCADE
                 );
 
+                CREATE TABLE IF NOT EXISTS ai_execution_finalization_intent (
+                    namespace TEXT NOT NULL,
+                    execution_id TEXT NOT NULL,
+                    expected_execution_version INTEGER NOT NULL,
+                    intent_digest TEXT NOT NULL,
+                    intent_json TEXT NOT NULL,
+                    staged_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, execution_id),
+                    FOREIGN KEY(namespace, execution_id)
+                        REFERENCES ai_execution_state(namespace, execution_id)
+                        ON DELETE CASCADE
+                );
+
                 CREATE TABLE IF NOT EXISTS ai_execution_outbox (
                     namespace TEXT NOT NULL,
                     outbox_id TEXT NOT NULL,
@@ -308,29 +322,65 @@ class SQLiteExecutionRepository:
             ) from exc
 
     @staticmethod
-    def _result_from_row(row: sqlite3.Row) -> AIExecutionResult:
+    def _result_from_payload(payload: dict[str, Any]) -> AIExecutionResult:
+        return AIExecutionResult(
+            operation_id=payload["operation_id"],
+            execution_id=payload["execution_id"],
+            status=payload["status"],
+            final_output=payload.get("final_output"),
+            verification=payload.get("verification"),
+            verification_receipt=payload.get("verification_receipt"),
+            evidence_refs=tuple(payload.get("evidence_refs") or ()),
+            route_receipts=tuple(payload.get("route_receipts") or ()),
+            provider_receipts=tuple(payload.get("provider_receipts") or ()),
+            tool_receipts=tuple(payload.get("tool_receipts") or ()),
+            memory_refs=tuple(payload.get("memory_refs") or ()),
+            artifact_refs=tuple(payload.get("artifact_refs") or ()),
+            usage=payload.get("usage") or {},
+            stream_terminal_event=payload.get("stream_terminal_event"),
+            completed_at=_parse_time(payload["completed_at"], "completed_at"),
+        )
+
+    @classmethod
+    def _result_from_row(cls, row: sqlite3.Row) -> AIExecutionResult:
         try:
             payload = _json_object(row["result_json"], "result_json")
-            return AIExecutionResult(
-                operation_id=payload["operation_id"],
-                execution_id=payload["execution_id"],
-                status=payload["status"],
-                final_output=payload.get("final_output"),
-                verification=payload.get("verification"),
-                verification_receipt=payload.get("verification_receipt"),
-                evidence_refs=tuple(payload.get("evidence_refs") or ()),
-                route_receipts=tuple(payload.get("route_receipts") or ()),
-                provider_receipts=tuple(payload.get("provider_receipts") or ()),
-                tool_receipts=tuple(payload.get("tool_receipts") or ()),
-                memory_refs=tuple(payload.get("memory_refs") or ()),
-                artifact_refs=tuple(payload.get("artifact_refs") or ()),
-                usage=payload.get("usage") or {},
-                stream_terminal_event=payload.get("stream_terminal_event"),
-                completed_at=_parse_time(payload["completed_at"], "completed_at"),
-            )
+            return cls._result_from_payload(payload)
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted result violates contract"
+            ) from exc
+
+    @classmethod
+    def _intent_from_row(cls, row: sqlite3.Row) -> ExecutionFinalizationIntent:
+        try:
+            payload = _json_object(row["intent_json"], "intent_json")
+            result_payload = payload.get("result")
+            if not isinstance(result_payload, dict):
+                raise ExecutionRepositoryCorruption(
+                    "finalization intent result must be an object"
+                )
+            intent = ExecutionFinalizationIntent(
+                result=cls._result_from_payload(result_payload),
+                expected_execution_version=int(
+                    payload["expected_execution_version"]
+                ),
+                staged_at=_parse_time(payload["staged_at"], "staged_at"),
+            )
+            if intent.intent_digest != row["intent_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted finalization intent digest mismatch"
+                )
+            if payload.get("intent_digest") != intent.intent_digest:
+                raise ExecutionRepositoryCorruption(
+                    "finalization intent payload digest mismatch"
+                )
+            return intent
+        except ExecutionRepositoryCorruption:
+            raise
+        except Exception as exc:
+            raise ExecutionRepositoryCorruption(
+                "persisted finalization intent violates contract"
             ) from exc
 
     @staticmethod
@@ -731,6 +781,117 @@ class SQLiteExecutionRepository:
             ).fetchone()
             return None if row is None else self._result_from_row(row)
 
+    def finalization_intent(
+        self,
+        execution_id: str,
+    ) -> ExecutionFinalizationIntent | None:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT * FROM ai_execution_finalization_intent
+                WHERE namespace = ? AND execution_id = ?
+                """,
+                (self.namespace, execution_id),
+            ).fetchone()
+            return None if row is None else self._intent_from_row(row)
+
+    def stage_finalization(
+        self,
+        result: AIExecutionResult,
+        *,
+        expected_execution_version: int,
+        now: datetime | None = None,
+    ) -> ExecutionFinalizationIntent:
+        if not isinstance(result, AIExecutionResult):
+            raise TypeError("result must be AIExecutionResult")
+        instant = _utc(now or result.completed_at)
+        intent = ExecutionFinalizationIntent(
+            result=result,
+            expected_execution_version=expected_execution_version,
+            staged_at=instant,
+        )
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                current = self.get(result.execution_id)
+                if current.operation_id != result.operation_id:
+                    raise ExecutionRepositoryConflict(
+                        "finalization intent operation does not match execution"
+                    )
+                existing_result = self.result(result.execution_id)
+                if existing_result is not None:
+                    if existing_result.as_dict() != result.as_dict():
+                        raise ExecutionRepositoryConflict(
+                            "terminal execution result already differs"
+                        )
+                    self._connection.execute("COMMIT")
+                    return intent
+                if current.version != expected_execution_version:
+                    raise ExecutionRepositoryConflict(
+                        "execution version changed before finalization staging"
+                    )
+                row = self._connection.execute(
+                    """
+                    SELECT * FROM ai_execution_finalization_intent
+                    WHERE namespace = ? AND execution_id = ?
+                    """,
+                    (self.namespace, result.execution_id),
+                ).fetchone()
+                if row is not None:
+                    existing = self._intent_from_row(row)
+                    if existing.intent_digest != intent.intent_digest:
+                        raise ExecutionRepositoryConflict(
+                            "staged finalization intent already differs"
+                        )
+                    self._connection.execute("COMMIT")
+                    return existing
+                self._connection.execute(
+                    """
+                    INSERT INTO ai_execution_finalization_intent(
+                        namespace, execution_id, expected_execution_version,
+                        intent_digest, intent_json, staged_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.namespace,
+                        result.execution_id,
+                        expected_execution_version,
+                        intent.intent_digest,
+                        _json_dump(intent.as_dict()),
+                        instant.isoformat(),
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return intent
+            except sqlite3.IntegrityError as exc:
+                self._connection.execute("ROLLBACK")
+                raise ExecutionRepositoryConflict(
+                    "finalization intent identity conflict"
+                ) from exc
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def finalize_staged(
+        self,
+        execution_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> AIExecution:
+        intent = self.finalization_intent(execution_id)
+        if intent is None:
+            existing = self.result(execution_id)
+            if existing is not None:
+                return self.get(execution_id)
+            raise ExecutionRepositoryError(
+                "execution has no staged finalization intent"
+            )
+        return self.finalize(
+            intent.result,
+            expected_execution_version=intent.expected_execution_version,
+            now=now,
+        )
+
     def finalize(
         self,
         result: AIExecutionResult,
@@ -762,6 +923,13 @@ class SQLiteExecutionRepository:
                         raise ExecutionRepositoryConflict(
                             "terminal execution result already differs"
                         )
+                    self._connection.execute(
+                        """
+                        DELETE FROM ai_execution_finalization_intent
+                        WHERE namespace = ? AND execution_id = ?
+                        """,
+                        (self.namespace, result.execution_id),
+                    )
                     self._connection.execute("COMMIT")
                     return current
                 if current.version != expected_execution_version:
@@ -817,6 +985,12 @@ class SQLiteExecutionRepository:
                     "verification": result.verification,
                     "verification_receipt": result.verification_receipt,
                     "evidence_refs": list(result.evidence_refs),
+                    "route_receipts": list(result.route_receipts),
+                    "provider_receipts": list(result.provider_receipts),
+                    "tool_receipts": list(result.tool_receipts),
+                    "memory_refs": list(result.memory_refs),
+                    "artifact_refs": list(result.artifact_refs),
+                    "usage": dict(result.usage),
                 }
                 self._connection.execute(
                     """
@@ -854,6 +1028,13 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution changed during atomic finalization"
                     )
+                self._connection.execute(
+                    """
+                    DELETE FROM ai_execution_finalization_intent
+                    WHERE namespace = ? AND execution_id = ?
+                    """,
+                    (self.namespace, result.execution_id),
+                )
                 self._connection.execute("COMMIT")
                 return AIExecution(
                     request=current.request,
