@@ -50,6 +50,7 @@ on:
       - "skeleton/contracts/conversation.py"
       - "skeleton/contracts/context.py"
       - "skeleton/contracts/memory_record.py"
+      - "skeleton/contracts/ai_execution.py"
       - "skeleton/context/compiler.py"
       - "skeleton/context/policy.py"
       - "skeleton/context/sources/**"
@@ -67,6 +68,7 @@ on:
       - "skeleton/persistence/operation_runtime.py"
       - "skeleton/persistence/conversation_repository.py"
       - "skeleton/persistence/memory_repository.py"
+      - "skeleton/persistence/execution_repository.py"
       - "skeleton/memory/policy.py"
       - "skeleton/memory/writeback.py"
       - "skeleton/memory/projection.py"
@@ -80,6 +82,7 @@ on:
       - "skeleton/testing/test_mongo_memory_repository.py"
       - "skeleton/testing/test_memory_writeback.py"
       - "skeleton/testing/test_memory_projection.py"
+      - "skeleton/testing/test_execution_repository.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
@@ -359,11 +362,11 @@ jobs:
           python -m compileall -q
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
-          skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py
+          skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py skeleton/contracts/ai_execution.py
           skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
-          skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py
+          skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py skeleton/persistence/execution_repository.py
           skeleton/memory/policy.py skeleton/memory/writeback.py skeleton/memory/projection.py skeleton/memory/core.py skeleton/memory/vector.py
           skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
@@ -452,6 +455,7 @@ jobs:
           skeleton/testing/test_mongo_memory_repository.py
           skeleton/testing/test_memory_writeback.py
           skeleton/testing/test_memory_projection.py
+          skeleton/testing/test_execution_repository.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
