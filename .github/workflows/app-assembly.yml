@@ -78,6 +78,10 @@ on:
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_engine_execution_service.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/core/ai_provider.py"
+      - "backend/tests/test_engine_provider_adapter.py"
+      - "docker-compose.yml"
+      - "skeleton/app/manifest.json"
       - "skeleton/testing/test_instruction_policy.py"
       - "backend/tests/test_instruction_policy_convergence.py"
       - "skeleton/skills/tool_contract.py"
@@ -380,7 +384,7 @@ jobs:
           skeleton/contracts/verification.py skeleton/intelligence/verification_policy.py skeleton/intelligence/verification_runtime.py
           skeleton/contracts/ai_execution.py skeleton/persistence/execution_repository.py skeleton/intelligence/execution_runtime.py
           skeleton/api/engine_authority.py skeleton/api/engine_runtime.py skeleton/api/engine_service.py skeleton/api/engine_routes.py
-          skeleton/config/settings.py skeleton/api/server.py backend/core/engine_client.py
+          skeleton/config/settings.py skeleton/api/server.py backend/core/engine_client.py backend/core/ai_provider.py
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py
@@ -509,6 +513,7 @@ jobs:
           backend/tests/test_operation_stream_route.py
           backend/tests/test_conversations_api.py
           backend/tests/test_engine_client.py
+          backend/tests/test_engine_provider_adapter.py
           backend/tests/test_instruction_policy_convergence.py
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_ai_chat_conversation_authority.py
