@@ -32,7 +32,6 @@ from core.exec_guard import code_execution_enabled, execution_disabled_response,
 from skeleton.skills import (
     AsyncToolRuntime,
     ToolEffect,
-    ToolExecutionDenied,
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
@@ -102,39 +101,65 @@ async def _tool_compile_code(params: dict) -> dict:
     lang = scoped["language"]
     code = scoped["code"]
     timeout_seconds = scoped["timeout_seconds"]
-    # Lightweight inline compile — defers to /api/compiler/compile semantics
-    # by spawning a subprocess for compiled langs we can support locally.
+    max_output_bytes = scoped["max_output_bytes"]
+    max_memory_mb = scoped["max_memory_mb"]
+
     suffix_map = {"c": ".c", "cpp": ".cpp", "cxx": ".cpp", "go": ".go", "rust": ".rs"}
     cmd_map = {
-        "c":    lambda src, out: ["gcc", src, "-o", out],
-        "cpp":  lambda src, out: ["g++", src, "-o", out],
-        "cxx":  lambda src, out: ["g++", src, "-o", out],
-        "go":   lambda src, out: ["go", "build", "-o", out, src],
+        "c": lambda src, out: ["gcc", src, "-o", out],
+        "cpp": lambda src, out: ["g++", src, "-o", out],
+        "cxx": lambda src, out: ["g++", src, "-o", out],
+        "go": lambda src, out: ["go", "build", "-o", out, src],
         "rust": lambda src, out: ["rustc", src, "-o", out],
     }
-    if lang not in suffix_map:
-        return {"ok": False, "error": f"language not supported for inline compile: {lang}"}
-    with tempfile.TemporaryDirectory() as td:
-        src = os.path.join(td, f"src{suffix_map[lang]}")
-        outp = os.path.join(td, "a.out")
-        with open(src, "w") as fh: fh.write(code)
-        try:
-            proc = subprocess.run(
-                cmd_map[lang](src, outp),
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-            )
-            return {
-                "ok": proc.returncode == 0,
-                "stdout": proc.stdout[-4000:],
-                "stderr": proc.stderr[-4000:],
-                "exit_code": proc.returncode,
-            }
-        except subprocess.TimeoutExpired:
-            return {"ok": False, "error": "compile timed out"}
-        except FileNotFoundError:
-            return {"ok": False, "error": "toolchain_missing"}
+
+    def _run_compile() -> dict:
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, f"src{suffix_map[lang]}")
+            outp = os.path.join(td, "a.out")
+            with open(src, "w", encoding="utf-8") as fh:
+                fh.write(code)
+
+            preexec_fn = None
+            if os.name == "posix":
+                def _limits():
+                    import resource
+                    memory_bytes = int(max_memory_mb) * 1024 * 1024
+                    resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
+                    cpu_seconds = max(1, int(float(timeout_seconds)) + 1)
+                    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
+                preexec_fn = _limits
+
+            try:
+                with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+                    proc = subprocess.Popen(
+                        cmd_map[lang](src, outp),
+                        stdout=stdout_file,
+                        stderr=stderr_file,
+                        preexec_fn=preexec_fn,
+                    )
+                    try:
+                        exit_code = proc.wait(timeout=timeout_seconds)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait()
+                        return {"ok": False, "error": "compile timed out"}
+
+                    def _tail(file_obj):
+                        size = file_obj.seek(0, os.SEEK_END)
+                        file_obj.seek(max(0, size - max_output_bytes), os.SEEK_SET)
+                        return file_obj.read().decode("utf-8", errors="replace")
+
+                    return {
+                        "ok": exit_code == 0,
+                        "stdout": _tail(stdout_file),
+                        "stderr": _tail(stderr_file),
+                        "exit_code": exit_code,
+                    }
+            except FileNotFoundError:
+                return {"ok": False, "error": "toolchain_missing"}
+
+    return await asyncio.to_thread(_run_compile)
 
 
 async def _tool_run_code(params: dict) -> dict:
@@ -174,14 +199,35 @@ async def _tool_package_build(params: dict) -> dict:
     doc = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
     if not doc:
         return {"ok": False, "error": f"build_id not found: {build_id}"}
-    kinds = scoped["kinds"]
-    out = await binary_builder.package_build(doc, kinds=kinds)
-    # Persist artifact metadata
+
+    out = await binary_builder.package_build(doc, kinds=scoped["kinds"])
+    oversized = []
+    for artifact in out.get("artifacts", []):
+        size_bytes = int(artifact.get("size_bytes") or 0)
+        if size_bytes > scoped["max_output_bytes"]:
+            oversized.append(str(artifact.get("artifact_id") or "unknown"))
+            artifact_path = artifact.get("path")
+            if isinstance(artifact_path, str):
+                try:
+                    os.remove(artifact_path)
+                except (FileNotFoundError, OSError):
+                    pass
+        else:
+            artifact["retention_days"] = scoped["retention_days"]
+
+    if oversized:
+        return {
+            "ok": False,
+            "error": "artifact_too_large",
+            "artifacts_rejected": oversized,
+        }
+
     try:
-        for art in out["artifacts"]:
+        for art in out.get("artifacts", []):
             await db.build_artifacts.update_one(
                 {"artifact_id": art["artifact_id"]},
-                {"$set": art}, upsert=True,
+                {"$set": art},
+                upsert=True,
             )
     except Exception:
         pass
@@ -190,12 +236,12 @@ async def _tool_package_build(params: dict) -> dict:
 
 async def _tool_mongo_query(params: dict) -> dict:
     scoped = _DATABASE_POLICY.query_request(params)
-    coll = scoped["collection"]
     db = _db()
-    q = scoped["filter"]
-    proj = scoped["project"]
-    limit = scoped["limit"]
-    rows = await db[coll].find(q, proj).limit(limit).to_list(length=limit)
+    coll = scoped["collection"]
+    rows = await db[coll].find(
+        scoped["filter"],
+        scoped["project"],
+    ).limit(scoped["limit"]).to_list(length=scoped["limit"])
     return {"ok": True, "collection": coll, "rows": rows, "count": len(rows)}
 
 
@@ -215,7 +261,7 @@ async def _tool_llm_chat(params: dict) -> dict:
 
 
 async def _tool_web_search(params: dict) -> dict:
-    """Live web search through a bounded egress/result policy."""
+    """Live web search through bounded egress and result policy."""
     scoped = _NETWORK_POLICY.search_request(params)
     query = scoped["query"]
     max_results = scoped["max_results"]
@@ -263,14 +309,14 @@ async def _tool_web_search(params: dict) -> dict:
 # ─────────────────────────────────────────────────────────────────
 ToolFn = Callable[[dict], Coroutine[Any, Any, dict]]
 TOOLS: dict[str, ToolFn] = {
-    "vault_query":    _tool_vault_query,
+    "vault_query": _tool_vault_query,
     "jeeves_consult": _tool_jeeves_consult,
-    "compile_code":   _tool_compile_code,
-    "run_code":       _tool_run_code,
-    "package_build":  _tool_package_build,
-    "mongo_query":    _tool_mongo_query,
-    "llm_chat":       _tool_llm_chat,
-    "web_search":     _tool_web_search,
+    "compile_code": _tool_compile_code,
+    "run_code": _tool_run_code,
+    "package_build": _tool_package_build,
+    "mongo_query": _tool_mongo_query,
+    "llm_chat": _tool_llm_chat,
+    "web_search": _tool_web_search,
 }
 
 
@@ -349,10 +395,21 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
                     "minItems": 1,
                     "maxItems": 2,
                 },
+                "max_output_bytes": {
+                    "type": "integer",
+                    "minimum": 1024,
+                    "maximum": 536870912,
+                },
+                "retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                },
             },
             required=["build_id"],
         ),
         effect=ToolEffect.REVERSIBLE,
+        approval_required=True,
     ),
     "mongo_query": ToolManifest(
         tool_id="mongo_query",
@@ -389,10 +446,7 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
             {
                 "query": {"type": "string", "minLength": 1, "maxLength": 512},
                 "q": {"type": "string", "minLength": 1, "maxLength": 512},
-                "kind": {
-                    "type": "string",
-                    "enum": ["text", "news", "images"],
-                },
+                "kind": {"type": "string", "enum": ["text", "news", "images"]},
                 "max_results": {"type": "integer", "minimum": 1, "maximum": 10},
             }
         ),
@@ -426,7 +480,9 @@ class _CompatibilityResultStore:
                 request.arguments_digest,
             )
         ).encode("utf-8")
-        ref = "legacy-tool-result:" + hashlib.sha256(identity + b"\x1f" + encoded).hexdigest()
+        ref = "legacy-tool-result:" + hashlib.sha256(
+            identity + b"\x1f" + encoded
+        ).hexdigest()
         async with self._lock:
             self._items[ref] = dict(result)
             self._items.move_to_end(ref)
@@ -449,6 +505,42 @@ _CANONICAL_INIT_LOCK = asyncio.Lock()
 _CANONICAL_READY = False
 
 
+async def _result_postcondition(
+    request: ToolExecutionRequest,
+    result_ref: str | None,
+) -> bool:
+    if result_ref is None:
+        return False
+    result = await _CANONICAL_RESULT_STORE.get(result_ref)
+    return bool(result is not None and result.get("ok") is not False)
+
+
+async def _package_compensator(
+    request: ToolExecutionRequest,
+    result_ref: str | None,
+) -> str:
+    if result_ref is not None:
+        result = await _CANONICAL_RESULT_STORE.get(result_ref)
+        if result is not None:
+            for artifact in result.get("artifacts", []):
+                if not isinstance(artifact, dict):
+                    continue
+                path = artifact.get("path")
+                if isinstance(path, str):
+                    try:
+                        os.remove(path)
+                    except (FileNotFoundError, OSError):
+                        pass
+    material = (
+        request.operation_id
+        + "\x1f"
+        + request.tool_id
+        + "\x1f"
+        + request.idempotency_key
+    ).encode("utf-8")
+    return "compensation:" + hashlib.sha256(material).hexdigest()
+
+
 async def _ensure_canonical_runtime() -> None:
     global _CANONICAL_READY
     if _CANONICAL_READY:
@@ -466,13 +558,22 @@ async def _ensure_canonical_runtime() -> None:
             ) -> str:
                 try:
                     result = await _fn(dict(request.arguments))
-                except ToolAdapterDenied as exc:
-                    raise ToolExecutionDenied("tool_denied") from exc
+                except ToolAdapterDenied:
+                    result = {"ok": False, "error": "tool_denied"}
                 except Exception:
                     result = {"ok": False, "error": "tool_failed"}
                 return await _CANONICAL_RESULT_STORE.put(request, result)
 
-            await _CANONICAL_RUNTIME.register(manifest, handler)
+            await _CANONICAL_RUNTIME.register(
+                manifest,
+                handler,
+                postcondition=_result_postcondition,
+                compensate=(
+                    _package_compensator
+                    if manifest.effect is ToolEffect.REVERSIBLE
+                    else None
+                ),
+            )
         _CANONICAL_READY = True
 
 
@@ -487,11 +588,7 @@ async def invoke_canonical(
     approval_ref: str | None = None,
     delegated_authority_ref: str | None = None,
 ) -> dict:
-    """Execute through canonical request/receipt authority.
-
-    The returned payload preserves legacy result fields and attaches a sanitized
-    canonical receipt. Exact concurrent retries share one execution reservation.
-    """
+    """Execute through canonical request/receipt authority."""
 
     if tool not in TOOLS:
         return {
@@ -512,6 +609,7 @@ async def invoke_canonical(
         delegated_authority_ref=delegated_authority_ref,
     )
     receipt = await _CANONICAL_RUNTIME.execute(request)
+
     if receipt.status is ToolExecutionStatus.DENIED:
         return {
             "ok": False,
@@ -541,52 +639,100 @@ async def invoke_canonical(
     return result
 
 
-async def invoke(tool: str, params: dict) -> dict:
-    """Legacy-compatible dispatch delegated through canonical tool authority."""
+async def invoke(
+    tool: str,
+    params: dict,
+    *,
+    operation_id: str | None = None,
+    tenant_id: str = "legacy-backend",
+    idempotency_key: str | None = None,
+    request_id: str | None = None,
+    approval_ref: str | None = None,
+    delegated_authority_ref: str = "legacy:backend/services/tool_registry.invoke",
+) -> dict:
+    """Legacy-compatible entrypoint delegated through canonical authority."""
 
-    request_id = str(uuid4())
+    manifest = _TOOL_MANIFESTS.get(tool)
+    if manifest is None:
+        return {
+            "ok": False,
+            "error": f"unknown tool: {tool}",
+            "available": list(TOOLS.keys()),
+        }
+
+    rid = request_id or str(uuid4())
+    op_id = operation_id or str(uuid4())
+    if manifest.effect is not ToolEffect.READ_ONLY and not idempotency_key:
+        return {
+            "ok": False,
+            "error": "idempotency_key_required",
+            "tool": tool,
+        }
+    key = idempotency_key or rid
     return await invoke_canonical(
         tool,
         params or {},
-        operation_id=str(uuid4()),
-        tenant_id="legacy-backend",
-        idempotency_key=request_id,
-        request_id=request_id,
-        delegated_authority_ref="legacy:backend/services/tool_registry.invoke",
+        operation_id=op_id,
+        tenant_id=tenant_id,
+        idempotency_key=key,
+        request_id=rid,
+        approval_ref=approval_ref,
+        delegated_authority_ref=delegated_authority_ref,
     )
 
 
 async def invoke_many(calls: list[dict]) -> list[dict]:
-    """Parallel compatibility calls, each delegated through canonical authority."""
+    """Parallel compatibility calls delegated through canonical authority."""
 
     coros = [
-        invoke(c.get("tool"), c.get("params", {}))
-        for c in calls
+        invoke(
+            call.get("tool"),
+            call.get("params", {}),
+            operation_id=call.get("operation_id"),
+            tenant_id=call.get("tenant_id") or "legacy-backend",
+            idempotency_key=call.get("idempotency_key"),
+            request_id=call.get("request_id"),
+            approval_ref=call.get("approval_ref"),
+            delegated_authority_ref=(
+                call.get("delegated_authority_ref")
+                or "legacy:backend/services/tool_registry.invoke_many"
+            ),
+        )
+        for call in calls
     ]
     return await asyncio.gather(*coros, return_exceptions=False)
 
 
 def describe() -> dict:
-    tools = []
     legacy_params = {
         "vault_query": ["topic|collection", "limit", "contains?"],
         "jeeves_consult": ["context", "topic?"],
         "compile_code": ["language", "code"],
         "run_code": ["language=python", "code"],
-        "package_build": ["build_id", "kinds=[zip,apk]"],
+        "package_build": [
+            "build_id",
+            "kinds=[zip,apk]",
+            "max_output_bytes?",
+            "retention_days?",
+        ],
         "mongo_query": ["collection", "filter", "limit"],
         "llm_chat": ["prompt", "model?", "system?"],
         "web_search": ["query"],
     }
-    for name in TOOLS:
-        manifest = _TOOL_MANIFESTS[name]
-        tools.append(
+    items = []
+    for name, manifest in _TOOL_MANIFESTS.items():
+        items.append(
             {
                 "name": name,
                 "params": legacy_params[name],
                 "effect": manifest.effect.value,
                 "approval_required": manifest.approval_required,
+                "idempotency_required": manifest.effect is not ToolEffect.READ_ONLY,
                 "canonical_version": manifest.version,
             }
         )
-    return {"tools": tools, "count": len(tools), "authority": "canonical-tool-runtime"}
+    return {
+        "tools": items,
+        "count": len(items),
+        "authority": "canonical-tool-runtime",
+    }

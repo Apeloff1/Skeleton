@@ -9,6 +9,7 @@ artifact builders.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import ipaddress
 import json
 import math
 import re
@@ -56,6 +57,8 @@ class SandboxAdapterPolicy:
     allowed_compile_languages: frozenset[str] = frozenset({"c", "cpp", "cxx", "go", "rust"})
     max_source_chars: int = 200_000
     max_compile_seconds: float = 30.0
+    max_output_bytes: int = 64 * 1024
+    max_memory_mb: int = 512
 
     def __post_init__(self) -> None:
         if not self.allowed_compile_languages:
@@ -65,6 +68,10 @@ class SandboxAdapterPolicy:
         timeout = float(self.max_compile_seconds)
         if not math.isfinite(timeout) or timeout <= 0 or timeout > 120:
             raise ValueError("max_compile_seconds must be within (0, 120]")
+        if self.max_output_bytes < 1024 or self.max_output_bytes > 4 * 1024 * 1024:
+            raise ValueError("max_output_bytes must be within [1KiB, 4MiB]")
+        if self.max_memory_mb < 32 or self.max_memory_mb > 4096:
+            raise ValueError("max_memory_mb must be within [32, 4096]")
 
     def compile_request(self, params: Mapping[str, Any]) -> dict[str, Any]:
         data = _mapping(params, "compile params")
@@ -82,6 +89,8 @@ class SandboxAdapterPolicy:
             "language": language,
             "code": code,
             "timeout_seconds": float(self.max_compile_seconds),
+            "max_output_bytes": self.max_output_bytes,
+            "max_memory_mb": self.max_memory_mb,
         }
 
 
@@ -171,6 +180,31 @@ class NetworkEgressPolicy:
         parsed = urlparse(raw_url)
         if parsed.scheme.lower() not in self.allowed_result_schemes or not parsed.netloc:
             return None
+        if parsed.username is not None or parsed.password is not None:
+            return None
+        hostname = (parsed.hostname or "").rstrip(".").lower()
+        if not hostname:
+            return None
+        if (
+            hostname in {"localhost", "localhost.localdomain", "metadata.google.internal"}
+            or hostname.endswith(".localhost")
+            or hostname.endswith(".local")
+            or hostname.endswith(".internal")
+        ):
+            return None
+        try:
+            address = ipaddress.ip_address(hostname)
+        except ValueError:
+            address = None
+        if address is not None and (
+            address.is_private
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_multicast
+            or address.is_reserved
+            or address.is_unspecified
+        ):
+            return None
         snippet = str(result.get("body") or result.get("description") or "")[
             : self.max_snippet_chars
         ]
@@ -184,6 +218,16 @@ _BUILD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$")
 class ArtifactAdapterPolicy:
     allowed_kinds: frozenset[str] = frozenset({"zip", "apk"})
     max_kinds: int = 2
+    max_artifact_bytes: int = 512 * 1024 * 1024
+    max_retention_days: int = 30
+
+    def __post_init__(self) -> None:
+        if self.max_kinds < 1 or self.max_kinds > len(self.allowed_kinds):
+            raise ValueError("max_kinds is invalid")
+        if self.max_artifact_bytes < 1024 or self.max_artifact_bytes > 4 * 1024 * 1024 * 1024:
+            raise ValueError("max_artifact_bytes is invalid")
+        if self.max_retention_days < 1 or self.max_retention_days > 365:
+            raise ValueError("max_retention_days is invalid")
 
     def package_request(self, params: Mapping[str, Any]) -> dict[str, Any]:
         data = _mapping(params, "artifact params")
@@ -198,7 +242,24 @@ class ArtifactAdapterPolicy:
             raise ToolAdapterDenied("artifact kind count exceeds policy")
         if any(kind not in self.allowed_kinds for kind in kinds):
             raise ToolAdapterDenied("artifact kind is not allowed")
-        return {"build_id": build_id, "kinds": list(kinds)}
+        max_output_bytes = _bounded_int(
+            data.get("max_output_bytes", self.max_artifact_bytes),
+            "max_output_bytes",
+            minimum=1024,
+            maximum=self.max_artifact_bytes,
+        )
+        retention_days = _bounded_int(
+            data.get("retention_days", min(7, self.max_retention_days)),
+            "retention_days",
+            minimum=1,
+            maximum=self.max_retention_days,
+        )
+        return {
+            "build_id": build_id,
+            "kinds": list(kinds),
+            "max_output_bytes": max_output_bytes,
+            "retention_days": retention_days,
+        }
 
 
 __all__ = [
