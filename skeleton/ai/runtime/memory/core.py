@@ -47,6 +47,8 @@ class InMemoryTFIDFStore:
         self._total_docs = 0
 
     def add(self, chunk: Chunk) -> None:
+        if chunk.chunk_id in self._docs:
+            self.delete(chunk.chunk_id)
         self._docs[chunk.chunk_id] = chunk
         terms = self._tokenize(chunk.text)
         freq: Dict[str, int] = {}
@@ -84,6 +86,24 @@ class InMemoryTFIDFStore:
             for doc_id, score in ranked
         ]
 
+    def delete(self, chunk_id: str) -> bool:
+        chunk = self._docs.pop(chunk_id, None)
+        if chunk is None:
+            return False
+        for term in set(self._tokenize(chunk.text)):
+            postings = self._term_freq.get(term)
+            if postings is not None:
+                postings.pop(chunk_id, None)
+                if not postings:
+                    self._term_freq.pop(term, None)
+            remaining = self._doc_freq.get(term, 0) - 1
+            if remaining > 0:
+                self._doc_freq[term] = remaining
+            else:
+                self._doc_freq.pop(term, None)
+        self._total_docs = max(0, self._total_docs - 1)
+        return True
+
     def stats(self) -> Dict[str, Any]:
         return {
             "documents": len(self._docs),
@@ -120,6 +140,11 @@ class CAGStore:
                 results.append({"key": key, "value": entry["value"], "context": context})
         return results
 
+    def delete(self, key: str) -> bool:
+        existed = self._entries.pop(key, None) is not None
+        self._associations.pop(key, None)
+        return existed
+
     def stats(self) -> Dict[str, Any]:
         return {"entries": len(self._entries), "associations": len(self._associations)}
 
@@ -144,6 +169,19 @@ class MAGStore:
     def recall_by_tag(self, tag: str) -> List[Dict[str, Any]]:
         episode_ids = self._tag_index.get(tag, set())
         return [self._episodes[eid] for eid in episode_ids if eid in self._episodes]
+
+    def delete(self, episode_id: str) -> bool:
+        episode = self._episodes.pop(episode_id, None)
+        if episode is None:
+            return False
+        for tag in episode.get("tags", []):
+            ids = self._tag_index.get(tag)
+            if ids is None:
+                continue
+            ids.discard(episode_id)
+            if not ids:
+                self._tag_index.pop(tag, None)
+        return True
 
     def stats(self) -> Dict[str, Any]:
         return {

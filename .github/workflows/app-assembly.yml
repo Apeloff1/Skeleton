@@ -68,6 +68,9 @@ on:
       - "skeleton/persistence/memory_repository.py"
       - "skeleton/memory/policy.py"
       - "skeleton/memory/writeback.py"
+      - "skeleton/memory/projection.py"
+      - "skeleton/memory/core.py"
+      - "skeleton/memory/vector.py"
       - "skeleton/testing/test_operation_store.py"
       - "skeleton/testing/test_operation_runtime.py"
       - "skeleton/testing/test_operation_server_binding.py"
@@ -75,6 +78,7 @@ on:
       - "skeleton/testing/test_memory_repository.py"
       - "skeleton/testing/test_mongo_memory_repository.py"
       - "skeleton/testing/test_memory_writeback.py"
+      - "skeleton/testing/test_memory_projection.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
@@ -354,7 +358,7 @@ jobs:
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py
-          skeleton/memory/policy.py skeleton/memory/writeback.py
+          skeleton/memory/policy.py skeleton/memory/writeback.py skeleton/memory/projection.py skeleton/memory/core.py skeleton/memory/vector.py
           skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
           backend/core/operation_stream_transport.py backend/routes/operation_stream.py backend/routes/app_runtime.py
@@ -439,6 +443,7 @@ jobs:
           skeleton/testing/test_memory_repository.py
           skeleton/testing/test_mongo_memory_repository.py
           skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_memory_projection.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
