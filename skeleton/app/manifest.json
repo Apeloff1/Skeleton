@@ -48,18 +48,29 @@
       "MONGO_URL",
       "SKL_MONGO_URI",
       "MONGO_INITDB_ROOT_PASSWORD",
-      "JWT_SECRET"
+      "JWT_SECRET",
+      "GF_SEAL_SECRET"
     ],
     "optional_env": [
       "OPENAI_API_KEY",
-      "EMERGENT_LLM_KEY",
       "STRIPE_API_KEY",
       "SKELETON_MASTER_SECRET",
       "GF_SEAL_SECRET",
       "EXPO_PUBLIC_BACKEND_URL",
       "EXPO_PUBLIC_SKELETON_URL",
-      "SKELETON_INTERNAL_URL"
-    ]
+      "SKELETON_INTERNAL_URL",
+      "CODEDOCK_ENGINE_SERVICE_PRINCIPAL",
+      "AI_PROVIDER",
+      "AI_TIMEOUT_SECONDS",
+      "AI_MAX_RETRIES"
+    ],
+    "credential_owners": {
+      "OPENAI_API_KEY": "skeleton",
+      "GF_SEAL_SECRET": "skeleton+backend-auth",
+      "JWT_SECRET": "backend",
+      "STRIPE_API_KEY": "backend",
+      "SKELETON_MASTER_SECRET": "skeleton"
+    }
   },
   "services": [
     {
@@ -204,7 +215,14 @@
     "machine/ai_runtime_schemas.json",
     "machine/ai_implementation_handoff.json",
     "machine/ai_closure_evidence.json",
-    "machine/ai_capabilities.json"
+    "machine/ai_capabilities.json",
+    "backend/core/engine_client.py",
+    "backend/tests/test_engine_client.py",
+    "backend/tests/test_engine_provider_adapter.py",
+    "skeleton/api/engine_authority.py",
+    "skeleton/api/engine_runtime.py",
+    "skeleton/api/engine_service.py",
+    "skeleton/api/engine_routes.py"
   ],
   "architecture": {
     "contract": "machine/architecture.json",
@@ -235,6 +253,11 @@
     "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
     "implementation_handoff": "machine/ai_implementation_handoff.json",
     "closure_evidence_ledger": "machine/ai_closure_evidence.json",
-    "capability_registry": "machine/ai_capabilities.json"
+    "capability_registry": "machine/ai_capabilities.json",
+    "engine_execution_owner": "skeleton",
+    "engine_client": "backend/core/engine_client.py",
+    "engine_routes": "skeleton/api/engine_routes.py",
+    "provider_credential_owner": "skeleton",
+    "backend_provider_mode": "engine-client-only"
   }
 }
