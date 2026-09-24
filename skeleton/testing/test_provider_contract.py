@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import URLError
 
@@ -8,8 +9,22 @@ import pytest
 
 from skeleton.automation.free_model import FreeModelClient, ModelError, redact_secrets
 from skeleton.jeeves.providers import AnthropicProvider, OpenAIProvider
-from skeleton.provider_contract import load_provider_architecture
-from skeleton.provider_runtime import OpenAISyncProviderAdapter, ProviderRequest
+from skeleton.provider_contract import (
+    FinishReason,
+    ProviderProtocolError,
+    ProviderToolCall,
+    ProviderToolDefinition,
+    ProviderUsage,
+    load_provider_architecture,
+)
+from skeleton.provider_runtime import (
+    OpenAISyncProviderAdapter,
+    ProviderAdapter,
+    ProviderInvocationError,
+    ProviderRequest,
+    ProviderResponse,
+    provider_response_deltas,
+)
 
 
 class _Response:
@@ -232,3 +247,334 @@ def test_jeeves_provider_module_contains_no_runtime_credentials_or_transport() -
 
     assert "OpenAISyncProviderAdapter" in source
     assert "ProviderRequest" in source
+
+
+
+def _tool_definition(name: str = "repo.read") -> ProviderToolDefinition:
+    return ProviderToolDefinition(
+        tool_id=name,
+        description="Read a repository file",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    )
+
+
+def test_provider_tool_call_digest_is_canonical_and_self_validating() -> None:
+    left = ProviderToolCall(
+        call_id="call-1",
+        tool_id="repo.read",
+        arguments={"b": 2, "a": 1},
+    )
+    right = ProviderToolCall(
+        call_id="call-2",
+        tool_id="repo.read",
+        arguments={"a": 1, "b": 2},
+    )
+
+    assert left.arguments_digest == right.arguments_digest
+    with pytest.raises(ProviderProtocolError, match="does not match"):
+        ProviderToolCall(
+            call_id="call-3",
+            tool_id="repo.read",
+            arguments={"a": 1},
+            arguments_digest="0" * 64,
+        )
+
+
+def test_provider_usage_keeps_unknown_values_unknown() -> None:
+    usage = ProviderUsage(usage_source="unknown")
+
+    assert usage.input_tokens is None
+    assert usage.output_tokens is None
+    assert usage.total_tokens is None
+    assert usage.billed_cost is None
+    assert usage.as_dict()["usage_source"] == "unknown"
+
+
+def test_sync_openai_accepts_tool_only_response_and_normalizes_call(monkeypatch) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return _Response(
+            json.dumps(
+                {
+                    "id": "resp-tool",
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "function_call",
+                            "call_id": "call-1",
+                            "name": "repo.read",
+                            "arguments": json.dumps({"path": "README.md"}),
+                        }
+                    ],
+                    "usage": {
+                        "input_tokens": 12,
+                        "output_tokens": 4,
+                        "total_tokens": 16,
+                    },
+                }
+            ).encode("utf-8")
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    adapter = OpenAISyncProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        timeout_seconds=5,
+        max_retries=0,
+    )
+
+    response = adapter.generate_sync(
+        ProviderRequest(
+            instructions="use tools when needed",
+            prompt="read README",
+            operation_id="tool-only-test",
+            tools=(_tool_definition(),),
+            tool_choice="required",
+        )
+    )
+
+    assert response.text is None
+    assert response.finish_reason is FinishReason.TOOL_CALLS
+    assert len(response.tool_calls) == 1
+    assert response.tool_calls[0].tool_id == "repo.read"
+    assert response.tool_calls[0].arguments == {"path": "README.md"}
+    assert response.usage.input_tokens == 12
+    assert response.usage.total_tokens == 16
+    assert captured["body"]["tools"][0]["name"] == "repo.read"
+    assert captured["body"]["tool_choice"] == "required"
+
+
+def test_sync_openai_rejects_unoffered_tool_call(monkeypatch) -> None:
+    def fake_urlopen(request, timeout):
+        return _Response(
+            json.dumps(
+                {
+                    "id": "resp-tool",
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "function_call",
+                            "call_id": "call-1",
+                            "name": "repo.delete",
+                            "arguments": "{}",
+                        }
+                    ],
+                }
+            ).encode("utf-8")
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    adapter = OpenAISyncProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+    )
+
+    with pytest.raises(ProviderInvocationError, match="unoffered tool"):
+        adapter.generate_sync(
+            ProviderRequest(
+                instructions="read only",
+                prompt="inspect",
+                operation_id="unoffered-tool-test",
+                tools=(_tool_definition("repo.read"),),
+            )
+        )
+
+
+def test_sync_openai_normalizes_structured_output(monkeypatch) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return _Response(
+            json.dumps(
+                {
+                    "id": "resp-json",
+                    "status": "completed",
+                    "output_text": json.dumps({"answer": 42}),
+                    "output": [],
+                }
+            ).encode("utf-8")
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    adapter = OpenAISyncProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+    )
+
+    response = adapter.generate_sync(
+        ProviderRequest(
+            instructions="return json",
+            prompt="answer",
+            operation_id="structured-test",
+            structured_output_schema={
+                "type": "object",
+                "properties": {"answer": {"type": "integer"}},
+                "required": ["answer"],
+                "additionalProperties": False,
+            },
+        )
+    )
+
+    assert response.structured_output == {"answer": 42}
+    assert response.finish_reason is FinishReason.COMPLETED
+    assert captured["body"]["text"]["format"]["type"] == "json_schema"
+
+
+def test_sync_openai_deadline_clamps_transport_timeout(monkeypatch) -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["timeout"] = timeout
+        return _Response(
+            json.dumps(
+                {
+                    "id": "resp-deadline",
+                    "status": "completed",
+                    "output_text": "ok",
+                    "output": [],
+                }
+            ).encode("utf-8")
+        )
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    adapter = OpenAISyncProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        timeout_seconds=5,
+        max_retries=0,
+    )
+
+    response = adapter.generate_sync(
+        ProviderRequest(
+            instructions="answer",
+            prompt="hello",
+            operation_id="deadline-test",
+            deadline=datetime.now(timezone.utc) + timedelta(seconds=1),
+        )
+    )
+
+    assert response.text == "ok"
+    assert 0 < captured["timeout"] <= 1.0
+
+
+def test_sync_openai_rejects_expired_deadline_before_network(monkeypatch) -> None:
+    called = {"network": 0}
+
+    def fake_urlopen(request, timeout):
+        called["network"] += 1
+        raise AssertionError("network must not be reached")
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    adapter = OpenAISyncProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+    )
+
+    with pytest.raises(ProviderInvocationError, match="deadline exceeded"):
+        adapter.generate_sync(
+            ProviderRequest(
+                instructions="answer",
+                prompt="hello",
+                operation_id="expired-deadline-test",
+                deadline=datetime.now(timezone.utc) - timedelta(seconds=1),
+            )
+        )
+
+    assert called["network"] == 0
+
+
+
+def test_normalized_response_decomposes_into_ordered_neutral_deltas() -> None:
+    usage = ProviderUsage(
+        input_tokens=10,
+        output_tokens=4,
+        total_tokens=14,
+        usage_source="provider",
+    )
+    tool_call = ProviderToolCall(
+        call_id="call-1",
+        tool_id="repo.read",
+        arguments={"path": "README.md"},
+    )
+    response = ProviderResponse(
+        text="answer",
+        provider="test",
+        model="model",
+        response_id="resp-1",
+        structured_output={"answer": 42},
+        tool_calls=(tool_call,),
+        finish_reason=FinishReason.TOOL_CALLS,
+        usage=usage,
+    )
+
+    deltas = provider_response_deltas(
+        response,
+        emitted_at=datetime(2026, 9, 24, 0, 30, tzinfo=timezone.utc),
+    )
+
+    assert [delta.sequence for delta in deltas] == [0, 1, 2, 3, 4]
+    assert [delta.kind.value for delta in deltas] == [
+        "text",
+        "structured",
+        "tool_call",
+        "usage",
+        "final",
+    ]
+    assert deltas[0].text == "answer"
+    assert deltas[1].structured_fragment == {"answer": 42}
+    assert deltas[2].tool_call == tool_call
+    assert deltas[3].usage == usage
+    assert deltas[4].finish_reason is FinishReason.TOOL_CALLS
+    assert all(delta.response_id == "resp-1" for delta in deltas)
+
+
+@pytest.mark.asyncio
+async def test_default_provider_stream_uses_neutral_delta_contract() -> None:
+    calls = {"generate": 0}
+
+    class FakeAdapter(ProviderAdapter):
+        provider_id = "fake"
+        model = "fake-model"
+
+        @property
+        def available(self) -> bool:
+            return True
+
+        async def generate(self, request: ProviderRequest) -> ProviderResponse:
+            calls["generate"] += 1
+            return ProviderResponse(
+                text="hello",
+                provider=self.provider_id,
+                model=self.model,
+                response_id="resp-stream",
+                finish_reason=FinishReason.COMPLETED,
+                usage=ProviderUsage(
+                    input_tokens=1,
+                    output_tokens=1,
+                    total_tokens=2,
+                    usage_source="provider",
+                ),
+            )
+
+    request = ProviderRequest(
+        instructions="answer",
+        prompt="hello",
+        operation_id="stream-test",
+    )
+    deltas = [delta async for delta in FakeAdapter().stream(request)]
+
+    assert calls["generate"] == 1
+    assert [delta.kind.value for delta in deltas] == ["text", "usage", "final"]
+    assert deltas[-1].finish_reason is FinishReason.COMPLETED
+    assert deltas[-1].response_id == "resp-stream"
