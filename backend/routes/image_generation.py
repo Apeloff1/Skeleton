@@ -22,6 +22,7 @@ from core.ai_provider import (
     ProviderRegistry,
     ProviderRequest,
 )
+from skeleton.context.instruction_policy import INSTRUCTION_POLICIES
 import uuid
 import base64
 import asyncio
@@ -430,27 +431,19 @@ async def enhance_prompt(
     if provider not in {"openai", "auto"}:
         raise HTTPException(status_code=409, detail="Requested provider is not declared")
     request_id = str(uuid.uuid4())
-    enhancement_prompt = f"""Create an enhanced, detailed image generation prompt based on:
-
-Original: {prompt}
-{f'Style: {style}' if style else ''}
-
-Create a vivid, specific prompt that includes:
-1. Main subject with precise details
-2. Composition and framing
-3. Lighting and atmosphere
-4. Color palette
-5. Background elements
-6. Mood and emotion
-7. Technical aspects (depth of field, angle, etc.)
-
-Output only the enhanced prompt, no explanations."""
+    enhancement_prompt = (
+        "BEGIN USER IMAGE PROMPT DATA\n"
+        f"Original: {prompt}\n"
+        f"{f'Style: {style}' if style else 'Style: unspecified'}\n"
+        "END USER IMAGE PROMPT DATA"
+    )
+    policy = INSTRUCTION_POLICIES.resolve("image.prompt_enhance")
 
     try:
         adapter = ProviderRegistry.from_env().require_active()
         response = await adapter.generate(
             ProviderRequest(
-                instructions="You are an expert at creating detailed image prompts.",
+                instructions=policy.content,
                 prompt=enhancement_prompt,
                 purpose="image-prompt-enhancement",
             )

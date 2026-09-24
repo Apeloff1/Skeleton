@@ -51,8 +51,13 @@ on:
       - "skeleton/contracts/memory_record.py"
       - "skeleton/context/compiler.py"
       - "skeleton/context/policy.py"
+      - "skeleton/context/instruction_policy.py"
       - "skeleton/context/sources/**"
       - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/testing/test_context_source_adapters.py"
+      - "skeleton/testing/test_context_provider_binding.py"
+      - "skeleton/testing/test_instruction_policy.py"
+      - "backend/tests/test_instruction_policy_convergence.py"
       - "skeleton/skills/tool_contract.py"
       - "skeleton/skills/tool_runtime.py"
       - "skeleton/skills/tool_receipt_store.py"
@@ -349,7 +354,7 @@ jobs:
           skeleton/app skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
           skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py
-          skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
+          skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/instruction_policy.py skeleton/context/sources
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py
@@ -365,7 +370,7 @@ jobs:
           skeleton/vault/governance_registry.py skeleton/vault/governance_audit.py skeleton/vault/lifecycle_adapters.py skeleton/intelligence/admission.py
           skeleton/intelligence/admission_runtime.py skeleton/intelligence/quota.py skeleton/intelligence/quota_sqlite.py
           backend/core/ai_provider.py backend/core/provider_architecture.py
-          backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
+          backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py backend/routes/ai.py backend/routes/image_generation.py
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
@@ -439,6 +444,9 @@ jobs:
           skeleton/testing/test_mongo_memory_repository.py
           skeleton/testing/test_memory_writeback.py
           skeleton/testing/test_context_compiler.py
+          skeleton/testing/test_context_source_adapters.py
+          skeleton/testing/test_context_provider_binding.py
+          skeleton/testing/test_instruction_policy.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
           skeleton/testing/test_tool_adapters.py
@@ -469,6 +477,7 @@ jobs:
           backend/tests/test_conversations_api.py
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_instruction_policy_convergence.py
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py

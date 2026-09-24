@@ -8,6 +8,13 @@ from skeleton.context.compiler import (
     project_provider_context,
 )
 from skeleton.context.cockpit import Cockpit, CockpitError
+from skeleton.context.instruction_policy import (
+    INSTRUCTION_POLICIES,
+    InstructionPolicy,
+    InstructionPolicyError,
+    InstructionPolicyRegistry,
+    build_default_instruction_policy_registry,
+)
 from skeleton.context.policy import (
     ContextAdmissionDecision,
     ContextCompilePolicy,
@@ -39,6 +46,11 @@ __all__ = [
     "ContextCompilePolicy",
     "ContextCompiler",
     "ContextPolicyError",
+    "INSTRUCTION_POLICIES",
+    "InstructionPolicy",
+    "InstructionPolicyError",
+    "InstructionPolicyRegistry",
+    "build_default_instruction_policy_registry",
     "ProviderContextProjection",
     "project_provider_context",
     "AXES",
