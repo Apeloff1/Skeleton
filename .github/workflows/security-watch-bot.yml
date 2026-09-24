@@ -31,6 +31,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install security-watch runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input \
+            'pydantic>=2,<3' \
+            'pydantic-settings>=2,<3'
+
       - name: Inspect dependency security queue
         env:
           GH_TOKEN: ${{ github.token }}
