@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 import sys
 from typing import Iterable
 
