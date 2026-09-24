@@ -209,6 +209,8 @@ def candidate_files() -> Iterable[Path]:
         relative = Path(relative_text)
         if relative.is_absolute() or ".." in relative.parts:
             raise OSError("tracked-file enumeration produced an unsafe path")
+        if any(part in SKIP_DIRS for part in relative.parts[:-1]):
+            continue
 
         path = root / relative
         try:

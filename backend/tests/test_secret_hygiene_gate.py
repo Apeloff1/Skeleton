@@ -36,9 +36,12 @@ def test_candidate_files_uses_git_index_not_workspace_walk(
     tracked_markdown.write_text("tracked docs\n", encoding="utf-8")
     tracked_binary = tmp_path / "asset.bin"
     tracked_binary.write_bytes(b"binary")
+    skipped = tmp_path / "build" / "generated.py"
+    skipped.parent.mkdir()
+    skipped.write_text("print('tracked build output')\n", encoding="utf-8")
     untracked = tmp_path / "generated.py"
     untracked.write_text("API_KEY='generated-only'\n", encoding="utf-8")
-    _git(tmp_path, "add", "tracked.py", "docs/notes.md", "asset.bin")
+    _git(tmp_path, "add", "tracked.py", "docs/notes.md", "asset.bin", "build/generated.py")
 
     monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
 
@@ -46,6 +49,7 @@ def test_candidate_files_uses_git_index_not_workspace_walk(
 
     assert paths == ["docs/notes.md", "tracked.py"]
     assert "generated.py" not in paths
+    assert "build/generated.py" not in paths
     assert "asset.bin" not in paths
 
 
