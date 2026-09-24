@@ -40,6 +40,17 @@ services:
       - SKL_CHROMA_PORT=8000
       - SKL_OPERATION_STATE_PATH=/app/data/operation_state.sqlite
       - SKL_OPERATION_STREAM_PATH=/app/data/operation_stream.sqlite
+      - SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite3
+      - SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite3
+      - SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite3
+      - SKL_ENGINE_SERVICE_PRINCIPAL=${CODEDOCK_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
+      - SKL_ENGINE_ALLOWED_TENANTS_CSV=${SKL_ENGINE_ALLOWED_TENANTS_CSV:-*}
+      - SKL_ENGINE_ALLOWED_CAPABILITIES_CSV=${SKL_ENGINE_ALLOWED_CAPABILITIES_CSV:-*}
+      - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be set}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - AI_TIMEOUT_SECONDS=${AI_TIMEOUT_SECONDS:-45}
+      - AI_MAX_RETRIES=${AI_MAX_RETRIES:-2}
     depends_on:
       mongo:
         condition: service_healthy
@@ -80,9 +91,9 @@ services:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-false}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
+      - GF_SEAL_SECRET=${GF_SEAL_SECRET:?GF_SEAL_SECRET must be set}
+      - CODEDOCK_ENGINE_SERVICE_PRINCIPAL=${CODEDOCK_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
       - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
