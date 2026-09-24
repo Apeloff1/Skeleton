@@ -97,6 +97,36 @@ class ExecutionVerificationDecision:
         return dict(self.receipt)
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutionFinalizationBindings:
+    """External durable references bound into the terminal result."""
+
+    memory_refs: tuple[str, ...] = ()
+    artifact_refs: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for field_name in ("memory_refs", "artifact_refs"):
+            values = getattr(self, field_name)
+            if isinstance(values, (str, bytes)):
+                raise CognitiveExecutionError(
+                    f"{field_name} must be an iterable of references"
+                )
+            normalized: list[str] = []
+            for raw in values:
+                if not isinstance(raw, str) or not raw.strip():
+                    raise CognitiveExecutionError(
+                        f"{field_name} must contain non-empty strings"
+                    )
+                value = raw.strip()
+                if value not in normalized:
+                    normalized.append(value)
+                if len(normalized) > 1024:
+                    raise CognitiveExecutionError(
+                        f"{field_name} exceeds maximum reference count"
+                    )
+            object.__setattr__(self, field_name, tuple(normalized))
+
+
 ToolResultResolver = Callable[
     [ToolExecutionReceipt],
     str | Awaitable[str],
@@ -104,6 +134,10 @@ ToolResultResolver = Callable[
 VerificationHook = Callable[
     [AIExecutionRequest, str, str],
     ExecutionVerificationDecision | Awaitable[ExecutionVerificationDecision],
+]
+FinalizationBindingHook = Callable[
+    [AIExecutionRequest, str, Mapping[str, object]],
+    ExecutionFinalizationBindings | Awaitable[ExecutionFinalizationBindings],
 ]
 
 
@@ -265,6 +299,7 @@ class CognitiveExecutionRuntime:
         *,
         tool_result_resolver: ToolResultResolver | None = None,
         verification_hook: VerificationHook | None = None,
+        finalization_binding_hook: FinalizationBindingHook | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -279,6 +314,7 @@ class CognitiveExecutionRuntime:
             tool_result_resolver or self._default_tool_result_resolver
         )
         self.verification_hook = verification_hook
+        self.finalization_binding_hook = finalization_binding_hook
         self._verification_runtime = VerificationRuntime()
 
     @staticmethod
@@ -511,6 +547,17 @@ class CognitiveExecutionRuntime:
                     execution_id=execution_id,
                     state=execution.state,
                     result=result,
+                )
+            staged = self.repository.finalization_intent(execution_id)
+            if staged is not None:
+                terminal = self.repository.finalize_staged(
+                    execution_id,
+                    now=now,
+                )
+                return ExecutionRunResult(
+                    execution_id=terminal.execution_id,
+                    state=terminal.state,
+                    result=staged.result,
                 )
 
             payload = self._checkpoint_payload(execution_id)
@@ -1559,6 +1606,49 @@ class CognitiveExecutionRuntime:
             evidence_refs=evidence_refs,
         )
 
+    async def _finalization_bindings(
+        self,
+        execution: AIExecution,
+        candidate: str,
+        payload: Mapping[str, object],
+    ) -> ExecutionFinalizationBindings:
+        if self.finalization_binding_hook is None:
+            return ExecutionFinalizationBindings()
+        bindings = await _await_maybe(
+            self.finalization_binding_hook(
+                execution.request,
+                candidate,
+                payload,
+            )
+        )
+        if not isinstance(bindings, ExecutionFinalizationBindings):
+            raise CognitiveExecutionError(
+                "finalization_binding_hook must return ExecutionFinalizationBindings"
+            )
+        return bindings
+
+    def _commit_terminal_result(
+        self,
+        execution: AIExecution,
+        result: AIExecutionResult,
+        *,
+        now: datetime | None,
+    ) -> ExecutionRunResult:
+        self.repository.stage_finalization(
+            result,
+            expected_execution_version=execution.version,
+            now=now,
+        )
+        terminal = self.repository.finalize_staged(
+            execution.execution_id,
+            now=now,
+        )
+        return ExecutionRunResult(
+            execution_id=terminal.execution_id,
+            state=terminal.state,
+            result=result,
+        )
+
     async def _verify_and_finalize(
         self,
         execution: AIExecution,
@@ -1596,6 +1686,11 @@ class CognitiveExecutionRuntime:
                 verification=verification,
             )
 
+        bindings = await self._finalization_bindings(
+            execution,
+            candidate,
+            payload,
+        )
         terminal_event = (
             "stream-terminal:"
             + execution.execution_id
@@ -1618,6 +1713,8 @@ class CognitiveExecutionRuntime:
                 str(item)
                 for item in payload.get("tool_receipts", [])
             ),
+            memory_refs=bindings.memory_refs,
+            artifact_refs=bindings.artifact_refs,
             usage={
                 "model_turns": int(payload.get("model_turns", 0)),
                 "tool_calls": int(payload.get("tool_calls", 0)),
@@ -1630,15 +1727,10 @@ class CognitiveExecutionRuntime:
                 else now.astimezone(timezone.utc)
             ),
         )
-        terminal = self.repository.finalize(
+        return self._commit_terminal_result(
+            execution,
             result,
-            expected_execution_version=execution.version,
             now=now,
-        )
-        return ExecutionRunResult(
-            execution_id=terminal.execution_id,
-            state=terminal.state,
-            result=result,
         )
 
     def _finalize_non_success(
@@ -1694,21 +1786,17 @@ class CognitiveExecutionRuntime:
                 else now.astimezone(timezone.utc)
             ),
         )
-        terminal = self.repository.finalize(
+        return self._commit_terminal_result(
+            execution,
             result,
-            expected_execution_version=execution.version,
             now=now,
-        )
-        return ExecutionRunResult(
-            execution_id=terminal.execution_id,
-            state=terminal.state,
-            result=result,
         )
 
 
 __all__ = [
     "CognitiveExecutionError",
     "CognitiveExecutionRuntime",
+    "ExecutionFinalizationBindings",
     "ExecutionRunResult",
     "ExecutionVerificationDecision",
     "PendingApproval",

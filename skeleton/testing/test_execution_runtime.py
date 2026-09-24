@@ -10,6 +10,7 @@ from skeleton.contracts.ai_execution import AIExecutionRequest, ExecutionState
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionError,
     CognitiveExecutionRuntime,
+    ExecutionFinalizationBindings,
     ExecutionVerificationDecision,
 )
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
@@ -629,3 +630,118 @@ def test_verification_adapter_rejects_inconsistent_pass_receipt() -> None:
             },
             evidence_refs=("evidence:test-source",),
         )
+
+
+@pytest.mark.asyncio
+async def test_finalization_binding_refs_are_committed_with_terminal_result() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider([_text_response("bound", response_id="resp-bound")])
+
+    async def bindings(_request, candidate, _payload):
+        assert candidate == "bound"
+        return ExecutionFinalizationBindings(
+            memory_refs=("memory:turn-summary",),
+            artifact_refs=("artifact:answer",),
+        )
+
+    runtime = _runtime(
+        repo,
+        provider,
+        tools,
+        finalization_binding_hook=bindings,
+    )
+    result = await runtime.start(
+        _request(),
+        instructions="Answer.",
+        prompt="Bind final lineage.",
+        context_digest="7" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.memory_refs == ("memory:turn-summary",)
+    assert result.result.artifact_refs == ("artifact:answer",)
+    pending = repo.pending_outbox(execution_id="exec-1")
+    assert pending[0].payload["memory_refs"] == ["memory:turn-summary"]
+    assert pending[0].payload["artifact_refs"] == ["artifact:answer"]
+
+
+@pytest.mark.asyncio
+async def test_resume_commits_staged_terminal_intent_without_replaying_verification(
+    monkeypatch,
+) -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider([_text_response("recover me", response_id="resp-recover")])
+    verification_calls = []
+    binding_calls = []
+
+    def verify(_request, candidate, _context_digest):
+        verification_calls.append(candidate)
+        return ExecutionVerificationDecision(
+            passed=True,
+            receipt={
+                "outcome": "passed",
+                "policy_satisfied": True,
+                "verifier_id": "test:recovery",
+            },
+            evidence_refs=("evidence:independent",),
+        )
+
+    def bindings(_request, candidate, _payload):
+        binding_calls.append(candidate)
+        return ExecutionFinalizationBindings(
+            memory_refs=("memory:recover",),
+            artifact_refs=("artifact:recover",),
+        )
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        verification_hook=verify,
+        finalization_binding_hook=bindings,
+    )
+    real_finalize_staged = repo.finalize_staged
+
+    def crash_before_terminal_commit(*args, **kwargs):
+        raise RuntimeError("simulated crash after finalization intent")
+
+    monkeypatch.setattr(repo, "finalize_staged", crash_before_terminal_commit)
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        await runtime.start(
+            _request(),
+            instructions="Answer.",
+            prompt="Recover finalization.",
+            context_digest="8" * 64,
+            now=_now(),
+        )
+
+    staged = repo.finalization_intent("exec-1")
+    assert staged is not None
+    assert staged.result.memory_refs == ("memory:recover",)
+    assert staged.result.artifact_refs == ("artifact:recover",)
+    assert verification_calls == ["recover me"]
+    assert binding_calls == ["recover me"]
+
+    monkeypatch.setattr(repo, "finalize_staged", real_finalize_staged)
+
+    def forbidden_verification(*_args, **_kwargs):
+        raise AssertionError("verification must not replay after staged intent")
+
+    recovered = CognitiveExecutionRuntime(
+        repo,
+        FakeProvider([]),
+        tools,
+        verification_hook=forbidden_verification,
+    )
+    result = await recovered.resume("exec-1", now=_now())
+
+    assert result.completed is True
+    assert result.result is not None
+    assert result.result.final_output == "recover me"
+    assert result.result.memory_refs == ("memory:recover",)
+    assert result.result.artifact_refs == ("artifact:recover",)
+    assert repo.finalization_intent("exec-1") is None
+    assert len(repo.pending_outbox(execution_id="exec-1")) == 1
