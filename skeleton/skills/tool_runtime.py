@@ -313,6 +313,23 @@ class ToolRuntime:
                     approval_ref=request.approval_ref,
                     metered_tool_calls=1,
                 )
+            except ToolExecutionDenied as exc:
+                finished = _utc()
+                receipt = ToolExecutionReceipt(
+                    receipt_id=_receipt_id(request, manifest),
+                    request_id=request.request_id,
+                    operation_id=request.operation_id,
+                    tenant_id=request.tenant_id,
+                    tool_id=request.tool_id,
+                    idempotency_key=request.idempotency_key,
+                    arguments_digest=request.arguments_digest,
+                    status=ToolExecutionStatus.DENIED,
+                    started_at=started,
+                    finished_at=max(started, finished),
+                    error_code=str(exc).strip() or "tool_denied",
+                    approval_ref=request.approval_ref,
+                    metered_tool_calls=0,
+                )
             except Exception as exc:
                 finished = _utc()
                 receipt = ToolExecutionReceipt(
@@ -706,6 +723,22 @@ class AsyncToolRuntime:
                 result_ref=result_ref,
                 approval_ref=request.approval_ref,
                 metered_tool_calls=1,
+            )
+        except ToolExecutionDenied as exc:
+            return ToolExecutionReceipt(
+                receipt_id=_receipt_id(request, manifest),
+                request_id=request.request_id,
+                operation_id=request.operation_id,
+                tenant_id=request.tenant_id,
+                tool_id=request.tool_id,
+                idempotency_key=request.idempotency_key,
+                arguments_digest=request.arguments_digest,
+                status=ToolExecutionStatus.DENIED,
+                started_at=started,
+                finished_at=max(started, _utc()),
+                error_code=str(exc).strip() or "tool_denied",
+                approval_ref=request.approval_ref,
+                metered_tool_calls=0,
             )
         except Exception as exc:
             return ToolExecutionReceipt(
