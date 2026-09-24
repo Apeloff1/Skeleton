@@ -7,10 +7,16 @@ import pytest
 
 from skeleton.context.compiler import COMPILER_VERSION, ContextCompiler
 from skeleton.context.instruction_policy import INSTRUCTION_POLICIES
+from skeleton.context.sources.conversation import conversation_message_segment
 from skeleton.context.sources.request import user_input_segment
 from skeleton.contracts.ai_execution import AIExecutionRequest, ExecutionState
 from skeleton.contracts.context import ContextBudget
+from skeleton.contracts.conversation import (
+    ConversationAuthorType,
+    ConversationMessage,
+)
 from skeleton.intelligence.execution_runtime import CognitiveExecutionRuntime
+from skeleton.persistence.conversation_repository import SQLiteConversationRepository
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
@@ -442,3 +448,128 @@ async def test_golden_approval_wait_survives_restart_and_effect_runs_once(
 
     second_repo.close()
     second_receipts.close()
+
+
+
+def test_golden_conversation_restart_rebuilds_canonical_context(tmp_path) -> None:
+    conversation_path = tmp_path / "conversation.sqlite3"
+    thread_id = str(uuid4())
+    branch_id = str(uuid4())
+    operation_id = str(uuid4())
+    user_message_id = str(uuid4())
+    assistant_message_id = str(uuid4())
+
+    first = SQLiteConversationRepository(conversation_path)
+    thread = first.create_thread(
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        thread_id=thread_id,
+        branch_id=branch_id,
+        created_at=NOW,
+        title="Golden thread",
+    )
+
+    thread, user = first.append_message(
+        ConversationMessage(
+            message_id=user_message_id,
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=1,
+            author_type=ConversationAuthorType.USER,
+            created_at=NOW,
+            idempotency_key="user-1",
+            content="What is the canonical architecture?",
+        ),
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+    thread, assistant = first.append_message(
+        ConversationMessage(
+            message_id=assistant_message_id,
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=2,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=NOW,
+            idempotency_key="assistant-1",
+            content="The server-owned runtime is authoritative.",
+            parent_message_id=user.message_id,
+            causal_user_message_id=user.message_id,
+            operation_id=operation_id,
+            ai_result_id="ai-result:golden-1",
+            tool_receipt_refs=("tool-receipt:golden-1",),
+            citation_refs=("citation:golden-1",),
+        ),
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+    first.close()
+
+    reopened = SQLiteConversationRepository(conversation_path)
+    restored_thread = reopened.get_thread(
+        thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+    transcript = reopened.active_transcript(
+        thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+
+    assert [item.message_id for item in transcript] == [
+        user_message_id,
+        assistant_message_id,
+    ]
+    assert transcript[-1].operation_id == operation_id
+    assert transcript[-1].ai_result_id == "ai-result:golden-1"
+
+    policy = INSTRUCTION_POLICIES.resolve("chat.jeeves")
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    envelope = ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=_context_budget(),
+        segments=(
+            policy.as_segment(
+                tenant_id="tenant-a",
+                purpose="model-inference",
+                created_at=NOW,
+            ),
+            *(
+                conversation_message_segment(
+                    restored_thread,
+                    message,
+                    purpose="model-inference",
+                )
+                for message in transcript
+            ),
+        ),
+        compiled_at=NOW,
+    )
+    projected = provider_request_from_context(
+        envelope,
+        purpose="model-inference",
+    )
+
+    assert [(item.role, item.content) for item in projected.history] == [
+        ("user", "What is the canonical architecture?"),
+        ("assistant", "The server-owned runtime is authoritative."),
+    ]
+    assistant_segment = next(
+        segment
+        for segment in envelope.segments
+        if segment.source_id == assistant_message_id
+    )
+    assert f"operation:{operation_id}" in assistant_segment.provenance
+    assert "ai-result:ai-result:golden-1" in assistant_segment.provenance
+    assert "tool-receipt:tool-receipt:golden-1" in assistant_segment.provenance
+    assert "citation:citation:golden-1" in assistant_segment.provenance
+
+    reopened.close()
