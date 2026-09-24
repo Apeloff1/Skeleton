@@ -92,6 +92,13 @@ from skeleton.intelligence.shared_pressure import (
     SharedQueueTicket,
     SqliteSharedPressureLedger,
 )
+from skeleton.intelligence.verification_policy import (
+    VERIFICATION_POLICY_VERSION,
+    VerificationRequirement,
+    VerificationRiskClass,
+    VerificationRiskProfile,
+    select_verification_requirement,
+)
 from skeleton.intelligence.quests import (
     QuestObjective,
     QuestProgress,
@@ -137,6 +144,11 @@ __all__ = [
     "DialogueNode",
     "DialogueState",
     "NpcRelationship",
+    "VERIFICATION_POLICY_VERSION",
+    "VerificationRequirement",
+    "VerificationRiskClass",
+    "VerificationRiskProfile",
+    "select_verification_requirement",
     "QuestObjective",
     "QuestProgress",
     "QuestTemplate",
