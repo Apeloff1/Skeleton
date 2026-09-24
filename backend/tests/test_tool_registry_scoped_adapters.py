@@ -164,8 +164,9 @@ async def test_artifact_byte_ceiling_rejects_before_metadata_persistence(registr
     )
 
     assert result["ok"] is False
-    assert result["error"] == "artifact_too_large"
-    assert result["artifacts_rejected"] == ["zip_build-1"]
+    assert result["error"] == "postcondition_failed"
+    assert result["receipt"]["status"] == "failed"
+    assert result["receipt"]["error_code"] == "postcondition_failed"
     assert persisted == []
 
 
