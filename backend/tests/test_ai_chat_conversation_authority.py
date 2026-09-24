@@ -179,9 +179,8 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
         captured["commit"] = {"thread_id": thread_id, **kwargs}
         return after_assistant, assistant
 
-    async def fake_call_llm(system_prompt, user_prompt, *, history=None, **kwargs):
-        captured["history"] = history
-        captured["user_prompt"] = user_prompt
+    async def fake_execute_provider_request(provider_request):
+        captured["provider_request"] = provider_request
         return {
             "success": True,
             "response": "canonical answer",
@@ -189,6 +188,14 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             "model": "test-model",
             "provider_request_id": "provider-request-1",
             "latency_ms": 1.0,
+            "context_id": provider_request.context_id,
+            "context_digest": provider_request.context_digest,
+            "context_source_snapshot": list(
+                getattr(provider_request, "context_source_snapshot", ())
+            ),
+            "context_compiler_version": getattr(
+                provider_request, "context_compiler_version", None
+            ),
         }
 
     monkeypatch.setattr(
@@ -200,7 +207,7 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
             commit_assistant_message=commit_assistant_message,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", fake_call_llm)
+    monkeypatch.setattr(route, "_execute_provider_request", fake_execute_provider_request)
 
     response = client.post(
         "/ai/chat",
@@ -214,10 +221,15 @@ def test_chat_uses_server_transcript_and_commits_assistant_lineage(
 
     assert response.status_code == 200
     assert captured["append"]["expected_thread_version"] == 1
-    assert captured["history"] == [
-        {"role": "user", "content": "older question"},
-        {"role": "assistant", "content": "older answer"},
+    provider_request = captured["provider_request"]
+    assert [(item.role, item.content) for item in provider_request.history] == [
+        ("user", "older question"),
+        ("assistant", "older answer"),
     ]
+    assert provider_request.prompt == "new question"
+    assert provider_request.context_id
+    assert provider_request.context_digest
+    assert "chat.jeeves@1.0.0" in provider_request.instructions
     assert captured["commit"]["expected_thread_version"] == 2
     assert captured["commit"]["causal_user_message_id"] == user_message.message_id
     assert captured["commit"]["idempotency_key"] == "client-1:assistant"
@@ -296,7 +308,7 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
             commit_assistant_message=assistant_must_not_commit,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", provider_must_not_run)
+    monkeypatch.setattr(route, "_execute_provider_request", provider_must_not_run)
 
     response = client.post(
         "/ai/chat",
@@ -382,7 +394,9 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
         committed["assistant"] += 1
         raise AssertionError("failed provider must not commit assistant state")
 
-    async def failed_call(*args, **kwargs):
+    async def failed_execute(provider_request):
+        assert provider_request.context_id
+        assert provider_request.context_digest
         return {
             "success": False,
             "error": "AI provider is unavailable",
@@ -398,7 +412,7 @@ def test_provider_failure_keeps_user_message_canonical_for_retry(
             commit_assistant_message=commit_assistant_message,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", failed_call)
+    monkeypatch.setattr(route, "_execute_provider_request", failed_execute)
 
     response = client.post(
         "/ai/chat",
@@ -466,7 +480,7 @@ def test_successful_chat_retry_reuses_committed_assistant_without_provider(
             active_transcript=active_transcript,
         ),
     )
-    monkeypatch.setattr(route, "call_llm", provider_must_not_run)
+    monkeypatch.setattr(route, "_execute_provider_request", provider_must_not_run)
 
     response = client.post(
         "/ai/chat",
