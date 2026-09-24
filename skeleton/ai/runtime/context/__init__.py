@@ -16,6 +16,12 @@ from skeleton.context.policy import (
 from skeleton.context.dodeca import Dodecahedron, FACES
 from skeleton.context.helix import DNAHelix, BasePair
 from skeleton.context.ledger import ContextLedger, LedgerError
+from skeleton.context.instruction_policy import (
+    INSTRUCTION_POLICY_SCHEMA_VERSION,
+    InstructionPolicy,
+    InstructionPolicyError,
+    InstructionPolicyRegistry,
+)
 from skeleton.context.oracle import Magic8Ball, OracleReading
 from skeleton.context.pipeline import GameForgeRun
 from skeleton.context.questionnaire import Intake, IntakeResult, Questionnaire, intake, BEATS
@@ -52,6 +58,10 @@ __all__ = [
     "BasePair",
     "ContextLedger",
     "LedgerError",
+    "INSTRUCTION_POLICY_SCHEMA_VERSION",
+    "InstructionPolicy",
+    "InstructionPolicyError",
+    "InstructionPolicyRegistry",
     "Snowball",
     "SNOWBALL_STAGES",
     "Cockpit",

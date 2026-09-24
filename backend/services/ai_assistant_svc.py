@@ -23,6 +23,7 @@ from core.ai_provider import (
     ProviderRegistry,
     ProviderRequest,
 )
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 def _ai_modes():
@@ -131,8 +132,8 @@ Follow testing best practices (AAA pattern: Arrange, Act, Assert).""",
 4. Identify data exposure risks
 5. Suggest secure coding fixes
 Rate each finding: [CRITICAL], [HIGH], [MEDIUM], [LOW].""",
-            AIAssistantMode.CONVERT: f"""You are a polyglot programming expert. Your task is to:
-1. Convert the code to {getattr(request.target_language, 'value', None) or 'Python'}
+            AIAssistantMode.CONVERT: """You are a polyglot programming expert. Your task is to:
+1. Convert the code to the target language explicitly specified in the user request
 2. Use idiomatic patterns for the target language
 3. Preserve the original logic and functionality
 4. Add type annotations appropriate to the target language
@@ -160,9 +161,23 @@ Be constructive and specific with all feedback.""",
 5. Propose a roadmap for improvements
 Consider maintainability, testability, and extensibility.""",
         }
+        policies = {
+            mode: InstructionPolicy(
+                policy_id="backend.ai-assistant." + str(mode.value),
+                version="1",
+                instructions=text,
+            )
+            for mode, text in prompts.items()
+        }
+        policy = policies.get(
+            request.mode,
+            policies[AIAssistantMode.EXPLAIN],
+        )
 
         language = request.language.value
+        target_language = getattr(request.target_language, "value", None)
         user_message = f"""Language: {language}
+Target language: {target_language or 'not-applicable'}
 
 Code:
 ```{language}
@@ -177,10 +192,7 @@ Please provide a detailed, well-structured response."""
             adapter = self._registry.require_active()
             response = await adapter.generate(
                 ProviderRequest(
-                    instructions=prompts.get(
-                        request.mode,
-                        prompts[AIAssistantMode.EXPLAIN],
-                    ),
+                    instructions=policy.instructions,
                     prompt=user_message,
                     model=self.model,
                 )

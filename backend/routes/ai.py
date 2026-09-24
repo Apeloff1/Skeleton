@@ -22,14 +22,11 @@ from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest, n
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from routes.gameforge_auth import require_role
 from skeleton.contracts.conversation import ConversationAuthorType
+from skeleton.context.instruction_policy import InstructionPolicy
 from skeleton.persistence.conversation_repository import (
     ConversationConflict,
     ConversationNotFound,
 )
-from core.conversations import ConversationStorageUnavailable, conversation_authority
-from routes.gameforge_auth import require_role
-from skeleton.contracts.conversation import ConversationAuthorType
-from skeleton.persistence.conversation_repository import ConversationConflict, ConversationNotFound
 
 
 logger = logging.getLogger("CodeDock.AI")
@@ -139,6 +136,27 @@ AI_MODES = {
         ),
     },
 }
+
+for _mode_id, _mode in AI_MODES.items():
+    _policy = InstructionPolicy(
+        policy_id="backend.ai.mode." + _mode_id,
+        version="1",
+        instructions=_mode["system_prompt"],
+    )
+    _mode["instruction_policy"] = _policy
+    # Transitional read compatibility. Execution resolves through the policy.
+    _mode["system_prompt"] = _policy.instructions
+del _mode_id, _mode, _policy
+
+CHAT_INSTRUCTION_POLICY = InstructionPolicy(
+    policy_id="backend.ai.chat.jeeves",
+    version="1",
+    instructions=(
+        "You are Jeeves, a practical coding assistant for Tutolage Academy. Help with programming, "
+        "debugging, architecture, and learning. Be concise, distinguish facts from assumptions, and "
+        "prefer concrete examples when they improve the answer."
+    ),
+)
 
 
 class AIAssistRequest(BaseModel):
@@ -254,14 +272,17 @@ async def call_llm(
     *,
     history: List[Dict[str, str]] | None = None,
     max_output_tokens: int | None = None,
+    instruction_policy: InstructionPolicy | None = None,
 ) -> Dict[str, Any]:
     """Execute one model request without exposing provider exception details."""
 
     try:
         adapter = AI_REGISTRY.require_active()
+        policy = instruction_policy
+        instructions = policy.instructions if policy is not None else system_prompt
         response = await adapter.generate(
             ProviderRequest(
-                instructions=system_prompt,
+                instructions=instructions,
                 prompt=user_prompt,
                 history=normalize_history(history),
                 max_output_tokens=max_output_tokens,
@@ -274,6 +295,9 @@ async def call_llm(
             "model": response.model,
             "provider_request_id": response.request_id,
             "latency_ms": response.latency_ms,
+            "instruction_policy_id": policy.policy_id if policy is not None else None,
+            "instruction_policy_version": policy.version if policy is not None else None,
+            "instruction_policy_digest": policy.digest if policy is not None else None,
         }
     except ProviderError as exc:
         logger.warning("AI provider unavailable or failed: %s", exc.__class__.__name__)
@@ -302,7 +326,11 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
     if mode_info is None:
         raise HTTPException(status_code=422, detail=f"Unsupported AI mode: {request.mode}")
 
-    result = await call_llm(mode_info["system_prompt"], _assist_prompt(request))
+    result = await call_llm(
+        mode_info["system_prompt"],
+        _assist_prompt(request),
+        instruction_policy=mode_info["instruction_policy"],
+    )
     if result["success"]:
         suggestion = str(result["response"])
         return AIAssistResponse(
@@ -397,11 +425,7 @@ async def ai_chat(
             "timestamp": _utcnow(),
         }
 
-    system_prompt = (
-        "You are Jeeves, a practical coding assistant for Tutolage Academy. Help with programming, "
-        "debugging, architecture, and learning. Be concise, distinguish facts from assumptions, and "
-        "prefer concrete examples when they improve the answer."
-    )
+    system_prompt = CHAT_INSTRUCTION_POLICY.instructions
     sections = [request.message]
     if request.context:
         sections.append(
@@ -415,7 +439,12 @@ async def ai_chat(
     )
     operation_id = str(uuid.uuid4())
 
-    result = await call_llm(system_prompt, user_prompt, history=history)
+    result = await call_llm(
+        system_prompt,
+        user_prompt,
+        history=history,
+        instruction_policy=CHAT_INSTRUCTION_POLICY,
+    )
     if not result["success"]:
         return {
             "success": False,
