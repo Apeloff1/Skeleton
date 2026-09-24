@@ -151,6 +151,32 @@ def cancel_operation(
     return {"ok": True, **result.as_dict()}
 
 
+@router.get("/{operation_id}/events/snapshot")
+def operation_event_snapshot(
+    operation_id: str,
+    consumer_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=_CONSUMER_PATTERN,
+    ),
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    """Authoritative current operation state + cursor for gap recovery."""
+
+    tenant_id = _principal_tenant(user)
+    try:
+        snapshot = _transport().snapshot(
+            operation_id,
+            tenant_id=tenant_id,
+            consumer_id=consumer_id,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, **snapshot.as_dict()}
+
+
 @router.get("/{operation_id}/events/replay")
 def operation_event_replay(
     operation_id: str,
@@ -302,6 +328,7 @@ async def operation_events(
 __all__ = [
     "router",
     "operation_event_replay",
+    "operation_event_snapshot",
     "acknowledge_operation_events",
     "_last_event_sequence",
     "_principal_tenant",
