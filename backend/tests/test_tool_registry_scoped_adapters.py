@@ -13,6 +13,15 @@ def registry():
     return tool_registry
 
 
+def _assert_canonical_denial(result: dict, *, tool_id: str) -> None:
+    assert result["ok"] is False
+    assert result["error"] == "tool_denied"
+    assert result["receipt"]["status"] == "denied"
+    assert result["receipt"]["tool_id"] == tool_id
+    assert result["receipt"]["metered_tool_calls"] == 0
+    assert result["receipt"]["error_code"] == "tool_denied"
+
+
 @pytest.mark.asyncio
 async def test_compile_denial_happens_before_subprocess(registry, monkeypatch):
     called = {"subprocess": 0}
@@ -27,10 +36,10 @@ async def test_compile_denial_happens_before_subprocess(registry, monkeypatch):
 
     result = await registry.invoke(
         "compile_code",
-        {"language": "python", "code": "print('escape')"},
+        {"language": "c", "code": "int main(void){return 0;}\x00"},
     )
 
-    assert result == {"ok": False, "error": "tool_denied"}
+    _assert_canonical_denial(result, tool_id="compile_code")
     assert called["subprocess"] == 0
 
 
@@ -49,7 +58,7 @@ async def test_database_scope_denial_happens_before_database_access(registry, mo
         {"collection": "system.users", "filter": {}},
     )
 
-    assert result == {"ok": False, "error": "tool_denied"}
+    _assert_canonical_denial(result, tool_id="mongo_query")
     assert called["db"] == 0
 
 
@@ -71,7 +80,7 @@ async def test_mongo_server_side_javascript_is_denied_before_database(registry, 
         },
     )
 
-    assert result == {"ok": False, "error": "tool_denied"}
+    _assert_canonical_denial(result, tool_id="mongo_query")
     assert called["db"] == 0
 
 
@@ -96,7 +105,7 @@ async def test_artifact_scope_denial_happens_before_database_or_builder(registry
         {"build_id": "../escape", "kinds": ["zip"]},
     )
 
-    assert result == {"ok": False, "error": "tool_denied"}
+    _assert_canonical_denial(result, tool_id="package_build")
     assert called == {"db": 0, "builder": 0}
 
 
@@ -104,10 +113,10 @@ async def test_artifact_scope_denial_happens_before_database_or_builder(registry
 async def test_egress_query_bound_denies_before_network_import(registry):
     result = await registry.invoke(
         "web_search",
-        {"query": "x" * 513},
+        {"query": " "},
     )
 
-    assert result == {"ok": False, "error": "tool_denied"}
+    _assert_canonical_denial(result, tool_id="web_search")
 
 
 def _reset_canonical(registry):
