@@ -14,14 +14,8 @@ on:
       - "docs/ARCHITECTURE.md"
       - "docs/CANONICAL_MODULE_BOUNDARIES.md"
       - "docs/SECURITY_INCIDENT_RESPONSE.md"
-      - "scripts/check_architecture_boundaries.py"
-      - "scripts/check_provider_runtime_boundary.py"
-      - "scripts/check_quality_gate_parity.py"
-      - "scripts/check_repository_python_sast.py"
-      - "scripts/container_digest_refresh.py"
-      - "scripts/quality-gates.sh"
-      - "tests/test_architecture_boundaries.py"
-      - "tests/test_provider_runtime_boundary.py"
+      - "scripts/**"
+      - "tests/**"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
   pull_request:
@@ -34,14 +28,8 @@ on:
       - "docs/ARCHITECTURE.md"
       - "docs/CANONICAL_MODULE_BOUNDARIES.md"
       - "docs/SECURITY_INCIDENT_RESPONSE.md"
-      - "scripts/check_architecture_boundaries.py"
-      - "scripts/check_provider_runtime_boundary.py"
-      - "scripts/check_quality_gate_parity.py"
-      - "scripts/check_repository_python_sast.py"
-      - "scripts/container_digest_refresh.py"
-      - "scripts/quality-gates.sh"
-      - "tests/test_architecture_boundaries.py"
-      - "tests/test_provider_runtime_boundary.py"
+      - "scripts/**"
+      - "tests/**"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
 
@@ -65,7 +53,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 2
-
       - name: Classify backend-quality scope
         id: scope
         working-directory: ${{ github.workspace }}
@@ -74,32 +61,22 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-
           if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
             echo "full=true" >> "$GITHUB_OUTPUT"
             echo "plan_only=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           git fetch --no-tags --depth=1 origin "$BASE_REF"
           current_base="$(git rev-parse FETCH_HEAD)"
           mapfile -t changed < <(git diff --name-only "$current_base" "$HEAD_SHA")
           full=false
-
           for path in "${changed[@]}"; do
             case "$path" in
-              docs/plan/*|machine/ai_master_plan.json|scripts/check_ai_master_plan.py|skeleton/testing/test_ai_master_plan.py)
-                ;;
-              *)
-                full=true
-                ;;
+              docs/plan/*|machine/ai_master_plan.json|scripts/check_ai_master_plan.py|skeleton/testing/test_ai_master_plan.py) ;;
+              *) full=true ;;
             esac
           done
-
-          if [ "${#changed[@]}" -eq 0 ]; then
-            full=true
-          fi
-
+          if [ "${#changed[@]}" -eq 0 ]; then full=true; fi
           if [ "$full" = true ]; then
             echo "full=true" >> "$GITHUB_OUTPUT"
             echo "plan_only=false" >> "$GITHUB_OUTPUT"
@@ -107,25 +84,18 @@ jobs:
             echo "full=false" >> "$GITHUB_OUTPUT"
             echo "plan_only=true" >> "$GITHUB_OUTPUT"
           fi
-          printf 'backend-quality scope: full=%s changed=%s\n' "$full" "${#changed[@]}"
-
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.11.16"
-
       - name: Install full quality dependencies
         if: steps.scope.outputs.full == 'true'
         run: >-
           python -m pip install --disable-pip-version-check
           "ruff==0.9.10" "pytest>=8,<9" "fastapi==0.136.1"
           "pydantic-settings>=2.1,<3" "httpx==0.28.1" "pymongo>=4,<5" "motor>=3,<4"
-
       - name: Install plan-only quality runtime
         if: steps.scope.outputs.plan_only == 'true'
-        run: >-
-          python -m pip install --disable-pip-version-check
-          "pytest>=8,<9" "pydantic>=2,<3"
-
+        run: python -m pip install --disable-pip-version-check "pytest>=8,<9" "pydantic>=2,<3"
       - name: Validate plan-only masterplan contract
         if: steps.scope.outputs.plan_only == 'true'
         working-directory: ${{ github.workspace }}
@@ -135,20 +105,16 @@ jobs:
         run: |
           python scripts/check_ai_master_plan.py
           python -m pytest -q --noconftest skeleton/testing/test_ai_master_plan.py
-
       - name: Ruff lint
         if: steps.scope.outputs.full == 'true'
         run: ruff check . --output-format=github
-
       - name: Syntax check (full backend)
         if: steps.scope.outputs.full == 'true'
         run: python -m compileall -q .
-
       - name: Canonical local/CI quality parity gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_quality_gate_parity.py
-
       - name: Canonical architecture boundary gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
@@ -157,7 +123,6 @@ jobs:
         run: |
           python scripts/check_architecture_boundaries.py
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_architecture_boundaries.py
-
       - name: Provider runtime boundary gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
@@ -166,20 +131,16 @@ jobs:
         run: |
           python scripts/check_provider_runtime_boundary.py
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_provider_runtime_boundary.py
-
       - name: Production layer boundary gate
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_architecture_boundaries.py
-
       - name: Security scanner surface preflight
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_security_scan_surface.py
-
       - name: Defense control-plane contract
         if: steps.scope.outputs.full == 'true'
         working-directory: .
         run: python scripts/check_defense_control_plane_contract.py
-
       - name: Security scanner and capability fail-closed contracts
         if: steps.scope.outputs.full == 'true'
         working-directory: .
@@ -196,106 +157,119 @@ jobs:
           tests/test_container_digest_refresh.py
           tests/test_container_digest_refresh_workflow.py
           tests/test_generated_code_sandbox.py
-
-      - name: Canonical backend security regressions
+      - name: Process invocation safety gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_process_safety.py
+      - name: Unsafe deserialization safety gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_deserialization_safety.py
+      - name: Dynamic import safety gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_dynamic_import_safety.py
+      - name: Tar archive extraction safety gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_archive_extraction_safety.py
+      - name: High-confidence Python and JavaScript SAST gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_sast_security.py
+      - name: Core/tooling Python high-confidence SAST gate
         if: steps.scope.outputs.full == 'true'
         working-directory: .
+        run: python scripts/check_repository_python_sast.py
+      - name: JavaScript child_process alias safety gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_js_process_alias_safety.py
+      - name: GitHub Actions workflow security gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_workflow_security.py
+      - name: GitHub Actions repository allowlist
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_workflow_action_allowlist.py
+      - name: GitHub Actions token permissions
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_workflow_permissions.py
+      - name: GitHub Actions trigger-fanout audit
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_workflow_trigger_fanout.py
+      - name: GitHub Actions concurrency collision audit
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_workflow_concurrency.py
+      - name: GitHub Actions workflow_run branch-completion contract
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_workflow_run_branch_completions.py
+      - name: Repository secret hygiene gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_secret_hygiene.py
+      - name: Repository malware and IOC gate
+        if: steps.scope.outputs.full == 'true'
+        run: python scripts/check_malware_iocs.py
+      - name: Live-service backend test boundary
+        if: steps.scope.outputs.full == 'true'
+        run: |
+          python scripts/check_live_service_test_boundaries.py
+          python -m pytest -q --noconftest tests/test_live_service_test_boundaries.py
+      - name: Security, provider-chaos, and developer-tooling adversarial regression tests
+        if: steps.scope.outputs.full == 'true'
+        working-directory: ${{ github.workspace }}
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-          PYTHONPATH: "."
         run: >-
-          python -m pytest -q --noconftest
+          PYTHONPATH=.:backend python -m pytest -q --noconftest --rootdir=. --import-mode=importlib
+          tests/test_architecture_boundaries.py
+          backend/tests/test_ai_provider_reliability.py
+          backend/tests/test_auth_security.py
+          backend/tests/test_process_safety_gate.py
+          backend/tests/test_process_safety_destructuring.py
+          backend/tests/test_process_safety_partial.py
+          backend/tests/test_process_safety_namespace_get.py
+          backend/tests/test_process_safety_getattribute.py
+          backend/tests/test_process_safety_helper_aliases.py
+          backend/tests/test_process_safety_scanner_coverage.py
+          backend/tests/test_deserialization_safety_gate.py
           backend/tests/test_dynamic_import_safety.py
+          backend/tests/test_dynamic_import_exception_policy.py
+          backend/tests/test_scanner_nonempty_contract.py
           backend/tests/test_archive_extraction_safety.py
           backend/tests/test_security_scan_surface.py
           backend/tests/test_live_scraper_network_security.py
+          backend/tests/test_ai_reader_error_redaction.py
           backend/tests/test_sast_security_gate.py
           backend/tests/test_repository_python_sast_scope.py
+          backend/tests/test_js_process_alias_safety.py
           backend/tests/test_workflow_security_gate.py
-          backend/tests/test_workflow_action_allowlist.py
-          backend/tests/test_workflow_permissions_gate.py
-          backend/tests/test_workflow_security_checkout_credentials.py
-          backend/tests/test_workflow_input_security_gate.py
-          backend/tests/test_workflow_event_shell_security.py
           backend/tests/test_workflow_flow_style_security.py
           backend/tests/test_workflow_event_context_security.py
           backend/tests/test_workflow_quoted_key_security.py
           backend/tests/test_workflow_flow_uses_security.py
           backend/tests/test_workflow_trigger_security.py
+          backend/tests/test_workflow_security_checkout_credentials.py
+          backend/tests/test_workflow_input_security_gate.py
+          backend/tests/test_workflow_event_shell_security.py
+          backend/tests/test_workflow_action_allowlist.py
+          backend/tests/test_workflow_permissions_gate.py
           backend/tests/test_workflow_trigger_fanout_gate.py
           backend/tests/test_workflow_concurrency_gate.py
           backend/tests/test_workflow_run_branch_completions_contract.py
-          backend/tests/test_auth_security.py
+          backend/tests/test_pr_obsolete_run_from_workflow_run.py
+          backend/tests/test_pr_obsolete_run_workflow_run.py
+          backend/tests/test_pr_obsolete_run_sweep.py
+          backend/tests/test_pr_obsolete_run_drain.py
+          backend/tests/test_secret_hygiene_gate.py
+          backend/tests/test_malware_ioc_gate.py
+          backend/tests/test_malware_ioc_io_fail_closed.py
           backend/tests/test_developer_tooling_security.py
           backend/tests/test_dependency_security_workflow_contract.py
+          backend/tests/test_incident_response_runbook.py
           backend/tests/test_api_middleware_adversarial.py
           backend/tests/test_api_middleware_regression_gaps.py
           backend/tests/test_proxy_header_bounds.py
           backend/tests/test_request_identity_logging_security.py
           backend/tests/test_security_middleware_properties.py
-          backend/tests/test_live_service_test_boundaries.py
-
-      - name: Process invocation safety gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_process_safety.py
-
-      - name: Unsafe deserialization safety gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_deserialization_safety.py
-
-      - name: Dynamic import safety gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_dynamic_import_safety.py
-
-      - name: Tar archive extraction safety gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_archive_extraction_safety.py
-
-      - name: High-confidence Python and JavaScript SAST gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_sast_security.py
-
-      - name: Core/tooling Python high-confidence SAST gate
-        if: steps.scope.outputs.full == 'true'
-        working-directory: .
-        run: python scripts/check_repository_python_sast.py
-
-      - name: JavaScript child_process alias safety gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_js_process_alias_safety.py
-
-      - name: GitHub Actions workflow security gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_workflow_security.py
-
-      - name: GitHub Actions repository allowlist
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_workflow_action_allowlist.py
-
-      - name: GitHub Actions token permissions
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_workflow_permissions.py
-
-      - name: GitHub Actions trigger-fanout audit
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_workflow_trigger_fanout.py
-
-      - name: GitHub Actions concurrency collision audit
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_workflow_concurrency.py
-
-      - name: GitHub Actions workflow_run branch-completion contract
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_workflow_run_branch_completions.py
-
-      - name: Live-service backend test boundary
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_live_service_test_boundaries.py
-
-      - name: Repository secret hygiene gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_secret_hygiene.py
-
-      - name: Repository malware and IOC gate
-        if: steps.scope.outputs.full == 'true'
-        run: python scripts/check_malware_iocs.py
+          backend/tests/test_webhook_cron_security.py
+          backend/tests/test_traffic_manager_workflow_contract.py
+          tests/test_traffic_manager.py
+          tests/test_actions_housekeeping_live_reaper.py
+          tests/test_queue_drain_housekeeping_cooldown.py
+          tests/test_arm64_workflow_trigger_scope.py
+          tests/test_ci_java_accelerator_dependencies.py
+          tests/test_backend_quality_plan_fast_path.py
