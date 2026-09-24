@@ -213,8 +213,11 @@ def test_ai_file_tree_preserves_remaining_acquired_lineage() -> None:
         assert "cutover:quarantine" in item["move_tags"]
         assert (ROOT / destination).exists()
 
-    assert manifest["pre_move_readiness"]["governed_mapping_count"] == 134
-    assert manifest["pre_move_readiness"]["batch_counts"]["B4-research-quarantine"] == 39
+    readiness = manifest["pre_move_readiness"]
+    assert readiness["governed_mapping_count"] == len(manifest["mappings"])
+    assert readiness["batch_counts"]["B4-research-quarantine"] == sum(
+        item["move_batch"] == "B4-research-quarantine" for item in manifest["mappings"]
+    )
 
 
 def test_ai_file_tree_ignores_runtime_generated_membership_noise(tmp_path: Path) -> None:

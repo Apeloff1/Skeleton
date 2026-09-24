@@ -458,6 +458,14 @@ class MongoConversationAuthority:
                     raise ConversationConflict(
                         "superseding message must preserve author type"
                     )
+                if (
+                    prior.author_type is ConversationAuthorType.ASSISTANT
+                    and prior.causal_user_message_id
+                    != message.causal_user_message_id
+                ):
+                    raise ConversationConflict(
+                        "assistant regeneration must preserve causal user lineage"
+                    )
 
             prepared = _message_doc(message)
             prepared["_commit_state"] = "prepared"
@@ -589,6 +597,74 @@ class MongoConversationAuthority:
             tenant_id=tenant_id,
             owner_id=owner_id,
             expected_thread_version=expected_thread_version,
+        )
+
+    async def regenerate_assistant_message(
+        self,
+        thread_id: str,
+        prior_assistant_message_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        content: str,
+        idempotency_key: str,
+        expected_thread_version: int,
+        operation_id: str,
+        ai_result_id: str,
+        tool_receipt_refs: tuple[str, ...] = (),
+        citation_refs: tuple[str, ...] = (),
+        artifact_refs: tuple[str, ...] = (),
+    ) -> tuple[ConversationThread, ConversationMessage]:
+        """Commit a regenerated assistant result as a new active branch.
+
+        The prior assistant message remains immutable. Regeneration creates a
+        fresh branch that preserves the original causal user message and binds
+        the replacement to a new canonical operation/result identity.
+        """
+
+        thread = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        try:
+            doc = await self.messages.find_one(
+                {
+                    "_id": prior_assistant_message_id,
+                    "thread_id": thread_id,
+                    "sequence": {"$lte": thread.message_sequence},
+                }
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "conversation storage is unavailable"
+            ) from exc
+        if doc is None:
+            raise ConversationNotFound(prior_assistant_message_id)
+        prior = _message_from_doc(doc)
+        if prior.author_type is not ConversationAuthorType.ASSISTANT:
+            raise ConversationConflict("only assistant messages can be regenerated")
+        if prior.causal_user_message_id is None:
+            raise ConversationConflict(
+                "assistant message is missing causal user lineage"
+            )
+
+        return await self.commit_assistant_message(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content=content,
+            idempotency_key=idempotency_key,
+            expected_thread_version=expected_thread_version,
+            causal_user_message_id=prior.causal_user_message_id,
+            operation_id=operation_id,
+            ai_result_id=ai_result_id,
+            branch_id=str(uuid4()),
+            supersedes_message_id=prior.message_id,
+            tool_receipt_refs=tool_receipt_refs,
+            citation_refs=citation_refs,
+            artifact_refs=artifact_refs,
+            data_class=prior.data_class,
         )
 
     async def list_messages(

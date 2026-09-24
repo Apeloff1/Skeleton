@@ -25,6 +25,16 @@ from .conversation import (
     ConversationThread,
     ConversationThreadState,
 )
+from .memory_record import (
+    MEMORY_SCHEMA_VERSION,
+    MAX_MEMORY_CONTENT_CHARS,
+    MemoryContractError,
+    MemoryKind,
+    MemoryRecord,
+    MemoryState,
+    MemoryWriteProposal,
+    memory_payload_digest,
+)
 from .operation import (
     OperationContractError,
     OperationEnvelope,
@@ -53,6 +63,14 @@ __all__ = [
     "ConversationMessage",
     "ConversationThread",
     "ConversationThreadState",
+    "MEMORY_SCHEMA_VERSION",
+    "MAX_MEMORY_CONTENT_CHARS",
+    "MemoryContractError",
+    "MemoryKind",
+    "MemoryRecord",
+    "MemoryState",
+    "MemoryWriteProposal",
+    "memory_payload_digest",
     "OperationContractError",
     "OperationEnvelope",
     "OperationState",
