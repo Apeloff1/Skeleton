@@ -404,3 +404,125 @@ def test_backend_topology_persists_canonical_tool_receipts_and_results() -> None
     assert "BACKEND_TOOL_RECEIPT_PATH=/app/data/backend_tool_receipts.sqlite3" in compose
     assert "BACKEND_TOOL_RESULT_PATH=/app/data/backend_tool_results.sqlite3" in compose
     assert 'com.skeleton.state.role: "declared-mixed-tool-authority-and-derived"' in compose
+
+@pytest.mark.asyncio
+async def test_backend_delegate_preserves_lineage_and_restart_replay(
+    registry,
+    monkeypatch,
+    tmp_path,
+):
+    receipt_path = str(tmp_path / "lineage-tool-receipts.sqlite3")
+    result_path = str(tmp_path / "lineage-tool-results.sqlite3")
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    call_id = str(uuid4())
+    calls = {"count": 0}
+
+    async def first_handler(params):
+        calls["count"] += 1
+        return {"ok": True, "value": params["topic"]}
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", first_handler)
+    _reset_canonical(
+        registry,
+        receipt_path=receipt_path,
+        result_path=result_path,
+    )
+    first = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "lineage"},
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
+        tenant_id="tenant-a",
+        idempotency_key="lineage-replay",
+        request_id=str(uuid4()),
+    )
+
+    assert first["ok"] is True
+    assert first["receipt"]["execution_id"] == execution_id
+    assert first["receipt"]["turn_id"] == turn_id
+    assert first["receipt"]["call_id"] == call_id
+    assert calls["count"] == 1
+
+    async def must_not_execute_again(_params):
+        calls["count"] += 1
+        raise AssertionError("durable lineage replay must fence duplicate effect")
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", must_not_execute_again)
+    _reset_canonical(
+        registry,
+        receipt_path=receipt_path,
+        result_path=result_path,
+    )
+    replay = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "lineage"},
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
+        tenant_id="tenant-a",
+        idempotency_key="lineage-replay",
+        request_id=str(uuid4()),
+    )
+
+    assert replay["ok"] is True
+    assert replay["receipt"]["receipt_id"] == first["receipt"]["receipt_id"]
+    assert replay["receipt"]["execution_id"] == execution_id
+    assert replay["receipt"]["turn_id"] == turn_id
+    assert replay["receipt"]["call_id"] == call_id
+    assert calls["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_backend_delegate_rejects_idempotency_reuse_with_changed_call_lineage(
+    registry,
+    monkeypatch,
+):
+    _reset_canonical(registry)
+    calls = {"count": 0}
+
+    async def handler(params):
+        calls["count"] += 1
+        return {"ok": True, "value": params["topic"]}
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", handler)
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    first_call_id = str(uuid4())
+
+    first = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "lineage"},
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=first_call_id,
+        tenant_id="tenant-a",
+        idempotency_key="lineage-conflict",
+        request_id=str(uuid4()),
+    )
+    assert first["ok"] is True
+
+    with pytest.raises(
+        registry.ToolExecutionConflict,
+        match="different tool or arguments",
+    ):
+        await registry.invoke_canonical(
+            "vault_query",
+            {"topic": "lineage"},
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+            call_id=str(uuid4()),
+            tenant_id="tenant-a",
+            idempotency_key="lineage-conflict",
+            request_id=str(uuid4()),
+        )
+
+    assert calls["count"] == 1
+
