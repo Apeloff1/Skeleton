@@ -446,4 +446,3 @@ def test_legacy_quota_schema_migrates_storage_columns_in_place(
     assert "estimate_storage_bytes" in columns["quota_completions"]
     assert "actual_storage_bytes" in columns["quota_completions"]
     assert "delta_storage_bytes" in columns["quota_usage_events"]
-
