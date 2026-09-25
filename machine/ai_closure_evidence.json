@@ -47,7 +47,13 @@
         "provider text usage reconciliation from returned token usage",
         "image/speech artifact-byte reconciliation",
         "media provider admission through the shared runtime",
-        "quota exhaustion and shared saturation regression coverage"
+        "quota exhaustion and shared saturation regression coverage",
+        "skeleton/intelligence/quota_sqlite.py durable tenant quota/window persistence",
+        "skeleton/testing/test_tenant_quota_sqlite.py restart and multi-worker reservation regression coverage",
+        "Stage 0 Foundations Verification exercises restart-safe quota/admission",
+        "skeleton/intelligence/admission_runtime.py estimate/actual/delta aggregate telemetry",
+        "skeleton/testing/test_admission_runtime.py payload-free telemetry regression",
+        "skeleton/skills/tool_runtime.py manifest-aware tool call/cost metering"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -56,18 +62,16 @@
         "cost telemetry test"
       ],
       "outstanding_evidence": [
-        "durable tenant quota/window persistence and restart recovery",
-        "estimate-vs-actual cost telemetry in the canonical observability plane",
-        "actual tool and storage usage accounting",
         "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment"
+        "cross-process/distributed pressure feed for multi-worker deployment",
+        "fresh exact-head durable quota/admission verification",
+        "fresh exact-head estimate-vs-actual admission telemetry verification",
+        "actual storage usage accounting across artifact/storage write paths"
       ],
       "blockers": [
-        "durable tenant quota/window persistence and restart recovery",
-        "estimate-vs-actual cost telemetry in the canonical observability plane",
-        "actual tool and storage usage accounting",
         "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment"
+        "cross-process/distributed pressure feed for multi-worker deployment",
+        "actual storage usage accounting across artifact/storage write paths"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
