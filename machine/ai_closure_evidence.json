@@ -402,7 +402,10 @@
         "skeleton/testing/test_tool_runtime.py cost-before-effect and concurrency regressions",
         "backend/services/tool_registry.py governed CompatibilityResultStore with restart-persistent lifecycle metadata and fail-closed registration",
         "backend/services/tool_registry.py output-schema/result-size enforcement plus retention/capacity deletion lifecycle",
-        "backend/tests/test_tool_registry_canonical_delegate.py governed result restart/fail-closed/capacity/retention regression suite"
+        "backend/tests/test_tool_registry_canonical_delegate.py governed result restart/fail-closed/capacity/retention regression suite",
+        "skeleton/testing/test_tool_runtime.py malformed nested schema and rich manifest invariant coverage",
+        "skeleton/testing/test_execution_runtime.py enabled-only minimal model-visible tool inventory proof",
+        "backend/services/tool_registry.py governed durable result classification/retention binding"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
@@ -417,9 +420,6 @@
         "tool receipt lineage binds operation/execution/turn/call identity"
       ],
       "outstanding_evidence": [
-        "tool manifest schema validation/fuzz coverage against malformed nested schemas",
-        "model-visible inventory proof that only admitted/enabled tools are projected",
-        "bind governance classification/retention to durable tool results",
         "exact-head App Assembly and provider-surface isolation evidence"
       ],
       "blockers": [
