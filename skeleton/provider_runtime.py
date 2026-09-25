@@ -2443,11 +2443,19 @@ class ProviderRegistry:
         self._architecture_receipts: dict[str, ProviderArchitectureReceipt] = {}
 
     @classmethod
-    def from_env(cls) -> "ProviderRegistry":
+    def from_env(
+        cls,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+    ) -> "ProviderRegistry":
         active = os.getenv("AI_PROVIDER", "openai").strip().lower() or "openai"
         timeout = _env_float("AI_TIMEOUT_SECONDS", 45.0, minimum=1.0)
         retries = _env_int("AI_MAX_RETRIES", 2, minimum=0)
-        adapter = OpenAIProviderAdapter(timeout_seconds=timeout, max_retries=retries)
+        adapter = OpenAIProviderAdapter(
+            timeout_seconds=timeout,
+            max_retries=retries,
+            admission_runtime=admission_runtime,
+        )
         return cls([adapter], active=active)
 
     @property
