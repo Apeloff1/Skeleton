@@ -548,7 +548,10 @@
         "skeleton/testing/test_execution_runtime.py proves governance metadata never crosses provider boundary",
         "skeleton/skills/tool_runtime.py meters configured manifest cost into admission usage before effects",
         "skeleton/skills/tool_runtime.py enforces manifest max_concurrency with per-tool semaphores",
-        "skeleton/testing/test_tool_runtime.py proves both runtime governance bindings"
+        "skeleton/testing/test_tool_runtime.py proves both runtime governance bindings",
+        "backend/services/tool_registry.py binds durable tool results to canonical GovernanceRegistry artifact-plane lifecycle before payload mutation",
+        "backend/services/tool_registry.py executes retention/capacity deletion with lifecycle acknowledgement",
+        "backend/tests/test_tool_registry_canonical_delegate.py verifies restart persistence and fail-closed lifecycle behavior"
       ],
       "remaining": [
         "bind governance lifecycle policy to durable tool result references",
