@@ -142,6 +142,12 @@ function canonicalResultFromPayload(
     ?? optionalString(payload.state)
     ?? '';
   if (!status) return null;
+  const hasCanonicalPayload = nested !== null
+    || Object.prototype.hasOwnProperty.call(payload, 'final_output')
+    || Object.prototype.hasOwnProperty.call(payload, 'result_ref')
+    || Object.prototype.hasOwnProperty.call(payload, 'message_id')
+    || Object.prototype.hasOwnProperty.call(payload, 'failure_code');
+  if (!hasCanonicalPayload) return null;
 
   const finalOutput = source.final_output;
   const resultRef = source.result_ref ?? payload.result_ref;
