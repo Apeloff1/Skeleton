@@ -283,7 +283,7 @@ def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
         ),
         headers=headers,
     )
-    assert wrong_status.status_code == 422
+    assert wrong_status.status_code == 403
 
     wrong_events = client.get(
         (
@@ -292,7 +292,7 @@ def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
         ),
         headers=headers,
     )
-    assert wrong_events.status_code == 422
+    assert wrong_events.status_code == 403
 
     wrong_cancel = client.post(
         "/api/v1/engine/executions/route-exec/cancel",
@@ -303,4 +303,4 @@ def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
         },
         headers=headers,
     )
-    assert wrong_cancel.status_code == 422
+    assert wrong_cancel.status_code == 403

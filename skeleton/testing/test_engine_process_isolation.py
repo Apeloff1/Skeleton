@@ -150,6 +150,10 @@ def test_engine_media_body_override_is_route_scoped() -> None:
     from fastapi import FastAPI, Request
     from fastapi.testclient import TestClient
 
+    # With postponed annotations, FastAPI resolves Request from function
+    # globals rather than this test's local import scope.
+    globals()["Request"] = Request
+
     from skeleton.api.middleware import BodyBoundMiddleware, GatePolicy
 
     policy = GatePolicy(

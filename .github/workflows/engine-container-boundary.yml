@@ -36,10 +36,10 @@ jobs:
     env:
       PYTHON_VERSION: "3.11.16"
       MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ci-mongo-password
+      MONGO_INITDB_ROOT_PASSWORD: dummy-mongo-password
       MONGO_INITDB_DATABASE: tutolage
-      MONGO_URL: mongodb://admin:ci-mongo-password@mongo:27017/tutolage?authSource=admin
-      SKL_MONGO_URI: mongodb://admin:ci-mongo-password@mongo:27017/skeleton?authSource=admin
+      MONGO_URL: mongodb://admin:dummy-mongo-password@mongo:27017/tutolage?authSource=admin
+      SKL_MONGO_URI: mongodb://admin:dummy-mongo-password@mongo:27017/skeleton?authSource=admin
       JWT_SECRET: ci-jwt-secret-00000000000000000000000000000001
       SKL_ENGINE_SERVICE_TOKEN: ci-engine-service-token-00000000000000000001
       SKL_ENGINE_SERVICE_PRINCIPAL: codedock-backend

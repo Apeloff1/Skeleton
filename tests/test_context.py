@@ -1005,3 +1005,25 @@ class TestOmni:
         assert any("invented mix" in n for n in plan.notes), plan.notes
 
 
+
+
+
+class TestPipelineGenerationFallback:
+    def test_generation_detection_is_optional_for_normal_vision(self):
+        from skeleton.context.pipeline import _stage_detect
+
+        cockpit = Cockpit()
+        ctx = {
+            "vision": "cozy wholesome farm",
+            "era_hint": None,
+            "blend": None,
+            "generation": None,
+            "cockpit": cockpit,
+        }
+
+        result = _stage_detect(ctx)
+
+        assert result["era"] == "cozy_wholesome"
+        assert result["generation"] is None
+        assert ctx["generation"] is None
+        assert cockpit.snowball.mass > 0

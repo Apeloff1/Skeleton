@@ -38,6 +38,25 @@ class MemoryConflict(MemoryRepositoryError):
     """Idempotency/version/ownership conflict."""
 
 
+class MemoryProjectionEventCorruption(MemoryRepositoryError):
+    """A durable projection event cannot be decoded into its canonical contract."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        event_id: str,
+        memory_id: str,
+        memory_version: int,
+        action: str,
+    ) -> None:
+        super().__init__(message)
+        self.event_id = event_id
+        self.memory_id = memory_id
+        self.memory_version = memory_version
+        self.action = action
+
+
 _REVISION_MUTATIONS = frozenset({"create", "update", "tombstone", "expire"})
 _PROJECTION_ACTIONS = frozenset({"upsert", "delete"})
 
@@ -771,7 +790,19 @@ class SQLiteMemoryRepository:
                 """,
                 (self.repository_namespace, limit),
             ).fetchall()
-            return tuple(self._projection_event(row) for row in rows)
+            events: list[MemoryProjectionEvent] = []
+            for row in rows:
+                try:
+                    events.append(self._projection_event(row))
+                except Exception as exc:
+                    raise MemoryProjectionEventCorruption(
+                        "pending projection event failed canonical decoding",
+                        event_id=str(row["event_id"]),
+                        memory_id=str(row["memory_id"]),
+                        memory_version=int(row["memory_version"]),
+                        action=str(row["action"]),
+                    ) from exc
+            return tuple(events)
 
     def mark_projection_published(
         self,
