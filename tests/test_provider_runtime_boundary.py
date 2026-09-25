@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from scripts.check_provider_bootstrap import (
+    _is_non_runtime_provider_mirror,
+    discover_provider_surfaces,
+)
 from scripts.check_provider_runtime_boundary import audit_repository
 
 
@@ -82,6 +86,70 @@ def test_frontier_and_agent_core_reject_provider_sdk_imports(tmp_path: Path) -> 
     assert sum("provider SDK import" in item for item in violations) == 2
 
 
+def test_provider_bootstrap_excludes_only_external_research_mirrors(tmp_path: Path) -> None:
+    external = (
+        "skeleton/ai/research/external/Tutolage/backend/routes/legacy.py"
+    )
+    live = "skeleton/ai/research/live_provider.py"
+    source = "import os\nfrom openai import AsyncOpenAI\nOPENAI_API_KEY = os.getenv('OPENAI_API_KEY')\n"
+
+    _write(tmp_path, external, source)
+    _write(tmp_path, live, source)
+
+    discovered = discover_provider_surfaces(tmp_path)
+
+    assert external not in discovered
+    assert live in discovered
+    assert _is_non_runtime_provider_mirror(external) is True
+    assert _is_non_runtime_provider_mirror(live) is False
+
+
+def test_provider_bootstrap_detects_aliased_credential_reads(tmp_path: Path) -> None:
+    cases = {
+        "backend/alias_os.py": (
+            "import os as operating_system\n"
+            "from openai import AsyncOpenAI\n"
+            "key = operating_system.getenv('OPENAI_API_KEY')\n"
+        ),
+        "backend/alias_getenv.py": (
+            "from os import getenv as read_env\n"
+            "from openai import AsyncOpenAI\n"
+            "key = read_env('OPENAI_API_KEY')\n"
+        ),
+        "backend/alias_environ.py": (
+            "from os import environ as environment\n"
+            "from openai import AsyncOpenAI\n"
+            "key = environment.get('OPENAI_API_KEY')\n"
+        ),
+    }
+    for relative, source in cases.items():
+        _write(tmp_path, relative, source)
+
+    discovered = discover_provider_surfaces(tmp_path)
+
+    for relative in cases:
+        assert relative in discovered
+        assert "credential" in discovered[relative]["edge_classes"]
+
+
+def test_external_research_mirror_is_not_a_runtime_provider_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "skeleton/ai/research/external/Tutolage/backend/routes/legacy.py",
+        "from openai import AsyncOpenAI\n",
+    )
+
+    assert audit_repository(tmp_path) == []
+
+
+def test_live_ai_research_surface_still_rejects_provider_sdk_imports(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/ai/research/live.py", "import openai\n")
+
+    violations = audit_repository(tmp_path)
+
+    assert any("provider SDK import" in item for item in violations)
+
+
 def test_backend_openai_sdk_import_is_rejected(tmp_path: Path) -> None:
     _write(tmp_path, "backend/routes/feature.py", "from openai import AsyncOpenAI\n")
 
@@ -101,3 +169,15 @@ def test_canonical_provider_runtime_may_import_declared_vendor_sdk(tmp_path: Pat
     )
 
     assert audit_repository(tmp_path) == []
+
+
+def test_lafs_has_no_shadow_provider_credentials_or_client() -> None:
+    relative = "backend/routes/lafs.py"
+    source = (ROOT / relative).read_text(encoding="utf-8")
+
+    assert "EMERGENT_LLM_KEY" not in source
+    assert "emergentintegrations.llm.chat" not in source
+    assert "ProviderRegistry.from_env()" in source
+
+    discovered = discover_provider_surfaces(ROOT)
+    assert relative not in discovered
