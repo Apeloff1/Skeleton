@@ -51,22 +51,38 @@ class PrivacySpend:
     at: float = field(default_factory=time.time)
 
 
+def _positive_budget(value: float, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a positive finite number")
+    if value != value or value in (float("inf"), float("-inf")) or not value > 0:
+        raise ValueError(f"{label} must be a positive finite number")
+    return float(value)
+
+
 class PrivacyAccountant:
     """Session ε ledger: budget enforcement under composition."""
 
     def __init__(self, session_budget: float = 1.0, per_plane_budget: float = 0.5):
-        self.session_budget = session_budget
-        self.per_plane_budget = per_plane_budget
+        self.session_budget = _positive_budget(session_budget, "session budget")
+        self.per_plane_budget = _positive_budget(per_plane_budget, "plane budget")
         self._spent_total = 0.0
         self._spent_by_plane: Dict[str, float] = {}
         self._history: List[PrivacySpend] = []
 
     def can_spend(self, epsilon: float, plane: str = "") -> bool:
-        if isinstance(epsilon, bool) or not isinstance(epsilon, (int, float)) or epsilon <= 0:
+        if (
+            isinstance(epsilon, bool)
+            or not isinstance(epsilon, (int, float))
+            or not epsilon > 0
+            or epsilon != epsilon
+            or epsilon == float("inf")
+        ):
             return False
-        if self._spent_total + epsilon > self.session_budget:
+        if not isinstance(plane, str) or not plane.strip():
             return False
-        if plane and self._spent_by_plane.get(plane, 0.0) + epsilon > self.per_plane_budget:
+        if self._spent_total + float(epsilon) > self.session_budget:
+            return False
+        if self._spent_by_plane.get(plane, 0.0) + float(epsilon) > self.per_plane_budget:
             return False
         return True
 
