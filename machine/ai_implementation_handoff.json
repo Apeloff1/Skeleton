@@ -913,16 +913,17 @@
         "skeleton/testing/test_engine_media_routes.py media authority/bounds regression",
         "backend/tests/test_engine_media_client.py media transport regression",
         "backend/tests/test_engine_media_cutover.py application media cutover regression",
-        "docker-compose.yml engine-only runtime model credentials"
+        "docker-compose.yml engine-only runtime model credentials",
+        "backend/tests/test_engine_http_boundary.py authenticated submit/status/cancel with token+principal enforcement",
+        "backend/tests/test_engine_cross_service_boundary.py delegated tenant/capability/token denial proof",
+        "backend/tests/test_engine_cross_service_boundary.py fresh-authority retry returns same acknowledgement without duplicate provider work",
+        "backend/tests/test_engine_cross_service_boundary.py cancel fences late provider completion",
+        "backend/tests/test_engine_cross_service_boundary.py golden path preserves operation/turn/provider/tool/evidence/result lineage"
       ],
       "remaining": [
-        "exact-head App Assembly must prove zero production backend ProviderRegistry.from_env activators",
-        "prove backend->engine authenticated submit against deployed service boundary",
-        "prove delegated tenant/user/scope denial across deployed service boundary",
-        "prove submit retry/query returns same operation/execution across deployed service boundary",
-        "prove idempotent cancel plus late-result fencing across service transport",
-        "prove provider execution occurs only in Skeleton service in production topology",
-        "prove cross-service golden journey with operation/turn/verification/provider/tool/result lineage"
+        "exact-head App Assembly must prove zero production backend ProviderRegistry.from_env activators and engine-only provider credentials",
+        "exact-head topology/assembly validation must prove provider execution remains engine-owned in canonical production Compose",
+        "close lower-stage dependency gaps before changing Stage-5 gap status to closed"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
