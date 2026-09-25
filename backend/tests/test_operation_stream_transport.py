@@ -15,7 +15,10 @@ from core.operation_stream_transport import (
 from skeleton.contracts.operation import OperationEnvelope, OperationState
 from skeleton.frontier.operation_stream import ReplayCursor, StreamReplayGapError
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
-from skeleton.persistence.operation_store import SQLiteOperationStore
+from skeleton.persistence.operation_store import (
+    OperationStoreConflict,
+    SQLiteOperationStore,
+)
 
 
 BASE_TIME = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
@@ -128,6 +131,90 @@ def test_transport_recovers_when_stream_commit_preceded_outbox_ack(
     events.close()
 
 
+def test_shared_sqlite_workers_recover_projection_without_duplicate_events(
+    tmp_path: Path,
+) -> None:
+    operation_path = tmp_path / "shared-operations.sqlite"
+    event_path = tmp_path / "shared-events.sqlite"
+
+    operations_a = SQLiteOperationStore(operation_path)
+    operations_b = SQLiteOperationStore(operation_path)
+    events_a = SQLiteOperationEventStore(event_path)
+    events_b = SQLiteOperationEventStore(event_path)
+    transport_a = OperationStreamTransport(operations_a, events_a)
+    transport_b = OperationStreamTransport(operations_b, events_b)
+
+    operation = _operation()
+    created = operations_a.create(operation, now=BASE_TIME)
+
+    # Worker A durably appends the outbox event but crashes before ACK.
+    pending = operations_a.pending_outbox(
+        operation_id=operation.operation_id,
+    )
+    assert len(pending) == 1
+    item = pending[0]
+    appended = events_a.append(
+        item.operation_id,
+        item.event_type,
+        item.payload,
+        event_id=item.outbox_id,
+        timestamp=item.created_at,
+    )
+
+    # Independent worker B replays the same deterministic outbox identity,
+    # observes the idempotent append, and completes the ACK.
+    recovered = transport_b.dispatch_pending(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+    assert len(recovered) == 1
+    assert recovered[0].as_dict() == appended.as_dict()
+    assert operations_b.pending_outbox(
+        operation_id=operation.operation_id,
+    ) == ()
+    assert len(events_b.replay(ReplayCursor(operation.operation_id))) == 1
+
+    validated = operations_b.transition(
+        operation.operation_id,
+        OperationState.VALIDATED,
+        expected_version=created.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    batch_a = transport_a.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        after_sequence=1,
+        consumer_id="worker-a-client",
+    )
+    assert [event.type for event in batch_a.events] == [
+        "operation.validated",
+    ]
+    assert batch_a.operation.version == validated.version
+
+    cancelled = transport_b.cancel(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+    assert cancelled.changed is True
+    terminal_a = transport_a.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        after_sequence=2,
+        consumer_id="worker-a-client",
+    )
+    assert [event.type for event in terminal_a.events] == [
+        "operation.cancelled",
+    ]
+    assert terminal_a.terminal is True
+    assert terminal_a.stream_latest_sequence == 3
+    assert terminal_a.has_more is False
+
+    operations_a.close()
+    operations_b.close()
+    events_a.close()
+    events_b.close()
+
+
 def test_transport_replay_preserves_explicit_compaction_gap(
     tmp_path: Path,
 ) -> None:
@@ -183,6 +270,78 @@ def test_cancel_transitions_authority_and_projects_terminal_event(
         "operation.cancelled",
     ]
     assert replay[-1].terminal is True
+
+    operations.close()
+    events.close()
+
+
+def test_cancel_complete_race_preserves_single_completed_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+            OperationState.ADMITTED,
+            OperationState.RUNNING,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    original_transition = operations.transition
+    raced = False
+
+    def racing_transition(
+        operation_id,
+        target,
+        *,
+        expected_version=None,
+        now=None,
+    ):
+        nonlocal raced
+        if OperationState(target) is OperationState.CANCELLED and not raced:
+            raced = True
+            original_transition(
+                operation_id,
+                OperationState.COMPLETED,
+                expected_version=expected_version,
+                now=BASE_TIME + timedelta(seconds=10),
+            )
+            raise OperationStoreConflict(
+                "simulated completion won cancellation race"
+            )
+        return original_transition(
+            operation_id,
+            target,
+            expected_version=expected_version,
+            now=now,
+        )
+
+    monkeypatch.setattr(operations, "transition", racing_transition)
+
+    result = transport.cancel(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+
+    assert raced is True
+    assert result.changed is False
+    assert result.operation.envelope.state is OperationState.COMPLETED
+
+    replay = events.replay(ReplayCursor(operation.operation_id))
+    terminal = [event for event in replay if event.terminal]
+    assert [event.type for event in terminal] == ["operation.completed"]
+    assert all(event.type != "operation.cancelled" for event in replay)
 
     operations.close()
     events.close()
@@ -283,6 +442,118 @@ def test_transport_acknowledgement_is_tenant_bound(
             tenant_id="tenant-b",
             consumer_id="client-a",
             sequence=1,
+        )
+
+    operations.close()
+    events.close()
+
+
+def test_resync_snapshot_returns_compaction_floor_and_latest_cursor(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.compact_through(operation.operation_id, 2)
+
+    snapshot = transport.resync_snapshot(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-recover",
+    )
+
+    assert snapshot.compacted_through == 2
+    assert snapshot.resume_after_sequence == 2
+    assert snapshot.latest_sequence == 3
+    assert snapshot.operation.envelope.state is OperationState.AUTHORIZED
+    assert snapshot.active_consumer_count == 1
+
+    replay = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        after_sequence=snapshot.resume_after_sequence,
+        consumer_id="client-recover",
+    )
+    assert [event.sequence for event in replay.events] == [3]
+
+    operations.close()
+    events.close()
+
+
+def test_acknowledge_and_compact_waits_for_slowest_active_consumer(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    first = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+        after_sequence=0,
+    )
+    second = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-b",
+        after_sequence=0,
+    )
+    assert first.latest_sequence == second.latest_sequence == 3
+
+    fast = transport.acknowledge_and_compact(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+        sequence=3,
+    )
+    assert fast.compacted_through == 0
+    assert fast.compacted_events == 0
+    assert fast.active_consumer_count == 2
+
+    slow = transport.acknowledge_and_compact(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-b",
+        sequence=2,
+    )
+    assert slow.compacted_through == 2
+    assert slow.compacted_events == 2
+    assert slow.latest_sequence == 3
+
+    with pytest.raises(StreamReplayGapError):
+        transport.replay(
+            operation.operation_id,
+            tenant_id="tenant-a",
+            after_sequence=1,
         )
 
     operations.close()

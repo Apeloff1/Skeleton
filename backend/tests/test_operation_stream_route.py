@@ -9,7 +9,7 @@ import pytest
 from core.operation_stream_transport import OperationStreamTransport
 from core.routes_registry import KNOWN_ROUTES_WITH_PREFIX
 from routes import operation_stream as route
-from skeleton.contracts.operation import OperationEnvelope
+from skeleton.contracts.operation import OperationEnvelope, OperationState
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
 from skeleton.persistence.operation_store import SQLiteOperationStore
 
@@ -138,6 +138,71 @@ async def test_terminal_sse_replay_emits_canonical_events_and_closes(
     events.close()
 
 
+@pytest.mark.asyncio
+async def test_sse_terminal_backlog_drains_across_bounded_batches(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+            OperationState.ADMITTED,
+            OperationState.RUNNING,
+            OperationState.COMPLETED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+    monkeypatch.setattr(route, "_SSE_BATCH_LIMIT", 2)
+    monkeypatch.setattr(route, "_POLL_SECONDS", 0.0)
+
+    response = await route.operation_events(
+        _Request(),
+        operation.operation_id,
+        consumer_id="slow-route-client",
+        after_sequence=0,
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    chunks: list[str] = []
+    async for chunk in response.body_iterator:
+        chunks.append(
+            chunk.decode("utf-8")
+            if isinstance(chunk, bytes)
+            else chunk
+        )
+
+    payload = "".join(chunks)
+    expected_types = (
+        "operation.created",
+        "operation.validated",
+        "operation.authorized",
+        "operation.admitted",
+        "operation.running",
+        "operation.completed",
+    )
+    offsets = [payload.index("event: " + item) for item in expected_types]
+    assert offsets == sorted(offsets)
+    assert payload.count("id: ") == 6
+    assert payload.count("event: operation.completed") == 1
+    assert "event: stream.resync_required" not in payload
+    assert "idle-timeout" not in payload
+
+    operations.close()
+    events.close()
+
+
 def test_json_replay_returns_resume_metadata(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -259,6 +324,86 @@ def test_route_ack_is_tenant_bound(
         )
 
     assert getattr(caught.value, "status_code", None) == 404
+
+    operations.close()
+    events.close()
+
+
+@pytest.mark.asyncio
+async def test_resync_route_returns_authoritative_compaction_floor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        "validated",
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.compact_through(operation.operation_id, 1)
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    payload = await route.operation_event_resync(
+        operation.operation_id,
+        consumer_id="route-resync",
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    assert payload["ok"] is True
+    assert payload["compacted_through"] == 1
+    assert payload["resume_after_sequence"] == 1
+    assert payload["latest_sequence"] == 2
+    assert payload["operation"]["state"] == "validated"
+    assert payload["active_consumer_count"] == 1
+
+    operations.close()
+    events.close()
+
+
+def test_ack_route_compacts_only_after_active_consumers_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        "validated",
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    for consumer in ("client-a", "client-b"):
+        replay = route.operation_event_replay(
+            operation.operation_id,
+            consumer_id=consumer,
+            after_sequence=0,
+            limit=250,
+            user={"tenant_id": "tenant-a", "role": "viewer"},
+        )
+        assert replay["latest_sequence"] == 2
+
+    first = route.acknowledge_operation_events(
+        operation.operation_id,
+        route.OperationAckRequest(consumer_id="client-a", sequence=2),
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+    assert first["compacted_through"] == 0
+    assert first["active_consumer_count"] == 2
+
+    second = route.acknowledge_operation_events(
+        operation.operation_id,
+        route.OperationAckRequest(consumer_id="client-b", sequence=1),
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+    assert second["compacted_through"] == 1
+    assert second["compacted_events"] == 1
 
     operations.close()
     events.close()

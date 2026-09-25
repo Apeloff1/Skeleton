@@ -12,8 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from skeleton.contracts.operation import OperationState
 from skeleton.frontier.operation_stream import StreamContractError
 
+from core.conversations import (
+    ConversationStorageUnavailable,
+    conversation_authority,
+)
 from core.operation_stream_transport import (
     OperationAccessDenied,
     OperationStreamTransport,
@@ -42,6 +47,25 @@ def _positive_float_env(name: str, default: float, *, minimum: float) -> float:
     return value
 
 
+def _positive_int_env(
+    name: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    if value < minimum or value > maximum:
+        return default
+    return value
+
+
 _POLL_SECONDS = _positive_float_env(
     "CODEDOCK_OPERATION_STREAM_POLL_SECONDS",
     0.25,
@@ -59,6 +83,12 @@ _IDLE_TIMEOUT_SECONDS = _positive_float_env(
 )
 _CONSUMER_PATTERN = r"^[A-Za-z0-9._:-]{1,128}$"
 _CONSUMER_LEASE_SECONDS = 300
+_SSE_BATCH_LIMIT = _positive_int_env(
+    "CODEDOCK_OPERATION_STREAM_SSE_BATCH_LIMIT",
+    64,
+    minimum=1,
+    maximum=512,
+)
 
 
 class OperationAckRequest(BaseModel):
@@ -181,6 +211,54 @@ def operation_event_replay(
     return {"ok": True, **batch.as_dict()}
 
 
+@router.get("/{operation_id}/events/resync")
+async def operation_event_resync(
+    operation_id: str,
+    consumer_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=_CONSUMER_PATTERN,
+    ),
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    """Return authoritative operation state, replay floor and canonical result."""
+
+    tenant_id = _principal_tenant(user)
+    try:
+        snapshot = _transport().resync_snapshot(
+            operation_id,
+            tenant_id=tenant_id,
+            consumer_id=consumer_id,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+
+    payload: dict[str, Any] = {"ok": True, **snapshot.as_dict()}
+    operation = snapshot.operation.envelope
+    if operation.terminal and OperationState(operation.state) is OperationState.COMPLETED:
+        try:
+            message = await conversation_authority.assistant_message_for_operation(
+                operation_id,
+                tenant_id=tenant_id,
+                owner_id=operation.actor_id,
+            )
+        except ConversationStorageUnavailable:
+            raise HTTPException(
+                status_code=503,
+                detail="Canonical conversation result unavailable",
+            ) from None
+        if message is not None:
+            payload["canonical_result"] = {
+                "status": "completed",
+                "final_output": message.content,
+                "message_id": message.message_id,
+                "result_ref": message.ai_result_id,
+            }
+    return payload
+
+
 @router.post("/{operation_id}/events/ack")
 def acknowledge_operation_events(
     operation_id: str,
@@ -191,7 +269,7 @@ def acknowledge_operation_events(
 
     tenant_id = _principal_tenant(user)
     try:
-        checkpoint = _transport().acknowledge(
+        acknowledgement = _transport().acknowledge_and_compact(
             operation_id,
             tenant_id=tenant_id,
             consumer_id=body.consumer_id,
@@ -200,7 +278,7 @@ def acknowledge_operation_events(
         )
     except Exception as exc:
         raise _map_transport_error(exc) from None
-    return {"ok": True, "consumer": checkpoint.as_dict()}
+    return {"ok": True, **acknowledgement.as_dict()}
 
 
 @router.get("/{operation_id}/events")
@@ -229,6 +307,7 @@ async def operation_events(
             after_sequence=cursor,
             consumer_id=consumer_id,
             consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+            limit=_SSE_BATCH_LIMIT,
         )
     except Exception as exc:
         raise _map_transport_error(exc) from None
@@ -270,6 +349,7 @@ async def operation_events(
                     after_sequence=cursor,
                     consumer_id=consumer_id,
                     consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+                    limit=_SSE_BATCH_LIMIT,
                 )
             except StreamReplayGapError:
                 # Once response headers are committed an HTTP 409 is no longer
@@ -303,6 +383,7 @@ __all__ = [
     "router",
     "operation_event_replay",
     "acknowledge_operation_events",
+    "operation_event_resync",
     "_last_event_sequence",
     "_principal_tenant",
 ]
