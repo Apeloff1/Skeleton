@@ -33,6 +33,14 @@ class GrokDelegationRequest:
     metadata: Mapping[str, str] | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.mode, DelegationMode):
+            object.__setattr__(self, "mode", DelegationMode(str(self.mode)))
+        if not isinstance(self.wait_mode, DelegationWaitMode):
+            object.__setattr__(
+                self,
+                "wait_mode",
+                DelegationWaitMode(str(self.wait_mode)),
+            )
         if not self.objective.strip():
             raise ValueError("objective must be non-empty")
         if not self.workspace_id.strip():
