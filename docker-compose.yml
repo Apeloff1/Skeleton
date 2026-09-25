@@ -41,6 +41,8 @@ services:
       - SKL_OPERATION_STATE_PATH=/app/data/operation_state.sqlite
       - SKL_OPERATION_STREAM_PATH=/app/data/operation_stream.sqlite
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
+      - BACKEND_TOOL_RECEIPT_PATH=/app/data/backend_tool_receipts.sqlite3
+      - BACKEND_TOOL_RESULT_PATH=/app/data/backend_tool_results.sqlite3
       - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
       - SKL_ENGINE_ALLOWED_TENANTS_CSV=${SKL_ENGINE_ALLOWED_TENANTS_CSV:-*}
       - SKL_ENGINE_ALLOWED_CAPABILITIES_CSV=${SKL_ENGINE_ALLOWED_CAPABILITIES_CSV:-*}
@@ -211,8 +213,8 @@ volumes:
   backend_data:
     driver: local
     labels:
-      com.skeleton.state.role: "derived"
-      com.skeleton.recovery.order: "90"
+      com.skeleton.state.role: "declared-mixed-tool-authority-and-derived"
+      com.skeleton.recovery.order: "50"
   skeleton_data:
     driver: local
     labels:
