@@ -526,3 +526,219 @@ async def test_backend_delegate_rejects_idempotency_reuse_with_changed_call_line
         )
 
     assert calls["count"] == 1
+
+@pytest.mark.asyncio
+async def test_canonical_result_lifecycle_metadata_persists_across_restart(
+    registry,
+    monkeypatch,
+    tmp_path,
+):
+    receipt_path = str(tmp_path / "governed-tool-receipts.sqlite3")
+    result_path = str(tmp_path / "governed-tool-results.sqlite3")
+    operation_id = str(uuid4())
+
+    async def handler(params):
+        return {"ok": True, "value": params["topic"]}
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", handler)
+    _reset_canonical(
+        registry,
+        receipt_path=receipt_path,
+        result_path=result_path,
+    )
+    first = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "governance"},
+        operation_id=operation_id,
+        tenant_id="tenant-a",
+        idempotency_key="governed-result",
+        request_id=str(uuid4()),
+    )
+
+    result_ref = first["receipt"]["result_ref"]
+    assert isinstance(result_ref, str)
+    store = registry._CANONICAL_RESULT_STORE
+    lifecycle = store.governance.lifecycle.get(result_ref)
+    assert lifecycle["tenant_id"] == "tenant-a"
+    assert lifecycle["owner_plane"] == "artifact"
+    assert lifecycle["source_ref"] == store.source_ref(result_ref)
+    assert lifecycle["data_class"] == "internal"
+    assert lifecycle["purposes"] == ["model-inference"]
+    assert lifecycle["deletion_targets"] == ["tool-result"]
+    assert lifecycle["state"] == "active"
+    assert lifecycle["exportable"] is False
+    assert lifecycle["retention_until"] > lifecycle["created_at"]
+
+    _reset_canonical(
+        registry,
+        receipt_path=receipt_path,
+        result_path=result_path,
+    )
+    reopened = registry._CANONICAL_RESULT_STORE
+    persisted = reopened.governance.lifecycle.get(result_ref)
+    assert persisted == lifecycle
+
+    replay = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "governance"},
+        operation_id=operation_id,
+        tenant_id="tenant-a",
+        idempotency_key="governed-result",
+        request_id=str(uuid4()),
+    )
+    assert replay["ok"] is True
+    assert replay["receipt"]["result_ref"] == result_ref
+
+
+@pytest.mark.asyncio
+async def test_result_store_fails_closed_before_payload_write_when_governance_fails(
+    registry,
+    monkeypatch,
+):
+    _reset_canonical(registry)
+    store = registry._CANONICAL_RESULT_STORE
+
+    def fail_registration(*args, **kwargs):
+        raise RuntimeError("governance unavailable")
+
+    monkeypatch.setattr(
+        store.governance,
+        "register_canonical_write",
+        fail_registration,
+    )
+
+    async def handler(_params):
+        return {"ok": True, "secret": "must-not-persist"}
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", handler)
+    result = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "fail-closed"},
+        operation_id=str(uuid4()),
+        tenant_id="tenant-a",
+        idempotency_key="governance-failure",
+        request_id=str(uuid4()),
+    )
+
+    assert result["ok"] is False
+    assert result["receipt"]["status"] == "failed"
+    assert store._connection.execute(
+        "SELECT COUNT(*) FROM legacy_tool_result"
+    ).fetchone()[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_result_store_capacity_eviction_is_lifecycle_acknowledged(
+    registry,
+):
+    store = registry._CompatibilityResultStore(
+        ":memory:",
+        max_entries=1,
+        retention_seconds=3600,
+    )
+    manifest = registry._TOOL_MANIFESTS["vault_query"]
+
+    def request(key):
+        return registry.ToolExecutionRequest(
+            request_id=str(uuid4()),
+            operation_id=str(uuid4()),
+            tenant_id="tenant-a",
+            tool_id="vault_query",
+            idempotency_key=key,
+            arguments={"topic": key},
+            requested_at=datetime.now(timezone.utc),
+        )
+
+    first_ref = await store.put(
+        request("first"),
+        {"ok": True, "value": "first"},
+        manifest=manifest,
+    )
+    second_ref = await store.put(
+        request("second"),
+        {"ok": True, "value": "second"},
+        manifest=manifest,
+    )
+
+    assert await store.get(first_ref) is None
+    assert (await store.get(second_ref))["value"] == "second"
+    assert store.governance.lifecycle.get(first_ref)["state"] == "deleted"
+    assert store.governance.lifecycle.get(second_ref)["state"] == "active"
+    receipts = store.governance.lifecycle.receipts(tenant_id="tenant-a")
+    assert any(
+        item.record_id == first_ref
+        and item.target == "tool-result"
+        and item.state.value == "deleted"
+        for item in receipts
+    )
+    store.close()
+
+
+@pytest.mark.asyncio
+async def test_result_store_enforces_manifest_output_schema_and_size(
+    registry,
+):
+    store = registry._CompatibilityResultStore(":memory:")
+    request = registry.ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="bounded.result",
+        idempotency_key="bounded-result",
+        arguments={},
+        requested_at=datetime.now(timezone.utc),
+    )
+    manifest = registry.ToolManifest(
+        tool_id="bounded.result",
+        version="1.0.0",
+        description="Bounded result fixture",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "answer": {"type": "string", "maxLength": 8},
+            },
+            "required": ["answer"],
+            "additionalProperties": False,
+        },
+        result_size_limit=32,
+    )
+
+    with pytest.raises(registry.ToolContractError):
+        await store.put(
+            request,
+            {"wrong": "shape"},
+            manifest=manifest,
+        )
+    with pytest.raises(ValueError, match="result_size_limit"):
+        await store.put(
+            request,
+            {"answer": "12345678"},
+            manifest=registry.ToolManifest(
+                tool_id="bounded.result",
+                version="1.0.1",
+                description="Tiny result fixture",
+                input_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object",
+                    "properties": {
+                        "answer": {"type": "string"},
+                    },
+                    "required": ["answer"],
+                    "additionalProperties": False,
+                },
+                result_size_limit=8,
+            ),
+        )
+
+    assert store._connection.execute(
+        "SELECT COUNT(*) FROM legacy_tool_result"
+    ).fetchone()[0] == 0
+    store.close()
+
