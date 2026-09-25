@@ -19,9 +19,13 @@ class Tensor:
     grad: Optional[List[float]] = None
 
     def __post_init__(self):
+        if not isinstance(self.shape, tuple) or any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in self.shape):
+            raise ValueError("shape must be non-negative integers")
         expected = math.prod(self.shape)
         if len(self.data) != expected:
             raise ValueError(f"Data length {len(self.data)} != shape product {expected}")
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in self.data):
+            raise ValueError("tensor values must be finite")
 
     @classmethod
     def zeros(cls, *shape: int) -> "Tensor":
@@ -49,11 +53,13 @@ class Tensor:
         return sum(a * b for a, b in zip(self.data, other.data))
 
     def mean(self) -> float:
-        return sum(self.data) / len(self.data) if self.data else 0.0
+        if not self.data:
+            raise ValueError("an empty tensor has no mean")
+        return sum(self.data) / len(self.data)
 
     def std(self) -> float:
         if len(self.data) < 2:
-            return 0.0
+            raise ValueError("standard deviation needs two values")
         m = self.mean()
         variance = sum((x - m) ** 2 for x in self.data) / (len(self.data) - 1)
         return math.sqrt(variance)
