@@ -33,6 +33,7 @@ class Mesh:
     def accept(self, agent: str, peer: str) -> str:
         if agent not in self.offers:
             return "refuse"
+        self.offers.pop(agent)
         self.accepted.append((agent, peer))
         return "accept"
 
@@ -95,6 +96,12 @@ class SwarmMesh:
 
     def join(self, specialisations: Set[str], weight: float = 1.0, metadata: Optional[Dict[str, Any]] = None) -> Agent:
         """Register a new agent in the swarm."""
+        if len(self._agents) >= N_CAP:
+            raise ValueError("n-cap")
+        if not isinstance(specialisations, set) or not specialisations or any(not isinstance(item, str) or not item for item in specialisations):
+            raise ValueError("specialisations must be a non-empty set of names")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not weight > 0:
+            raise ValueError("weight must be positive")
         agent = Agent(
             agent_id=str(uuid.uuid4())[:8],
             specialisations=set(specialisations),
@@ -112,9 +119,12 @@ class SwarmMesh:
 
         return agent
 
+    def agents(self) -> tuple[Agent, ...]:
+        return tuple(self._agents.values())
+
     def route(self, capability: str) -> Optional[Agent]:
         """Find the best agent for a given capability."""
-        candidates = [(a.score(capability), a) for a in self._agents.values()]
+        candidates = [(a.score(capability), a) for a in self.agents()]
         candidates = [(s, a) for s, a in candidates if s > 0]
 
         if not candidates:
@@ -153,13 +163,20 @@ class PheromoneField:
     """Stigmergic communication via evaporating pheromone trails."""
 
     def __init__(self, bus: Optional[EventBus] = None, decay_rate: float = 0.95):
+        if isinstance(decay_rate, bool) or not isinstance(decay_rate, (int, float)) or not 0.0 < float(decay_rate) <= 1.0:
+            raise ValueError("decay_rate must be in (0, 1]")
         self._trails: Dict[str, Dict[str, float]] = {}  # location -> {marker: strength}
-        self._decay_rate = decay_rate
+        self._decay_rate = float(decay_rate)
         self._bus = bus
 
     def deposit(self, location: str, marker: str, strength: float = 1.0) -> None:
         """Deposit a pheromone marker at a location."""
-        self._trails.setdefault(location, {})[marker] = self._trails.get(location, {}).get(marker, 0) + strength
+        if not isinstance(location, str) or not location.strip() or not isinstance(marker, str) or not marker.strip():
+            raise ValueError("location and marker are required")
+        if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not strength > 0:
+            raise ValueError("strength must be positive")
+        trails = self._trails.setdefault(location, {})
+        trails[marker] = min(100.0, trails.get(marker, 0.0) + float(strength))
         if self._bus:
             self._bus.emit("swarm.pheromone.deposited", {"location": location, "marker": marker, "strength": strength})
 
@@ -196,7 +213,7 @@ class StigmergicRouter:
     def route_with_stigmergy(self, mesh: SwarmMesh, capability: str, location: str = "default") -> Optional[Agent]:
         """Route considering both agent scores and local pheromone signals."""
         # Get base agent candidates
-        candidates = [(a.score(capability), a) for a in mesh._agents.values()]
+        candidates = [(a.score(capability), a) for a in mesh.agents()]
         candidates = [(s, a) for s, a in candidates if s > 0]
 
         if not candidates:
@@ -222,38 +239,46 @@ class HiveMind:
 
     def contribute(self, topic: str, agent_id: str, value: Any, confidence: float = 1.0) -> None:
         """Contribute an opinion to a topic."""
-        self._opinions.setdefault(topic, []).append({
+        if not isinstance(topic, str) or not topic.strip() or not isinstance(agent_id, str) or not agent_id.strip():
+            raise ValueError("topic and agent_id are required")
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0.0 < float(confidence) <= 1.0:
+            raise ValueError("confidence must be in (0, 1]")
+        opinions = self._opinions.setdefault(topic, [])
+        opinions[:] = [item for item in opinions if item["agent_id"] != agent_id]
+        opinions.append({
             "agent_id": agent_id,
             "value": value,
-            "confidence": confidence,
+            "confidence": float(confidence),
             "timestamp": time.time(),
         })
 
     def consensus(self, topic: str, threshold: float = 0.6) -> Optional[Any]:
-        """Attempt to reach consensus on a topic."""
+        """Return a value only when enough weight actually agrees."""
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not 0.0 < float(threshold) <= 1.0:
+            raise ValueError("threshold must be in (0, 1]")
         opinions = self._opinions.get(topic, [])
         if not opinions:
             return None
-
-        # Weighted voting for scalar values
-        try:
-            values = [o["value"] for o in opinions if isinstance(o["value"], (int, float))]
-            if values:
-                weights = [o["confidence"] for o in opinions if isinstance(o["value"], (int, float))]
-                weighted_sum = sum(v * w for v, w in zip(values, weights))
-                total_weight = sum(weights)
-                return weighted_sum / total_weight if total_weight > 0 else None
-        except (TypeError, ValueError):
-            pass
-
-        # Majority vote for categorical
-        from collections import Counter
-        votes = Counter(str(o["value"]) for o in opinions)
-        most_common, count = votes.most_common(1)[0]
-        if count / len(opinions) >= threshold:
-            return most_common
-
-        return None  # No consensus
+        total = sum(item["confidence"] for item in opinions)
+        if total <= 0:
+            return None
+        numeric = [item for item in opinions if not isinstance(item["value"], bool) and isinstance(item["value"], (int, float))]
+        if len(numeric) == len(opinions):
+            ordered = sorted(float(item["value"]) for item in numeric)
+            median = ordered[len(ordered) // 2]
+            spread = max(ordered) - min(ordered)
+            scale = max(1.0, abs(median))
+            if spread > 0.05 * scale:
+                return None
+            return sum(float(item["value"]) * item["confidence"] for item in numeric) / total
+        votes: Dict[str, float] = {}
+        for item in opinions:
+            key = str(item["value"])
+            votes[key] = votes.get(key, 0.0) + item["confidence"]
+        choice, weight = max(votes.items(), key=lambda item: item[1])
+        if weight / total >= float(threshold):
+            return choice
+        return None
 
     def stats(self) -> Dict[str, Any]:
         return {"topics": len(self._opinions), "total_opinions": sum(len(o) for o in self._opinions.values())}
@@ -267,9 +292,17 @@ class CapabilityNegotiator:
         self._bus = bus
 
     def advertise(self, agent_id: str, capabilities: Set[str]) -> None:
-        """Advertise capabilities for an agent."""
-        for cap in capabilities:
-            self._capabilities.setdefault(cap, set()).add(agent_id)
+        """Replace the capabilities an agent claims."""
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            raise ValueError("agent_id is required")
+        if not isinstance(capabilities, set) or any(not isinstance(item, str) or not item for item in capabilities):
+            raise ValueError("capabilities must be a set of names")
+        for claimed in list(self._capabilities):
+            self._capabilities[claimed].discard(agent_id)
+            if not self._capabilities[claimed]:
+                del self._capabilities[claimed]
+        for capability in capabilities:
+            self._capabilities.setdefault(capability, set()).add(agent_id)
 
     def discover(self, capability: str) -> Set[str]:
         """Discover agents that provide a capability."""
@@ -302,23 +335,28 @@ class Platoons:
         self._bus = bus
 
     def deploy(self, mesh: SwarmMesh, template: str, count: Optional[int] = None) -> List[Agent]:
-        """Deploy a platoon from a template."""
-        spec = self.TEMPLATES.get(template, {"specialisations": {"general"}, "count": 1})
-        n = count or spec["count"]
-
+        """Deploy a platoon from a template, or refuse if it would break the cap."""
+        if template not in self.TEMPLATES:
+            raise ValueError(f"unknown platoon template {template}")
+        spec = self.TEMPLATES[template]
+        if count is None:
+            n = int(spec["count"])
+        elif isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= N_CAP:
+            raise ValueError("platoon count must be an integer from 1 to n-cap")
+        else:
+            n = count
+        if len(mesh.agents()) + n > N_CAP:
+            raise ValueError("n-cap")
         agents = []
         for _ in range(n):
-            agent = mesh.join(spec["specialisations"])
+            agent = mesh.join(set(spec["specialisations"]))
             agents.append(agent)
-
         self._platoons[template] = agents
-
         if self._bus:
             self._bus.emit("swarm.platoon.deployed", {
                 "template": template,
                 "count": len(agents),
             })
-
         return agents
 
     def stats(self) -> Dict[str, Any]:
