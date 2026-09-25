@@ -79,9 +79,21 @@ class EngineSettings(BaseSettings):
     execution_state_path: str = ":memory:"
     submission_state_path: str = ":memory:"
     tool_receipt_path: str = ":memory:"
+    service_token: str = ""
     service_principal: str = "codedock-backend"
     allowed_tenants_csv: str = "*"
     allowed_capabilities_csv: str = "*"
+
+    @field_validator("service_token")
+    @classmethod
+    def _service_token(cls, value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("engine service token must be text")
+        if value and (value != value.strip() or len(value) < 32):
+            raise ValueError(
+                "engine service token must be normalized and at least 32 characters"
+            )
+        return value
 
     @property
     def allowed_tenants(self) -> frozenset[str]:
