@@ -106,7 +106,11 @@
         "backend/services/tool_registry.py charges manifest-aware tool usage before side effects",
         "skeleton/intelligence/admission.py and quota.py separate artifact_bytes from storage_bytes",
         "skeleton/intelligence/quota_sqlite.py migrates durable pre-storage schemas in place and persists storage usage independently",
-        "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent storage budget/restart behavior"
+        "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent storage budget/restart behavior",
+        "skeleton/intelligence/admission.py and quota.py define independent storage byte budgets",
+        "skeleton/intelligence/quota_sqlite.py persists storage quotas with additive legacy migration",
+        "skeleton/artifact_plane/usage.py charges storage writes to storage_bytes",
+        "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent and restart-safe storage accounting"
       ],
       "remaining": [
         "admission at every expensive non-provider action",
