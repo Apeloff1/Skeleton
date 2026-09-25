@@ -20,12 +20,14 @@ class Variant:
     weight: int = 50
     outcomes: List[float] = field(default_factory=list)
 
-    def mean(self) -> float:
-        return sum(self.outcomes) / len(self.outcomes) if self.outcomes else 0.0
+    def mean(self) -> float | None:
+        if not self.outcomes:
+            return None
+        return sum(self.outcomes) / len(self.outcomes)
 
-    def std(self) -> float:
+    def std(self) -> float | None:
         if len(self.outcomes) < 2:
-            return 0.0
+            return None
         m = self.mean()
         return math.sqrt(sum((x - m) ** 2 for x in self.outcomes) / (len(self.outcomes) - 1))
 
@@ -43,7 +45,9 @@ class ExperimentTracker:
     """A/B experiment runner with significance testing."""
 
     def __init__(self, significance_level: float = 0.05):
-        self.alpha = significance_level
+        if isinstance(significance_level, bool) or not isinstance(significance_level, (int, float)) or not 0.0 < float(significance_level) < 1.0:
+            raise ValueError("significance level must be in (0, 1)")
+        self.alpha = float(significance_level)
         self._experiments: Dict[str, Experiment] = {}
 
     def create(self, name: str, variants: Optional[List[str]] = None,
@@ -72,23 +76,32 @@ class ExperimentTracker:
         return exp
 
     def assign(self, experiment: str, subject_id: str) -> Optional[str]:
-        exp = self._experiments.get(experiment)
-        if not exp or exp.concluded:
-            return exp.winner if exp else None
+        if experiment not in self._experiments:
+            raise KeyError(experiment)
+        if not isinstance(subject_id, str) or not subject_id:
+            raise ValueError("subject id is required")
+        exp = self._experiments[experiment]
+        if exp.concluded:
+            return exp.winner
         digest = int(hashlib.sha256(f"{experiment}:{subject_id}".encode()).hexdigest(), 16)
         roll = digest % 100
-        acc = 0
+        acc = 0.0
         total = sum(v.weight for v in exp.variants.values())
-        for name, v in exp.variants.items():
-            acc += (v.weight / total) * 100
+        for name, variant in exp.variants.items():
+            acc += (variant.weight / total) * 100
             if roll < acc:
                 return name
         return list(exp.variants.keys())[-1]
 
     def record(self, experiment: str, variant: str, outcome: float) -> None:
+        if experiment not in self._experiments:
+            raise KeyError(experiment)
         exp = self._experiments[experiment]
-        if variant in exp.variants:
-            exp.variants[variant].outcomes.append(outcome)
+        if variant not in exp.variants:
+            raise ValueError(f"unknown variant {variant!r}")
+        if isinstance(outcome, bool) or not isinstance(outcome, (int, float)) or not math.isfinite(float(outcome)):
+            raise ValueError("outcome must be finite")
+        exp.variants[variant].outcomes.append(float(outcome))
 
     def significance(self, experiment: str) -> Dict[str, Any]:
         exp = self._experiments[experiment]
@@ -133,7 +146,14 @@ class ExperimentTracker:
             "kind": "experiment-card",
             "experiments": {
                 n: {
-                    "variants": {v: {"weight": v2.weight, "samples": len(v2.outcomes), "mean": round(v2.mean(), 4)} for v, v2 in e.variants.items()},
+                    "variants": {
+                        v: {
+                            "weight": variant.weight,
+                            "samples": len(variant.outcomes),
+                            "mean": None if variant.mean() is None else round(variant.mean(), 4),
+                        }
+                        for v, variant in e.variants.items()
+                    },
                     "concluded": e.concluded,
                     "winner": e.winner,
                 }
