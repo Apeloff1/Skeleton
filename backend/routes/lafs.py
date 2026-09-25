@@ -275,8 +275,8 @@ async def jeeves_ask(req: JeevesAskReq):
                 "You are Jeeves, the GameForge master orchestrator. Answer the user "
                 "only from the provided canon knowledge and PDF text. Cite sheet "
                 "numbers [n]. If the supplied evidence is insufficient, say so briefly. "
-                "An image attachment may be present, but this text-only compatibility "
-                "path cannot inspect image bytes, so never infer image contents."
+                "An image attachment may be present, but this text path cannot inspect "
+                "image bytes, so never infer image contents."
             )
             prompt = (
                 f"CANON KNOWLEDGE:\n{context_block}\n\n"
@@ -285,36 +285,27 @@ async def jeeves_ask(req: JeevesAskReq):
             if req.image_base64:
                 prompt += (
                     "\n\nIMAGE ATTACHMENT: present but not inspected by this "
-                    "text-only compatibility path."
+                    "text-only engine path."
                 )
-            identity = "\x00".join(
-                (
-                    req.query,
-                    context_block,
-                    pdf_text,
-                    "image-present" if req.image_base64 else "image-absent",
-                )
-            )
+            identity = hashlib.sha256(
+                (req.query + "\x1f" + context_block).encode("utf-8")
+            ).hexdigest()
             response = await execute_engine_text(
                 EngineTextRequest(
                     instructions=system,
                     prompt=prompt,
-                    idempotency_key=(
-                        "lafs-jeeves:"
-                        + hashlib.sha256(identity.encode("utf-8")).hexdigest()
-                    ),
-                    tenant_id="default",
+                    idempotency_key="lafs-jeeves:" + identity,
                     actor_id="lafs-jeeves",
                     capability="assistant.compat",
-                    verification_profile="assistant_proposal",
+                    verification_profile="evidence_required",
                     max_output_tokens=1600,
-                    data_class="internal",
-                    purpose="lafs-grounded-answer",
                 )
             )
             reply = response.text
             model = "skeleton-engine"
         except EngineTextError:
+            reply = None
+        except Exception:  # noqa: BLE001
             reply = None
     if not reply:
         if recalled or pdf_text:
