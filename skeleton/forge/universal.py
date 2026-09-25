@@ -174,6 +174,12 @@ class Forge:
         return component
 
     def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False, max_rounds: int = 3) -> dict[str, Any]:
+        if not isinstance(target, str) or target not in {"godot", "json", "yaml"}:
+            raise MaterialisationError("unknown materialisation target", context={"target": target})
+        if not isinstance(repair, bool):
+            raise ValueError("repair must be boolean")
+        if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
+            raise ValueError("max_rounds must be an integer >= 1")
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
@@ -224,7 +230,7 @@ class Forge:
                 if looped.get("repairs"):
                     result["repair"] = looped["repairs"][-1]
                     result["repairs"] = looped["repairs"]
-                verification_accepted = bool(looped["accepted"])
+                verification_accepted = looped.get("accepted") is True
                 verification_payload = looped["verification"]
                 evidence = {
                     "project_issues": list(verification_payload.get("project_issues") or []),
@@ -261,7 +267,7 @@ class Forge:
                 if looped.get("repairs"):
                     last = looped["repairs"][-1]
                     self._bus.publish(DomainEvent(
-                        topic="forge.repair.completed" if last.get("ok") else "forge.repair.failed",
+                        topic="forge.repair.completed" if last.get("ok") == 1 else "forge.repair.failed",
                         payload={
                             "blueprint_id": blueprint.blueprint_id,
                             "name": blueprint.name,
@@ -319,7 +325,7 @@ class Forge:
                     },
                     correlation_id=f"forge_verify_{blueprint.blueprint_id}",
                 ))
-                if not verification.accepted:
+                if verification.accepted is not True:
                     raise MaterialisationError(
                         "emitted Godot project failed verification",
                         context={
@@ -362,7 +368,7 @@ class Forge:
                 if looped.get("repairs"):
                     result["repair"] = looped["repairs"][-1]
                     result["repairs"] = looped["repairs"]
-                verification_accepted = bool(looped["accepted"])
+                verification_accepted = looped.get("accepted") is True
                 verification_payload = looped["verification"]
                 evidence = {
                     "project_issues": list(verification_payload.get("project_issues") or []),
@@ -401,7 +407,7 @@ class Forge:
                 if looped.get("repairs"):
                     last = looped["repairs"][-1]
                     self._bus.publish(DomainEvent(
-                        topic="forge.repair.completed" if last.get("ok") else "forge.repair.failed",
+                        topic="forge.repair.completed" if last.get("ok") == 1 else "forge.repair.failed",
                         payload={
                             "blueprint_id": blueprint.blueprint_id,
                             "name": blueprint.name,
@@ -471,7 +477,7 @@ class Forge:
                     },
                     correlation_id=f"forge_verify_{blueprint.blueprint_id}",
                 ))
-                if not verification["accepted"]:
+                if verification.get("accepted") is not True:
                     raise MaterialisationError(
                         f"emitted {target} artefact failed verification",
                         context={
@@ -481,6 +487,8 @@ class Forge:
                             "verification_stats": result["verification_stats"],
                         },
                     )
+        else:
+            raise MaterialisationError("unknown materialisation target", context={"target": target})
         materialised = {
             "blueprint_id": blueprint.blueprint_id,
             "components": len(blueprint.components),
