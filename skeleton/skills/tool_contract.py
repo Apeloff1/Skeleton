@@ -370,10 +370,25 @@ class ToolManifest:
             if self.cost_model is None
             else self.cost_model
         )
+        normalized_cost_model = _schema(cost_model, "cost_model")
+        if "estimated_cost_usd" in normalized_cost_model:
+            raw_cost = normalized_cost_model["estimated_cost_usd"]
+            if isinstance(raw_cost, bool) or not isinstance(
+                raw_cost,
+                (int, float),
+            ):
+                raise ToolContractError(
+                    "cost_model.estimated_cost_usd must be non-negative numeric"
+                )
+            cost_value = float(raw_cost)
+            if not math.isfinite(cost_value) or cost_value < 0:
+                raise ToolContractError(
+                    "cost_model.estimated_cost_usd must be non-negative numeric"
+                )
         object.__setattr__(
             self,
             "cost_model",
-            _schema(cost_model, "cost_model"),
+            normalized_cost_model,
         )
 
         if (
