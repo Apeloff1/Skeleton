@@ -51,12 +51,18 @@ def polish_loop(
     repair_files: Optional[Callable[..., Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Bounded polish: score → optional file repair → re-score, until floor met."""
+    if not isinstance(item, Mapping):
+        raise ValueError("item is required")
+    if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
+        raise ValueError("max_rounds must be an integer >= 1")
+    if isinstance(stage_floor_grade, bool) or not isinstance(stage_floor_grade, int) or stage_floor_grade < 0:
+        raise ValueError("stage floor must be a non-negative integer")
     current = dict(item)
-    floor = max(0.5, 0.5 + 0.1 * stage_floor_grade)
+    floor = 0.5 + 0.1 * stage_floor_grade
     history: List[Dict[str, Any]] = []
     rounds = 0
 
-    for rounds in range(1, max(1, int(max_rounds)) + 1):
+    for rounds in range(1, max_rounds + 1):
         report = _score_item(current)
         history.append({"round": rounds, **report})
         if report["score"] >= floor:
@@ -120,14 +126,11 @@ def summarize(rows: List[Mapping[str, Any]] | None = None, **_: Any) -> Dict[str
 
 
 def persist_quality(row: Mapping[str, Any] | None = None, *, root=None, **_: Any) -> Dict[str, Any]:
-    payload = dict(row or {})
+    if not isinstance(row, Mapping):
+        raise ValueError("quality row is required")
+    payload = dict(row)
     payload.setdefault("kind", "forge-quality")
     payload["stored_prose"] = 0
-    try:
-        append_quality(payload, root=root)
-    except Exception as exc:
-        payload["stored"] = 0
-        payload["error"] = type(exc).__name__
-        return payload
+    append_quality(payload, root=root)
     payload["stored"] = 1
     return payload
