@@ -51,8 +51,12 @@ class ImproveLoop:
     def __init__(self, *, max_iterations: int = 10, patience: int = 3,
                  target: Optional[float] = None,
                  min_gain: float = 0.0) -> None:
-        if max_iterations < 1 or patience < 1:
-            raise ValueError("max_iterations and patience must be >= 1")
+        if isinstance(max_iterations, bool) or not isinstance(max_iterations, int) or max_iterations < 1:
+            raise ValueError("max_iterations must be an integer >= 1")
+        if isinstance(patience, bool) or not isinstance(patience, int) or patience < 1:
+            raise ValueError("patience must be an integer >= 1")
+        if isinstance(min_gain, bool) or not isinstance(min_gain, (int, float)) or min_gain < 0:
+            raise ValueError("min_gain must be non-negative")
         self.max_iterations = max_iterations
         self.patience = patience
         self.target = target
