@@ -82,6 +82,7 @@ def test_assist_executes_through_engine_and_preserves_policy_context(
     assert command.operation.actor_id == "backend-ai"
     assert command.operation.tenant_id == "default"
     assert command.operation.capability == "assistant.compat"
+    assert command.execution_request.context_policy["verification_profile"] == "assistant_proposal"
     assert command.delegated_authority.service_principal == "codedock-backend"
     assert command.execution_request.tool_policy["allowed_tool_ids"] == []
     assert command.compiled_context.tool_choice == "none"
