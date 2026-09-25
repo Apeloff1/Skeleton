@@ -21,18 +21,33 @@ class ForecastPoint:
     upper: float
 
 
+
+def _unit(name: str, value: float, *, allow_zero: bool) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise ValueError(f"{name} must be a finite number")
+    number = float(value)
+    if allow_zero:
+        if not 0.0 <= number <= 1.0:
+            raise ValueError(f"{name} must be in [0, 1]")
+    elif not 0.0 < number <= 1.0:
+        raise ValueError(f"{name} must be in (0, 1]")
+    return number
+
+
 class Forecaster:
     """Holt double-exponential-smoothing forecaster."""
 
     def __init__(self, alpha: float = 0.4, beta: float = 0.1, damping: float = 0.9):
-        self.alpha = alpha
-        self.beta = beta
-        self.damping = damping
+        self.alpha = _unit("alpha", alpha, allow_zero=False)
+        self.beta = _unit("beta", beta, allow_zero=False)
+        self.damping = _unit("damping", damping, allow_zero=True)
         self._series: Dict[str, List[float]] = {}
 
     def feed(self, metric: str, value: float) -> None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise ValueError("metric value must be finite")
         buf = self._series.setdefault(metric, [])
-        buf.append(value)
+        buf.append(float(value))
         if len(buf) > 500:
             buf.pop(0)
 
@@ -63,6 +78,8 @@ class Forecaster:
         }
 
     def forecast(self, metric: str, steps: int = 10) -> Dict[str, Any]:
+        if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
+            raise ValueError("steps must be a positive integer")
         values = self._series.get(metric, [])
         result = self._holt(values, steps)
         result["metric"] = metric
