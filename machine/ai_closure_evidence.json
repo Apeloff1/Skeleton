@@ -733,7 +733,15 @@
         "cancellation bridge into durable OperationEnvelope state",
         "transactional outbox drain before replay",
         "explicit post-header replay-gap resync event",
-        "focused tenant-isolation/cancel/replay/terminal SSE tests"
+        "focused tenant-isolation/cancel/replay/terminal SSE tests",
+        "frontend event-id dedupe and out-of-order/gap rejection test",
+        "provisional assistant content and canonical terminal reconciliation test",
+        "persisted reconnect cursor plus compaction-gap authoritative resync",
+        "multi-client acknowledgement/compaction waits for slowest active cursor",
+        "bounded frontend replay pages and bounded SSE replay batches",
+        "terminal backlog drains fully before SSE close",
+        "completion-versus-cancel race emits exactly one terminal outcome",
+        "per-consumer persisted cursor key isolation prevents cross-tab cursor overwrite/skipping"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -745,21 +753,21 @@
         "slow-client/backpressure test"
       ],
       "outstanding_evidence": [
-        "frontend reducer with sequence and event-id dedupe",
-        "frontend reconnect/resume cursor",
-        "multi-client acknowledgement/compaction strategy",
         "distributed stream ownership for multi-worker deployment",
-        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+        "browser/API disconnect-reconnect recovery journey",
+        "browser/API slow-client backpressure journey",
+        "browser/API cancel-complete race journey",
+        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence"
       ],
       "blockers": [
         "dependency must close: gap-cognitive-execution-loop",
         "dependency must close: gap-engine-application-execution-boundary",
         "dependency must close: gap-state-authority-convergence",
-        "frontend reducer with sequence and event-id dedupe",
-        "frontend reconnect/resume cursor",
-        "multi-client acknowledgement/compaction strategy",
         "distributed stream ownership for multi-worker deployment",
-        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+        "browser/API disconnect-reconnect recovery journey",
+        "browser/API slow-client backpressure journey",
+        "browser/API cancel-complete race journey",
+        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
