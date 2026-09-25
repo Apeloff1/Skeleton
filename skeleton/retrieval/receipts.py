@@ -19,6 +19,8 @@ STATE_VERSION = 1
 def query_digest(query: str) -> str:
     if not isinstance(query, str):
         raise TypeError("query must be a string")
+    if not query.strip():
+        raise ValueError("query is required")
     return hashlib.blake2b(query.encode("utf-8"), digest_size=16).hexdigest()
 
 
@@ -84,7 +86,7 @@ class RetrievalReceipt:
         for candidate_id, planes in self.fragment_planes:
             if candidate_id == fragment_id:
                 return planes
-        return ()
+        raise KeyError(fragment_id)
 
     @property
     def fragment_ids(self) -> Tuple[str, ...]:
@@ -135,9 +137,16 @@ class RetrievalReceipt:
             raise ValueError("created_ns must be an integer")
         if not isinstance(partial, bool):
             raise ValueError("partial must be a boolean")
+        source = payload.get("source")
+        receipt_id_value = payload.get("receipt_id")
+        digest = payload.get("query_digest")
+        if not isinstance(receipt_id_value, str) or not isinstance(digest, str):
+            raise ValueError("receipt_id and query_digest are required")
+        if not isinstance(source, str) or source not in {"live", "cache"}:
+            raise ValueError("source must be live or cache")
         return cls(
-            receipt_id=str(payload.get("receipt_id") or ""),
-            query_digest=str(payload.get("query_digest") or ""),
+            receipt_id=receipt_id_value,
+            query_digest=digest,
             generation=generation,
             scope_digest=str(payload.get("scope_digest") or ""),
             considered_planes=_string_tuple(
@@ -152,7 +161,7 @@ class RetrievalReceipt:
             fragment_planes=tuple(fragment_planes),
             partial=partial,
             created_ns=created_ns,
-            source=str(payload.get("source") or "live"),
+            source=source,
         )
 
 
