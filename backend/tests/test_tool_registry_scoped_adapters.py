@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 import sys
 from uuid import uuid4
 
 import pytest
 
+import skeleton.skills.tool_adapters.owners as adapter_owners
 from skeleton.skills.tool_contract import approval_ref_for_request
 
 
@@ -38,7 +40,7 @@ async def test_compile_denial_happens_before_subprocess(registry, monkeypatch):
         called["subprocess"] += 1
         raise AssertionError("subprocess must not run")
 
-    monkeypatch.setattr(registry.subprocess, "Popen", popen)
+    monkeypatch.setattr(adapter_owners.subprocess, "Popen", popen)
     result = await registry.invoke(
         "compile_code",
         {"language": "python", "code": "print('escape')"},
@@ -213,3 +215,74 @@ async def test_web_search_drops_private_loopback_and_userinfo_results(registry, 
     assert result["results"] == [
         {"title": "ok", "url": "https://example.com/a", "snippet": "safe"}
     ]
+
+@pytest.mark.asyncio
+async def test_privileged_compatibility_handlers_delegate_to_adapter_owners(
+    registry,
+    monkeypatch,
+):
+    calls = []
+
+    async def sandbox(params):
+        calls.append(("sandbox", dict(params)))
+        return {"ok": True, "stdout": "", "stderr": "", "exit_code": 0}
+
+    async def database(params):
+        calls.append(("database", dict(params)))
+        return {"ok": True, "collection": params["collection"], "rows": [], "count": 0}
+
+    async def network(params):
+        calls.append(("network", dict(params)))
+        return {
+            "ok": True,
+            "query": params["query"],
+            "kind": "text",
+            "results": [],
+            "count": 0,
+        }
+
+    monkeypatch.setattr(registry._SANDBOX_OWNER, "execute", sandbox)
+    monkeypatch.setattr(registry._DATABASE_OWNER, "execute", database)
+    monkeypatch.setattr(registry._NETWORK_OWNER, "execute", network)
+
+    compile_result = await registry._tool_compile_code(
+        {"language": "c", "code": "int main(void){return 0;}"}
+    )
+    database_result = await registry._tool_mongo_query(
+        {"collection": "knowledge"}
+    )
+    network_result = await registry._tool_web_search(
+        {"query": "bounded search"}
+    )
+
+    assert compile_result["ok"] is True
+    assert database_result["ok"] is True
+    assert network_result["ok"] is True
+    assert [item[0] for item in calls] == [
+        "sandbox",
+        "database",
+        "network",
+    ]
+
+
+def test_backend_registry_contains_no_privileged_execution_body() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "services"
+        / "tool_registry.py"
+    ).read_text(encoding="utf-8")
+
+    forbidden = (
+        "subprocess.Popen",
+        "tempfile.TemporaryDirectory",
+        "from ddgs import",
+        "os.remove(",
+        "binary_builder.package_build(",
+        ".find(scoped[",
+    )
+    assert all(marker not in source for marker in forbidden)
+    assert "AsyncSandboxCompileAdapter" in source
+    assert "AsyncDatabaseQueryAdapter" in source
+    assert "AsyncNetworkSearchAdapter" in source
+    assert "AsyncArtifactPackageAdapter" in source
+
