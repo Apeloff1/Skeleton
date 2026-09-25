@@ -214,13 +214,21 @@ class AnswerQualitySignal:
     records: int = 0
 
     def record(self, prefix_sha: str, score: float) -> None:
-        self._scores.setdefault(prefix_sha, []).append(float(score))
+        if not isinstance(prefix_sha, str) or not prefix_sha:
+            raise ValueError("prefix sha is required")
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            raise ValueError("score must be finite")
+        number = float(score)
+        if number != number or number in (float("inf"), float("-inf")):
+            raise ValueError("score must be finite")
+        self._scores.setdefault(prefix_sha, []).append(number)
         self.records += 1
 
     def mean(self, prefix_sha: str, default: float = 0.0) -> float:
+        del default
         vals = self._scores.get(prefix_sha)
         if not vals:
-            return float(default)
+            raise ValueError("no quality evidence")
         return sum(vals) / len(vals)
 
     def scorer(self, *, default: float = 0.0) -> QualityScorerFn:
@@ -234,31 +242,35 @@ def adapt_plane_learner(
     learner: Any,
     *,
     signal: Optional[AnswerQualitySignal] = None,
-    default: float = 0.5,
 ) -> QualityScorerFn:
-    """Thin F-2 adapter: blend mean plane win-rates with optional answer scores.
+    """Score a prefix from recorded answers or measured plane rates.
 
-    When ``signal`` has observations for a variant's sha, those dominate.
-    Otherwise falls back to the learner's mean plane ``rate`` (Laplace-smoothed
-    win rate from :class:`~skeleton.retrieval.plane_weights.PlaneWeightLearner`),
-    or ``default`` if no learner/stats are available.
+    A missing learner, an empty rate table, and a prefix with no recorded
+    answers do not become a score of one half.
     """
 
     def _plane_mean() -> float:
-        if learner is None:
-            return default
-        stats = learner.stats() if hasattr(learner, "stats") else None
+        if learner is None or not hasattr(learner, "stats"):
+            raise ValueError("plane rates are required")
+        stats = learner.stats()
         if not isinstance(stats, dict):
-            return default
-        rates = stats.get("rates") or {}
-        if not rates:
-            return default
-        vals = [float(v) for v in rates.values()]
-        return sum(vals) / len(vals) if vals else default
+            raise ValueError("plane rates are required")
+        rates = stats.get("rates")
+        if not isinstance(rates, dict) or not rates:
+            raise ValueError("plane rates are required")
+        vals = []
+        for value in rates.values():
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError("plane rate must be finite")
+            number = float(value)
+            if number != number or number in (float("inf"), float("-inf")):
+                raise ValueError("plane rate must be finite")
+            vals.append(number)
+        return sum(vals) / len(vals)
 
     def score(variant: PrefixVariant) -> float:
-        if signal is not None and variant.sha in signal._scores:
-            return signal.mean(variant.sha, default=default)
+        if signal is not None and signal._scores.get(variant.sha):
+            return signal.mean(variant.sha)
         return _plane_mean()
 
     return score
