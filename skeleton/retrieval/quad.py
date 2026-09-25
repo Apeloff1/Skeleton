@@ -16,12 +16,19 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from threading import Event, RLock
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from skeleton.kernel.events import EventBus
 from skeleton.retrieval.cache import ResultCache
 from skeleton.retrieval.extraction import TripleExtractor
+from skeleton.retrieval.freshness import FreshnessRegistry
 from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
+from skeleton.retrieval.receipts import (
+    ReceiptLedger,
+    RetrievalReceipt,
+    query_digest,
+    receipt_id,
+)
 
 
 @dataclass
@@ -51,18 +58,25 @@ class QuadRetriever:
 
     _PLANE_HISTORY_LIMIT = 64
     _MAX_PARALLEL_PLANES = 4
+    _RETRIEVAL_STATE_VERSION = 1
 
     def __init__(
         self,
         bus: Optional[EventBus] = None,
         extractor: Optional[TripleExtractor] = None,
         cache: Optional[ResultCache] = None,
+        freshness: Optional[FreshnessRegistry] = None,
+        *,
+        receipt_limit: int = 256,
     ) -> None:
         self._bus = bus
         self._planes: Dict[str, Any] = {}
         self._fuser = Fuser(strategy=FusionStrategy.RRF)
         self._cache = cache if cache is not None else ResultCache()
         self._extractor = extractor or TripleExtractor()
+        self._freshness = freshness if freshness is not None else FreshnessRegistry()
+        self._receipts = ReceiptLedger(max_entries=receipt_limit)
+        self._receipt_sequence = 0
         self._plane_history: deque[str] = deque(maxlen=self._PLANE_HISTORY_LIMIT)
         self._state_lock = RLock()
         self._cache_generation = 0
@@ -74,6 +88,10 @@ class QuadRetriever:
             "cache_hits": 0,
             "coalesced_queries": 0,
             "plane_failures": 0,
+            "partial_queries": 0,
+            "receipts_created": 0,
+            "feedback_consumed": 0,
+            "stale_results": 0,
             "ingested": 0,
             "triples_extracted": 0,
         }
@@ -84,8 +102,31 @@ class QuadRetriever:
             return
         with self._state_lock:
             self._planes[name] = retriever
-            self._cache_generation += 1
-            self._cache.clear()
+            self._invalidate_cache_locked()
+
+    def mark_plane_freshness(
+        self,
+        name: str,
+        *,
+        index_version: str,
+        source_revision: str,
+        indexed_at: Optional[float] = None,
+        stale_after_s: float = 300.0,
+    ) -> Dict[str, Any]:
+        """Publish projection freshness and invalidate rankings carrying old metadata."""
+        state = self._freshness.update(
+            name,
+            index_version=index_version,
+            source_revision=source_revision,
+            indexed_at=indexed_at,
+            stale_after_s=stale_after_s,
+        )
+        with self._state_lock:
+            self._invalidate_cache_locked()
+        return state.metadata(self._freshness._clock())
+
+    def freshness_snapshot(self) -> Dict[str, Any]:
+        return self._freshness.snapshot()
 
     def as_retriever(
         self,
@@ -192,11 +233,85 @@ class QuadRetriever:
         else:
             return []
 
-        return [
+        normalized = [
             item
             for raw in plane_results
             if (item := self._normalize_result(plane_name, raw)) is not None
         ]
+        freshness = self._freshness.metadata(plane_name)
+        for item in normalized:
+            metadata = dict(item.metadata)
+            metadata["index_freshness"] = (
+                {"tracked": False, "stale": None}
+                if freshness is None
+                else {"tracked": True, **freshness}
+            )
+            item.metadata = metadata
+        return normalized
+
+    @staticmethod
+    def _result_planes(result: ScoredResult) -> Tuple[str, ...]:
+        raw = result.metadata.get("fusion_planes")
+        if isinstance(raw, (list, tuple)):
+            planes = tuple(
+                dict.fromkeys(
+                    str(plane) for plane in raw if isinstance(plane, str) and plane
+                )
+            )
+            if planes:
+                return planes
+        return (result.plane,) if result.plane else ()
+
+    def _record_receipt(
+        self,
+        *,
+        query: str,
+        generation: int,
+        considered_planes: Tuple[str, ...],
+        failed_planes: Tuple[str, ...],
+        results: List[ScoredResult],
+        source: str,
+    ) -> RetrievalReceipt:
+        fragment_planes = tuple(
+            (result.fragment_id, self._result_planes(result))
+            for result in results
+            if result.fragment_id and self._result_planes(result)
+        )
+        candidate_planes = tuple(
+            sorted(
+                {
+                    plane
+                    for _, planes in fragment_planes
+                    for plane in planes
+                }
+            )
+        )
+        with self._state_lock:
+            self._receipt_sequence += 1
+            sequence = self._receipt_sequence
+            digest = query_digest(query)
+            receipt = RetrievalReceipt(
+                receipt_id=receipt_id(sequence, digest, generation),
+                query_digest=digest,
+                generation=generation,
+                considered_planes=tuple(dict.fromkeys(considered_planes)),
+                candidate_planes=candidate_planes,
+                failed_planes=tuple(dict.fromkeys(failed_planes)),
+                fragment_planes=fragment_planes,
+                partial=bool(failed_planes),
+                created_ns=time.time_ns(),
+                source=source,
+            )
+            self._receipts.record(receipt)
+            self._stats["receipts_created"] += 1
+            if receipt.partial:
+                self._stats["partial_queries"] += 1
+            self._stats["stale_results"] += sum(
+                1
+                for result in results
+                if (result.metadata.get("index_freshness") or {}).get("stale") is True
+            )
+        return receipt
 
     def _emit_cache_hit(self, query: str, hits: int) -> None:
         if self._bus:
@@ -245,21 +360,114 @@ class QuadRetriever:
         self.attach_weight_learner(learner)
         return learner.stats()
 
-    def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
+    def export_retrieval_state(self) -> Dict[str, Any]:
+        """Checkpoint adaptive feedback authority, receipts, and freshness together."""
+        with self._state_lock:
+            learner = self._weight_learner
+            learner_state = None
+            if learner is not None:
+                snapshot = getattr(learner, "snapshot", None)
+                if not callable(snapshot):
+                    raise TypeError("attached learner does not support durable snapshots")
+                learner_state = snapshot()
+            return {
+                "version": self._RETRIEVAL_STATE_VERSION,
+                "receipt_sequence": self._receipt_sequence,
+                "learner": learner_state,
+                "receipts": self._receipts.snapshot(),
+                "freshness": self._freshness.snapshot(),
+            }
+
+    def restore_retrieval_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Atomically restore durable adaptive retrieval authority."""
+        from skeleton.retrieval.plane_weights import PlaneWeightLearner
+
+        if not isinstance(state, dict) or state.get("version") != self._RETRIEVAL_STATE_VERSION:
+            raise ValueError("unsupported retrieval state version")
+        sequence = state.get("receipt_sequence")
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+            raise ValueError("receipt_sequence must be a non-negative integer")
+        learner_payload = state.get("learner")
+        learner = (
+            None
+            if learner_payload is None
+            else PlaneWeightLearner.from_snapshot(learner_payload)
+        )
+        receipts = ReceiptLedger.from_snapshot(state.get("receipts"))
+        freshness = FreshnessRegistry.from_snapshot(state.get("freshness"))
+
+        with self._state_lock:
+            self._weight_learner = learner
+            self._receipts = receipts
+            self._freshness = freshness
+            self._receipt_sequence = sequence
+            self._invalidate_cache_locked()
+            return {
+                "receipt_sequence": self._receipt_sequence,
+                "receipts": len(self._receipts.recent(self._receipts.max_entries)),
+                "learner": None if learner is None else learner.stats(),
+                "freshness_revision": self._freshness.revision,
+            }
+
+    def recent_receipts(self, limit: int = 20) -> Tuple[RetrievalReceipt, ...]:
+        return self._receipts.recent(limit)
+
+    def retrieve_with_receipt(
+        self,
+        query: str,
+        k: int = 8,
+        use_cache: bool = True,
+    ) -> Tuple[List[ScoredResult], RetrievalReceipt]:
+        sink: List[RetrievalReceipt] = []
+        results = self.retrieve(
+            query,
+            k=k,
+            use_cache=use_cache,
+            _receipt_sink=sink,
+        )
+        if not sink:
+            raise RuntimeError("retrieval completed without a receipt")
+        return results, sink[-1]
+
+    def retrieve(
+        self,
+        query: str,
+        k: int = 8,
+        use_cache: bool = True,
+        *,
+        _receipt_sink: Optional[List[RetrievalReceipt]] = None,
+    ) -> List[ScoredResult]:
         """Query registered planes concurrently and fuse deterministic results."""
         t0 = time.perf_counter()
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
+        if isinstance(k, bool) or not isinstance(k, int) or k < 0:
+            raise ValueError("k must be a non-negative integer")
         with self._state_lock:
             generation = self._cache_generation
             plane_items = tuple(self._planes.items())
 
-        cache_key = f"{generation}:{k}:{query}"
+        considered_planes = tuple(name for name, _ in plane_items)
+        freshness_token = self._freshness.cache_token()
+        cache_key = f"{generation}:{freshness_token}:{k}:{query_digest(query)}"
         if use_cache:
             cached = self._cache.get(cache_key)
             if cached is not None:
+                cached_list = list(cached)
                 with self._state_lock:
                     self._stats["cache_hits"] += 1
-                self._emit_cache_hit(query, len(cached))
-                return list(cached)
+                receipt = self._record_receipt(
+                    query=query,
+                    generation=generation,
+                    considered_planes=considered_planes,
+                    failed_planes=(),
+                    results=cached_list,
+                    source="cache",
+                )
+                if _receipt_sink is not None:
+                    _receipt_sink.append(receipt)
+                self._emit_cache_hit(query, len(cached_list))
+                return cached_list
 
         with self._state_lock:
             self._stats["queries"] += 1
@@ -276,15 +484,31 @@ class QuadRetriever:
             flight.wait()
             cached = self._cache.get(cache_key)
             if cached is not None:
+                cached_list = list(cached)
                 with self._state_lock:
                     self._stats["cache_hits"] += 1
-                self._emit_cache_hit(query, len(cached))
-                return list(cached)
+                receipt = self._record_receipt(
+                    query=query,
+                    generation=generation,
+                    considered_planes=considered_planes,
+                    failed_planes=(),
+                    results=cached_list,
+                    source="cache",
+                )
+                if _receipt_sink is not None:
+                    _receipt_sink.append(receipt)
+                self._emit_cache_hit(query, len(cached_list))
+                return cached_list
 
             # A topology/ingestion generation change can intentionally prevent
             # the leader from caching its old-generation result. Retry against
             # the current generation rather than serving that stale snapshot.
-            return self.retrieve(query, k=k, use_cache=True)
+            return self.retrieve(
+                query,
+                k=k,
+                use_cache=True,
+                _receipt_sink=_receipt_sink,
+            )
 
         try:
             if use_cache:
@@ -292,10 +516,21 @@ class QuadRetriever:
                 # cache after our first miss but before this caller became leader.
                 cached = self._cache.get(cache_key)
                 if cached is not None:
+                    cached_list = list(cached)
                     with self._state_lock:
                         self._stats["cache_hits"] += 1
-                    self._emit_cache_hit(query, len(cached))
-                    return list(cached)
+                    receipt = self._record_receipt(
+                        query=query,
+                        generation=generation,
+                        considered_planes=considered_planes,
+                        failed_planes=(),
+                        results=cached_list,
+                        source="cache",
+                    )
+                    if _receipt_sink is not None:
+                        _receipt_sink.append(receipt)
+                    self._emit_cache_hit(query, len(cached_list))
+                    return cached_list
 
             results_by_plane: Dict[str, List[ScoredResult]] = {}
             failures: List[str] = []
@@ -345,6 +580,16 @@ class QuadRetriever:
                     self._plane_history.append(plane_name)
 
             fused = self._fuse(results_by_plane, k)
+            receipt = self._record_receipt(
+                query=query,
+                generation=generation,
+                considered_planes=considered_planes,
+                failed_planes=tuple(failures),
+                results=fused,
+                source="live",
+            )
+            if _receipt_sink is not None:
+                _receipt_sink.append(receipt)
 
             # Generation checking closes a subtle invalidation race: a query that
             # started before register_plane()/ingest_document() may finish after the
@@ -363,6 +608,8 @@ class QuadRetriever:
                         "results": len(fused),
                         "elapsed_ms": round(elapsed_ms, 3),
                         "planes": {plane: len(hits) for plane, hits in results_by_plane.items()},
+                        "receipt_id": receipt.receipt_id,
+                        "partial": receipt.partial,
                     },
                 )
                 self._bus.emit(
@@ -372,6 +619,8 @@ class QuadRetriever:
                         "planes": list(results_by_plane.keys()),
                         "failed_planes": list(failures),
                         "results": len(fused),
+                        "receipt_id": receipt.receipt_id,
+                        "partial": receipt.partial,
                     },
                 )
 
@@ -390,8 +639,61 @@ class QuadRetriever:
                 return dict(self._static_weights)
             return learner.effective_weights()
 
+    def observe_receipt(
+        self,
+        receipt_id_value: str,
+        used_fragment_ids,
+    ) -> Dict[str, Any]:
+        """Apply feedback exactly once against fragments actually returned."""
+        from skeleton.retrieval.plane_weights import PlaneWeightLearner
+
+        used_fragments = tuple(dict.fromkeys(str(item) for item in used_fragment_ids))
+        with self._state_lock:
+            receipt = self._receipts.require_available(receipt_id_value)
+            unknown = sorted(set(used_fragments) - set(receipt.fragment_ids))
+            if unknown:
+                raise ValueError(
+                    "feedback references fragment(s) absent from receipt: "
+                    + ", ".join(unknown)
+                )
+            if not receipt.candidate_planes:
+                raise ValueError("retrieval receipt has no candidate planes to train")
+            used_planes = tuple(
+                sorted(
+                    {
+                        plane
+                        for fragment_id in used_fragments
+                        for plane in receipt.planes_for_fragment(fragment_id)
+                    }
+                )
+            )
+            if self._weight_learner is None:
+                self._weight_learner = PlaneWeightLearner(self._static_weights)
+            self._weight_learner.observe(
+                used_planes,
+                all_planes=receipt.candidate_planes,
+            )
+            self._receipts.mark_consumed(receipt_id_value)
+            self._stats["feedback_consumed"] += 1
+            self._invalidate_cache_locked()
+            stats = self._weight_learner.stats()
+
+        if self._bus:
+            self._bus.emit(
+                "retrieval.feedback.attributed",
+                {
+                    "receipt_id": receipt.receipt_id,
+                    "query_digest": receipt.query_digest,
+                    "used_fragments": len(used_fragments),
+                    "used_planes": list(used_planes),
+                    "candidate_planes": list(receipt.candidate_planes),
+                    "updates": stats["updates"],
+                },
+            )
+        return stats
+
     def observe(self, used_planes, *, all_planes=None) -> Dict[str, Any]:
-        """Record feedback and invalidate rankings learned under old weights."""
+        """Record unattributed compatibility feedback and invalidate old rankings."""
         from skeleton.retrieval.plane_weights import PlaneWeightLearner
 
         used = tuple(used_planes)
@@ -420,18 +722,11 @@ class QuadRetriever:
         learner = self._weight_learner
         if learner is None:
             return self._fuser.fuse(results_by_plane, top_k=top_k)
-        weights = learner.effective_weights()
-        scores: Dict[str, float] = {}
-        fragments: Dict[str, ScoredResult] = {}
-        for plane, results in results_by_plane.items():
-            weight = float(weights.get(plane, 1.0))
-            for rank, result in enumerate(results, 1):
-                fragment_id = result.fragment_id
-                scores[fragment_id] = scores.get(fragment_id, 0.0) + weight / (self._fuser.k + rank)
-                if fragment_id not in fragments:
-                    fragments[fragment_id] = result
-        ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:top_k]
-        return [fragments[fragment_id] for fragment_id, _ in ranked]
+        return self._fuser.weighted_rrf(
+            results_by_plane,
+            learner.effective_weights(),
+            top_k=top_k,
+        )
 
     def ingest_document(
         self,
@@ -549,6 +844,11 @@ class QuadRetriever:
                 "planes_registered": len(self._planes),
                 "cache_size": self._cache.size(),
                 "cache_generation": self._cache_generation,
+                "receipt_sequence": self._receipt_sequence,
+                "retained_receipts": len(
+                    self._receipts.recent(self._receipts.max_entries)
+                ),
+                "freshness_revision": self._freshness.revision,
             }
             if self._weight_learner is not None:
                 payload["learner"] = self._weight_learner.stats()
