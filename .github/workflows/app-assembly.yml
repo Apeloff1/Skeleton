@@ -92,6 +92,7 @@ on:
       - "skeleton/testing/test_engine_execution_service.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_engine_routes.py"
+      - "skeleton/testing/test_engine_process_isolation.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
@@ -474,6 +475,7 @@ jobs:
           skeleton/testing/test_engine_execution_service.py
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_engine_routes.py
+          skeleton/testing/test_engine_process_isolation.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
