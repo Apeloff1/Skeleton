@@ -170,7 +170,7 @@ def learned_policy_card(*, root=None) -> Dict[str, Any]:
         "kind": "learned-policy-card",
         "total_attempts": total_attempts,
         "total_successes": total_successes,
-        "overall_success_rate": round(total_successes / max(1, total_attempts), 4),
+        "overall_success_rate": None if total_attempts == 0 else round(total_successes / total_attempts, 4),
         "strategies_learned": len(strategies),
         "actions_tracked": len(action_eff),
         "top_actions": [{"action": k, "rate": round(v.get("successes", 0) / max(1, v.get("attempts", 1)), 4)} for k, v in top_actions],

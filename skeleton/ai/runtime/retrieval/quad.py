@@ -161,11 +161,11 @@ class QuadRetriever:
         path = metadata.get("source_path")
         if not any(isinstance(value, str) and value for value in (repository, revision, path)):
             return ""
-        source = str(repository or "unknown")
-        if revision:
-            source += f"@{revision}"
-        if path:
-            source += f":{path}"
+        source = repository if isinstance(repository, str) and repository else ""
+        if isinstance(revision, str) and revision:
+            source = f"{source}@{revision}" if source else revision
+        if isinstance(path, str) and path:
+            source = f"{source}:{path}" if source else path
         return source
 
     @classmethod

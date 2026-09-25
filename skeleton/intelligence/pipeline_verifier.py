@@ -129,7 +129,7 @@ class PipelineVerifier:
         return {
             "runs": self.runs,
             "accepted": self.accepted,
-            "accept_rate": round(self.accepted / max(1, self.runs), 4),
+            "accept_rate": None if self.runs == 0 else round(self.accepted / self.runs, 4),
         }
 
     def _completeness(self, spec: Mapping[str, Any], issues: list[str]) -> float:

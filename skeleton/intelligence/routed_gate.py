@@ -159,7 +159,7 @@ class RoutedGate:
         return {
             "queries": self.queries,
             "abstained": self.abstained,
-            "abstain_rate": round(self.abstained / max(1, self.queries), 4),
+            "abstain_rate": None if self.queries == 0 else round(self.abstained / self.queries, 4),
             "router": self.router.stats(),
             "gate": self.gate.stats(),
         }

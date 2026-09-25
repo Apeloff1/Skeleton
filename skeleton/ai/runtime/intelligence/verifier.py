@@ -155,5 +155,5 @@ class CodeVerifier:
         return {
             "checks": self.checks,
             "accepted": self.accepted,
-            "accept_rate": round(self.accepted / max(1, self.checks), 4),
+            "accept_rate": None if self.checks == 0 else round(self.accepted / self.checks, 4),
         }

@@ -62,7 +62,7 @@ def heuristic_step_scorer(step: str, prev: Optional[str], context: Dict[str, Any
     prev_words = set(prev.lower().split()) if prev else set()
     goal_words = set(str(context.get("goal", "")).lower().split())
     novelty = len(words - prev_words) / max(1, len(words))
-    alignment = len(words & goal_words) / max(1, len(goal_words)) if goal_words else 0.5
+    alignment = len(words & goal_words) / len(goal_words) if goal_words else 0.0
     return round(min(1.0, novelty), 4), round(min(1.0, alignment), 4)
 
 

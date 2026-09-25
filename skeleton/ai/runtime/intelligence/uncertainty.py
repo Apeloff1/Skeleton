@@ -155,5 +155,5 @@ class UncertaintyGate:
             "decisions": self.decisions,
             "abstentions": self.abstentions,
             "escalations": self.escalations,
-            "abstain_rate": round(self.abstentions / max(1, self.decisions), 4),
+            "abstain_rate": None if self.decisions == 0 else round(self.abstentions / self.decisions, 4),
         }

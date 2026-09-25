@@ -83,7 +83,7 @@ class DialogueVerifier:
         return DialogueVerificationReport(accepted=accepted, score=score, reason=reason, weakest_path=weakest, thresholds={"dialogue_accept_at": self.accept_at}, summary=summary, issues=tuple(issues), quality=quality, policy_gate=policy_gate)
 
     def stats(self) -> Dict[str, Any]:
-        return {"runs": self.runs, "accepted": self.accepted, "accept_rate": round(self.accepted / max(1, self.runs), 4)}
+        return {"runs": self.runs, "accepted": self.accepted, "accept_rate": None if self.runs == 0 else round(self.accepted / self.runs, 4)}
 
     def _completeness(self, tree: Mapping[str, Any], issues: list[str]) -> float:
         entry = tree.get("entry")

@@ -36,9 +36,9 @@ ModelFn = Callable[[str], ModelResponse]
 def difficulty_estimate(query: str) -> float:
     """0..1 difficulty from surface features — no model call required."""
 
-    q = (query or "").strip()
-    if not q:
-        return 0.0
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("query is required")
+    q = query.strip()
     words = q.split()
     length_score = min(1.0, len(words) / 60.0)
     avg_len = sum(len(w) for w in words) / max(1, len(words))

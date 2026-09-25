@@ -84,7 +84,7 @@ class ForgeVerifier:
         return ForgeVerificationReport(accepted=accepted, score=avg, reason=reason, project_issues=project_issues, blocking_issues=tuple(blocking), weakest_path=weakest, thresholds={"project_accept_at": self.accept_at, "gdscript_accept_at": self.gd_accept_at}, summary=summary, file_reports=reports, quality=quality, policy_gate=policy_gate)
 
     def stats(self) -> Dict[str, Any]:
-        return {"runs": self.runs, "accepted": self.accepted, "accept_rate": round(self.accepted / max(1, self.runs), 4)}
+        return {"runs": self.runs, "accepted": self.accepted, "accept_rate": None if self.runs == 0 else round(self.accepted / self.runs, 4)}
 
     def _reason(self, project_issues: Tuple[str, ...], reports: Tuple[ForgeFileReport, ...], avg: float) -> str:
         if project_issues:

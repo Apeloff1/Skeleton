@@ -73,11 +73,11 @@ class CalibrationLedger:
                 out.append((mean_stated, acc, len(bucket)))
         return out
 
-    def expected_calibration_error(self, channel: Optional[str] = None) -> float:
+    def expected_calibration_error(self, channel: Optional[str] = None) -> float | None:
         stats = self._band_stats(channel)
         total = sum(n for _, _, n in stats)
         if total == 0:
-            return 0.0
+            return None
         return sum(abs(stated - acc) * n for stated, acc, n in stats) / total
 
     # ------------------------------------------------------------------
@@ -101,9 +101,10 @@ class CalibrationLedger:
         return round(sum(1 for r in bucket if r.correct) / len(bucket), 4)
 
     def stats(self) -> Dict[str, Any]:
+        ece = self.expected_calibration_error()
         return {
             "records": len(self._records),
-            "ece": round(self.expected_calibration_error(), 4),
+            "ece": None if ece is None else round(ece, 4),
             "channels": sorted({r.channel for r in self._records}),
             "ready": len(self._records) >= self.min_samples,
         }

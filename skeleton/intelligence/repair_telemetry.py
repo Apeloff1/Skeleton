@@ -135,8 +135,8 @@ def load_telemetry(root=None, surface: str = "", limit: int = 32) -> List[Dict[s
             row = json.loads(line)
             if not surface or row.get("surface") == surface:
                 rows.append(row)
-        except json.JSONDecodeError:
-            continue
+        except json.JSONDecodeError as exc:
+            raise ValueError("repair telemetry is not JSON") from exc
     return rows
 
 
@@ -144,10 +144,10 @@ def telemetry_card(surface: str = "", *, root=None, limit: int = 16) -> Dict[str
     """Operator-facing telemetry card."""
     rows = load_telemetry(root=root, surface=surface, limit=limit)
     if not rows:
-        return {"kind": "repair-telemetry-card", "surface": surface or "all", "n": 0, "avg_duration_ms": 0, "error_rate": 0.0, "stored_prose": 0}
+        return {"kind": "repair-telemetry-card", "surface": surface or "all", "n": 0, "avg_duration_ms": None, "error_rate": None, "accept_rate": None, "stored_prose": 0}
     durations = [r.get("duration_ms", 0) for r in rows]
     errors = [r for r in rows if r.get("error")]
-    accepted = [r for r in rows if r.get("accepted")]
+    accepted = [r for r in rows if r.get("accepted") is True]
     return {
         "kind": "repair-telemetry-card",
         "surface": surface or "all",

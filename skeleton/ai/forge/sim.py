@@ -34,8 +34,8 @@ class EncounterResult:
 
     @property
     def error(self) -> float:
-        if self.target_ttk <= 0:
-            return 0.0
+        if not self.target_ttk > 0:
+            raise ValueError("target ttk must be positive")
         return abs(self.measured_ttk - self.target_ttk) / self.target_ttk
 
     def to_dict(self) -> Dict[str, Any]:
