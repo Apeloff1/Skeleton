@@ -709,6 +709,8 @@ class CognitiveExecutionRuntime:
         tools: list[ProviderToolDefinition] = []
         for tool_id in raw:
             manifest = await self.tool_runtime.manifest(str(tool_id))
+            if not manifest.enabled:
+                continue
             if (
                 manifest.effect is not ToolEffect.READ_ONLY
                 and self.tool_runtime.receipt_store is None
