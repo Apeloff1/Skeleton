@@ -582,7 +582,8 @@ class TestHardware:
         assert [e["order"] for e in rows] == sorted(e["order"] for e in rows)
         assert get_generation("NES")["key"] == "8bit"
         assert get_generation("PS5")["key"] == "modern"
-        assert get_generation("garbage")["key"] == "modern"
+        with pytest.raises(ValueError):
+            get_generation("garbage")
         ng = get_generation("nextgen")
         assert ng["storage_bytes"][0] >= 250 * 1024**3
         assert ng["asset_capacity"] == round(4_000_000 * 1.4)

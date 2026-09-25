@@ -163,10 +163,17 @@ _SNES = ("#1a103c", "#f4e4c1", "#c43c3c", "#3c6e9a", "#3c8c4c", "#d4a44c", "#8c5
 
 
 def get_generation(key: Optional[str]) -> Dict[str, Any]:
-    if not key:
+    if key is None or key == "":
         return GENERATIONS[DEFAULT_GENERATION]
-    k = str(key).strip().lower().replace("-", "").replace(" ", "").replace("/", "")
-    return GENERATIONS.get(_ALIAS.get(k, k), GENERATIONS[DEFAULT_GENERATION])
+    if not isinstance(key, str):
+        raise ValueError("generation must be a string")
+    k = key.strip().lower().replace("-", "").replace(" ", "").replace("/", "")
+    if not k:
+        return GENERATIONS[DEFAULT_GENERATION]
+    resolved = _ALIAS.get(k)
+    if resolved is None:
+        raise ValueError(f"unknown generation {key!r}")
+    return GENERATIONS[resolved]
 
 
 def catalog() -> List[Dict[str, Any]]:
