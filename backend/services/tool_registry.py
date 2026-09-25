@@ -462,6 +462,9 @@ class _CompatibilityResultStore:
         identity = "\x1f".join(
             (
                 request.operation_id,
+                request.execution_id or "",
+                request.turn_id or "",
+                request.call_id or "",
                 request.tool_id,
                 request.idempotency_key,
                 request.arguments_digest,
@@ -581,6 +584,12 @@ async def _package_compensator(
     material = (
         request.operation_id
         + "\x1f"
+        + (request.execution_id or "")
+        + "\x1f"
+        + (request.turn_id or "")
+        + "\x1f"
+        + (request.call_id or "")
+        + "\x1f"
         + request.tool_id
         + "\x1f"
         + request.idempotency_key
@@ -641,6 +650,9 @@ async def invoke_canonical(
     operation_id: str,
     tenant_id: str,
     idempotency_key: str,
+    execution_id: str | None = None,
+    turn_id: str | None = None,
+    call_id: str | None = None,
     request_id: str | None = None,
     approval_ref: str | None = None,
     delegated_authority_ref: str | None = None,
@@ -657,6 +669,9 @@ async def invoke_canonical(
     request = ToolExecutionRequest(
         request_id=request_id or str(uuid4()),
         operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
         tenant_id=tenant_id,
         tool_id=tool,
         idempotency_key=idempotency_key,
@@ -721,6 +736,9 @@ async def invoke(
     params: dict,
     *,
     operation_id: str | None = None,
+    execution_id: str | None = None,
+    turn_id: str | None = None,
+    call_id: str | None = None,
     tenant_id: str = "legacy-backend",
     idempotency_key: str | None = None,
     request_id: str | None = None,
@@ -763,6 +781,9 @@ async def invoke(
         tool,
         normalized_params,
         operation_id=op_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
         tenant_id=tenant_id,
         idempotency_key=key,
         request_id=rid,
@@ -779,6 +800,9 @@ async def invoke_many(calls: list[dict]) -> list[dict]:
             call.get("tool"),
             call.get("params", {}),
             operation_id=call.get("operation_id"),
+            execution_id=call.get("execution_id"),
+            turn_id=call.get("turn_id"),
+            call_id=call.get("call_id"),
             tenant_id=call.get("tenant_id") or "legacy-backend",
             idempotency_key=call.get("idempotency_key"),
             request_id=call.get("request_id"),
