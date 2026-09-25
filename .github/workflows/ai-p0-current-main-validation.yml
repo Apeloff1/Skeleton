@@ -10,6 +10,7 @@ on:
       - "frontend/**"
       - "skeleton/**"
       - "machine/**"
+      - "scripts/check_ai_assistant_control_plane.py"
   workflow_dispatch:
 
 permissions:
@@ -46,9 +47,27 @@ jobs:
           python -m pip install --disable-pip-version-check -r backend/requirements.txt
           python -m pip install --disable-pip-version-check "pytest==8.4.2" "pytest-asyncio==1.4.0"
 
+      - name: Validate assistant control-plane authority
+        run: python scripts/check_ai_assistant_control_plane.py
+
       - name: Run current-main AI/runtime contracts
         run: |
-          python -m pytest -q             backend/tests/test_ai_chat_conversation_authority.py             backend/tests/test_operation_stream_transport.py             backend/tests/test_operation_stream_route.py             skeleton/testing/test_provider_contract.py             skeleton/testing/test_verification_runtime.py             skeleton/testing/test_execution_repository.py             skeleton/testing/test_execution_runtime.py             skeleton/testing/test_tool_runtime.py             skeleton/testing/test_engine_execution_service.py             skeleton/testing/test_engine_execution_coordinator.py
+          python -m pytest -q \
+            backend/tests/test_ai_chat_conversation_authority.py \
+            backend/tests/test_operation_stream_transport.py \
+            backend/tests/test_operation_stream_route.py \
+            skeleton/testing/test_provider_contract.py \
+            skeleton/testing/test_verification_runtime.py \
+            skeleton/testing/test_execution_repository.py \
+            skeleton/testing/test_execution_runtime.py \
+            skeleton/testing/test_tool_runtime.py \
+            skeleton/testing/test_engine_execution_service.py \
+            skeleton/testing/test_engine_execution_coordinator.py \
+            skeleton/testing/test_ai_assistant_routing.py \
+            skeleton/testing/test_ai_assistant_context.py \
+            skeleton/testing/test_ai_assistant_tooling.py \
+            skeleton/testing/test_ai_assistant_runtime.py \
+            skeleton/testing/test_ai_assistant_manifest.py
 
   frontend-runtime:
     name: Frontend Jeeves + operation stream
