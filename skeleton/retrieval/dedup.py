@@ -8,6 +8,7 @@ same source signature, keep the higher score and discard the weaker.
 
 from __future__ import annotations
 
+import math
 from typing import Sequence, Tuple
 
 from skeleton.retrieval.fusion import ScoredResult
@@ -26,11 +27,13 @@ class Deduper:
         seen_sigs: set[str] = set()
         out: list[ScoredResult] = []
         ordered = sorted(
-            items,
-            key=lambda item: (-float(getattr(item, "score", 0.0)), self._identity(item)),
+            (_require_scored(item) for item in items),
+            key=lambda item: (-item.score, self._identity(item)),
         )
         for item in ordered:
             identity = self._identity(item)
+            if not identity:
+                raise ValueError("result id is required")
             if identity and identity in seen_ids:
                 continue
             signature = self._signature(item)
@@ -42,6 +45,15 @@ class Deduper:
                 seen_sigs.add(signature)
             out.append(item)
         return tuple(out)
+
+
+def _require_scored(item: ScoredResult) -> ScoredResult:
+    if not hasattr(item, "score"):
+        raise ValueError("result score is required")
+    value = item.score
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+        raise ValueError("result score must be finite")
+    return item
 
     @staticmethod
     def _identity(item: ScoredResult) -> str:
