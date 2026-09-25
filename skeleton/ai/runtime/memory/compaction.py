@@ -60,6 +60,8 @@ class ContextCompactor:
                  head_ratio: float = 0.2) -> None:
         if not 0.0 < head_ratio < 1.0:
             raise ValueError("head_ratio must be in (0, 1)")
+        if isinstance(token_budget, bool) or not isinstance(token_budget, int) or token_budget < 1:
+            raise ValueError("token_budget must be a positive integer")
         self.token_budget = token_budget
         self.head_ratio = head_ratio
         self.compactions = 0
