@@ -503,11 +503,19 @@ class MemoryConflictResolver:
             for candidate in conflict.candidates
             if candidate.record_id != retain[0].record_id
         ):
-            winner = retain[0]
-            reason = "quality-policy-unique-retain"
+            if (
+                not self.policy.require_winner_provenance
+                or retain[0].provenance_count > 0
+            ):
+                winner = retain[0]
+                reason = "quality-policy-unique-retain"
         elif len(viable) == 1:
-            winner = viable[0]
-            reason = "all-alternatives-quality-tombstoned"
+            if (
+                not self.policy.require_winner_provenance
+                or viable[0].provenance_count > 0
+            ):
+                winner = viable[0]
+                reason = "all-alternatives-quality-tombstoned"
         elif len(viable) >= 2:
             first, second = viable[0], viable[1]
             confidence_margin = first.confidence - second.confidence
@@ -581,6 +589,13 @@ class MemoryConflictLedger:
             raise TypeError("conflict must be MemoryConflictSet")
         key = (conflict.scope_key, conflict.claim_key)
         with self._lock:
+            existing_same_id = self._entries.get(conflict.conflict_id)
+            if existing_same_id is not None:
+                if existing_same_id == conflict:
+                    return existing_same_id
+                raise ValueError(
+                    "memory conflict id already exists with different state"
+                )
             existing_id = self._active_by_claim.get(key)
             if existing_id is not None:
                 existing = self._entries[existing_id]
