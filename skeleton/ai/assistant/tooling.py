@@ -390,7 +390,8 @@ class ToolCoordinator:
         replayed = prior is not None
         if prior_binding is None:
             self._idempotency_bindings[idempotency_scope] = binding
-            self._request_call_counts[request.digest] = count + 1
+            if not replayed:
+                self._request_call_counts[request.digest] = count + 1
 
         canonical_receipt = await self.tool_runtime.execute(
             canonical_request,
