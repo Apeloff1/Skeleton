@@ -1,10 +1,10 @@
-"""Forge revise-until-green — VerificationLoop + CodeVerifier.verdict + repair.
+"""Forge revise-until-green — Godot verification + bounded repair.
 
 F-5 glue: materialise already had a single ForgeVerifier gate and an optional
 one-shot ``attempt_repair``. This module composes the existing bounded
-``VerificationLoop`` with ``CodeVerifier.verdict`` so Godot artefacts can
-revise until accepted (or rounds/gain flatten), without growing a second
-policy stack.
+``VerificationLoop`` with that Godot-aware verifier so projects can revise
+until accepted (or rounds/gain flatten), without letting a generic Python-style
+code rubric veto valid GDScript. ``CodeVerifier`` remains advisory telemetry.
 """
 
 from __future__ import annotations
@@ -109,9 +109,12 @@ def forge_verify_until_green(
             "confidence": round(code_confidence, 4),
             "issues": list(code_issues),
         }
-        confidence = min(float(report.score), code_confidence)
-        both_clear = report.accepted is True and not code_issues and code_confidence >= threshold
-        if both_clear:
+        # ForgeVerifier is the authoritative Godot/GDScript gate. The generic
+        # CodeVerifier is intentionally advisory here: it looks for Python-like
+        # "def"/"class" structure and therefore reports false negatives for
+        # valid GDScript using "func"/"class_name".
+        confidence = float(report.score)
+        if report.accepted is True:
             state["rounds_detail"].append(
                 {
                     "accepted": True,
@@ -138,7 +141,7 @@ def forge_verify_until_green(
                 state["files"] = dict(revised_files)
                 revised_claim = _encode_claim(state["files"])
 
-        issues = tuple(report.blocking_issues) or code_issues or ("not accepted",)
+        issues = tuple(report.blocking_issues) or ("not accepted",)
         state["rounds_detail"].append(
             {
                 "accepted": False,
@@ -158,13 +161,20 @@ def forge_verify_until_green(
     final_files = _decode_claim(final_claim)
     # Re-verify final tree so the returned report matches files on disk of the loop.
     final_report = forge_verifier.verify(final_files, request=request)
-    final_path, final_src = _primary_script(final_files)
-    if not final_path or not final_src.strip():
-        final_code_ok = False
-    else:
-        final_code = code.verdict(final_src, request=request or final_path)
-        final_code_ok = not final_code.issues and final_code.confidence >= threshold
-    accepted = bool(final_report.accepted) and final_code_ok
+    final_path, final_src = _primary_script(
+        final_files,
+        final_report.weakest_path if isinstance(final_report.weakest_path, str) else "",
+    )
+    if final_path and final_src.strip():
+        final_code = code.verify(final_src, request=request or final_path)
+        state["last_code"] = {
+            "path": final_path,
+            "confidence": round(final_code.score, 4),
+            "accepted_as_code": final_code.accepted,
+            "issues": list(final_code.issues),
+            "advisory": True,
+        }
+    accepted = bool(final_report.accepted)
     return {
         "kind": "forge-verify-loop",
         "ok": int(accepted),
