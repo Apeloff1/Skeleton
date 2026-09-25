@@ -66,27 +66,14 @@ def _walk_from_cortex(cortex: Any, era: str) -> Optional[Dict[str, Any]]:
     if cortex is None or not hasattr(cortex, "recall"):
         return None
     rec = cortex.recall(f"forge run {era} extract hops cores bias")
-    composed = (rec or {}).get("composed") or {}
-    thought = composed.get("thought") or {}
-    text = str(thought.get("text") or "").lower()
-    if "forge run" not in text:
+    if not isinstance(rec, dict):
         return None
-    extracted = "extract true" in text or " extracted" in text
-    collapsed = "collapse" in text and "extract true" not in text
-    hops = 0
-    if "hops" in text:
-        for tok in text.split():
-            if tok.isdigit():
-                hops = int(tok)
-                break
-    return {
-        "extracted": extracted and not collapsed,
-        "collapsed": collapsed,
-        "t": 0.0,
-        "fights": 0,
-        "hops": hops,
-        "from_recall": True,
-    }
+    composed = rec.get("composed")
+    thought = composed.get("thought") if isinstance(composed, dict) else None
+    walk = thought.get("walk") if isinstance(thought, dict) else None
+    if not isinstance(walk, dict):
+        return None
+    return walk
 
 
 def adapt_from_walk(
@@ -346,7 +333,7 @@ class BuilderBrain:
                     f"improved mix trash={trash} elite={elite} boss={boss}"
                 ] + extra
                 ob = own.best_observed_bias(stim) if hasattr(own, "best_observed_bias") else None
-                if ob:
+                if ob in {"loot", "heat", "combat", "balanced"}:
                     bias = ob
                     veto_notes.append(f"improved bias={bias}")
                 op = own.best_observed_policy(stim) if hasattr(own, "best_observed_policy") else None
