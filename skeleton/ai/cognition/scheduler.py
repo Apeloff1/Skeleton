@@ -53,3 +53,9 @@ class CognitiveScheduler:
                 raise ValueError("budget must be non-negative")
             self.budget = budget
         self.consumed = 0
+
+# Backward-compatible public name retained for callers exported by
+# skeleton.cognition.__init__. CognitiveScheduler is the canonical class.
+BudgetScheduler = CognitiveScheduler
+
+__all__ = ["BudgetScheduler", "CognitiveScheduler", "ScheduledWork"]
