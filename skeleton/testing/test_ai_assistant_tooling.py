@@ -183,3 +183,56 @@ async def test_capability_specific_input_bound_is_enforced() -> None:
     )
     with pytest.raises(ToolCoordinatorError, match="input exceeds"):
         await coordinator.execute(proposal, request)
+
+
+@pytest.mark.asyncio
+async def test_same_idempotency_text_is_isolated_across_requests() -> None:
+    registry = CapabilityRegistry()
+    descriptor = CapabilityDescriptor(
+        capability_id="public.lookup.shared",
+        kind=CapabilityKind.PUBLIC_WEB,
+        side_effect=SideEffectClass.READ_ONLY,
+    )
+    registry.register(descriptor)
+    coordinator = ToolCoordinator(registry)
+    calls = {"count": 0}
+
+    def handler(args):
+        calls["count"] += 1
+        return {"value": args["q"]}
+
+    coordinator.bind(descriptor.capability_id, handler)
+    first_request = AssistantRequest(request_id="scope-a", text="Lookup a")
+    second_request = AssistantRequest(request_id="scope-b", text="Lookup b")
+    first = ToolProposal(
+        proposal_id="scope-proposal-a",
+        capability_id=descriptor.capability_id,
+        arguments={"q": "a"},
+        request_digest=first_request.digest,
+        side_effect=descriptor.side_effect,
+        idempotency_key="client-reused-key",
+    )
+    second = ToolProposal(
+        proposal_id="scope-proposal-b",
+        capability_id=descriptor.capability_id,
+        arguments={"q": "b"},
+        request_digest=second_request.digest,
+        side_effect=descriptor.side_effect,
+        idempotency_key="client-reused-key",
+    )
+    assert (await coordinator.execute(first, first_request)).receipt.status == "succeeded"
+    assert (await coordinator.execute(second, second_request)).receipt.status == "succeeded"
+    assert calls["count"] == 2
+
+
+def test_grant_is_not_valid_before_issuance() -> None:
+    request = AssistantRequest(request_id="grant-time", text="Read scoped data")
+    grant = CapabilityGrant(
+        capability_id="files.read",
+        request_digest=request.digest,
+        granted_scopes=frozenset({"files:read"}),
+        granted_at=NOW,
+        expires_at=NOW + timedelta(minutes=5),
+    )
+    assert grant.valid_at(NOW - timedelta(seconds=1)) is False
+    assert grant.valid_at(NOW) is True
