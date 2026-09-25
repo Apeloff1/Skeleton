@@ -1285,6 +1285,13 @@ def _operation_state(execution_state: ExecutionState) -> OperationState:
     return OperationState.RUNNING
 
 
+def _external_execution_state(execution_state: ExecutionState) -> str:
+    """Normalize repository bootstrap state at the cross-service boundary."""
+    if execution_state is ExecutionState.CREATED:
+        return OperationState.ADMITTED.value
+    return execution_state.value
+
+
 class EngineExecutionService:
     """Authenticated durable engine submit/status/cancel/events boundary."""
 
@@ -1724,7 +1731,7 @@ class EngineExecutionService:
             operation_id=stored.command.operation.operation_id,
             execution_id=execution.execution_id,
             operation_state=_operation_state(execution.state).value,
-            execution_state=execution.state.value,
+            execution_state=_external_execution_state(execution.state),
             latest_checkpoint_version=execution.checkpoint_version,
             result_ref=(
                 None
