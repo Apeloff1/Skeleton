@@ -27,7 +27,22 @@ class ResourcePool:
         return max(0.0, self.capacity - self.current_usage())
 
     def utilization(self) -> float:
-        return self.current_usage() / self.capacity if self.capacity else 0.0
+        if self.capacity <= 0:
+            return 1.0 if self.current_usage() > 0 else 0.0
+        return self.current_usage() / self.capacity
+
+
+
+def _positive_capacity(capacity: float) -> float:
+    if isinstance(capacity, bool) or not isinstance(capacity, (int, float)) or float(capacity) <= 0:
+        raise ValueError("capacity must be positive")
+    return float(capacity)
+
+
+def _warn_fraction(fraction: float) -> float:
+    if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not 0.0 < float(fraction) <= 1.0:
+        raise ValueError("warn_fraction must be in (0, 1]")
+    return float(fraction)
 
 
 class CapacityPlanner:
@@ -40,7 +55,8 @@ class CapacityPlanner:
 
     def define_pool(self, name: str, capacity: float, unit: str,
                     warn_fraction: float = 0.8) -> ResourcePool:
-        pool = ResourcePool(name=name, capacity=capacity, unit=unit, warn_fraction=warn_fraction)
+        pool = ResourcePool(name=name, capacity=_positive_capacity(capacity), unit=unit,
+                            warn_fraction=_warn_fraction(warn_fraction))
         self._pools[name] = pool
         return pool
 
@@ -53,7 +69,7 @@ class CapacityPlanner:
             self._forecaster.feed(f"capacity.{pool}", usage)
 
     def resize(self, pool: str, new_capacity: float) -> None:
-        self._pools[pool].capacity = new_capacity
+        self._pools[pool].capacity = _positive_capacity(new_capacity)
 
     def record_shared_pressure(self, snapshot: Any) -> Dict[str, float]:
         """Feed durable shared queue/concurrency pressure into capacity history."""
