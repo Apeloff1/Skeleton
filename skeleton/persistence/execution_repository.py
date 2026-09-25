@@ -830,6 +830,13 @@ class SQLiteExecutionRepository:
                     raise ExecutionRepositoryConflict(
                         "execution version changed before finalization staging"
                     )
+                if (
+                    current.cancellation_requested
+                    and result.status not in {"failed", "cancelled"}
+                ):
+                    raise ExecutionRepositoryConflict(
+                        "successful finalization is fenced after cancellation request"
+                    )
                 row = self._connection.execute(
                     """
                     SELECT * FROM ai_execution_finalization_intent
@@ -935,6 +942,13 @@ class SQLiteExecutionRepository:
                 if current.version != expected_execution_version:
                     raise ExecutionRepositoryConflict(
                         "execution version changed before finalization"
+                    )
+                if (
+                    current.cancellation_requested
+                    and result.status not in {"failed", "cancelled"}
+                ):
+                    raise ExecutionRepositoryConflict(
+                        "successful finalization is fenced after cancellation request"
                     )
 
                 if terminal_state in {
