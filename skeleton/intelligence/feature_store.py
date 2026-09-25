@@ -35,6 +35,7 @@ class FeatureStore:
     def __init__(self):
         self._defs: Dict[str, FeatureDef] = {}
         self._values: Dict[str, List[FeatureValue]] = {}
+        self._feature_of: Dict[str, str] = {}
 
     def _key(self, feature: str, entity_id: str) -> str:
         return f"{feature}:{entity_id}"
@@ -56,7 +57,9 @@ class FeatureStore:
         if feature not in self._defs:
             raise KeyError(f"unregistered feature: {feature}")
         fv = FeatureValue(entity_id=entity_id, value=value, timestamp_ns=timestamp_ns or time.time_ns())
-        buf = self._values.setdefault(self._key(feature, entity_id), [])
+        key = self._key(feature, entity_id)
+        self._feature_of[key] = feature
+        buf = self._values.setdefault(key, [])
         buf.append(fv)
         buf.sort(key=lambda x: x.timestamp_ns)
         return fv
@@ -92,7 +95,7 @@ class FeatureStore:
         for key, buf in self._values.items():
             if buf:
                 age_s = (now - buf[-1].timestamp_ns) / 1e9
-                feature = key.split(":")[0]
+                feature = self._feature_of.get(key, key.split(":", 1)[0])
                 fd = self._defs.get(feature)
                 ttl = fd.ttl_s if fd else 0
                 out[key] = {"age_s": round(age_s, 1), "stale": age_s > ttl, "values": len(buf)}
