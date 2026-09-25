@@ -835,6 +835,47 @@ class EngineClient:
             )
         return dict(payload)
 
+    @staticmethod
+    def _validate_image_payload(
+        payload: Mapping[str, Any],
+        *,
+        maximum_items: int = 4,
+    ) -> dict[str, Any]:
+        images = payload.get("images")
+        if (
+            not isinstance(images, list)
+            or not images
+            or len(images) > maximum_items
+        ):
+            raise EngineProtocolError(
+                "engine image response has invalid image count"
+            )
+        for item in images:
+            if not isinstance(item, Mapping):
+                raise EngineProtocolError(
+                    "engine image item must be an object"
+                )
+            data = item.get("data")
+            if not isinstance(data, str) or not data:
+                raise EngineProtocolError(
+                    "engine image item is missing base64 data"
+                )
+            if len(data) > 32 * 1024 * 1024:
+                raise EngineProtocolError(
+                    "engine image payload exceeds size bound"
+                )
+            try:
+                decoded = base64.b64decode(data, validate=True)
+            except (ValueError, binascii.Error) as exc:
+                raise EngineProtocolError(
+                    "engine image payload is invalid base64"
+                ) from exc
+            if not decoded or len(decoded) > 24 * 1024 * 1024:
+                raise EngineProtocolError(
+                    "engine image payload exceeds decoded size bound"
+                )
+        return dict(payload)
+
     async def generate_image(
         self,
         *,
@@ -866,32 +907,7 @@ class EngineClient:
             trace_id=trace_id,
             max_response_bytes=self.config.max_media_response_bytes,
         )
-        images = payload.get("images")
-        if not isinstance(images, list) or not images:
-            raise EngineProtocolError(
-                "engine image response is missing images"
-            )
-        for item in images:
-            if not isinstance(item, Mapping):
-                raise EngineProtocolError(
-                    "engine image item must be an object"
-                )
-            data = item.get("data")
-            if not isinstance(data, str) or not data:
-                raise EngineProtocolError(
-                    "engine image item is missing base64 data"
-                )
-            if len(data) > 32 * 1024 * 1024:
-                raise EngineProtocolError(
-                    "engine image payload exceeds size bound"
-                )
-            try:
-                base64.b64decode(data, validate=True)
-            except (ValueError, binascii.Error) as exc:
-                raise EngineProtocolError(
-                    "engine image payload is invalid base64"
-                ) from exc
-        return payload
+        return self._validate_image_payload(payload, maximum_items=count)
 
     async def create_image_variation(
         self,
@@ -908,7 +924,7 @@ class EngineClient:
             raise EngineProtocolError("image must be non-empty bytes")
         if len(image) > 20 * 1024 * 1024:
             raise EngineProtocolError("image exceeds media size bound")
-        return await self._request(
+        payload = await self._request(
             "POST",
             "/media/images/variation",
             json_body={
@@ -926,6 +942,7 @@ class EngineClient:
             trace_id=trace_id,
             max_response_bytes=self.config.max_media_response_bytes,
         )
+        return self._validate_image_payload(payload, maximum_items=count)
 
     async def edit_image(
         self,
@@ -949,7 +966,7 @@ class EngineClient:
             or len(mask) > 20 * 1024 * 1024
         ):
             raise EngineProtocolError("mask exceeds media size bound")
-        return await self._request(
+        payload = await self._request(
             "POST",
             "/media/images/edit",
             json_body={
@@ -972,6 +989,7 @@ class EngineClient:
             trace_id=trace_id,
             max_response_bytes=self.config.max_media_response_bytes,
         )
+        return self._validate_image_payload(payload, maximum_items=1)
 
     async def synthesize_speech(
         self,
