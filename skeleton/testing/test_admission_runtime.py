@@ -19,6 +19,10 @@ from skeleton.intelligence.quota import (
     TenantQuota,
     TenantQuotaLedger,
 )
+from skeleton.intelligence.shared_pressure import (
+    SharedPressurePolicy,
+    SqliteSharedPressureLedger,
+)
 
 
 def _request(
@@ -380,3 +384,122 @@ def test_idempotent_replay_does_not_double_count_admission_telemetry() -> None:
     telemetry = runtime.telemetry_snapshot()["metrics"]
     assert telemetry["counters"]["admission.admitted_total"] == 1
     assert telemetry["samples"]["admission.estimated.input_tokens"] == (10.0,)
+
+def _shared_pressure_runtime(
+    path,
+    *,
+    owner_id: str,
+    quota_ledger: TenantQuotaLedger | None = None,
+) -> AdmissionRuntime:
+    pressure = SqliteSharedPressureLedger(path)
+    try:
+        pressure.configure(
+            SharedPressurePolicy(
+                scope="ai-work",
+                max_concurrency=1,
+                max_queue_depth=8,
+                max_tenant_concurrency=1,
+                max_tenant_queue_depth=4,
+                soft_shed_fraction=1.0,
+                protect_priority_at_or_below=100,
+                default_lease_seconds=30.0,
+            )
+        )
+    except Exception as exc:
+        if "already configured" not in str(exc):
+            raise
+    return AdmissionRuntime(
+        quota_ledger=quota_ledger,
+        shared_pressure_ledger=pressure,
+        shared_pressure_scope="ai-work",
+        shared_pressure_owner_id=owner_id,
+    )
+
+
+def test_shared_pressure_prevents_cross_worker_overbooking(tmp_path) -> None:
+    path = tmp_path / "pressure.sqlite3"
+    first = _shared_pressure_runtime(path, owner_id="worker-a")
+    second = _shared_pressure_runtime(path, owner_id="worker-b")
+
+    first.admit(_request("op-a", max_concurrency=2), now_wall=10.0)
+
+    with pytest.raises(AdmissionError, match="shared_concurrency_saturated"):
+        second.admit(
+            _request(
+                "op-b",
+                tenant_id="tenant-b",
+                max_concurrency=2,
+            ),
+            now_wall=10.1,
+        )
+
+    assert first.pressure.active_operations == 1
+    assert second.pressure.active_operations == 0
+
+    first.complete(
+        "op-a",
+        UsageEstimate(),
+        now_wall=10.2,
+    )
+    admitted = second.admit(
+        _request(
+            "op-b",
+            tenant_id="tenant-b",
+            max_concurrency=2,
+        ),
+        now_wall=10.3,
+    )
+    assert admitted.operation_id == "op-b"
+
+
+def test_quota_denial_releases_shared_pressure_slot(tmp_path) -> None:
+    path = tmp_path / "pressure.sqlite3"
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="window-shared",
+            max_operations=10,
+            max_input_tokens=5,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_tool_calls=100,
+            max_artifact_bytes=10_000,
+            max_storage_bytes=10_000,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = _shared_pressure_runtime(
+        path,
+        owner_id="worker-a",
+        quota_ledger=ledger,
+    )
+
+    with pytest.raises(
+        AdmissionError,
+        match="tenant_quota_exceeded:input_tokens",
+    ):
+        runtime.admit(
+            _request("op-denied", input_tokens=10),
+            now_wall=20.0,
+        )
+
+    pressure = SqliteSharedPressureLedger(path).snapshot(
+        "ai-work",
+        now=20.1,
+    )
+    assert pressure.active == 0
+
+
+def test_shared_pressure_configuration_is_all_or_none(tmp_path) -> None:
+    pressure = SqliteSharedPressureLedger(tmp_path / "pressure.sqlite3")
+
+    with pytest.raises(ValueError, match="configured together"):
+        AdmissionRuntime(shared_pressure_ledger=pressure)
+
+    with pytest.raises(ValueError, match="configured together"):
+        AdmissionRuntime(
+            shared_pressure_scope="ai-work",
+            shared_pressure_owner_id="worker-a",
+        )
+
