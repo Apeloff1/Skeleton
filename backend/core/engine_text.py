@@ -55,6 +55,7 @@ class EngineTextRequest:
     tenant_id: str = "default"
     actor_id: str = "backend-ai"
     capability: str = "assistant.compat"
+    verification_profile: str = "assistant_proposal"
     max_output_tokens: int | None = None
     data_class: str = "internal"
     purpose: str = "model-inference"
@@ -91,6 +92,14 @@ class EngineTextRequest:
                 "engine text compatibility requires an assistant capability"
             )
         object.__setattr__(self, "capability", capability)
+        profile = _text(
+            self.verification_profile,
+            "verification_profile",
+            maximum=64,
+        )
+        if profile not in {"assistant_proposal", "evidence_required"}:
+            raise EngineTextError("verification_profile is unsupported")
+        object.__setattr__(self, "verification_profile", profile)
         if self.data_class not in {
             "public",
             "internal",
@@ -317,7 +326,7 @@ async def execute_engine_text(
         instructions=policy.instructions,
         prompt=request.prompt,
         objective="Execute tool-free backend assistant compatibility request",
-        verification_profile="assistant_proposal",
+        verification_profile=request.verification_profile,
         history=request.history,
         service_principal=active_client.config.service_principal,
         created_at=now,
