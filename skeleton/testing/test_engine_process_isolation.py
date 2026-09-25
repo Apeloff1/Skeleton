@@ -207,3 +207,23 @@ def test_engine_principal_identity_is_explicit_and_matches_backend_client_defaul
     client = (ROOT / "backend/core/engine_client.py").read_text(encoding="utf-8")
     assert 'service_principal: str = "codedock-backend"' in client
     assert '"x-zaibatsu-attester": self.config.service_principal' in client
+
+
+def test_engine_transport_requires_authenticated_service_token() -> None:
+    compose = _compose()
+    skeleton = _service_block(compose, "skeleton", "backend")
+    backend = _service_block(compose, "backend", "frontend")
+    token_binding = (
+        "SKL_ENGINE_SERVICE_TOKEN="
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set}"
+    )
+
+    assert token_binding in skeleton
+    assert token_binding in backend
+
+    client = (ROOT / "backend/core/engine_client.py").read_text(encoding="utf-8")
+    routes = (ROOT / "skeleton/api/engine_routes.py").read_text(encoding="utf-8")
+    assert '"authorization": "Bearer " + token' in client
+    assert "SKL_ENGINE_SERVICE_TOKEN" in client
+    assert "hmac.compare_digest" in routes
+    assert "engine service authentication failed" in routes
