@@ -110,17 +110,18 @@
         "skeleton/intelligence/admission.py and quota.py define independent storage byte budgets",
         "skeleton/intelligence/quota_sqlite.py persists storage quotas with additive legacy migration",
         "skeleton/artifact_plane/usage.py charges storage writes to storage_bytes",
-        "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent and restart-safe storage accounting"
+        "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent and restart-safe storage accounting",
+        "skeleton/intelligence/shared_pressure.py coordinates durable multi-worker concurrency and queue pressure",
+        "skeleton/testing/test_shared_pressure.py proves restart/multi-worker/fairness/shedding invariants",
+        "AdmissionRuntime consumes shared snapshots and durable pressure leases"
       ],
       "remaining": [
         "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment",
         "bind actual storage usage to artifact/storage admission receipts",
         "admit every expensive non-provider action before allocation",
         "add shared multi-worker pressure coordination",
         "collect fresh exact-head cost/admission telemetry and quota verification",
         "bind admission to every remaining expensive non-provider action",
-        "add shared cross-process/distributed pressure coordination",
         "collect exact-head and independent closure evidence",
         "validate independent storage byte migration on exact head"
       ],
