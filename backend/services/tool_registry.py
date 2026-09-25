@@ -10,7 +10,7 @@ Available tools:
   • analyze_code        — invoke the debugger / code intelligence analysis
   • vault_query         — fetch samples from the vault collections
   • jeeves_consult      — pull persona-flavoured guidance from Jeeves
-  • llm_chat            — talk to GPT-4o via Emergent LLM key (if configured)
+  • llm_chat            — retired compatibility alias; provider I/O is engine-owned
   • package_build       — produce a ZIP/APK from a Galaxy build_id
   • mongo_query         — read a knowledge collection
   • web_search          — placeholder (returns "feature gated", non-blocking)
@@ -19,10 +19,9 @@ This registry is consumed by agents.py (each agent step can declare a list
 of tool calls to run before producing its output).
 """
 from __future__ import annotations
-from collections import OrderedDict
 from datetime import datetime, timezone
 import hashlib
-import os, asyncio, json, subprocess, tempfile
+import os, asyncio, json, sqlite3, subprocess, tempfile
 from typing import Any, Callable, Coroutine
 from uuid import uuid4
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -31,6 +30,7 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 from core.exec_guard import code_execution_enabled, execution_disabled_response, execution_disabled_message
 from skeleton.skills import (
     AsyncToolRuntime,
+    SQLiteToolReceiptStore,
     ToolEffect,
     ToolExecutionRequest,
     ToolExecutionStatus,
@@ -245,21 +245,6 @@ async def _tool_mongo_query(params: dict) -> dict:
     return {"ok": True, "collection": coll, "rows": rows, "count": len(rows)}
 
 
-async def _tool_llm_chat(params: dict) -> dict:
-    """Call the Emergent LLM key via the same path the rest of the app uses."""
-    try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
-        key = os.environ.get("EMERGENT_LLM_KEY", "")
-        if not key:
-            return {"ok": False, "error": "EMERGENT_LLM_KEY not set"}
-        model = params.get("model", "gpt-4o")
-        chat = LlmChat(api_key=key, session_id=params.get("session_id", "tool"), system_message=params.get("system", "You are a helpful assistant.")).with_model("openai", model)
-        msg = await chat.send_message(UserMessage(text=params.get("prompt", "")))
-        return {"ok": True, "response": str(msg)[:8000], "model": model}
-    except Exception:
-        return {"ok": False, "error": "llm_request_failed"}
-
-
 async def _tool_web_search(params: dict) -> dict:
     """Live web search through bounded egress and result policy."""
     scoped = _NETWORK_POLICY.search_request(params)
@@ -315,7 +300,6 @@ TOOLS: dict[str, ToolFn] = {
     "run_code": _tool_run_code,
     "package_build": _tool_package_build,
     "mongo_query": _tool_mongo_query,
-    "llm_chat": _tool_llm_chat,
     "web_search": _tool_web_search,
 }
 
@@ -425,19 +409,6 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
             required=["collection"],
         ),
     ),
-    "llm_chat": ToolManifest(
-        tool_id="llm_chat",
-        version="1.0.0",
-        description="Compatibility LLM call through configured provider credentials.",
-        input_schema=_object_schema(
-            {
-                "prompt": {"type": "string", "maxLength": 100000},
-                "model": {"type": "string", "maxLength": 128},
-                "system": {"type": "string", "maxLength": 100000},
-                "session_id": {"type": "string", "maxLength": 256},
-            }
-        ),
-    ),
     "web_search": ToolManifest(
         tool_id="web_search",
         version="1.0.0",
@@ -455,23 +426,39 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
 
 
 class _CompatibilityResultStore:
-    """Bounded transient projection of canonical tool receipts for legacy callers."""
+    """Durable projection of canonical tool outputs for legacy callers."""
 
-    def __init__(self, max_entries: int = 1024) -> None:
+    def __init__(self, path: str = ":memory:", max_entries: int = 4096) -> None:
         self.max_entries = max_entries
         self._lock = asyncio.Lock()
-        self._items: OrderedDict[str, dict] = OrderedDict()
+        self._connection = sqlite3.connect(
+            str(path),
+            check_same_thread=False,
+            isolation_level=None,
+            timeout=5.0,
+        )
+        self._connection.row_factory = sqlite3.Row
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS legacy_tool_result (
+                result_ref TEXT PRIMARY KEY,
+                result_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
     async def put(self, request: ToolExecutionRequest, result: dict) -> str:
         if not isinstance(result, dict):
             raise TypeError("legacy tool result must be an object")
-        encoded = json.dumps(
+        encoded_text = json.dumps(
             result,
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
             default=str,
-        ).encode("utf-8")
+        )
+        encoded = encoded_text.encode("utf-8")
         identity = "\x1f".join(
             (
                 request.operation_id,
@@ -484,19 +471,63 @@ class _CompatibilityResultStore:
             identity + b"\x1f" + encoded
         ).hexdigest()
         async with self._lock:
-            self._items[ref] = dict(result)
-            self._items.move_to_end(ref)
-            while len(self._items) > self.max_entries:
-                self._items.popitem(last=False)
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                existing = self._connection.execute(
+                    "SELECT result_json FROM legacy_tool_result WHERE result_ref = ?",
+                    (ref,),
+                ).fetchone()
+                if existing is not None and existing["result_json"] != encoded_text:
+                    raise RuntimeError("legacy tool result digest collision")
+                self._connection.execute(
+                    """
+                    INSERT OR IGNORE INTO legacy_tool_result(
+                        result_ref, result_json, created_at
+                    ) VALUES (?, ?, ?)
+                    """,
+                    (ref, encoded_text, datetime.now(timezone.utc).isoformat()),
+                )
+                self._connection.execute(
+                    """
+                    DELETE FROM legacy_tool_result
+                    WHERE result_ref IN (
+                        SELECT result_ref
+                        FROM legacy_tool_result
+                        ORDER BY created_at DESC, result_ref DESC
+                        LIMIT -1 OFFSET ?
+                    )
+                    """,
+                    (self.max_entries,),
+                )
+                self._connection.execute("COMMIT")
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
         return ref
 
     async def get(self, ref: str) -> dict | None:
         async with self._lock:
-            item = self._items.get(ref)
-            if item is None:
-                return None
-            self._items.move_to_end(ref)
-            return dict(item)
+            row = self._connection.execute(
+                "SELECT result_json FROM legacy_tool_result WHERE result_ref = ?",
+                (str(ref),),
+            ).fetchone()
+        if row is None:
+            return None
+        value = json.loads(row["result_json"])
+        if not isinstance(value, dict):
+            raise RuntimeError("durable legacy tool result is not an object")
+        return value
+
+    def close(self) -> None:
+        self._connection.close()
+
+
+def _canonical_receipt_path() -> str:
+    return os.environ.get("BACKEND_TOOL_RECEIPT_PATH", ":memory:")
+
+
+def _canonical_result_path() -> str:
+    return os.environ.get("BACKEND_TOOL_RESULT_PATH", ":memory:")
 
 
 _CANONICAL_RUNTIME: AsyncToolRuntime | None = None
@@ -565,9 +596,13 @@ async def _ensure_canonical_runtime() -> None:
         if _CANONICAL_READY:
             return
         if _CANONICAL_RUNTIME is None:
-            _CANONICAL_RUNTIME = AsyncToolRuntime()
+            _CANONICAL_RUNTIME = AsyncToolRuntime(
+                receipt_store=SQLiteToolReceiptStore(_canonical_receipt_path())
+            )
         if _CANONICAL_RESULT_STORE is None:
-            _CANONICAL_RESULT_STORE = _CompatibilityResultStore()
+            _CANONICAL_RESULT_STORE = _CompatibilityResultStore(
+                _canonical_result_path()
+            )
         runtime = _CANONICAL_RUNTIME
         store = _CANONICAL_RESULT_STORE
         for name, fn in TOOLS.items():
@@ -694,6 +729,14 @@ async def invoke(
 ) -> dict:
     """Legacy-compatible entrypoint delegated through canonical authority."""
 
+    if tool == "llm_chat":
+        return {
+            "ok": False,
+            "error": "provider_tool_retired",
+            "tool": "llm_chat",
+            "delegate": "skeleton-engine-provider-boundary",
+        }
+
     manifest = _TOOL_MANIFESTS.get(tool)
     if manifest is None:
         return {
@@ -763,7 +806,6 @@ def describe() -> dict:
             "retention_days?",
         ],
         "mongo_query": ["collection", "filter", "limit"],
-        "llm_chat": ["prompt", "model?", "system?"],
         "web_search": ["query"],
     }
     items = []
@@ -782,4 +824,10 @@ def describe() -> dict:
         "tools": items,
         "count": len(items),
         "authority": "canonical-tool-runtime",
+        "retired_tools": {
+            "llm_chat": {
+                "reason": "provider execution is engine-owned",
+                "delegate": "skeleton-engine-provider-boundary",
+            }
+        },
     }
