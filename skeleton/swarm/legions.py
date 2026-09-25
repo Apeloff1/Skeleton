@@ -16,7 +16,7 @@ from __future__ import annotations
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable, Optional
 
 
@@ -64,7 +64,7 @@ class LegionRegistry:
         self.cashiered_total: int = 0
 
     def found(self, name: str, motto: str) -> Legion:
-        """Found a legion. Names are unique within the empire (last write wins)."""
+        """Found a legion. A name can be founded once."""
         legion = Legion(
             id=str(uuid.uuid4()),
             name=name,
@@ -72,7 +72,11 @@ class LegionRegistry:
             cohorts=[],
             founded=self._now(),
         )
+        if not isinstance(name, str) or not name.strip() or not isinstance(motto, str) or not motto.strip():
+            raise ValueError("legion name and motto are required")
         with self._lock:
+            if name in self._legions:
+                raise ValueError("legion already founded")
             self._legions[legion.name] = legion
         return legion
 
@@ -85,6 +89,8 @@ class LegionRegistry:
             legion = self._legions.get(legion_name)
             if legion is None:
                 return None
+            if not isinstance(capability, str) or not capability.strip():
+                raise ValueError("capability is required")
             if not any(c.capability == capability for c in legion.cohorts):
                 legion.cohorts.append(
                     Cohort(id=str(uuid.uuid4()), capability=capability, members=[])
@@ -146,6 +152,8 @@ class LegionRegistry:
 
     def degrade_silent(self, max_silence_secs: float) -> int:
         """Degrade members silent longer than ``max_silence_secs`` (rank > 1 only)."""
+        if isinstance(max_silence_secs, bool) or not isinstance(max_silence_secs, (int, float)) or max_silence_secs <= 0:
+            raise ValueError("max_silence_secs must be positive")
         now = self._now()
         degraded = 0
         with self._lock:
@@ -170,17 +178,23 @@ class LegionRegistry:
         with self._lock:
             return list(self._legions.values())
 
-    def fit_for(self, capability: str) -> list[tuple[str, Member]]:
-        """Fit non-traitor members for a capability, highest rank first."""
+    def fit_for(self, capability: str, *, max_silence_secs: float = 60.0) -> list[tuple[str, Member]]:
+        """Fit living non-traitor members, highest rank first."""
+        if isinstance(max_silence_secs, bool) or not isinstance(max_silence_secs, (int, float)) or max_silence_secs <= 0:
+            raise ValueError("max_silence_secs must be positive")
+        now = self._now()
         out: list[tuple[str, Member]] = []
         with self._lock:
             for legion in self._legions.values():
                 for cohort in legion.cohorts:
                     if cohort.capability != capability:
                         continue
-                    for m in cohort.members:
-                        if not m.traitor:
-                            out.append((legion.name, m))
+                    for member in cohort.members:
+                        if member.traitor:
+                            continue
+                        if now - member.last_heartbeat > max_silence_secs:
+                            continue
+                        out.append((legion.name, replace(member)))
         out.sort(key=lambda pair: pair[1].rank, reverse=True)
         return out
 
