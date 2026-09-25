@@ -422,3 +422,103 @@ def test_staged_finalization_is_idempotent_and_rejects_changed_terminal_payload(
             expected_execution_version=current.version,
             now=_now(),
         )
+
+
+def test_cancellation_request_fences_direct_success_finalization() -> None:
+    repo = SQLiteExecutionRepository()
+    created = repo.create(_request(), now=_now())
+    cancelled = repo.request_cancel(
+        created.execution_id,
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="late-success",
+        verification="verification:late",
+        usage={"model_turns": 1},
+        stream_terminal_event="stream:late-success",
+        completed_at=_now() + timedelta(seconds=2),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryConflict,
+        match="fenced after cancellation request",
+    ):
+        repo.finalize(
+            result,
+            expected_execution_version=cancelled.version,
+            now=_now() + timedelta(seconds=2),
+        )
+
+    current = repo.get("exec-1")
+    assert current.cancellation_requested is True
+    assert current.state is ExecutionState.CREATED
+    assert repo.result("exec-1") is None
+    assert repo.pending_outbox(execution_id="exec-1") == ()
+
+
+def test_cancellation_request_fences_staged_success_finalization() -> None:
+    repo = SQLiteExecutionRepository()
+    created = repo.create(_request(), now=_now())
+    cancelled = repo.request_cancel(
+        created.execution_id,
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="completed",
+        final_output="late-staged-success",
+        verification="verification:late",
+        usage={"model_turns": 1},
+        stream_terminal_event="stream:late-staged-success",
+        completed_at=_now() + timedelta(seconds=2),
+    )
+
+    with pytest.raises(
+        ExecutionRepositoryConflict,
+        match="fenced after cancellation request",
+    ):
+        repo.stage_finalization(
+            result,
+            expected_execution_version=cancelled.version,
+            now=_now() + timedelta(seconds=2),
+        )
+
+    assert repo.finalization_intent("exec-1") is None
+    assert repo.result("exec-1") is None
+
+
+def test_cancellation_request_still_allows_cancelled_terminal_result() -> None:
+    repo = SQLiteExecutionRepository()
+    created = repo.create(_request(), now=_now())
+    cancelled = repo.request_cancel(
+        created.execution_id,
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    result = AIExecutionResult(
+        operation_id="op-1",
+        execution_id="exec-1",
+        status="cancelled",
+        usage={"model_turns": 0, "tool_calls": 0},
+        stream_terminal_event="stream:cancelled",
+        completed_at=_now() + timedelta(seconds=2),
+    )
+
+    terminal = repo.finalize(
+        result,
+        expected_execution_version=cancelled.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert terminal.state is ExecutionState.CANCELLED
+    assert terminal.cancellation_requested is True
+    assert repo.result("exec-1") == result
+    pending = repo.pending_outbox(execution_id="exec-1")
+    assert len(pending) == 1
+    assert pending[0].event_type == "execution.cancelled"
