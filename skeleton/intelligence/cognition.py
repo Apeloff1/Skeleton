@@ -67,6 +67,8 @@ class Cognition:
 
     def hold(self, predicate: str, polarity: bool) -> str:
         """Hold a new belief (or locate the existing one on predicate+polarity)."""
+        if not isinstance(predicate, str) or not predicate.strip() or not isinstance(polarity, bool):
+            raise ValueError("predicate and boolean polarity are required")
         with self._lock:
             for b in self._beliefs.values():
                 if b.predicate == predicate and b.polarity == polarity:
@@ -99,7 +101,11 @@ class Cognition:
         weight: float,
     ) -> Optional[float]:
         """Add witness evidence; updates log-odds and re-scans for schisms."""
-        weight = max(0.0, min(1.0, float(weight)))
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not 0.0 < float(weight) <= 1.0:
+            raise ValueError("weight must be in (0, 1]")
+        if not isinstance(supports, bool) or not isinstance(witness, str) or not witness.strip():
+            raise ValueError("witness and boolean support are required")
+        weight = float(weight)
         with self._lock:
             b = self._beliefs.get(belief_id)
             if b is None:
@@ -161,7 +167,7 @@ class Cognition:
                 (i for i, s in enumerate(self._schisms) if s.predicate == predicate),
                 None,
             )
-            if idx is None:
+            if not isinstance(winning_polarity, bool) or idx is None:
                 return False
             self._schisms.pop(idx)
             for b in self._beliefs.values():
@@ -221,10 +227,14 @@ class Cognition:
         """
         predicates: List[str] = []
         for raw in claims:
-            pred = str(raw.get("predicate") or "").strip()
-            if not pred:
-                continue
-            polarity = bool(raw.get("polarity", True))
+            if not isinstance(raw, Mapping):
+                raise ValueError("claim must be an object")
+            pred = raw.get("predicate")
+            if not isinstance(pred, str) or not pred.strip():
+                raise ValueError("claim predicate is required")
+            if "polarity" not in raw or not isinstance(raw.get("polarity"), bool):
+                raise ValueError("claim polarity must be boolean")
+            polarity = raw["polarity"]
             predicates.append(pred)
             bid = self.hold(pred, polarity)
             self.testify(bid, "plan", True, 1.0)
