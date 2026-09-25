@@ -126,8 +126,26 @@ class CausalInference:
         Estimate Average Treatment Effect: E[Y(1)] - E[Y(0)]
         Returns (ate, standard_error).
         """
+        if not isinstance(treatment, str) or not treatment or not isinstance(outcome, str) or not outcome:
+            raise ValueError("treatment and outcome are required")
         if not self._data:
-            return 0.0, 0.0
+            raise ValueError("observations are required")
+
+        def _arm(obs: Dict[str, Any]) -> int:
+            if treatment not in obs:
+                raise ValueError("treatment is required")
+            value = obs[treatment]
+            if value is True or value is False or value not in (0, 1):
+                raise ValueError("treatment must be 0 or 1")
+            return int(value)
+
+        def _outcome(obs: Dict[str, Any]) -> float:
+            if outcome not in obs:
+                raise ValueError("outcome is required")
+            value = obs[outcome]
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise ValueError("outcome must be finite")
+            return float(value)
 
         # Determine adjustment set using backdoor criterion if not provided
         if adjustment_set is None and self._graph:
@@ -136,6 +154,8 @@ class CausalInference:
         # Stratify by adjustment set and compute weighted difference
         strata: Dict[str, List[Dict[str, Any]]] = {}
         for obs in self._data:
+            if not isinstance(obs, dict):
+                raise ValueError("observation must be an object")
             key = str(tuple(obs.get(c) for c in (adjustment_set or [])))
             strata.setdefault(key, []).append(obs)
 
@@ -144,14 +164,14 @@ class CausalInference:
         squared_errors = []
 
         for key, group in strata.items():
-            treated = [obs for obs in group if obs.get(treatment) == 1]
-            control = [obs for obs in group if obs.get(treatment) == 0]
+            treated = [obs for obs in group if _arm(obs) == 1]
+            control = [obs for obs in group if _arm(obs) == 0]
 
             if not treated or not control:
                 continue
 
-            y_treated = sum(obs.get(outcome, 0) for obs in treated) / len(treated)
-            y_control = sum(obs.get(outcome, 0) for obs in control) / len(control)
+            y_treated = sum(_outcome(obs) for obs in treated) / len(treated)
+            y_control = sum(_outcome(obs) for obs in control) / len(control)
             stratum_ate = y_treated - y_control
 
             weight = len(group)
@@ -159,13 +179,13 @@ class CausalInference:
             total_weight += weight
 
             # Within-stratum variance
-            var_treated = sum((obs.get(outcome, 0) - y_treated) ** 2 for obs in treated) / max(len(treated), 1)
-            var_control = sum((obs.get(outcome, 0) - y_control) ** 2 for obs in control) / max(len(control), 1)
-            stratum_var = var_treated / max(len(treated), 1) + var_control / max(len(control), 1)
+            var_treated = sum((_outcome(obs) - y_treated) ** 2 for obs in treated) / len(treated)
+            var_control = sum((_outcome(obs) - y_control) ** 2 for obs in control) / len(control)
+            stratum_var = var_treated / len(treated) + var_control / len(control)
             squared_errors.append(stratum_var * weight ** 2)
 
         if total_weight == 0:
-            return 0.0, 0.0
+            raise ValueError("ate needs a treated and a control observation")
 
         ate = ate_weighted / total_weight
         se = math.sqrt(sum(squared_errors)) / total_weight if squared_errors else 0.0
