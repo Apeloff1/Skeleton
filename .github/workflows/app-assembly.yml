@@ -95,6 +95,9 @@ on:
       - "skeleton/testing/test_engine_process_isolation.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
+      - "backend/routes/ai_debugger.py"
+      - "backend/routes/ai_pipeline.py"
+      - "backend/routes/ai_toolkit_enhanced.py"
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
       - "backend/core/engine_client.py"
@@ -103,6 +106,7 @@ on:
       - "backend/services/ai_assistant_svc.py"
       - "backend/services/game_llm_service.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_text_route_cutovers.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
@@ -519,6 +523,7 @@ jobs:
           backend/tests/test_ai_provider_compat.py
           backend/tests/test_game_llm_engine_cutover.py
           backend/tests/test_llm_router_engine_cutover.py
+          backend/tests/test_engine_text_route_cutovers.py
           backend/tests/test_ai_chat_engine_cutover.py
           backend/tests/test_ai_assist_engine_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
