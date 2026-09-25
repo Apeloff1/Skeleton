@@ -7,12 +7,11 @@ ids, and a digest. It does not paste episode bodies into shared retrieval.
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol
 
 from skeleton.memory.types import MemoryChunk
 
 
-@runtime_checkable
 class _EventEmitter(Protocol):
     def emit(
         self,
@@ -35,7 +34,7 @@ class DreamEngine:
             raise TypeError("mag must expose user_id and clusters()")
         if not hasattr(rag, "add"):
             raise TypeError("rag must expose add()")
-        if bus is not None and not isinstance(bus, _EventEmitter):
+        if bus is not None and not callable(getattr(bus, "emit", None)):
             raise TypeError("bus must expose emit()")
         self._mag = mag
         self._rag = rag
