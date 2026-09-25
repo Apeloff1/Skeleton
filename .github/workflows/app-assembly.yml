@@ -39,6 +39,7 @@ on:
       - "skeleton/testing/test_provider_runtime_schema_parity.py"
       - "machine/ai_runtime_schemas.json"
       - "skeleton/testing/test_provider_surface_inventory.py"
+      - "tests/test_provider_surface_closure.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/testing/test_operation_stream.py"
@@ -170,6 +171,7 @@ on:
       - "scripts/check_state_topology.py"
       - "scripts/state_recovery_drill.py"
       - "scripts/check_provider_bootstrap.py"
+      - "scripts/check_provider_surface_closure.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
       - "machine/ai_app_construction.json"
@@ -331,6 +333,24 @@ jobs:
             echo "~~~"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Validate provider surface closure
+        env:
+          PROVIDER_CLOSURE_EVIDENCE: ${{ runner.temp }}/provider-surface-closure.json
+        run: |
+          python scripts/check_provider_surface_closure.py \
+            --head-sha "$GITHUB_SHA" \
+            --evidence-out "$PROVIDER_CLOSURE_EVIDENCE"
+          cat "$PROVIDER_CLOSURE_EVIDENCE"
+          {
+            echo "### Provider surface closure"
+            echo
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo "~~~json"
+            cat "$PROVIDER_CLOSURE_EVIDENCE"
+            echo "~~~"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install full assembly test runtime
         if: steps.scope.outputs.full == 'true'
         run: >-
@@ -415,7 +435,7 @@ jobs:
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/check_ai_execution_frontier.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
-          scripts/check_state_topology.py scripts/check_provider_bootstrap.py
+          scripts/check_state_topology.py scripts/check_provider_bootstrap.py scripts/check_provider_surface_closure.py
 
       - name: Audit repository-wide assembly contracts
         if: steps.scope.outputs.full == 'true'
@@ -508,6 +528,7 @@ jobs:
           skeleton/testing/test_app_installer.py
           skeleton/testing/test_windows_installer.py
           tests/test_provider_runtime_boundary.py
+          tests/test_provider_surface_closure.py
           tests/test_jeeves_local_provider_policy.py
           tests/test_jeeves_chat_workspace.py
 
