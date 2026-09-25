@@ -181,17 +181,26 @@ class QuadRetriever:
 
         chunk = getattr(result, "chunk", None)
         if chunk is not None:
-            fragment_id = str(getattr(chunk, "chunk_id", "") or "")
+            fragment_id = str(
+                getattr(chunk, "chunk_id", "")
+                or getattr(chunk, "id", "")
+                or ""
+            )
             content = str(getattr(chunk, "text", "") or "")
             if not fragment_id:
                 return None
             raw_metadata = getattr(chunk, "metadata", {}) or {}
             metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
+            native_plane = (
+                getattr(result, "plane", "")
+                or getattr(chunk, "source_tier", "")
+                or plane_name
+            )
             return ScoredResult(
                 fragment_id=fragment_id,
                 content=content,
                 score=float(getattr(result, "score", 0.0)),
-                plane=str(getattr(result, "plane", "") or plane_name),
+                plane=str(native_plane),
                 provenance=str(
                     getattr(result, "provenance", "")
                     or cls._metadata_provenance(metadata)
