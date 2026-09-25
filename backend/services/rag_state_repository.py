@@ -71,6 +71,7 @@ class RAGStateRepository:
     """Mongo-backed canonical authority for user-owned RAG product state."""
 
     LEARNING = "rag_learning_sessions"
+    CONCEPTS = "rag_concepts"
     PROGRESS = "rag_user_progress"
     COCODING = "rag_cocoding_context"
     FEEDBACK = "rag_feedback"
@@ -117,6 +118,10 @@ class RAGStateRepository:
         self._collection(self.LEARNING).create_index("session_id", unique=True)
         self._collection(self.LEARNING).create_index(
             [("user_id", 1), ("timestamp", -1)]
+        )
+        self._collection(self.CONCEPTS).create_index("concept_id", unique=True)
+        self._collection(self.CONCEPTS).create_index(
+            [("domain", 1), ("name", 1)]
         )
         self._collection(self.PROGRESS).create_index(
             [("user_id", 1), ("domain", 1)],
@@ -186,6 +191,83 @@ class RAGStateRepository:
             self._without_native_id(row) or {}
             for row in cursor
         ]
+
+    def put_concept(
+        self,
+        *,
+        concept_id: str,
+        name: str,
+        explanation: str,
+        examples: list[str],
+        domain: str,
+        difficulty: float,
+        timestamp: datetime | str | None = None,
+    ) -> dict[str, Any]:
+        candidate = {
+            "concept_id": _required_text(concept_id, "concept_id"),
+            "name": _required_text(name, "name"),
+            "explanation": _required_text(
+                explanation,
+                "explanation",
+                max_len=100_000,
+            ),
+            "examples": [str(item) for item in examples],
+            "domain": _required_text(domain, "domain"),
+            "difficulty": float(difficulty),
+            "timestamp": _utc_iso(timestamp),
+            "authority": "mongo",
+            "schema_version": 1,
+        }
+        if not 0.0 <= candidate["difficulty"] <= 1.0:
+            raise RAGStateError("difficulty must be between 0 and 1")
+        coll = self._collection(self.CONCEPTS)
+        existing = self._without_native_id(
+            coll.find_one({"concept_id": candidate["concept_id"]})
+        )
+        self._assert_identity_match(
+            existing,
+            candidate,
+            immutable_fields=(
+                "name",
+                "explanation",
+                "examples",
+                "domain",
+                "difficulty",
+            ),
+            identity="concept",
+        )
+        if existing is not None:
+            return existing
+        coll.insert_one(copy.deepcopy(candidate))
+        return copy.deepcopy(candidate)
+
+    def get_concept(self, concept_id: str) -> dict[str, Any] | None:
+        concept = _required_text(concept_id, "concept_id")
+        row = self._collection(self.CONCEPTS).find_one(
+            {"concept_id": concept}
+        )
+        return self._without_native_id(row)
+
+    def list_concepts(
+        self,
+        *,
+        domain: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5000:
+            raise RAGStateError("limit must be between 1 and 5000")
+        query: dict[str, Any] = {}
+        if domain is not None:
+            query["domain"] = _required_text(domain, "domain")
+        cursor = self._collection(self.CONCEPTS).find(query)
+        if hasattr(cursor, "sort"):
+            cursor = cursor.sort("name", 1)
+        if hasattr(cursor, "limit"):
+            cursor = cursor.limit(limit)
+        return [
+            self._without_native_id(row) or {}
+            for row in cursor
+        ][:limit]
 
     def upsert_user_progress(
         self,
@@ -339,6 +421,10 @@ class RAGStateRepository:
                 self._without_native_id(row) or {}
                 for row in self._collection(self.LEARNING).find({})
             ],
+            "concepts": [
+                self._without_native_id(row) or {}
+                for row in self._collection(self.CONCEPTS).find({})
+            ],
             "cocoding_context": [
                 self._without_native_id(row) or {}
                 for row in self._collection(self.COCODING).find({})
@@ -353,6 +439,9 @@ class RAGStateRepository:
         return {
             "learning_sessions": int(
                 self._collection(self.LEARNING).count_documents({})
+            ),
+            "concepts": int(
+                self._collection(self.CONCEPTS).count_documents({})
             ),
             "user_progress": int(
                 self._collection(self.PROGRESS).count_documents({})
