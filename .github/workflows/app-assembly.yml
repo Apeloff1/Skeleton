@@ -164,6 +164,7 @@ on:
       - "scripts/check_state_topology.py"
       - "scripts/state_recovery_drill.py"
       - "scripts/check_provider_bootstrap.py"
+      - "tests/test_provider_runtime_boundary.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
       - "machine/ai_app_construction.json"
@@ -497,6 +498,7 @@ jobs:
           skeleton/testing/test_app_runtime_contract.py
           skeleton/testing/test_app_installer.py
           skeleton/testing/test_windows_installer.py
+          tests/test_provider_runtime_boundary.py
           tests/test_jeeves_local_provider_policy.py
           tests/test_jeeves_chat_workspace.py
 
