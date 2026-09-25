@@ -42,7 +42,12 @@ class Reranker:
                     boosted += rule.boost
             rescored.append((boosted, item))
         rescored.sort(key=lambda kv: -kv[0])
-        trimmed = rescored[: top_k] if top_k else rescored
+        if top_k is None:
+            trimmed = rescored
+        else:
+            if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+                raise ValueError("top_k must be a non-negative integer or None")
+            trimmed = rescored[:top_k]
         return tuple(
             ScoredResult(
                 fragment_id=item.fragment_id,
@@ -50,7 +55,7 @@ class Reranker:
                 score=round(boost, 6),
                 plane=item.plane,
                 provenance=item.provenance,
-                metadata=item.metadata,
+                metadata=dict(item.metadata) if isinstance(item.metadata, dict) else {},
             )
             for boost, item in trimmed
         )
