@@ -545,11 +545,13 @@
         "skeleton/skills/tool_contract.py implements rich governance metadata on canonical ToolManifest",
         "backend/services/tool_registry.py declares explicit metadata per production compatibility tool",
         "skeleton/intelligence/execution_runtime.py provider inventory is enabled-only and minimal",
-        "skeleton/testing/test_execution_runtime.py proves governance metadata never crosses provider boundary"
+        "skeleton/testing/test_execution_runtime.py proves governance metadata never crosses provider boundary",
+        "skeleton/skills/tool_runtime.py meters configured manifest cost into admission usage before effects",
+        "skeleton/skills/tool_runtime.py enforces manifest max_concurrency with per-tool semaphores",
+        "skeleton/testing/test_tool_runtime.py proves both runtime governance bindings"
       ],
       "remaining": [
         "bind governance lifecycle policy to durable tool result references",
-        "bind monotonic cost/admission reconciliation for all expensive tool classes",
         "prove minimal provider tool projection and current-head provider-surface isolation",
         "collect exact-head CI and independent verification after dependencies close"
       ],
