@@ -66,27 +66,14 @@ def _walk_from_cortex(cortex: Any, era: str) -> Optional[Dict[str, Any]]:
     if cortex is None or not hasattr(cortex, "recall"):
         return None
     rec = cortex.recall(f"forge run {era} extract hops cores bias")
-    composed = (rec or {}).get("composed") or {}
-    thought = composed.get("thought") or {}
-    text = str(thought.get("text") or "").lower()
-    if "forge run" not in text:
+    if not isinstance(rec, dict):
         return None
-    extracted = "extract true" in text or " extracted" in text
-    collapsed = "collapse" in text and "extract true" not in text
-    hops = 0
-    if "hops" in text:
-        for tok in text.split():
-            if tok.isdigit():
-                hops = int(tok)
-                break
-    return {
-        "extracted": extracted and not collapsed,
-        "collapsed": collapsed,
-        "t": 0.0,
-        "fights": 0,
-        "hops": hops,
-        "from_recall": True,
-    }
+    composed = rec.get("composed")
+    thought = composed.get("thought") if isinstance(composed, dict) else None
+    walk = thought.get("walk") if isinstance(thought, dict) else None
+    if not isinstance(walk, dict):
+        return None
+    return walk
 
 
 def adapt_from_walk(
@@ -102,15 +89,31 @@ def adapt_from_walk(
 ) -> Tuple[str, bool, bool, int, int, int, str, float, List[str]]:
     """Mutate a plan from a prior walk. Falsifiable: same walk → same tag."""
     notes: List[str] = []
-    collapse = float((pack.get("session") or {}).get("collapse_max") or 9999.0)
-    if not walk:
-        return bias, spawn_weapon, extract_late, trash, elite, boss, "none", 1.0, notes
-    extracted = bool(walk.get("extracted"))
-    collapsed = bool(walk.get("collapsed"))
-    t = float(walk.get("t") or 0.0)
-    fights = int(walk.get("fights") or 0)
-    hops = int(walk.get("hops") or 0)
-    slack = ((collapse - t) / collapse) if (extracted and collapse > 0 and t > 0) else (
+    if walk is None:
+        return bias, spawn_weapon, extract_late, trash, elite, boss, "none", 0.0, notes
+    if not isinstance(walk, dict):
+        raise ValueError("walk must be an object")
+    session = pack.get("session") if isinstance(pack.get("session"), dict) else {}
+    if "collapse_max" not in session:
+        raise ValueError("collapse_max is required")
+    collapse = float(session["collapse_max"])
+    if isinstance(session["collapse_max"], bool) or not collapse > 0 or collapse != collapse:
+        raise ValueError("collapse_max must be a positive number")
+    extracted = walk.get("extracted")
+    collapsed = walk.get("collapsed")
+    if not isinstance(extracted, bool) or not isinstance(collapsed, bool):
+        raise ValueError("walk extracted and collapsed must be boolean")
+    t = walk.get("t")
+    fights = walk.get("fights")
+    hops = walk.get("hops")
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or float(t) < 0 or float(t) != float(t):
+        raise ValueError("walk t must be a non-negative number")
+    if isinstance(fights, bool) or not isinstance(fights, int) or fights < 0:
+        raise ValueError("walk fights must be a non-negative integer")
+    if isinstance(hops, bool) or not isinstance(hops, int) or hops < 0:
+        raise ValueError("walk hops must be a non-negative integer")
+    t = float(t)
+    slack = ((collapse - t) / collapse) if (extracted and t > 0) else (
         0.0 if (collapsed or not extracted) else 1.0
     )
     if collapsed or not extracted:
@@ -144,7 +147,12 @@ def _prune_mix(
     """Left-brain veto: sequential thermal kills must fit inside 70% of collapse."""
     from skeleton.forge.sim import simulate_encounter
     notes: List[str] = []
-    collapse = float((pack.get("session") or {}).get("collapse_max") or 9999.0)
+    session = pack.get("session") if isinstance(pack.get("session"), dict) else {}
+    if "collapse_max" not in session or isinstance(session.get("collapse_max"), bool):
+        raise ValueError("collapse_max is required")
+    collapse = float(session["collapse_max"])
+    if not collapse > 0 or collapse != collapse:
+        raise ValueError("collapse_max must be a positive number")
     budget = collapse * 0.70
     enemies = {str(e.get("id")): e for e in (pack.get("enemies") or [])}
 
@@ -202,7 +210,10 @@ def _mix_of(left: Any) -> Optional[Tuple[int, int, int]]:
     nums = tuple(getattr(left, "numbers", ()) or ())
     if len(nums) < 3:
         return None
-    trash, elite, boss = int(nums[-3]), int(nums[-2]), int(nums[-1])
+    raw = nums[-3:]
+    if any(isinstance(n, bool) or not isinstance(n, (int, float)) or float(n) != int(n) for n in raw):
+        return None
+    trash, elite, boss = (int(n) for n in raw)
     if 0 <= trash <= 8 and 0 <= elite <= 4 and 0 <= boss <= 2:
         return trash, elite, boss
     return None
@@ -269,7 +280,11 @@ class BuilderBrain:
         cortex: Any = None,
         last_walk: Optional[Dict[str, Any]] = None,
     ) -> BuildPlan:
-        era = str(pack.get("era") or "extraction_now")
+        if not isinstance(pack, dict):
+            raise ValueError("pack is required")
+        era = pack.get("era")
+        if not isinstance(era, str) or not era.strip():
+            raise ValueError("era is required")
         cube = tensor or ContextTensor.from_era(era.split("~")[0])
         fp = cube.fingerprint()
         oracle_index = int(reading.index) if reading is not None else -1
@@ -309,26 +324,28 @@ class BuilderBrain:
             stim = f"plan {era} forge mix bias ttk extract"
             rec = own.best_observed_record(stim) if hasattr(own, "best_observed_record") else None
             improved = rec["mix"] if rec else own.best_observed_mix(stim)
-            if improved is not None:
-                trash, elite, boss = int(improved[0]), int(improved[1]), int(improved[2])
+            if improved is not None and len(improved) >= 3 and all(
+                not isinstance(n, bool) and isinstance(n, (int, float)) and float(n) == int(n) for n in improved[:3]
+            ):
+                trash, elite, boss = (int(n) for n in improved[:3])
                 trash, elite, boss, thermal_span, extra = _prune_mix(pack, trash, elite, boss)
                 veto_notes = list(veto_notes) + [
                     f"improved mix trash={trash} elite={elite} boss={boss}"
                 ] + extra
                 ob = own.best_observed_bias(stim) if hasattr(own, "best_observed_bias") else None
-                if ob:
+                if ob in {"loot", "heat", "combat", "balanced"}:
                     bias = ob
                     veto_notes.append(f"improved bias={bias}")
                 op = own.best_observed_policy(stim) if hasattr(own, "best_observed_policy") else None
-                if op:
-                    spawn_weapon, extract_late = bool(op[0]), bool(op[1])
+                if isinstance(op, (tuple, list)) and len(op) >= 2 and isinstance(op[0], bool) and isinstance(op[1], bool):
+                    spawn_weapon, extract_late = op[0], op[1]
                     veto_notes.append(
                         f"improved policy armed={int(spawn_weapon)} late={int(extract_late)}"
                     )
                 skip_search = bool(rec and (rec.get("imported") or rec.get("invented")))
                 if rec and rec.get("imported"):
                     veto_notes.append("imported mix — no search")
-                collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
+                collapse = float(pack["session"]["collapse_max"])
                 search_seed = hashlib.sha256(f"{era}|{fp}|search".encode()).hexdigest()[:16]
                 if hasattr(own, "propose_mix") and not skip_search:
                     def _mix_score(tr: int, el: int, bo: int) -> float:
@@ -438,7 +455,7 @@ class BuilderBrain:
                     }
                     wr = walk_from_pack(pack, plan=proto, mode="thermal")
                     if wr.extracted and not wr.collapsed:
-                        collapse = float((pack.get("session") or {}).get("collapse_max") or 1.0)
+                        collapse = float(pack["session"]["collapse_max"])
                         moe_slack = (collapse - wr.t) / collapse if collapse else 0.0
                         cur = walk_from_pack(
                             pack,

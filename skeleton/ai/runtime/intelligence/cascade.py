@@ -86,6 +86,23 @@ class RouteDecision:
         }
 
 
+def _bad_unit(value: float) -> bool:
+    return isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0
+
+
+def _bad_cost(value: float) -> bool:
+    return isinstance(value, bool) or not isinstance(value, (int, float)) or not value >= 0 or value != value or value == float("inf")
+
+
+def _usable(response: ModelResponse) -> bool:
+    return (
+        isinstance(response, ModelResponse)
+        and isinstance(response.text, str)
+        and bool(response.text.strip())
+        and not _bad_unit(response.confidence)
+    )
+
+
 class CascadeRouter:
     """Cheap-first routing with difficulty pre-check and confidence escalation.
 
@@ -107,11 +124,9 @@ class CascadeRouter:
         cheap_name: str = "cheap",
         strong_name: str = "strong",
     ) -> None:
-        if not 0.0 <= route_threshold <= 1.0:
-            raise ValueError("route_threshold must be in [0, 1]")
-        if not 0.0 <= escalate_below <= 1.0:
-            raise ValueError("escalate_below must be in [0, 1]")
-        if cheap_cost < 0 or strong_cost < 0:
+        if _bad_unit(route_threshold) or _bad_unit(escalate_below):
+            raise ValueError("thresholds must be in [0, 1]")
+        if _bad_cost(cheap_cost) or _bad_cost(strong_cost):
             raise ValueError("model costs must be non-negative")
         if not cheap_name or not strong_name:
             raise ValueError("model names must be non-empty")
@@ -132,41 +147,49 @@ class CascadeRouter:
     def route(self, query: str) -> RouteDecision:
         """Answer the query with the cheapest model that can handle it."""
 
-        self.decisions += 1
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
         difficulty = difficulty_estimate(query)
 
         if difficulty >= self.route_threshold:
-            self.strong_direct += 1
-            self.total_cost += self.strong_cost
             resp = self.strong(query)
+            self.total_cost += self.strong_cost
+            if not _usable(resp):
+                raise ValueError("model did not answer")
+            self.decisions += 1
+            self.strong_direct += 1
             return RouteDecision(
                 model=self.strong_name,
                 text=resp.text,
-                confidence=resp.confidence,
+                confidence=float(resp.confidence),
                 escalated=False,
                 difficulty=difficulty,
                 reason="difficulty_threshold",
             )
 
-        self.total_cost += self.cheap_cost
         resp = self.cheap(query)
-        if resp.confidence >= self.escalate_below:
+        self.total_cost += self.cheap_cost
+        if _usable(resp) and float(resp.confidence) >= self.escalate_below:
+            self.decisions += 1
             return RouteDecision(
                 model=self.cheap_name,
                 text=resp.text,
-                confidence=resp.confidence,
+                confidence=float(resp.confidence),
                 escalated=False,
                 difficulty=difficulty,
                 reason="cheap_confident",
             )
 
-        self.escalations += 1
-        self.total_cost += self.strong_cost
         resp = self.strong(query)
+        self.total_cost += self.strong_cost
+        if not _usable(resp):
+            raise ValueError("model did not answer")
+        self.decisions += 1
+        self.escalations += 1
         return RouteDecision(
             model=self.strong_name,
             text=resp.text,
-            confidence=resp.confidence,
+            confidence=float(resp.confidence),
             escalated=True,
             difficulty=difficulty,
             reason="confidence_escalation",

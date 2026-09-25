@@ -23,6 +23,14 @@ class AdmissionPolicy:
     allow_empty_assumptions: bool = True
     max_steps: int = 256
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.maximum_risk, RiskTier):
+            raise ValueError("maximum_risk must be a risk tier")
+        if not isinstance(self.require_evidence, bool) or not isinstance(self.require_constraints, bool) or not isinstance(self.allow_empty_assumptions, bool):
+            raise ValueError("admission flags must be boolean")
+        if isinstance(self.max_steps, bool) or not isinstance(self.max_steps, int) or not 1 <= self.max_steps <= 256:
+            raise ValueError("max_steps must be an integer from 1 to 256")
+
 
 @dataclass(frozen=True, slots=True)
 class AdmissionFinding:

@@ -163,10 +163,17 @@ _SNES = ("#1a103c", "#f4e4c1", "#c43c3c", "#3c6e9a", "#3c8c4c", "#d4a44c", "#8c5
 
 
 def get_generation(key: Optional[str]) -> Dict[str, Any]:
-    if not key:
+    if key is None or key == "":
         return GENERATIONS[DEFAULT_GENERATION]
-    k = str(key).strip().lower().replace("-", "").replace(" ", "").replace("/", "")
-    return GENERATIONS.get(_ALIAS.get(k, k), GENERATIONS[DEFAULT_GENERATION])
+    if not isinstance(key, str):
+        raise ValueError("generation must be a string")
+    k = key.strip().lower().replace("-", "").replace(" ", "").replace("/", "")
+    if not k:
+        return GENERATIONS[DEFAULT_GENERATION]
+    resolved = _ALIAS.get(k)
+    if resolved is None:
+        raise ValueError(f"unknown generation {key!r}")
+    return GENERATIONS[resolved]
 
 
 def catalog() -> List[Dict[str, Any]]:
@@ -203,11 +210,13 @@ def hex_to_color(hx: str) -> Tuple[float, float, float]:
 
 
 def detect_generation(text: str) -> Tuple[str, Dict[str, int]]:
-    blob = (text or "").lower()
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("generation text is required")
+    blob = text.lower()
     scores = {k: sum(1 for w in words if w in blob) for k, words in _KEYWORDS.items()}
     best = max(scores, key=lambda k: (scores[k], -GENERATIONS[k]["order"]))
     if scores[best] <= 0:
-        return DEFAULT_GENERATION, scores
+        raise ValueError("no generation in text")
     return best, scores
 
 

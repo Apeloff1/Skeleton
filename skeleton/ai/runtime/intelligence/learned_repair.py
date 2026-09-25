@@ -60,7 +60,7 @@ def learn_from_repair(result: Dict[str, Any], *, root=None) -> Dict[str, Any]:
     policy = load_learned_policy(root)
     surface = str(result.get("surface") or "unknown")
     reason = str(result.get("reason") or "unknown")
-    accepted = bool(result.get("ok") or result.get("accepted"))
+    accepted = result.get("ok") is True or result.get("ok") == 1 or result.get("accepted") is True or result.get("accepted") == 1
     actions = list(result.get("actions") or [])
 
     # Track surface strategy outcomes

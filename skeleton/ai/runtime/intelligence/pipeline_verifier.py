@@ -36,6 +36,15 @@ class PipelineVerificationReport:
         }
 
 
+def _finite(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        return None
+    return number
+
+
 class PipelineVerifier:
     """Verifier for pipeline outputs, starting with game logic specs."""
 
@@ -153,13 +162,18 @@ class PipelineVerifier:
         progression = spec.get("progression") or {}
         score = 1.0
         base_values = combat.get("base_values") or {}
-        if any(float(v) < 0 for v in base_values.values()):
-            issues.append("hard: combat has negative base stats")
-            score -= 0.4
-        if float(economy.get("starting_balance") or 0) < 0:
-            issues.append("hard: economy starts negative")
+        for value in base_values.values():
+            number = _finite(value)
+            if number is None or number < 0:
+                issues.append("hard: combat has a base stat that is not a positive finite number")
+                score -= 0.4
+                break
+        balance = _finite(economy.get("starting_balance")) if "starting_balance" in economy else None
+        if balance is None or balance < 0:
+            issues.append("hard: economy starting balance is missing or negative")
             score -= 0.3
-        if int(progression.get("max_level") or 0) < 1:
+        level = progression.get("max_level")
+        if isinstance(level, bool) or not isinstance(level, int) or level < 1:
             issues.append("hard: progression max_level is invalid")
             score -= 0.3
         return max(0.0, score)

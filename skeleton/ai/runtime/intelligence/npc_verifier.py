@@ -39,6 +39,10 @@ class NpcVerificationReport:
 
 class NpcVerifier:
     def __init__(self, *, accept_at: float | None = None, root=None) -> None:
+        if accept_at is not None and (
+            isinstance(accept_at, bool) or not isinstance(accept_at, (int, float)) or not 0 < float(accept_at) <= 1
+        ):
+            raise ValueError("accept_at must be in (0, 1]")
         self.accept_at = accept_at if accept_at is not None else threshold_for("npc", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
@@ -103,23 +107,22 @@ class NpcVerifier:
         return max(0.0, score)
 
     def _behavior(self, spec: Mapping[str, Any], issues: list[str]) -> float:
-        dialogue = spec.get("dialogue_tree") or []
-        behavior = spec.get("behaviour_graph") or []
+        dialogue = _steps(spec.get("dialogue_tree"))
+        behavior = _steps(spec.get("behaviour_graph"))
         score = 1.0
         if len(dialogue) < 2:
             issues.append("hard: npc dialogue tree is too small")
             score -= 0.5
-        if len(behavior) < 2:
-            issues.append("soft: npc behavior graph is thin")
+        if not isinstance(spec.get("behaviour_graph"), list) or len(behavior) < 2:
+            issues.append("hard: npc behavior graph is not a graph")
             score -= 0.5
         return max(0.0, score)
 
     def _grounding(self, spec: Mapping[str, Any], description: str, issues: list[str]) -> float:
-        if not description.strip():
-            return 1.0
         tokens = [t for t in description.lower().replace("_", " ").split() if len(t) >= 4]
         if not tokens:
-            return 1.0
+            issues.append("hard: npc has no description to ground against")
+            return 0.0
         persona = spec.get("persona") or {}
         hay = " ".join([str(spec.get("name") or ""), str(spec.get("archetype") or ""), str(persona.get("motivation") or ""), " ".join(persona.get("traits") or [])]).lower()
         hits = sum(1 for t in tokens if t in hay)
@@ -127,6 +130,15 @@ class NpcVerifier:
         if score < 0.2:
             issues.append("soft: npc output weakly reflects the description")
         return score
+
+
+def _steps(value: Any) -> list:
+    if not isinstance(value, list):
+        return []
+    return [
+        item for item in value
+        if isinstance(item, Mapping) and str(item.get("text") or item.get("id") or "").strip()
+    ]
 
 
 NPCVerifier = NpcVerifier

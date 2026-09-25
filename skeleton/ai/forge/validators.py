@@ -90,21 +90,32 @@ class BlueprintValidator:
         ids: List[str] = []
         for i, system in enumerate(systems):
             path = f"systems[{i}]"
+            if not isinstance(system, dict):
+                violations.append(ConstraintViolation(path, "type", "system must be an object"))
+                continue
             sid = system.get("id")
-            if not sid:
+            if not isinstance(sid, str) or not sid.strip():
                 violations.append(ConstraintViolation(f"{path}.id", "required",
-                                                      "every system needs an id"))
+                                                      "every system needs a string id"))
                 continue
             if sid in ids:
                 violations.append(ConstraintViolation(f"{path}.id", "unique",
                                                       f"duplicate system id {sid!r}"))
             ids.append(sid)
 
-        # ---- reference integrity + cycles ----------------------------------
-        edges = {
-            s.get("id"): list(s.get("depends_on", []))
-            for s in systems if s.get("id")
-        }
+        edges: Dict[str, List[str]] = {}
+        for system in systems:
+            if not isinstance(system, dict) or not isinstance(system.get("id"), str):
+                continue
+            raw_deps = system.get("depends_on", [])
+            if raw_deps is None:
+                raw_deps = []
+            if not isinstance(raw_deps, list) or any(not isinstance(dep, str) or not dep.strip() for dep in raw_deps):
+                violations.append(ConstraintViolation(
+                    f"systems[{system['id']}].depends_on", "type",
+                    "depends_on must be a list of ids"))
+                raw_deps = []
+            edges[system["id"]] = raw_deps
         for sid, deps in edges.items():
             for dep in deps:
                 if dep not in ids:
@@ -122,6 +133,8 @@ class BlueprintValidator:
 
         # ---- advisory warnings ---------------------------------------------
         for i, system in enumerate(systems):
+            if not isinstance(system, dict):
+                continue
             if "description" not in system:
                 warnings.append(f"systems[{i}] ({system.get('id', '?')}) has no description")
 
@@ -141,7 +154,7 @@ class BlueprintValidator:
                 return []
         if rule.kind == "range":
             lo, hi = rule.arg
-            if not (isinstance(value, (int, float)) and lo <= value <= hi):
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not lo <= float(value) <= hi:
                 return [ConstraintViolation(rule.path, "range",
                                             f"{value!r} outside [{lo}, {hi}]")]
         elif rule.kind == "enum":
@@ -207,7 +220,7 @@ def validate_with_quality(
     )
     return {
         "kind": "blueprint-quality-verdict",
-        "valid": structural.valid and bool(quality.get("passed")),
+        "valid": structural.valid and quality.get("ok") == 1,
         "validation": structural.to_dict(),
         "quality": quality,
         "stored_prose": 0,

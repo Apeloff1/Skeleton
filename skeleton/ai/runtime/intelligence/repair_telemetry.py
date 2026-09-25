@@ -70,7 +70,7 @@ def capture_telemetry(
     before_score = float((result.get("before") or {}).get("score") or 0.0)
     after_score = float((result.get("after") or {}).get("score") or before_score)
     actions = list(result.get("actions") or [])
-    accepted = bool(result.get("ok") or result.get("accepted"))
+    accepted = result.get("ok") is True or result.get("ok") == 1 or result.get("accepted") is True or result.get("accepted") == 1
     reason = str(result.get("reason") or "unknown")
 
     error_str = ""

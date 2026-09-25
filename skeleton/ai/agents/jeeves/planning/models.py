@@ -51,7 +51,7 @@ class Goal:
     def __post_init__(self) -> None:
         _clean_text(self.name, field_name="goal name")
         _clean_text(self.description, field_name="goal description")
-        if not 0 <= self.priority <= 100:
+        if isinstance(self.priority, bool) or not isinstance(self.priority, int) or not 0 <= self.priority <= 100:
             raise ValueError("goal priority out of bounds")
         if len(self.constraints) > MAX_ITEMS:
             raise ValueError("too many constraints")
@@ -75,6 +75,12 @@ class Step:
     def __post_init__(self) -> None:
         _clean_text(self.name, field_name="step name")
         _clean_text(self.action, field_name="step action")
+        if not isinstance(self.depends_on, tuple):
+            raise ValueError("depends_on must be a tuple of names")
+        if not isinstance(self.evidence_required, bool):
+            raise ValueError("evidence_required must be boolean")
+        if not isinstance(self.risk, RiskTier):
+            raise ValueError("risk must be a risk tier")
         if len(self.depends_on) > MAX_ITEMS:
             raise ValueError("too many dependencies")
         if len(self.metadata) > MAX_METADATA:
