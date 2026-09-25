@@ -300,6 +300,32 @@ def audit_endpoint_boundary() -> None:
 
 
 
+def _provider_registry_names(tree: ast.AST) -> set[str]:
+    """Return local names that are imported as ProviderRegistry."""
+
+    names = {"ProviderRegistry"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        for alias in node.names:
+            if alias.name == "ProviderRegistry":
+                names.add(alias.asname or alias.name)
+    return names
+
+
+def _is_provider_registry_from_env_call(node: ast.Call, names: set[str]) -> bool:
+    func = node.func
+    if not isinstance(func, ast.Attribute) or func.attr != "from_env":
+        return False
+
+    receiver = func.value
+    if isinstance(receiver, ast.Name):
+        return receiver.id in names
+
+    # Also catch qualified calls such as provider_runtime.ProviderRegistry.from_env().
+    return isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
+
+
 def _backend_local_provider_consumers() -> tuple[str, ...]:
     """Return production backend modules that still activate ProviderRegistry locally."""
 
@@ -314,20 +340,15 @@ def _backend_local_provider_consumers() -> tuple[str, ...]:
         except (OSError, SyntaxError) as exc:
             check(False, f"cannot inspect backend provider consumer {relative}: {exc}")
             continue
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "from_env"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "ProviderRegistry"
-            ):
-                consumers.append(relative)
-                break
-    return tuple(consumers)
 
+        provider_registry_names = _provider_registry_names(tree)
+        if any(
+            isinstance(node, ast.Call)
+            and _is_provider_registry_from_env_call(node, provider_registry_names)
+            for node in ast.walk(tree)
+        ):
+            consumers.append(relative)
+    return tuple(consumers)
 
 def audit_compose_modes() -> None:
     base = read("docker-compose.yml")
