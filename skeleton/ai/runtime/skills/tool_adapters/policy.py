@@ -153,6 +153,40 @@ def _sensitive_query_key(key: str) -> bool:
     return any(marker in key for marker in markers)
 
 
+_HOST_LABEL = re.compile(r"[a-z0-9-]+")
+_BLOCKED_HOST_SUFFIXES = (".localhost", ".local", ".internal")
+
+
+def _quotable_host(hostname: str) -> bool:
+    """Allow a public DNS name or a canonical global IP, nothing browsers rewrite."""
+
+    if hostname in {"localhost", "localhost.localdomain", "metadata.google.internal"}:
+        return False
+    if any(hostname.endswith(suffix) for suffix in _BLOCKED_HOST_SUFFIXES):
+        return False
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address is not None:
+        return bool(address.is_global)
+    labels = hostname.split(".")
+    if len(labels) < 2 or not re.search(r"[a-z]", labels[-1]):
+        return False
+    for label in labels:
+        if (
+            not label
+            or len(label) > 63
+            or label.startswith("-")
+            or label.endswith("-")
+            or _HOST_LABEL.fullmatch(label) is None
+            or label.isdigit()
+            or (len(label) > 1 and label[0] == "0" and label[1].isdigit())
+        ):
+            return False
+    return True
+
+
 @dataclass(frozen=True, slots=True)
 class NetworkEgressPolicy:
     max_query_chars: int = 512
@@ -197,27 +231,7 @@ class NetworkEgressPolicy:
         if any(_sensitive_query_key(item) for item in query_keys):
             return None
         hostname = (parsed.hostname or "").rstrip(".").lower()
-        if not hostname:
-            return None
-        if (
-            hostname in {"localhost", "localhost.localdomain", "metadata.google.internal"}
-            or hostname.endswith(".localhost")
-            or hostname.endswith(".local")
-            or hostname.endswith(".internal")
-        ):
-            return None
-        try:
-            address = ipaddress.ip_address(hostname)
-        except ValueError:
-            address = None
-        if address is not None and (
-            address.is_private
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_multicast
-            or address.is_reserved
-            or address.is_unspecified
-        ):
+        if not _quotable_host(hostname):
             return None
         snippet = str(
             result.get("body")

@@ -264,3 +264,25 @@ def test_artifact_port_cannot_relabel_the_build() -> None:
     assert surface.results == {}
     assert result.disposition == "block"
     assert result.error_code == "ToolRuntimeError"
+
+
+def test_rewritten_private_hosts_are_not_quotable() -> None:
+    runtime, surface = _surface()
+
+    def network(request):
+        return {
+            "results": [
+                {"title": "Loop", "url": "http://2130706433/meta", "snippet": "decimal loopback"},
+                {"title": "Short", "url": "http://127.1/meta", "snippet": "shorthand loopback"},
+                {"title": "Nat", "url": "http://100.64.0.1/meta", "snippet": "carrier nat"},
+                {"title": "Inside", "url": "http://printer.internal/meta", "snippet": "internal name"},
+                {"title": "Docs", "url": "https://example.com/guide", "snippet": "public guide page"},
+            ]
+        }
+
+    surface.network = network
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(_request("network.search", {"query": "docs"}), "Public guide page.")
+    stored = next(iter(surface.results.values()))
+    assert [hit["url"] for hit in stored["hits"]] == ["https://example.com/guide"]
+    assert result.disposition == "answer"
