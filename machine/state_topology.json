@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.6.0",
+  "topology_version": "1.7.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -142,6 +142,31 @@
         "skeleton/config/settings.py",
         "docker-compose.yml",
         "skeleton/testing/test_operation_runtime.py"
+      ]
+    },
+    {
+      "id": "governance-lifecycle-sqlite",
+      "technology": "SQLite",
+      "runtime_service": "skeleton",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "skeleton_data"
+      ],
+      "durability": "persistent named volume in Compose via /app/data; in-memory only for explicit local/test construction",
+      "production_role": "authoritative lifecycle metadata, deletion-plan, acknowledgement and governance-receipt state",
+      "network": "in-process only",
+      "authentication": "inherits canonical API/governance authority",
+      "backup": "required with skeleton_data; lifecycle state must be preserved with governed canonical stores",
+      "restore": "reopen governance_lifecycle.sqlite and validate snapshot schema before provider-transfer, export, retention or deletion actions are admitted",
+      "migration": "schema migration must preserve governed record identity, tenant scope, lifecycle state, active deletion plan, acknowledged targets and receipts",
+      "evidence": [
+        "skeleton/vault/data_lifecycle.py",
+        "skeleton/vault/governance_registry.py",
+        "skeleton/vault/lifecycle_adapters.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_data_lifecycle.py",
+        "skeleton/testing/test_governance_runtime_binding.py"
       ]
     },
     {
@@ -700,6 +725,38 @@
       ]
     },
     {
+      "id": "governance-lifecycle-registry",
+      "owner_plane": "governance",
+      "physical_store": "governance-lifecycle-sqlite",
+      "logical_location": "SKL_GOVERNANCE_LIFECYCLE_PATH=/app/data/governance_lifecycle.sqlite",
+      "authority": "authoritative",
+      "source_of_truth": true,
+      "status": "production-bound",
+      "data_classes": [
+        "public",
+        "internal",
+        "confidential",
+        "restricted"
+      ],
+      "transaction_scope": "single SQLite snapshot transaction per lifecycle registration, reconciliation, deletion-plan or acknowledgement transition",
+      "consistency": "restart-safe lifecycle metadata; active/delete-pending/deleted state, outstanding deletion targets and receipts cannot reset on process restart",
+      "retention": "governance metadata retained at least as long as governed record/deletion evidence policy requires",
+      "backup_restore": "restore with skeleton_data before governance actions; corrupt or unsupported snapshots fail closed at registry construction",
+      "migration": "preserve record_id, tenant, owner/source identity, classification, purposes, deletion targets, retention, lifecycle state, plan identity, acknowledgements and receipts",
+      "derived_from": [],
+      "rebuildable": false,
+      "gap": "gap-governance-registry",
+      "evidence": [
+        "skeleton/vault/data_lifecycle.py",
+        "skeleton/vault/governance_registry.py",
+        "skeleton/vault/lifecycle_adapters.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_data_lifecycle.py",
+        "skeleton/testing/test_governance_runtime_binding.py"
+      ]
+    },
+    {
       "id": "canonical-ai-memory-records",
       "owner_plane": "memory",
       "physical_store": "mongo",
@@ -893,12 +950,21 @@
       "mode": "cache-projection",
       "rule": "process-local MAG/CAG/vector/reference state may warm from canonical memory records but remains discardable",
       "failure": "restart cold and rebuild; canonical memory remains durable"
+    },
+    {
+      "id": "canonical-memory-to-governance-lifecycle",
+      "from": "canonical-ai-memory-records",
+      "to": "governance-lifecycle-registry",
+      "mode": "fail-closed lifecycle registration",
+      "rule": "GovernedMemoryWriter commits canonical memory then reconciles tenant-bound lifecycle metadata; if governance persistence fails the committed memory is tombstoned fail-closed and a canonical delete projection intent is emitted",
+      "failure": "active ungoverned memory is forbidden; governance registration failure forces canonical memory tombstone and surfaces a typed writeback error"
     }
   ],
   "recovery_order": [
     "restore/authenticate Mongo physical service",
     "restore backend-core-app-state and any materialized engine authoritative state",
     "restore conversation thread/message authority and verify branch/message ordering before accepting AI chat traffic",
+    "restore governance lifecycle registry and validate pending deletion plans/acknowledgements before provider transfer, export, retention or deletion actions",
     "restore canonical AI memory records before rebuilding memory/vector/process-local projections",
     "verify schema/index/migration compatibility",
     "verify authoritative document counts, canonical document digests and user index digests before any derived rebuild",
@@ -941,6 +1007,7 @@
     "production Skeleton reasoning persists OperationEnvelope state before executing/advancing work and never treats the event stream as operation-state authority",
     "stream delivery failure leaves a durable unpublished outbox row; startup and later dispatch reconcile it using retry-stable event identity",
     "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage",
-    "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes"
+    "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes",
+    "governance lifecycle metadata, deletion plans, acknowledgements and receipts are restart-safe authoritative state and cannot rely solely on process memory"
   ]
 }
