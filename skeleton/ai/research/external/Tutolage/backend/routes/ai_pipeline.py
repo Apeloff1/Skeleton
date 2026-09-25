@@ -104,15 +104,15 @@ async def call_gpt4o(prompt: str, system_prompt: str = None, max_tokens: int = 4
     """Call GPT-4o via Emergent LLM Key"""
     try:
         default_system = "You are an expert programmer and software architect. Provide helpful, accurate, and well-documented code and explanations."
-        
+
         chat = LlmChat(
             api_key=EMERGENT_LLM_KEY,
             session_id=f"codedock-pipeline-{uuid.uuid4().hex[:8]}",
             system_message=system_prompt or default_system
         ).with_model("openai", "gpt-4o")
-        
+
         response = await chat.send_message(UserMessage(text=prompt))
-        
+
         return response.content if hasattr(response, 'content') else str(response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"GPT-4o error: {str(e)}")
@@ -122,7 +122,7 @@ async def generate_image_openai(prompt: str, size: str = "1024x1024") -> Dict[st
     try:
         from openai import OpenAI
         client = OpenAI(api_key=EMERGENT_LLM_KEY)
-        
+
         response = client.images.generate(
             model="gpt-image-1",
             prompt=prompt,
@@ -131,7 +131,7 @@ async def generate_image_openai(prompt: str, size: str = "1024x1024") -> Dict[st
             n=1,
             response_format="b64_json"
         )
-        
+
         return {
             "provider": "openai",
             "data": response.data[0].b64_json,
@@ -150,19 +150,19 @@ async def generate_image_gemini(prompt: str) -> Dict[str, Any]:
             session_id=f"codedock-gemini-{uuid.uuid4().hex[:8]}",
             system_message="You are an expert image description generator. Create vivid, detailed descriptions."
         ).with_model("google", "gemini-2.0-flash")
-        
+
         image_prompt = f"""Generate a detailed visual description for an image generator:
-        
+
 Original request: {prompt}
 
 Provide a highly detailed, vivid description that could be used to generate this image,
 including colors, composition, lighting, style, and mood."""
-        
+
         response = await asyncio.to_thread(
             chat.send_message,
             UserMessage(text=image_prompt)
         )
-        
+
         return {
             "provider": "gemini",
             "description": response.content if hasattr(response, 'content') else str(response),
@@ -176,19 +176,19 @@ async def call_grok(prompt: str, task_type: str = "general") -> str:
     """Call Grok API for various tasks"""
     try:
         from openai import OpenAI
-        
+
         client = OpenAI(
             api_key=EMERGENT_LLM_KEY,
             base_url="https://api.x.ai/v1"
         )
-        
+
         system_prompts = {
             "code": "You are Grok, an expert programmer. Generate clean, efficient, well-documented code.",
             "image": "You are Grok with image generation capabilities. Describe images in vivid detail.",
             "analysis": "You are Grok, a code analysis expert. Provide thorough, insightful analysis.",
             "general": "You are Grok, a helpful AI assistant created by xAI."
         }
-        
+
         response = client.chat.completions.create(
             model="grok-beta",
             messages=[
@@ -197,7 +197,7 @@ async def call_grok(prompt: str, task_type: str = "general") -> str:
             ],
             max_tokens=4096
         )
-        
+
         return response.choices[0].message.content
     except Exception:
         # Fallback to GPT-4o if Grok fails
@@ -242,9 +242,9 @@ async def get_pipeline_info():
 async def text_to_code(request: TextToCodeRequest):
     """Generate code from natural language description"""
     request_id = str(uuid.uuid4())
-    
+
     system_prompt = f"""You are an expert {request.language} developer. Generate production-ready code.
-    
+
 Requirements:
 - Clean, readable, well-documented code
 - Follow best practices and design patterns
@@ -268,7 +268,7 @@ Provide complete, working code with explanations."""
             code = await call_grok(user_prompt, "code")
         else:
             code = await call_gpt4o(user_prompt, system_prompt)
-        
+
         return PipelineResponse(
             id=request_id,
             pipeline_type="text_to_code",
@@ -291,24 +291,24 @@ Provide complete, working code with explanations."""
 async def text_to_image(request: TextToImageRequest):
     """Generate images from text descriptions"""
     request_id = str(uuid.uuid4())
-    
+
     enhanced_prompt = request.prompt
     if request.style:
         enhanced_prompt = f"{request.prompt}, in {request.style} style"
-    
+
     try:
         images = []
-        
+
         if request.provider in [AIProvider.OPENAI, AIProvider.AUTO]:
             for i in range(request.count):
                 img = await generate_image_openai(enhanced_prompt, request.size)
                 if "error" not in img:
                     images.append(img)
-        
+
         if request.provider == AIProvider.GEMINI or (request.provider == AIProvider.AUTO and len(images) == 0):
             gemini_result = await generate_image_gemini(enhanced_prompt)
             images.append(gemini_result)
-        
+
         return PipelineResponse(
             id=request_id,
             pipeline_type="text_to_image",
@@ -332,7 +332,7 @@ async def text_to_image(request: TextToImageRequest):
 async def code_to_app(request: CodeToAppRequest):
     """Transform code into a complete application package"""
     request_id = str(uuid.uuid4())
-    
+
     app_prompt = f"""Transform this {request.language} code into a complete {request.app_type} application:
 
 ```{request.language}
@@ -353,7 +353,7 @@ Provide the complete package with all files and their contents."""
 
     try:
         result = await call_gpt4o(app_prompt)
-        
+
         return PipelineResponse(
             id=request_id,
             pipeline_type="code_to_app",
@@ -381,7 +381,7 @@ Provide the complete package with all files and their contents."""
 async def code_to_game(request: CodeToAppRequest):
     """Transform code/description into a complete game"""
     request_id = str(uuid.uuid4())
-    
+
     game_prompt = f"""Create a complete game based on this code/description:
 
 ```{request.language}
@@ -401,7 +401,7 @@ Make it fun, engaging, and polished!"""
 
     try:
         result = await call_gpt4o(game_prompt)
-        
+
         return PipelineResponse(
             id=request_id,
             pipeline_type="code_to_game",
@@ -424,7 +424,7 @@ Make it fun, engaging, and polished!"""
 async def analyze_code(request: CodeAnalysisRequest):
     """Analyze code - explain, test, document, debug, optimize, or refactor"""
     request_id = str(uuid.uuid4())
-    
+
     analysis_prompts = {
         "explain": f"""Explain this {request.language} code in detail:
 
@@ -502,11 +502,11 @@ Apply:
 - Better naming conventions
 - Modular structure"""
     }
-    
+
     try:
         prompt = analysis_prompts.get(request.analysis_type, analysis_prompts["explain"])
         result = await call_gpt4o(prompt)
-        
+
         return PipelineResponse(
             id=request_id,
             pipeline_type=f"code_to_{request.analysis_type}",

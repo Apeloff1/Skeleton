@@ -78,17 +78,17 @@ JEEVES_PERSONALITIES = {
 Speak formally but warmly, like a trusted family butler.
 Use phrases like "Very good, sir/madam", "If I may suggest", "Indeed".
 Be precise, professional, and thorough in your explanations.""",
-    
+
     "friendly": """You are Jeeves, a friendly and approachable AI coding buddy.
 Be warm, encouraging, and conversational.
 Use casual language but remain helpful and accurate.
 Celebrate successes and be supportive during struggles.""",
-    
+
     "encouraging": """You are Jeeves, an enthusiastic and motivating AI coding coach.
 Be extremely positive and encouraging.
 Celebrate every small win. Turn mistakes into learning opportunities.
 Use phrases like "Great question!", "You've got this!", "Let's figure this out together!".""",
-    
+
     "concise": """You are Jeeves, a no-nonsense AI coding assistant.
 Be direct and to the point. Minimize fluff.
 Give clear, actionable answers quickly.
@@ -127,7 +127,7 @@ Always be helpful, accurate, and adapt to the user's level."""
             session_id=session_id or f"jeeves-{uuid.uuid4().hex[:8]}",
             system_message=system
         ).with_model("openai", "gpt-4o")
-        
+
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except Exception as e:
@@ -182,7 +182,7 @@ async def get_jeeves_info():
 async def ask_jeeves(request: JeevesRequest):
     """Ask Jeeves anything about coding"""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""User's question: {request.message}
 
 {f'Code/Context:{chr(10)}```{request.language}{chr(10)}{request.context}{chr(10)}```' if request.context else ''}
@@ -193,7 +193,7 @@ Please help with this query. Remember to adapt your response to a {request.skill
 
     try:
         response = await call_jeeves(prompt, request.personality, request.skill_level, request.session_id)
-        
+
         return {
             "id": request_id,
             "jeeves_response": response,
@@ -208,14 +208,14 @@ Please help with this query. Remember to adapt your response to a {request.skill
 async def explain_code(request: ExplainRequest):
     """Have Jeeves explain code in detail"""
     request_id = str(uuid.uuid4())
-    
+
     depth_instructions = {
         "eli5": "Explain like I'm 5 years old. Use simple analogies, no jargon.",
         "beginner": "Explain for someone new to programming. Define terms, be thorough.",
         "detailed": "Comprehensive technical explanation with all details.",
         "expert": "Expert-level analysis: patterns, trade-offs, optimizations, edge cases."
     }
-    
+
     prompt = f"""Please explain this {request.language} code:
 
 ```{request.language}
@@ -234,9 +234,9 @@ Provide:
 5. **Learning Points** - What can be learned from this code?"""
 
     try:
-        response = await call_jeeves(prompt, "friendly", 
+        response = await call_jeeves(prompt, "friendly",
                                        "beginner" if request.depth in ["eli5", "beginner"] else "advanced")
-        
+
         return {
             "id": request_id,
             "explanation": response,
@@ -251,7 +251,7 @@ Provide:
 async def debug_help(request: DebugHelpRequest):
     """Get Jeeves' help debugging code"""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""I need help debugging this {request.language} code:
 
 ```{request.language}
@@ -272,7 +272,7 @@ Be supportive - debugging is hard!"""
 
     try:
         response = await call_jeeves(prompt, "encouraging", request.skill_level)
-        
+
         return {
             "id": request_id,
             "debug_assistance": response,
@@ -287,7 +287,7 @@ Be supportive - debugging is hard!"""
 async def teach_concept(request: ConceptRequest):
     """Have Jeeves teach you a programming concept"""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""Teach me about: **{request.concept}**
 
 Language: {request.language}
@@ -308,7 +308,7 @@ Make it engaging and memorable!"""
 
     try:
         response = await call_jeeves(prompt, "encouraging", request.skill_level)
-        
+
         return {
             "id": request_id,
             "lesson": response,
@@ -323,7 +323,7 @@ Make it engaging and memorable!"""
 async def generate_practice(request: PracticeRequest):
     """Get practice problems from Jeeves"""
     request_id = str(uuid.uuid4())
-    
+
     prompt = f"""Generate {request.count} {request.difficulty} practice problems about {request.topic} in {request.language}.
 
 For each problem provide:
@@ -343,10 +343,10 @@ Make problems:
 - Teaching real skills"""
 
     try:
-        response = await call_jeeves(prompt, "encouraging", 
-                                       "intermediate" if request.difficulty == "medium" else 
+        response = await call_jeeves(prompt, "encouraging",
+                                       "intermediate" if request.difficulty == "medium" else
                                        "beginner" if request.difficulty == "easy" else "advanced")
-        
+
         return {
             "id": request_id,
             "practice_problems": response,
@@ -363,7 +363,7 @@ Make problems:
 async def get_motivation(mood: str = "stuck", context: Optional[str] = None):
     """Get encouragement from Jeeves when you need it"""
     request_id = str(uuid.uuid4())
-    
+
     mood_prompts = {
         "stuck": "The developer is stuck on a problem and feeling frustrated.",
         "imposter": "The developer is experiencing imposter syndrome.",
@@ -372,7 +372,7 @@ async def get_motivation(mood: str = "stuck", context: Optional[str] = None):
         "bored": "The developer is bored and losing motivation.",
         "excited": "The developer is excited about a success - celebrate with them!"
     }
-    
+
     prompt = f"""{mood_prompts.get(mood, mood_prompts['stuck'])}
 
 {f'Context: {context}' if context else ''}
@@ -388,7 +388,7 @@ Be genuinely supportive, not generic or preachy."""
 
     try:
         response = await call_jeeves(prompt, "encouraging", "intermediate")
-        
+
         return {
             "id": request_id,
             "message": response,
@@ -404,7 +404,7 @@ async def tip_of_the_day(language: str = "python", level: str = "intermediate"):
     import hashlib
     today = datetime.utcnow().strftime("%Y-%m-%d")
     seed = hashlib.md5(f"{today}-{language}-{level}".encode()).hexdigest()
-    
+
     prompt = f"""Give me one excellent {language} tip for a {level} developer.
 
 The tip should be:
@@ -429,7 +429,7 @@ Seed for variety: {seed}"""
 
     try:
         response = await call_jeeves(prompt, "friendly", level)
-        
+
         return {
             "date": today,
             "tip": response,
@@ -466,9 +466,9 @@ class JeevesContextRequest(BaseModel):
 @router.post("/ask-with-context")
 async def ask_jeeves_with_full_context(request: JeevesContextRequest):
     """Ask Jeeves with full access to vaults, logs, and curriculum"""
-    
+
     context_parts = []
-    
+
     # Gather vault data
     if request.include_vault:
         try:
@@ -477,7 +477,7 @@ async def ask_jeeves_with_full_context(request: JeevesContextRequest):
                 context_parts.append(f"User's saved code ({len(code_blocks)} items): {[c.get('title', 'Untitled') for c in code_blocks]}")
         except Exception:
             pass
-    
+
     # Gather learning history from logs
     if request.include_logs:
         try:
@@ -487,14 +487,14 @@ async def ask_jeeves_with_full_context(request: JeevesContextRequest):
                 context_parts.append(f"Recent learning topics: {topics}")
         except Exception:
             pass
-    
+
     # Add curriculum context
     if request.include_curriculum:
         context_parts.append("Available curriculum: 2860+ hours, 12 tracks including Python Mastery, JavaScript Mastery, Game Development, AI/ML, and more.")
-    
+
     # Build enhanced prompt
     context_str = "\\n".join(context_parts) if context_parts else "No additional context available."
-    
+
     prompt = f"""User's question: {request.message}
 
 SYSTEM CONTEXT (Jeeves has access to):
@@ -506,7 +506,7 @@ Respond as a helpful tutor who knows the user's learning journey."""
 
     try:
         response = await call_jeeves(prompt, request.personality, request.skill_level, request.session_id)
-        
+
         # Log this interaction for training
         try:
             await logs_db.ai_queries.insert_one({
@@ -523,7 +523,7 @@ Respond as a helpful tutor who knows the user's learning journey."""
             })
         except Exception:
             pass
-        
+
         return {
             "jeeves_response": response,
             "context_used": True,
@@ -535,7 +535,7 @@ Respond as a helpful tutor who knows the user's learning journey."""
 @router.get("/my-learning-profile")
 async def get_learning_profile():
     """Get Jeeves' understanding of the user's learning profile"""
-    
+
     profile = {
         "vault_summary": {},
         "recent_activity": [],
@@ -543,7 +543,7 @@ async def get_learning_profile():
         "areas_for_growth": [],
         "recommended_next": []
     }
-    
+
     # Analyze vault
     try:
         code_count = await vaults_db.code_blocks.count_documents({})
@@ -554,17 +554,17 @@ async def get_learning_profile():
         }
     except Exception:
         pass
-    
+
     # Analyze recent queries
     try:
         queries = await logs_db.ai_queries.find().sort("timestamp", -1).limit(50).to_list(50)
-        
+
         # Count query types
         query_types = {}
         for q in queries:
             qt = q.get("query_type", "unknown")
             query_types[qt] = query_types.get(qt, 0) + 1
-        
+
         # Find most common
         if query_types:
             sorted_types = sorted(query_types.items(), key=lambda x: x[1], reverse=True)
@@ -572,7 +572,7 @@ async def get_learning_profile():
             profile["areas_for_growth"] = ["Consider exploring: " + topic for topic in ["system_design", "testing", "performance"] if topic not in query_types]
     except Exception:
         pass
-    
+
     # Recommendations based on profile
     profile["recommended_next"] = [
         "Complete the next Masterclass module",
@@ -580,7 +580,7 @@ async def get_learning_profile():
         "Review your saved code blocks",
         "Ask Jeeves to explain a new concept"
     ]
-    
+
     return profile
 
 @router.post("/learn-from-interaction")
@@ -590,7 +590,7 @@ async def learn_from_interaction(
     feedback: Optional[str] = None
 ):
     """Allow Jeeves to learn from user interactions"""
-    
+
     try:
         await logs_db.user_actions.insert_one({
             "action_type": "jeeves_feedback",
@@ -602,7 +602,7 @@ async def learn_from_interaction(
             "timestamp": datetime.utcnow(),
             "processed": False
         })
-        
+
         return {
             "status": "feedback_recorded",
             "message": "Thank you! I'll use this to improve.",
@@ -614,15 +614,15 @@ async def learn_from_interaction(
 @router.get("/curriculum-guide/{track_key}")
 async def get_curriculum_guide(track_key: str, skill_level: str = "intermediate"):
     """Get Jeeves' personalized guide for a curriculum track"""
-    
+
     # Import masterclass data
     from routes.masterclass import MASTERCLASS_TRACKS
-    
+
     if track_key not in MASTERCLASS_TRACKS:
         raise HTTPException(status_code=404, detail="Track not found")
-    
+
     track = MASTERCLASS_TRACKS[track_key]
-    
+
     prompt = f"""Create a personalized study guide for the "{track['name']}" track ({track['total_hours']} hours).
 
 Track description: {track['description']}
@@ -637,7 +637,7 @@ Provide:
 
     try:
         response = await call_jeeves(prompt, "encouraging", skill_level)
-        
+
         return {
             "track": track_key,
             "track_name": track["name"],
@@ -658,9 +658,9 @@ async def interactive_lesson(
     session_id: Optional[str] = None
 ):
     """Start an interactive lesson with Jeeves"""
-    
+
     lesson_session = session_id or f"lesson-{uuid.uuid4().hex[:8]}"
-    
+
     prompt = f"""Start an interactive lesson on: {lesson_topic}
 {f'Part of track: {track}' if track else ''}
 
@@ -675,7 +675,7 @@ Make it conversational and engaging. End with a question for the student to answ
 
     try:
         response = await call_jeeves(prompt, personality, skill_level, lesson_session)
-        
+
         # Log the lesson start
         try:
             await logs_db.user_actions.insert_one({
@@ -690,7 +690,7 @@ Make it conversational and engaging. End with a question for the student to answ
             })
         except Exception:
             pass
-        
+
         return {
             "lesson_session": lesson_session,
             "topic": lesson_topic,
@@ -720,40 +720,40 @@ class AdaptiveTutoringRequest(BaseModel):
 @router.post("/adaptive-tutoring")
 async def adaptive_tutoring(request: AdaptiveTutoringRequest):
     """Jeeves provides deeply personalized tutoring using logscraper insights"""
-    
+
     # Fetch user's comprehensive learning profile from logscraper
     profile = await jeeves_db.learning_profiles.find_one({"user_id": request.user_id})
     patterns = await jeeves_db.patterns.find({"user_id": request.user_id}).to_list(20)
     insights = await jeeves_db.insights.find(
         {"user_id": request.user_id, "acted_upon": False}
     ).sort("priority", -1).to_list(5)
-    
+
     # Build personalized context
     personalization = []
-    
+
     if profile:
         # Struggle areas - be extra patient here
         struggle_areas = profile.get("struggle_areas", [])
         if struggle_areas:
             personalization.append(f"IMPORTANT: User struggles with: {', '.join(struggle_areas[:5])}. Be extra patient and thorough when explaining these topics.")
-        
+
         # Strength areas - can go faster
         strength_areas = profile.get("strength_areas", [])
         if strength_areas:
             personalization.append(f"User is strong in: {', '.join(strength_areas[:5])}. Can reference these as building blocks.")
-        
+
         # Topics studied - avoid redundant explanations
         topics_studied = profile.get("topics_studied", [])
         if topics_studied:
             personalization.append(f"User has studied: {', '.join(topics_studied[:10])}. Assume familiarity with these.")
-        
+
         # Learning velocity - adjust depth
         velocity = profile.get("learning_velocity", 1.0)
         if velocity > 1.5:
             personalization.append("User is a fast learner. Can be more concise and advanced.")
         elif velocity < 0.5:
             personalization.append("User prefers slower pace. Break down concepts into smaller steps.")
-        
+
         # Learning style
         style = profile.get("learning_style_detected")
         if style:
@@ -764,23 +764,23 @@ async def adaptive_tutoring(request: AdaptiveTutoringRequest):
                 "kinesthetic": "Focus on hands-on exercises and interactive examples."
             }
             personalization.append(f"Learning style: {style}. {style_instructions.get(style, '')}")
-        
+
         # Engagement score
         engagement = profile.get("engagement_score", 50)
         if engagement < 30:
             personalization.append("User engagement is low. Make responses more engaging and encouraging.")
         elif engagement > 70:
             personalization.append("Highly engaged user. Can include advanced topics and challenges.")
-        
+
         # Game/vault activity
         game_stats = profile.get("game_stats", {})
         if game_stats.get("games_completed", 0) > 5:
             personalization.append("User is an active game creator. Use game development examples when relevant.")
-        
+
         vault_stats = profile.get("vault_stats", {})
         if vault_stats.get("code_saves", 0) > 20:
             personalization.append("User actively saves code. Encourage saving useful snippets.")
-    
+
     # Add patterns-based personalization
     for pattern in patterns:
         pattern_type = pattern.get("pattern_type")
@@ -792,17 +792,17 @@ async def adaptive_tutoring(request: AdaptiveTutoringRequest):
             personalization.append("User often learns late. Keep energy high in responses.")
         elif pattern_type == "perseverant_learner":
             personalization.append("User shows great persistence. Acknowledge their effort.")
-    
+
     # Add insights-based adjustments
     for insight in insights[:3]:
         if insight.get("insight_type") == "struggle":
             topic = insight.get("topic")
             if topic:
                 personalization.append(f"Recent struggle detected with {topic}. Offer extra support here.")
-    
+
     # Build the personalized prompt
     personalization_str = "\n".join(f"- {p}" for p in personalization) if personalization else "No specific personalization data available."
-    
+
     prompt = f"""USER'S QUESTION: {request.question}
 
 {f'ADDITIONAL CONTEXT: {request.context}' if request.context else ''}
@@ -823,9 +823,9 @@ Be warm, encouraging, and genuinely helpful."""
         # Determine personality based on user preferences
         personality = request.preferred_style or "encouraging"
         skill_level = profile.get("preferred_difficulty", "intermediate") if profile else "intermediate"
-        
+
         response = await call_jeeves(prompt, personality, skill_level, request.session_id)
-        
+
         # Log this interaction for logscraper
         await logs_db.ai_queries.insert_one({
             "query_type": "adaptive_tutoring",
@@ -836,7 +836,7 @@ Be warm, encouraging, and genuinely helpful."""
             "insights_count": len(insights),
             "timestamp": datetime.utcnow()
         })
-        
+
         return {
             "response": response,
             "personalized": bool(personalization),
@@ -856,23 +856,23 @@ Be warm, encouraging, and genuinely helpful."""
 @router.get("/user-learning-summary/{user_id}")
 async def get_user_learning_summary(user_id: str):
     """Get a comprehensive summary of user's learning journey for Jeeves"""
-    
+
     # Get profile from logscraper
     profile = await jeeves_db.learning_profiles.find_one({"user_id": user_id})
     patterns = await jeeves_db.patterns.find({"user_id": user_id}).to_list(20)
     insights = await jeeves_db.insights.find({"user_id": user_id}).sort("created_at", -1).to_list(10)
-    
+
     # Get recent scrape results
     recent_scrape = await jeeves_db.scrape_results.find_one(
         {"user_id": user_id},
         sort=[("scraped_at", -1)]
     )
-    
+
     # Get game completions
     game_completions = await jeeves_db.game_completions.find(
         {"user_id": user_id}
     ).sort("timestamp", -1).to_list(10)
-    
+
     if not profile:
         return {
             "user_id": user_id,
@@ -885,14 +885,14 @@ async def get_user_learning_summary(user_id: str):
             ],
             "last_scrape": recent_scrape.get("scraped_at").isoformat() if recent_scrape else None
         }
-    
+
     # Compute summary statistics
     challenges = profile.get("challenges_attempted", [])
     passed_challenges = [c for c in challenges if c.get("passed")]
-    
+
     quiz_history = profile.get("quiz_history", [])
     avg_quiz_score = sum(q.get("score", 0) for q in quiz_history) / len(quiz_history) if quiz_history else 0
-    
+
     return {
         "user_id": user_id,
         "status": "active_learner",
@@ -968,7 +968,7 @@ def get_pattern_description(pattern_type: str) -> str:
 async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List[Dict]:
     """Generate personalized recommendations from Jeeves"""
     recommendations = []
-    
+
     # Based on struggle areas
     struggles = profile.get("struggle_areas", [])
     if struggles:
@@ -978,7 +978,7 @@ async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List
             "description": f"I noticed you're working through {struggles[0]}. Would you like me to explain it differently?",
             "action": f"Ask Jeeves about {struggles[0]}"
         })
-    
+
     # Based on engagement
     engagement = profile.get("engagement_score", 50)
     if engagement < 40:
@@ -988,10 +988,10 @@ async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List
             "description": "A quick 5-minute challenge could help build momentum!",
             "action": "Try Daily Challenge"
         })
-    
+
     # Based on patterns
     pattern_types = [p.get("pattern_type") for p in patterns]
-    
+
     if "fast_learner" in pattern_types:
         recommendations.append({
             "type": "advancement",
@@ -999,7 +999,7 @@ async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List
             "description": "Your quick progress suggests you're ready for expert-level content!",
             "action": "Try Expert Challenges"
         })
-    
+
     if "game_enthusiast" in pattern_types:
         recommendations.append({
             "type": "creation",
@@ -1007,7 +1007,7 @@ async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List
             "description": "You've created some great games! Consider publishing one.",
             "action": "Publish a Game"
         })
-    
+
     if "consistent_learner" in pattern_types:
         recommendations.append({
             "type": "streak",
@@ -1015,7 +1015,7 @@ async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List
             "description": "Your consistency is paying off. Don't break the chain!",
             "action": "Continue Learning"
         })
-    
+
     # Default recommendation
     if not recommendations:
         recommendations.append({
@@ -1024,7 +1024,7 @@ async def generate_jeeves_recommendations(profile: Dict, patterns: List) -> List
             "description": "Ready to learn something new? Let's start with a quick lesson!",
             "action": "Start a Lesson"
         })
-    
+
     return recommendations[:3]
 
 
@@ -1037,7 +1037,7 @@ async def log_jeeves_interaction(
     feedback: Optional[str] = None
 ):
     """Log a Jeeves interaction for logscraper to process"""
-    
+
     # Determine action type based on interaction
     if was_helpful is True:
         action_type = "jeeves_feedback_positive"
@@ -1045,7 +1045,7 @@ async def log_jeeves_interaction(
         action_type = "jeeves_feedback_negative"
     else:
         action_type = "jeeves_asked"
-    
+
     # Log to user_actions for logscraper
     await logs_db.user_actions.insert_one({
         "action_id": f"act_{uuid.uuid4().hex[:12]}",
@@ -1060,7 +1060,7 @@ async def log_jeeves_interaction(
         "timestamp": datetime.utcnow(),
         "processed": False
     })
-    
+
     return {
         "logged": True,
         "message": "Thank you for your feedback! It helps me improve." if was_helpful is not None else "Interaction logged.",
@@ -1173,7 +1173,7 @@ async def teach_physics(
     personality: str = "encouraging"
 ):
     """Have Jeeves teach a physics topic for game development"""
-    
+
     # Find relevant curriculum info
     relevant_modules = []
     for cat_key, category in PHYSICS_CURRICULUM.items():
@@ -1185,9 +1185,9 @@ async def teach_physics(
                     "topics": module.get("topics", []),
                     "game_applications": module.get("game_applications", [])
                 })
-    
+
     curriculum_context = f"Relevant curriculum modules: {relevant_modules}" if relevant_modules else ""
-    
+
     prompt = f"""Teach the physics concept: **{topic}**
 
 {curriculum_context}
@@ -1222,7 +1222,7 @@ Make the lesson engaging and practical. Use analogies where helpful."""
 
     try:
         response = await call_jeeves(prompt, personality, skill_level)
-        
+
         return {
             "subject": "physics",
             "topic": topic,
@@ -1246,7 +1246,7 @@ async def teach_math(
     personality: str = "encouraging"
 ):
     """Have Jeeves teach a math topic for game development"""
-    
+
     # Find relevant curriculum info
     relevant_modules = []
     for cat_key, category in MATH_CURRICULUM.items():
@@ -1258,9 +1258,9 @@ async def teach_math(
                     "topics": module.get("topics", []),
                     "game_applications": module.get("game_applications", [])
                 })
-    
+
     curriculum_context = f"Relevant curriculum modules: {relevant_modules}" if relevant_modules else ""
-    
+
     prompt = f"""Teach the mathematics concept: **{topic}**
 
 {curriculum_context}
@@ -1301,7 +1301,7 @@ Make math accessible and show its practical value in game development."""
 
     try:
         response = await call_jeeves(prompt, personality, skill_level)
-        
+
         return {
             "subject": "math",
             "topic": topic,
@@ -1325,7 +1325,7 @@ async def teach_cs(
     personality: str = "encouraging"
 ):
     """Have Jeeves teach a computer science topic for game development"""
-    
+
     # Find relevant curriculum info
     relevant_modules = []
     for cat_key, category in CS_CURRICULUM.items():
@@ -1338,9 +1338,9 @@ async def teach_cs(
                     "implementations": module.get("implementations", []),
                     "game_applications": module.get("game_applications", [])
                 })
-    
+
     curriculum_context = f"Relevant curriculum modules: {relevant_modules}" if relevant_modules else ""
-    
+
     prompt = f"""Teach the computer science concept: **{topic}**
 
 {curriculum_context}
@@ -1383,7 +1383,7 @@ Make CS practical and directly applicable to game development."""
 
     try:
         response = await call_jeeves(prompt, personality, skill_level)
-        
+
         return {
             "subject": "computer_science",
             "topic": topic,
@@ -1406,7 +1406,7 @@ async def game_dev_question(
     personality: str = "friendly"
 ):
     """Ask Jeeves any game development question - he knows Physics, Math, and CS!"""
-    
+
     # Build comprehensive context
     knowledge_context = f"""You have comprehensive knowledge of:
 
@@ -1421,7 +1421,7 @@ Core Topics: {', '.join(JEEVES_KNOWLEDGE_BASE['math']['core_topics'])}
 **COMPUTER SCIENCE ({JEEVES_KNOWLEDGE_BASE['cs']['total_hours']} hours of curriculum):**
 Categories: {', '.join(JEEVES_KNOWLEDGE_BASE['cs']['categories'])}
 Core Topics: {', '.join(JEEVES_KNOWLEDGE_BASE['cs']['core_topics'])}"""
-    
+
     prompt = f"""{knowledge_context}
 
 Student's Question: {question}
@@ -1439,7 +1439,7 @@ Be the knowledgeable, supportive tutor you are!"""
 
     try:
         response = await call_jeeves(prompt, personality, skill_level)
-        
+
         return {
             "question": question,
             "category": category or "general",
@@ -1458,7 +1458,7 @@ async def get_study_path(
     hours_per_week: int = 10
 ):
     """Get a personalized study path from Jeeves for a game dev goal"""
-    
+
     prompt = f"""Create a personalized study path for someone who wants to: **{goal}**
 
 Current skill level: {current_level}
@@ -1498,13 +1498,13 @@ Be specific and actionable. Include estimated weeks/months for each phase."""
 
     try:
         response = await call_jeeves(prompt, "encouraging", current_level)
-        
+
         total_curriculum_hours = (
             JEEVES_KNOWLEDGE_BASE['physics']['total_hours'] +
             JEEVES_KNOWLEDGE_BASE['math']['total_hours'] +
             JEEVES_KNOWLEDGE_BASE['cs']['total_hours']
         )
-        
+
         return {
             "goal": goal,
             "current_level": current_level,

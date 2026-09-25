@@ -109,7 +109,7 @@ async def get_ai_modes():
 async def ai_assist(request: AIAssistRequest):
     """Get AI assistance for code"""
     mode_info = AI_MODES.get(request.mode, AI_MODES["explain"])
-    
+
     # Generate response based on mode
     suggestions = {
         "explain": f"This {request.language} code appears to be well-structured. It contains several functions and follows common patterns.",
@@ -122,7 +122,7 @@ async def ai_assist(request: AIAssistRequest):
         "security_audit": "No critical security vulnerabilities detected. Consider input validation.",
         "convert": "// Converted code structure for target language"
     }
-    
+
     return AIAssistResponse(
         id=str(uuid.uuid4()),
         mode=request.mode,

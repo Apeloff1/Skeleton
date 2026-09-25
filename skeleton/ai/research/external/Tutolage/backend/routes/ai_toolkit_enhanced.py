@@ -142,12 +142,12 @@ async def call_ai(prompt: str, system_prompt: str = None) -> str:
     """Call AI with given prompt"""
     try:
         chat = LlmChat(api_key=EMERGENT_LLM_KEY)
-        
+
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{prompt}"
         else:
             full_prompt = prompt
-        
+
         response = await chat.send_async([UserMessage(content=full_prompt)])
         return response.text
     except Exception as e:
@@ -157,28 +157,28 @@ async def call_ai(prompt: str, system_prompt: str = None) -> str:
 def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:
     """Analyze code structure without AI"""
     lines = code.split('\n')
-    
+
     # Basic metrics
     total_lines = len(lines)
     blank_lines = sum(1 for line in lines if not line.strip())
     comment_lines = 0
-    
+
     if language == "python":
         comment_lines = sum(1 for line in lines if line.strip().startswith('#'))
     elif language in ["javascript", "typescript"]:
         comment_lines = sum(1 for line in lines if line.strip().startswith('//'))
-    
+
     code_lines = total_lines - blank_lines - comment_lines
-    
+
     # Complexity estimation (cyclomatic)
     complexity_keywords = {
         "python": ["if ", "elif ", "else:", "for ", "while ", "except ", "and ", "or "],
         "javascript": ["if ", "else if", "else {", "for ", "while ", "catch ", "&&", "||", "? "],
     }
-    
+
     keywords = complexity_keywords.get(language, complexity_keywords["python"])
     complexity = 1 + sum(code.count(kw) for kw in keywords)
-    
+
     # Nesting depth
     max_indent = 0
     for line in lines:
@@ -187,7 +187,7 @@ def analyze_code_structure(code: str, language: str) -> Dict[str, Any]:
             spaces_per_indent = 4 if language == "python" else 2
             depth = indent // spaces_per_indent
             max_indent = max(max_indent, depth)
-    
+
     return {
         "total_lines": total_lines,
         "code_lines": code_lines,
@@ -204,7 +204,7 @@ def detect_security_issues(code: str, language: str) -> List[Dict[str, Any]]:
     """Detect potential security issues using patterns"""
     issues = []
     patterns = SECURITY_PATTERNS.get(language, SECURITY_PATTERNS.get("python", {}))
-    
+
     for issue_type, pattern in patterns.items():
         matches = re.finditer(pattern, code, re.IGNORECASE)
         for match in matches:
@@ -216,7 +216,7 @@ def detect_security_issues(code: str, language: str) -> List[Dict[str, Any]]:
                 "snippet": match.group()[:50],
                 "recommendation": get_security_recommendation(issue_type)
             })
-    
+
     return issues
 
 
@@ -238,34 +238,34 @@ def get_security_recommendation(issue_type: str) -> str:
 def calculate_quality_score(metrics: Dict, security_issues: List) -> Dict[str, Any]:
     """Calculate overall code quality score"""
     scores = {}
-    
+
     # Maintainability (based on complexity and nesting)
     complexity = metrics.get("cyclomatic_complexity", 10)
     nesting = metrics.get("max_nesting_depth", 3)
     scores["maintainability"] = max(0, 100 - (complexity * 3) - (nesting * 5))
-    
+
     # Readability (based on comments and line length)
     comment_ratio = metrics.get("comment_ratio", 0)
     avg_line_length = metrics.get("average_line_length", 80)
     scores["readability"] = min(100, (comment_ratio * 200) + max(0, 100 - max(0, avg_line_length - 80)))
-    
+
     # Testability (based on function size and complexity)
     scores["testability"] = max(0, 100 - complexity * 2)
-    
+
     # Security (based on issues found)
     high_issues = sum(1 for i in security_issues if i.get("severity") == "high")
     medium_issues = sum(1 for i in security_issues if i.get("severity") == "medium")
     scores["security"] = max(0, 100 - (high_issues * 25) - (medium_issues * 10))
-    
+
     # Performance (estimated)
     scores["performance"] = max(0, 100 - complexity * 1.5)
-    
+
     # Overall score
     overall = sum(
         scores[metric] * QUALITY_METRICS[metric]["weight"]
         for metric in QUALITY_METRICS
     )
-    
+
     return {
         "overall": round(overall, 1),
         "breakdown": {k: round(v, 1) for k, v in scores.items()},
@@ -316,12 +316,12 @@ async def get_ai_toolkit_info():
 @router.post("/code-review")
 async def ai_code_review(request: CodeReviewRequest):
     """Perform comprehensive AI code review"""
-    
+
     # Static analysis
     structure = analyze_code_structure(request.code, request.language)
     security_issues = detect_security_issues(request.code, request.language)
     quality_score = calculate_quality_score(structure, security_issues)
-    
+
     # AI-powered deep analysis
     ai_prompt = f"""Perform a {request.review_depth} code review for this {request.language} code:
 
@@ -341,7 +341,7 @@ Provide:
 Be specific with line numbers where applicable."""
 
     ai_analysis = await call_ai(ai_prompt, "You are an expert code reviewer with deep knowledge of software engineering best practices, security, and performance optimization.")
-    
+
     # Store review
     review_id = f"rev_{uuid.uuid4().hex[:12]}"
     await ai_toolkit_db.code_reviews.insert_one({
@@ -352,7 +352,7 @@ Be specific with line numbers where applicable."""
         "security_issues_count": len(security_issues),
         "timestamp": datetime.utcnow()
     })
-    
+
     return {
         "review_id": review_id,
         "structure_analysis": structure,
@@ -370,14 +370,14 @@ Be specific with line numbers where applicable."""
 @router.post("/generate-tests")
 async def generate_tests(request: TestGenerationRequest):
     """Generate automated tests for code"""
-    
+
     framework_prompts = {
         "pytest": "Use pytest with fixtures, parametrize, and proper assertions",
         "jest": "Use Jest with describe/it blocks, beforeEach, and expect assertions",
         "mocha": "Use Mocha with Chai assertions and proper describe/it structure",
         "junit": "Use JUnit 5 with @Test annotations and Assertions class"
     }
-    
+
     test_type_descriptions = {
         "unit": "individual functions and methods",
         "edge_cases": "boundary conditions and edge cases",
@@ -385,9 +385,9 @@ async def generate_tests(request: TestGenerationRequest):
         "integration": "component interactions",
         "performance": "performance benchmarks"
     }
-    
+
     types_desc = ", ".join(test_type_descriptions.get(t, t) for t in request.test_types)
-    
+
     ai_prompt = f"""Generate comprehensive {request.test_framework} tests for this {request.language} code:
 
 ```{request.language}
@@ -409,10 +409,10 @@ Generate:
 Output only the test code, ready to run."""
 
     test_code = await call_ai(ai_prompt, "You are an expert test engineer who writes comprehensive, maintainable tests.")
-    
+
     # Extract test count estimate
     test_count = test_code.count("def test_") + test_code.count("it(") + test_code.count("@Test")
-    
+
     return {
         "test_code": test_code,
         "framework": request.test_framework,
@@ -425,9 +425,9 @@ Output only the test code, ready to run."""
 @router.post("/refactor")
 async def suggest_refactoring(request: RefactorRequest):
     """Suggest code refactoring improvements"""
-    
+
     goals_desc = ", ".join(request.refactor_goals)
-    
+
     ai_prompt = f"""Refactor this {request.language} code with these goals: {goals_desc}
 
 Original code:
@@ -444,7 +444,7 @@ Provide:
 4. Any trade-offs made"""
 
     refactored = await call_ai(ai_prompt, "You are a senior software architect specializing in clean code and design patterns.")
-    
+
     return {
         "original_length": len(request.code),
         "refactor_goals": request.refactor_goals,
@@ -457,14 +457,14 @@ Provide:
 @router.post("/generate-docs")
 async def generate_documentation(request: DocGenerationRequest):
     """Generate comprehensive documentation"""
-    
+
     style_examples = {
         "google": "Google style docstrings with Args, Returns, Raises sections",
         "numpy": "NumPy style with Parameters, Returns as separate sections",
         "sphinx": "Sphinx/reStructuredText format with :param: and :returns:",
         "jsdoc": "JSDoc format with @param, @returns, @example tags"
     }
-    
+
     ai_prompt = f"""Generate comprehensive documentation for this {request.language} code:
 
 ```{request.language}
@@ -488,7 +488,7 @@ Generate:
 Output the fully documented code."""
 
     documented_code = await call_ai(ai_prompt, "You are a technical writer who creates clear, comprehensive documentation.")
-    
+
     return {
         "documented_code": documented_code,
         "doc_style": request.doc_style,
@@ -499,10 +499,10 @@ Output the fully documented code."""
 @router.post("/predict-bugs")
 async def predict_bugs(request: BugPredictionRequest):
     """AI-powered bug prediction"""
-    
+
     # Static analysis for common bug patterns
     structure = analyze_code_structure(request.code, request.language)
-    
+
     ai_prompt = f"""Analyze this {request.language} code for potential bugs:
 
 ```{request.language}
@@ -527,11 +527,11 @@ For each bug:
 - Rate likelihood of occurrence"""
 
     predictions = await call_ai(ai_prompt, "You are a bug hunter with years of experience finding subtle software defects.")
-    
+
     # Count predicted bugs
     bug_indicators = ["potential", "bug", "issue", "error", "problem", "risk"]
     estimated_bugs = sum(predictions.lower().count(ind) for ind in bug_indicators) // 3
-    
+
     return {
         "code_metrics": structure,
         "bug_predictions": predictions,
@@ -543,12 +543,12 @@ For each bug:
 @router.post("/analyze-architecture")
 async def analyze_architecture(request: ArchitectureAnalysisRequest):
     """Analyze code architecture and design"""
-    
+
     files_summary = "\n".join([
         f"=== {filename} ===\n{content[:500]}..." if len(content) > 500 else f"=== {filename} ===\n{content}"
         for filename, content in request.code_files.items()
     ])
-    
+
     ai_prompt = f"""Analyze the architecture of this {request.project_type} project:
 
 {files_summary}
@@ -564,7 +564,7 @@ Provide:
 8. Technical Debt Assessment"""
 
     analysis = await call_ai(ai_prompt, "You are a software architect with expertise in system design and architecture patterns.")
-    
+
     return {
         "project_type": request.project_type,
         "files_analyzed": len(request.code_files),
@@ -576,21 +576,21 @@ Provide:
 @router.post("/pair-programming")
 async def ai_pair_programming(request: PairProgrammingRequest):
     """Interactive AI pair programming session"""
-    
+
     session_id = request.session_id or f"pair_{uuid.uuid4().hex[:12]}"
-    
+
     # Get session history
     session = await ai_toolkit_db.pair_sessions.find_one({"session_id": session_id})
     history = session.get("history", []) if session else []
-    
+
     history_context = "\n".join([
         f"User: {h['user']}\nAI: {h['ai']}"
         for h in history[-5:]  # Last 5 exchanges
     ])
-    
+
     # Build the prompt without nested f-strings
     prev_conv = f"Previous conversation:\n{history_context}\n" if history_context else ""
-    
+
     ai_prompt = f"""You are pair programming with a developer on this {request.language} code:
 
 ```{request.language}
@@ -611,10 +611,10 @@ As a pair programming partner:
 Be collaborative, not prescriptive. Ask clarifying questions if needed."""
 
     ai_response = await call_ai(ai_prompt, "You are an experienced developer who excels at collaborative coding. You're patient, helpful, and enjoy teaching.")
-    
+
     # Update session
     new_exchange = {"user": request.task_description, "ai": ai_response, "timestamp": datetime.utcnow().isoformat()}
-    
+
     await ai_toolkit_db.pair_sessions.update_one(
         {"session_id": session_id},
         {
@@ -623,7 +623,7 @@ Be collaborative, not prescriptive. Ask clarifying questions if needed."""
         },
         upsert=True
     )
-    
+
     return {
         "session_id": session_id,
         "ai_response": ai_response,
@@ -634,13 +634,13 @@ Be collaborative, not prescriptive. Ask clarifying questions if needed."""
 @router.post("/optimize-performance")
 async def optimize_performance(code: str, language: str = "python", optimization_level: str = "balanced"):
     """AI-powered performance optimization"""
-    
+
     level_desc = {
         "conservative": "minimal changes, maximum safety",
         "balanced": "reasonable optimizations with good safety",
         "aggressive": "maximum performance, may change behavior slightly"
     }
-    
+
     ai_prompt = f"""Optimize this {language} code for performance ({optimization_level}: {level_desc.get(optimization_level, '')}):
 
 ```{language}
@@ -658,7 +658,7 @@ Provide:
 5. Estimated performance gain"""
 
     optimized = await call_ai(ai_prompt, "You are a performance engineer who specializes in code optimization and algorithm efficiency.")
-    
+
     return {
         "original_length": len(code),
         "optimization_level": optimization_level,
@@ -669,11 +669,11 @@ Provide:
 @router.get("/quality-score")
 async def get_quality_score(code: str, language: str = "python"):
     """Get detailed code quality score"""
-    
+
     structure = analyze_code_structure(code, language)
     security_issues = detect_security_issues(code, language)
     quality = calculate_quality_score(structure, security_issues)
-    
+
     return {
         "code_metrics": structure,
         "security_issues": security_issues,

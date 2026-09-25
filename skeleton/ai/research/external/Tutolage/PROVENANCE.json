@@ -5,7 +5,7 @@
   "source_repository": "Apeloff1/Tutolage",
   "source_branch": "main",
   "imported_reason": "Cross-repository AI/Jeeves/RAG lineage recovery; copied without changing canonical runtime ownership.",
-  "safety": "Files with credential/private-key signatures are excluded. Promotion requires characterization, tests, and explicit owner convergence.",
+  "safety": "Files with credential/private-key signatures are excluded. Destination-only whitespace normalization is allowed; promotion requires characterization, tests, and explicit owner convergence.",
   "files": [
     {
       "source_path": "backend/routes/ai.py",
@@ -65,5 +65,12 @@
       "source_path": "frontend/features/JeevesEQ/JeevesEQModal.tsx",
       "source_blob_sha": "167341347034549cf265dda3e1cbaa099829cf53"
     }
-  ]
+  ],
+  "normalization": {
+    "mode": "semantic_copy",
+    "transformations": [
+      "strip_trailing_space_and_tabs"
+    ],
+    "source_blobs_preserved_in_manifest": true
+  }
 }

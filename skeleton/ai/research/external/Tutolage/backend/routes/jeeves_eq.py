@@ -409,12 +409,12 @@ async def detect_emotional_state(
     text_input: Optional[str] = None
 ):
     """Detect user's current emotional state from actions and text"""
-    
+
     emotion_scores = {emotion: 0.0 for emotion in EMOTIONAL_INDICATORS.keys()}
-    
+
     # Analyze recent actions
     action_types = [a.get("action_type", "") for a in recent_actions]
-    
+
     for emotion, indicators in EMOTIONAL_INDICATORS.items():
         # Check action patterns
         for pattern in indicators["patterns"]:
@@ -430,23 +430,23 @@ async def detect_emotional_state(
                 hints = sum(1 for a in action_types if "hint" in a)
                 if hints >= 4:
                     emotion_scores[emotion] += 0.25
-        
+
         # Check text signals if provided
         if text_input:
             text_lower = text_input.lower()
             for signal in indicators["text_signals"]:
                 if signal in text_lower:
                     emotion_scores[emotion] += 0.4
-    
+
     # Find primary emotion
     primary_emotion = max(emotion_scores, key=emotion_scores.get)
     intensity = min(1.0, emotion_scores[primary_emotion])
-    
+
     # Default to neutral if no strong signals
     if intensity < 0.2:
         primary_emotion = "neutral"
         intensity = 0.5
-    
+
     # Store emotional state
     emotional_state = {
         "user_id": user_id,
@@ -455,12 +455,12 @@ async def detect_emotional_state(
         "all_scores": emotion_scores,
         "detected_at": datetime.utcnow()
     }
-    
+
     await eq_db.emotional_states.insert_one(emotional_state)
-    
+
     # Get appropriate response style
     response_style = EMOTIONAL_INDICATORS.get(primary_emotion, {}).get("response_style", "neutral_helpful")
-    
+
     return {
         "user_id": user_id,
         "emotional_state": {
@@ -481,38 +481,38 @@ async def get_therapeutic_response(
     intensity: float = 0.5
 ):
     """Get an emotionally intelligent therapeutic response"""
-    
+
     if emotional_state not in THERAPEUTIC_RESPONSES:
         emotional_state = "neutral"
-    
+
     responses = THERAPEUTIC_RESPONSES.get(emotional_state, {})
-    
+
     # Build response based on intensity
     response_parts = []
-    
+
     if intensity > 0.5:
         # Strong emotion - acknowledge first
         if "acknowledgment" in responses:
             response_parts.append(random.choice(responses["acknowledgment"]))
-    
+
     # Add reframe
     if "reframe" in responses:
         response_parts.append(random.choice(responses["reframe"]))
-    
+
     # Add action suggestion
     if "action" in responses:
         response_parts.append(random.choice(responses["action"]))
     elif "challenge" in responses:
         response_parts.append(random.choice(responses["challenge"]))
-    
+
     combined_response = " ".join(response_parts)
-    
+
     # For intense negative emotions, use AI for more personalized response
     if intensity > 0.7 and emotional_state in ["frustrated", "overwhelmed", "discouraged"]:
         try:
             chat = LlmChat(api_key=EMERGENT_LLM_KEY)
             ai_prompt = f"""You are Jeeves, an emotionally intelligent AI tutor. The user is feeling {emotional_state} (intensity: {intensity}).
-            
+
 Context: {context or 'Learning programming'}
 
 Generate a warm, empathetic, and helpful response that:
@@ -527,7 +527,7 @@ Keep it conversational, warm, and under 100 words. Don't use phrases like "I und
             combined_response = ai_response.text
         except Exception:
             pass
-    
+
     # Log therapeutic interaction
     await eq_db.therapeutic_interactions.insert_one({
         "user_id": user_id,
@@ -536,7 +536,7 @@ Keep it conversational, warm, and under 100 words. Don't use phrases like "I und
         "response_given": combined_response,
         "timestamp": datetime.utcnow()
     })
-    
+
     return {
         "response": combined_response,
         "emotional_state": emotional_state,
@@ -549,9 +549,9 @@ Keep it conversational, warm, and under 100 words. Don't use phrases like "I und
 @router.get("/psychology-profile/{user_id}")
 async def get_psychology_profile(user_id: str):
     """Get or create user's learning psychology profile"""
-    
+
     profile = await eq_db.psychology_profiles.find_one({"user_id": user_id})
-    
+
     if not profile:
         # Create default profile
         profile = {
@@ -570,18 +570,18 @@ async def get_psychology_profile(user_id: str):
             "last_updated": datetime.utcnow()
         }
         await eq_db.psychology_profiles.insert_one(profile)
-    
+
     # Get recent emotional history
     recent_emotions = await eq_db.emotional_states.find(
         {"user_id": user_id}
     ).sort("detected_at", -1).limit(20).to_list(20)
-    
+
     # Calculate emotional trends
     emotion_counts = {}
     for e in recent_emotions:
         em = e.get("primary_emotion", "neutral")
         emotion_counts[em] = emotion_counts.get(em, 0) + 1
-    
+
     return {
         "user_id": user_id,
         "profile": {
@@ -604,7 +604,7 @@ async def get_psychology_profile(user_id: str):
 def generate_psychology_recommendations(profile: Dict, emotion_trends: Dict) -> List[Dict]:
     """Generate personalized recommendations based on psychology profile"""
     recommendations = []
-    
+
     # High anxiety
     if profile.get("learning_anxiety_level", 0) > 0.6:
         recommendations.append({
@@ -617,7 +617,7 @@ def generate_psychology_recommendations(profile: Dict, emotion_trends: Dict) -> 
                 "Try the Pomodoro technique to manage overwhelm"
             ]
         })
-    
+
     # Low growth mindset
     if profile.get("growth_mindset_score", 0) < 0.4:
         recommendations.append({
@@ -630,7 +630,7 @@ def generate_psychology_recommendations(profile: Dict, emotion_trends: Dict) -> 
                 "Learn about neuroplasticity - your brain can grow!"
             ]
         })
-    
+
     # High perfectionism
     if profile.get("perfectionism_tendency", 0) > 0.7:
         recommendations.append({
@@ -643,7 +643,7 @@ def generate_psychology_recommendations(profile: Dict, emotion_trends: Dict) -> 
                 "Value progress over perfection"
             ]
         })
-    
+
     # Frequent frustration
     if emotion_trends.get("frustrated", 0) > 5:
         recommendations.append({
@@ -656,7 +656,7 @@ def generate_psychology_recommendations(profile: Dict, emotion_trends: Dict) -> 
                 "Remember: frustration means you're challenging yourself"
             ]
         })
-    
+
     return recommendations
 
 
@@ -666,10 +666,10 @@ async def get_growth_mindset_message(
     user_id: Optional[str] = None
 ):
     """Get a growth mindset reinforcement message"""
-    
+
     messages = GROWTH_MINDSET_MESSAGES.get(context, GROWTH_MINDSET_MESSAGES["effort_praise"])
     message = random.choice(messages)
-    
+
     return {
         "message": message,
         "context": context,
@@ -686,39 +686,39 @@ async def check_cognitive_load(
     last_break_minutes_ago: int
 ):
     """Check if cognitive load is too high and suggest interventions"""
-    
+
     load_score = 0
-    
+
     # Session duration factor
     if session_duration_minutes > 60:
         load_score += 0.3
     elif session_duration_minutes > 90:
         load_score += 0.5
-    
+
     # New concepts factor
     if new_concepts_introduced > 3:
         load_score += 0.3
     elif new_concepts_introduced > 5:
         load_score += 0.5
-    
+
     # Error rate factor
     if error_count > 5:
         load_score += 0.2
     elif error_count > 10:
         load_score += 0.4
-    
+
     # Break factor
     if last_break_minutes_ago > 45:
         load_score += 0.3
     elif last_break_minutes_ago > 90:
         load_score += 0.5
-    
+
     load_level = "low" if load_score < 0.4 else "medium" if load_score < 0.7 else "high"
-    
+
     interventions = []
     if load_level == "high":
         interventions = COGNITIVE_LOAD_STRATEGIES["high_load_detected"]["interventions"]
-    
+
     return {
         "cognitive_load_level": load_level,
         "load_score": min(1.0, load_score),
@@ -736,21 +736,21 @@ async def check_cognitive_load(
 @router.get("/pomodoro/status/{user_id}")
 async def get_pomodoro_status(user_id: str):
     """Get user's Pomodoro session status"""
-    
+
     session = await eq_db.pomodoro_sessions.find_one(
         {"user_id": user_id, "active": True}
     )
-    
+
     if not session:
         return {
             "active_session": False,
             "message": "No active Pomodoro session. Start one to boost your focus!",
             "config": POMODORO_CONFIG
         }
-    
+
     elapsed = (datetime.utcnow() - session["started_at"]).seconds // 60
     remaining = session["duration_minutes"] - elapsed
-    
+
     return {
         "active_session": True,
         "session_type": session["session_type"],
@@ -764,19 +764,19 @@ async def get_pomodoro_status(user_id: str):
 @router.post("/pomodoro/start")
 async def start_pomodoro(user_id: str, session_type: Literal["work", "short_break", "long_break"] = "work"):
     """Start a Pomodoro session"""
-    
+
     # End any active session
     await eq_db.pomodoro_sessions.update_many(
         {"user_id": user_id, "active": True},
         {"$set": {"active": False, "ended_at": datetime.utcnow()}}
     )
-    
+
     durations = {
         "work": POMODORO_CONFIG["work_duration_minutes"],
         "short_break": POMODORO_CONFIG["short_break_minutes"],
         "long_break": POMODORO_CONFIG["long_break_minutes"]
     }
-    
+
     session = {
         "user_id": user_id,
         "session_type": session_type,
@@ -784,15 +784,15 @@ async def start_pomodoro(user_id: str, session_type: Literal["work", "short_brea
         "started_at": datetime.utcnow(),
         "active": True
     }
-    
+
     await eq_db.pomodoro_sessions.insert_one(session)
-    
+
     messages = {
         "work": "Focus time started! 25 minutes of concentrated learning ahead. You've got this!",
         "short_break": "Short break time! Step away from the screen, stretch, and breathe.",
         "long_break": "Great work! You've earned a longer break. Rest well to consolidate your learning."
     }
-    
+
     return {
         "started": True,
         "session_type": session_type,
@@ -819,22 +819,22 @@ async def update_psychology_profile(
     updates: Dict[str, Any]
 ):
     """Update user's psychology profile based on observed behavior"""
-    
+
     allowed_fields = [
         "motivation_type", "motivation_drivers", "cognitive_style",
         "stress_tolerance", "preferred_challenge_level", "learning_anxiety_level",
         "perfectionism_tendency", "growth_mindset_score", "resilience_score", "self_efficacy"
     ]
-    
+
     filtered_updates = {k: v for k, v in updates.items() if k in allowed_fields}
     filtered_updates["last_updated"] = datetime.utcnow()
-    
+
     await eq_db.psychology_profiles.update_one(
         {"user_id": user_id},
         {"$set": filtered_updates},
         upsert=True
     )
-    
+
     return {
         "updated": True,
         "fields_updated": list(filtered_updates.keys())
@@ -844,26 +844,26 @@ async def update_psychology_profile(
 @router.get("/spaced-repetition/schedule/{user_id}")
 async def get_spaced_repetition_schedule(user_id: str):
     """Get personalized spaced repetition schedule"""
-    
+
     # Get user's emotional profile for adjustments
     _profile = await eq_db.psychology_profiles.find_one({"user_id": user_id})
     recent_emotion = await eq_db.emotional_states.find_one(
         {"user_id": user_id},
         sort=[("detected_at", -1)]
     )
-    
+
     # Get items due for review
     now = datetime.utcnow()
     due_items = await eq_db.spaced_repetition.find(
         {"user_id": user_id, "next_review": {"$lte": now}}
     ).to_list(50)
-    
+
     # Adjust based on emotional state
     emotional_adjustment = 1.0
     if recent_emotion:
         emotion = recent_emotion.get("primary_emotion", "neutral")
         emotional_adjustment = SPACED_REPETITION_CONFIG["emotional_adjustments"].get(emotion, 1.0)
-    
+
     return {
         "user_id": user_id,
         "items_due_for_review": len(due_items),

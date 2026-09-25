@@ -44,12 +44,12 @@ class JeevesPersonality:
     and a sharp wit. Think a younger, more tech-savvy version of the
     classic gentleman's gentleman.
     """
-    
+
     # Core character traits
     NAME = "Jeeves"
     AGE = "Late twenties"
     BACKGROUND = "Cambridge educated, trained at Downton-style estates, passionate about technology"
-    
+
     # Voice characteristics
     VOICE = {
         "accent": "British RP (Received Pronunciation)",
@@ -57,7 +57,7 @@ class JeevesPersonality:
         "pace": "Measured and clear, with thoughtful pauses",
         "style": "Articulate, never rushed, emphasizes key points"
     }
-    
+
     # Personality traits
     TRAITS = {
         "charming": "Naturally likeable and personable",
@@ -68,7 +68,7 @@ class JeevesPersonality:
         "knowledgeable": "Well-read and cultured",
         "humble": "Knowledgeable but never condescending"
     }
-    
+
     # Signature phrases and expressions
     GREETINGS = [
         "Good day! Jeeves at your service. How may I assist you today?",
@@ -78,7 +78,7 @@ class JeevesPersonality:
         "Good day, good day! Jeeves here, at your complete disposal.",
         "Ah, excellent timing! I was just preparing for our next session."
     ]
-    
+
     ENCOURAGEMENTS = [
         "Splendid work! You're making excellent progress.",
         "Ah, now you're getting the hang of it! Brilliant!",
@@ -89,7 +89,7 @@ class JeevesPersonality:
         "Bravo! That was rather clever of you.",
         "You see? I told you this was within your grasp!"
     ]
-    
+
     THINKING_PHRASES = [
         "Let me consider that for a moment...",
         "Ah, an interesting question. Allow me to explain...",
@@ -98,7 +98,7 @@ class JeevesPersonality:
         "Hmm, yes, I see what you're getting at. Consider this...",
         "Now that's a question worthy of careful attention..."
     ]
-    
+
     CORRECTIONS = [
         "Ah, a small hiccup there, but easily remedied. You see...",
         "Not quite, I'm afraid, but you're on the right track. Consider...",
@@ -106,7 +106,7 @@ class JeevesPersonality:
         "Almost there! Let me show you where we went astray...",
         "A valiant attempt! Here's where we can improve..."
     ]
-    
+
     FAREWELLS = [
         "Until next time! Do take care, and keep up the excellent work.",
         "Cheerio! I shall be here whenever you need me.",
@@ -115,7 +115,7 @@ class JeevesPersonality:
         "Right then, I'll leave you to it. Best of luck!",
         "Until we meet again! You know where to find me."
     ]
-    
+
     BUTLER_EXPRESSIONS = [
         "Very good, sir/madam",
         "As you wish",
@@ -154,27 +154,27 @@ class JeevesDirections:
     Smart navigation system that provides contextual guidance
     based on user progress, emotional state, and learning goals.
     """
-    
+
     @staticmethod
     def get_direction(
         user_context: Dict[str, Any],
         direction_type: DirectionType
     ) -> Dict[str, Any]:
         """Generate contextual directions for the user"""
-        
+
         mastery = user_context.get("mastery_level", 0.5)
         streak = user_context.get("streak_days", 0)
         emotional_state = user_context.get("emotional_state", "neutral")
         time_available = user_context.get("time_available_minutes", 30)
         current_topic = user_context.get("current_topic", "programming")
-        
+
         # Base direction template
         direction = {
             "type": direction_type.value,
             "timestamp": datetime.utcnow().isoformat(),
             "context": user_context
         }
-        
+
         if direction_type == DirectionType.LEARNING_PATH:
             direction.update(JeevesDirections._get_learning_path_direction(
                 mastery, current_topic, time_available
@@ -203,9 +203,9 @@ class JeevesDirections:
             direction.update(JeevesDirections._get_recovery_direction(
                 emotional_state
             ))
-        
+
         return direction
-    
+
     @staticmethod
     def _get_learning_path_direction(mastery: float, topic: str, time: int) -> Dict:
         if mastery < 0.3:
@@ -220,7 +220,7 @@ class JeevesDirections:
         else:
             path = "mastery"
             recommendation = f"You're approaching mastery of {topic}! Let's polish those skills and explore edge cases."
-        
+
         # Adjust for time available
         if time < 15:
             time_note = "Given our limited time, let's focus on one key concept."
@@ -228,7 +228,7 @@ class JeevesDirections:
             time_note = "With about half an hour, we can cover a solid chunk of material."
         else:
             time_note = "Splendid! We have ample time for a proper deep dive."
-        
+
         return {
             "path": path,
             "recommendation": recommendation,
@@ -237,7 +237,7 @@ class JeevesDirections:
             "suggested_modules": JeevesDirections._get_suggested_modules(path, topic),
             "estimated_completion": f"{max(10, time - 5)} minutes"
         }
-    
+
     @staticmethod
     def _get_next_step_direction(mastery: float, emotion: str, topic: str) -> Dict:
         if emotion in ["frustrated", "confused", "overwhelmed"]:
@@ -249,7 +249,7 @@ class JeevesDirections:
         else:
             step = "Steady as she goes. Let's continue building on what we've learned."
             action = "continue"
-        
+
         return {
             "next_step": step,
             "action": action,
@@ -257,7 +257,7 @@ class JeevesDirections:
             "specific_recommendation": f"Based on your progress with {topic}, I suggest we {action} to the next level.",
             "confidence_level": "high" if mastery > 0.7 else "medium" if mastery > 0.4 else "building"
         }
-    
+
     @staticmethod
     def _get_review_direction(mastery: float, streak: int) -> Dict:
         if mastery < 0.5:
@@ -269,14 +269,14 @@ class JeevesDirections:
         else:
             review_type = "maintenance"
             message = "A light review to keep those skills sharp. Won't take but a moment."
-        
+
         return {
             "review_type": review_type,
             "jeeves_says": message,
             "focus_areas": ["Core concepts", "Common patterns", "Edge cases"][:2 if review_type == "maintenance" else 3],
             "streak_bonus": f"Your {streak}-day streak is impressive! Keep it going!" if streak > 3 else None
         }
-    
+
     @staticmethod
     def _get_challenge_direction(mastery: float, emotion: str) -> Dict:
         if emotion in ["frustrated", "tired"]:
@@ -288,14 +288,14 @@ class JeevesDirections:
         else:
             challenge_level = "balanced"
             message = "A well-calibrated challenge awaits. Challenging, but achievable."
-        
+
         return {
             "challenge_level": challenge_level,
             "jeeves_says": message,
             "expected_difficulty": {"gentle": 0.3, "balanced": 0.6, "expert": 0.85}[challenge_level],
             "reward": {"gentle": "10 XP", "balanced": "25 XP", "expert": "50 XP"}[challenge_level]
         }
-    
+
     @staticmethod
     def _get_break_direction(emotion: str) -> Dict:
         if emotion in ["tired", "overwhelmed", "frustrated"]:
@@ -308,7 +308,7 @@ class JeevesDirections:
             duration = 5
             message = "A brief pause to let things settle, then we'll continue."
             activities = ["Stretch your shoulders", "Look away from the screen", "Take three deep breaths"]
-        
+
         return {
             "break_type": break_type,
             "duration_minutes": duration,
@@ -316,7 +316,7 @@ class JeevesDirections:
             "suggested_activities": activities,
             "return_prompt": "Whenever you're ready, I'll be here."
         }
-    
+
     @staticmethod
     def _get_milestone_direction(mastery: float, streak: int) -> Dict:
         if mastery >= 0.9:
@@ -335,7 +335,7 @@ class JeevesDirections:
             milestone = "FIRST STEPS"
             message = "A solid start! Every expert was once a beginner. Keep going!"
             badge = "🌱 Beginner"
-        
+
         return {
             "milestone": milestone,
             "jeeves_says": message,
@@ -343,7 +343,7 @@ class JeevesDirections:
             "streak_status": f"Current streak: {streak} days",
             "next_milestone": f"{int((mastery + 0.2) * 100)}% mastery"
         }
-    
+
     @staticmethod
     def _get_recovery_direction(emotion: str) -> Dict:
         recovery_plans = {
@@ -384,13 +384,13 @@ class JeevesDirections:
                 ]
             }
         }
-        
+
         plan = recovery_plans.get(emotion, {
             "message": "Let's take stock and adjust our approach.",
             "strategy": "adaptive",
             "steps": ["Assess the situation", "Adjust the plan", "Move forward"]
         })
-        
+
         return {
             "emotion_detected": emotion,
             "jeeves_says": plan["message"],
@@ -398,7 +398,7 @@ class JeevesDirections:
             "action_steps": plan["steps"],
             "encouragement": random.choice(JeevesPersonality.ENCOURAGEMENTS)
         }
-    
+
     @staticmethod
     def _get_suggested_modules(path: str, topic: str) -> List[Dict]:
         modules = {
@@ -434,7 +434,7 @@ class JeevesVoice:
     Text-to-speech configuration for Jeeves voice output.
     Designed for a young English butler character.
     """
-    
+
     # Voice configuration for TTS systems
     VOICE_CONFIG = {
         "language": "en-GB",
@@ -450,7 +450,7 @@ class JeevesVoice:
         "style": "cheerful",  # SSML style
         "emphasis": "moderate"
     }
-    
+
     # SSML templates for expressive speech
     SSML_TEMPLATES = {
         "greeting": """
@@ -496,12 +496,12 @@ class JeevesVoice:
 </speak>
 """
     }
-    
+
     @staticmethod
     def generate_voice_config(text: str, speech_type: str = "explanation") -> Dict[str, Any]:
         """Generate voice configuration for text-to-speech"""
         config = JeevesVoice.VOICE_CONFIG.copy()
-        
+
         # Add SSML if template exists
         template = JeevesVoice.SSML_TEMPLATES.get(speech_type)
         if template:
@@ -515,12 +515,12 @@ class JeevesVoice:
                 encouragement=text,
                 correction=text
             )
-        
+
         config["plain_text"] = text
         config["speech_type"] = speech_type
-        
+
         return config
-    
+
     @staticmethod
     def get_voice_settings() -> Dict[str, Any]:
         """Get complete voice settings for frontend integration"""
@@ -549,7 +549,7 @@ class JeevesResponder:
     """
     Generates responses with Jeeves' personality infused throughout.
     """
-    
+
     @staticmethod
     def respond(
         content: str,
@@ -558,7 +558,7 @@ class JeevesResponder:
         emotional_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """Generate a full Jeeves response with personality and optional voice"""
-        
+
         # Add personality prefix based on type
         prefixes = {
             "greeting": random.choice(JeevesPersonality.GREETINGS),
@@ -567,18 +567,18 @@ class JeevesResponder:
             "correction": random.choice(JeevesPersonality.CORRECTIONS),
             "farewell": random.choice(JeevesPersonality.FAREWELLS)
         }
-        
+
         prefix = prefixes.get(response_type, "")
         full_response = f"{prefix}\n\n{content}" if prefix else content
-        
+
         # Add emotional adaptation
         if emotional_context:
             if emotional_context in ["frustrated", "confused"]:
                 full_response += f"\n\n{random.choice(JeevesPersonality.ENCOURAGEMENTS)}"
-        
+
         # Add butler expression
         expression = random.choice(JeevesPersonality.BUTLER_EXPRESSIONS)
-        
+
         response = {
             "content": full_response,
             "personality": {
@@ -589,11 +589,11 @@ class JeevesResponder:
             "response_type": response_type,
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         # Add voice configuration if requested
         if include_voice:
             response["voice"] = JeevesVoice.generate_voice_config(full_response, response_type)
-        
+
         return response
 
 # ============================================================================
@@ -659,7 +659,7 @@ async def get_direction(request: DirectionRequest):
         direction_type = DirectionType(request.direction_type)
     except ValueError:
         direction_type = DirectionType.NEXT_STEP
-    
+
     user_context = {
         "mastery_level": request.mastery_level,
         "streak_days": request.streak_days,
@@ -667,16 +667,16 @@ async def get_direction(request: DirectionRequest):
         "time_available_minutes": request.time_available_minutes,
         "current_topic": request.current_topic
     }
-    
+
     direction = JeevesDirections.get_direction(user_context, direction_type)
-    
+
     # Add voice for the direction
     if "jeeves_says" in direction:
         direction["voice"] = JeevesVoice.generate_voice_config(
             direction["jeeves_says"],
             "explanation"
         )
-    
+
     return direction
 
 @router.get("/direction/types")
