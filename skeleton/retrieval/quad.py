@@ -105,7 +105,10 @@ class QuadRetriever:
         if retriever is None:
             return
         with self._state_lock:
+            previous = self._planes.get(name)
             self._planes[name] = retriever
+            if previous is not retriever:
+                self._health.reset(name)
             self._invalidate_cache_locked()
 
     def mark_plane_freshness(
