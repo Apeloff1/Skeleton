@@ -305,3 +305,68 @@ def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() ->
     assert "code-1" in client.collections["jeeves_cocoding_context"].rows
     assert feedback_id in client.collections["jeeves_feedback"].rows
     assert state.get_user_progress("u1") == {}
+
+
+def test_generic_memory_convenience_fails_closed_instead_of_writing_projection(
+    monkeypatch,
+) -> None:
+    service, _, _, client = _service()
+    monkeypatch.setattr(rag_module, "rag_service", service)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="projection-only generic memory writes"):
+        rag_module.store_memory(
+            "arbitrary",
+            "must not become projection authority",
+            {"user_id": "u1"},
+        )
+
+    assert client.collections["jeeves_learning_sessions"].rows == {}
+
+
+def test_user_owned_convenience_memory_requires_explicit_user_identity(
+    monkeypatch,
+) -> None:
+    service, state, _, client = _service()
+    monkeypatch.setattr(rag_module, "rag_service", service)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="requires user_id"):
+        rag_module.store_memory("learning_session", "anonymous durable memory")
+    with pytest.raises(ValueError, match="requires user_id"):
+        rag_module.store_memory("feedback", "anonymous feedback")
+
+    assert state.stats() == {
+        "learning_sessions": 0,
+        "user_progress": 0,
+        "cocoding_context": 0,
+        "feedback": 0,
+    }
+    assert client.collections["jeeves_learning_sessions"].rows == {}
+    assert client.collections["jeeves_feedback"].rows == {}
+
+
+def test_supported_learning_convenience_commits_mongo_before_projection(
+    monkeypatch,
+) -> None:
+    service, state, _, client = _service()
+    monkeypatch.setattr(rag_module, "rag_service", service)
+    client.collections["jeeves_learning_sessions"].fail_add = True
+
+    memory_id = rag_module.store_memory(
+        "learning_session",
+        "canonical convenience memory",
+        {
+            "user_id": "u1",
+            "topic": "python",
+            "duration_minutes": 7,
+            "mastery_delta": 0.25,
+        },
+    )
+
+    rows = state.list_learning_sessions("u1")
+    assert rows[0]["session_id"] == memory_id
+    assert rows[0]["content"] == "canonical convenience memory"
+    assert service._projection_failures == 1
