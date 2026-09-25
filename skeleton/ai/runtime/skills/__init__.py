@@ -4,8 +4,13 @@ from .lifecycle import PromotionPolicy, SkillLifecycle
 from .manifest import SkillManifest, SkillState
 from .store import SkillStore
 from .tool_contract import (
+    ToolApprovalPolicy,
+    ToolAuthorityClass,
     ToolContractError,
     ToolEffect,
+    ToolIdempotencyMode,
+    ToolRiskClass,
+    ToolSideEffectClass,
     ToolExecutionRequest,
     ToolExecutionReceipt,
     ToolExecutionStatus,
@@ -37,8 +42,13 @@ __all__ = [
     "ToolReceiptConflict",
     "ToolReceiptStoreError",
     "ToolReservation",
+    "ToolApprovalPolicy",
+    "ToolAuthorityClass",
     "ToolContractError",
     "ToolEffect",
+    "ToolIdempotencyMode",
+    "ToolRiskClass",
+    "ToolSideEffectClass",
     "ToolExecutionRequest",
     "ToolExecutionReceipt",
     "ToolExecutionStatus",
