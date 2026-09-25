@@ -189,10 +189,19 @@ def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
         ctx["blend"] = blend
     from skeleton.forge.hardware import detect_generation, attach
     if not ctx.get("generation"):
-        gen, gscores = detect_generation(ctx.get("vision") or "")
-        if getattr(cockpit, "generation", None):
-            gen = cockpit.generation
-        ctx["generation"] = gen
+        cockpit_generation = getattr(cockpit, "generation", None)
+        if cockpit_generation:
+            ctx["generation"] = cockpit_generation
+            gscores = {"cockpit_hint": 1}
+        else:
+            try:
+                gen, gscores = detect_generation(ctx.get("vision") or "")
+            except ValueError:
+                # Hardware generation is optional. Absence of generation
+                # vocabulary must not abort the entire GameForge pipeline;
+                # downstream era compilation owns its canonical default.
+                gen, gscores = None, {}
+            ctx["generation"] = gen
     else:
         gscores = {"hint": 1}
     if blend and len(blend) >= 2:

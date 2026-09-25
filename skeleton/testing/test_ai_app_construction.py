@@ -226,13 +226,15 @@ def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
     assert "durable stream storage adapter" not in package["progress"]["remaining"]
     assert "tenant-bound backend operation transport service" in package["progress"]["completed"]
     assert "backend SSE or WebSocket transport" not in package["progress"]["remaining"]
-    assert "frontend reconnect/resume cursor" in package["progress"]["completed"]
-    assert set(package["progress"]["remaining"]) == {
-        "distributed stream ownership for multi-worker deployment",
-        "browser/API disconnect-reconnect recovery journey",
-        "browser/API slow-client backpressure journey",
-        "browser/API cancel-complete race journey",
-    }
+    remaining = set(package["progress"]["remaining"])
+    assert "frontend reconnect/resume cursor" not in remaining
+    assert "browser/API disconnect-reconnect recovery journey" not in remaining
+    assert "browser/API slow-client backpressure journey" not in remaining
+    assert "browser/API cancel-complete race journey" not in remaining
+    assert "cross-host/shared-network stream authority beyond the file-backed reference store" in remaining
+    assert "browser-level disconnect/reconnect automation against assembled topology" in remaining
+    assert "browser-level slow-client/backpressure automation against assembled topology" in remaining
+    assert "browser-level cancel-complete automation against assembled topology" in remaining
 
 
 def test_dependency_and_acceptance_relationships_are_separate() -> None:

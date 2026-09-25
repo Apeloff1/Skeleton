@@ -61,3 +61,41 @@ def test_candidate_files_fails_closed_without_git_index(
 
     with pytest.raises(OSError, match="tracked-file enumeration failed"):
         list(checker.candidate_files())
+
+
+def test_explicit_dummy_database_uri_is_allowed_as_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "workflow.yml"
+    candidate.write_text(
+        "MONGO_URL: mongodb://admin:dummy-mongo-password@mongo:27017/app?authSource=admin\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+
+    assert checker.violations(candidate) == []
+
+
+def test_credential_bearing_database_uri_fails_without_echoing_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = tmp_path / "workflow.yml"
+    secret_value = "ci-mongo-password"
+    credential_uri = (
+        "mongodb://"
+        + f"admin:{secret_value}@mongo:27017/app?authSource=admin"
+    )
+    candidate.write_text(
+        f"MONGO_URL: {credential_uri}\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
+
+    findings = checker.violations(candidate)
+
+    assert findings == [
+        "workflow.yml:1: possible credential-bearing database URI"
+    ]
+    assert secret_value not in "\n".join(findings)

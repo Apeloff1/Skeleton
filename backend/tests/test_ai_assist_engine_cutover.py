@@ -88,10 +88,17 @@ def test_assist_executes_through_engine_and_preserves_policy_context(
     assert command.compiled_context.tool_choice == "none"
     assert "def f(value)" in command.compiled_context.prompt
     assert "Prefer early returns." in command.compiled_context.prompt
-    assert any(
-        source_id == "backend.ai.mode.refactor@1"
-        for source_id, _digest in command.compiled_context.source_snapshot
+    policy = route.AI_MODES["refactor"]["instruction_policy"]
+    expected_segment = policy.to_segment(
+        tenant_id="*",
+        purpose="model-inference",
+        created_at=command.operation.created_at,
+        mandatory=True,
     )
+    assert (
+        expected_segment.segment_id,
+        expected_segment.content_digest,
+    ) in command.compiled_context.source_snapshot
 
 
 def test_assist_engine_outage_returns_limited_mode_without_local_provider(

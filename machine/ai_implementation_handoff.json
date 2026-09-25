@@ -962,7 +962,8 @@
           "skeleton/testing/test_operation_stream_store.py",
           "backend/tests/test_operation_stream_transport.py",
           "backend/tests/test_operation_stream_route.py",
-          "browser reconnect/cancel-race tests"
+          "browser reconnect/cancel-race tests",
+          "backend/tests/test_operation_stream_multiworker.py"
         ]
       },
       "ordered_steps": [
@@ -1021,14 +1022,23 @@
         "bounded frontend replay pages and bounded SSE server batches",
         "terminal backlog drains across multiple bounded batches before stream close",
         "completion-versus-cancel race produces exactly one terminal operation event",
-        "persisted reconnect cursor storage is namespaced per consumer to prevent cross-tab cursor skipping"
+        "persisted reconnect cursor storage is namespaced per consumer to prevent cross-tab cursor skipping",
+        "shared WAL-backed operation/event stores plus independent-worker exactly-once outbox projection, cross-worker consumer compaction, reconnect handoff and cancel/complete terminal-race regressions",
+        "file-backed multi-worker SQLite concurrency uses WAL with FULL synchronous durability and bounded busy timeout",
+        "concurrent outbox projection across independent worker connections converges to one ordered event sequence",
+        "cross-worker consumer checkpoints preserve one shared slowest-client compaction floor",
+        "worker restart and reconnect preserve accepted cursor continuity without duplicate events",
+        "API reconnect recovery can hand an operation cursor between independent workers",
+        "API slow-client backpressure and replay-gap recovery remain correct across worker handoff",
+        "API cancel-complete race across workers emits exactly one terminal result",
+        "frontend reconnect page continuity, slow-client gap rejection and terminal race fencing regressions"
       ],
       "remaining": [
-        "distributed stream ownership for multi-worker deployment",
-        "browser/API disconnect-reconnect recovery journey",
-        "browser/API slow-client backpressure journey",
-        "browser/API cancel-complete race journey",
-        "exact-head App Assembly and frontend typecheck/test:operation-stream evidence"
+        "exact-head App Assembly and frontend typecheck/test:operation-stream evidence",
+        "cross-host/shared-network stream authority beyond the file-backed reference store",
+        "browser-level disconnect/reconnect automation against assembled topology",
+        "browser-level slow-client/backpressure automation against assembled topology",
+        "browser-level cancel-complete automation against assembled topology"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },

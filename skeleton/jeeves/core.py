@@ -1537,8 +1537,16 @@ class Jeeves:
         }
 
     def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(pack, dict):
+            raise TypeError("pack must be an object")
+        # A compiled blend carries a synthetic era id such as
+        # "arcade_golden_age~soulslike@0.50". Lazy TacticalBrain creation
+        # must not try to recompile that synthetic id as a catalog era.
+        # Create the brain from the current canonical default first, then
+        # bind the already-compiled authoritative pack.
+        brain = self._brain_get()
+        pack = brain.bind_pack(pack)
         self.era = str(pack.get("era") or self.era)
-        pack = self._brain_get().bind_pack(pack)
         self._bus.emit("jeeves.era.bound", {"era": pack["era"], "dps": pack["primary_dps"]})
         return pack
 
@@ -1563,6 +1571,11 @@ class Jeeves:
         from skeleton.jeeves.builder import BuilderBrain
         if vision:
             pack = self.bind_era(vision)
+        if pack is None and self._brain is not None:
+            # Reuse the already-bound compiled authority. This matters for
+            # synthetic blend ids, which are valid compiled packs but are not
+            # catalog era names and therefore must not be recompiled.
+            pack = dict(self._brain.pack)
         if pack is None:
             from skeleton.forge.eras import compile_era
             pack = compile_era(self.era)

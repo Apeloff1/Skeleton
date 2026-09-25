@@ -290,15 +290,17 @@ class EngineTerminalResult:
         status = _text(body.get("status"), "result.status", maximum=64)
         if status != "completed":
             usage = _json_object(body.get("usage", {}), "result.usage")
+            failure_code = (
+                None
+                if usage.get("error_code") is None
+                else str(usage["error_code"])
+            )
             raise EngineExecutionFailed(
-                "engine execution did not complete successfully",
+                "engine execution did not complete successfully"
+                + (" (" + failure_code + ")" if failure_code else ""),
                 execution_id=str(body.get("execution_id") or ""),
                 status=status,
-                failure_code=(
-                    None
-                    if usage.get("error_code") is None
-                    else str(usage["error_code"])
-                ),
+                failure_code=failure_code,
                 result=body,
             )
         final_output = body.get("final_output")
@@ -1459,7 +1461,8 @@ class EngineClient:
                         )
                     )
                     raise EngineExecutionFailed(
-                        "engine execution reached non-success terminal state",
+                        "engine execution reached non-success terminal state"
+                        + (" (" + failure_code + ")" if failure_code else ""),
                         execution_id=execution_id,
                         status=state,
                         failure_code=failure_code,

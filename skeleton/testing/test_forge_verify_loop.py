@@ -1,4 +1,4 @@
-"""F-5 forge verify-loop — VerificationLoop + CodeVerifier.verdict glue."""
+"""F-5 forge verify-loop — Godot-aware bounded verification and repair."""
 from __future__ import annotations
 
 import pytest
@@ -30,9 +30,12 @@ def test_forge_verify_until_green_accepts_clean_project(tmp_path):
     }
     out = forge_verify_until_green(files, request="world map", root=tmp_path, max_rounds=2)
     assert out["kind"] == "forge-verify-loop"
+    assert out["accepted"] is True
+    assert out["verification"]["accepted"] is True
     assert out["trace"]["rounds"] >= 1
     assert "code_verdict" in out
     assert out["code_verdict"]["confidence"] >= 0.0
+    assert out["code_verdict"]["advisory"] is True
 
 
 def test_forge_verify_until_green_repairs_weak_script(tmp_path):

@@ -17,6 +17,7 @@ on:
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
+      - 'backend/scripts/check_secret_hygiene.py'
       - 'backend/scripts/check_workflow_trigger_fanout.py'
       - 'backend/scripts/check_workflow_concurrency.py'
       - 'backend/scripts/check_repo_attention_contract.py'
@@ -73,6 +74,7 @@ on:
       - 'backend/scripts/check_workflow_input_security.py'
       - 'backend/scripts/check_workflow_action_allowlist.py'
       - 'backend/scripts/check_workflow_permissions.py'
+      - 'backend/scripts/check_secret_hygiene.py'
       - 'backend/scripts/check_workflow_trigger_fanout.py'
       - 'backend/scripts/check_workflow_concurrency.py'
       - 'backend/scripts/check_repo_attention_contract.py'
@@ -170,5 +172,7 @@ jobs:
         run: python backend/scripts/check_branch_flow_contract.py
       - name: Enforce workflow_run branch-completion contract
         run: python backend/scripts/check_workflow_run_branch_completions.py
+      - name: Enforce repository secret hygiene preflight
+        run: python backend/scripts/check_secret_hygiene.py
       - name: Enforce bot activation security baseline
         run: python skeleton/security/activation_security.py

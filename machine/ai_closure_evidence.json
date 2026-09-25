@@ -741,7 +741,16 @@
         "bounded frontend replay pages and bounded SSE replay batches",
         "terminal backlog drains fully before SSE close",
         "completion-versus-cancel race emits exactly one terminal outcome",
-        "per-consumer persisted cursor key isolation prevents cross-tab cursor overwrite/skipping"
+        "per-consumer persisted cursor key isolation prevents cross-tab cursor overwrite/skipping",
+        "shared WAL-backed operation/event stores plus independent-worker exactly-once outbox projection, cross-worker consumer compaction, reconnect handoff and cancel/complete terminal-race regressions",
+        "file-backed multi-worker SQLite concurrency uses WAL with FULL synchronous durability and bounded busy timeout",
+        "concurrent outbox projection across independent worker connections converges to one ordered event sequence",
+        "cross-worker consumer checkpoints preserve one shared slowest-client compaction floor",
+        "worker restart and reconnect preserve accepted cursor continuity without duplicate events",
+        "API reconnect recovery can hand an operation cursor between independent workers",
+        "API slow-client backpressure and replay-gap recovery remain correct across worker handoff",
+        "API cancel-complete race across workers emits exactly one terminal result",
+        "frontend reconnect page continuity, slow-client gap rejection and terminal race fencing regressions"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
@@ -753,21 +762,21 @@
         "slow-client/backpressure test"
       ],
       "outstanding_evidence": [
-        "distributed stream ownership for multi-worker deployment",
-        "browser/API disconnect-reconnect recovery journey",
-        "browser/API slow-client backpressure journey",
-        "browser/API cancel-complete race journey",
-        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence"
+        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
+        "cross-host/shared-network stream authority beyond the file-backed reference store",
+        "browser-level disconnect/reconnect automation against assembled topology",
+        "browser-level slow-client/backpressure automation against assembled topology",
+        "browser-level cancel-complete automation against assembled topology"
       ],
       "blockers": [
         "dependency must close: gap-cognitive-execution-loop",
         "dependency must close: gap-engine-application-execution-boundary",
         "dependency must close: gap-state-authority-convergence",
-        "distributed stream ownership for multi-worker deployment",
-        "browser/API disconnect-reconnect recovery journey",
-        "browser/API slow-client backpressure journey",
-        "browser/API cancel-complete race journey",
-        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence"
+        "exact-head App Assembly plus frontend typecheck/test:operation-stream evidence",
+        "cross-host/shared-network stream authority beyond the file-backed reference store",
+        "browser-level disconnect/reconnect automation against assembled topology",
+        "browser-level slow-client/backpressure automation against assembled topology",
+        "browser-level cancel-complete automation against assembled topology"
       ],
       "close_when": [
         "all declared dependency gaps are closed",

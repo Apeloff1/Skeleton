@@ -172,7 +172,7 @@ class TestGameForgeRun:
             "soulslike extraction with bonfire rest and estus",
             target="godot",
         )
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["complete"]
         assert out["mass"] == 1.0
         assert out["era"] == "soulslike"
@@ -353,7 +353,7 @@ class TestAuthoredPlan:
     def test_pipeline_forge_is_cortex_authored(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("cozy wholesome farm")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["build_plan"]["authored"] == "cortex"
 
     def test_injected_left_changes_mix_keeps_right_bias(self):
@@ -448,7 +448,7 @@ class TestProjectorAndIntake:
             overwrite=True,
             target="godot",
         )
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["complete"]
         assert out["era"] == "soulslike"
         assert out["sim"]["passed"] is True
@@ -516,10 +516,26 @@ class TestBlend:
         trash = next(e for e in m["enemies"] if e["id"] == "trash")
         assert trash["hp"] == round(m["primary_dps"] * trash["ttk_target"], 1)
 
+    def test_jeeves_lazy_bind_accepts_compiled_blend_pack(self):
+        from skeleton.forge.eras import blend_eras
+        from skeleton.jeeves.core import Jeeves
+
+        pack = blend_eras("arcade_golden_age", "soulslike", 0.5)
+        jeeves = Jeeves()
+        bound = jeeves.bind_pack(pack)
+
+        assert bound["era"] == pack["era"]
+        assert jeeves.era == pack["era"]
+        assert jeeves._brain is not None
+        assert jeeves._brain.era == pack["era"]
+
+        plan = jeeves.plan_build()
+        assert plan["era"] == pack["era"]
+
     def test_pipeline_blend_run(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("", blend=("arcade_golden_age", "soulslike", 0.5))
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert "~" in out["era"]
         assert out["sim"]["passed"] is True
         chunk = out["files"]["scripts/player/player_controller.gd"].split("speed: float = ", 1)[1]
@@ -533,7 +549,7 @@ class TestBlend:
         c.apply("BLEND ERA arcade_golden_age soulslike 0.5")
         c.apply("ROLL ORACLE")
         out = GameForgeRun(cockpit=c).execute("")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert "~" in out["era"]
         assert out["build_plan"]["seed"]
 
@@ -593,6 +609,17 @@ class TestHardware:
         assert era == "8bit"
         assert scores["8bit"] >= 2
 
+    def test_pipeline_leaves_generation_unbound_without_hardware_signal(self):
+        from skeleton.context.pipeline import GameForgeRun
+        from skeleton.forge.hardware import detect_generation
+
+        with pytest.raises(ValueError):
+            detect_generation("cozy wholesome farm")
+
+        out = GameForgeRun().execute("cozy wholesome farm")
+        assert out["succeeded"], out["run"]
+        assert out["generation"] is None
+
     def test_pack_stamps_and_emit_viewport(self):
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
@@ -610,7 +637,7 @@ class TestHardware:
     def test_pipeline_generation(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("nes soulslike bonfire estus", generation="8bit")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["generation"] == "8bit"
         assert "viewport_width=256" in out["files"]["project.godot"]
         assert out["files"]["scripts/autoloads/game_state.gd"].count("8bit") >= 1
@@ -632,7 +659,7 @@ class TestLive:
         reset_live(wipe_disk=True)
         a = GameForgeRun.live()
         out = a.execute("cozy wholesome farm")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         size1 = live_cortex().own.size
         assert size1 > 0
         b = GameForgeRun.live()
@@ -681,7 +708,7 @@ class TestLive:
         size = live_cortex().own.size
         assert size > 0
         out = GameForgeRun.live().execute("soulslike extraction bonfire estus")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert live_cortex().own.size >= size
         assert out["build_plan"]["authored"] == "own"
         mix = out["build_plan"]["enemy_mix"]
@@ -1003,27 +1030,3 @@ class TestOmni:
         got = (plan.enemy_mix["trash"], plan.enemy_mix["elite"], plan.enemy_mix["boss"])
         assert got != (6, 2, 0), got
         assert any("invented mix" in n for n in plan.notes), plan.notes
-
-
-
-
-
-class TestPipelineGenerationFallback:
-    def test_generation_detection_is_optional_for_normal_vision(self):
-        from skeleton.context.pipeline import _stage_detect
-
-        cockpit = Cockpit()
-        ctx = {
-            "vision": "cozy wholesome farm",
-            "era_hint": None,
-            "blend": None,
-            "generation": None,
-            "cockpit": cockpit,
-        }
-
-        result = _stage_detect(ctx)
-
-        assert result["era"] == "cozy_wholesome"
-        assert result["generation"] is None
-        assert ctx["generation"] is None
-        assert cockpit.snowball.mass > 0
