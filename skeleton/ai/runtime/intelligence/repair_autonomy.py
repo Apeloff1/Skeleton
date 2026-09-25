@@ -79,8 +79,8 @@ def _load_sessions(root=None, limit: int = 64) -> List[Dict[str, Any]]:
     for line in path.read_text(encoding="utf-8").splitlines()[-limit:]:
         try:
             rows.append(json.loads(line))
-        except json.JSONDecodeError:
-            continue
+        except json.JSONDecodeError as exc:
+            raise ValueError("repair session is not JSON") from exc
     return rows
 
 
@@ -125,7 +125,9 @@ def _learned_max_passes(surface: str, root=None, default: int = 3) -> int:
         best_delta = 0.0
         best_n = 1
         for i, a in enumerate(attempts):
-            delta = float(a.get("delta") or 0)
+            delta = a.get("delta")
+            if isinstance(delta, bool) or not isinstance(delta, (int, float)) or delta != delta:
+                continue
             if delta > best_delta:
                 best_delta = delta
                 best_n = i + 1
@@ -195,11 +197,11 @@ def run_multi_pass(
         before_score = _finite_score(result.get("before"))
         after_score = _finite_score(result.get("after"))
         if before_score is None or after_score is None:
-            before_score = 0.0 if before_score is None else before_score
-            after_score = before_score if after_score is None else after_score
-            accepted = False
-        else:
-            accepted = _explicit_yes(result.get("ok")) or _explicit_yes(result.get("accepted"))
+            raise ValueError("repair scores are required")
+        accepted = _explicit_yes(result.get("ok")) or _explicit_yes(result.get("accepted"))
+        reason = result.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("repair reason is required")
         attempt = RepairAttempt(
             pass_n=pass_n,
             surface=surface,
@@ -207,7 +209,7 @@ def run_multi_pass(
             after_score=after_score,
             actions=list(result.get("actions") or []),
             accepted=accepted,
-            reason=str(result.get("reason") or "unknown"),
+            reason=reason,
         )
         session.attempts.append(attempt)
         session.final_accepted = attempt.accepted
@@ -246,15 +248,15 @@ def repair_session_card(surface: str = "", *, root=None, limit: int = 8) -> Dict
         sessions = [s for s in sessions if s.get("surface") == surface]
     sessions = sessions[-limit:]
     total = len(sessions)
-    accepted = sum(1 for s in sessions if s.get("final_accepted"))
-    avg_passes = sum(s.get("pass_count", 0) for s in sessions) / max(1, total)
+    accepted = sum(1 for s in sessions if s.get("final_accepted") is True)
+    avg_passes = None if total == 0 else round(sum(s.get("pass_count", 0) for s in sessions) / total, 2)
     return {
         "kind": "repair-session-card",
         "surface": surface or "all",
         "total_sessions": total,
         "accepted_sessions": accepted,
         "exhausted_sessions": total - accepted,
-        "avg_passes": round(avg_passes, 2),
+        "avg_passes": avg_passes,
         "sessions": sessions,
         "stored_prose": 0,
     }
@@ -266,27 +268,41 @@ def repair_effectiveness(surface: str = "", *, root=None) -> Dict[str, Any]:
     if surface:
         sessions = [s for s in sessions if s.get("surface") == surface]
     if not sessions:
-        return {"kind": "repair-effectiveness", "surface": surface or "all", "n": 0, "success_rate": 0.0, "avg_improvement": 0.0, "best_pass": 0, "stored_prose": 0}
-    success_rate = sum(1 for s in sessions if s.get("final_accepted")) / len(sessions)
+        return {"kind": "repair-effectiveness", "surface": surface or "all", "n": 0, "success_rate": None, "avg_improvement": None, "best_pass": None, "stored_prose": 0}
+    success_rate = sum(1 for s in sessions if s.get("final_accepted") is True) / len(sessions)
     improvements = []
     best_pass_counts: Dict[int, int] = {}
     for sess in sessions:
         attempts = sess.get("attempts", [])
-        if attempts:
-            first = attempts[0]
-            last = attempts[-1]
-            improvement = float(last.get("after_score") or 0) - float(first.get("before_score") or 0)
-            improvements.append(improvement)
-            best = max(range(len(attempts)), key=lambda i: float(attempts[i].get("after_score") or 0))
-            best_pass_counts[best + 1] = best_pass_counts.get(best + 1, 0) + 1
-    avg_improvement = sum(improvements) / max(1, len(improvements))
-    best_pass = max(best_pass_counts, key=best_pass_counts.get) if best_pass_counts else 1
+        if not attempts:
+            continue
+        first = attempts[0]
+        last = attempts[-1]
+        before = first.get("before_score")
+        after = last.get("after_score")
+        if isinstance(before, bool) or isinstance(after, bool) or not isinstance(before, (int, float)) or not isinstance(after, (int, float)):
+            continue
+        if before != before or after != after:
+            continue
+        improvements.append(float(after) - float(before))
+        scored = []
+        for i, attempt in enumerate(attempts):
+            value = attempt.get("after_score")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+                continue
+            scored.append((float(value), i))
+        if not scored:
+            continue
+        best = max(scored)[1]
+        best_pass_counts[best + 1] = best_pass_counts.get(best + 1, 0) + 1
+    avg_improvement = None if not improvements else round(sum(improvements) / len(improvements), 4)
+    best_pass = max(best_pass_counts, key=best_pass_counts.get) if best_pass_counts else None
     return {
         "kind": "repair-effectiveness",
         "surface": surface or "all",
         "n": len(sessions),
         "success_rate": round(success_rate, 4),
-        "avg_improvement": round(avg_improvement, 4),
+        "avg_improvement": avg_improvement,
         "best_pass": best_pass,
         "pass_distribution": best_pass_counts,
         "stored_prose": 0,

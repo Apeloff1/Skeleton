@@ -104,7 +104,8 @@ class TestRepairAutonomy:
     def test_repair_effectiveness_empty(self, tmp_path):
         eff = repair_effectiveness(root=tmp_path)
         assert eff["n"] == 0
-        assert eff["success_rate"] == 0.0
+        assert eff["success_rate"] is None
+        assert eff["avg_improvement"] is None
 
     def test_repair_session_card_empty(self, tmp_path):
         card = repair_session_card(root=tmp_path)

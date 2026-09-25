@@ -55,6 +55,15 @@ def _telemetry_path(root=None) -> Path:
     return organism_dir(root) / "repair_telemetry.jsonl"
 
 
+def _measured_score(blob: Any, label: str) -> float:
+    if not isinstance(blob, dict) or "score" not in blob:
+        raise ValueError(f"{label} score is required")
+    score = blob["score"]
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or score != score or score in (float("inf"), float("-inf")):
+        raise ValueError(f"{label} score must be finite")
+    return float(score)
+
+
 def capture_telemetry(
     surface: str,
     pass_n: int,
@@ -67,11 +76,15 @@ def capture_telemetry(
     """Capture telemetry for a repair attempt. Call this after
     every repair pass, successful or failed."""
     end_at = int(time.time() * 1000)
-    before_score = float((result.get("before") or {}).get("score") or 0.0)
-    after_score = float((result.get("after") or {}).get("score") or before_score)
-    actions = list(result.get("actions") or [])
+    before_score = _measured_score(result.get("before"), "before")
+    after_score = _measured_score(result.get("after"), "after")
+    actions = result.get("actions") or []
+    if not isinstance(actions, list):
+        raise ValueError("actions must be a list")
     accepted = result.get("ok") is True or result.get("ok") == 1 or result.get("accepted") is True or result.get("accepted") == 1
-    reason = str(result.get("reason") or "unknown")
+    reason = result.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("reason is required")
 
     error_str = ""
     stack = ""
