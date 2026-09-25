@@ -12,7 +12,10 @@ WORKDIR /app
 RUN apk upgrade --no-cache
 
 RUN addgroup -S -g 10001 appuser \
-    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser
+    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser \
+    && mkdir -p /app/data \
+    && chown appuser:appuser /app/data \
+    && chmod 0750 /app/data
 
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 COPY --chown=appuser:appuser skeleton ./skeleton
