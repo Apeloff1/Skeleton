@@ -319,7 +319,7 @@ class ToolExecutionRequest:
         for field in ("execution_id", "turn_id", "call_id"):
             value = getattr(self, field)
             if value is not None:
-                _uuid(value, field)
+                _text(value, field, max_length=512)
         _text(self.tenant_id, "tenant_id")
         object.__setattr__(self, "tool_id", _tool_id(self.tool_id))
         _text(self.idempotency_key, "idempotency_key", max_length=1024)
@@ -392,7 +392,7 @@ class ToolExecutionReceipt:
         for field in ("execution_id", "turn_id", "call_id"):
             value = getattr(self, field)
             if value is not None:
-                _uuid(value, field)
+                _text(value, field, max_length=512)
         _text(self.tenant_id, "tenant_id")
         object.__setattr__(self, "tool_id", _tool_id(self.tool_id))
         _text(self.idempotency_key, "idempotency_key", max_length=1024)
