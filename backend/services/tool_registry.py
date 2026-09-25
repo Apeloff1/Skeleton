@@ -77,8 +77,8 @@ def _db():
 
 _SANDBOX_OWNER = AsyncSandboxCompileAdapter(
     policy=_SANDBOX_POLICY,
-    execution_enabled=code_execution_enabled,
-    disabled_response=execution_disabled_response,
+    execution_enabled=lambda: code_execution_enabled(),
+    disabled_response=lambda name: execution_disabled_response(name),
 )
 _DATABASE_OWNER = AsyncDatabaseQueryAdapter(
     database_provider=lambda: _db(),
@@ -89,8 +89,8 @@ _ARTIFACT_OWNER = AsyncArtifactPackageAdapter(
     database_provider=lambda: _db(),
     package_builder=binary_builder,
     policy=_ARTIFACT_POLICY,
-    execution_enabled=code_execution_enabled,
-    disabled_response=execution_disabled_response,
+    execution_enabled=lambda: code_execution_enabled(),
+    disabled_response=lambda name: execution_disabled_response(name),
 )
 
 
