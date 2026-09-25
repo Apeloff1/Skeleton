@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from core.operation_stream_transport import OperationStreamTransport
+from routes import operation_stream as operation_stream_route
 from skeleton.contracts.operation import OperationEnvelope, OperationState
 from skeleton.frontier.operation_stream import StreamReplayGapError
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
@@ -386,3 +387,178 @@ def test_consumer_checkpoint_survives_worker_restart_and_lease_renewal(
 
     operations_b.close()
     events_b.close()
+
+
+
+def test_api_reconnect_can_resume_on_a_different_worker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_path, stream_path = _paths(tmp_path)
+    operation, _ = _seed_terminal_operation(state_path)
+    worker_a, operations_a, events_a = _worker(state_path, stream_path)
+    worker_b, operations_b, events_b = _worker(state_path, stream_path)
+
+    monkeypatch.setattr(operation_stream_route, "_transport", lambda: worker_a)
+    first = operation_stream_route.operation_event_replay(
+        operation.operation_id,
+        consumer_id="browser-api-resume",
+        after_sequence=0,
+        limit=2,
+        user={"tenant_id": TENANT, "role": "viewer"},
+    )
+    assert [event["sequence"] for event in first["events"]] == [1, 2]
+    assert first["has_more"] is True
+
+    acknowledged = operation_stream_route.acknowledge_operation_events(
+        operation.operation_id,
+        operation_stream_route.OperationAckRequest(
+            consumer_id="browser-api-resume",
+            sequence=2,
+        ),
+        user={"tenant_id": TENANT, "role": "viewer"},
+    )
+    assert acknowledged["consumer"]["acknowledged_through"] == 2
+
+    monkeypatch.setattr(operation_stream_route, "_transport", lambda: worker_b)
+    resumed = operation_stream_route.operation_event_replay(
+        operation.operation_id,
+        consumer_id="browser-api-resume",
+        after_sequence=2,
+        limit=100,
+        user={"tenant_id": TENANT, "role": "viewer"},
+    )
+    assert [event["sequence"] for event in resumed["events"]] == [3, 4, 5, 6]
+    assert resumed["terminal"] is True
+    assert resumed["has_more"] is False
+
+    operations_a.close()
+    events_a.close()
+    operations_b.close()
+    events_b.close()
+
+
+def test_api_slow_client_backpressure_survives_worker_handoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_path, stream_path = _paths(tmp_path)
+    operation, _ = _seed_terminal_operation(state_path)
+    worker_a, operations_a, events_a = _worker(state_path, stream_path)
+    worker_b, operations_b, events_b = _worker(state_path, stream_path)
+
+    monkeypatch.setattr(operation_stream_route, "_transport", lambda: worker_a)
+    for consumer in ("browser-fast", "browser-slow"):
+        payload = operation_stream_route.operation_event_replay(
+            operation.operation_id,
+            consumer_id=consumer,
+            after_sequence=0,
+            limit=100,
+            user={"tenant_id": TENANT, "role": "viewer"},
+        )
+        assert payload["latest_sequence"] == 6
+
+    fast = operation_stream_route.acknowledge_operation_events(
+        operation.operation_id,
+        operation_stream_route.OperationAckRequest(
+            consumer_id="browser-fast",
+            sequence=6,
+        ),
+        user={"tenant_id": TENANT, "role": "viewer"},
+    )
+    assert fast["compacted_through"] == 0
+
+    monkeypatch.setattr(operation_stream_route, "_transport", lambda: worker_b)
+    slow = operation_stream_route.acknowledge_operation_events(
+        operation.operation_id,
+        operation_stream_route.OperationAckRequest(
+            consumer_id="browser-slow",
+            sequence=2,
+        ),
+        user={"tenant_id": TENANT, "role": "viewer"},
+    )
+    assert slow["compacted_through"] == 2
+    assert slow["active_consumer_count"] == 2
+
+    with pytest.raises(Exception) as caught:
+        operation_stream_route.operation_event_replay(
+            operation.operation_id,
+            consumer_id="browser-fast",
+            after_sequence=1,
+            limit=100,
+            user={"tenant_id": TENANT, "role": "viewer"},
+        )
+    assert getattr(caught.value, "status_code", None) == 409
+    assert getattr(caught.value, "detail", None) == {
+        "error": "replay_gap",
+        "resync_required": True,
+    }
+
+    operations_a.close()
+    events_a.close()
+    operations_b.close()
+    events_b.close()
+
+
+def test_api_cancel_complete_race_projects_one_terminal_result_across_workers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state_path, stream_path = _paths(tmp_path)
+    operation, running_version = _seed_running_operation(state_path)
+    cancel_worker, cancel_operations, cancel_events = _worker(state_path, stream_path)
+    complete_worker, complete_operations, complete_events = _worker(state_path, stream_path)
+    gate = Barrier(2)
+
+    def cancel_via_api() -> str:
+        gate.wait(timeout=10)
+        monkeypatch.setattr(operation_stream_route, "_transport", lambda: cancel_worker)
+        payload = operation_stream_route.cancel_operation(
+            operation.operation_id,
+            user={"tenant_id": TENANT, "role": "viewer"},
+        )
+        return payload["operation"]["state"]
+
+    def complete_directly() -> str:
+        gate.wait(timeout=10)
+        try:
+            completed = complete_operations.transition(
+                operation.operation_id,
+                OperationState.COMPLETED,
+                expected_version=running_version,
+                now=BASE_TIME + timedelta(seconds=11),
+            )
+        except OperationStoreConflict:
+            return complete_operations.get(operation.operation_id).envelope.state.value
+        complete_worker.dispatch_pending(operation.operation_id, tenant_id=TENANT)
+        return completed.envelope.state.value
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        cancel_future = pool.submit(cancel_via_api)
+        complete_future = pool.submit(complete_directly)
+        states = {cancel_future.result(), complete_future.result()}
+
+    monkeypatch.setattr(operation_stream_route, "_transport", lambda: complete_worker)
+    final = operation_stream_route.operation_event_replay(
+        operation.operation_id,
+        consumer_id="browser-terminal-race",
+        after_sequence=0,
+        limit=100,
+        user={"tenant_id": TENANT, "role": "viewer"},
+    )
+    terminal_events = [
+        event
+        for event in final["events"]
+        if event["type"] in {"operation.completed", "operation.cancelled"}
+    ]
+
+    assert len(terminal_events) == 1
+    assert final["operation"]["state"] in {"completed", "cancelled"}
+    assert terminal_events[0]["type"] == f"operation.{final['operation']['state']}"
+    assert states <= {"running", "completed", "cancelled"}
+    assert final["terminal"] is True
+
+    cancel_operations.close()
+    cancel_events.close()
+    complete_operations.close()
+    complete_events.close()
