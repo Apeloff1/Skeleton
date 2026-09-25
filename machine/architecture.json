@@ -283,7 +283,8 @@
       "kind": "fastapi",
       "canonical": true,
       "depends_on": [
-        "mongo"
+        "mongo",
+        "skeleton"
       ]
     },
     {
