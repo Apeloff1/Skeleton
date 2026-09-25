@@ -32,12 +32,12 @@ def _decode_claim(claim: str) -> dict[str, str]:
 
 
 def _primary_script(files: Mapping[str, str], weakest_path: str = "") -> tuple[str, str]:
-    if weakest_path and weakest_path in files and weakest_path.endswith(".gd"):
-        return weakest_path, files[weakest_path]
-    scripts = sorted(p for p in files if p.endswith(".gd"))
-    if not scripts:
+    if not isinstance(weakest_path, str) or not weakest_path.endswith(".gd"):
         return "", ""
-    return scripts[0], files[scripts[0]]
+    source = files.get(weakest_path)
+    if not isinstance(source, str) or not source.strip():
+        return "", ""
+    return weakest_path, source
 
 
 def forge_verify_until_green(
@@ -59,6 +59,12 @@ def forge_verify_until_green(
     Returns a dict with final files, verification report, loop trace, and
     whether the loop accepted. Does not raise — callers decide hard-fail.
     """
+    if not isinstance(files, Mapping) or not files:
+        raise ValueError("files are required")
+    if any(not isinstance(path, str) or not isinstance(source, str) for path, source in files.items()):
+        raise ValueError("files must map paths to source")
+    if not isinstance(request, str) or not request.strip():
+        raise ValueError("request is required")
     if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
         raise ValueError("max_rounds must be an integer >= 1")
     if isinstance(min_gain, bool) or not isinstance(min_gain, (int, float)) or min_gain < 0 or min_gain != min_gain:
@@ -90,7 +96,7 @@ def forge_verify_until_green(
         report = forge_verifier.verify(current, request=request)
         state["files"] = current
         state["last_forge"] = report
-        path, src = _primary_script(current, report.weakest_path or "")
+        path, src = _primary_script(current, report.weakest_path if isinstance(report.weakest_path, str) else "")
         if not path or not src.strip():
             code_confidence = 0.0
             code_issues: tuple[str, ...] = ("no script",)
@@ -104,7 +110,7 @@ def forge_verify_until_green(
             "issues": list(code_issues),
         }
         confidence = min(float(report.score), code_confidence)
-        both_clear = bool(report.accepted) and not code_issues and code_confidence >= threshold
+        both_clear = report.accepted is True and not code_issues and code_confidence >= threshold
         if both_clear:
             state["rounds_detail"].append(
                 {
@@ -128,7 +134,7 @@ def forge_verify_until_green(
             )
             state["repairs"].append({k: v for k, v in repaired.items() if k != "files"})
             revised_files = repaired.get("files")
-            if repaired.get("changed") and isinstance(revised_files, dict) and revised_files != current:
+            if repaired.get("changed") == 1 and isinstance(revised_files, dict) and revised_files != current:
                 state["files"] = dict(revised_files)
                 revised_claim = _encode_claim(state["files"])
 
