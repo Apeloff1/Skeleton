@@ -142,9 +142,17 @@
       "plane": "model-provider",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/testing/test_provider_contract.py",
+        "tests/test_provider_runtime_boundary.py",
+        "backend/tests/test_ai_provider_media.py",
+        "scripts/check_provider_bootstrap.py",
+        "scripts/check_provider_runtime_boundary.py",
+        "backend/core/ai_provider.py compatibility facade",
+        "skeleton/jeeves/providers.py canonical-runtime compatibility facade"
+      ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
         "canonical synchronous provider transport regression suite",
@@ -637,9 +645,13 @@
       "plane": "engine-api",
       "stage": 5,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "deadline/trace/budget propagation test",
+        "query/result binding test",
+        "engine outage produces explicit backend degraded behavior"
+      ],
       "closure_evidence_required": [
         "backend->engine authenticated submit test",
         "delegated tenant/user/scope validation test",
@@ -656,10 +668,7 @@
         "backend->engine authenticated submit test",
         "delegated tenant/user/scope validation test",
         "submit retry returns same operation/execution rather than duplicate work",
-        "deadline/trace/budget propagation test",
-        "query/result binding test",
         "idempotent cancel and late-result fencing test",
-        "engine outage produces explicit backend degraded behavior",
         "backend contains no runtime model credential after cutover",
         "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
