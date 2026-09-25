@@ -1915,7 +1915,7 @@
       "plane": "engine-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are now delegated to the Skeleton engine. Canonical Compose removes runtime model-provider credentials from backend and retains them only in the engine process. The implementation boundary is materialized; closure remains open for exact-head assembly validation, deployed authority/idempotency/cancel proofs, and the cross-service golden journey.",
+      "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are delegated to the Skeleton engine. Authenticated submit/status/cancel, delegated-denial, retry-idempotency, late-result fencing, and golden-path lineage all have executable cross-service tests. Canonical Compose removes runtime model-provider credentials from backend. Closure remains open only for exact-head assembly/topology proof and lower-stage dependency closure.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -5993,7 +5993,7 @@
         "validates authenticated service principal and delegated execution authority"
       ],
       "cutover_guard": "App Assembly AST-scans all production backend Python for ProviderRegistry.from_env activation and forbids backend runtime model credentials when the inventory is zero.",
-      "remaining_gap": "exact-head App Assembly plus deployed cross-service authority, retry/idempotency, cancel/late-result, and golden-journey evidence"
+      "remaining_gap": "exact-head App Assembly/topology proof that the production backend activator inventory is zero and provider credentials/transport remain engine-owned, plus lower-stage dependency closure"
     },
     "target_process_ownership": {
       "backend": {
