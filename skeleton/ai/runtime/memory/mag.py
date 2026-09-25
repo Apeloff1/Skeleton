@@ -160,7 +160,7 @@ class MAGStore(MemoryStore):
         self.add_episode(
             chunk.text,
             emotional_valence=chunk.metadata.get("valence", 0.0),
-            importance=chunk.metadata.get("importance", 1.0),
+            importance=chunk.metadata.get("importance", 0.0),
             tags=tags,
         )
 
@@ -182,8 +182,12 @@ class MAGStore(MemoryStore):
             raise TypeError("metadata_filter must be a mapping")
         if top_k == 0:
             return []
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query is required")
         query_time = time.time()
         query_words = set(query_text.lower().split())
+        if not query_words:
+            return []
 
         # Score episodes by retrieval probability + keyword overlap
         scored: List[Tuple[float, EpisodicMemory]] = []
@@ -206,7 +210,9 @@ class MAGStore(MemoryStore):
 
             # Keyword overlap bonus
             content_words = set(episode.content.lower().split())
-            overlap = len(query_words & content_words) / max(len(query_words), 1)
+            overlap = len(query_words & content_words) / len(query_words)
+            if overlap == 0.0:
+                continue
 
             # Emotional resonance (boost if query sentiment matches)
             # Simplified: assume neutral query, use absolute valence as distinctiveness
