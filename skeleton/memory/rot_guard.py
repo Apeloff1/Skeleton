@@ -63,6 +63,14 @@ class ContextRotGuard:
     def __init__(self, *, attention_budget: int = 32_000,
                  dead_zone: float = 0.6, watch_at: float = 0.4,
                  rot_at: float = 0.65) -> None:
+        if isinstance(attention_budget, bool) or not isinstance(attention_budget, int) or attention_budget < 1:
+            raise ValueError("attention budget must be a positive integer")
+        if isinstance(dead_zone, bool) or not isinstance(dead_zone, (int, float)) or not 0.0 < float(dead_zone) < 1.0:
+            raise ValueError("dead zone must be in (0, 1)")
+        if isinstance(watch_at, bool) or isinstance(rot_at, bool) or not isinstance(watch_at, (int, float)) or not isinstance(rot_at, (int, float)):
+            raise ValueError("watch and rot thresholds must be numbers")
+        if not 0.0 <= float(watch_at) < float(rot_at) <= 1.0:
+            raise ValueError("watch must be below rot, and both must be in [0, 1]")
         self.attention_budget = attention_budget
         self.dead_zone = dead_zone
         self.watch_at = watch_at
@@ -75,6 +83,13 @@ class ContextRotGuard:
         """Score the prompt. ``constraints`` are literal strings the answer
         must respect; when omitted, ALL-CAPS / numbered-rule lines are
         auto-detected as constraints."""
+        if not isinstance(prompt, str):
+            raise TypeError("prompt must be a string")
+        if constraints is not None and (
+            not isinstance(constraints, (list, tuple))
+            or any(not isinstance(item, str) for item in constraints)
+        ):
+            raise TypeError("constraints must be strings")
         self.checks += 1
         total_tokens = estimate_tokens(prompt)
         lines = prompt.splitlines()
@@ -85,25 +100,31 @@ class ContextRotGuard:
             offsets.append(running)
             running += n
 
+        supplied = constraints is not None
         if constraints is None:
             constraints = tuple(
                 l.strip() for l in lines
                 if l.strip() and (l.strip().isupper() or re.match(r"^\s*\d+[.)]", l))
             )
 
-        # locate constraints; count restatements
         positions: Dict[str, List[float]] = {}
         for c in constraints:
             if not c:
                 continue
             for i, line in enumerate(lines):
                 if c in line:
-                    pos = (offsets[i] / total_tokens) if total_tokens else 0.0
-                    positions.setdefault(c, []).append(pos)
+                    if total_tokens <= 0:
+                        raise ValueError("a constraint cannot be placed in an empty prompt")
+                    positions.setdefault(c, []).append(offsets[i] / total_tokens)
 
         buried: List[str] = []
         restated = 0
         burial_scores: List[float] = []
+        if supplied:
+            for item in constraints:
+                if item and item not in positions:
+                    buried.append(item[:40])
+                    burial_scores.append(1.0)
         for c, poses in positions.items():
             earliest = min(poses)
             if len(poses) > 1:
@@ -117,6 +138,9 @@ class ContextRotGuard:
         risk = 0.55 * dilution + 0.35 * burial + 0.10 * (
             1.0 if restated == 0 and positions else 0.0
         )
+        absent = supplied and any(item and item not in positions for item in constraints)
+        if absent:
+            risk = max(risk, self.rot_at)
         verdict = "rot" if risk >= self.rot_at else (
             "watch" if risk >= self.watch_at else "fresh"
         )
