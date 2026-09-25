@@ -1334,18 +1334,48 @@ class CognitiveExecutionRuntime:
             + str(call.arguments_digest)
         )
 
+    @staticmethod
+    def _tool_lineage(
+        execution: AIExecution,
+        payload: Mapping[str, object],
+        call: ProviderToolCall,
+    ) -> tuple[str, str, str]:
+        last_provider = payload.get("last_provider")
+        if not isinstance(last_provider, Mapping):
+            raise CognitiveExecutionError(
+                "tool execution is missing provider-turn lineage"
+            )
+        turn_id = last_provider.get("turn_id")
+        if not isinstance(turn_id, str) or not turn_id.strip():
+            raise CognitiveExecutionError(
+                "tool execution is missing provider turn_id"
+            )
+        if not isinstance(call.call_id, str) or not call.call_id.strip():
+            raise CognitiveExecutionError(
+                "tool execution is missing provider call_id"
+            )
+        return execution.execution_id, turn_id.strip(), call.call_id.strip()
+
     def _approval_ref_for_call(
         self,
         execution: AIExecution,
         payload: Mapping[str, object],
         call: ProviderToolCall,
     ) -> str:
+        execution_id, turn_id, call_id = self._tool_lineage(
+            execution,
+            payload,
+            call,
+        )
         request = ToolExecutionRequest(
             request_id=_stable_uuid(
                 "skeleton-tool-request",
                 execution.execution_id + ":" + call.call_id,
             ),
             operation_id=_tool_operation_uuid(execution.operation_id),
+            execution_id=execution_id,
+            turn_id=turn_id,
+            call_id=call_id,
             tenant_id=str(payload["tenant_id"]),
             tool_id=call.tool_id,
             idempotency_key=self._tool_idempotency_key(execution, call),
@@ -1423,12 +1453,20 @@ class CognitiveExecutionRuntime:
         result_rows: list[dict[str, object]] = []
         receipt_ids = list(payload.get("tool_receipts", []))
         for call in calls:
+            execution_id, turn_id, call_id = self._tool_lineage(
+                execution,
+                payload,
+                call,
+            )
             tool_request = ToolExecutionRequest(
                 request_id=_stable_uuid(
                     "skeleton-tool-request",
                     execution.execution_id + ":" + call.call_id,
                 ),
                 operation_id=_tool_operation_uuid(execution.operation_id),
+                execution_id=execution_id,
+                turn_id=turn_id,
+                call_id=call_id,
                 tenant_id=str(payload["tenant_id"]),
                 tool_id=call.tool_id,
                 idempotency_key=self._tool_idempotency_key(
