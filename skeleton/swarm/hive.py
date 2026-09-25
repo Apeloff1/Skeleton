@@ -82,12 +82,23 @@ class HiveMind:
         """
         if not estimates:
             raise AggregationError("cannot aggregate zero estimates")
-
-        pairs = [
-            (e.value, weight_of(e.agent_id) if weight_of else e.weight)
-            for e in estimates
-        ]
-        pairs = [(v, max(w, 0.0)) for v, w in pairs]
+        if method not in ("mean", "weighted", "trimmed_weighted"):
+            raise AggregationError(f"unknown method {method!r}")
+        seen: set[str] = set()
+        pairs = []
+        for estimate in estimates:
+            if not isinstance(estimate, Estimate):
+                raise AggregationError("estimate must be an Estimate")
+            if not isinstance(estimate.agent_id, str) or not estimate.agent_id or estimate.agent_id in seen:
+                raise AggregationError("estimate agent_id must be unique")
+            seen.add(estimate.agent_id)
+            value = estimate.value
+            weight = weight_of(estimate.agent_id) if weight_of else estimate.weight
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+                raise AggregationError("estimate value must be finite")
+            if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not weight > 0:
+                raise AggregationError("estimate weight must be positive")
+            pairs.append((float(value), float(weight)))
         used = list(pairs)
 
         if method == "trimmed_weighted" and len(used) >= 4:
@@ -110,15 +121,22 @@ class HiveMind:
         values = [v for v, _ in used]
         mean = sum(values) / len(values)
         variance = sum((v - mean) ** 2 for v in values) / max(len(values) - 1, 1)
-        diversity = (variance ** 0.5 / abs(mean)) if mean != 0 else float("inf")
+        spread = max(values) - min(values)
+        diversity = 0.0 if spread == 0 else ((variance ** 0.5 / abs(mean)) if mean != 0 else float("inf"))
+        trustworthy = diversity <= self.TRUST_CEILING
+        if not trustworthy:
+            raise AggregationError(
+                "estimates do not agree",
+                context={"diversity": diversity, "spread": spread, "method": method},
+            )
         result = HiveResult(
             value=value,
             method=method,
             n_estimates=len(estimates),
             n_used=len(used),
             diversity=diversity,
-            spread=max(values) - min(values),
-            trustworthy=diversity <= self.TRUST_CEILING,
+            spread=spread,
+            trustworthy=True,
         )
 
         self._aggregations += 1

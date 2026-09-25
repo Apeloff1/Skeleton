@@ -8,13 +8,10 @@ crashed with AttributeError on every invocation. Uses ``AgentId.new()``.
 from __future__ import annotations
 
 import hashlib
-import random
-import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from skeleton.kernel.errors import ConsensusError
-from skeleton.kernel.ids import AgentId
 
 from .types import AgentState
 
@@ -32,6 +29,7 @@ class ConsensusProtocol(ABC):
         voters: List[AgentState],
         *,
         quorum_size: Optional[int] = None,
+        ballots: Optional[Mapping[str, str]] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
         """Run consensus. Returns (accepted, ballot_record)."""
         ...
@@ -49,22 +47,38 @@ class SimpleMajorityConsensus(ConsensusProtocol):
         voters: List[AgentState],
         *,
         quorum_size: Optional[int] = None,
+        ballots: Optional[Mapping[str, str]] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
         if not voters:
             raise ConsensusError("No voters available", ballot={})
+        if not isinstance(ballots, Mapping) or not ballots:
+            raise ConsensusError("explicit ballots are required", ballot={})
+        if quorum_size is not None and (isinstance(quorum_size, bool) or not isinstance(quorum_size, int) or quorum_size < 1):
+            raise ConsensusError("quorum_size must be a positive integer", ballot={})
 
         votes: Dict[str, float] = {"yes": 0.0, "no": 0.0, "abstain": 0.0}
         ballot_details: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        yes_count = 0
 
         for voter in voters:
             if not voter.is_alive():
                 continue
+            agent_id = str(voter.agent_id)
+            if agent_id in seen:
+                raise ConsensusError("duplicate voter", ballot={"agent_id": agent_id})
+            seen.add(agent_id)
+            vote = ballots.get(agent_id)
+            if vote not in {"yes", "no", "abstain"}:
+                raise ConsensusError("missing ballot", ballot={"agent_id": agent_id})
             weight = voter.reputation * voter.effective_capacity()
-            vote_prob = 0.5 + 0.5 * (voter.capabilities.prediction / 10.0)
-            vote = "yes" if random.random() < vote_prob else "no"
-            votes[vote] += weight
+            if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not weight > 0:
+                raise ConsensusError("voter weight must be positive", ballot={"agent_id": agent_id})
+            votes[vote] += float(weight)
+            if vote == "yes":
+                yes_count += 1
             ballot_details.append({
-                "agent_id": str(voter.agent_id),
+                "agent_id": agent_id,
                 "vote": vote,
                 "weight": weight,
                 "reputation": voter.reputation,
@@ -74,8 +88,8 @@ class SimpleMajorityConsensus(ConsensusProtocol):
         if total_weight == 0:
             raise ConsensusError("All voters dead or quarantined", ballot={"details": ballot_details})
 
-        threshold = quorum_size or (total_weight / 2.0)
-        accepted = votes["yes"] > threshold
+        threshold = total_weight / 2.0
+        accepted = votes["yes"] > votes["no"] and (quorum_size is None or yes_count >= quorum_size)
 
         ballot = {
             "proposal_hash": hashlib.sha256(str(proposal).encode()).hexdigest()[:16],
@@ -103,12 +117,10 @@ class ByzantineFaultTolerantConsensus(ConsensusProtocol):
     """
 
     def __init__(self, f: int = 1) -> None:
+        if isinstance(f, bool) or not isinstance(f, int) or f < 0:
+            raise ConsensusError("f must be a non-negative integer", ballot={})
         self.f = f
         self.required_nodes = 3 * f + 1
-
-    def _commit(self, value: Any, agent_id: AgentId) -> str:
-        data = f"{value}:{agent_id}:{time.time()}"
-        return hashlib.sha256(data.encode()).hexdigest()
 
     def propose(
         self,
@@ -116,77 +128,46 @@ class ByzantineFaultTolerantConsensus(ConsensusProtocol):
         voters: List[AgentState],
         *,
         quorum_size: Optional[int] = None,
+        ballots: Optional[Mapping[str, str]] = None,
     ) -> Tuple[bool, Dict[str, Any]]:
-        n = len(voters)
-        if n < self.required_nodes:
-            raise ConsensusError(
-                f"Insufficient nodes for BFT: {n} < {self.required_nodes} (f={self.f})",
-                ballot={"required": self.required_nodes, "actual": n},
-            )
-
-        proposal_hash = self._commit(proposal, AgentId.new())
-
-        pre_prepare_votes: Dict[str, List[str]] = {"accept": [], "reject": []}
+        del quorum_size
+        if not isinstance(ballots, Mapping) or not ballots:
+            raise ConsensusError("explicit ballots are required", ballot={})
+        proposal_hash = hashlib.sha256(repr(proposal).encode()).hexdigest()[:16]
+        required = 2 * self.f + 1
+        accepts: List[str] = []
+        rejects: List[str] = []
+        seen: set[str] = set()
         for voter in voters:
             if not voter.is_alive():
                 continue
-            is_byzantine = random.random() < 0.1
-            if is_byzantine:
-                vote = "reject" if random.random() < 0.5 else "accept"
-            else:
-                vote = "accept"
-            pre_prepare_votes[vote].append(str(voter.agent_id))
-
-        if len(pre_prepare_votes["accept"]) < 2 * self.f + 1:
-            raise ConsensusError(
-                "PRE-PREPARE phase failed: insufficient accepts",
-                ballot={"phase": "pre_prepare", "accepts": len(pre_prepare_votes["accept"]),
-                        "required": 2 * self.f + 1},
-            )
-
-        prepare_votes: Dict[str, List[str]] = {"accept": [], "reject": []}
-        for voter in voters:
-            if not voter.is_alive():
-                continue
-            if str(voter.agent_id) in pre_prepare_votes["accept"]:
-                prepare_votes["accept"].append(str(voter.agent_id))
-            else:
-                prepare_votes["reject"].append(str(voter.agent_id))
-
-        if len(prepare_votes["accept"]) < 2 * self.f + 1:
-            raise ConsensusError(
-                "PREPARE phase failed: insufficient prepares",
-                ballot={"phase": "prepare", "accepts": len(prepare_votes["accept"]),
-                        "required": 2 * self.f + 1},
-            )
-
-        commit_votes: Dict[str, List[str]] = {"accept": [], "reject": []}
-        for voter in voters:
-            if not voter.is_alive():
-                continue
-            if str(voter.agent_id) in prepare_votes["accept"]:
-                commit_votes["accept"].append(str(voter.agent_id))
-            else:
-                commit_votes["reject"].append(str(voter.agent_id))
-
-        accepted = len(commit_votes["accept"]) >= 2 * self.f + 1
-
+            agent_id = str(voter.agent_id)
+            if agent_id in seen:
+                raise ConsensusError("duplicate voter", ballot={"agent_id": agent_id})
+            seen.add(agent_id)
+            vote = ballots.get(agent_id)
+            if vote not in {"accept", "reject"}:
+                raise ConsensusError("missing ballot", ballot={"agent_id": agent_id})
+            (accepts if vote == "accept" else rejects).append(agent_id)
+        alive = len(seen)
         ballot = {
-            "protocol": "pbft_inspired",
+            "protocol": "explicit-bft",
             "f": self.f,
-            "total_nodes": n,
-            "alive_nodes": len([v for v in voters if v.is_alive()]),
-            "pre_prepare": pre_prepare_votes,
-            "prepare": prepare_votes,
-            "commit": commit_votes,
-            "accepted": accepted,
+            "alive_nodes": alive,
+            "accepts": accepts,
+            "rejects": rejects,
+            "required": required,
             "proposal_hash": proposal_hash,
+            "accepted": alive >= self.required_nodes and len(accepts) >= required,
         }
-
-        if not accepted:
+        if alive < self.required_nodes:
             raise ConsensusError(
-                f"COMMIT phase failed: {len(commit_votes['accept'])} < {2 * self.f + 1}",
+                f"Insufficient nodes for BFT: {alive} < {self.required_nodes} (f={self.f})",
                 ballot=ballot,
             )
-
-        return accepted, ballot
+        if len(accepts) < required:
+            raise ConsensusError(
+                f"COMMIT phase failed: {len(accepts)} < {required}",
+                ballot=ballot,
+            )
+        return True, ballot

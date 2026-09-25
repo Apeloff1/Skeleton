@@ -82,11 +82,17 @@ class QuorumSensor:
         release_fraction: float = 0.3,
         absolute_floor: int = 1,
     ) -> BehaviourGate:
-        if not 0.0 < release_fraction <= engage_fraction <= 1.0:
+        if (
+            isinstance(engage_fraction, bool)
+            or isinstance(release_fraction, bool)
+            or not 0.0 < release_fraction <= engage_fraction <= 1.0
+        ):
             raise QuorumError(
                 "thresholds must satisfy 0 < release <= engage <= 1",
                 context={"engage": engage_fraction, "release": release_fraction},
             )
+        if isinstance(absolute_floor, bool) or not isinstance(absolute_floor, int) or absolute_floor < 1:
+            raise QuorumError("absolute_floor must be a positive integer", context={"absolute_floor": absolute_floor})
         gate = BehaviourGate(
             name=name,
             engage_fraction=engage_fraction,
@@ -108,6 +114,12 @@ class QuorumSensor:
                 "signal for unregistered behaviour",
                 context={"behaviour": behaviour, "agent_id": agent_id},
             )
+        if not isinstance(agent_id, str) or not agent_id.strip():
+            raise QuorumError("agent_id is required", context={"behaviour": behaviour})
+        if isinstance(ttl_s, bool) or not isinstance(ttl_s, (int, float)) or not ttl_s > 0:
+            raise QuorumError("ttl_s must be positive", context={"ttl_s": ttl_s})
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not weight > 0:
+            raise QuorumError("weight must be positive", context={"weight": weight})
         now = time.time() if now is None else now
         signal = Signal(agent_id=agent_id, behaviour=behaviour,
                         emitted_at=now, ttl_s=ttl_s, weight=weight)
