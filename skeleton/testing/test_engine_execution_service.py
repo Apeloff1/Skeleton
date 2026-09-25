@@ -539,13 +539,13 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
         tenant_id="tenant-a",
         now=_now(),
     )
-    assert pending == (
-        {
-            "call_id": call.call_id,
-            "tool_id": call.tool_id,
-            "arguments_digest": call.arguments_digest,
-        },
-    )
+    assert len(pending) == 1
+    row = pending[0]
+    assert row["call_id"] == call.call_id
+    assert row["tool_id"] == call.tool_id
+    assert row["arguments_digest"] == call.arguments_digest
+    assert row["idempotency_key"]
+    assert row["approval_ref"].startswith("approval:")
 
     approval = service.approve_tool_call(
         "exec-1",
@@ -555,7 +555,7 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
-        idempotency_key="approve-1",
+        idempotency_key=row["idempotency_key"],
         expires_at=_now() + timedelta(minutes=5),
         now=_now(),
     )
@@ -567,7 +567,7 @@ def test_tool_approval_is_bound_to_current_pending_call_and_survives_restart(
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
-        idempotency_key="approve-1",
+        idempotency_key=row["idempotency_key"],
         expires_at=_now() + timedelta(minutes=5),
         now=_now() + timedelta(seconds=30),
     )
@@ -651,6 +651,13 @@ def test_expired_persisted_approval_is_not_replayed_into_resume(tmp_path) -> Non
         now=_now(),
     )
     call, _ = _suspend_for_tool_approval(service)
+    pending = service.pending_tool_approvals(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
     approval = service.approve_tool_call(
         "exec-1",
         verified_service_principal="backend-service",
@@ -659,7 +666,7 @@ def test_expired_persisted_approval_is_not_replayed_into_resume(tmp_path) -> Non
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
-        idempotency_key="short-lived",
+        idempotency_key=pending[0]["idempotency_key"],
         expires_at=_now() + timedelta(seconds=1),
         now=_now(),
     )
@@ -790,6 +797,13 @@ def test_active_approval_refs_fail_closed_after_delegation_expiry(
         now=_now(),
     )
     call, _ = _suspend_for_tool_approval(service)
+    pending = service.pending_tool_approvals(
+        "exec-1",
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
     approval = service.approve_tool_call(
         "exec-1",
         verified_service_principal="backend-service",
@@ -798,7 +812,7 @@ def test_active_approval_refs_fail_closed_after_delegation_expiry(
         call_id=call.call_id,
         tool_id=call.tool_id,
         arguments_digest=call.arguments_digest,
-        idempotency_key="within-window",
+        idempotency_key=pending[0]["idempotency_key"],
         expires_at=_now() + timedelta(seconds=90),
         now=_now(),
     )
@@ -814,11 +828,22 @@ def test_active_approval_refs_fail_closed_after_delegation_expiry(
 
 def test_engine_approval_uses_request_bound_runtime_capability(tmp_path) -> None:
     service = _service_with_approval_scope(tmp_path)
-    command, call = _suspend_for_tool_approval(service)
+    command = _command()
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id=command.operation.actor_id,
+        tenant_id=command.operation.tenant_id,
+        now=_now(),
+    )
+    call, _ = _suspend_for_tool_approval(
+        service,
+        execution_id=command.execution_request.execution_id,
+    )
 
     pending = service.pending_tool_approvals(
         command.execution_request.execution_id,
-        verified_service_principal="codedock-backend",
+        verified_service_principal="backend-service",
         actor_id=command.operation.actor_id,
         tenant_id=command.operation.tenant_id,
         now=_now(),
@@ -829,7 +854,7 @@ def test_engine_approval_uses_request_bound_runtime_capability(tmp_path) -> None
 
     approval = service.approve_tool_call(
         command.execution_request.execution_id,
-        verified_service_principal="codedock-backend",
+        verified_service_principal="backend-service",
         actor_id=command.operation.actor_id,
         tenant_id=command.operation.tenant_id,
         call_id=call.call_id,
@@ -847,7 +872,7 @@ def test_engine_approval_uses_request_bound_runtime_capability(tmp_path) -> None
     ):
         service.approve_tool_call(
             command.execution_request.execution_id,
-            verified_service_principal="codedock-backend",
+            verified_service_principal="backend-service",
             actor_id=command.operation.actor_id,
             tenant_id=command.operation.tenant_id,
             call_id=call.call_id,
