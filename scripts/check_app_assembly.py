@@ -402,6 +402,18 @@ def audit_compose_modes() -> None:
         if "  backend:" in base and "\n  frontend:" in base
         else ""
     )
+    engine_token_marker = (
+        "SKL_ENGINE_SERVICE_TOKEN="
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}"
+    )
+    check(
+        engine_token_marker in skeleton_block,
+        "Skeleton engine service authentication token binding missing",
+    )
+    check(
+        engine_token_marker in backend_block,
+        "backend engine service authentication token binding missing",
+    )
     local_provider_consumers = _backend_local_provider_consumers()
     for provider_secret in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
         check(

@@ -32,16 +32,16 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 from core.databases import client as _SHARED_MONGO_CLIENT
-from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
+from core.engine_client import EngineClient, EngineClientError
+from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 
 router = APIRouter(prefix="/api/llm-router", tags=["llm-router"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "codedock")]
 PROJ = {"_id": 0}
-AI_REGISTRY = ProviderRegistry.from_env()
 
 # ─── Legacy planning catalog ────────────────────────────────────────────────
 # Entries may describe providers that are not currently declared for runtime
-# execution. The executable ensemble is always filtered through AI_REGISTRY.
+# execution. Runtime selection is owned by the Skeleton engine.
 # cost_in / cost_out are legacy planning estimates only, never billing truth.
 MODEL_CATALOG = {
     # ── OpenAI ──
@@ -130,40 +130,52 @@ CACHE_TTL_S = int(os.environ.get("LLM_ROUTER_CACHE_TTL_S", "3600"))
 CACHE_MAX = int(os.environ.get("LLM_ROUTER_CACHE_MAX", "512"))
 
 
+def _engine_available() -> bool:
+    try:
+        return EngineClient.from_env() is not None
+    except EngineClientError:
+        return False
+
+
 def _active_provider_id() -> str:
-    return AI_REGISTRY.active_id
+    return "skeleton-engine"
 
 
 def _provider_status() -> dict:
+    available = _engine_available()
     return {
-        "active": AI_REGISTRY.active_id,
-        "available": AI_REGISTRY.available,
-        "providers": AI_REGISTRY.statuses(),
+        "active": "skeleton-engine",
+        "available": available,
+        "providers": [
+            {
+                "id": "skeleton-engine",
+                "available": available,
+                "active": True,
+                "ownership": "engine-process",
+            }
+        ],
     }
 
 
 def _model_is_executable(model: str) -> bool:
-    meta = MODEL_CATALOG.get(model)
-    return bool(meta and meta.get("provider") == _active_provider_id())
+    # Vendor/model selection is engine-owned. Catalog entries are planning metadata.
+    return False
 
 
 def _executable_ensemble(task: str, pinned_model: str = "") -> list[str]:
+    del task
     if pinned_model:
-        if pinned_model not in MODEL_CATALOG:
-            return []
-        candidates = [pinned_model]
-    else:
-        candidates = list(ROUTING_POLICY.get(task, ROUTING_POLICY["default"]))
-    return [model for model in candidates if _model_is_executable(model)]
+        return []
+    return ["engine-routed"] if _engine_available() else []
 
 
 def _catalog_view() -> dict[str, dict]:
-    active = _active_provider_id()
     return {
         model: {
             **meta,
-            "declared": meta.get("provider") == active,
-            "executable": meta.get("provider") == active and AI_REGISTRY.available,
+            "declared": False,
+            "executable": False,
+            "execution_owner": "skeleton-engine",
         }
         for model, meta in MODEL_CATALOG.items()
     }
@@ -242,15 +254,13 @@ async def _log_call(rec: dict):
 async def route_complete(task: str, prompt: str, system: str = "",
                          session_id: str = "", timeout_s: float = None,
                          use_cache: bool = True, model: str = "") -> dict:
-    """Route a completion through the task ensemble with cache + fallback.
+    """Execute one compatibility completion through the canonical engine.
 
-    If `model` is supplied and known, it pins the ensemble to that single model
-    (no fallback) — used by the dashboard test-bench to exercise any specific
-    model in the catalog. Returns {content, model, provider, cached,
-    latency_ms, est_cost_usd, attempts, task}. Never raises for routing/provider
-    issues — returns an `error` field so the pipeline degrades gracefully."""
+    The legacy model catalog remains planning metadata only. Provider/model
+    selection and failover are engine-owned; this route does not create a
+    second provider runtime or pretend to pin a vendor model locally.
+    """
     task = (task or "default").lower()
-    ensemble = _executable_ensemble(task, model)
     timeout_s = timeout_s or DEFAULT_TIMEOUT_S
     _STATS["calls"] += 1
 
@@ -259,118 +269,100 @@ async def route_complete(task: str, prompt: str, system: str = "",
         hit = _CACHE.get(key)
         if hit is not None:
             _STATS["cache_hits"] += 1
-            await _log_call({"task": task, "model": hit["model"], "cached": True,
-                             "latency_ms": 0, "est_cost_usd": 0.0})
+            await _log_call({
+                "task": task,
+                "model": hit["model"],
+                "provider": hit["provider"],
+                "cached": True,
+                "latency_ms": 0,
+                "est_cost_usd": 0.0,
+            })
             return {**hit, "cached": True, "latency_ms": 0, "est_cost_usd": 0.0}
 
-    if model and model in MODEL_CATALOG and not ensemble:
+    if model:
         _STATS["errors"] += 1
         return {
             "content": "",
-            "error": "requested model belongs to an undeclared provider",
-            "error_code": "provider_not_declared",
-            "model": model,
-            "provider": MODEL_CATALOG[model].get("provider"),
+            "error": "model pinning is owned by the Skeleton engine",
+            "error_code": "model_pinning_unavailable",
+            "model": model if model in MODEL_CATALOG else None,
+            "provider": "skeleton-engine",
             "cached": False,
             "task": task,
         }
 
-    if not ensemble:
-        _STATS["errors"] += 1
-        return {
-            "content": "",
-            "error": "no executable model for active provider",
-            "error_code": "no_executable_model",
-            "model": None,
-            "provider": _active_provider_id(),
-            "cached": False,
-            "task": task,
-        }
-
-    try:
-        adapter = AI_REGISTRY.require_active()
-    except ProviderError:
-        _STATS["errors"] += 1
-        return {
-            "content": "",
-            "error": "AI provider unavailable",
-            "error_code": "provider_unavailable",
-            "model": None,
-            "provider": _active_provider_id(),
-            "cached": False,
-            "task": task,
-        }
-
-    del session_id  # retained only for API compatibility; provider sessions are request-scoped
-    for i, candidate_model in enumerate(ensemble):
-        t0 = time.time()
-        try:
-            resp = await asyncio.wait_for(
-                adapter.generate(
-                    ProviderRequest(
-                        instructions=system or "You are a helpful assistant.",
-                        prompt=prompt,
-                        model=candidate_model,
-                    )
-                ),
-                timeout=timeout_s,
-            )
-            content = resp.text
-            actual_model = resp.model
-            actual_provider = resp.provider
-            latency_ms = int((time.time() - t0) * 1000)
-            cost = _estimate_cost(candidate_model, len(prompt) + len(system), len(content))
-            if i > 0:
-                _STATS["fallbacks"] += 1
-            result = {
-                "content": content,
-                "model": actual_model,
-                "provider": actual_provider,
-                "cached": False,
-                "latency_ms": latency_ms,
-                "est_cost_usd": cost,
-                "attempts": i + 1,
+    identity = hashlib.sha256(
+        json.dumps(
+            {
                 "task": task,
-            }
-            if use_cache:
-                _CACHE.set(
-                    key,
-                    {
-                        "content": content,
-                        "model": actual_model,
-                        "provider": actual_provider,
-                        "task": task,
-                    },
+                "system": system,
+                "prompt": prompt,
+                "session_id": session_id,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    started = time.time()
+    try:
+        response = await asyncio.wait_for(
+            execute_engine_text(
+                EngineTextRequest(
+                    instructions=system or "You are a helpful assistant.",
+                    prompt=prompt,
+                    idempotency_key="llm-router:" + identity,
+                    actor_id="llm-router",
+                    capability="assistant.compat",
+                    verification_profile="assistant_proposal",
+                    max_output_tokens=8192,
                 )
-            await _log_call(
-                {
-                    "task": task,
-                    "model": actual_model,
-                    "provider": actual_provider,
-                    "cached": False,
-                    "latency_ms": latency_ms,
-                    "est_cost_usd": cost,
-                    "fallback": i > 0,
-                }
-            )
-            return result
-        except (ProviderError, TimeoutError, asyncio.TimeoutError):
-            continue
-        except Exception:
-            continue
+            ),
+            timeout=timeout_s,
+        )
+    except (EngineTextError, TimeoutError, asyncio.TimeoutError):
+        _STATS["errors"] += 1
+        await _log_call({
+            "task": task,
+            "model": "engine-routed",
+            "provider": "skeleton-engine",
+            "cached": False,
+            "error": "engine_request_failed",
+        })
+        return {
+            "content": "",
+            "error": "engine_request_failed",
+            "error_code": "engine_unavailable",
+            "model": "engine-routed",
+            "provider": "skeleton-engine",
+            "cached": False,
+            "task": task,
+            "attempts": 1,
+        }
 
-    _STATS["errors"] += 1
-    await _log_call({"task": task, "model": None, "cached": False, "error": "llm_request_failed"})
-    return {
-        "content": "",
-        "error": "llm_request_failed",
-        "error_code": "provider_attempts_exhausted",
-        "model": None,
-        "provider": _active_provider_id(),
+    latency_ms = int((time.time() - started) * 1000)
+    result = {
+        "content": response.text,
+        "model": "engine-routed",
+        "provider": "skeleton-engine",
         "cached": False,
+        "latency_ms": latency_ms,
+        "est_cost_usd": 0.0,
+        "attempts": 1,
         "task": task,
-        "attempts": len(ensemble),
     }
+    if use_cache:
+        _CACHE.set(
+            key,
+            {
+                "content": response.text,
+                "model": "engine-routed",
+                "provider": "skeleton-engine",
+                "task": task,
+            },
+        )
+    await _log_call(result)
+    return result
 
 
 # ════════════════════════════ API surface ════════════════════════════
@@ -394,6 +386,7 @@ async def get_policy():
         "planning_policy": ROUTING_POLICY,
         "models": _catalog_view(),
         "provider": _provider_status(),
+        "key_configured": _engine_available(),
         "cache": {"ttl_s": CACHE_TTL_S, "max": CACHE_MAX, "size": len(_CACHE._d)},
     }
 

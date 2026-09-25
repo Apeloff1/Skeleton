@@ -285,6 +285,7 @@ class ServerState:
                             "engine:cancel",
                             "engine:events",
                             "engine:approve",
+                            "engine:media",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,

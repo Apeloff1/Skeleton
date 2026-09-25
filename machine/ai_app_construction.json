@@ -1915,7 +1915,7 @@
       "plane": "engine-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Phase-1 engine endpoints and phase-2 backend chat delegation are materialized. Phase-3 process isolation is prepared but intentionally gated: active backend ProviderRegistry consumers still exist, so backend runtime-model credentials must remain available until parity is complete. The remaining gap is migration of those consumers, then credential removal, cross-service cancellation/retry proof, and golden-journey closure.",
+      "gap": "Backend text and media execution now delegate through the authenticated Skeleton engine boundary. Canonical Compose no longer injects runtime-model credentials into the backend process; image generation/edit/variation and expressive TTS use authenticated engine media endpoints backed by the existing governed provider runtime. Remaining closure work is exact-head parity validation plus deployed cross-service delegated-authority, retry/query, cancel/late-result fencing, and golden-journey evidence.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -5979,20 +5979,21 @@
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
-        "ships product/application API plus Skeleton compatibility code",
-        "delegates configured product chat execution through backend/core/engine_client.py to the canonical engine API",
-        "still contains active local ProviderRegistry consumers outside the canonical chat cutover",
-        "therefore retains transitional OpenAI/Emergent runtime credentials until the local activation inventory reaches zero",
-        "waits for a healthy Skeleton engine before serving assembled AI ingress"
+        "delegates migrated text AI execution through backend/core/engine_text.py and backend/core/engine_client.py",
+        "delegates image generation, image variation/edit, and expressive TTS through authenticated engine media client methods",
+        "authenticates engine transport with required SKL_ENGINE_SERVICE_TOKEN plus granted service principal",
+        "does not receive OPENAI_API_KEY or EMERGENT_LLM_KEY in canonical Compose",
+        "retains product/conversation/cache/projection ownership but no runtime provider credential ownership"
       ],
       "skeleton_process": [
-        "owns the canonical engine API root and AIExecution orchestration runtime",
-        "receives runtime model-provider credentials in canonical compose",
+        "owns the canonical engine API, cognitive execution runtime, runtime provider credentials, and media provider transport",
+        "verifies backend bearer token before service-principal grant checks",
+        "requires engine:media plus tenant/capability grant before image or speech provider I/O",
         "owns durable engine execution, submission, and tool-receipt state under skeleton_data",
-        "validates service principal plus delegated actor/tenant/capability authority"
+        "applies existing provider governance/admission/quota controls to engine-side image and speech execution"
       ],
-      "cutover_guard": "App Assembly discovers production backend ProviderRegistry.from_env activators. While any remain, backend credentials are required; once none remain, the same gate forbids backend provider credentials.",
-      "remaining_gap": "migrate every active backend provider consumer to the engine boundary, remove transitional backend credentials only after that inventory is zero, then prove cross-service retry/cancel/golden-journey closure"
+      "cutover_guard": "App Assembly AST-scans every production backend Python module for ProviderRegistry.from_env activation. Canonical Compose now forbids backend runtime-model credentials; exact-head validation must prove the activation inventory is zero.",
+      "remaining_gap": "prove exact-head zero backend provider activators and complete deployed cross-service retry/query, delegated-authority denial, cancel/late-result fencing, and operation/turn/verification/provider/tool/result golden-journey evidence"
     },
     "target_process_ownership": {
       "backend": {
@@ -6056,6 +6057,30 @@
         "target": "/api/v1/executions/{operation_id}/events",
         "response": "canonical operation stream projection",
         "semantics": "cursor-based replay; backend may proxy/project but not invent engine state"
+      },
+      "media_image_generate": {
+        "method": "POST",
+        "target": "/api/v1/engine/media/images/generate",
+        "response": "provider-neutral bounded image payload",
+        "semantics": "authenticated engine-owned image generation; requires engine:media and media.image grant"
+      },
+      "media_image_variation": {
+        "method": "POST",
+        "target": "/api/v1/engine/media/images/variation",
+        "response": "provider-neutral bounded image payload",
+        "semantics": "authenticated engine-owned image variation with bounded base64 source media"
+      },
+      "media_image_edit": {
+        "method": "POST",
+        "target": "/api/v1/engine/media/images/edit",
+        "response": "provider-neutral bounded image payload",
+        "semantics": "authenticated engine-owned image edit with bounded source/mask media"
+      },
+      "media_speech": {
+        "method": "POST",
+        "target": "/api/v1/engine/media/speech",
+        "response": "bounded base64 speech payload",
+        "semantics": "authenticated engine-owned speech synthesis; requires engine:media and media.speech grant"
       }
     },
     "delegated_authority": {
@@ -6143,7 +6168,7 @@
       "phase_0": "compatibility: backend may still execute canonical provider runtime in-process",
       "phase_1": "engine execution endpoints and service auth available",
       "phase_2": "backend AI routes delegate; shadow local provider calls blocked by tests",
-      "phase_3": "runtime provider credentials removed from backend deployment and available only to Skeleton engine",
+      "phase_3": "implemented in ENG-04 source: runtime provider credentials are removed from backend canonical Compose and remain only in Skeleton engine; exact-head parity validation remains required",
       "phase_4": "backend/core/ai_provider.py becomes remote compatibility client or is retired",
       "invariant": "never remove backend credential before delegation parity is proven; never claim process convergence while backend still requires it"
     },
@@ -7262,10 +7287,12 @@
       },
       {
         "path": "backend/routes/image_generation.py",
-        "role": "media request adapter delegating to canonical provider runtime",
+        "role": "media request adapter delegating to authenticated Skeleton engine media boundary",
         "required_tokens": [
-          "ProviderRegistry",
-          "ProviderImageRequest"
+          "EngineClient",
+          "generate_image",
+          "create_image_variation",
+          "edit_image"
         ],
         "forbidden_edge_classes": [
           "credential",
@@ -7275,8 +7302,10 @@
       },
       {
         "path": "backend/core/expressive_tts.py",
-        "role": "provider-neutral speech cadence preparation",
+        "role": "speech presentation adapter delegating synthesis to authenticated Skeleton engine media boundary",
         "required_tokens": [
+          "EngineClient",
+          "synthesize_speech",
           "shape_cadence",
           "resolve_tone"
         ],

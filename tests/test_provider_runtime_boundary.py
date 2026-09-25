@@ -171,13 +171,17 @@ def test_canonical_provider_runtime_may_import_declared_vendor_sdk(tmp_path: Pat
     assert audit_repository(tmp_path) == []
 
 
-def test_lafs_has_no_shadow_provider_credentials_or_client() -> None:
+def test_lafs_has_no_shadow_or_local_provider_runtime() -> None:
     relative = "backend/routes/lafs.py"
     source = (ROOT / relative).read_text(encoding="utf-8")
 
     assert "EMERGENT_LLM_KEY" not in source
     assert "emergentintegrations.llm.chat" not in source
-    assert "ProviderRegistry.from_env()" in source
+    assert "ProviderRegistry.from_env()" not in source
+    assert "EngineTextRequest" in source
+    assert "execute_engine_text" in source
+    assert '(system + "\\x1f" + prompt).encode("utf-8")' in source
+    assert 'verification_profile="evidence_required"' in source
 
     discovered = discover_provider_surfaces(ROOT)
     assert relative not in discovered

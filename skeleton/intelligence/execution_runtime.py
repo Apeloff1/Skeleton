@@ -87,9 +87,18 @@ class ExecutionVerificationDecision:
                     "passed verification requires outcome=passed"
                 )
             if not refs:
-                raise CognitiveExecutionError(
-                    "passed model-output verification requires external evidence refs"
+                policy = normalized.get("policy")
+                structural_assistant_proposal = (
+                    normalized.get("verification_profile") == "assistant_proposal"
+                    and normalized.get("claim_kind") == ClaimKind.HYPOTHESIS.value
+                    and isinstance(policy, Mapping)
+                    and policy.get("level") == 0
+                    and policy.get("required_modes") == ["structural"]
                 )
+                if not structural_assistant_proposal:
+                    raise CognitiveExecutionError(
+                        "passed model-output verification requires external evidence refs"
+                    )
         object.__setattr__(self, "receipt", normalized)
         object.__setattr__(self, "evidence_refs", tuple(refs))
 
@@ -886,6 +895,84 @@ class CognitiveExecutionRuntime:
             )
         )
 
+        # Provider I/O may outlive a concurrent cancellation request (or the
+        # execution deadline). Never transition using the stale pre-call
+        # execution snapshot. Re-read canonical state, account for the provider
+        # work that actually happened, and fence the late result before it can
+        # become user-visible success.
+        durable_after_provider = self.repository.get(
+            execution.execution_id
+        )
+        if (
+            durable_after_provider.cancellation_requested
+            or self._deadline_expired(payload, now=now)
+        ):
+            late_provider_ref = (
+                "provider:"
+                + response.provider
+                + ":"
+                + str(
+                    response.response_id
+                    or response.request_id
+                    or turn_id
+                )
+            )
+            late_receipts = list(
+                payload.get("provider_receipts", [])
+            )
+            late_receipts.append(late_provider_ref)
+            late_usage = list(payload.get("usage_events", []))
+            late_usage.append(response.usage.as_dict())
+            payload.update(
+                {
+                    "provider_receipts": late_receipts,
+                    "usage_events": late_usage,
+                    "last_provider": {
+                        "turn_id": turn_id,
+                        "turn_index": turn_index,
+                        "provider_ref": late_provider_ref,
+                        "provider_request_id": response.request_id,
+                        "provider_response_id": response.response_id,
+                        "text": response.text,
+                        "structured_output": (
+                            None
+                            if response.structured_output is None
+                            else dict(response.structured_output)
+                        ),
+                        "tool_calls": [
+                            call.as_dict()
+                            for call in response.tool_calls
+                        ],
+                        "finish_reason": response.finish_reason.value,
+                        "usage": response.usage.as_dict(),
+                        "late_result_fenced": True,
+                    },
+                }
+            )
+            durable_after_provider, _ = self._checkpoint(
+                durable_after_provider,
+                payload,
+                now=now,
+            )
+            if durable_after_provider.cancellation_requested:
+                return self._finalize_non_success(
+                    durable_after_provider,
+                    payload,
+                    status="cancelled",
+                    error_code="cancellation_requested",
+                    now=now,
+                )
+            return self._finalize_non_success(
+                durable_after_provider,
+                payload,
+                status="failed",
+                error_code="execution_deadline_exceeded",
+                now=now,
+            )
+
+        execution = durable_after_provider
+
+
         execution = self._transition(
             execution,
             ExecutionState.PROVIDER_COMPLETED,
@@ -1545,6 +1632,32 @@ class CognitiveExecutionRuntime:
                 execution.execution_id + ":verification",
             )
         )
+        verification_profile = execution.request.context_policy.get(
+            "verification_profile",
+            "evidence_required",
+        )
+        if verification_profile == "evidence_required":
+            claim_kind = ClaimKind.STRUCTURED_OUTPUT
+        elif verification_profile == "assistant_proposal":
+            capability = execution.request.context_policy.get("capability")
+            allowed_tool_ids = execution.request.tool_policy.get(
+                "allowed_tool_ids",
+                [],
+            )
+            if capability not in {"assistant.chat", "assistant.compat"}:
+                raise CognitiveExecutionError(
+                    "assistant_proposal verification requires assistant capability"
+                )
+            if not isinstance(allowed_tool_ids, list) or allowed_tool_ids:
+                raise CognitiveExecutionError(
+                    "assistant_proposal verification requires tool-free execution"
+                )
+            claim_kind = ClaimKind.HYPOTHESIS
+        else:
+            raise CognitiveExecutionError(
+                "unsupported execution verification_profile"
+            )
+
         claim = VerificationClaim(
             claim_id=_stable_uuid(
                 "skeleton-execution-verification-claim",
@@ -1554,7 +1667,7 @@ class CognitiveExecutionRuntime:
             ),
             tenant_id=tenant_id.strip(),
             text=candidate.strip(),
-            kind=ClaimKind.STRUCTURED_OUTPUT,
+            kind=claim_kind,
             risk=VerificationRisk.LOW,
             created_at=instant,
             operation_id=_tool_operation_uuid(execution.operation_id),
@@ -1581,6 +1694,9 @@ class CognitiveExecutionRuntime:
         receipt = {
             "claim_id": claim.claim_id,
             "claim_digest": claim.digest,
+            "verification_profile": verification_profile,
+            "claim_kind": claim.kind.value,
+            "risk": claim.risk.value,
             "outcome": assessment.outcome.value,
             "policy_satisfied": assessment.policy_satisfied,
             "policy": {
