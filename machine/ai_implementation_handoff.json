@@ -554,8 +554,6 @@
         "backend/tests/test_tool_registry_canonical_delegate.py verifies restart persistence and fail-closed lifecycle behavior"
       ],
       "remaining": [
-        "bind governance lifecycle policy to durable tool result references",
-        "prove minimal provider tool projection and current-head provider-surface isolation",
         "collect exact-head CI and independent verification after dependencies close"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
