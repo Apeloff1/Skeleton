@@ -11,9 +11,12 @@ import pytest
         "feedback.py",
         "freshness.py",
         "fusion.py",
+        "index.py",
+        "pipeline.py",
         "plane_weights.py",
         "quad.py",
         "receipts.py",
+        "reranker_contract.py",
         "scope.py",
     ),
 )
