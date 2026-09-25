@@ -598,7 +598,7 @@ async def ai_chat(
             prompt=user_prompt,
             history=history,
             service_principal=engine_client.config.service_principal,
-            created_at=user_message.created_at,
+            created_at=datetime.now(timezone.utc),
             deadline=engine_deadline,
             trace_id="chat:" + operation_id,
             max_model_turns=4,
