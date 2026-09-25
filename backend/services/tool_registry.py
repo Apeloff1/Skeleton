@@ -39,8 +39,10 @@ from skeleton.skills.tool_adapters import (
     ArtifactAdapterPolicy,
     AsyncArtifactPackageAdapter,
     AsyncDatabaseQueryAdapter,
+    AsyncJeevesConsultAdapter,
     AsyncNetworkSearchAdapter,
     AsyncSandboxCompileAdapter,
+    AsyncVaultQueryAdapter,
     DatabaseAdapterPolicy,
     NetworkEgressPolicy,
     SandboxAdapterPolicy,
@@ -75,6 +77,10 @@ def _db():
     return _client[_DB_NAME]
 
 
+_VAULT_OWNER = AsyncVaultQueryAdapter(vault_port=vault_loader)
+_JEEVES_OWNER = AsyncJeevesConsultAdapter(
+    consultant_port=jeeves_consultant
+)
 _SANDBOX_OWNER = AsyncSandboxCompileAdapter(
     policy=_SANDBOX_POLICY,
     execution_enabled=lambda: code_execution_enabled(),
@@ -98,21 +104,11 @@ _ARTIFACT_OWNER = AsyncArtifactPackageAdapter(
 # Compatibility delegates
 # ─────────────────────────────────────────────────────────────────
 async def _tool_vault_query(params: dict) -> dict:
-    topic = params.get("topic") or params.get("collection") or ""
-    limit = int(params.get("limit", 10))
-    if params.get("collection"):
-        rows = vault_loader.query_collection(params["collection"], limit=limit,
-                                              contains=params.get("contains"))
-        return {"collection": params["collection"], "rows": rows, "count": len(rows)}
-    return {"topic": topic, "matches": vault_loader.query_topic(topic, limit=limit)}
+    return await _VAULT_OWNER.execute(params)
 
 
 async def _tool_jeeves_consult(params: dict) -> dict:
-    return await jeeves_consultant.consult(
-        params.get("context", "lesson"),
-        topic=params.get("topic", ""),
-        limit=int(params.get("limit", 1)),
-    )
+    return await _JEEVES_OWNER.execute(params)
 
 
 async def _tool_compile_code(params: dict) -> dict:
