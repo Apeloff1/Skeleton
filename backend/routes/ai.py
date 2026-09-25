@@ -1,10 +1,9 @@
-"""AI assistant routes backed by the canonical provider runtime.
+"""AI assistant routes backed by the canonical Skeleton engine boundary.
 
-The API surface remains compatible with the existing coding assistant while
-provider execution now lives behind ``core.ai_provider``. This keeps vendor
-SDK details out of HTTP handlers, preserves conversation history, reports
-provider readiness accurately, and avoids leaking raw provider exceptions to
-clients.
+The public coding-assistant surface remains stable while model execution,
+provider credentials, durable execution state, and verification are owned by
+the Skeleton engine process. HTTP handlers compile bounded context and submit
+delegated engine commands; they do not instantiate provider transports.
 """
 
 from __future__ import annotations
@@ -20,15 +19,6 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from core.ai_provider import (
-    ProviderError,
-    ProviderPolicyError,
-    ProviderRegistry,
-    ProviderRequest,
-    normalize_history,
-    provider_request_from_context,
-    require_provider_response_context,
-)
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
     EngineClient,
@@ -51,9 +41,6 @@ from skeleton.persistence.conversation_repository import (
 
 logger = logging.getLogger("CodeDock.AI")
 router = APIRouter(prefix="/ai", tags=["AI Assistant v16"])
-AI_REGISTRY = ProviderRegistry.from_env()
-
-
 AI_MODES = {
     "explain": {
         "id": "explain",
@@ -323,9 +310,15 @@ def _compile_chat_context(
     )
 
 
+def _engine_configured() -> bool:
+    try:
+        return EngineClient.from_env() is not None
+    except EngineClientError:
+        return False
+
+
 def _active_model() -> str:
-    active = AI_REGISTRY.active
-    return active.model if active is not None else "unavailable"
+    return "engine-routed" if _engine_configured() else "unavailable"
 
 
 def _extract_code_blocks(text: str) -> list[dict[str, str]]:
@@ -363,59 +356,162 @@ async def call_llm(
     instruction_policy: InstructionPolicy | None = None,
     context_envelope: ContextEnvelope | None = None,
 ) -> Dict[str, Any]:
-    """Execute one model request without exposing provider exception details."""
+    """Compatibility text execution through the canonical engine boundary."""
 
     try:
-        adapter = AI_REGISTRY.require_active()
-        policy = instruction_policy
-        if context_envelope is not None:
-            if policy is not None:
-                expected_source = policy.policy_id + "@" + policy.version
-                if not any(
-                    segment.source_id == expected_source
-                    for segment in context_envelope.instruction_segments
-                ):
-                    raise ProviderPolicyError(
-                        "compiled context is not bound to requested instruction policy"
-                    )
-            provider_request = provider_request_from_context(
-                context_envelope,
-                purpose="model-inference",
-                max_output_tokens=max_output_tokens,
-            )
-            response = await adapter.generate(provider_request)
-            require_provider_response_context(response, context_envelope)
-        else:
-            instructions = policy.instructions if policy is not None else system_prompt
-            response = await adapter.generate(
-                ProviderRequest(
-                    instructions=instructions,
-                    prompt=user_prompt,
-                    history=normalize_history(history),
-                    max_output_tokens=max_output_tokens,
-                )
-            )
+        client = EngineClient.from_env()
+    except EngineClientError:
+        logger.error("AI engine configuration is invalid")
         return {
-            "success": True,
-            "response": response.text,
-            "provider": response.provider,
-            "model": response.model,
-            "provider_request_id": response.request_id,
-            "latency_ms": response.latency_ms,
-            "instruction_policy_id": policy.policy_id if policy is not None else None,
-            "instruction_policy_version": policy.version if policy is not None else None,
-            "instruction_policy_digest": policy.digest if policy is not None else None,
-            "context_id": response.context_id,
-            "context_digest": response.context_digest,
-            "context_source_snapshot": response.context_source_snapshot,
-            "context_compiler_version": response.context_compiler_version,
+            "success": False,
+            "error": "AI engine is unavailable",
+            "error_code": "engine_configuration_invalid",
         }
-    except ProviderError as exc:
-        logger.warning("AI provider unavailable or failed: %s", exc.__class__.__name__)
-        return {"success": False, "error": "AI provider is unavailable", "error_code": "provider_unavailable"}
+    if client is None:
+        return {
+            "success": False,
+            "error": "AI engine is unavailable",
+            "error_code": "engine_unavailable",
+        }
+
+    now = datetime.now(timezone.utc)
+    policy = instruction_policy
+    if policy is None:
+        instruction_text = str(system_prompt or "").strip()
+        if not instruction_text:
+            return {
+                "success": False,
+                "error": "AI request is invalid",
+                "error_code": "instruction_policy_missing",
+            }
+        policy = InstructionPolicy(
+            policy_id=(
+                "backend.ai.compat."
+                + hashlib.sha256(instruction_text.encode("utf-8")).hexdigest()[:24]
+            ),
+            version="1",
+            instructions=instruction_text,
+        )
+
+    if context_envelope is None:
+        operation_id = str(uuid.uuid4())
+        execution_id = str(uuid.uuid4())
+        turn_id = str(uuid.uuid4())
+        prompt_text = str(user_prompt or "").strip()
+        if not prompt_text:
+            return {
+                "success": False,
+                "error": "AI request is invalid",
+                "error_code": "prompt_missing",
+            }
+        segments = [
+            policy.to_segment(
+                tenant_id="*",
+                purpose="model-inference",
+                created_at=now,
+                mandatory=True,
+            ),
+            artifact_segment(
+                artifact_id="ai-compat-prompt:" + turn_id,
+                content=prompt_text,
+                tenant_id="default",
+                purpose="model-inference",
+                created_at=now,
+                data_class="internal",
+                retention_class="ephemeral-ai-request",
+                priority=800,
+                relevance=1.0,
+            ),
+        ]
+        context_envelope = ContextCompiler().compile(
+            operation_id=operation_id,
+            execution_id=execution_id,
+            turn_id=turn_id,
+            tenant_id="default",
+            purpose="model-inference",
+            budget=CHAT_CONTEXT_BUDGET,
+            segments=segments,
+            tools_enabled=False,
+            compiled_at=now,
+        )
+
+    try:
+        command = command_from_context(
+            context=context_envelope,
+            actor_id="backend-ai",
+            capability="assistant.compat",
+            idempotency_key="engine-compat:" + context_envelope.operation_id,
+            instructions=policy.instructions,
+            prompt=str(user_prompt).strip(),
+            objective="Execute backend AI compatibility request",
+            verification_profile="assistant_proposal",
+            history=history or (),
+            service_principal=client.config.service_principal,
+            created_at=now,
+            deadline=now + timedelta(seconds=client.config.execution_timeout_s),
+            trace_id="ai-compat:" + context_envelope.operation_id,
+            max_model_turns=4,
+            max_output_tokens=max_output_tokens,
+            max_tool_calls=1,
+            max_repeat_tool_batches=1,
+            context_seed_refs=(
+                "context:" + context_envelope.context_id,
+                "turn:" + context_envelope.turn_id,
+            ),
+        )
+        result = await client.execute(command)
+    except EngineExecutionFailed as exc:
+        logger.warning(
+            "AI engine execution failed code=%s",
+            exc.failure_code or "unknown",
+        )
+        return {
+            "success": False,
+            "error": "AI execution failed",
+            "error_code": exc.failure_code or "engine_execution_failed",
+        }
+    except EngineUnavailableError:
+        logger.warning("AI engine is unavailable")
+        return {
+            "success": False,
+            "error": "AI engine is unavailable",
+            "error_code": "engine_unavailable",
+        }
+    except EngineClientError:
+        logger.warning("AI engine protocol rejected request")
+        return {
+            "success": False,
+            "error": "AI request failed",
+            "error_code": "engine_protocol_failure",
+        }
     except Exception:
-        logger.exception("Unexpected AI provider boundary failure")
-        return {"success": False, "error": "AI request failed", "error_code": "provider_failure"}
+        logger.exception("Unexpected AI engine boundary failure")
+        return {
+            "success": False,
+            "error": "AI request failed",
+            "error_code": "engine_failure",
+        }
+
+    return {
+        "success": True,
+        "response": result.final_output,
+        "provider": "skeleton-engine",
+        "model": "engine-routed",
+        "provider_request_id": None,
+        "engine_execution_id": result.execution_id,
+        "latency_ms": None,
+        "instruction_policy_id": policy.policy_id,
+        "instruction_policy_version": policy.version,
+        "instruction_policy_digest": policy.digest,
+        "context_id": context_envelope.context_id,
+        "context_digest": context_envelope.context_digest,
+        "context_source_snapshot": [
+            list(item) for item in context_envelope.source_snapshot
+        ],
+        "context_compiler_version": context_envelope.compiler_version,
+        "engine_verification": result.verification,
+        "engine_evidence_refs": list(result.evidence_refs),
+    }
 
 
 @router.get("/modes")
@@ -426,7 +522,11 @@ async def get_ai_modes() -> Dict[str, Any]:
         {"id": mode["id"], "name": mode["name"], "description": mode["description"], "icon": mode["icon"]}
         for mode in AI_MODES.values()
     ]
-    return {"modes": modes, "total": len(modes), "llm_available": AI_REGISTRY.available}
+    return {
+        "modes": modes,
+        "total": len(modes),
+        "llm_available": _engine_configured(),
+    }
 
 
 @router.post("/assist", response_model=AIAssistResponse)
@@ -470,7 +570,7 @@ async def ai_assist(request: AIAssistRequest) -> AIAssistResponse:
         code_blocks=[],
         confidence=0.0,
         model="unavailable",
-        provider=AI_REGISTRY.active_id,
+        provider="skeleton-engine" if _engine_configured() else None,
         ai_generated=False,
         timestamp=_utcnow(),
     )
@@ -625,6 +725,7 @@ async def ai_chat(
                     "Respond to canonical chat turn "
                     + user_message.message_id
                 ),
+                verification_profile="assistant_proposal",
                 history=history,
                 service_principal=engine_client.config.service_principal,
                 created_at=datetime.now(timezone.utc),
@@ -727,9 +828,9 @@ async def ai_chat(
     if not result["success"]:
         return {
             "success": False,
-            "response": "The AI provider is unavailable right now. Check provider configuration and retry.",
+            "response": "The AI engine is unavailable right now. Retry the request.",
             "ai_generated": False,
-            "provider": AI_REGISTRY.active_id,
+            "provider": "skeleton-engine" if _engine_configured() else None,
             "model": _active_model(),
             "error": result["error"],
             "error_code": result["error_code"],
@@ -796,12 +897,19 @@ async def ai_chat(
 
 @router.get("/providers")
 async def get_ai_providers() -> Dict[str, Any]:
-    """Return provider configuration without exposing credentials."""
+    """Return the application-visible engine provider boundary."""
 
+    available = _engine_configured()
     return {
-        "providers": AI_REGISTRY.statuses(),
-        "active": AI_REGISTRY.active_id,
-        "llm_available": AI_REGISTRY.available,
+        "providers": [
+            {
+                "id": "skeleton-engine",
+                "available": available,
+                "ownership": "engine-process",
+            }
+        ],
+        "active": "skeleton-engine" if available else None,
+        "llm_available": available,
     }
 
 
@@ -825,13 +933,13 @@ async def ai_quick_actions(code: str, language: str = "python") -> Dict[str, Any
 
 @router.get("/status")
 async def ai_status() -> Dict[str, Any]:
-    """Return truthful runtime readiness for the active model provider."""
+    """Return application readiness for the canonical engine boundary."""
 
-    available = AI_REGISTRY.available
+    available = _engine_configured()
     return {
         "status": "operational" if available else "limited",
         "llm_available": available,
-        "provider": AI_REGISTRY.active_id,
+        "provider": "skeleton-engine" if available else None,
         "model": _active_model(),
         "features": {
             "code_assist": available,
