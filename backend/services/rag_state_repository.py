@@ -34,6 +34,14 @@ def _finite_number(value: object, field: str) -> float:
     return number
 
 
+def _nonnegative_integer(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RAGStateError(f"{field} must be an integer")
+    if value < 0:
+        raise RAGStateError(f"{field} must be non-negative")
+    return value
+
+
 def _bounded_number(
     value: object,
     field: str,
@@ -178,15 +186,16 @@ class RAGStateRepository:
             "user_id": _required_text(user_id, "user_id"),
             "topic": _required_text(topic, "topic"),
             "content": str(content),
-            "duration_minutes": int(duration_minutes),
+            "duration_minutes": _nonnegative_integer(
+                duration_minutes,
+                "duration_minutes",
+            ),
             "mastery_delta": _finite_number(mastery_delta, "mastery_delta"),
             "timestamp": _utc_iso(timestamp),
             "metadata": _safe_mapping(metadata, "metadata"),
             "authority": "mongo",
             "schema_version": 1,
         }
-        if candidate["duration_minutes"] < 0:
-            raise RAGStateError("duration_minutes must be non-negative")
         coll = self._collection(self.LEARNING)
         existing = self._without_native_id(coll.find_one({"session_id": candidate["session_id"]}))
         self._assert_identity_match(
