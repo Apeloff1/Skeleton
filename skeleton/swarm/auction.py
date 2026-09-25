@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
-
-from skeleton.kernel.ids import AgentId
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from .types import AgentState, CapabilityVector
+
+
+class AuctionError(ValueError):
+    """A sealed bid cannot be priced."""
 
 # =============================================================================
 # RESOURCE AUCTIONING (VICKREY / SECOND-PRICE SEALED BID)
@@ -35,31 +37,35 @@ class VickreyAuction:
         self,
         task_requirements: CapabilityVector,
         bidders: List[AgentState],
+        bids: Optional[Mapping[str, float]] = None,
     ) -> Tuple[Optional[AgentState], float, List[Dict[str, Any]]]:
-        """Run auction. Returns (winner, price_paid, auction_record)."""
-        if not bidders:
-            return None, 0.0, []
-
-        bids: List[AuctionBid] = []
-        for bidder in bidders:
-            if not bidder.is_alive():
-                continue
-            match = bidder.capabilities.similarity(task_requirements)
-            value = bidder.effective_capacity() * match
-            cost = bidder.load_factor * 10.0
-            bids.append(AuctionBid(
+        """Price an explicit sealed bid. The auction does not invent one."""
+        if not isinstance(task_requirements, CapabilityVector):
+            raise AuctionError("task requirements are required")
+        if not isinstance(bids, Mapping) or len(bids) < 2:
+            raise AuctionError("a second-price auction needs at least two sealed bids")
+        live = {str(bidder.agent_id): bidder for bidder in bidders if bidder.is_alive()}
+        if len(live) != len([bidder for bidder in bidders if bidder.is_alive()]):
+            raise AuctionError("duplicate bidder")
+        sealed: List[AuctionBid] = []
+        for agent_id, value in bids.items():
+            if not isinstance(agent_id, str) or agent_id not in live:
+                raise AuctionError("bid is not from a live bidder")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not value > 0:
+                raise AuctionError("bid must be positive")
+            bidder = live[agent_id]
+            sealed.append(AuctionBid(
                 agent_id=bidder.agent_id,
-                value=value,
-                cost=cost,
-                capability_match=match,
+                value=float(value),
+                cost=float(value),
+                capability_match=bidder.capabilities.similarity(task_requirements),
             ))
-
-        if not bids:
-            return None, 0.0, []
-
-        bids.sort(key=lambda b: b.value, reverse=True)
+        if len(sealed) < 2:
+            raise AuctionError("a second-price auction needs at least two sealed bids")
+        sealed.sort(key=lambda bid: (-bid.value, str(bid.agent_id)))
+        bids = sealed
         winner_bid = bids[0]
-        second_price = bids[1].value if len(bids) > 1 else 0.0
+        second_price = bids[1].value
 
         winner = next(
             (b for b in bidders if b.agent_id == winner_bid.agent_id), None
