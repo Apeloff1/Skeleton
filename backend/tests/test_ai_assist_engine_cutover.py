@@ -141,3 +141,41 @@ def test_ai_route_source_has_no_local_provider_activation() -> None:
     assert "from core.ai_provider import" not in source
     assert "command_from_context" in source
     assert "EngineClient.from_env()" in source
+
+
+@pytest.mark.asyncio
+async def test_call_llm_preserves_requested_output_budget(route, monkeypatch) -> None:
+    captured = {}
+
+    class FakeEngineClient:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, command):
+            captured["command"] = command
+            return SimpleNamespace(
+                execution_id=command.execution_request.execution_id,
+                final_output="bounded answer",
+                verification="verification:budget",
+                evidence_refs=(),
+            )
+
+    fake = FakeEngineClient()
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: fake),
+    )
+
+    result = await route.call_llm(
+        "Follow policy.",
+        "Answer briefly.",
+        max_output_tokens=321,
+    )
+
+    assert result["success"] is True
+    command = captured["command"]
+    assert command.execution_request.resource_budget["max_output_tokens"] == 321
