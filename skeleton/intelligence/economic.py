@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Set
 
-from skeleton.intelligence.cascade import CascadeRouter, ModelFn
+from skeleton.intelligence.cascade import CascadeRouter, ModelFn, _bad_cost, _bad_unit
 from skeleton.kernel.events import DomainEvent, EventBus
 
 
@@ -82,6 +82,14 @@ class EconomicOptimiser:
         self._bus = bus
 
     def register_model(self, model: ModelOption) -> None:
+        if not isinstance(model.model_id, str) or not model.model_id.strip():
+            raise ValueError("model_id is required")
+        if model.model_id in self._models:
+            raise ValueError("model already registered")
+        if _bad_cost(model.cost_per_token) or _bad_cost(model.latency_ms) or _bad_unit(model.quality_score):
+            raise ValueError("model cost, latency, and quality must be finite")
+        if not isinstance(model.capabilities, set):
+            raise ValueError("capabilities must be a set")
         self._models[model.model_id] = model
 
     def compute_pareto_frontier(self) -> List[ModelOption]:
@@ -183,7 +191,9 @@ class EconomicOptimiser:
         """
 
         self._validate_token_estimate(token_estimate)
-        complexity = max(0.0, min(1.0, float(query_complexity)))
+        if isinstance(query_complexity, bool) or not isinstance(query_complexity, (int, float)) or not 0.0 <= float(query_complexity) <= 1.0:
+            raise ValueError("query_complexity must be in [0, 1]")
+        complexity = float(query_complexity)
         candidates = self._eligible_models(
             required_capabilities=required_capabilities,
             constraint=constraint,
@@ -237,10 +247,8 @@ class EconomicOptimiser:
         """
 
         self._validate_token_estimate(token_estimate)
-        if not 0.0 <= route_threshold <= 1.0:
-            raise ValueError("route_threshold must be in [0, 1]")
-        if not 0.0 <= escalate_below <= 1.0:
-            raise ValueError("escalate_below must be in [0, 1]")
+        if _bad_unit(route_threshold) or _bad_unit(escalate_below):
+            raise ValueError("thresholds must be in [0, 1]")
 
         candidates = self._eligible_models(
             required_capabilities=required_capabilities,
