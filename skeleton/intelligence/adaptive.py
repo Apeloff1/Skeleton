@@ -37,8 +37,10 @@ class Arm:
     total_reward: float = 0.0
 
     @property
-    def mean_reward(self) -> float:
-        return self.total_reward / self.pulls if self.pulls else 0.0
+    def mean_reward(self) -> float | None:
+        if self.pulls == 0:
+            return None
+        return self.total_reward / self.pulls
 
     def ucb1(self, total_pulls: int, c: float = 1.414) -> float:
         if self.pulls == 0 or total_pulls < 1:
@@ -86,9 +88,15 @@ class AdaptiveLearner:
                wall_time_s: float, failed: bool = False) -> None:
         """Feed one run's outcome back into the bandit."""
         key = json.dumps(config, sort_keys=True)
-        arm = self._arms.setdefault(key, Arm(config=dict(config)))
+        if key not in self._arms:
+            raise ValueError("unknown configuration")
         if isinstance(final_loss, bool) or not isinstance(final_loss, (int, float)) or not math.isfinite(float(final_loss)):
             raise ValueError("final_loss must be finite")
+        if isinstance(wall_time_s, bool) or not isinstance(wall_time_s, (int, float)) or not math.isfinite(float(wall_time_s)) or float(wall_time_s) < 0:
+            raise ValueError("wall time must be finite and non-negative")
+        if not isinstance(failed, bool):
+            raise ValueError("failed must be a bool")
+        arm = self._arms[key]
         reward = 0.0 if failed else 1.0 / (1.0 + max(float(final_loss), 0.0))
         arm.pulls += 1
         arm.total_reward += reward
@@ -115,8 +123,8 @@ class AdaptiveLearner:
             "runs": len(self._history),
             "arms": len(self._arms),
             "tried_arms": sum(1 for a in self._arms.values() if a.pulls > 0),
-            "best_mean_reward": round(
-                max((a.mean_reward for a in self._arms.values()), default=0.0), 4),
+            "best_mean_reward": None if not any(a.pulls for a in self._arms.values()) else round(
+                max(a.mean_reward for a in self._arms.values() if a.pulls), 4),
         }
 
 
