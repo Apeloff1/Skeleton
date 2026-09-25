@@ -67,13 +67,16 @@ test('pending work is restored as retryable and attachment bytes never persist',
   assert.equal(restored.conversations[0].messages[0].artifactCount, 1);
 });
 
-test('expired and future session timestamps cannot resume a backend session', () => {
+test('expired and future backend session timestamps fall back to conversation identity', () => {
   const now = Date.now();
   for (const time of [now - W.SESSION_TTL - 1, now + 100000]) {
     const workspace = W.createWorkspace();
     Object.assign(workspace.conversations[0], { sessionId: 'stale', sessionUpdatedAt: time });
     assert.equal(W.decodeWorkspace(W.encodeWorkspace(workspace), now).conversations[0].sessionId, null);
-    assert.equal(W.buildChatBody(workspace.conversations[0], 'hello', undefined, now).session_id, undefined);
+    assert.equal(
+      W.buildChatBody(workspace.conversations[0], 'hello', undefined, now).session_id,
+      workspace.conversations[0].id,
+    );
   }
 });
 
