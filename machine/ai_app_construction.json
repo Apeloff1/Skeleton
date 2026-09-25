@@ -5979,17 +5979,18 @@
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
-        "ships backend plus Skeleton compatibility code",
-        "receives runtime provider credentials in compose",
-        "can execute skeleton/provider_runtime.py through compatibility facades"
+        "ships product/application API plus Skeleton compatibility code",
+        "delegates configured product chat execution through backend/core/engine_client.py to the canonical engine API",
+        "does not receive runtime model-provider credentials in canonical compose",
+        "waits for a healthy Skeleton engine before serving assembled AI ingress"
       ],
       "skeleton_process": [
-        "owns canonical engine API root",
-        "owns provider/orchestration source contracts",
-        "does not yet own the complete product cognitive execution ingress",
-        "does not currently receive the product runtime provider credential in compose"
+        "owns the canonical engine API root and AIExecution orchestration runtime",
+        "receives runtime model-provider credentials in canonical compose",
+        "owns durable engine execution, submission, and tool-receipt state under skeleton_data",
+        "validates service principal plus delegated actor/tenant/capability authority"
       ],
-      "conflict": "source ownership says engine; deployed credential/execution ownership can occur in backend"
+      "remaining_gap": "legacy backend provider compatibility surfaces still exist for non-engine or pre-cutover callers; phase-4 retirement/remote-delegation remains separate work"
     },
     "target_process_ownership": {
       "backend": {
