@@ -56,11 +56,17 @@ class HandlerPolicy:
     cooldown_seconds: float = 30.0
 
     def __post_init__(self) -> None:
-        if self.min_confidence is not None and not 0.0 <= self.min_confidence <= 1.0:
+        if isinstance(self.min_confidence, bool) or (
+            self.min_confidence is not None
+            and (
+                not isinstance(self.min_confidence, (int, float))
+                or not 0.0 <= float(self.min_confidence) <= 1.0
+            )
+        ):
             raise ValueError("min_confidence must be between 0 and 1")
-        if self.failure_threshold < 1:
+        if isinstance(self.failure_threshold, bool) or not isinstance(self.failure_threshold, int) or self.failure_threshold < 1:
             raise ValueError("failure_threshold must be >= 1")
-        if self.cooldown_seconds < 0:
+        if isinstance(self.cooldown_seconds, bool) or not isinstance(self.cooldown_seconds, (int, float)) or float(self.cooldown_seconds) < 0:
             raise ValueError("cooldown_seconds must be >= 0")
 
 
@@ -79,8 +85,10 @@ class HandlerTelemetry:
     circuit_open_until: float = 0.0
 
     @property
-    def success_rate(self) -> float:
-        return self.successes / self.attempts if self.attempts else 0.5
+    def success_rate(self) -> float | None:
+        if self.attempts == 0:
+            return None
+        return self.successes / self.attempts
 
     def snapshot(self, now: Optional[float] = None) -> Dict[str, Any]:
         current = time.time() if now is None else now
@@ -516,7 +524,7 @@ class IntelligenceOrchestrator:
         policy = self._policies[capability]
         telemetry = self._telemetry[capability]
         if telemetry.attempts == 0:
-            quality = 0.5
+            return float(policy.priority)
         else:
             quality = 0.65 * telemetry.success_rate + 0.35 * telemetry.avg_confidence
         latency_penalty = min(0.25, telemetry.avg_latency_ms / 20_000.0) if telemetry.attempts else 0.0
@@ -526,12 +534,12 @@ class IntelligenceOrchestrator:
     def _validate_result(result: ReasoningResult) -> None:
         if not isinstance(result, ReasoningResult):
             raise TypeError("reasoning handler must return ReasoningResult")
-        if not isinstance(result.confidence, (int, float)):
+        if isinstance(result.confidence, bool) or not isinstance(result.confidence, (int, float)):
             raise TypeError("result confidence must be numeric")
         if not 0.0 <= float(result.confidence) <= 1.0:
             raise ValueError("result confidence must be between 0 and 1")
         if result.sources is None:
-            result.sources = []
+            raise ValueError("sources are required")
 
     def _current_handler_state(
         self, capability: str, handler_version: int
