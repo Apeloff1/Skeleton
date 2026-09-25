@@ -5,23 +5,23 @@ Extracted from server.py (Feb 2026 Phase-9). Self-contained except for
 ``AIAssistantMode`` enum (still in server.py) and ``AIAssistRequest`` /
 ``AIAssistResponse`` Pydantic models (now in models/code_runtime.py).
 
-Provider execution is routed through ``core.ai_provider.ProviderRegistry``.
-The registry enforces the mandatory architecture/construction receipt before
-provider activation, so this legacy API surface cannot become a second provider
-runtime.
+Model execution is delegated to the canonical Skeleton engine through the
+backend engine-text compatibility adapter. This legacy service owns neither
+provider credentials nor provider transport.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
-import os
 import re
 
 from fastapi import HTTPException
 
-from core.ai_provider import (
-    ProviderError,
-    ProviderRegistry,
-    ProviderRequest,
+from core.engine_client import EngineClient, EngineClientError
+from core.engine_text import (
+    EngineTextError,
+    EngineTextRequest,
+    execute_engine_text,
 )
 from skeleton.context.instruction_policy import InstructionPolicy
 
@@ -42,20 +42,21 @@ logger = logging.getLogger("CodeDock.AIAssistant")
 
 
 class AIAssistantService:
-    """Legacy code-assistance surface backed by the canonical provider registry."""
+    """Legacy code-assistance surface backed by the canonical engine."""
 
     def __init__(
         self,
         *,
-        registry: ProviderRegistry | None = None,
+        registry: object | None = None,
         runtime: object | None = None,
+        engine_executor=None,
     ) -> None:
-        if runtime is not None:
+        if registry is not None or runtime is not None:
             raise ValueError(
-                "alternate model runtimes are disabled; inject ProviderRegistry instead"
+                "local model runtime injection is disabled; use the canonical engine"
             )
-        self._registry = registry or ProviderRegistry.from_env()
-        self.model = os.environ.get("AI_ASSISTANT_MODEL", "gpt-4o").strip() or "gpt-4o"
+        self._engine_executor = engine_executor or execute_engine_text
+        self.model = "engine-routed"
 
     @property
     def api_key(self) -> str:
@@ -64,14 +65,24 @@ class AIAssistantService:
 
     @property
     def available(self) -> bool:
-        return self._registry.available
+        try:
+            return EngineClient.from_env() is not None
+        except EngineClientError:
+            return False
 
     def provider_status(self) -> dict:
-        """Return non-secret provider and construction acknowledgement metadata."""
+        """Return non-secret engine ownership metadata."""
+        available = self.available
         return {
-            "active": self._registry.active_id,
-            "available": self._registry.available,
-            "providers": self._registry.statuses(),
+            "active": "skeleton-engine" if available else None,
+            "available": available,
+            "providers": [
+                {
+                    "id": "skeleton-engine",
+                    "available": available,
+                    "ownership": "engine-process",
+                }
+            ],
         }
 
     async def assist(self, request: AIAssistRequest) -> AIAssistResponse:
@@ -188,13 +199,29 @@ Code:
 
 Please provide a detailed, well-structured response."""
 
+        identity = hashlib.sha256(
+            (
+                str(request.mode.value)
+                + "\n"
+                + language
+                + "\n"
+                + str(target_language or "")
+                + "\n"
+                + request.code
+                + "\n"
+                + str(request.context or "")
+            ).encode("utf-8")
+        ).hexdigest()
+
         try:
-            adapter = self._registry.require_active()
-            response = await adapter.generate(
-                ProviderRequest(
+            response = await self._engine_executor(
+                EngineTextRequest(
                     instructions=policy.instructions,
                     prompt=user_message,
-                    model=self.model,
+                    idempotency_key="legacy-ai-assistant:" + identity,
+                    actor_id="legacy-ai-assistant",
+                    capability="assistant.compat",
+                    max_output_tokens=8_192,
                 )
             )
             suggestion = response.text
@@ -207,14 +234,17 @@ Please provide a detailed, well-structured response."""
                 suggestion=suggestion,
                 code_blocks=code_blocks,
                 confidence=0.92,
-                model=response.model or self.model,
+                model=self.model,
             )
-        except ProviderError as exc:
+        except EngineTextError as exc:
             logger.warning(
-                "AI Assistant provider unavailable or failed: %s",
+                "AI Assistant engine unavailable or failed: %s",
                 exc.__class__.__name__,
             )
-            raise HTTPException(status_code=503, detail="AI service unavailable") from exc
+            raise HTTPException(
+                status_code=503,
+                detail="AI service unavailable",
+            ) from exc
         except HTTPException:
             raise
         except Exception as exc:
