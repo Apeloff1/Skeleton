@@ -219,17 +219,24 @@ def _merge(base: Dict[str, Any], delta: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def era_pack(era: str) -> Dict[str, Any]:
-    raw = era or ""
-    name = raw if raw in ERA_IDS else ""
-    if not name:
-        try:
-            from skeleton.cortex.era_bind import house_era
-            name = house_era(raw)
-        except Exception:
-            name = "extraction_now"
+def _era_name(era: str) -> str:
+    if not isinstance(era, str) or not era.strip():
+        raise ValueError("era is required")
+    if era in ERA_IDS:
+        return era
+    from skeleton.cortex.era_bind import HOUSE_ERA
+    key = era.lower().replace("-", " ").replace("_", " ")
+    key = "_".join(key.split())
+    if key not in HOUSE_ERA:
+        raise ValueError(f"unknown era {era!r}")
+    name = HOUSE_ERA[key]
     if name not in ERA_IDS:
-        name = "extraction_now"
+        raise ValueError(f"unknown era {era!r}")
+    return name
+
+
+def era_pack(era: str) -> Dict[str, Any]:
+    name = _era_name(era)
     pack = _merge(_BASE, _DELTA.get(name, {}))
     pack["era"] = name
     return pack
@@ -238,8 +245,11 @@ def era_pack(era: str) -> Dict[str, Any]:
 def primary_dps(pack: Dict[str, Any]) -> float:
     """Kinetic shot DPS used as the HP compiler numerator."""
     # 18 dmg * 360 rpm / 60 = 108 baseline, scaled by player speed as a motor proxy
-    speed = float(pack["player"].get("speed") or 180.0)
-    return round(18.0 * (360.0 / 60.0) * (speed / 195.0), 1)
+    player = pack.get("player") if isinstance(pack.get("player"), dict) else {}
+    speed = player.get("speed")
+    if isinstance(speed, bool) or not isinstance(speed, (int, float)) or not float(speed) > 0:
+        raise ValueError("player speed is required")
+    return round(18.0 * (360.0 / 60.0) * (float(speed) / 195.0), 1)
 
 
 def compile_pack(pack: Dict[str, Any], *, generation: str | None = None) -> Dict[str, Any]:
@@ -281,7 +291,9 @@ def _lerp(a: Any, b: Any, t: float) -> Any:
 
 def blend_eras(era_a: str, era_b: str, t: float, *, generation: str | None = None) -> Dict[str, Any]:
     """Linear interpolation of two compiled dialects, then re-derive HP."""
-    t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else float(t)
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or not 0.0 <= float(t) <= 1.0:
+        raise ValueError("blend t must be in [0, 1]")
+    t = float(t)
     a, b = era_pack(era_a), era_pack(era_b)
     mixed = _lerp(a, b, t)
     mixed["era"] = f"{a['era']}~{b['era']}@{t:.2f}"
