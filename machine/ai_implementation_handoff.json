@@ -183,7 +183,7 @@
       "depends_on": [],
       "work_package": "WP-P0-PROVIDER-SURFACES",
       "blueprint": "provider_surface_convergence_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
       "target_files": {
         "contracts": [
@@ -231,8 +231,20 @@
         "application provider credential isolation"
       ],
       "closure_gate": "no credential-bearing model edge exists outside a declared receipt-governed surface",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/testing/test_provider_contract.py",
+        "tests/test_provider_runtime_boundary.py",
+        "backend/tests/test_ai_provider_media.py",
+        "scripts/check_provider_bootstrap.py",
+        "scripts/check_provider_runtime_boundary.py",
+        "backend/core/ai_provider.py compatibility facade",
+        "skeleton/jeeves/providers.py canonical-runtime compatibility facade"
+      ],
+      "remaining": [
+        "confirm exact-head provider-surface inventory and SDK-isolation CI",
+        "finish application provider credential isolation before engine credential cutover",
+        "prove no undeclared credential-bearing or raw provider transport surfaces remain"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
