@@ -82,9 +82,8 @@ class FillerStore:
 
     ``path`` is optional: with it, the store reloads a prior snapshot on
     construction and writes atomically on every ``put``; without it the
-    store is purely in-memory. Persistence failures are best-effort — the
-    in-memory copy always continues (a warm cache is an optimization, never
-    a boot blocker).
+    store is purely in-memory. A corrupt snapshot is rejected. A save
+    failure is raised; it is not reported as a successful write.
     """
 
     def __init__(
@@ -101,24 +100,30 @@ class FillerStore:
             self._load()
 
     def _load(self) -> None:
+        if self.path is None or not self.path.exists():
+            return
         try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))  # type: ignore[union-attr]
-            for key, rec in raw.get("fillers", {}).items():
-                self._fillers[key] = Filler(**rec)
-        except Exception:
-            self._fillers = {}
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("filler snapshot is not JSON") from exc
+        fillers = raw.get("fillers") if isinstance(raw, dict) else None
+        if not isinstance(fillers, dict):
+            raise ValueError("filler snapshot is not JSON")
+        loaded: Dict[str, Filler] = {}
+        for key, rec in fillers.items():
+            if not isinstance(key, str) or not isinstance(rec, dict):
+                raise ValueError("filler snapshot is not JSON")
+            loaded[key] = Filler(**rec)
+        self._fillers = loaded
 
     def _save(self) -> None:
         if self.path is None:
             return
-        try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp")
-            payload = {"fillers": {k: asdict(v) for k, v in self._fillers.items()}}
-            tmp.write_text(json.dumps(payload), encoding="utf-8")
-            tmp.replace(self.path)
-        except Exception:
-            pass  # persistence is best-effort; in-memory copy continues
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".tmp")
+        payload = {"fillers": {k: asdict(v) for k, v in self._fillers.items()}}
+        tmp.write_text(json.dumps(payload), encoding="utf-8")
+        tmp.replace(self.path)
 
     def register_builder(self, key: str, builder: FillerBuilder,
                          ttl_s: int = DEFAULT_TTL_S) -> None:
