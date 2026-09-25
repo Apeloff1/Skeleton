@@ -26,8 +26,10 @@ class Chunker:
     """Sliding-window splitter with overlap."""
 
     def __init__(self, *, window: int = 512, overlap: int = 64) -> None:
-        if window <= 0:
+        if isinstance(window, bool) or not isinstance(window, int) or window <= 0:
             raise RetrievalError("window must be positive")
+        if isinstance(overlap, bool) or not isinstance(overlap, int) or overlap < 0:
+            raise RetrievalError("overlap must be non-negative")
         if overlap >= window:
             raise RetrievalError("overlap must be smaller than window")
         self.window = window
