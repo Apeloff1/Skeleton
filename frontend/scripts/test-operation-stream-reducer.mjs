@@ -356,3 +356,65 @@ test('unsupported stream schema forces resync instead of silent downgrade', () =
   assert.equal(state.resyncRequired, true);
   assert.equal(state.error, 'unsupported_schema_version');
 });
+
+test('restart from persisted cursor resumes only later events and reconciles terminal truth', () => {
+  let beforeRestart = createOperationClientState('op-1');
+  beforeRestart = reduceOperationEvent(
+    beforeRestart,
+    event(1, 'operation.created'),
+  );
+  beforeRestart = reduceOperationEvent(
+    beforeRestart,
+    event(2, 'assistant_content', {
+      payload: { text: 'provisional before disconnect', mode: 'append' },
+    }),
+  );
+  assert.equal(beforeRestart.lastSequence, 2);
+  const persistedCursor = beforeRestart.lastSequence;
+
+  const restarted = createOperationClientState('op-1', persistedCursor);
+  const resumed = reduceOperationReplay(restarted, {
+    ok: true,
+    operation: snapshot('completed'),
+    events: [
+      event(3, 'assistant_content', {
+        payload: { text: ' resumed', mode: 'append' },
+      }),
+      event(4, 'operation.completed', {
+        payload: {
+          state: 'completed',
+          final_output: 'canonical after reconnect',
+          result_ref: 'result:reconnect',
+          message_id: 'message:reconnect',
+        },
+      }),
+    ],
+    after_sequence: persistedCursor,
+    latest_sequence: 4,
+    terminal: true,
+  });
+
+  assert.equal(resumed.resyncRequired, false);
+  assert.equal(resumed.lastSequence, 4);
+  assert.equal(resumed.terminal, true);
+  assert.equal(resumed.contentReconciled, true);
+  assert.equal(resumed.displayedAssistantContent, 'canonical after reconnect');
+  assert.equal(resumed.terminalResultRef, 'result:reconnect');
+  assert.equal(resumed.terminalMessageId, 'message:reconnect');
+  assert.deepEqual(
+    resumed.events.map((item) => item.sequence),
+    [3, 4],
+  );
+});
+
+
+test('restart never promotes pre-disconnect provisional content from cursor persistence alone', () => {
+  const restarted = createOperationClientState('op-1', 2);
+
+  assert.equal(restarted.provisionalAssistantContent, '');
+  assert.equal(restarted.canonicalAssistantContent, null);
+  assert.equal(restarted.displayedAssistantContent, '');
+  assert.equal(restarted.contentState, 'empty');
+  assert.equal(restarted.lastSequence, 2);
+});
+
