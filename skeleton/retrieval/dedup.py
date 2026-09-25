@@ -28,15 +28,15 @@ class Deduper:
         out: list[ScoredResult] = []
         ordered = sorted(
             (_require_scored(item) for item in items),
-            key=lambda item: (-item.score, self._identity(item)),
+            key=lambda item: (-item.score, _identity(item)),
         )
         for item in ordered:
-            identity = self._identity(item)
+            identity = _identity(item)
             if not identity:
                 raise ValueError("result id is required")
-            if identity and identity in seen_ids:
+            if identity in seen_ids:
                 continue
-            signature = self._signature(item)
+            signature = _signature(item, self._sig_len)
             if signature and signature in seen_sigs:
                 continue
             if identity:
@@ -55,29 +55,30 @@ def _require_scored(item: ScoredResult) -> ScoredResult:
         raise ValueError("result score must be finite")
     return item
 
-    @staticmethod
-    def _identity(item: ScoredResult) -> str:
-        for attr in ("item_id", "fragment_id"):
-            value = getattr(item, attr, None)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
-        return ""
 
-    def _signature(self, item: ScoredResult) -> str:
-        metadata = getattr(item, "metadata", None)
-        text = ""
-        if isinstance(metadata, dict):
-            raw = metadata.get("text") or metadata.get("preview") or ""
-            if isinstance(raw, str):
-                text = raw
-        if not text:
-            content = getattr(item, "content", "")
-            if isinstance(content, str):
-                text = content
-        if text.strip():
-            return text.strip()[: self._sig_len]
-        source = getattr(item, "source", None) or getattr(item, "provenance", "") or ""
-        identity = self._identity(item)
-        if not source and not identity:
-            return ""
-        return f"{source}:{identity}"
+def _identity(item: ScoredResult) -> str:
+    for attr in ("item_id", "fragment_id"):
+        value = getattr(item, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
+def _signature(item: ScoredResult, sig_len: int) -> str:
+    metadata = getattr(item, "metadata", None)
+    text = ""
+    if isinstance(metadata, dict):
+        raw = metadata.get("text") or metadata.get("preview") or ""
+        if isinstance(raw, str):
+            text = raw
+    if not text:
+        content = getattr(item, "content", "")
+        if isinstance(content, str):
+            text = content
+    if text.strip():
+        return text.strip()[:sig_len]
+    source = getattr(item, "source", None) or getattr(item, "provenance", "") or ""
+    identity = _identity(item)
+    if not source and not identity:
+        return ""
+    return f"{source}:{identity}"
