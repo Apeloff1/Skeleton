@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+from uuid import uuid4
 
 from skeleton.contracts.operation import OperationState
 from skeleton.frontier.operation_stream import (
@@ -41,6 +42,9 @@ from skeleton.persistence.operation_store import (
     SQLiteOperationStore,
     StoredOperation,
 )
+
+
+_PROCESS_STREAM_WORKER_ID = f"worker-{os.getpid()}-{uuid4().hex}"
 
 
 class OperationTransportError(RuntimeError):
@@ -213,9 +217,26 @@ def transport_from_env(
     state_path, stream_path = operation_runtime_paths(source)
     state_path.parent.mkdir(parents=True, exist_ok=True)
     stream_path.parent.mkdir(parents=True, exist_ok=True)
+    environ = os.environ if source is None else source
+    lease_raw = environ.get(
+        "CODEDOCK_OPERATION_STREAM_PROJECTION_LEASE_SECONDS",
+        "10",
+    ).strip()
+    try:
+        projection_lease_seconds = int(lease_raw)
+    except ValueError as exc:
+        raise OperationTransportError(
+            "operation stream projection lease must be an integer"
+        ) from exc
+    if projection_lease_seconds < 1 or projection_lease_seconds > 300:
+        raise OperationTransportError(
+            "operation stream projection lease must be between 1 and 300 seconds"
+        )
     return OperationStreamTransport(
         SQLiteOperationStore(state_path),
         SQLiteOperationEventStore(stream_path),
+        worker_id=_PROCESS_STREAM_WORKER_ID,
+        projection_lease_seconds=projection_lease_seconds,
     )
 
 
@@ -226,13 +247,37 @@ class OperationStreamTransport:
         self,
         operation_store: SQLiteOperationStore,
         event_store: SQLiteOperationEventStore,
+        *,
+        worker_id: str | None = None,
+        projection_lease_seconds: int = 10,
     ) -> None:
         if not isinstance(operation_store, SQLiteOperationStore):
             raise TypeError("operation_store must be SQLiteOperationStore")
         if not isinstance(event_store, SQLiteOperationEventStore):
             raise TypeError("event_store must be SQLiteOperationEventStore")
+        if (
+            isinstance(projection_lease_seconds, bool)
+            or not isinstance(projection_lease_seconds, int)
+            or not 1 <= projection_lease_seconds <= 300
+        ):
+            raise ValueError(
+                "projection_lease_seconds must be an integer between 1 and 300"
+            )
+        resolved_worker = worker_id or _PROCESS_STREAM_WORKER_ID
+        if (
+            not isinstance(resolved_worker, str)
+            or not resolved_worker.strip()
+            or len(resolved_worker.strip()) > 128
+            or any(
+                char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._:-"
+                for char in resolved_worker.strip()
+            )
+        ):
+            raise ValueError("worker_id must be a bounded stream-safe identifier")
         self.operation_store = operation_store
         self.event_store = event_store
+        self.worker_id = resolved_worker.strip()
+        self.projection_lease_seconds = projection_lease_seconds
 
     def _authorized_operation(
         self,
@@ -267,22 +312,46 @@ class OperationStreamTransport:
         """Project committed outbox rows into the durable stream and ack them."""
 
         self._authorized_operation(operation_id, tenant_id=tenant_id)
-        pending = self.operation_store.pending_outbox(
-            operation_id=operation_id,
-            limit=limit,
+        lease = self.event_store.acquire_worker_lease(
+            operation_id,
+            self.worker_id,
+            lease_seconds=self.projection_lease_seconds,
         )
+        if lease is None:
+            return ()
         delivered: list[StreamEvent] = []
-        for item in pending:
-            event = self.event_store.append(
-                item.operation_id,
-                item.event_type,
-                item.payload,
-                event_id=item.outbox_id,
-                timestamp=item.created_at,
+        try:
+            pending = self.operation_store.pending_outbox(
+                operation_id=operation_id,
+                limit=limit,
             )
-            self.operation_store.acknowledge_outbox(item.outbox_id)
-            delivered.append(event)
-        return tuple(delivered)
+            for index, item in enumerate(pending, start=1):
+                if index > 1 and (index - 1) % 64 == 0:
+                    renewed = self.event_store.renew_worker_lease(
+                        operation_id,
+                        self.worker_id,
+                        lease.generation,
+                        lease_seconds=self.projection_lease_seconds,
+                    )
+                    if renewed is None:
+                        break
+                    lease = renewed
+                event = self.event_store.append(
+                    item.operation_id,
+                    item.event_type,
+                    item.payload,
+                    event_id=item.outbox_id,
+                    timestamp=item.created_at,
+                )
+                self.operation_store.acknowledge_outbox(item.outbox_id)
+                delivered.append(event)
+            return tuple(delivered)
+        finally:
+            self.event_store.release_worker_lease(
+                operation_id,
+                self.worker_id,
+                lease.generation,
+            )
 
     def replay(
         self,
