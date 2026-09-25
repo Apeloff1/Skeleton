@@ -7287,10 +7287,12 @@
       },
       {
         "path": "backend/routes/image_generation.py",
-        "role": "media request adapter delegating to canonical provider runtime",
+        "role": "media request adapter delegating to authenticated Skeleton engine media boundary",
         "required_tokens": [
-          "ProviderRegistry",
-          "ProviderImageRequest"
+          "EngineClient",
+          "generate_image",
+          "create_image_variation",
+          "edit_image"
         ],
         "forbidden_edge_classes": [
           "credential",
@@ -7300,8 +7302,10 @@
       },
       {
         "path": "backend/core/expressive_tts.py",
-        "role": "provider-neutral speech cadence preparation",
+        "role": "speech presentation adapter delegating synthesis to authenticated Skeleton engine media boundary",
         "required_tokens": [
+          "EngineClient",
+          "synthesize_speech",
           "shape_cadence",
           "resolve_tone"
         ],
