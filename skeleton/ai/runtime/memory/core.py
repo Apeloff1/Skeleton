@@ -330,17 +330,20 @@ class RepetitionScheduler:
             "repetitions": 0,
         }
 
-    def review(self, item_id: str, performance: float = 1.0) -> float:
+    def review(self, item_id: str, performance: float) -> float:
         """Process a review, return new interval in hours."""
         if item_id not in self._schedule:
-            self.schedule(item_id)
+            raise KeyError(item_id)
+        if isinstance(performance, bool) or not isinstance(performance, (int, float)):
+            raise ValueError("performance must be in [0, 1]")
+        score = float(performance)
+        if score != score or score in (float("inf"), float("-inf")) or not 0.0 <= score <= 1.0:
+            raise ValueError("performance must be in [0, 1]")
 
         entry = self._schedule[item_id]
         entry["repetitions"] += 1
-
-        # SM-2 inspired interval calculation
-        if performance >= 0.6:
-            entry["interval"] *= (1.5 + 0.1 * performance)
+        if score >= 0.6:
+            entry["interval"] *= (1.5 + 0.1 * score)
         else:
             entry["interval"] = max(1, entry["interval"] * 0.5)
 

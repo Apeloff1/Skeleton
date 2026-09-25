@@ -20,6 +20,15 @@ from typing import Any, Dict, List, Optional
 from skeleton.kernel.events import DomainEvent, EventBus
 
 
+def _unit_retention(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("retention must be in [0, 1]")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")) or not 0.0 <= number <= 1.0:
+        raise ValueError("retention must be in [0, 1]")
+    return number
+
+
 class ConsolidationCycle:
     """Wire KREM due-refresh into spaced repetition and dream synthesis."""
 
@@ -56,11 +65,10 @@ class ConsolidationCycle:
             if not item.startswith("krem:"):
                 continue
             concept = item[len("krem:"):]
-            before = self._krem.retention(concept)
+            _unit_retention(self._krem.retention(concept))
             self._krem.observe(concept)  # review strengthens the cell
-            after = self._krem.retention(concept)
-            performance = 1.0 if after > before else 0.5
-            self._scheduler.review(item, performance=performance)
+            after = _unit_retention(self._krem.retention(concept))
+            self._scheduler.review(item, performance=after)
             refreshed.append(concept)
             self._stats["refreshed"] += 1
 
