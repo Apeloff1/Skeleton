@@ -388,7 +388,10 @@
         "skeleton/testing/test_tool_receipt_store.py lineage replay/conflict/migration regressions",
         "backend/tests/test_tool_registry_canonical_delegate.py lineage propagation/restart replay regression",
         "skeleton/intelligence/execution_runtime.py canonical execution/provider-turn/provider-call lineage binding",
-        "skeleton/testing/test_execution_runtime.py end-to-end model-tool-model lineage regression"
+        "skeleton/testing/test_execution_runtime.py end-to-end model-tool-model lineage regression",
+        "skeleton/skills/tool_adapters/owners.py canonical async execution owners for vault/Jeeves/sandbox/database/network/artifact surfaces",
+        "backend/services/tool_registry.py delegation-only executable compatibility handlers",
+        "backend/tests/test_tool_registry_scoped_adapters.py no-privileged-body source regression plus delegation tests"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
@@ -405,7 +408,6 @@
       "outstanding_evidence": [
         "tool manifest schema validation/fuzz coverage against malformed nested schemas",
         "model-visible inventory proof that only admitted/enabled tools are projected",
-        "move remaining privileged backend I/O handlers behind canonical adapter owners",
         "bind governance classification/retention to durable tool results",
         "bind cost/admission reconciliation across tool/artifact/storage usage",
         "exact-head App Assembly and provider-surface isolation evidence"
@@ -413,8 +415,7 @@
       "blockers": [
         "dependency must close: gap-governance-registry",
         "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence",
-        "remaining privileged backend I/O handlers need adapter-owner cutover"
+        "dependency must close: gap-provider-surface-convergence"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
