@@ -158,7 +158,9 @@
         {
           "source_path": "gpt_oss/tools/apply_patch.py",
           "upstream_blob_sha": "a1ecb113c26643dcae498c57bc3a3e64b9d2750d",
-          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/gpt_oss/tools/apply_patch.py.txt"
+          "destination_path": "skeleton/ai/research/external/OpenAI/gpt-oss/gpt_oss/tools/apply_patch.py.txt",
+          "normalization": "strip-trailing-whitespace-v1",
+          "destination_blob_sha": "a3ffd47fce6f809fe2c8b78265519f00c2dff95b"
         },
         {
           "source_path": "gpt_oss/tools/simple_browser/simple_browser_tool.py",
