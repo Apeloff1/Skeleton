@@ -33,7 +33,11 @@ class Notification:
     timestamp_ns: int = 0
 
     def dedupe_key(self) -> str:
-        return hashlib.sha256(f"{self.title}:{self.source}".encode()).hexdigest()[:16]
+        # Severity is part of the identity. An info alert must not swallow
+        # a later critical alert with the same title.
+        return hashlib.sha256(
+            f"{self.severity}:{self.title}:{self.source}".encode()
+        ).hexdigest()[:16]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -60,6 +64,10 @@ class NotificationCenter:
 
     def add_channel(self, name: str, sender: Callable[[Dict[str, Any]], bool],
                     min_severity: str = "info", rate_limit_s: float = 0.0) -> Channel:
+        if min_severity not in SEVERITY_ORDER:
+            raise ValueError(f"unknown severity {min_severity!r}")
+        if isinstance(rate_limit_s, bool) or not isinstance(rate_limit_s, (int, float)) or rate_limit_s < 0:
+            raise ValueError("rate_limit_s must be non-negative")
         ch = Channel(name=name, sender=sender, min_severity=min_severity, rate_limit_s=rate_limit_s)
         self._channels[name] = ch
         return ch
@@ -77,6 +85,8 @@ class NotificationCenter:
         return False
 
     def notify(self, title: str, body: str, severity: str = "info", source: str = "system") -> Dict[str, Any]:
+        if severity not in SEVERITY_ORDER:
+            raise ValueError(f"unknown severity {severity!r}")
         n = Notification(title=title, body=body, severity=severity, source=source, timestamp_ns=time.time_ns())
         if self._is_duplicate(n):
             return {"status": "deduplicated", "title": title}
@@ -114,6 +124,8 @@ class NotificationCenter:
         for n in self._retry_queue:
             delivered_any = False
             for ch in self._channels.values():
+                if SEVERITY_ORDER.get(n.severity, 0) < SEVERITY_ORDER.get(ch.min_severity, 0):
+                    continue
                 try:
                     if ch.sender(n.to_dict()):
                         ch.delivered += 1
