@@ -87,7 +87,8 @@
       "health_path": "/api/health",
       "container_port": 8001,
       "depends_on": [
-        "mongo"
+        "mongo",
+        "skeleton"
       ],
       "canonical": true,
       "ingress_prefix": "/api"
@@ -131,6 +132,7 @@
     }
   ],
   "required_paths": [
+    "backend/core/engine_client.py",
     "pyproject.toml",
     "docker-compose.yml",
     "docker-compose.hot.yml",
@@ -218,7 +220,7 @@
     "manual": "docs/AI_APP_CONSTRUCTION_MANUAL.md",
     "validator": "scripts/check_ai_app_construction.py",
     "provider_bootstrap_validator": "scripts/check_provider_bootstrap.py",
-    "provider_activation_boundary": "backend/core/ai_provider.py",
+    "provider_activation_boundary": "skeleton/provider_runtime.py",
     "provider_architecture_loader": "skeleton/provider_contract.py",
     "provider_architecture_compatibility_loader": "backend/core/provider_architecture.py",
     "construction_version": "3.7.0",
@@ -235,6 +237,9 @@
     "runtime_schema_catalog": "machine/ai_runtime_schemas.json",
     "implementation_handoff": "machine/ai_implementation_handoff.json",
     "closure_evidence_ledger": "machine/ai_closure_evidence.json",
-    "capability_registry": "machine/ai_capabilities.json"
+    "capability_registry": "machine/ai_capabilities.json",
+    "provider_compatibility_boundary": "backend/core/ai_provider.py",
+    "backend_engine_client": "backend/core/engine_client.py",
+    "engine_execution_boundary": "skeleton/api/engine_routes.py"
   }
 }
