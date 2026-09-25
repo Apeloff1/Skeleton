@@ -1915,7 +1915,7 @@
       "plane": "engine-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Runtime code ownership and process ownership are not yet aligned. The Skeleton root owns provider/orchestration contracts, but backend currently ships Skeleton code and receives model credentials, while the standalone Skeleton service lacks the canonical product execution API needed for backend delegation. Fully functional deployment requires one authenticated backend->engine execution boundary so product state stays in backend and AI execution/provider credentials stay in the engine process.",
+      "gap": "Phase-1 engine execution endpoints, phase-2 backend chat delegation, and phase-3 provider credential/process isolation are materialized. The remaining gap is phase-4 compatibility convergence plus cross-service closure evidence: legacy backend provider facades still exist for pre-cutover callers, and the complete submit/cancel/replay/golden-journey path must be proven before the boundary can close.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -5975,7 +5975,7 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
@@ -5990,7 +5990,7 @@
         "owns durable engine execution, submission, and tool-receipt state under skeleton_data",
         "validates service principal plus delegated actor/tenant/capability authority"
       ],
-      "remaining_gap": "legacy backend provider compatibility surfaces still exist for non-engine or pre-cutover callers; phase-4 retirement/remote-delegation remains separate work"
+      "remaining_gap": "legacy backend provider compatibility surfaces still exist for non-engine or pre-cutover callers; phase-4 retirement/remote-delegation and cross-service golden-journey closure remain outstanding"
     },
     "target_process_ownership": {
       "backend": {
