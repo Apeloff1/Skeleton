@@ -32,6 +32,7 @@ from core.ai_provider import (
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
     EngineClient,
+    EngineClientError,
     EngineExecutionFailed,
     EngineUnavailableError,
     command_from_context,
@@ -583,34 +584,61 @@ async def ai_chat(
     # Once an engine is configured, engine failure is fail-closed: never perform a
     # second local provider request because that would duplicate effects/cost and
     # violate the single credential-bearing runtime owner.
-    engine_client = EngineClient.from_env()
+    try:
+        engine_client = EngineClient.from_env()
+    except EngineClientError:
+        logger.error(
+            "canonical engine configuration invalid operation=%s execution=%s",
+            operation_id,
+            execution_id,
+        )
+        return {
+            "success": False,
+            "response": "The AI engine configuration is unavailable. Retry later.",
+            "ai_generated": False,
+            "provider": "skeleton-engine",
+            "model": "engine-routed",
+            "error": "AI engine configuration invalid",
+            "error_code": "engine_configuration_invalid",
+            "operation_id": operation_id,
+            "engine_execution_id": execution_id,
+            "thread": thread.as_dict(),
+            "user_message": user_message.as_dict(),
+            "context": context_envelope.binding_dict(),
+            "timestamp": _utcnow(),
+        }
+
     if engine_client is not None:
         engine_started = time.monotonic()
         engine_deadline = datetime.now(timezone.utc) + timedelta(
             seconds=engine_client.config.execution_timeout_s
         )
-        command = command_from_context(
-            context=context_envelope,
-            actor_id=owner_id,
-            capability="assistant.chat",
-            idempotency_key=request.idempotency_key,
-            instructions=system_prompt,
-            prompt=user_prompt,
-            history=history,
-            service_principal=engine_client.config.service_principal,
-            created_at=datetime.now(timezone.utc),
-            deadline=engine_deadline,
-            trace_id="chat:" + operation_id,
-            max_model_turns=4,
-            max_tool_calls=1,
-            max_repeat_tool_batches=1,
-            context_seed_refs=(
-                "conversation:" + thread.thread_id,
-                "conversation-message:" + user_message.message_id,
-                *context_attachment_refs,
-            ),
-        )
         try:
+            command = command_from_context(
+                context=context_envelope,
+                actor_id=owner_id,
+                capability="assistant.chat",
+                idempotency_key=request.idempotency_key,
+                instructions=system_prompt,
+                prompt=user_prompt,
+                objective=(
+                    "Respond to canonical chat turn "
+                    + user_message.message_id
+                ),
+                history=history,
+                service_principal=engine_client.config.service_principal,
+                created_at=datetime.now(timezone.utc),
+                deadline=engine_deadline,
+                trace_id="chat:" + operation_id,
+                max_model_turns=4,
+                max_tool_calls=1,
+                max_repeat_tool_batches=1,
+                context_seed_refs=(
+                    "conversation:" + thread.thread_id,
+                    "conversation-message:" + user_message.message_id,
+                    *context_attachment_refs,
+                ),
+            )
             engine_result = await engine_client.execute(command)
         except EngineExecutionFailed as exc:
             logger.warning(
@@ -648,6 +676,27 @@ async def ai_chat(
                 "model": "engine-routed",
                 "error": "AI engine unavailable",
                 "error_code": "engine_unavailable",
+                "operation_id": operation_id,
+                "engine_execution_id": execution_id,
+                "thread": thread.as_dict(),
+                "user_message": user_message.as_dict(),
+                "context": context_envelope.binding_dict(),
+                "timestamp": _utcnow(),
+            }
+        except EngineClientError:
+            logger.error(
+                "canonical engine protocol failure operation=%s execution=%s",
+                operation_id,
+                execution_id,
+            )
+            return {
+                "success": False,
+                "response": "The AI execution request could not be safely admitted.",
+                "ai_generated": False,
+                "provider": "skeleton-engine",
+                "model": "engine-routed",
+                "error": "AI engine protocol failure",
+                "error_code": "engine_protocol_failure",
                 "operation_id": operation_id,
                 "engine_execution_id": execution_id,
                 "thread": thread.as_dict(),
