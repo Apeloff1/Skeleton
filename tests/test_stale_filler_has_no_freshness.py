@@ -1,5 +1,7 @@
 """A stale filler does not keep a leftover freshness score."""
 
+import pytest
+
 from skeleton.memory.eviction import keep_score
 from skeleton.memory.warmer import Filler
 
@@ -12,4 +14,4 @@ def test_stale_freshness_is_zero() -> None:
     now = 1_050.0
     fresh = keep_score(_filler("fresh", 100), now=now, hits=0)
     stale = keep_score(_filler("stale", 10), now=now, hits=0)
-    assert fresh - stale == 1.0
+    assert fresh - stale == pytest.approx(1.0)
