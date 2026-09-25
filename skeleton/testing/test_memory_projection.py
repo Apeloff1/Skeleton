@@ -336,13 +336,16 @@ def test_outbox_failure_blocks_later_versions_until_retry() -> None:
     )
 
     assert blocked.degraded is True
-    assert blocked.attempted_events == 1
-    assert blocked.published_events == 0
+    assert blocked.attempted_events == 2
+    assert blocked.published_events == 1
     assert blocked.blocked_event_id is not None
     assert blocked.attempts[0].memory_version == 1
-    assert blocked.attempts[0].published is False
-    assert len(repo.pending_projection_events()) == 2
-    assert healthy.items[first.memory_id].text == "v1"
+    assert blocked.attempts[0].published is True
+    assert blocked.attempts[0].superseded is True
+    assert blocked.attempts[1].memory_version == 2
+    assert blocked.attempts[1].published is False
+    assert len(repo.pending_projection_events()) == 1
+    assert healthy.items[first.memory_id].text == "v2"
 
     failing.fail_add = False
     recovered = coordinator.dispatch_pending(
@@ -352,7 +355,7 @@ def test_outbox_failure_blocks_later_versions_until_retry() -> None:
     )
 
     assert recovered.degraded is False
-    assert recovered.published_events == 2
+    assert recovered.published_events == 1
     assert repo.pending_projection_events() == ()
     assert healthy.items[first.memory_id].text == "v2"
     assert failing.items[first.memory_id].text == "v2"
@@ -424,4 +427,76 @@ def test_outbox_dispatch_limit_preserves_pending_tail() -> None:
 
     assert first.published_events == 1
     assert first.remaining_pending_sample == 1
+    assert len(repo.pending_projection_events()) == 1
+
+
+def test_stale_pending_event_cannot_regress_rebuilt_projection() -> None:
+    repo = SQLiteMemoryRepository()
+    first = repo.commit(
+        _proposal(key="stale-fence-create", content="v1"),
+        now=_now(),
+    )
+    repo.commit(
+        _proposal(
+            key="stale-fence-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now(),
+    )
+    store = FakeStore()
+    projection = LegacyMemoryStoreProjection("rag", store)
+    coordinator = MemoryProjectionCoordinator(repo)
+
+    rebuilt = coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert rebuilt.degraded is False
+    assert store.items[first.memory_id].text == "v2"
+
+    bounded = coordinator.dispatch_pending(
+        projections=(projection,),
+        limit=1,
+        now=_now(),
+    )
+
+    assert bounded.published_events == 1
+    assert bounded.attempts[0].memory_version == 1
+    assert bounded.attempts[0].superseded is True
+    assert store.items[first.memory_id].text == "v2"
+    assert [(event.memory_version, event.action) for event in repo.pending_projection_events()] == [
+        (2, "upsert"),
+    ]
+
+
+def test_current_projection_event_must_match_canonical_record() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(key="canonical-fence", content="canonical"),
+        now=_now(),
+    )
+    # Corrupt only the durable outbox snapshot; canonical authority remains intact.
+    with repo._lock:
+        repo._connection.execute(
+            """
+            UPDATE canonical_memory_projection_outbox
+            SET record_json = REPLACE(record_json, 'canonical', 'tampered')
+            WHERE repository_namespace = ? AND memory_id = ?
+            """,
+            (repo.repository_namespace, record.memory_id),
+        )
+
+    report = MemoryProjectionCoordinator(repo).dispatch_pending(
+        projections=(LegacyMemoryStoreProjection("rag", FakeStore()),),
+        now=_now(),
+    )
+
+    assert report.degraded is True
+    assert report.published_events == 0
+    assert report.blocked_event_id is not None
+    assert report.attempts[0].results[0].projection == "canonical-fence"
     assert len(repo.pending_projection_events()) == 1
