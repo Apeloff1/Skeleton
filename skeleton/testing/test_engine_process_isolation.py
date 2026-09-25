@@ -29,6 +29,27 @@ def _manifest() -> dict[str, object]:
     )
 
 
+def _provider_registry_names(tree: ast.AST) -> set[str]:
+    names = {"ProviderRegistry"}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        for alias in node.names:
+            if alias.name == "ProviderRegistry":
+                names.add(alias.asname or alias.name)
+    return names
+
+
+def _is_provider_registry_from_env_call(node: ast.Call, names: set[str]) -> bool:
+    func = node.func
+    if not isinstance(func, ast.Attribute) or func.attr != "from_env":
+        return False
+    receiver = func.value
+    if isinstance(receiver, ast.Name):
+        return receiver.id in names
+    return isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
+
+
 def _local_provider_consumers() -> tuple[str, ...]:
     consumers: list[str] = []
     for path in sorted((ROOT / "backend").rglob("*.py")):
@@ -36,20 +57,40 @@ def _local_provider_consumers() -> tuple[str, ...]:
         if "/tests/" in "/" + relative:
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            func = node.func
-            if (
-                isinstance(func, ast.Attribute)
-                and func.attr == "from_env"
-                and isinstance(func.value, ast.Name)
-                and func.value.id == "ProviderRegistry"
-            ):
-                consumers.append(relative)
-                break
+        names = _provider_registry_names(tree)
+        if any(
+            isinstance(node, ast.Call)
+            and _is_provider_registry_from_env_call(node, names)
+            for node in ast.walk(tree)
+        ):
+            consumers.append(relative)
     return tuple(consumers)
 
+
+def test_provider_registry_activation_detection_covers_alias_and_qualified_calls() -> None:
+    alias_tree = ast.parse(
+        "from skeleton.provider_runtime import ProviderRegistry as Registry\n"
+        "Registry.from_env()\n"
+    )
+    alias_names = _provider_registry_names(alias_tree)
+    alias_calls = [node for node in ast.walk(alias_tree) if isinstance(node, ast.Call)]
+    assert any(
+        _is_provider_registry_from_env_call(node, alias_names)
+        for node in alias_calls
+    )
+
+    qualified_tree = ast.parse(
+        "import skeleton.provider_runtime as provider_runtime\n"
+        "provider_runtime.ProviderRegistry.from_env()\n"
+    )
+    qualified_names = _provider_registry_names(qualified_tree)
+    qualified_calls = [
+        node for node in ast.walk(qualified_tree) if isinstance(node, ast.Call)
+    ]
+    assert any(
+        _is_provider_registry_from_env_call(node, qualified_names)
+        for node in qualified_calls
+    )
 
 def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
     compose = _compose()
