@@ -37,7 +37,7 @@ def keep_score(
         raise EvictionError("filler tokens must be a non-negative integer")
     age_s = max(0.0, float(now) - filler.refreshed_at)
     recency = 1.0 / (1.0 + age_s / 3600.0)
-    freshness = 1.0 if filler.is_fresh(now) else 0.2
+    freshness = 1.0 if filler.is_fresh(now) else 0.0
     rebuild_cost = min(4.0, filler.tokens / 10_000)
     hit_bonus = min(2.0, hits / 10.0)
     return recency + freshness + rebuild_cost + hit_bonus
