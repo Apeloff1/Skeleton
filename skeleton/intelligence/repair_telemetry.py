@@ -111,8 +111,10 @@ def capture_telemetry(
 
 def load_telemetry(root=None, surface: str = "", limit: int = 32) -> List[Dict[str, Any]]:
     """Load recent telemetry records."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+        raise ValueError("limit must be a non-negative integer")
     path = _telemetry_path(root)
-    if not path.exists():
+    if limit == 0 or not path.exists():
         return []
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines()[-limit:]:
