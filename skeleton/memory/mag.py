@@ -187,6 +187,22 @@ class MAGStore(MemoryStore):
 
         return results
 
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Enforce the store's user identity before scoring episodic memory."""
+        if not isinstance(scope, dict) or set(scope) != {"user_id"}:
+            raise ValueError("MAG scope must contain exactly user_id")
+        if not isinstance(scope["user_id"], str) or not scope["user_id"]:
+            raise ValueError("user_id scope must be a non-empty string")
+        if scope["user_id"] != str(self.user_id):
+            return []
+        return self.query(query_text, top_k=top_k)
+
     def delete(self, chunk_id: str) -> bool:
         if chunk_id not in self._episodes:
             return False
