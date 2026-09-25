@@ -42,6 +42,8 @@ class ErrorTaxonomy:
     """Error classification with fingerprint aggregation."""
 
     def __init__(self, novelty_window_s: float = 3600.0):
+        if isinstance(novelty_window_s, bool) or not isinstance(novelty_window_s, (int, float)) or novelty_window_s < 0:
+            raise ValueError("novelty_window_s must be non-negative")
         self._occurrences: Dict[str, ErrorOccurrence] = {}
         self.novelty_window_s = novelty_window_s
         self._history: List[Dict[str, Any]] = []
@@ -92,7 +94,9 @@ class ErrorTaxonomy:
         return occ
 
     def top_errors(self, limit: int = 10) -> List[Dict[str, Any]]:
-        ranked = sorted(self._occurrences.values(), key=lambda o: -o.count)
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise ValueError("limit must be a non-negative integer")
+        ranked = sorted(self._occurrences.values(), key=lambda o: (-o.count, o.fingerprint))
         return [{
             "fingerprint": o.fingerprint,
             "category": o.category,
