@@ -91,31 +91,28 @@ class TemporalReasoner:
         Predict next events based on pattern matching in history.
         Returns list of (event_id, confidence) sorted by confidence.
         """
-        if len(sequence) < 2:
-            return []
+        if not isinstance(sequence, list) or len(sequence) < 2 or any(not isinstance(item, str) or not item for item in sequence):
+            raise ValueError("sequence must contain at least two event ids")
+        if isinstance(confidence_threshold, bool) or not isinstance(confidence_threshold, (int, float)) or not 0.0 <= float(confidence_threshold) <= 1.0:
+            raise ValueError("confidence threshold must be in [0, 1]")
 
-        # Find matching pattern suffixes
-        predictions: Dict[str, List[float]] = {}
+        matched = 0
+        counts: Dict[str, int] = {}
         for pattern in self._patterns:
-            if len(pattern) <= len(sequence):
+            if len(pattern) <= len(sequence) or pattern[:len(sequence)] != sequence:
                 continue
-            # Check if sequence matches pattern prefix
-            if pattern[:len(sequence)] == sequence:
-                next_event = pattern[len(sequence)]
-                # Compute confidence based on pattern frequency and recency
-                confidence = 0.5 + 0.5 * (len(pattern) / (len(pattern) + 10))
-                predictions.setdefault(next_event, []).append(confidence)
-
-        # Frequency is evidence. Averaging identical confidences threw it
-        # away, so a pattern seen twice scored the same as a pattern seen once.
+            matched += 1
+            next_event = pattern[len(sequence)]
+            counts[next_event] = counts.get(next_event, 0) + 1
+        if matched == 0:
+            return []
         result = []
-        for eid, confs in predictions.items():
-            miss = 1.0
-            for conf in confs:
-                miss *= 1.0 - conf
-            confidence = 1.0 - miss
+        for event_id, count in counts.items():
+            if count < 2:
+                continue
+            confidence = count / matched
             if confidence >= confidence_threshold:
-                result.append((eid, confidence))
+                result.append((event_id, confidence))
         return sorted(result, key=lambda item: (-item[1], item[0]))
 
     def allen_relation(self, a: TemporalEvent, b: TemporalEvent) -> str:
@@ -189,13 +186,14 @@ class TemporalReasoner:
 
     def learn_pattern(self, sequence: List[str]) -> None:
         """Learn a temporal pattern from an observed sequence."""
-        if len(sequence) >= 2:
-            self._patterns.append(sequence)
-            if self._bus:
-                self._bus.publish(
-                    DomainEvent(
-                        topic="temporal.pattern.learned",
-                        payload={"sequence": sequence, "length": len(sequence)},
-                        correlation_id=f"pattern_{hashlib.sha256(str(sequence).encode()).hexdigest()[:12]}",
-                    )
+        if not isinstance(sequence, list) or len(sequence) < 2 or any(not isinstance(item, str) or not item for item in sequence):
+            raise ValueError("a pattern needs at least two event ids")
+        self._patterns.append(sequence)
+        if self._bus:
+            self._bus.publish(
+                DomainEvent(
+                    topic="temporal.pattern.learned",
+                    payload={"sequence": sequence, "length": len(sequence)},
+                    correlation_id=f"pattern_{hashlib.sha256(str(sequence).encode()).hexdigest()[:12]}",
                 )
+            )

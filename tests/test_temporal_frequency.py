@@ -13,7 +13,9 @@ def test_repeated_pattern_crosses_the_confidence_floor() -> None:
     reasoner.learn_pattern(pattern)
     predicted = reasoner.predict_next(["wake", "eat"], confidence_threshold=0.7)
     assert predicted and predicted[0][0] == "work"
-    assert predicted[0][1] > 0.7
+    assert predicted[0][1] == 1.0
+    with pytest.raises(ValueError):
+        reasoner.learn_pattern(["only"])
 
 
 def test_negative_duration_is_rejected() -> None:
