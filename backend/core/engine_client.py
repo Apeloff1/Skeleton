@@ -545,6 +545,31 @@ def command_from_context(
         if len(normalized_history) > 1024:
             raise EngineProtocolError("history exceeds maximum turn count")
 
+    input_capacity = context.budget.input_capacity(
+        tools_enabled=bool(normalized_tools)
+    )
+    if context.selected_tokens_estimate > input_capacity:
+        raise EngineProtocolError(
+            "compiled context exceeds bound input capacity"
+        )
+
+    reserved_output = int(context.budget.reserved_output_tokens)
+    if max_output_tokens is None:
+        resolved_output_tokens = reserved_output
+    else:
+        resolved_output_tokens = _positive_int(
+            max_output_tokens,
+            "max_output_tokens",
+            maximum=131_072,
+        )
+        if (
+            reserved_output > 0
+            and resolved_output_tokens > reserved_output
+        ):
+            raise EngineProtocolError(
+                "max_output_tokens exceeds compiled context reserve"
+            )
+
     resource_budget = {
         "max_model_turns": _positive_int(
             max_model_turns,
@@ -556,13 +581,18 @@ def command_from_context(
             "max_tool_calls",
             maximum=1024,
         ),
+        "max_input_tokens": input_capacity,
+        "selected_input_tokens_estimate": (
+            context.selected_tokens_estimate
+        ),
+        "max_tool_result_tokens": int(
+            context.budget.reserved_tool_result_tokens
+        ),
         "max_elapsed_seconds": (due - started).total_seconds(),
     }
-    if max_output_tokens is not None:
-        resource_budget["max_output_tokens"] = _positive_int(
-            max_output_tokens,
-            "max_output_tokens",
-            maximum=131_072,
+    if resolved_output_tokens > 0:
+        resource_budget["max_output_tokens"] = (
+            resolved_output_tokens
         )
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
