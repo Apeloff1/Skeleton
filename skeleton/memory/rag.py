@@ -221,6 +221,12 @@ class ChromaDBStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query is required")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+            raise ValueError("top_k must be a positive integer")
+        if isinstance(min_score, bool) or not isinstance(min_score, (int, float)) or not 0.0 <= float(min_score) <= 1.0:
+            raise ValueError("min_score must be in [0, 1]")
         if self._available and self._collection:
             try:
                 results = self._collection.query(
@@ -228,32 +234,50 @@ class ChromaDBStore(MemoryStore):
                     n_results=top_k,
                     where=metadata_filter,
                 )
-                memory_results: List[MemoryQueryResult] = []
-                for i in range(len(results["ids"][0])):
-                    score = results["distances"][0][i] if results["distances"] else 0.0
-                    # Convert distance to similarity (cosine distance → similarity)
-                    similarity = 1.0 - score
-                    if similarity >= min_score:
-                        chunk = MemoryChunk(
-                            id=results["ids"][0][i],
-                            text=results["documents"][0][i],
-                            metadata=results["metadatas"][0][i] if results["metadatas"] else {},
-                            source_tier="rag",
-                            confidence=similarity,
-                        )
-                        memory_results.append(
-                            MemoryQueryResult(chunk=chunk, score=similarity, rank=i + 1)
-                        )
-                return memory_results
             except Exception as exc:
                 raise RagQueryError(
                     f"ChromaDB query failed: {exc}",
                     context={"query": query_text, "top_k": top_k},
                 ) from exc
-        else:
-            return self._fallback.query(
-                query_text, top_k=top_k, metadata_filter=metadata_filter, min_score=min_score
-            )
+            ids = results.get("ids") if isinstance(results, dict) else None
+            distances = results.get("distances") if isinstance(results, dict) else None
+            documents = results.get("documents") if isinstance(results, dict) else None
+            metadatas = results.get("metadatas") if isinstance(results, dict) else None
+            if not isinstance(ids, list) or not ids or not isinstance(ids[0], list):
+                raise RagQueryError("query ids are required", context={"query": query_text})
+            row = ids[0]
+            if (
+                not isinstance(distances, list)
+                or not distances
+                or not isinstance(distances[0], list)
+                or len(distances[0]) != len(row)
+            ):
+                raise RagQueryError("query distances are required", context={"query": query_text})
+            if not isinstance(documents, list) or not documents or not isinstance(documents[0], list) or len(documents[0]) != len(row):
+                raise RagQueryError("query documents are required", context={"query": query_text})
+            if not isinstance(metadatas, list) or not metadatas or not isinstance(metadatas[0], list) or len(metadatas[0]) != len(row):
+                raise RagQueryError("query metadata is required", context={"query": query_text})
+            memory_results: List[MemoryQueryResult] = []
+            for i, chunk_id in enumerate(row):
+                distance = distances[0][i]
+                if isinstance(distance, bool) or not isinstance(distance, (int, float)) or not math.isfinite(float(distance)):
+                    raise RagQueryError("query distance must be finite", context={"query": query_text})
+                similarity = 1.0 - float(distance)
+                if similarity >= min_score:
+                    chunk = MemoryChunk(
+                        id=chunk_id,
+                        text=documents[0][i],
+                        metadata=metadatas[0][i],
+                        source_tier="rag",
+                        confidence=similarity,
+                    )
+                    memory_results.append(
+                        MemoryQueryResult(chunk=chunk, score=similarity, rank=i + 1)
+                    )
+            return memory_results
+        return self._fallback.query(
+            query_text, top_k=top_k, metadata_filter=metadata_filter, min_score=min_score
+        )
 
     def query_scoped(
         self,
