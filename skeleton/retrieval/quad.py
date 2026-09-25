@@ -680,6 +680,12 @@ class QuadRetriever:
                 for plane_name in results_by_plane:
                     self._plane_history.append(plane_name)
 
+            if _scope is not None and failures:
+                raise ScopedRetrievalError(
+                    "scoped retrieval aborted because plane(s) failed: "
+                    + ", ".join(sorted(failures))
+                )
+
             fused = self._fuse(results_by_plane, k)
             receipt = self._record_receipt(
                 query=query,
