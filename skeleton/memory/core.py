@@ -154,17 +154,58 @@ class MAGStore:
 
     def __init__(self, agent_id: str):
         self.agent_id = agent_id
+        # user_id is the canonical identity name used by DreamEngine and
+        # scoped/adaptive memory contracts. Keep agent_id for legacy callers.
+        self.user_id = agent_id
         self._episodes: Dict[str, Dict[str, Any]] = {}
         self._tag_index: Dict[str, Set[str]] = {}
 
     def record(self, episode_id: str, content: str, tags: Optional[List[str]] = None) -> None:
+        if not isinstance(episode_id, str) or not episode_id:
+            raise ValueError("episode_id must be a non-empty string")
+        if not isinstance(content, str) or not content:
+            raise ValueError("content must be a non-empty string")
+        if tags is not None and (
+            not isinstance(tags, list)
+            or any(not isinstance(tag, str) or not tag for tag in tags)
+        ):
+            raise ValueError("tags must be a list of non-empty strings")
+
+        previous = self._episodes.get(episode_id)
+        if previous is not None:
+            for tag in previous.get("tags", []):
+                ids = self._tag_index.get(tag)
+                if ids is None:
+                    continue
+                ids.discard(episode_id)
+                if not ids:
+                    self._tag_index.pop(tag, None)
+
+        normalized_tags = list(dict.fromkeys(tags or []))
         self._episodes[episode_id] = {
             "content": content,
-            "tags": tags or [],
+            "tags": normalized_tags,
             "recorded_at": time.time(),
         }
-        for tag in (tags or []):
+        for tag in normalized_tags:
             self._tag_index.setdefault(tag, set()).add(episode_id)
+
+    def clusters(self, *, min_size: int = 2) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return deterministic tag clusters for DreamEngine consolidation."""
+        if isinstance(min_size, bool) or not isinstance(min_size, int) or min_size < 2:
+            raise ValueError("min_size must be an integer >= 2")
+        grouped: list[tuple[str, tuple[str, ...]]] = []
+        for tag in sorted(self._tag_index):
+            episode_ids = tuple(
+                sorted(
+                    episode_id
+                    for episode_id in self._tag_index[tag]
+                    if episode_id in self._episodes
+                )
+            )
+            if len(episode_ids) >= min_size:
+                grouped.append((tag, episode_ids))
+        return tuple(grouped)
 
     def recall_by_tag(self, tag: str) -> List[Dict[str, Any]]:
         episode_ids = self._tag_index.get(tag, set())
@@ -188,6 +229,7 @@ class MAGStore:
             "episodes": len(self._episodes),
             "tags": len(self._tag_index),
             "agent_id": self.agent_id,
+            "user_id": self.user_id,
         }
 
 
