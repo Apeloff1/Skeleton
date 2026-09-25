@@ -100,9 +100,9 @@ def test_backend_runtime_provider_credential_reintroduction_is_rejected(
     frontend_start = compose.index("\n  frontend:\n", backend_start)
     backend = compose[backend_start:frontend_start]
     backend = backend.replace(
-        "      - DEBUG=\${DEBUG:-false}\n",
-        "      - DEBUG=\${DEBUG:-false}\n"
-        "      - OPENAI_API_KEY=\${OPENAI_API_KEY:-}\n",
+        "      - DEBUG=${DEBUG:-false}\n",
+        "      - DEBUG=${DEBUG:-false}\n"
+        "      - OPENAI_API_KEY=${OPENAI_API_KEY:-}\n",
     )
     compose_path.write_text(
         compose[:backend_start] + backend + compose[frontend_start:],
