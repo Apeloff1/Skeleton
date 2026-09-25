@@ -26,9 +26,9 @@ def _encode_claim(files: Mapping[str, str]) -> str:
 
 def _decode_claim(claim: str) -> dict[str, str]:
     raw = json.loads(claim)
-    if not isinstance(raw, dict):
+    if not isinstance(raw, dict) or any(not isinstance(key, str) or not isinstance(value, str) for key, value in raw.items()):
         raise TypeError("forge verify claim must be a JSON object of path→source")
-    return {str(k): str(v) for k, v in raw.items()}
+    return dict(raw)
 
 
 def _primary_script(files: Mapping[str, str], weakest_path: str = "") -> tuple[str, str]:
@@ -59,14 +59,18 @@ def forge_verify_until_green(
     Returns a dict with final files, verification report, loop trace, and
     whether the loop accepted. Does not raise — callers decide hard-fail.
     """
-    threshold = (
-        accept_threshold
-        if accept_threshold is not None
-        else threshold_for("forge", root=root, fallback=0.7)
-    )
+    if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
+        raise ValueError("max_rounds must be an integer >= 1")
+    if isinstance(min_gain, bool) or not isinstance(min_gain, (int, float)) or min_gain < 0 or min_gain != min_gain:
+        raise ValueError("min_gain must be a finite number >= 0")
+    if accept_threshold is None:
+        accept_threshold = threshold_for("forge", root=root, fallback=0.7)
+    if isinstance(accept_threshold, bool) or not isinstance(accept_threshold, (int, float)) or not 0 < float(accept_threshold) <= 1:
+        raise ValueError("accept_threshold must be in (0, 1]")
+    threshold = float(accept_threshold)
     loop = VerificationLoop(
-        max_rounds=max(1, int(max_rounds)),
-        min_gain=min_gain,
+        max_rounds=max_rounds,
+        min_gain=float(min_gain),
         accept_threshold=threshold,
         min_rounds=1,
     )
@@ -87,16 +91,21 @@ def forge_verify_until_green(
         state["files"] = current
         state["last_forge"] = report
         path, src = _primary_script(current, report.weakest_path or "")
-        code_verdict = code.verdict(src or "\n".join(current.values()), request=request or path)
+        if not path or not src.strip():
+            code_confidence = 0.0
+            code_issues: tuple[str, ...] = ("no script",)
+        else:
+            code_verdict = code.verdict(src, request=request or path)
+            code_confidence = float(code_verdict.confidence)
+            code_issues = tuple(code_verdict.issues)
         state["last_code"] = {
             "path": path,
-            "confidence": code_verdict.confidence,
-            "issues": list(code_verdict.issues),
+            "confidence": round(code_confidence, 4),
+            "issues": list(code_issues),
         }
-        # Confidence for the loop: blend project score with CodeVerifier.verdict.
-        confidence = (0.7 * report.score) + (0.3 * code_verdict.confidence)
-        if report.accepted and code_verdict.confidence >= threshold:
-            confidence = max(confidence, threshold)
+        confidence = min(float(report.score), code_confidence)
+        both_clear = bool(report.accepted) and not code_issues and code_confidence >= threshold
+        if both_clear:
             state["rounds_detail"].append(
                 {
                     "accepted": True,
@@ -105,7 +114,7 @@ def forge_verify_until_green(
                     "confidence": round(confidence, 4),
                 }
             )
-            return VerificationVerdict(confidence=confidence, issues=code_verdict.issues)
+            return VerificationVerdict(confidence=confidence, issues=())
 
         revised_claim = None
         if repair_enabled_for("forge", root=root):
@@ -118,15 +127,12 @@ def forge_verify_until_green(
                 current, request=request, root=root, evidence=evidence
             )
             state["repairs"].append({k: v for k, v in repaired.items() if k != "files"})
-            if repaired.get("changed") or repaired.get("ok"):
-                state["files"] = dict(repaired.get("files") or current)
+            revised_files = repaired.get("files")
+            if repaired.get("changed") and isinstance(revised_files, dict) and revised_files != current:
+                state["files"] = dict(revised_files)
                 revised_claim = _encode_claim(state["files"])
-                # Prefer post-repair score when available.
-                after = repaired.get("after") or {}
-                if isinstance(after, dict) and "score" in after:
-                    confidence = max(confidence, float(after.get("score") or confidence))
 
-        issues = tuple(report.blocking_issues) or code_verdict.issues
+        issues = tuple(report.blocking_issues) or code_issues or ("not accepted",)
         state["rounds_detail"].append(
             {
                 "accepted": False,
@@ -146,7 +152,13 @@ def forge_verify_until_green(
     final_files = _decode_claim(final_claim)
     # Re-verify final tree so the returned report matches files on disk of the loop.
     final_report = forge_verifier.verify(final_files, request=request)
-    accepted = bool(final_report.accepted)
+    final_path, final_src = _primary_script(final_files)
+    if not final_path or not final_src.strip():
+        final_code_ok = False
+    else:
+        final_code = code.verdict(final_src, request=request or final_path)
+        final_code_ok = not final_code.issues and final_code.confidence >= threshold
+    accepted = bool(final_report.accepted) and final_code_ok
     return {
         "kind": "forge-verify-loop",
         "ok": int(accepted),
