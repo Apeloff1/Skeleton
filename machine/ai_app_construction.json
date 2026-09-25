@@ -2175,7 +2175,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, restart-safe SQLite tenant quota reservation, shared live pressure, provider/media lease enforcement, manifest-aware tool usage metering, and aggregate estimate-vs-actual telemetry now share one contract. Remaining work is broad storage/non-provider admission and shared cross-process pressure for multi-worker deployments.",
+      "gap": "Request admission, restart-safe durable tenant quota reservation, shared live process pressure, provider/media lease enforcement, manifest-aware tool metering, artifact/storage write metering, and aggregate estimate-vs-actual telemetry now share one contract. Remaining work is distinct storage-byte budgeting, broader non-provider admission coverage, distributed pressure coordination, and final exact-head/independent verification.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2192,9 +2192,15 @@
         "skeleton/testing/test_tenant_quota_sqlite.py restart, race and durable reservation regression coverage",
         "skeleton/intelligence/admission_runtime.py aggregate estimate/actual/delta telemetry through cognition MetricRegistry",
         "skeleton/testing/test_admission_runtime.py payload-free admission telemetry and idempotent replay coverage",
-        "skeleton/skills/tool_runtime.py manifest-aware tool call/cost admission metering"
+        "skeleton/skills/tool_runtime.py manifest-aware tool call/cost admission metering",
+        "skeleton/intelligence/quota_sqlite.py restart-safe SQLite tenant quota reservations and completion ledger",
+        "skeleton/testing/test_tenant_quota_sqlite.py restart recovery and multi-worker reservation regression coverage",
+        "skeleton/intelligence/admission_runtime.py aggregate estimate/actual/delta telemetry across all UsageEstimate dimensions",
+        "skeleton/testing/test_admission_runtime.py payload-free telemetry and idempotent replay regression coverage",
+        "skeleton/artifact_plane/usage.py deterministic artifact/storage usage adapter",
+        "skeleton/testing/test_artifact_usage.py storage category, replay, budget and unknown-usage resolution coverage"
       ],
-      "status_detail": "AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, concurrency/queue pressure, provider/media leases, manifest-aware tool usage, failure release, actual provider/media reconciliation, and payload-free estimate/actual/delta telemetry. Storage-wide accounting, distributed pressure and universal non-provider admission remain."
+      "status_detail": "shared AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, artifact/storage usage categories, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; distinct storage-byte ceilings, distributed pressure and broader expensive-plane admission remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -7377,7 +7383,10 @@
       "no expensive provider/tool/storage path without admission receipt",
       "restart-safe quota persistence is implemented by skeleton/intelligence/quota_sqlite.py and covered by skeleton/testing/test_tenant_quota_sqlite.py",
       "AdmissionRuntime emits aggregate estimate/actual/delta telemetry without operation or tenant identifiers",
-      "ToolRuntime charges manifest tool-call and estimated-cost usage through AdmissionRuntime before side effects"
+      "ToolRuntime charges manifest tool-call and estimated-cost usage through AdmissionRuntime before side effects",
+      "skeleton/testing/test_tenant_quota_sqlite.py restart-safe durable quota recovery and multi-worker fencing",
+      "skeleton/testing/test_admission_runtime.py estimate-versus-actual telemetry with identity-free snapshots",
+      "skeleton/testing/test_artifact_usage.py deterministic artifact/storage write metering and unknown-usage resolution"
     ]
   },
   "provider_surface_convergence_blueprint": {
