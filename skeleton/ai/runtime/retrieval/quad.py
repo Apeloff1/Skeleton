@@ -278,6 +278,33 @@ class QuadRetriever:
                 return planes
         return (result.plane,) if result.plane else ()
 
+    def _refresh_result_freshness(
+        self,
+        results: List[ScoredResult],
+    ) -> List[ScoredResult]:
+        """Refresh fused freshness metadata even when the ranking came from cache."""
+        refreshed: List[ScoredResult] = []
+        for result in results:
+            planes = self._result_planes(result)
+            per_plane: Dict[str, Dict[str, Any]] = {}
+            for plane in planes:
+                metadata = self._freshness.metadata(plane)
+                per_plane[plane] = (
+                    {"tracked": False, "stale": None}
+                    if metadata is None
+                    else {"tracked": True, **metadata}
+                )
+            copied = replace(result, metadata=dict(result.metadata))
+            copied.metadata["fusion_freshness"] = per_plane
+            copied.metadata["stale"] = any(
+                row.get("stale") is True for row in per_plane.values()
+            )
+            copied.metadata["freshness_complete"] = all(
+                row.get("tracked") is True for row in per_plane.values()
+            )
+            refreshed.append(copied)
+        return refreshed
+
     def _record_receipt(
         self,
         *,
@@ -327,7 +354,7 @@ class QuadRetriever:
             self._stats["stale_results"] += sum(
                 1
                 for result in results
-                if (result.metadata.get("index_freshness") or {}).get("stale") is True
+                if result.metadata.get("stale") is True
             )
         return receipt
 
@@ -544,7 +571,7 @@ class QuadRetriever:
         if use_cache:
             cached = self._cache.get(cache_key)
             if cached is not None:
-                cached_list = list(cached)
+                cached_list = self._refresh_result_freshness(list(cached))
                 with self._state_lock:
                     self._stats["cache_hits"] += 1
                 receipt = self._record_receipt(
@@ -576,7 +603,7 @@ class QuadRetriever:
             flight.wait()
             cached = self._cache.get(cache_key)
             if cached is not None:
-                cached_list = list(cached)
+                cached_list = self._refresh_result_freshness(list(cached))
                 with self._state_lock:
                     self._stats["cache_hits"] += 1
                 receipt = self._record_receipt(
@@ -610,7 +637,7 @@ class QuadRetriever:
                 # cache after our first miss but before this caller became leader.
                 cached = self._cache.get(cache_key)
                 if cached is not None:
-                    cached_list = list(cached)
+                    cached_list = self._refresh_result_freshness(list(cached))
                     with self._state_lock:
                         self._stats["cache_hits"] += 1
                     receipt = self._record_receipt(
@@ -686,7 +713,9 @@ class QuadRetriever:
                     + ", ".join(sorted(failures))
                 )
 
-            fused = self._fuse(results_by_plane, k)
+            fused = self._refresh_result_freshness(
+                self._fuse(results_by_plane, k)
+            )
             receipt = self._record_receipt(
                 query=query,
                 generation=generation,
