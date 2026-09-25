@@ -16,9 +16,6 @@ from core.engine_client import (
     EngineUnavailableError,
     command_from_context,
 )
-_SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
-
-
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -27,6 +24,9 @@ from skeleton.contracts.context import (
     ContextTrust,
     context_digest_payload,
 )
+
+
+_SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
 
 
 def _now() -> datetime:
