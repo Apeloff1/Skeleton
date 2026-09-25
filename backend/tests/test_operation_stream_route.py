@@ -262,3 +262,82 @@ def test_route_ack_is_tenant_bound(
 
     operations.close()
     events.close()
+
+
+def test_resync_route_returns_authoritative_compaction_floor(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        "validated",
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.compact_through(operation.operation_id, 1)
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    payload = route.operation_event_resync(
+        operation.operation_id,
+        consumer_id="route-resync",
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    assert payload["ok"] is True
+    assert payload["compacted_through"] == 1
+    assert payload["resume_after_sequence"] == 1
+    assert payload["latest_sequence"] == 2
+    assert payload["operation"]["state"] == "validated"
+    assert payload["active_consumer_count"] == 1
+
+    operations.close()
+    events.close()
+
+
+def test_ack_route_compacts_only_after_active_consumers_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        "validated",
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+
+    for consumer in ("client-a", "client-b"):
+        replay = route.operation_event_replay(
+            operation.operation_id,
+            consumer_id=consumer,
+            after_sequence=0,
+            limit=250,
+            user={"tenant_id": "tenant-a", "role": "viewer"},
+        )
+        assert replay["latest_sequence"] == 2
+
+    first = route.acknowledge_operation_events(
+        operation.operation_id,
+        route.OperationAckRequest(consumer_id="client-a", sequence=2),
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+    assert first["compacted_through"] == 0
+    assert first["active_consumer_count"] == 2
+
+    second = route.acknowledge_operation_events(
+        operation.operation_id,
+        route.OperationAckRequest(consumer_id="client-b", sequence=1),
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+    assert second["compacted_through"] == 1
+    assert second["compacted_events"] == 1
+
+    operations.close()
+    events.close()
