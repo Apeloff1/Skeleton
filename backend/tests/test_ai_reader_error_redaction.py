@@ -104,7 +104,7 @@ def test_ai_debugger_does_not_stringify_caught_failures() -> None:
 
 def test_ai_debugger_uses_stable_generic_public_failures() -> None:
     source = AI_DEBUGGER.read_text(encoding="utf-8")
-    assert 'detail="AI debugger provider failed"' in source
+    assert 'detail="AI debugger engine failed"' in source
     assert 'detail="AI debugger request failed"' in source
     assert source.count("except HTTPException:") == 7
     assert source.count("raise _debugger_http_error(") == 6
