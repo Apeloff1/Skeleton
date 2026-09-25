@@ -1,6 +1,7 @@
 """Bounded pipeline repair scaffold.
 
-Now wired to policy_enforcement for dynamic threshold/repair gating.
+A repair may name what is missing. It does not invent the missing NPC or
+dialogue and then score that invention as accepted.
 """
 from __future__ import annotations
 
@@ -12,66 +13,65 @@ from skeleton.organism.policy_enforcement import repair_class_enabled, repair_en
 from skeleton.organism.quality_state import append_repair
 
 
+def _proposal(field: str, action: str) -> Dict[str, Any]:
+    return {"field": field, "action": action, "applied": 0}
+
+
+def _result(surface: str, before, proposals, payload_key: str, payload: Mapping[str, Any]) -> Dict[str, Any]:
+    report = before.to_dict()
+    return {
+        "kind": "pipeline-repair-attempt",
+        "surface": surface,
+        "ok": int(before.accepted),
+        "reason": str(before.reason),
+        "weakest_path": str(before.weakest_path or ""),
+        "before": report,
+        "after": report,
+        "actions": proposals,
+        "changed": 0,
+        "targeted_path": str(before.weakest_path or surface),
+        "stored_prose": 0,
+        payload_key: dict(payload),
+    }
+
+
 def attempt_npc_repair(spec: Mapping[str, Any], *, description: str = "", root=None) -> Dict[str, Any]:
-    gate = repair_enabled_for("npc", root=root)
-    if not gate:
+    if not repair_enabled_for("npc", root=root):
         return {"kind": "pipeline-repair-attempt", "surface": "npc", "ok": 0, "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "spec": dict(spec)}
-    threshold = threshold_for("npc", root=root, fallback=0.7)
-    verifier = NpcVerifier(accept_at=threshold, root=root)
+    verifier = NpcVerifier(accept_at=threshold_for("npc", root=root, fallback=0.7), root=root)
     before = verifier.verify(spec, description=description)
-    fixed = dict(spec)
-    actions = []
-    persona = dict(fixed.get("persona") or {})
-    allow_seed = repair_class_enabled("pipeline_seed", root=root)
-    if not before.accepted and allow_seed:
-        if not fixed.get("name"):
-            fixed["name"] = "npc_repaired"
-            actions.append({"field": "name", "action": "filled default npc name"})
-        if not fixed.get("archetype") and not persona.get("archetype"):
-            fixed["archetype"] = "guardian"
-            persona.setdefault("archetype", "guardian")
-            actions.append({"field": "archetype", "action": "filled default archetype"})
+    proposals = []
+    if not before.accepted and repair_class_enabled("pipeline_seed", root=root):
+        persona = spec.get("persona") or {}
+        if not spec.get("name"):
+            proposals.append(_proposal("name", "needs a name"))
+        if not spec.get("archetype") and not persona.get("archetype"):
+            proposals.append(_proposal("archetype", "needs an archetype"))
         if not persona.get("traits"):
-            persona["traits"] = ["stoic", "loyal"]
-            actions.append({"field": "persona.traits", "action": "filled default traits"})
-        if len(fixed.get("dialogue_tree") or []) < 2:
-            fixed["dialogue_tree"] = [{"node_id": "root", "line": "Hello.", "choices": ["farewell"]}, {"node_id": "farewell", "line": "Goodbye.", "choices": []}]
-            actions.append({"field": "dialogue_tree", "action": "seeded minimal dialogue tree"})
-        if len(fixed.get("behaviour_graph") or []) < 2:
-            fixed["behaviour_graph"] = [{"name": "idle", "enter": "idle", "exit": "idle", "transitions": [["player_near", "greet"]]}, {"name": "greet", "enter": "greet", "exit": "idle", "transitions": [["dialogue_end", "idle"]]}]
-            actions.append({"field": "behaviour_graph", "action": "seeded minimal behavior graph"})
-    if persona:
-        fixed["persona"] = persona
-    after = verifier.verify(fixed, description=description)
-    result = {"kind": "pipeline-repair-attempt", "surface": "npc", "ok": int(after.accepted), "reason": str(after.reason), "weakest_path": str(after.weakest_path or before.weakest_path or ""), "before": before.to_dict(), "after": after.to_dict(), "actions": actions, "changed": int(bool(actions)), "targeted_path": str(before.weakest_path or "npc"), "stored_prose": 0, "spec": fixed}
+            proposals.append(_proposal("persona.traits", "needs traits"))
+        dialogue = spec.get("dialogue_tree")
+        if not isinstance(dialogue, list) or len(dialogue) < 2:
+            proposals.append(_proposal("dialogue_tree", "needs a dialogue tree"))
+        behavior = spec.get("behaviour_graph")
+        if not isinstance(behavior, list) or len(behavior) < 2:
+            proposals.append(_proposal("behaviour_graph", "needs a behavior graph"))
+    result = _result("npc", before, proposals, "spec", spec)
     append_repair(result, root=root)
     return result
 
 
 def attempt_dialogue_repair(tree: Mapping[str, Any], *, description: str = "", root=None) -> Dict[str, Any]:
-    gate = repair_enabled_for("dialogue", root=root)
-    if not gate:
+    if not repair_enabled_for("dialogue", root=root):
         return {"kind": "pipeline-repair-attempt", "surface": "dialogue", "ok": 0, "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "tree": dict(tree)}
-    threshold = threshold_for("dialogue", root=root, fallback=0.7)
-    verifier = DialogueVerifier(accept_at=threshold, root=root)
+    verifier = DialogueVerifier(accept_at=threshold_for("dialogue", root=root, fallback=0.7), root=root)
     before = verifier.verify(tree, description=description)
-    fixed = dict(tree)
-    actions = []
-    nodes = dict(fixed.get("nodes") or {})
-    allow_seed = repair_class_enabled("pipeline_seed", root=root)
-    if not before.accepted and allow_seed:
-        if not fixed.get("entry"):
-            fixed["entry"] = "root"
-            actions.append({"field": "entry", "action": "filled default entry"})
+    proposals = []
+    if not before.accepted and repair_class_enabled("pipeline_seed", root=root):
+        nodes = tree.get("nodes") or {}
+        if not tree.get("entry"):
+            proposals.append(_proposal("entry", "needs an entry"))
         if not nodes:
-            nodes = {"root": {"speaker": "npc", "line": "Hello.", "terminal": False, "on_enter": {}, "edges": [{"text": "Go", "target": "end", "effects": {}}]}, "end": {"speaker": "npc", "line": "Done.", "terminal": True, "on_enter": {}, "edges": []}}
-            actions.append({"field": "nodes", "action": "seeded minimal dialogue tree"})
-        elif fixed.get("entry") in nodes and not nodes[fixed["entry"]].get("edges") and not nodes[fixed["entry"]].get("terminal"):
-            nodes[fixed["entry"]]["edges"] = [{"text": "Continue", "target": "end", "effects": {}}]
-            nodes.setdefault("end", {"speaker": "npc", "line": "Done.", "terminal": True, "on_enter": {}, "edges": []})
-            actions.append({"field": "entry.edges", "action": "restored minimal outgoing edge"})
-    fixed["nodes"] = nodes
-    after = verifier.verify(fixed, description=description)
-    result = {"kind": "pipeline-repair-attempt", "surface": "dialogue", "ok": int(after.accepted), "reason": str(after.reason), "weakest_path": str(after.weakest_path or before.weakest_path or ""), "before": before.to_dict(), "after": after.to_dict(), "actions": actions, "changed": int(bool(actions)), "targeted_path": str(before.weakest_path or "dialogue"), "stored_prose": 0, "tree": fixed}
+            proposals.append(_proposal("nodes", "needs nodes"))
+    result = _result("dialogue", before, proposals, "tree", tree)
     append_repair(result, root=root)
     return result
