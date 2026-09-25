@@ -1758,7 +1758,7 @@
       "plane": "tool-runtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, adapter-owned privileged/read execution surfaces, rich governance manifests, and minimal enabled-only provider projection now exist. Remaining closure is runtime governance/cost/admission binding, dependency closure, exact-head validation and independent verification.",
+      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, adapter-owned privileged/read execution surfaces, rich governance manifests, minimal enabled-only provider projection, manifest-aware cost metering, and per-tool concurrency governance now exist. Remaining closure is durable-result governance lifecycle binding, dependency closure, exact-head validation and independent verification.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
         "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
@@ -1804,11 +1804,14 @@
         "backend/services/tool_registry.py production manifests declare explicit governance metadata for every compatibility tool",
         "skeleton/intelligence/execution_runtime.py projects only enabled manifests and exposes only tool_id/description/input_schema to providers",
         "skeleton/testing/test_execution_runtime.py proves disabled tools and internal governance metadata are excluded from provider projection",
-        "skeleton/testing/test_tool_runtime.py validates governance manifest normalization and fail-closed invariants"
+        "skeleton/testing/test_tool_runtime.py validates governance manifest normalization and fail-closed invariants",
+        "skeleton/skills/tool_runtime.py meters manifest estimated_cost_usd with tool-call usage through AdmissionRuntime when available",
+        "skeleton/skills/tool_runtime.py enforces ToolManifest.max_concurrency with per-tool async semaphores",
+        "skeleton/testing/test_tool_runtime.py proves cost usage is metered before side effects and max_concurrency serializes distinct calls",
+        "skeleton/skills/tool_contract.py validates non-negative finite cost_model.estimated_cost_usd"
       ],
       "outstanding_evidence": [
         "governance lifecycle binding for durable results",
-        "cost/admission reconciliation across tool classes",
         "dependency closure and exact-head validation"
       ]
     },
@@ -5249,10 +5252,11 @@
       "backend compatibility registry contains wiring/delegation only for executable data/I-O tools",
       "ToolManifest implements the masterplan governance metadata surface with backward-compatible safe defaults",
       "production backend tool manifests explicitly declare authority, risk, side-effect, idempotency, approval, network/data/cost, result and concurrency metadata",
-      "provider projection skips disabled manifests and strips all internal governance metadata"
+      "provider projection skips disabled manifests and strips all internal governance metadata",
+      "manifest estimated tool cost is reconciled into AdmissionRuntime usage events together with tool-call count",
+      "async runtime enforces manifest max_concurrency per tool before handler execution"
     ],
     "remaining": [
-      "governance/cost bindings",
       "dependency closure and exact-head validation"
     ]
   },
