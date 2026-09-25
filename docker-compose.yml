@@ -41,6 +41,7 @@ services:
       - SKL_OPERATION_STATE_PATH=/app/data/operation_state.sqlite
       - SKL_OPERATION_STREAM_PATH=/app/data/operation_stream.sqlite
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
+      - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
       - SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite
       - SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite
       - SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite
@@ -94,6 +95,7 @@ services:
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
       - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
+      - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
     volumes:
       - backend_data:/app/data
     depends_on:
