@@ -19,6 +19,13 @@ if HAS_YAML:
     import yaml as _yaml
 
 
+def _threshold(accept_threshold: float | None, root) -> float:
+    value = accept_threshold if accept_threshold is not None else threshold_for("forge", root=root, fallback=0.7)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < float(value) <= 1:
+        raise ValueError("accept_threshold must be in (0, 1]")
+    return float(value)
+
+
 def _ext(target: str) -> str:
     return "yaml" if target == "yaml" else "json"
 
@@ -43,14 +50,22 @@ def encode_structured_files(
 def _parse_ok(text: str, target: str) -> tuple[bool, str]:
     try:
         if target == "json":
-            json.loads(text)
+            parsed = json.loads(text)
+            if not isinstance(parsed, (dict, list)):
+                return False, "json root must be an object or array"
         else:
             if not HAS_YAML:
                 return False, "yaml-unavailable"
-            _yaml.safe_load(text)
+            parsed = _yaml.safe_load(text)
+            if not isinstance(parsed, (dict, list)):
+                return False, "yaml root must be an object or array"
         return True, ""
-    except Exception as exc:  # noqa: BLE001 — surface parse reason
-        return False, f"parse_error: {exc}"
+    except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        return False, f"parse_error: {type(exc).__name__}"
+    except Exception as exc:
+        if HAS_YAML and isinstance(exc, _yaml.YAMLError):
+            return False, "parse_error: YAMLError"
+        return False, f"parse_error: {type(exc).__name__}"
 
 
 def _verification_dict(
@@ -104,11 +119,7 @@ def verify_structured(
     accept_threshold: float | None = None,
 ) -> dict[str, Any]:
     """Parse-check + policy-aware ``CodeVerifier.verdict`` on encoded text."""
-    threshold = (
-        accept_threshold
-        if accept_threshold is not None
-        else threshold_for("forge", root=root, fallback=0.7)
-    )
+    threshold = _threshold(accept_threshold, root)
     if not files:
         return _verification_dict(
             accepted=False,
@@ -168,15 +179,13 @@ def structured_verify_until_green(
     Does **not** call Godot ``attempt_repair``. Repair is gated by
     ``policy_enforcement.repair_enabled_for("forge")``.
     """
-    threshold = (
-        accept_threshold
-        if accept_threshold is not None
-        else threshold_for("forge", root=root, fallback=0.7)
-    )
+    threshold = _threshold(accept_threshold, root)
+    if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
+        raise ValueError("max_rounds must be an integer >= 1")
     files = encode_structured_files(canonical, target=target, name=name)
     path = next(iter(files))
     loop = VerificationLoop(
-        max_rounds=max(1, int(max_rounds)),
+        max_rounds=max_rounds,
         min_gain=min_gain,
         accept_threshold=threshold,
         min_rounds=1,

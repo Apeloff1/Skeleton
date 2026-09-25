@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover
 from skeleton.forge import Forge, Port, compile_era, list_eras, emit_godot
 from skeleton.forge.archetypes import default_library
 from skeleton.forge.planner import MaterialisationPlanner
+from skeleton.forge.world import generate_rooms
 from skeleton.kernel.errors import BlueprintError, MaterialisationError
 
 
@@ -121,6 +122,32 @@ class TestGodotEmit:
         assert art["file_count"] >= 7
         assert "scripts/autoloads/heat_system.gd" in art["files"]
         assert "220.0" in art["files"]["scripts/player/player_controller.gd"]
+
+
+class TestOptionalForgePlanDefaults:
+    def test_unset_optional_plan_fields_preserve_defaults(self):
+        pack = compile_era("soulslike")
+        plan = {
+            "room_bias": None,
+            "spawn_weapon": None,
+            "extract_late": None,
+        }
+
+        graph = generate_rooms(pack, plan=plan)
+        files = emit_godot(pack, build_plan=plan)
+
+        assert graph["bias"] == "balanced"
+        assert graph["spawn_weapon"] is False
+        assert graph["extract_late"] is False
+        assert "var spawn_weapon: bool = false" in files["scripts/autoloads/game_state.gd"]
+
+    def test_explicit_invalid_optional_plan_values_still_fail_closed(self):
+        pack = compile_era("soulslike")
+
+        with pytest.raises(ValueError):
+            generate_rooms(pack, plan={"spawn_weapon": "false"})
+        with pytest.raises(ValueError):
+            generate_rooms(pack, plan={"room_bias": "unknown"})
 
 
 class TestPlannerFromBlueprint:

@@ -51,20 +51,38 @@ class PrivacySpend:
     at: float = field(default_factory=time.time)
 
 
+def _positive_budget(value: float, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a positive finite number")
+    if value != value or value in (float("inf"), float("-inf")) or not value > 0:
+        raise ValueError(f"{label} must be a positive finite number")
+    return float(value)
+
+
 class PrivacyAccountant:
     """Session ε ledger: budget enforcement under composition."""
 
     def __init__(self, session_budget: float = 1.0, per_plane_budget: float = 0.5):
-        self.session_budget = session_budget
-        self.per_plane_budget = per_plane_budget
+        self.session_budget = _positive_budget(session_budget, "session budget")
+        self.per_plane_budget = _positive_budget(per_plane_budget, "plane budget")
         self._spent_total = 0.0
         self._spent_by_plane: Dict[str, float] = {}
         self._history: List[PrivacySpend] = []
 
     def can_spend(self, epsilon: float, plane: str = "") -> bool:
-        if self._spent_total + epsilon > self.session_budget:
+        if (
+            isinstance(epsilon, bool)
+            or not isinstance(epsilon, (int, float))
+            or not epsilon > 0
+            or epsilon != epsilon
+            or epsilon == float("inf")
+        ):
             return False
-        if plane and self._spent_by_plane.get(plane, 0.0) + epsilon > self.per_plane_budget:
+        if not isinstance(plane, str) or not plane.strip():
+            return False
+        if self._spent_total + float(epsilon) > self.session_budget:
+            return False
+        if self._spent_by_plane.get(plane, 0.0) + float(epsilon) > self.per_plane_budget:
             return False
         return True
 
@@ -116,7 +134,11 @@ class SeededNoise:
     def laplace(rng: random.Random, scale: float) -> float:
         """Sample Laplace(0, scale) via inverse CDF."""
         u = rng.random() - 0.5
-        return -scale * math.copysign(math.log(1 - 2 * abs(u)), u)
+        # random() can be 0, which makes the inverse-CDF argument 0 and log() raise.
+        span = max(1.0 - 2.0 * abs(u), 1e-16)
+        if u == 0.0:
+            return 0.0
+        return -scale * math.copysign(math.log(span), u)
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +166,11 @@ class LaplaceMechanism:
         """Noised mean over a clamped range. Mean sensitivity = range / n."""
         if not values:
             return None
+        lo, hi = value_range
+        if hi < lo:
+            raise ValueError("value_range low must be <= high")
         if not self.accountant.spend(epsilon, "laplace", "mean", plane):
             return None
-        lo, hi = value_range
         clamped = [max(lo, min(hi, v)) for v in values]
         sensitivity = (hi - lo) / len(clamped)
         scale = sensitivity / epsilon
@@ -179,6 +203,8 @@ class ExponentialMechanism:
         """Pick an option with probability ∝ exp(ε·score / 2Δu)."""
         if not options:
             return None
+        if isinstance(sensitivity, bool) or not isinstance(sensitivity, (int, float)) or sensitivity <= 0:
+            raise ValueError("sensitivity must be positive")
         if not self.accountant.spend(epsilon, "exponential", "select", plane):
             return None
         rng = self.noise.rng_for(query_id)

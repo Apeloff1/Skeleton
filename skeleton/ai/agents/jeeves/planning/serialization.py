@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from math import isfinite
 from typing import Any
 
 MAX_DOCUMENT = 1_000_000
@@ -8,20 +9,47 @@ MAX_DEPTH = 16
 MAX_KEYS = 512
 
 
-def _depth(value: Any, current: int = 0) -> int:
+def _check(value: Any, current: int = 0) -> None:
     if current > MAX_DEPTH:
         raise ValueError("document nesting exceeds limit")
+    if value is None or isinstance(value, str) or isinstance(value, bool):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValueError("document number must be finite")
+        return
     if isinstance(value, dict):
-        if len(value) > MAX_KEYS: raise ValueError("too many object keys")
-        return max([current] + [_depth(v, current + 1) for v in value.values()])
-    if isinstance(value, (list, tuple)):
-        if len(value) > MAX_KEYS: raise ValueError("too many array items")
-        return max([current] + [_depth(v, current + 1) for v in value])
-    return current
+        if len(value) > MAX_KEYS:
+            raise ValueError("too many object keys")
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError("object keys must be strings")
+            _check(item, current + 1)
+        return
+    if isinstance(value, list):
+        if len(value) > MAX_KEYS:
+            raise ValueError("too many array items")
+        for item in value:
+            _check(item, current + 1)
+        return
+    raise ValueError("document value must be JSON")
+
+
+def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    seen: set[str] = set()
+    out: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in seen:
+            raise ValueError("duplicate key")
+        seen.add(key)
+        out[key] = item
+    return out
 
 
 def dumps(value: Any) -> str:
-    _depth(value)
+    _check(value)
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     if len(encoded.encode("utf-8")) > MAX_DOCUMENT:
         raise ValueError("serialized document exceeds limit")
@@ -31,8 +59,11 @@ def dumps(value: Any) -> str:
 def loads(text: str) -> Any:
     if not isinstance(text, str) or len(text.encode("utf-8")) > MAX_DOCUMENT:
         raise ValueError("serialized input exceeds limit")
-    value = json.loads(text)
-    _depth(value)
+    try:
+        value = json.loads(text, object_pairs_hook=_pairs)
+    except json.JSONDecodeError as exc:
+        raise ValueError("document is not JSON") from exc
+    _check(value)
     return value
 
 def encode_channel_001(value: Any) -> str:

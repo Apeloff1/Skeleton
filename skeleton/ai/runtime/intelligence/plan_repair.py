@@ -1,6 +1,7 @@
 """Bounded plan repair scaffold.
 
-Now wired to policy_enforcement for dynamic threshold/repair gating.
+A repair may name a missing field. It does not fill an era, a damage
+number, or a room bias and then call the plan accepted.
 """
 from __future__ import annotations
 
@@ -12,41 +13,34 @@ from skeleton.organism.quality_state import append_repair
 
 
 def attempt_plan_repair(plan: Mapping[str, Any], *, vision: str = "", root=None) -> Dict[str, Any]:
-    gate = repair_enabled_for("plan", root=root)
-    if not gate:
+    if not repair_enabled_for("plan", root=root):
         return {"kind": "plan-repair-attempt", "surface": "plan", "ok": 0, "reason": "repair-disabled", "actions": [], "changed": 0, "stored_prose": 0, "plan": dict(plan)}
-    threshold = threshold_for("plan", root=root, fallback=0.7)
-    verifier = PlanVerifier(accept_at=threshold, root=root)
+    verifier = PlanVerifier(accept_at=threshold_for("plan", root=root, fallback=0.7), root=root)
     before = verifier.verify(plan, vision=vision)
-    fixed = dict(plan)
-    actions = []
-    allow_fill = repair_class_enabled("plan_fill", root=root)
-
-    if not before.accepted and allow_fill:
-        if not fixed.get("era"):
-            fixed["era"] = "extraction_now"
-            actions.append({"field": "era", "action": "filled default era"})
-        if fixed.get("primary_dps") in {None, ""}:
-            fixed["primary_dps"] = 120.0
-            actions.append({"field": "primary_dps", "action": "filled default dps"})
-        if not fixed.get("room_bias"):
-            fixed["room_bias"] = "pressure labyrinth"
-            actions.append({"field": "room_bias", "action": "filled default room bias"})
-
-    after = verifier.verify(fixed, vision=vision)
+    proposals = []
+    if not before.accepted and repair_class_enabled("plan_fill", root=root):
+        if not plan.get("era"):
+            proposals.append({"field": "era", "action": "needs an era", "applied": 0})
+        if plan.get("primary_dps") in {None, ""}:
+            proposals.append({"field": "primary_dps", "action": "needs a primary dps", "applied": 0})
+        if not plan.get("room_bias"):
+            proposals.append({"field": "room_bias", "action": "needs a room bias", "applied": 0})
+        if not vision.strip():
+            proposals.append({"field": "vision", "action": "needs a vision", "applied": 0})
+    report = before.to_dict()
     result = {
         "kind": "plan-repair-attempt",
         "surface": "plan",
-        "ok": int(after.accepted),
-        "reason": str(after.reason),
-        "weakest_path": str(after.weakest_path or before.weakest_path or ""),
-        "before": before.to_dict(),
-        "after": after.to_dict(),
-        "actions": actions,
-        "changed": int(bool(actions)),
+        "ok": int(before.accepted),
+        "reason": str(before.reason),
+        "weakest_path": str(before.weakest_path or ""),
+        "before": report,
+        "after": report,
+        "actions": proposals,
+        "changed": 0,
         "targeted_path": str(before.weakest_path or "plan"),
         "stored_prose": 0,
-        "plan": fixed,
+        "plan": dict(plan),
     }
     append_repair(result, root=root)
     return result

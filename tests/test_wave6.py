@@ -206,7 +206,12 @@ class TestForecaster:
     def test_insufficient_data(self):
         f = Forecaster()
         f.feed("x", 1.0)
-        assert "error" in f.forecast("x")
+        with pytest.raises(ValueError):
+            f.forecast("x")
+        with pytest.raises(ValueError):
+            f.time_to_threshold("x", 10.0)
+        with pytest.raises(ValueError):
+            f.anomalies_foreseen("x")
 
     def test_confidence_bands_widen(self):
         f = Forecaster()

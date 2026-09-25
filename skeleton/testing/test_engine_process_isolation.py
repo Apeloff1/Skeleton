@@ -93,33 +93,105 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
     )
 
 
-def test_remaining_local_provider_consumers_are_media_only() -> None:
-    assert set(_local_provider_consumers()) == {
-        "backend/core/expressive_tts.py",
-        "backend/routes/image_generation.py",
-    }
+def test_backend_has_no_local_provider_runtime_activation() -> None:
+    assert _local_provider_consumers() == ()
 
 
-def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
+def test_runtime_provider_credentials_are_engine_only_after_cutover() -> None:
     compose = _compose()
     skeleton = _service_block(compose, "skeleton", "backend")
     backend = _service_block(compose, "backend", "frontend")
-    consumers = _local_provider_consumers()
 
+    assert _local_provider_consumers() == ()
     for credential in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
         marker = credential + "=${"
         assert marker in skeleton
-        if consumers:
-            # Stage-5 cutover law: do not remove backend credentials while any
-            # production backend module can still instantiate the local runtime.
-            assert marker in backend, consumers
-        else:
-            assert marker not in backend
+        assert marker not in backend
 
-    # Non-provider product credentials remain backend-owned.  This prevents an
+    # Non-provider product credentials remain backend-owned. This prevents an
     # overbroad secret migration from changing product payment/auth ownership.
     assert "JWT_SECRET=${JWT_SECRET:" in backend
     assert "STRIPE_API_KEY=${STRIPE_API_KEY:-}" in backend
+
+
+def test_production_topology_has_single_model_provider_execution_owner() -> None:
+    compose = _compose()
+    skeleton = _service_block(compose, "skeleton", "backend")
+    backend = _service_block(compose, "backend", "frontend")
+
+    # Production model-provider credentials are materialized only in Skeleton.
+    for credential in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
+        marker = credential + "=${"
+        assert marker in skeleton
+        assert marker not in backend
+
+    # Backend has no local provider activation and can reach model execution only
+    # through the authenticated internal engine service.
+    assert _local_provider_consumers() == ()
+    assert (
+        "SKELETON_INTERNAL_URL="
+        "${SKELETON_INTERNAL_URL:-http://skeleton:8001}"
+    ) in backend
+    assert (
+        "SKL_ENGINE_SERVICE_TOKEN="
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}"
+    ) in backend
+    assert "OPENAI_API_KEY=" not in backend
+    assert "EMERGENT_LLM_KEY=" not in backend
+
+    # The engine process owns both provider credentials and the same service
+    # authentication secret used to admit backend engine traffic.
+    assert "SKL_ENGINE_SERVICE_TOKEN=" in skeleton
+    assert "OPENAI_API_KEY=" in skeleton
+    assert "EMERGENT_LLM_KEY=" in skeleton
+
+
+def test_engine_media_body_override_is_route_scoped() -> None:
+    from fastapi import FastAPI, Request
+    from fastapi.testclient import TestClient
+
+    from skeleton.api.middleware import BodyBoundMiddleware, GatePolicy
+
+    policy = GatePolicy(
+        body_limits=(
+            ("/api/v1/engine/media/images/variation", 4096),
+        )
+    )
+    app = FastAPI()
+    app.add_middleware(
+        BodyBoundMiddleware,
+        policy=policy,
+        max_body_bytes=1024,
+    )
+
+    @app.post("/api/v1/engine/media/images/variation")
+    async def engine_media(request: Request) -> dict[str, int]:
+        return {"size": len(await request.body())}
+
+    @app.post("/api/v1/swarm/status")
+    async def ordinary_route(request: Request) -> dict[str, int]:
+        return {"size": len(await request.body())}
+
+    client = TestClient(app)
+    engine = client.post(
+        "/api/v1/engine/media/images/variation",
+        content=b"x" * 2048,
+    )
+    ordinary = client.post(
+        "/api/v1/swarm/status",
+        content=b"x" * 2048,
+    )
+    oversized_engine = client.post(
+        "/api/v1/engine/media/images/variation",
+        content=b"x" * 5000,
+    )
+
+    assert engine.status_code == 200
+    assert engine.json() == {"size": 2048}
+    assert ordinary.status_code == 413
+    assert ordinary.json()["limit"] == 1024
+    assert oversized_engine.status_code == 413
+    assert oversized_engine.json()["limit"] == 4096
 
 
 def test_engine_durable_state_is_bound_to_persistent_skeleton_volume() -> None:
@@ -182,14 +254,13 @@ def test_manifest_declares_engine_as_backend_runtime_dependency() -> None:
     assert "backend/core/engine_client.py" in manifest["required_paths"]
 
 
-def test_backend_compose_cannot_gain_undeclared_provider_credentials() -> None:
+def test_backend_compose_has_no_runtime_model_provider_credentials() -> None:
     compose = _compose()
     backend = _service_block(compose, "backend", "frontend")
 
-    # OpenAI/Emergent remain transitional compatibility credentials until the
-    # local ProviderRegistry activation inventory reaches zero. No additional
-    # provider family may appear in the backend process during that migration.
     forbidden = (
+        "OPENAI_API_KEY",
+        "EMERGENT_LLM_KEY",
         "ANTHROPIC_API_KEY",
         "GEMINI_API_KEY",
         "GOOGLE_API_KEY",
@@ -212,6 +283,51 @@ def test_engine_principal_identity_is_explicit_and_matches_backend_client_defaul
     client = (ROOT / "backend/core/engine_client.py").read_text(encoding="utf-8")
     assert 'service_principal: str = "codedock-backend"' in client
     assert '"x-zaibatsu-attester": self.config.service_principal' in client
+
+
+def test_engine_media_authority_scope_and_capabilities_are_explicit() -> None:
+    server = (ROOT / "skeleton/api/server.py").read_text(encoding="utf-8")
+    routes = (ROOT / "skeleton/api/engine_routes.py").read_text(encoding="utf-8")
+
+    assert '"engine:media"' in server
+    assert 'capability="media.image"' in routes
+    assert 'capability="media.speech"' in routes
+    assert '"engine:media" not in grant.scopes' in routes
+    assert "grant.allows_tenant" in routes
+    assert "grant.allows_capability" in routes
+
+
+def test_production_gate_routes_engine_to_dedicated_service_auth_only() -> None:
+    from skeleton.api.middleware import GatePolicy
+    from skeleton.api.server import _gate_body_limits, _gate_open_prefixes
+
+    policy = GatePolicy(
+        open_prefixes=_gate_open_prefixes(),
+        body_limits=_gate_body_limits(),
+    )
+
+    assert policy.is_open_route("/api/v1/engine/executions")
+    assert policy.is_open_route("/api/v1/engine/media/images/edit")
+    assert not policy.is_open_route("/api/v1/engineer")
+    assert not policy.is_open_route("/api/v1/engines")
+
+    mib = 1024 * 1024
+    assert policy.body_limit("/api/v1/engine/executions", mib) == 4 * mib
+    assert (
+        policy.body_limit(
+            "/api/v1/engine/media/images/variation",
+            mib,
+        )
+        == 34 * mib
+    )
+    assert (
+        policy.body_limit(
+            "/api/v1/engine/media/images/edit",
+            mib,
+        )
+        == 70 * mib
+    )
+    assert policy.body_limit("/api/v1/swarm/status", mib) == mib
 
 
 def test_engine_transport_requires_authenticated_service_token() -> None:

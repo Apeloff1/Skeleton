@@ -22,6 +22,25 @@ _BIAS: Dict[str, Tuple[str, ...]] = {
 ROOM_W, ROOM_H = 640, 360
 
 
+
+def _count(value, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{label} must be a non-negative integer")
+    return value
+
+
+def _flag(value, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{label} must be boolean")
+    return value
+
+
+def _optional_flag(value, label: str, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return _flag(value, label)
+
+
 def _rng(seed: str) -> random.Random:
     digest = hashlib.sha256(seed.encode()).digest()
     return random.Random(int.from_bytes(digest[:8], "big"))
@@ -33,17 +52,30 @@ def generate_rooms(
     seed: str | None = None,
     plan: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    session = pack.get("session") or {}
-    lo = int(session.get("room_count_min") or 6)
-    hi = int(session.get("room_count_max") or 12)
-    lo, hi = max(3, lo), max(lo, hi)
+    if not isinstance(pack, dict):
+        raise ValueError("pack is required")
+    session = pack.get("session") if isinstance(pack.get("session"), dict) else {}
+    lo = _count(session.get("room_count_min"), "room_count_min")
+    hi = _count(session.get("room_count_max"), "room_count_max")
+    if lo < 3 or hi < lo:
+        raise ValueError("room counts must be at least 3 and max must be >= min")
     plan = plan or {}
-    seed = seed or str(plan.get("seed") or pack.get("era") or "extraction_now")
+    if not isinstance(plan, dict):
+        raise ValueError("plan must be an object")
+    if seed is None:
+        seed = plan.get("seed") or pack.get("era")
+    if not isinstance(seed, str) or not seed.strip():
+        raise ValueError("seed is required")
     rng = _rng(seed)
-    # keep graphs bounded so the instanced tscn stays a project, not a novel
     n = rng.randint(lo, min(hi, lo + 8, 24))
-    bias = str(plan.get("room_bias") or "balanced")
-    bag = _BIAS.get(bias, _BIAS["balanced"])
+    bias = plan.get("room_bias")
+    if bias is None:
+        bias = pack.get("room_bias")
+    if bias is None:
+        bias = "balanced"
+    if not isinstance(bias, str) or bias not in _BIAS:
+        raise ValueError(f"unknown room_bias {bias!r}")
+    bag = _BIAS[bias]
     rooms: List[Dict[str, Any]] = []
     for i in range(n):
         if i == 0:
@@ -65,7 +97,7 @@ def generate_rooms(
     for i in range(n - 1):
         edges.append((rooms[i]["id"], rooms[i + 1]["id"]))
     extra = max(0, n // 4)
-    if str(plan.get("extract_late")) in {"True", "true", "1"}:
+    if plan.get("extract_late") is True:
         extra = max(extra, n // 3)
     for _ in range(extra):
         a, b = rng.randrange(n), rng.randrange(n)
@@ -85,8 +117,8 @@ def generate_rooms(
         "edges": [{"from": a, "to": b} for a, b in edges],
         "doors": doors,
         "reachable": True,
-        "spawn_weapon": bool(plan.get("spawn_weapon")),
-        "extract_late": bool(plan.get("extract_late")),
+        "spawn_weapon": _optional_flag(plan.get("spawn_weapon"), "spawn_weapon"),
+        "extract_late": _optional_flag(plan.get("extract_late"), "extract_late"),
         "occupancy": occupant_counts({"rooms": rooms}),
     }
 
@@ -97,10 +129,10 @@ def _populate(
     plan: Dict[str, Any],
     rng: random.Random,
 ) -> None:
-    mix = plan.get("enemy_mix") or {}
-    trash_n = int(mix.get("trash") or 2)
-    elite_n = int(mix.get("elite") or 0)
-    boss_n = int(mix.get("boss") or 0)
+    mix = plan.get("enemy_mix") if isinstance(plan.get("enemy_mix"), dict) else {}
+    trash_n = _count(mix["trash"], "trash") if "trash" in mix else 0
+    elite_n = _count(mix["elite"], "elite") if "elite" in mix else 0
+    boss_n = _count(mix["boss"], "boss") if "boss" in mix else 0
     combat = [r for r in rooms if r["kind"] == "combat"]
     for r in rooms:
         if r["kind"] == "spawn":
@@ -182,6 +214,8 @@ def occupant_counts(graph: Dict[str, Any]) -> Dict[str, int]:
     counts: Dict[str, int] = {"player": 0, "enemy": 0, "extract": 0, "heat": 0, "loot": 0}
     for room in graph["rooms"]:
         for occ in room.get("occupants") or []:
-            k = occ.get("kind") or "loot"
-            counts[k] = counts.get(k, 0) + 1
+            kind = occ.get("kind")
+            if kind not in counts:
+                continue
+            counts[kind] += 1
     return counts

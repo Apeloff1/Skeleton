@@ -64,11 +64,23 @@ class InMemoryTFIDFStore(MemoryStore):
         return dot / (norm1 * norm2)
 
     def add(self, chunk: MemoryChunk) -> None:
+        if not isinstance(chunk, MemoryChunk):
+            raise TypeError("chunk must be MemoryChunk")
+        if not isinstance(chunk.text, str) or not self._tokenize(chunk.text):
+            raise ValueError("text must contain a token")
+
+        previous = self._chunks.get(chunk.id)
+        if previous is not None:
+            for token in set(self._tokenize(previous.text)):
+                self._doc_freq[token] -= 1
+                if self._doc_freq[token] <= 0:
+                    del self._doc_freq[token]
+        else:
+            self._total_docs += 1
+
         self._chunks[chunk.id] = chunk
-        tokens = set(self._tokenize(chunk.text))
-        for t in tokens:
-            self._doc_freq[t] += 1
-        self._total_docs += 1
+        for token in set(self._tokenize(chunk.text)):
+            self._doc_freq[token] += 1
 
     def query(
         self,
@@ -78,8 +90,20 @@ class InMemoryTFIDFStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
-        if not self._chunks:
+        if isinstance(top_k, bool) or not isinstance(top_k, int):
+            raise TypeError("top_k must be an integer")
+        if top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        if isinstance(min_score, bool) or not isinstance(min_score, (int, float)):
+            raise TypeError("min_score must be numeric")
+        if metadata_filter is not None and not isinstance(metadata_filter, dict):
+            raise TypeError("metadata_filter must be a mapping")
+        if top_k == 0 or not self._chunks:
             return []
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query is required")
+        if not self._tokenize(query_text):
+            raise ValueError("query must contain a token")
 
         idf = self._compute_idf()
         query_vec = self._vectorise(query_text, idf)
@@ -98,14 +122,39 @@ class InMemoryTFIDFStore(MemoryStore):
 
             chunk_vec = self._vectorise(chunk.text, idf)
             score = self._cosine_similarity(query_vec, chunk_vec)
-            if score >= min_score:
-                results.append((score, chunk))
+            if score <= 0.0 or score < min_score:
+                continue
+            results.append((score, chunk))
 
-        results.sort(key=lambda x: x[0], reverse=True)
+        results.sort(key=lambda item: (-item[0], item[1].id))
         return [
             MemoryQueryResult(chunk=chunk, score=score, rank=i + 1)
             for i, (score, chunk) in enumerate(results[:top_k])
         ]
+
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Apply exact metadata scope before TF-IDF scoring."""
+        if not isinstance(scope, dict) or not scope:
+            raise ValueError("scope must be a non-empty mapping")
+        if any(
+            not isinstance(key, str)
+            or not key
+            or not isinstance(value, str)
+            or not value
+            for key, value in scope.items()
+        ):
+            raise ValueError("scope keys and values must be non-empty strings")
+        return self.query(
+            query_text,
+            top_k=top_k,
+            metadata_filter=dict(scope),
+        )
 
     def delete(self, chunk_id: str) -> bool:
         if chunk_id not in self._chunks:
@@ -179,6 +228,12 @@ class ChromaDBStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query is required")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+            raise ValueError("top_k must be a positive integer")
+        if isinstance(min_score, bool) or not isinstance(min_score, (int, float)) or not 0.0 <= float(min_score) <= 1.0:
+            raise ValueError("min_score must be in [0, 1]")
         if self._available and self._collection:
             try:
                 results = self._collection.query(
@@ -186,32 +241,74 @@ class ChromaDBStore(MemoryStore):
                     n_results=top_k,
                     where=metadata_filter,
                 )
-                memory_results: List[MemoryQueryResult] = []
-                for i in range(len(results["ids"][0])):
-                    score = results["distances"][0][i] if results["distances"] else 0.0
-                    # Convert distance to similarity (cosine distance → similarity)
-                    similarity = 1.0 - score
-                    if similarity >= min_score:
-                        chunk = MemoryChunk(
-                            id=results["ids"][0][i],
-                            text=results["documents"][0][i],
-                            metadata=results["metadatas"][0][i] if results["metadatas"] else {},
-                            source_tier="rag",
-                            confidence=similarity,
-                        )
-                        memory_results.append(
-                            MemoryQueryResult(chunk=chunk, score=similarity, rank=i + 1)
-                        )
-                return memory_results
             except Exception as exc:
                 raise RagQueryError(
                     f"ChromaDB query failed: {exc}",
                     context={"query": query_text, "top_k": top_k},
                 ) from exc
-        else:
-            return self._fallback.query(
-                query_text, top_k=top_k, metadata_filter=metadata_filter, min_score=min_score
-            )
+            ids = results.get("ids") if isinstance(results, dict) else None
+            distances = results.get("distances") if isinstance(results, dict) else None
+            documents = results.get("documents") if isinstance(results, dict) else None
+            metadatas = results.get("metadatas") if isinstance(results, dict) else None
+            if not isinstance(ids, list) or not ids or not isinstance(ids[0], list):
+                raise RagQueryError("query ids are required", context={"query": query_text})
+            row = ids[0]
+            if (
+                not isinstance(distances, list)
+                or not distances
+                or not isinstance(distances[0], list)
+                or len(distances[0]) != len(row)
+            ):
+                raise RagQueryError("query distances are required", context={"query": query_text})
+            if not isinstance(documents, list) or not documents or not isinstance(documents[0], list) or len(documents[0]) != len(row):
+                raise RagQueryError("query documents are required", context={"query": query_text})
+            if not isinstance(metadatas, list) or not metadatas or not isinstance(metadatas[0], list) or len(metadatas[0]) != len(row):
+                raise RagQueryError("query metadata is required", context={"query": query_text})
+            memory_results: List[MemoryQueryResult] = []
+            for i, chunk_id in enumerate(row):
+                distance = distances[0][i]
+                if isinstance(distance, bool) or not isinstance(distance, (int, float)) or not math.isfinite(float(distance)):
+                    raise RagQueryError("query distance must be finite", context={"query": query_text})
+                similarity = 1.0 - float(distance)
+                if similarity >= min_score:
+                    chunk = MemoryChunk(
+                        id=chunk_id,
+                        text=documents[0][i],
+                        metadata=metadatas[0][i],
+                        source_tier="rag",
+                        confidence=similarity,
+                    )
+                    memory_results.append(
+                        MemoryQueryResult(chunk=chunk, score=similarity, rank=i + 1)
+                    )
+            return memory_results
+        return self._fallback.query(
+            query_text, top_k=top_k, metadata_filter=metadata_filter, min_score=min_score
+        )
+
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Apply Chroma/fallback metadata scope before nearest-neighbor ranking."""
+        if not isinstance(scope, dict) or not scope:
+            raise ValueError("scope must be a non-empty mapping")
+        if any(
+            not isinstance(key, str)
+            or not key
+            or not isinstance(value, str)
+            or not value
+            for key, value in scope.items()
+        ):
+            raise ValueError("scope keys and values must be non-empty strings")
+        return self.query(
+            query_text,
+            top_k=top_k,
+            metadata_filter=dict(scope),
+        )
 
     def delete(self, chunk_id: str) -> bool:
         if self._available and self._collection:

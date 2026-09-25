@@ -24,11 +24,13 @@ class Observation:
     severity: int = 50
 
     def __post_init__(self) -> None:
-        if not self.source or len(self.source) > 256:
+        if not isinstance(self.source, str) or not self.source or len(self.source) > 256:
             raise ValueError("invalid observation source")
-        if not self.detail or len(self.detail) > 4096:
+        if not isinstance(self.reason, ReplanReason):
+            raise ValueError("observation reason is required")
+        if not isinstance(self.detail, str) or not self.detail or len(self.detail) > 4096:
             raise ValueError("invalid observation detail")
-        if not 0 <= self.severity <= 100:
+        if isinstance(self.severity, bool) or not isinstance(self.severity, int) or not 0 <= self.severity <= 100:
             raise ValueError("severity out of bounds")
 
 
@@ -43,7 +45,7 @@ class ReplanProposal:
     def __post_init__(self) -> None:
         if not self.base_plan_id or len(self.base_plan_id) != 64:
             raise ValueError("invalid base plan id")
-        if not 0 <= self.confidence <= 1:
+        if isinstance(self.confidence, bool) or not isinstance(self.confidence, (int, float)) or not 0 <= float(self.confidence) <= 1 or float(self.confidence) != float(self.confidence):
             raise ValueError("confidence out of bounds")
         if len(self.rationale) > 64:
             raise ValueError("too much rationale")
@@ -78,6 +80,11 @@ def propose(plan: Plan, observations: Iterable[Observation]) -> ReplanProposal:
 def apply_proposal(plan: Plan, proposal: ReplanProposal) -> Plan:
     if proposal.base_plan_id != plan.id:
         raise ValueError("proposal does not target supplied plan")
+    if not proposal.removed_steps and not proposal.added_steps:
+        raise ValueError("proposal changes nothing")
+    known = {step.name for step in plan.steps}
+    if any(name not in known for name in proposal.removed_steps):
+        raise ValueError("proposal removes an unknown step")
     kept = [step for step in plan.steps if step.name not in set(proposal.removed_steps)]
     names = {step.name for step in kept}
     for step in proposal.added_steps:

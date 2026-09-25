@@ -16,7 +16,7 @@ Pure sync (no asyncio) to match Skeleton scheduler style.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
 
@@ -27,6 +27,7 @@ class TaskStatus(str, Enum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+    BLOCKED = "blocked"
 
 
 @dataclass
@@ -79,7 +80,9 @@ class SwarmDag:
         deps: Optional[List[str]] = None,
     ) -> None:
         """Submit a task. Dependencies must exist; graph must stay acyclic."""
-        deps = list(deps or [])
+        if not isinstance(id, str) or not id.strip() or not isinstance(capability, str) or not capability.strip():
+            raise SubmitError("invalid", id if isinstance(id, str) else "")
+        deps = list(dict.fromkeys(deps or []))
         if id in self._nodes:
             raise SubmitError.duplicate(id)
         # Self-edge is a cycle even though the id is not yet in the map
@@ -145,10 +148,12 @@ class SwarmDag:
             if n.status == TaskStatus.PENDING and all(d in done for d in n.deps):
                 n.status = TaskStatus.READY
                 wave.append(n)
-        return list(wave)
+        return [replace(node) for node in wave]
 
     def claim(self, task_id: str, executor: str) -> Optional[TaskNode]:
         """Claim a Ready task for an executor. Ready → Running."""
+        if not isinstance(executor, str) or not executor.strip():
+            return None
         n = self._nodes.get(task_id)
         if n is None or n.status != TaskStatus.READY:
             return None
@@ -162,7 +167,7 @@ class SwarmDag:
         Unwitnessed / unattested completion is rejected (returns False and
         leaves status unchanged). There is no complete_unattested path to Done.
         """
-        if result is None:
+        if result is None or isinstance(result, bool) or (isinstance(result, str) and not result.strip()):
             return False
         n = self._nodes.get(task_id)
         if n is None or n.status != TaskStatus.RUNNING:
@@ -177,7 +182,19 @@ class SwarmDag:
         if n is None or n.status != TaskStatus.RUNNING:
             return False
         n.status = TaskStatus.FAILED
+        self._block_unreachable()
         return True
+
+    def _block_unreachable(self) -> None:
+        changed = True
+        while changed:
+            changed = False
+            for node in self._nodes.values():
+                if node.status not in (TaskStatus.PENDING, TaskStatus.READY):
+                    continue
+                if any(self._nodes[dep].status in (TaskStatus.FAILED, TaskStatus.BLOCKED) for dep in node.deps):
+                    node.status = TaskStatus.BLOCKED
+                    changed = True
 
     def get(self, task_id: str) -> Optional[TaskNode]:
         return self._nodes.get(task_id)

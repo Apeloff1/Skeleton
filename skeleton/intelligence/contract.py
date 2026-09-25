@@ -62,6 +62,16 @@ _COERCERS = {
 }
 
 
+
+def _wrong_type(value: Any, want: Any) -> bool:
+    """bool is an int subclass, but a flag is not a count or a measure."""
+    if want is None:
+        return False
+    if want in (int, float) and isinstance(value, bool):
+        return True
+    return not isinstance(value, want)
+
+
 class Contract:
     """Validate and repair payloads against a lightweight field schema."""
 
@@ -79,10 +89,10 @@ class Contract:
                     issues.append(ContractIssue(name, "missing", "required, no default"))
                 continue
             want = spec.get("type")
-            if want is not None and not isinstance(value, want):
+            if _wrong_type(value, want):
                 issues.append(ContractIssue(
                     name, "wrong_type",
-                    f"want {want.__name__}, got {type(value).__name__}",
+                    f"want {getattr(want, '__name__', want)}, got {type(value).__name__}",
                 ))
         if self.strict_keys:
             for key in payload:
@@ -106,7 +116,7 @@ class Contract:
         for name, spec in self.schema.items():
             value = out.get(name)
             want = spec.get("type")
-            if value is None or want is None or isinstance(value, want):
+            if value is None or want is None or not _wrong_type(value, want):
                 continue
             if spec.get("coerce") and want in _COERCERS:
                 try:

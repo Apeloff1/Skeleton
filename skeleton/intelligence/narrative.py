@@ -37,13 +37,19 @@ class DialogueState:
 
     def can_choose(self, choice: DialogueChoice) -> bool:
         for key, expected in choice.requirements.items():
-            if key == "item" and expected not in self.inventory:
-                return False
-            if key.startswith("fact:") and self.facts.get(key[5:]) != expected:
-                return False
-            if key.startswith("rep:") and self.reputation.get(key[4:], 0) < expected:
-                return False
-            if key.startswith("trust:") and self.trust.get(key[6:], 0) < expected:
+            if key == "item":
+                if not isinstance(expected, str) or expected not in self.inventory:
+                    return False
+            elif key.startswith("fact:"):
+                if self.facts.get(key[5:]) != expected:
+                    return False
+            elif key.startswith("rep:") or key.startswith("trust:"):
+                if isinstance(expected, bool) or not isinstance(expected, (int, float)):
+                    return False
+                current = self.reputation if key.startswith("rep:") else self.trust
+                if current.get(key.split(":", 1)[1], 0) < expected:
+                    return False
+            else:
                 return False
         return True
 
@@ -72,12 +78,14 @@ class DialogueGraph:
         trust = dict(state.trust)
         facts = dict(state.facts)
         for key, value in choice.effects.items():
-            if key.startswith("rep:"):
-                faction = key[4:]
-                reputation[faction] = reputation.get(faction, 0) + int(value)
-            elif key.startswith("trust:"):
-                npc = key[6:]
-                trust[npc] = max(0, min(100, trust.get(npc, 0) + int(value)))
+            if key.startswith("rep:") or key.startswith("trust:"):
+                if isinstance(value, bool) or not isinstance(value, int):
+                    raise ValueError("relationship effect must be an integer")
+                name = key.split(":", 1)[1]
+                if key.startswith("rep:"):
+                    reputation[name] = reputation.get(name, 0) + value
+                else:
+                    trust[name] = max(0, min(100, trust.get(name, 0) + value))
             elif key.startswith("fact:"):
                 facts[key[5:]] = value
         return DialogueState(choice.next_node or state.node_id, facts, state.inventory, reputation, trust)

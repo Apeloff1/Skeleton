@@ -16,6 +16,25 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 
+
+@dataclass(frozen=True)
+class FactAnnotation:
+    """Confidence and provenance kept beside a triple, not inside its identity."""
+
+    confidence: float
+    provenance: str
+
+
+def validate_fact_confidence(confidence: float) -> float:
+    """Reject bools and values outside the unit interval."""
+    if isinstance(confidence, bool) or not isinstance(confidence, (int, float)):
+        raise ValueError("confidence must be numeric")
+    value = float(confidence)
+    if not 0.0 <= value <= 1.0:
+        raise ValueError("confidence must be in [0, 1]")
+    return value
+
+
 @dataclass(frozen=True)
 class Triple:
     """A subject-predicate-object fact."""
@@ -35,18 +54,47 @@ class KnowledgeGraph:
         self._by_subject: Dict[str, Set[Triple]] = {}
         self._by_object: Dict[str, Set[Triple]] = {}
         self._by_predicate: Dict[str, Set[Triple]] = {}
+        self._annotations: Dict[Triple, FactAnnotation] = {}
 
-    def add(self, subject: str, predicate: str, obj: str) -> Triple:
+    def add(
+        self,
+        subject: str,
+        predicate: str,
+        obj: str,
+        *,
+        confidence: float = 1.0,
+        provenance: str = "",
+    ) -> Triple:
+        confidence = validate_fact_confidence(confidence)
+        if not isinstance(provenance, str):
+            raise TypeError("provenance must be a string")
         t = Triple(subject.lower().strip(), predicate.lower().strip(), obj.lower().strip())
         if t not in self._triples:
             self._triples.add(t)
             self._by_subject.setdefault(t.subject, set()).add(t)
             self._by_object.setdefault(t.obj, set()).add(t)
             self._by_predicate.setdefault(t.predicate, set()).add(t)
+        previous = self._annotations.get(t)
+        if previous is None:
+            self._annotations[t] = FactAnnotation(confidence, provenance)
+        else:
+            kept_confidence = max(previous.confidence, confidence)
+            if provenance and (not previous.provenance or confidence >= previous.confidence):
+                kept_provenance = provenance
+            else:
+                kept_provenance = previous.provenance
+            self._annotations[t] = FactAnnotation(kept_confidence, kept_provenance)
         return t
 
+    def annotation_for(self, subject: str, predicate: str, obj: str) -> FactAnnotation:
+        t = Triple(subject.lower().strip(), predicate.lower().strip(), obj.lower().strip())
+        return self._annotations.get(t, FactAnnotation(1.0, ""))
+
     def add_many(self, facts: List[Tuple[str, str, str]]) -> int:
-        return sum(1 for s, p, o in facts if self.add(s, p, o))
+        before = len(self._triples)
+        for subject, predicate, obj in facts:
+            self.add(subject, predicate, obj)
+        return len(self._triples) - before
 
     def neighbors(self, entity: str, direction: str = "both") -> List[Triple]:
         entity = entity.lower().strip()
@@ -110,13 +158,15 @@ class KAGRetriever:
         for rank, entity in enumerate(entities[:3]):
             for t in self.graph.neighbors(entity)[:top_k]:
                 content = f"{t.subject} {t.predicate.replace('_', ' ')} {t.obj}"
-                score = 1.0 / (1 + rank)
+                note = self.graph.annotation_for(t.subject, t.predicate, t.obj)
+                score = (1.0 / (1 + rank)) * note.confidence
                 results.append(ScoredResult(
                     fragment_id=f"kag-{t.subject}-{t.predicate}-{t.obj}",
                     content=content,
                     score=score,
                     plane="kag",
-                    provenance=f"graph:{entity}",
+                    provenance=note.provenance or f"graph:{entity}",
+                    metadata={"confidence": note.confidence},
                 ))
 
         self._stats["hits"] += len(results)

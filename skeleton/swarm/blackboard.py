@@ -62,6 +62,13 @@ def _payload_bytes(payload: Dict[str, Any]) -> int:
     return len(json.dumps(payload, default=str, separators=(",", ":")).encode("utf-8"))
 
 
+def _topic_matches(pattern: str, topic: str) -> bool:
+    if pattern.endswith(".*"):
+        prefix = pattern[:-2]
+        return topic == prefix or topic.startswith(prefix + ".")
+    return pattern == topic
+
+
 def is_poisonous(
     entry: BlackboardEntry,
     *,
@@ -135,6 +142,12 @@ class Blackboard:
         provenance: str = "",
     ) -> BlackboardEntry:
         payload = dict(payload)
+        if not isinstance(topic, str) or not topic.strip() or not isinstance(producer, str) or not producer.strip():
+            raise ValueError("topic and producer are required")
+        if isinstance(confidence, bool) or not isinstance(confidence, (int, float)) or not 0.0 <= float(confidence) <= 1.0:
+            raise ValueError("confidence must be in [0, 1]")
+        if isinstance(ttl_s, bool) or not isinstance(ttl_s, (int, float)) or not ttl_s > 0:
+            raise ValueError("ttl_s must be positive")
         size = _payload_bytes(payload)
         if size > self.max_payload_bytes:
             raise ValueError(
@@ -147,7 +160,7 @@ class Blackboard:
             topic=topic,
             payload=payload,
             producer=producer,
-            confidence=min(1.0, max(0.0, confidence)),
+            confidence=float(confidence),
             posted_at=self._now(),
             ttl_s=ttl_s,
             provenance=provenance or "",
@@ -182,7 +195,7 @@ class Blackboard:
         out = [
             e for e in self._entries.values()
             if not e.is_expired(now)
-            and (topic is None or e.topic == topic)
+            and (_topic_matches(topic, e.topic) if topic is not None else True)
             and (include_quarantined or not e.quarantined)
         ]
         out.sort(key=lambda e: (-e.confidence, e.posted_at))
@@ -205,6 +218,9 @@ class Blackboard:
         if entry is None:
             raise KeyError(f"unknown blackboard entry: {entry_id}")
         entry.quarantined = False
+        if self._should_quarantine(entry):
+            entry.quarantined = True
+            raise ValueError("entry is still poisonous")
         return entry
 
     def sweep(self) -> List[str]:

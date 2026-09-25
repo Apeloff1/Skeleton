@@ -17,6 +17,7 @@ from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk
 from skeleton.memory.vector import VectorStore
 from skeleton.persistence.memory_repository import (
+    MemoryProjectionEvent,
     MongoMemoryRepository,
     SQLiteMemoryRepository,
 )
@@ -61,6 +62,121 @@ class ProjectionSyncReport:
         return any(result.state is ProjectionState.DEGRADED for result in self.results)
 
 
+@dataclass(frozen=True, slots=True)
+class ProjectionEventDispatch:
+    event_id: str
+    memory_id: str
+    memory_version: int
+    action: str
+    published: bool
+    results: tuple[ProjectionResult, ...]
+    superseded: bool = False
+
+    @property
+    def degraded(self) -> bool:
+        return any(result.state is ProjectionState.DEGRADED for result in self.results)
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionDispatchReport:
+    attempted_events: int
+    published_events: int
+    blocked_event_id: str | None
+    remaining_pending_sample: int
+    attempts: tuple[ProjectionEventDispatch, ...]
+
+    @property
+    def degraded(self) -> bool:
+        return self.blocked_event_id is not None
+
+
+def _projection_batch(
+    projections: Iterable[MemoryProjection],
+    *,
+    require_nonempty: bool = False,
+) -> tuple[MemoryProjection, ...]:
+    resolved = tuple(projections)
+    if require_nonempty and not resolved:
+        raise ValueError("at least one projection is required")
+    names = tuple(str(getattr(item, "name", "")).strip() for item in resolved)
+    if any(not name for name in names):
+        raise ValueError("every projection requires a name")
+    if len(set(names)) != len(names):
+        raise ValueError("projection names must be unique")
+    return resolved
+
+
+def _fence_projection_event(
+    event: MemoryProjectionEvent,
+    current: MemoryRecord,
+) -> bool:
+    """Return True when an event is superseded; fail closed on impossible order.
+
+    A pending historical event may survive a rebuild or a bounded dispatcher
+    batch. Applying it after a newer canonical version would regress the
+    derived store. Older events are therefore acknowledged without replaying
+    their stale payload, while same-version events must exactly match current
+    canonical state.
+    """
+    if event.memory_id != current.memory_id:
+        raise ValueError("projection event/current memory identity mismatch")
+    if event.tenant_id != current.tenant_id or event.namespace != current.namespace:
+        raise ValueError("projection event/current authority scope mismatch")
+    if event.memory_version > current.version:
+        raise ValueError("projection event is ahead of canonical memory")
+    if event.memory_version < current.version:
+        return True
+    if event.record != current:
+        raise ValueError("projection event diverges from canonical current version")
+    return False
+
+
+def _dispatch_event(
+    event: MemoryProjectionEvent,
+    projections: tuple[MemoryProjection, ...],
+) -> ProjectionEventDispatch:
+    results: list[ProjectionResult] = []
+    for projection in projections:
+        try:
+            if event.action == "upsert":
+                projection.upsert(event.record)
+                results.append(
+                    ProjectionResult(
+                        projection=projection.name,
+                        state=ProjectionState.HEALTHY,
+                        upserted=1,
+                    )
+                )
+            elif event.action == "delete":
+                projection.delete(event.memory_id)
+                results.append(
+                    ProjectionResult(
+                        projection=projection.name,
+                        state=ProjectionState.HEALTHY,
+                        deleted=1,
+                    )
+                )
+            else:
+                raise ValueError(f"unsupported projection action: {event.action}")
+        except Exception as exc:
+            results.append(
+                ProjectionResult(
+                    projection=projection.name,
+                    state=ProjectionState.DEGRADED,
+                    error_code=type(exc).__name__,
+                )
+            )
+            break
+    return ProjectionEventDispatch(
+        event_id=event.event_id,
+        memory_id=event.memory_id,
+        memory_version=event.memory_version,
+        action=event.action,
+        published=False,
+        results=tuple(results),
+    )
+
+
 class LegacyMemoryStoreProjection:
     """Write-only projection adapter for legacy MemoryStore implementations."""
 
@@ -83,6 +199,7 @@ class LegacyMemoryStoreProjection:
             # itself. The materializer responsible for content_ref must do so
             # before this adapter is used.
             raise ValueError("projection requires materialized inline content")
+        self.store.delete(record.memory_id)
         chunk = MemoryChunk(
             id=record.memory_id,
             text=content,
@@ -288,9 +405,7 @@ class MemoryProjectionCoordinator:
             subject_id=subject_id,
             include_tombstoned=True,
         )
-        projection_list = tuple(projections)
-        if any(not getattr(item, "name", "") for item in projection_list):
-            raise ValueError("every projection requires a name")
+        projection_list = _projection_batch(projections)
 
         active = tuple(r for r in records if r.state is MemoryState.ACTIVE)
         tombstoned = tuple(r for r in records if r.state is MemoryState.TOMBSTONED)
@@ -335,6 +450,101 @@ class MemoryProjectionCoordinator:
             results=tuple(results),
         )
 
+    def dispatch_pending(
+        self,
+        *,
+        projections: Iterable[MemoryProjection],
+        limit: int = 100,
+        now=None,
+    ) -> ProjectionDispatchReport:
+        """Apply durable projection events in order and ack only complete events.
+
+        The first failed event blocks later events. This preserves canonical
+        mutation ordering and makes retry behavior deterministic after crashes.
+        """
+        projection_list = _projection_batch(
+            projections,
+            require_nonempty=True,
+        )
+        events = self.repository.pending_projection_events(limit=limit)
+        attempts: list[ProjectionEventDispatch] = []
+        published = 0
+        blocked_event_id: str | None = None
+
+        for event in events:
+            try:
+                current = self.repository.get(
+                    event.memory_id,
+                    tenant_id=event.tenant_id,
+                    namespace=event.namespace,
+                    include_tombstoned=True,
+                )
+                superseded = _fence_projection_event(event, current)
+            except Exception as exc:
+                attempt = ProjectionEventDispatch(
+                    event_id=event.event_id,
+                    memory_id=event.memory_id,
+                    memory_version=event.memory_version,
+                    action=event.action,
+                    published=False,
+                    results=(
+                        ProjectionResult(
+                            projection="canonical-fence",
+                            state=ProjectionState.DEGRADED,
+                            error_code=type(exc).__name__,
+                        ),
+                    ),
+                )
+                attempts.append(attempt)
+                blocked_event_id = event.event_id
+                break
+
+            attempt = (
+                ProjectionEventDispatch(
+                    event_id=event.event_id,
+                    memory_id=event.memory_id,
+                    memory_version=event.memory_version,
+                    action=event.action,
+                    published=False,
+                    results=(),
+                    superseded=True,
+                )
+                if superseded
+                else _dispatch_event(event, projection_list)
+            )
+            if attempt.degraded:
+                attempts.append(attempt)
+                blocked_event_id = event.event_id
+                break
+
+            self.repository.mark_projection_published(
+                event.event_id,
+                now=now,
+            )
+            attempts.append(
+                ProjectionEventDispatch(
+                    event_id=attempt.event_id,
+                    memory_id=attempt.memory_id,
+                    memory_version=attempt.memory_version,
+                    action=attempt.action,
+                    published=True,
+                    results=attempt.results,
+                    superseded=attempt.superseded,
+                )
+            )
+            published += 1
+
+        remaining = len(
+            self.repository.pending_projection_events(limit=limit)
+        )
+        return ProjectionDispatchReport(
+            attempted_events=len(attempts),
+            published_events=published,
+            blocked_event_id=blocked_event_id,
+            remaining_pending_sample=remaining,
+            attempts=tuple(attempts),
+        )
+
     def expire_and_sync_subject(
         self,
         *,
@@ -365,7 +575,7 @@ class MemoryProjectionCoordinator:
         projections: Iterable[MemoryProjection],
         known_projection_ids: Iterable[str] = (),
     ) -> ProjectionSyncReport:
-        projection_list = tuple(projections)
+        projection_list = _projection_batch(projections)
         known_ids = tuple(dict.fromkeys(str(item).strip() for item in known_projection_ids))
         if any(not item for item in known_ids):
             raise ValueError("known_projection_ids must be non-empty ids")
@@ -430,9 +640,7 @@ class AsyncMemoryProjectionCoordinator:
             subject_id=subject_id,
             include_tombstoned=True,
         )
-        projection_list = tuple(projections)
-        if any(not getattr(item, "name", "") for item in projection_list):
-            raise ValueError("every projection requires a name")
+        projection_list = _projection_batch(projections)
 
         active = tuple(r for r in records if r.state is MemoryState.ACTIVE)
         tombstoned = tuple(r for r in records if r.state is MemoryState.TOMBSTONED)
@@ -477,6 +685,97 @@ class AsyncMemoryProjectionCoordinator:
             results=tuple(results),
         )
 
+    async def dispatch_pending(
+        self,
+        *,
+        projections: Iterable[MemoryProjection],
+        limit: int = 100,
+        now=None,
+    ) -> ProjectionDispatchReport:
+        """Async durable projection dispatch over Mongo canonical authority."""
+        projection_list = _projection_batch(
+            projections,
+            require_nonempty=True,
+        )
+        events = await self.repository.pending_projection_events(limit=limit)
+        attempts: list[ProjectionEventDispatch] = []
+        published = 0
+        blocked_event_id: str | None = None
+
+        for event in events:
+            try:
+                current = await self.repository.get(
+                    event.memory_id,
+                    tenant_id=event.tenant_id,
+                    namespace=event.namespace,
+                    include_tombstoned=True,
+                )
+                superseded = _fence_projection_event(event, current)
+            except Exception as exc:
+                attempt = ProjectionEventDispatch(
+                    event_id=event.event_id,
+                    memory_id=event.memory_id,
+                    memory_version=event.memory_version,
+                    action=event.action,
+                    published=False,
+                    results=(
+                        ProjectionResult(
+                            projection="canonical-fence",
+                            state=ProjectionState.DEGRADED,
+                            error_code=type(exc).__name__,
+                        ),
+                    ),
+                )
+                attempts.append(attempt)
+                blocked_event_id = event.event_id
+                break
+
+            attempt = (
+                ProjectionEventDispatch(
+                    event_id=event.event_id,
+                    memory_id=event.memory_id,
+                    memory_version=event.memory_version,
+                    action=event.action,
+                    published=False,
+                    results=(),
+                    superseded=True,
+                )
+                if superseded
+                else _dispatch_event(event, projection_list)
+            )
+            if attempt.degraded:
+                attempts.append(attempt)
+                blocked_event_id = event.event_id
+                break
+
+            await self.repository.mark_projection_published(
+                event.event_id,
+                now=now,
+            )
+            attempts.append(
+                ProjectionEventDispatch(
+                    event_id=attempt.event_id,
+                    memory_id=attempt.memory_id,
+                    memory_version=attempt.memory_version,
+                    action=attempt.action,
+                    published=True,
+                    results=attempt.results,
+                    superseded=attempt.superseded,
+                )
+            )
+            published += 1
+
+        remaining = len(
+            await self.repository.pending_projection_events(limit=limit)
+        )
+        return ProjectionDispatchReport(
+            attempted_events=len(attempts),
+            published_events=published,
+            blocked_event_id=blocked_event_id,
+            remaining_pending_sample=remaining,
+            attempts=tuple(attempts),
+        )
+
     async def rebuild_subject(
         self,
         *,
@@ -486,7 +785,7 @@ class AsyncMemoryProjectionCoordinator:
         projections: Iterable[MemoryProjection],
         known_projection_ids: Iterable[str] = (),
     ) -> ProjectionSyncReport:
-        projection_list = tuple(projections)
+        projection_list = _projection_batch(projections)
         known_ids = tuple(
             dict.fromkeys(str(item).strip() for item in known_projection_ids)
         )
@@ -534,6 +833,8 @@ __all__ = [
     "MAGStoreProjection",
     "MemoryProjection",
     "MemoryProjectionCoordinator",
+    "ProjectionDispatchReport",
+    "ProjectionEventDispatch",
     "ProjectionResult",
     "ProjectionState",
     "ProjectionSyncReport",

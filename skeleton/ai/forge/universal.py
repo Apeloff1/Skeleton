@@ -18,6 +18,12 @@ from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import BlueprintId
 
 
+def _pair(end: Any) -> tuple[str, str] | None:
+    if isinstance(end, tuple) and len(end) == 2 and all(isinstance(part, str) and part.strip() for part in end):
+        return end
+    return None
+
+
 @dataclass(frozen=True)
 class Port:
     name: str
@@ -63,12 +69,19 @@ class Blueprint:
         self.components[component.instance_id] = component
 
     def connect(self, src: tuple[str, str], dst: tuple[str, str]) -> None:
+        if _pair(src) is None or _pair(dst) is None:
+            raise BlueprintError("wire ends must be (component, port)")
         self.wires.append(Wire(src=src, dst=dst))
 
     def validate(self) -> list[str]:
         problems: list[str] = []
         for wire in self.wires:
-            for end, direction in ((wire.src, "out"), (wire.dst, "in")):
+            src = _pair(wire.src)
+            dst = _pair(wire.dst)
+            if src is None or dst is None:
+                problems.append("wire ends must be (component, port)")
+                continue
+            for end, direction in ((src, "out"), (dst, "in")):
                 comp_id, port_name = end
                 comp = self.components.get(comp_id)
                 if comp is None:
@@ -81,20 +94,24 @@ class Blueprint:
                     continue
                 if port.direction != direction:
                     problems.append(f"{comp_id}.{port_name} is a {port.direction}-port; expected {direction}")
-            src_comp = self.components.get(wire.src[0])
-            dst_comp = self.components.get(wire.dst[0])
+            src_comp = self.components.get(src[0])
+            dst_comp = self.components.get(dst[0])
             if src_comp is not None and dst_comp is not None:
                 try:
-                    s = src_comp.port(wire.src[1])
-                    d = dst_comp.port(wire.dst[1])
+                    s = src_comp.port(src[1])
+                    d = dst_comp.port(dst[1])
                     if s.port_type != d.port_type:
-                        problems.append(f"type mismatch {wire.src[0]}.{wire.src[1]} ({s.port_type}) -> {wire.dst[0]}.{wire.dst[1]} ({d.port_type})")
+                        problems.append(f"type mismatch {src[0]}.{src[1]} ({s.port_type}) -> {dst[0]}.{dst[1]} ({d.port_type})")
                 except BlueprintError:
                     pass
         edges: dict[str, list[str]] = {c: [] for c in self.components}
         for wire in self.wires:
-            if wire.src[0] in edges and wire.dst[0] in edges:
-                edges[wire.src[0]].append(wire.dst[0])
+            src = _pair(wire.src)
+            dst = _pair(wire.dst)
+            if src is None or dst is None:
+                continue
+            if src[0] in edges and dst[0] in edges:
+                edges[src[0]].append(dst[0])
         visited: set[str] = set()
         stack: set[str] = set()
 
@@ -151,29 +168,48 @@ class Forge:
         self.register_kind("jeeves", (Port("telemetry", "state", "in"), Port("advice", "event", "out")))
 
     def register_kind(self, kind: str, ports: tuple[Port, ...]) -> None:
-        if not kind.strip():
-            raise BlueprintError("kind name must be non-empty")
-        self._kinds[kind] = tuple(ports)
+        if not isinstance(kind, str) or not kind.strip() or kind != kind.strip():
+            raise BlueprintError("kind name must be a non-empty string")
+        if kind in self._kinds:
+            raise BlueprintError("kind is already registered", context={"kind": kind})
+        if not isinstance(ports, tuple) or not ports or any(not isinstance(port, Port) for port in ports):
+            raise BlueprintError("kind needs at least one port")
+        names = [port.name for port in ports]
+        if len(names) != len(set(names)):
+            raise BlueprintError("duplicate port name", context={"kind": kind})
+        self._kinds[kind] = ports
 
     def available_kinds(self) -> list[str]:
         return sorted(self._kinds)
 
     def new_blueprint(self, name: str) -> Blueprint:
-        if not name.strip():
-            raise BlueprintError("blueprint name must be non-empty")
+        if not isinstance(name, str) or not name.strip() or name != name.strip():
+            raise BlueprintError("blueprint name must be a non-empty string")
         bp = Blueprint(blueprint_id=str(BlueprintId.new()), name=name)
         self._bus.emit("forge.blueprint.created", {"blueprint_id": bp.blueprint_id, "name": name})
         return bp
 
     def instantiate(self, blueprint: Blueprint, kind: str, instance_id: str, *, config: dict[str, Any] | None = None) -> Component:
+        if not isinstance(instance_id, str) or not instance_id.strip():
+            raise BlueprintError("instance id is required")
+        if config is None:
+            config = {}
+        elif not isinstance(config, dict):
+            raise BlueprintError("config must be an object")
         ports = self._kinds.get(kind)
         if ports is None:
             raise BlueprintError("unknown component kind", context={"kind": kind, "available": self.available_kinds()})
-        component = Component(instance_id=instance_id, kind=kind, ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports), config=dict(config or {}))
+        component = Component(instance_id=instance_id, kind=kind, ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports), config=dict(config))
         blueprint.add_component(component)
         return component
 
     def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False, max_rounds: int = 3) -> dict[str, Any]:
+        if not isinstance(target, str) or target not in {"godot", "json", "yaml"}:
+            raise MaterialisationError("unknown materialisation target", context={"target": target})
+        if not isinstance(repair, bool):
+            raise ValueError("repair must be boolean")
+        if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
+            raise ValueError("max_rounds must be an integer >= 1")
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
@@ -224,7 +260,7 @@ class Forge:
                 if looped.get("repairs"):
                     result["repair"] = looped["repairs"][-1]
                     result["repairs"] = looped["repairs"]
-                verification_accepted = bool(looped["accepted"])
+                verification_accepted = looped.get("accepted") is True
                 verification_payload = looped["verification"]
                 evidence = {
                     "project_issues": list(verification_payload.get("project_issues") or []),
@@ -261,7 +297,7 @@ class Forge:
                 if looped.get("repairs"):
                     last = looped["repairs"][-1]
                     self._bus.publish(DomainEvent(
-                        topic="forge.repair.completed" if last.get("ok") else "forge.repair.failed",
+                        topic="forge.repair.completed" if last.get("ok") == 1 else "forge.repair.failed",
                         payload={
                             "blueprint_id": blueprint.blueprint_id,
                             "name": blueprint.name,
@@ -319,7 +355,7 @@ class Forge:
                     },
                     correlation_id=f"forge_verify_{blueprint.blueprint_id}",
                 ))
-                if not verification.accepted:
+                if verification.accepted is not True:
                     raise MaterialisationError(
                         "emitted Godot project failed verification",
                         context={
@@ -362,7 +398,7 @@ class Forge:
                 if looped.get("repairs"):
                     result["repair"] = looped["repairs"][-1]
                     result["repairs"] = looped["repairs"]
-                verification_accepted = bool(looped["accepted"])
+                verification_accepted = looped.get("accepted") is True
                 verification_payload = looped["verification"]
                 evidence = {
                     "project_issues": list(verification_payload.get("project_issues") or []),
@@ -401,7 +437,7 @@ class Forge:
                 if looped.get("repairs"):
                     last = looped["repairs"][-1]
                     self._bus.publish(DomainEvent(
-                        topic="forge.repair.completed" if last.get("ok") else "forge.repair.failed",
+                        topic="forge.repair.completed" if last.get("ok") == 1 else "forge.repair.failed",
                         payload={
                             "blueprint_id": blueprint.blueprint_id,
                             "name": blueprint.name,
@@ -471,7 +507,7 @@ class Forge:
                     },
                     correlation_id=f"forge_verify_{blueprint.blueprint_id}",
                 ))
-                if not verification["accepted"]:
+                if verification.get("accepted") is not True:
                     raise MaterialisationError(
                         f"emitted {target} artefact failed verification",
                         context={
@@ -481,6 +517,8 @@ class Forge:
                             "verification_stats": result["verification_stats"],
                         },
                     )
+        else:
+            raise MaterialisationError("unknown materialisation target", context={"target": target})
         materialised = {
             "blueprint_id": blueprint.blueprint_id,
             "components": len(blueprint.components),
@@ -506,16 +544,26 @@ class Forge:
     def _topological_order(blueprint: Blueprint) -> list[str]:
         indegree = {c: 0 for c in blueprint.components}
         for wire in blueprint.wires:
-            if wire.dst[0] in indegree:
-                indegree[wire.dst[0]] += 1
+            src = _pair(wire.src)
+            dst = _pair(wire.dst)
+            if src is None or dst is None:
+                raise MaterialisationError("wire ends must be (component, port)")
+            if dst[0] in indegree:
+                indegree[dst[0]] += 1
         queue = sorted([c for c, d in indegree.items() if d == 0])
         order: list[str] = []
         while queue:
             node = queue.pop(0)
             order.append(node)
             for wire in blueprint.wires:
-                if wire.src[0] == node and wire.dst[0] in indegree:
-                    indegree[wire.dst[0]] -= 1
-                    if indegree[wire.dst[0]] == 0:
-                        queue.append(wire.dst[0])
+                src = _pair(wire.src)
+                dst = _pair(wire.dst)
+                if src is None or dst is None:
+                    continue
+                if src[0] == node and dst[0] in indegree:
+                    indegree[dst[0]] -= 1
+                    if indegree[dst[0]] == 0:
+                        queue.append(dst[0])
+        if len(order) != len(blueprint.components):
+            raise MaterialisationError("blueprint execution order is incomplete")
         return order

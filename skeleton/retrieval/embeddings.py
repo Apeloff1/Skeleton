@@ -24,22 +24,41 @@ class LocalEmbedder:
     """Deterministic bag-of-words hashing embedder."""
 
     def __init__(self, *, dim: int = 128) -> None:
-        if dim <= 0:
-            raise ValueError("dim must be positive")
+        if isinstance(dim, bool) or not isinstance(dim, int) or dim < 1:
+            raise ValueError("dim must be a positive integer")
         self._dim = dim
 
     def vector(self, text: str) -> Tuple[float, ...]:
-        tokens = _TOKEN.findall((text or "").lower())
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("text is required")
+        tokens = _TOKEN.findall(text.lower())
+        if not tokens:
+            raise ValueError("text must contain a token")
         vec = [0.0] * self._dim
         for token in tokens:
             digest = hashlib.sha256(token.encode()).digest()
             idx = digest[0] % self._dim
             vec[idx] += 1.0
-        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+        norm = math.sqrt(sum(v * v for v in vec))
+        if norm == 0.0:
+            raise ValueError("embedding must be non-zero")
         return tuple(v / norm for v in vec)
 
     def similarity(self, a: Sequence[float], b: Sequence[float]) -> float:
+        if len(a) != len(b):
+            raise ValueError("embedding dimensions differ")
         return sum(x * y for x, y in zip(a, b))
+
+
+
+def _embed_text(item: ScoredResult) -> str:
+    metadata = item.metadata if isinstance(item.metadata, dict) else {}
+    raw = metadata.get("text") or metadata.get("preview") or ""
+    if isinstance(raw, str) and raw.strip():
+        return raw
+    if isinstance(item.content, str) and item.content.strip():
+        return item.content
+    raise ValueError("result text is required")
 
 
 def rerank_by_embedding(
@@ -52,17 +71,21 @@ def rerank_by_embedding(
     """Blend embedding similarity (weight) with fused score into the final."""
     query_vec = embedder.vector(query)
     scored = []
+    if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not 0.0 <= float(weight) <= 1.0:
+        raise ValueError("weight must be between 0 and 1")
     for item in items:
-        text = item.metadata.get("text") or item.metadata.get("preview") or item.item_id
-        sim = embedder.similarity(query_vec, embedder.vector(str(text)))
+        text = _embed_text(item)
+        sim = embedder.similarity(query_vec, embedder.vector(text))
         scored.append((item, sim))
-    scored.sort(key=lambda kv: -(kv[1] * weight + kv[0].score * (1 - weight)))
+    scored.sort(key=lambda kv: -(kv[1] * weight + kv[0].score * (1.0 - weight)))
     return tuple(
         ScoredResult(
-            item_id=item.item_id,
-            score=round(item.score * (1 - weight) + sim * weight, 6),
-            source=item.source,
-            metadata=item.metadata,
+            fragment_id=item.fragment_id,
+            content=item.content,
+            score=round(item.score * (1.0 - weight) + sim * weight, 6),
+            plane=item.plane,
+            provenance=item.provenance,
+            metadata=dict(item.metadata),
         )
         for item, sim in scored
     )

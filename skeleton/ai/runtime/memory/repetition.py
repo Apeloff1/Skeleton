@@ -111,11 +111,14 @@ class RepetitionScheduler:
         card.reviews += 1
         card.last_reviewed = now
 
+        interval_scale = 1.0
         if outcome == Outcome.RECALLED:
             card.stability *= card.ease
             card.ease *= self.ease_growth
         elif outcome == Outcome.STRUGGLED:
-            pass  # stability and ease unchanged — same interval again
+            # Stability stays put, but the next deadline is sooner than a
+            # clean recall. The contract says a struggle shortens the interval.
+            interval_scale = 0.5
         elif outcome == Outcome.FORGOTTEN:
             card.stability = 3600.0
             card.ease = max(1.0, card.ease * self.ease_shrink)
@@ -123,7 +126,7 @@ class RepetitionScheduler:
         else:
             raise ValueError(f"unknown outcome {outcome!r}")
 
-        card.next_due = now + card.interval(self.floor)
+        card.next_due = now + card.interval(self.floor) * interval_scale
 
         if self._bus:
             self._bus.publish(
@@ -155,11 +158,11 @@ class RepetitionScheduler:
     def retention(self, episode_id: str) -> float:
         """Current predicted recall probability for an episode."""
         card = self._cards.get(episode_id)
-        if card is None or card.last_reviewed is None:
-            return 1.0 if card is None else math.exp(
-                -(self._now() - card.next_due + card.interval(self.floor))
-                / max(card.stability * card.ease, 1e-9)
-            )
+        if card is None:
+            raise ValueError("episode is not enrolled")
+        if card.last_reviewed is None:
+            elapsed = self._now() - card.next_due + card.interval(self.floor)
+            return math.exp(-elapsed / max(card.stability * card.ease, 1e-9))
         elapsed = self._now() - card.last_reviewed
         return math.exp(-elapsed / max(card.stability * card.ease, 1e-9))
 
@@ -170,7 +173,7 @@ class RepetitionScheduler:
             "due_now": len([c for c in cards if c.next_due <= self._now()]),
             "total_reviews": sum(c.reviews for c in cards),
             "total_lapses": sum(c.lapses for c in cards),
-            "mean_stability_h": round(
+            "mean_stability_h": None if not cards else round(
                 sum(c.stability for c in cards) / len(cards) / 3600, 2
-            ) if cards else 0.0,
+            ),
         }

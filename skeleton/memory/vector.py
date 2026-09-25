@@ -21,6 +21,22 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from skeleton.memory.core import Chunk, ScoredChunk
 
 
+def _unit_norm(vector: List[float]) -> float:
+    if not vector:
+        raise ValueError("embedding is required")
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        for value in vector
+    ):
+        raise ValueError("embedding values must be finite")
+    norm = math.sqrt(sum(float(value) * float(value) for value in vector))
+    if norm == 0.0:
+        raise ValueError("embedding must be non-zero")
+    return norm
+
+
 class HashEmbedder:
     """Deterministic local embedder via feature hashing.
 
@@ -39,7 +55,9 @@ class HashEmbedder:
             idx = h % self.dims
             sign = 1.0 if (h >> 63) & 1 == 0 else -1.0
             vec[idx] += sign
-        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+        if not tokens:
+            raise ValueError("text must contain a token")
+        norm = _unit_norm(vec)
         return [v / norm for v in vec]
 
     @staticmethod
@@ -111,7 +129,7 @@ class VectorStore:
 
     def add(self, chunk: Chunk) -> None:
         vector = self._embedder_fn(chunk.text)
-        norm = math.sqrt(sum(v * v for v in vector)) or 1.0
+        norm = _unit_norm(vector)
         self._entries[chunk.chunk_id] = VectorEntry(chunk=chunk, vector=vector, norm=norm)
         self._stats["added"] += 1
         self._invalidate_asm_prepared_cache()
@@ -127,7 +145,7 @@ class VectorStore:
             return []
 
         qv = self._embedder_fn(text)
-        qnorm = math.sqrt(sum(v * v for v in qv)) or 1.0
+        qnorm = _unit_norm(qv)
         candidates = [
             entry
             for entry in self._entries.values()
@@ -232,7 +250,7 @@ class VectorStore:
         embedded: List[Tuple[List[float], float]] = []
         for text in queries:
             vector = self._embedder_fn(text)
-            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            norm = _unit_norm(vector)
             embedded.append((vector, norm))
 
         if self._use_jvm_acceleration and top_k > 0:
@@ -349,7 +367,7 @@ class VectorStore:
             return []
 
         qv = self._embedder_fn(text)
-        qnorm = math.sqrt(sum(value * value for value in qv)) or 1.0
+        qnorm = _unit_norm(qv)
         candidates = [
             entry
             for entry in self._entries.values()
@@ -479,7 +497,7 @@ class VectorStore:
         embedded: List[Tuple[List[float], float]] = []
         for text in queries:
             vector = self._embedder_fn(text)
-            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            norm = _unit_norm(vector)
             embedded.append((vector, norm))
 
         cosine_threshold = float(minimum_score) * 2.0 - 1.0

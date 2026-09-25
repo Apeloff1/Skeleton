@@ -54,6 +54,9 @@ class PersonaDriftDetector:
 
     def establish_baseline(self, samples: List[str]) -> None:
         """Establish baseline from historical action distribution."""
+        if not samples:
+            self._baseline = {}
+            return
         from collections import Counter
         counts = Counter(samples)
         total = len(samples)

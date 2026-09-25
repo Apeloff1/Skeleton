@@ -57,14 +57,24 @@ class MemoryTrace:
         return min(spacing * weight, MAX_STABILITY)
 
 
-def retrievability(trace: MemoryTrace, now: Optional[float] = None) -> float:
+def retrievability(
+    trace: MemoryTrace,
+    now: Optional[float] = None,
+    *,
+    half_life_s: float = DEFAULT_HALF_LIFE_S,
+) -> float:
     """Ebbinghaus retrievability R = exp(-t / (S * half_life))."""
+    if isinstance(half_life_s, bool) or not isinstance(half_life_s, (int, float)) or half_life_s <= 0:
+        raise ForgettingError(
+            "half-life must be positive",
+            context={"half_life_s": half_life_s},
+        )
     now = time.time() if now is None else now
     elapsed = max(0.0, now - trace.last_recalled_at)
     if elapsed == 0.0:
         return 1.0
     s = trace.stability()
-    return math.exp(-elapsed / (s * DEFAULT_HALF_LIFE_S))
+    return math.exp(-elapsed / (s * float(half_life_s)))
 
 
 def reinforce(trace: MemoryTrace, now: Optional[float] = None) -> MemoryTrace:
@@ -81,6 +91,12 @@ class EvictionCandidate:
     recalls: int
 
 
+def _unit(value: float, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
+        raise ForgettingError(f"{label} must be in [0, 1]", context={label: value})
+    return float(value)
+
+
 class ForgettingCurve:
     """Tracks traces for a store and answers "what may we forget?"."""
 
@@ -95,8 +111,13 @@ class ForgettingCurve:
                 "retention floor must be in (0, 1)",
                 context={"retention_floor": retention_floor},
             )
+        if isinstance(half_life_s, bool) or not isinstance(half_life_s, (int, float)) or half_life_s <= 0:
+            raise ForgettingError(
+                "half-life must be positive",
+                context={"half_life_s": half_life_s},
+            )
         self.retention_floor = retention_floor
-        self.half_life_s = half_life_s
+        self.half_life_s = float(half_life_s)
         self._traces: Dict[str, MemoryTrace] = {}
 
     def register(self, memory_id: str, *, importance: float = 0.5,
@@ -106,8 +127,8 @@ class ForgettingCurve:
             memory_id=memory_id,
             created_at=now,
             last_recalled_at=now,
-            importance=min(max(importance, 0.0), 1.0),
-            salience=min(max(salience, 0.0), 1.0),
+            importance=_unit(importance, "importance"),
+            salience=_unit(salience, "salience"),
         )
         self._traces[memory_id] = trace
         return trace
@@ -126,24 +147,33 @@ class ForgettingCurve:
     def score(self, memory_id: str, now: Optional[float] = None) -> float:
         trace = self._traces.get(memory_id)
         if trace is None:
-            return 0.0
-        return retrievability(trace, now)
+            raise ForgettingError(
+                "score for unregistered memory",
+                context={"memory_id": memory_id},
+            )
+        return retrievability(trace, now, half_life_s=self.half_life_s)
 
     def eviction_candidates(self, now: Optional[float] = None,
                             limit: Optional[int] = None) -> List[EvictionCandidate]:
         now = time.time() if now is None else now
-        doomed = [
-            EvictionCandidate(
-                memory_id=t.memory_id,
-                retrievability=retrievability(t, now),
-                age_s=now - t.created_at,
-                recalls=t.recalls,
-            )
-            for t in self._traces.values()
-            if retrievability(t, now) < self.retention_floor
-        ]
+        doomed = []
+        for t in self._traces.values():
+            score = retrievability(t, now, half_life_s=self.half_life_s)
+            if score < self.retention_floor:
+                doomed.append(
+                    EvictionCandidate(
+                        memory_id=t.memory_id,
+                        retrievability=score,
+                        age_s=now - t.created_at,
+                        recalls=t.recalls,
+                    )
+                )
         doomed.sort(key=lambda c: (c.retrievability, -c.age_s))
-        return doomed[:limit] if limit else doomed
+        if limit is None:
+            return doomed
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise ValueError("limit must be a non-negative integer or None")
+        return doomed[:limit]
 
     def sweep(self, now: Optional[float] = None) -> Tuple[str, ...]:
         """Drop every sub-floor trace; returns the evicted ids."""
@@ -153,10 +183,10 @@ class ForgettingCurve:
             del self._traces[mid]
         return tuple(sorted(doomed))
 
-    def snapshot(self) -> Dict[str, Dict[str, float]]:
+    def snapshot(self, now: Optional[float] = None) -> Dict[str, Dict[str, float]]:
         return {
             mid: {
-                "retrievability": retrievability(t),
+                "retrievability": retrievability(t, now, half_life_s=self.half_life_s),
                 "recalls": float(t.recalls),
                 "stability": t.stability(),
             }

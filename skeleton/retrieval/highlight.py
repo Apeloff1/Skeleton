@@ -24,7 +24,7 @@ class Highlighter:
         positive = [t for t in terms if not t.negated and t.raw]
         if not positive:
             return text
-        patterns = [re.escape(t.raw) for t in positive]
+        patterns = sorted((re.escape(t.raw) for t in positive), key=len, reverse=True)
         regex = re.compile("(" + "|".join(patterns) + ")", re.IGNORECASE)
         return regex.sub(
             lambda m: f"{self._open}{m.group(0)}{self._close}", text

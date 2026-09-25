@@ -47,17 +47,30 @@ class TripleExtractor:
 
     def extract(self, text: str) -> List[Tuple[str, str, str]]:
         """Extract (subject, predicate, object) triples from text."""
+        if not isinstance(text, str):
+            raise TypeError("text must be a string")
         if self._custom is not None:
-            return self._custom(text)
+            triples = self._custom(text)
+            if not isinstance(triples, list) or any(
+                not isinstance(item, tuple)
+                or len(item) != 3
+                or any(not isinstance(part, str) or not part.strip() for part in item)
+                for item in triples
+            ):
+                raise ValueError("custom extractor must return triples")
+            return triples
+        if not text.strip():
+            return []
 
         triples: List[Tuple[str, str, str]] = []
         sentences = re.split(r"[.!?\n]+", text)
-        self._stats["sentences"] += len(sentences)
+        considered = 0
 
         for sentence in sentences:
             sentence = sentence.strip()
             if len(sentence) < 10:
                 continue
+            considered += 1
             for pattern, builder in _PATTERNS:
                 m = pattern.search(sentence)
                 if m:
@@ -66,12 +79,15 @@ class TripleExtractor:
                         triples.append(triple)
                     break
 
+        self._stats["sentences"] += considered
         self._stats["extracted"] += len(triples)
         return triples
 
     @staticmethod
     def _valid(triple: Tuple[str, str, str]) -> bool:
-        subject, _, obj = triple
+        subject, predicate, obj = triple
+        if not subject.strip() or not predicate.strip() or not obj.strip():
+            return False
         if subject.lower().split()[0] in _STOP:
             return False
         if len(subject) < 2 or len(obj) < 2:

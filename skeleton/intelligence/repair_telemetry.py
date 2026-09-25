@@ -55,6 +55,15 @@ def _telemetry_path(root=None) -> Path:
     return organism_dir(root) / "repair_telemetry.jsonl"
 
 
+def _measured_score(blob: Any, label: str) -> float:
+    if not isinstance(blob, dict) or "score" not in blob:
+        raise ValueError(f"{label} score is required")
+    score = blob["score"]
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or score != score or score in (float("inf"), float("-inf")):
+        raise ValueError(f"{label} score must be finite")
+    return float(score)
+
+
 def capture_telemetry(
     surface: str,
     pass_n: int,
@@ -67,11 +76,15 @@ def capture_telemetry(
     """Capture telemetry for a repair attempt. Call this after
     every repair pass, successful or failed."""
     end_at = int(time.time() * 1000)
-    before_score = float((result.get("before") or {}).get("score") or 0.0)
-    after_score = float((result.get("after") or {}).get("score") or before_score)
-    actions = list(result.get("actions") or [])
-    accepted = bool(result.get("ok") or result.get("accepted"))
-    reason = str(result.get("reason") or "unknown")
+    before_score = _measured_score(result.get("before"), "before")
+    after_score = _measured_score(result.get("after"), "after")
+    actions = result.get("actions") or []
+    if not isinstance(actions, list):
+        raise ValueError("actions must be a list")
+    accepted = result.get("ok") is True or result.get("ok") == 1 or result.get("accepted") is True or result.get("accepted") == 1
+    reason = result.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("reason is required")
 
     error_str = ""
     stack = ""
@@ -111,8 +124,10 @@ def capture_telemetry(
 
 def load_telemetry(root=None, surface: str = "", limit: int = 32) -> List[Dict[str, Any]]:
     """Load recent telemetry records."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+        raise ValueError("limit must be a non-negative integer")
     path = _telemetry_path(root)
-    if not path.exists():
+    if limit == 0 or not path.exists():
         return []
     rows = []
     for line in path.read_text(encoding="utf-8").splitlines()[-limit:]:
@@ -120,8 +135,8 @@ def load_telemetry(root=None, surface: str = "", limit: int = 32) -> List[Dict[s
             row = json.loads(line)
             if not surface or row.get("surface") == surface:
                 rows.append(row)
-        except json.JSONDecodeError:
-            continue
+        except json.JSONDecodeError as exc:
+            raise ValueError("repair telemetry is not JSON") from exc
     return rows
 
 
@@ -129,10 +144,10 @@ def telemetry_card(surface: str = "", *, root=None, limit: int = 16) -> Dict[str
     """Operator-facing telemetry card."""
     rows = load_telemetry(root=root, surface=surface, limit=limit)
     if not rows:
-        return {"kind": "repair-telemetry-card", "surface": surface or "all", "n": 0, "avg_duration_ms": 0, "error_rate": 0.0, "stored_prose": 0}
+        return {"kind": "repair-telemetry-card", "surface": surface or "all", "n": 0, "avg_duration_ms": None, "error_rate": None, "accept_rate": None, "stored_prose": 0}
     durations = [r.get("duration_ms", 0) for r in rows]
     errors = [r for r in rows if r.get("error")]
-    accepted = [r for r in rows if r.get("accepted")]
+    accepted = [r for r in rows if r.get("accepted") is True]
     return {
         "kind": "repair-telemetry-card",
         "surface": surface or "all",

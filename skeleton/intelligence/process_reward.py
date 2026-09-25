@@ -21,12 +21,31 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 
+class ProcessRewardError(ValueError):
+    """A step score is not a usable promise or progress value."""
+
+
+def _unit(value: object, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProcessRewardError(f"{label} must be a real number in [0, 1]")
+    number = float(value)
+    if number != number or number < 0.0 or number > 1.0:
+        raise ProcessRewardError(f"{label} must be a real number in [0, 1]")
+    return number
+
+
 @dataclass(frozen=True)
 class StepScore:
     step_index: int
     promise: float
     progress: float
     note: str = ""
+
+    def __post_init__(self) -> None:
+        if isinstance(self.step_index, bool) or not isinstance(self.step_index, int) or self.step_index < 0:
+            raise ProcessRewardError("step_index must be a non-negative integer")
+        object.__setattr__(self, "promise", _unit(self.promise, "promise"))
+        object.__setattr__(self, "progress", _unit(self.progress, "progress"))
 
     @property
     def value(self) -> float:
@@ -43,7 +62,7 @@ def heuristic_step_scorer(step: str, prev: Optional[str], context: Dict[str, Any
     prev_words = set(prev.lower().split()) if prev else set()
     goal_words = set(str(context.get("goal", "")).lower().split())
     novelty = len(words - prev_words) / max(1, len(words))
-    alignment = len(words & goal_words) / max(1, len(goal_words)) if goal_words else 0.5
+    alignment = len(words & goal_words) / len(goal_words) if goal_words else 0.0
     return round(min(1.0, novelty), 4), round(min(1.0, alignment), 4)
 
 
@@ -53,12 +72,22 @@ class Trajectory:
     scores: List[StepScore] = field(default_factory=list)
 
     def aggregate(self, *, recency_weight: float = 0.7) -> float:
-        """Recency-weighted mean of step values."""
+        """Recency-weighted mean of step values.
+
+        ``recency_weight`` is a decay in ``[0, 1]``. Above 1 the oldest
+        step would dominate, and a negative weight can sum to zero.
+        """
         if not self.scores:
             return 0.0
+        if (
+            isinstance(recency_weight, bool)
+            or not isinstance(recency_weight, (int, float))
+            or not 0.0 <= float(recency_weight) <= 1.0
+        ):
+            raise ValueError("recency_weight must be between 0 and 1")
         n = len(self.scores)
-        weights = [recency_weight ** (n - 1 - i) for i in range(n)]
-        total_w = sum(weights)
+        weights = [float(recency_weight) ** (n - 1 - i) for i in range(n)]
+        total_w = sum(weights) or 1.0
         return sum(s.value * w for s, w in zip(self.scores, weights)) / total_w
 
 
@@ -74,6 +103,8 @@ class ProcessRewarder:
         traj = Trajectory(steps=list(steps))
         prev: Optional[str] = None
         for i, step in enumerate(steps):
+            if not isinstance(step, str) or not step.strip():
+                raise ProcessRewardError("each step must be a non-empty string")
             promise, progress = self._scorer(step, prev, ctx)
             traj.scores.append(StepScore(i, promise, progress))
             prev = step

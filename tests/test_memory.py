@@ -28,7 +28,7 @@ class TestCagStore:
         cag = CAGStore()
         cag.create_persona("tutor", "Jeeves", "You are a patient tutor.")
         cag.add(_chunk("Recursion is a function calling itself."))
-        hits = cag.query("recursion")
+        hits = cag.query("alpha")
         assert hits and "tutor" in hits[0].chunk.text.lower() or hits[0].chunk.text
 
 

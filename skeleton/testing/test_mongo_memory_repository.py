@@ -81,13 +81,27 @@ class FakeCollection:
         self.docs.append(created)
         return deepcopy(created)
 
-    async def update_one(self, query, update):
+    async def update_one(self, query, update, *, upsert=False):
         for index, doc in enumerate(self.docs):
             if _matches(doc, query):
                 updated = deepcopy(doc)
                 updated.update(deepcopy(update.get("$set", {})))
                 self.docs[index] = updated
                 return SimpleNamespace(matched_count=1, modified_count=1)
+        if upsert:
+            created = {
+                key: deepcopy(value)
+                for key, value in query.items()
+                if not isinstance(value, dict)
+            }
+            created.update(deepcopy(update.get("$setOnInsert", {})))
+            created.update(deepcopy(update.get("$set", {})))
+            self.docs.append(created)
+            return SimpleNamespace(
+                matched_count=0,
+                modified_count=0,
+                upserted_id=created.get("event_id") or created.get("memory_id"),
+            )
         return SimpleNamespace(matched_count=0, modified_count=0)
 
     async def insert_one(self, doc):
@@ -431,3 +445,342 @@ async def test_mongo_expiry_removes_projection_but_keeps_export_lineage() -> Non
     assert report.active_records == 0
     assert exported[0]["memory_id"] == due.memory_id
     assert exported[0]["state"] == "tombstoned"
+
+
+@pytest.mark.asyncio
+async def test_mongo_indexes_cover_revision_and_projection_outbox() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+
+    await repo.ensure_indexes()
+
+    revision_indexes = db["canonical_memory_revisions"].indexes
+    projection_indexes = db["canonical_memory_projection_outbox"].indexes
+    assert any(
+        meta.get("name") == "canonical_memory_revision_identity"
+        and meta.get("unique") is True
+        for _, meta in revision_indexes
+    )
+    assert any(
+        meta.get("name") == "canonical_memory_projection_event_identity"
+        and meta.get("unique") is True
+        for _, meta in projection_indexes
+    )
+
+
+@pytest.mark.asyncio
+async def test_mongo_revision_history_and_projection_outbox_follow_versions() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    created = await repo.commit(_proposal(key="rev-create", content="v1"), now=_now())
+    updated = await repo.commit(
+        _proposal(
+            key="rev-update",
+            content="v2",
+            target=created.memory_id,
+            version=created.version,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    tombstoned = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=updated.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    history = await repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    events = await repo.pending_projection_events()
+
+    assert [row.version for row in history] == [1, 2, 3]
+    assert [row.predecessor_version for row in history] == [None, 1, 2]
+    assert [row.mutation for row in history] == ["create", "update", "tombstone"]
+    assert history[-1].record == tombstoned
+    assert [(row.memory_version, row.action) for row in events] == [
+        (1, "upsert"),
+        (2, "upsert"),
+        (3, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_projection_ack_is_idempotent_and_filters_pending() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    await repo.commit(_proposal(key="projection-ack"), now=_now())
+    event = (await repo.pending_projection_events())[0]
+
+    first = await repo.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=1),
+    )
+    second = await repo.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=5),
+    )
+
+    assert first.published_at == _now() + timedelta(seconds=1)
+    assert second.published_at == first.published_at
+    assert await repo.pending_projection_events() == ()
+
+
+@pytest.mark.asyncio
+async def test_mongo_idempotent_replay_does_not_duplicate_revision_or_outbox() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="replay-no-duplicate", content="v1")
+
+    created = await repo.commit(proposal, now=_now())
+    replay = await repo.commit(proposal, now=_now() + timedelta(seconds=10))
+
+    assert replay == created
+    history = await repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    events = await repo.pending_projection_events()
+    assert [row.version for row in history] == [1]
+    assert [(row.memory_version, row.action) for row in events] == [(1, "upsert")]
+
+
+@pytest.mark.asyncio
+async def test_mongo_tombstone_retry_with_original_version_heals_idempotently() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    created = await repo.commit(_proposal(key="delete-retry"), now=_now())
+
+    first = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    retry = await repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=10),
+    )
+
+    assert retry == first
+    history = await repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    events = await repo.pending_projection_events()
+    assert [row.version for row in history] == [1, 2]
+    assert [(row.memory_version, row.action) for row in events] == [
+        (1, "upsert"),
+        (2, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_revision_and_outbox_survive_repository_reinstantiation() -> None:
+    db = FakeDatabase()
+    first = MongoMemoryRepository(db)
+    created = await first.commit(_proposal(key="restart-history", content="v1"), now=_now())
+    await first.commit(
+        _proposal(
+            key="restart-update",
+            content="v2",
+            target=created.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    first_event = (await first.pending_projection_events())[0]
+    await first.mark_projection_published(
+        first_event.event_id,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    reopened = MongoMemoryRepository(db)
+    history = await reopened.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    pending = await reopened.pending_projection_events()
+
+    assert [row.record.content for row in history] == ["v1", "v2"]
+    assert [(row.memory_version, row.action) for row in pending] == [(2, "upsert")]
+
+
+@pytest.mark.asyncio
+async def test_mongo_outbox_dispatch_applies_versions_and_acks() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="async-dispatch-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="async-dispatch-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    store = FakeProjectionStore()
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    report = await coordinator.dispatch_pending(
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        limit=10,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert report.degraded is False
+    assert report.published_events == 2
+    assert [attempt.memory_version for attempt in report.attempts] == [1, 2]
+    assert store.items[first.memory_id].text == "v2"
+    assert await repo.pending_projection_events() == ()
+
+
+@pytest.mark.asyncio
+async def test_mongo_outbox_failure_blocks_later_versions_and_recovers() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="async-block-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="async-block-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    healthy = FakeProjectionStore()
+    failing = FakeProjectionStore()
+    original_add = failing.add
+
+    def broken_add(chunk):
+        raise RuntimeError("projection down")
+
+    failing.add = broken_add
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+    projections = (
+        LegacyMemoryStoreProjection("healthy", healthy),
+        LegacyMemoryStoreProjection("failing", failing),
+    )
+
+    blocked = await coordinator.dispatch_pending(
+        projections=projections,
+        limit=10,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert blocked.degraded is True
+    assert blocked.attempted_events == 2
+    assert blocked.published_events == 1
+    assert blocked.attempts[0].superseded is True
+    assert blocked.attempts[0].published is True
+    assert blocked.attempts[1].memory_version == 2
+    assert blocked.attempts[1].published is False
+    assert len(await repo.pending_projection_events()) == 1
+    assert healthy.items[first.memory_id].text == "v2"
+
+    failing.add = original_add
+    recovered = await coordinator.dispatch_pending(
+        projections=projections,
+        limit=10,
+        now=_now() + timedelta(seconds=3),
+    )
+
+    assert recovered.degraded is False
+    assert recovered.published_events == 1
+    assert healthy.items[first.memory_id].text == "v2"
+    assert failing.items[first.memory_id].text == "v2"
+    assert await repo.pending_projection_events() == ()
+
+
+@pytest.mark.asyncio
+async def test_mongo_expiry_revision_is_expire_not_generic_tombstone() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    due = await repo.commit(
+        _proposal(
+            key="expire-revision-kind",
+            content="old",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+
+    await repo.expire_due(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        now=_now() + timedelta(seconds=10),
+    )
+    history = await repo.history(
+        due.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert [row.mutation for row in history] == ["create", "expire"]
+    assert [(row.memory_version, row.action) for row in await repo.pending_projection_events()] == [
+        (1, "upsert"),
+        (2, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_stale_pending_event_cannot_regress_rebuilt_projection() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="mongo-stale-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="mongo-stale-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    store = FakeProjectionStore()
+    projection = LegacyMemoryStoreProjection("rag", store)
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    rebuilt = await coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert rebuilt.degraded is False
+    assert store.items[first.memory_id].text == "v2"
+
+    bounded = await coordinator.dispatch_pending(
+        projections=(projection,),
+        limit=1,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert bounded.published_events == 1
+    assert bounded.attempts[0].memory_version == 1
+    assert bounded.attempts[0].superseded is True
+    assert store.items[first.memory_id].text == "v2"
+    assert [(event.memory_version, event.action) for event in await repo.pending_projection_events()] == [
+        (2, "upsert"),
+    ]

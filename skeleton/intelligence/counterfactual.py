@@ -37,6 +37,11 @@ class CounterfactualError(PipelineError):
     http_status = 422
 
 
+def _is_number(value: Any) -> bool:
+    """bool is an int, but a flag is not a measurement."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
 @dataclass
 class StructuralModel:
     """
@@ -58,8 +63,7 @@ class StructuralModel:
             raise CounterfactualError("cannot fit a structural model with no observations")
         model = cls(graph=graph)
         for name, var in graph.variables.items():
-            numeric = [o for o in observations
-                       if isinstance(o.get(name), (int, float))]
+            numeric = [o for o in observations if _is_number(o.get(name))]
             if not numeric:
                 model.biases[name] = 0.0
                 model.coefficients[name] = {}
@@ -70,7 +74,7 @@ class StructuralModel:
             for parent in var.parents:
                 # 1-D slope estimate: cov / var of the parent
                 pairs = [(o.get(parent), o[name]) for o in numeric
-                         if isinstance(o.get(parent), (int, float))]
+                         if _is_number(o.get(parent))]
                 if len(pairs) < 2:
                     coefs[parent] = 0.0
                     continue
@@ -88,7 +92,7 @@ class StructuralModel:
         """Abduction: the exogenous noise that explains one observation."""
         noise: Dict[str, float] = {}
         for name in self.graph.variables:
-            if not isinstance(observation.get(name), (int, float)):
+            if not _is_number(observation.get(name)):
                 continue
             explained = self.biases.get(name, 0.0) + sum(
                 c * observation.get(p, 0.0)

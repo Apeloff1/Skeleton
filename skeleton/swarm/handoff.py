@@ -88,6 +88,12 @@ class HandoffRegistry:
 
     def submit(self, capability: str, input: Dict[str, Any], *,
                requester: str) -> TaskEnvelope:
+        if not isinstance(capability, str) or not capability.strip():
+            raise HandoffError("capability is required")
+        if not isinstance(requester, str) or not requester.strip():
+            raise HandoffError("requester is required")
+        if not isinstance(input, dict):
+            raise HandoffError("input must be an object")
         now = self._now()
         env = TaskEnvelope(
             task_id=uuid.uuid4().hex[:12],
@@ -124,16 +130,30 @@ class HandoffRegistry:
         return env
 
     def accept(self, task_id: str, *, assignee: str) -> TaskEnvelope:
+        if not isinstance(assignee, str) or not assignee.strip():
+            raise HandoffError("assignee is required")
         return self._transition(task_id, TaskState.WORKING, assignee=assignee)
 
     def complete(self, task_id: str,
                  artefacts: Optional[List[Dict[str, Any]]] = None) -> TaskEnvelope:
+        if not artefacts or any(not self._artefact_ok(item) for item in artefacts):
+            raise HandoffError("completion requires an artefact id")
         env = self._tasks.get(task_id)
-        if env is not None and artefacts:
-            env.artefacts.extend(artefacts)
+        if env is None or env.state is not TaskState.WORKING:
+            return self._transition(task_id, TaskState.COMPLETED)
+        env.artefacts.extend(artefacts)
         return self._transition(task_id, TaskState.COMPLETED)
 
+    @staticmethod
+    def _artefact_ok(item: Any) -> bool:
+        if not isinstance(item, dict):
+            return False
+        identity = item.get("id") or item.get("uri")
+        return isinstance(identity, str) and bool(identity.strip())
+
     def fail(self, task_id: str, error: str) -> TaskEnvelope:
+        if not isinstance(error, str) or not error.strip():
+            raise HandoffError("failure reason is required")
         return self._transition(task_id, TaskState.FAILED, error=error)
 
     def cancel(self, task_id: str) -> TaskEnvelope:

@@ -13,11 +13,14 @@ from typing import Any, Callable, Dict, Tuple
 
 from skeleton.kernel.errors import MaterialisationError
 
-def _encode_godot(d):
-    files = d.get("files") or {}
-    if not files:
-        from skeleton.forge.godot_emit import emit_godot
-        files = emit_godot(d.get("pack") or {}, title=str(d.get("name") or "FORGE"))
+def _encode_godot(document):
+    if not isinstance(document, dict):
+        raise MaterialisationError("godot materialisation needs an object", context={})
+    files = document.get("files")
+    if not isinstance(files, dict) or not files:
+        raise MaterialisationError("godot materialisation needs files", context={})
+    if any(not isinstance(path, str) or not isinstance(body, str) or not path.strip() for path, body in files.items()):
+        raise MaterialisationError("godot files must be path to source", context={})
     manifest = {path: ("gd" if path.endswith(".gd") else "other") for path in files}
     payload = {"manifest": manifest, "files": files, "count": len(files)}
     return json.dumps(payload, indent=2).encode()

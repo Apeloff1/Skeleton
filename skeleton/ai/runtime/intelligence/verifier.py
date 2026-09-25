@@ -39,12 +39,14 @@ class VerifierReport:
     score: float
     dimensions: Tuple[RubricScore, ...]
     issues: Tuple[str, ...]
+    accepted: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "score": round(self.score, 4),
             "dimensions": [vars(d) for d in self.dimensions],
             "issues": list(self.issues),
+            "accepted": self.accepted,
         }
 
 
@@ -77,7 +79,9 @@ class CodeVerifier:
         if accept_at is None:
             from skeleton.organism.policy_enforcement import threshold_for
             accept_at = threshold_for(surface, root=root, fallback=0.7)
-        self.accept_at = accept_at
+        if isinstance(accept_at, bool) or not isinstance(accept_at, (int, float)) or not 0 < float(accept_at) <= 1:
+            raise ValueError("accept_at must be in (0, 1]")
+        self.accept_at = float(accept_at)
         self.checks = 0
         self.accepted = 0
         self._root = root
@@ -85,6 +89,8 @@ class CodeVerifier:
 
     def verify(self, code: str, *, request: str = "") -> VerifierReport:
         self.checks += 1
+        if not isinstance(code, str) or not code.strip():
+            return VerifierReport(score=0.0, dimensions=(), issues=("empty code",), accepted=False)
         dims: List[RubricScore] = []
         issues: List[str] = []
 
@@ -116,33 +122,38 @@ class CodeVerifier:
         dims.append(RubricScore("size", size))
 
         # grounding — request identifiers appear in the code
-        grounding = 1.0
-        if request:
-            anchors = [w for w in re.findall(r"[A-Za-z_]{4,}", request.lower())
-                       if w not in {"that", "with", "this", "from", "function", "should"}]
-            if anchors:
-                hits = sum(1 for a in anchors if a in code.lower())
-                grounding = hits / len(anchors)
-                if grounding < 0.3:
-                    issues.append("code ignores the request's named concepts")
+        anchors = [w for w in re.findall(r"[A-Za-z_]{4,}", (request or "").lower())
+                   if w not in {"that", "with", "this", "from", "function", "should"}]
+        if not isinstance(request, str) or not request.strip() or not anchors:
+            grounding = 0.0
+            issues.append("no request to ground against")
+        else:
+            hits = sum(1 for a in anchors if a in code.lower())
+            grounding = hits / len(anchors)
+            if grounding < 0.3:
+                issues.append("code ignores the request's named concepts")
         dims.append(RubricScore("grounding", grounding))
 
         score = (0.25 * dims[0].score + 0.20 * dims[1].score +
                  0.25 * dims[2].score + 0.10 * dims[3].score +
                  0.20 * dims[4].score)
-        if score >= self.accept_at:
+        accepted = score >= self.accept_at and grounding >= 0.3 and syntax_ok and has_def and not unsafe
+        if accepted:
             self.accepted += 1
-        return VerifierReport(score=score, dimensions=tuple(dims),
-                              issues=tuple(issues))
+        return VerifierReport(score=round(score, 4), dimensions=tuple(dims),
+                              issues=tuple(issues), accepted=accepted)
 
     def verdict(self, code: str, *, request: str = "") -> VerificationVerdict:
         """Adapter for VerificationLoop — report as a verification verdict."""
         report = self.verify(code, request=request)
-        return VerificationVerdict(confidence=report.score, issues=report.issues)
+        return VerificationVerdict(
+            confidence=report.score if report.accepted else 0.0,
+            issues=report.issues,
+        )
 
     def stats(self) -> Dict[str, Any]:
         return {
             "checks": self.checks,
             "accepted": self.accepted,
-            "accept_rate": round(self.accepted / max(1, self.checks), 4),
+            "accept_rate": None if self.checks == 0 else round(self.accepted / self.checks, 4),
         }

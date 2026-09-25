@@ -25,12 +25,18 @@ class Constraint:
     value: str | None = None
 
     def __post_init__(self) -> None:
-        if not self.name or len(self.name) > 256 or "\x00" in self.name:
+        if not isinstance(self.name, str) or not self.name or len(self.name) > 256 or "\x00" in self.name:
             raise ValueError("invalid constraint name")
-        if self.limit is not None and not 0 <= self.limit <= 1_000_000:
+        if not isinstance(self.kind, ConstraintKind):
+            raise ValueError("constraint kind is required")
+        if self.limit is not None and (isinstance(self.limit, bool) or not isinstance(self.limit, int) or not 0 <= self.limit <= 1_000_000):
             raise ValueError("constraint limit out of bounds")
-        if self.value is not None and (not self.value or len(self.value) > 4096):
+        if self.value is not None and (not isinstance(self.value, str) or not self.value or len(self.value) > 4096):
             raise ValueError("invalid constraint value")
+        if self.kind in {ConstraintKind.REQUIRED, ConstraintKind.FORBIDDEN} and not self.value:
+            raise ValueError("constraint value is required")
+        if self.kind is ConstraintKind.BUDGET and self.limit is None:
+            raise ValueError("budget limit is required")
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +102,9 @@ def validate_constraints(plan: Plan, constraints: tuple[Constraint, ...]) -> Con
     if len(constraints) > MAX_ITEMS:
         raise ValueError("too many constraints")
     violations = []
+    for constraint in constraints:
+        if constraint.kind not in {ConstraintKind.REQUIRED, ConstraintKind.FORBIDDEN, ConstraintKind.BUDGET, ConstraintKind.EVIDENCE}:
+            violations.append(ConstraintViolation(constraint.name, "plan", "constraint kind is not enforced"))
     violations.extend(check_required_steps(plan, constraints))
     violations.extend(check_forbidden_actions(plan, constraints))
     violations.extend(check_budget(plan, constraints))

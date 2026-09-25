@@ -12,34 +12,46 @@ from skeleton.organism.policy_state import default_policy, load_policy
 
 
 def _policy(root=None) -> Dict[str, Any]:
-    try:
-        return load_policy(root=root)
-    except Exception:
-        return default_policy()
+    return load_policy(root=root)
 
 
 def threshold_for(surface: str, *, root=None, fallback: float = 0.7) -> float:
     """Return the quality threshold for a given surface."""
-    policy = _policy(root)
-    return float((policy.get("quality_thresholds") or {}).get(surface, fallback))
+    del fallback
+    thresholds = _policy(root).get("quality_thresholds")
+    if not isinstance(thresholds, dict) or surface not in thresholds:
+        raise ValueError(f"unknown surface {surface!r}")
+    value = thresholds[surface]
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 < float(value) <= 1:
+        raise ValueError("threshold must be in (0, 1]")
+    return float(value)
 
 
 def repair_enabled_for(surface: str, *, root=None, fallback: bool = True) -> bool:
     """Return whether repair is enabled for a given surface."""
-    policy = _policy(root)
-    return bool((policy.get("repair_enabled") or {}).get(surface, fallback))
+    del fallback
+    flags = _policy(root).get("repair_enabled")
+    if not isinstance(flags, dict) or surface not in flags or not isinstance(flags[surface], bool):
+        raise ValueError(f"unknown surface {surface!r}")
+    return flags[surface]
 
 
 def repair_class_enabled(name: str, *, root=None, fallback: bool = True) -> bool:
     """Return whether a repair class is enabled."""
-    policy = _policy(root)
-    return bool((policy.get("repair_classes") or {}).get(name, fallback))
+    del fallback
+    flags = _policy(root).get("repair_classes")
+    if not isinstance(flags, dict) or name not in flags or not isinstance(flags[name], bool):
+        raise ValueError(f"unknown repair class {name!r}")
+    return flags[name]
 
 
 def policy_summary(*, root=None) -> Dict[str, Any]:
     """Compact policy state for embedding in operator cards."""
     policy = _policy(root)
-    thresholds = dict(policy.get("quality_thresholds") or {})
+    raw = policy.get("quality_thresholds")
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError("policy has no thresholds")
+    thresholds = dict(raw)
     repair_enabled = dict(policy.get("repair_enabled") or {})
     repair_classes = dict(policy.get("repair_classes") or {})
     active_surfaces = [s for s, v in repair_enabled.items() if v]
@@ -50,15 +62,17 @@ def policy_summary(*, root=None) -> Dict[str, Any]:
         "repair_surfaces_count": len(active_surfaces),
         "repair_classes_active": active_classes,
         "repair_classes_count": len(active_classes),
-        "strictest": min(thresholds.values()) if thresholds else 0.7,
-        "mean_threshold": round(sum(thresholds.values()) / max(1, len(thresholds)), 4) if thresholds else 0.7,
+        "strictest": min(float(value) for value in thresholds.values()),
+        "mean_threshold": round(sum(float(value) for value in thresholds.values()) / len(thresholds), 4),
     }
 
 
 def gate_check(surface: str, score: float, *, root=None) -> Dict[str, Any]:
     """Return a gate result dict for a score against a surface threshold."""
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or not 0 <= float(score) <= 1 or float(score) != float(score):
+        raise ValueError("score must be in [0, 1]")
     threshold = threshold_for(surface, root=root)
-    passed = score >= threshold
+    passed = float(score) >= threshold
     return {
         "surface": surface,
         "score": round(score, 4),

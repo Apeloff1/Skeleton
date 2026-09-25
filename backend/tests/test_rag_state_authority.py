@@ -297,6 +297,7 @@ def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() ->
 
     assert rebuilt == {
         "learning_sessions": 1,
+        "concepts": 0,
         "cocoding_context": 1,
         "feedback": 1,
         "failed": 0,
@@ -305,3 +306,166 @@ def test_projection_rebuild_restores_from_mongo_after_total_projection_loss() ->
     assert "code-1" in client.collections["jeeves_cocoding_context"].rows
     assert feedback_id in client.collections["jeeves_feedback"].rows
     assert state.get_user_progress("u1") == {}
+
+
+def test_generic_memory_convenience_fails_closed_instead_of_writing_projection(
+    monkeypatch,
+) -> None:
+    service, _, _, client = _service()
+    monkeypatch.setattr(rag_module, "rag_service", service)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="projection-only generic memory writes"):
+        rag_module.store_memory(
+            "arbitrary",
+            "must not become projection authority",
+            {"user_id": "u1"},
+        )
+
+    assert client.collections["jeeves_learning_sessions"].rows == {}
+
+
+def test_user_owned_convenience_memory_requires_explicit_user_identity(
+    monkeypatch,
+) -> None:
+    service, state, _, client = _service()
+    monkeypatch.setattr(rag_module, "rag_service", service)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="requires user_id"):
+        rag_module.store_memory("learning_session", "anonymous durable memory")
+    with pytest.raises(ValueError, match="requires user_id"):
+        rag_module.store_memory("feedback", "anonymous feedback")
+
+    assert state.stats() == {
+        "learning_sessions": 0,
+        "concepts": 0,
+        "user_progress": 0,
+        "cocoding_context": 0,
+        "feedback": 0,
+    }
+    assert client.collections["jeeves_learning_sessions"].rows == {}
+    assert client.collections["jeeves_feedback"].rows == {}
+
+
+def test_supported_learning_convenience_commits_mongo_before_projection(
+    monkeypatch,
+) -> None:
+    service, state, _, client = _service()
+    monkeypatch.setattr(rag_module, "rag_service", service)
+    client.collections["jeeves_learning_sessions"].fail_add = True
+
+    memory_id = rag_module.store_memory(
+        "learning_session",
+        "canonical convenience memory",
+        {
+            "user_id": "u1",
+            "topic": "python",
+            "duration_minutes": 7,
+            "mastery_delta": 0.25,
+        },
+    )
+
+    rows = state.list_learning_sessions("u1")
+    assert rows[0]["session_id"] == memory_id
+    assert rows[0]["content"] == "canonical convenience memory"
+    assert service._projection_failures == 1
+
+
+def test_projection_failure_does_not_rollback_canonical_concept() -> None:
+    service, state, _, client = _service()
+    client.collections["jeeves_concepts"].fail_add = True
+
+    concept_id = service.store_concept(
+        "concept-1",
+        "Recursion",
+        "A function calls itself.",
+        ["factorial"],
+        "python",
+        difficulty=0.4,
+    )
+
+    canonical = state.get_concept(concept_id)
+    assert canonical is not None
+    assert canonical["name"] == "Recursion"
+    assert canonical["authority"] == "mongo"
+    assert service._projection_failures == 1
+
+
+def test_stale_concept_projection_cannot_resurrect_missing_canonical_state() -> None:
+    service, state, _, client = _service()
+    projection = client.collections["jeeves_concepts"]
+    projection.add(
+        documents=["stale concept"],
+        metadatas=[{
+            "concept_id": "stale",
+            "name": "Stale",
+            "domain": "python",
+            "difficulty": 0.1,
+        }],
+        ids=["stale"],
+    )
+
+    assert state.get_concept("stale") is None
+    assert service.search_concepts("stale", domain="python") == []
+
+    live_id = service.store_concept(
+        "live",
+        "Live",
+        "Canonical explanation.",
+        ["example"],
+        "python",
+        difficulty=0.2,
+    )
+    results = service.search_concepts("live", domain="python")
+
+    assert live_id == "live"
+    assert len(results) == 1
+    assert results[0]["metadata"]["concept_id"] == "live"
+    assert results[0]["metadata"]["authority"] == "mongo"
+    assert "Canonical explanation." in results[0]["content"]
+
+
+def test_legacy_concept_projection_migrates_to_mongo_authority() -> None:
+    service, state, db, client = _service()
+    client.collections["jeeves_concepts"].add(
+        documents=["Recursion\n\nA function calls itself.\n\nExamples:\n- factorial"],
+        metadatas=[{
+            "name": "Recursion",
+            "domain": "python",
+            "difficulty": 0.4,
+            "timestamp": "2026-09-20T10:00:00Z",
+        }],
+        ids=["legacy-concept"],
+    )
+
+    first = service.migrate_legacy_chroma_state()
+    second = service.migrate_legacy_chroma_state()
+
+    assert first["concepts"] == 1
+    assert second["conflicts"] == 0
+    assert db[state.CONCEPTS].count_documents({}) == 1
+    canonical = state.get_concept("legacy-concept")
+    assert canonical is not None
+    assert canonical["explanation"] == "A function calls itself."
+
+
+def test_projection_rebuild_restores_concept_from_mongo() -> None:
+    service, state, _, client = _service()
+    concept_id = service.store_concept(
+        "rebuild-concept",
+        "Generators",
+        "Lazy iteration.",
+        ["yield x"],
+        "python",
+        difficulty=0.3,
+    )
+    client.collections["jeeves_concepts"].rows.clear()
+
+    rebuilt = service.rebuild_projections_from_mongo()
+
+    assert rebuilt["concepts"] == 1
+    assert concept_id in client.collections["jeeves_concepts"].rows
+    assert state.get_concept(concept_id)["authority"] == "mongo"

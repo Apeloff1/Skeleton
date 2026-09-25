@@ -409,10 +409,29 @@ def _public_dev_surfaces_enabled() -> bool:
 def _gate_open_prefixes() -> tuple[str, ...]:
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES
 
-    prefixes = DEFAULT_OPEN_PREFIXES + ("/",)
+    # The engine API has its own fail-closed service-to-service bearer token
+    # and principal validation. Exempt only this exact route prefix from the
+    # generic user/API HMAC gate so the backend EngineClient can reach it.
+    # Segment-aware prefix matching keeps /api/v1/engineer sealed.
+    prefixes = DEFAULT_OPEN_PREFIXES + ("/", "/api/v1/engine")
     if _public_dev_surfaces_enabled():
         prefixes += _DEV_OPEN_PREFIXES
     return prefixes
+
+
+def _gate_body_limits() -> tuple[tuple[str, int], ...]:
+    """Route-scoped ceilings for authenticated engine transport envelopes."""
+
+    mib = 1024 * 1024
+    return (
+        # Edit can carry a source image and mask, each bounded to 32 MiB
+        # base64 text by the engine request model.
+        ("/api/v1/engine/media/images/edit", 70 * mib),
+        ("/api/v1/engine/media/images/variation", 34 * mib),
+        # Canonical text commands may include bounded instructions + prompt +
+        # compiled context metadata above the generic 1 MiB API ceiling.
+        ("/api/v1/engine/executions", 4 * mib),
+    )
 
 
 def create_app() -> Any:
@@ -454,7 +473,10 @@ def create_app() -> Any:
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import GatePolicy, install_gate
-    gate_policy = GatePolicy(open_prefixes=_gate_open_prefixes())
+    gate_policy = GatePolicy(
+        open_prefixes=_gate_open_prefixes(),
+        body_limits=_gate_body_limits(),
+    )
     install_gate(app, policy=gate_policy)
 
     @app.on_event("startup")

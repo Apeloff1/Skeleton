@@ -7,6 +7,7 @@ and tracks committed vs actual capacity for budget alignment.
 """
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -20,14 +21,37 @@ class ResourcePool:
     usage: List[float] = field(default_factory=list)
     warn_fraction: float = 0.8
 
-    def current_usage(self) -> float:
-        return self.usage[-1] if self.usage else 0.0
+    def current_usage(self) -> float | None:
+        if not self.usage:
+            return None
+        return float(self.usage[-1])
 
-    def headroom(self) -> float:
-        return max(0.0, self.capacity - self.current_usage())
+    def headroom(self) -> float | None:
+        usage = self.current_usage()
+        if usage is None:
+            return None
+        return self.capacity - usage
 
-    def utilization(self) -> float:
-        return self.current_usage() / self.capacity if self.capacity else 0.0
+    def utilization(self) -> float | None:
+        usage = self.current_usage()
+        if usage is None:
+            return None
+        if self.capacity <= 0:
+            return 1.0 if usage > 0 else 0.0
+        return usage / self.capacity
+
+
+
+def _positive_capacity(capacity: float) -> float:
+    if isinstance(capacity, bool) or not isinstance(capacity, (int, float)) or float(capacity) <= 0:
+        raise ValueError("capacity must be positive")
+    return float(capacity)
+
+
+def _warn_fraction(fraction: float) -> float:
+    if isinstance(fraction, bool) or not isinstance(fraction, (int, float)) or not 0.0 < float(fraction) <= 1.0:
+        raise ValueError("warn_fraction must be in (0, 1]")
+    return float(fraction)
 
 
 class CapacityPlanner:
@@ -40,20 +64,25 @@ class CapacityPlanner:
 
     def define_pool(self, name: str, capacity: float, unit: str,
                     warn_fraction: float = 0.8) -> ResourcePool:
-        pool = ResourcePool(name=name, capacity=capacity, unit=unit, warn_fraction=warn_fraction)
+        pool = ResourcePool(name=name, capacity=_positive_capacity(capacity), unit=unit,
+                            warn_fraction=_warn_fraction(warn_fraction))
         self._pools[name] = pool
         return pool
 
     def record_usage(self, pool: str, usage: float) -> None:
+        if pool not in self._pools:
+            raise KeyError(pool)
+        if isinstance(usage, bool) or not isinstance(usage, (int, float)) or not math.isfinite(float(usage)) or float(usage) < 0:
+            raise ValueError("usage must be a finite non-negative number")
         p = self._pools[pool]
-        p.usage.append(usage)
+        p.usage.append(float(usage))
         if len(p.usage) > 200:
             p.usage.pop(0)
         if self._forecaster:
             self._forecaster.feed(f"capacity.{pool}", usage)
 
     def resize(self, pool: str, new_capacity: float) -> None:
-        self._pools[pool].capacity = new_capacity
+        self._pools[pool].capacity = _positive_capacity(new_capacity)
 
     def record_shared_pressure(self, snapshot: Any) -> Dict[str, float]:
         """Feed durable shared queue/concurrency pressure into capacity history."""
@@ -91,13 +120,12 @@ class CapacityPlanner:
         return result
 
     def saturation_estimate(self, pool: str) -> Dict[str, Any]:
-        p = self._pools.get(pool)
-        if not p:
-            return {"pool": pool, "error": "unknown pool"}
-        if len(p.usage) >= 2:
-            growth = p.usage[-1] - p.usage[-2]
-        else:
-            growth = 0.0
+        if pool not in self._pools:
+            raise KeyError(pool)
+        p = self._pools[pool]
+        if len(p.usage) < 2:
+            raise ValueError("saturation needs two usage samples")
+        growth = p.usage[-1] - p.usage[-2]
         if growth <= 0:
             return {"pool": pool, "saturates": False, "growth_per_step": round(growth, 4)}
         steps = p.headroom() / growth
@@ -112,8 +140,14 @@ class CapacityPlanner:
     def analyze(self) -> List[Dict[str, Any]]:
         self._recommendations.clear()
         for name, p in self._pools.items():
-            if p.utilization() >= p.warn_fraction:
-                est = self.saturation_estimate(name)
+            used = p.utilization()
+            if used is None:
+                continue
+            if used >= p.warn_fraction:
+                if len(p.usage) >= 2:
+                    est = self.saturation_estimate(name)
+                else:
+                    est = {"pool": name, "saturates": None, "reason": "need two usage samples"}
                 suggested = round(p.capacity * 1.5, 1)
                 rec = {
                     "pool": name,
@@ -125,7 +159,7 @@ class CapacityPlanner:
                     "urgency": "high" if p.utilization() >= 0.95 else "medium",
                 }
                 self._recommendations.append(rec)
-            elif p.utilization() < 0.2 and len(p.usage) > 10:
+            elif used < 0.2 and len(p.usage) > 10:
                 self._recommendations.append({
                     "pool": name,
                     "action": "scale_down",
@@ -143,8 +177,8 @@ class CapacityPlanner:
                 "capacity": p.capacity,
                 "usage": p.current_usage(),
                 "unit": p.unit,
-                "utilization": round(p.utilization(), 3),
-                "headroom": round(p.headroom(), 2),
+                "utilization": None if p.utilization() is None else round(p.utilization(), 3),
+                "headroom": None if p.headroom() is None else round(p.headroom(), 2),
             } for n, p in self._pools.items()},
             "recommendations": self.analyze(),
         }

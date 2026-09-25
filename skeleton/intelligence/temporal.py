@@ -30,6 +30,9 @@ class TemporalEvent:
         return other.before(self)
 
     def overlaps(self, other: "TemporalEvent") -> bool:
+        for event in (self, other):
+            if event.duration is not None and event.duration < 0:
+                raise ValueError("duration must be non-negative")
         if self.duration is None or other.duration is None:
             return False
         return (
@@ -88,28 +91,29 @@ class TemporalReasoner:
         Predict next events based on pattern matching in history.
         Returns list of (event_id, confidence) sorted by confidence.
         """
-        if len(sequence) < 2:
-            return []
+        if not isinstance(sequence, list) or len(sequence) < 2 or any(not isinstance(item, str) or not item for item in sequence):
+            raise ValueError("sequence must contain at least two event ids")
+        if isinstance(confidence_threshold, bool) or not isinstance(confidence_threshold, (int, float)) or not 0.0 <= float(confidence_threshold) <= 1.0:
+            raise ValueError("confidence threshold must be in [0, 1]")
 
-        # Find matching pattern suffixes
-        predictions: Dict[str, List[float]] = {}
+        matched = 0
+        counts: Dict[str, int] = {}
         for pattern in self._patterns:
-            if len(pattern) <= len(sequence):
+            if len(pattern) <= len(sequence) or pattern[:len(sequence)] != sequence:
                 continue
-            # Check if sequence matches pattern prefix
-            if pattern[:len(sequence)] == sequence:
-                next_event = pattern[len(sequence)]
-                # Compute confidence based on pattern frequency and recency
-                confidence = 0.5 + 0.5 * (len(pattern) / (len(pattern) + 10))
-                predictions.setdefault(next_event, []).append(confidence)
-
-        # Average confidences
-        result = [
-            (eid, sum(confs) / len(confs))
-            for eid, confs in predictions.items()
-            if sum(confs) / len(confs) >= confidence_threshold
-        ]
-        return sorted(result, key=lambda x: x[1], reverse=True)
+            matched += 1
+            next_event = pattern[len(sequence)]
+            counts[next_event] = counts.get(next_event, 0) + 1
+        if matched == 0:
+            return []
+        result = []
+        for event_id, count in counts.items():
+            if count < 2:
+                continue
+            confidence = count / matched
+            if confidence >= confidence_threshold:
+                result.append((event_id, confidence))
+        return sorted(result, key=lambda item: (-item[1], item[0]))
 
     def allen_relation(self, a: TemporalEvent, b: TemporalEvent) -> str:
         """
@@ -117,6 +121,9 @@ class TemporalReasoner:
         Returns one of: before, meets, overlaps, starts, during, finishes,
         equal, after, met-by, overlapped-by, started-by, contains, finished-by.
         """
+        for event in (a, b):
+            if event.duration is not None and event.duration < 0:
+                raise ValueError("duration must be non-negative")
         if a.duration is None or b.duration is None:
             # Point events: use simple before/after/equal
             if a.timestamp < b.timestamp:
@@ -179,13 +186,14 @@ class TemporalReasoner:
 
     def learn_pattern(self, sequence: List[str]) -> None:
         """Learn a temporal pattern from an observed sequence."""
-        if len(sequence) >= 2:
-            self._patterns.append(sequence)
-            if self._bus:
-                self._bus.publish(
-                    DomainEvent(
-                        topic="temporal.pattern.learned",
-                        payload={"sequence": sequence, "length": len(sequence)},
-                        correlation_id=f"pattern_{hashlib.sha256(str(sequence).encode()).hexdigest()[:12]}",
-                    )
+        if not isinstance(sequence, list) or len(sequence) < 2 or any(not isinstance(item, str) or not item for item in sequence):
+            raise ValueError("a pattern needs at least two event ids")
+        self._patterns.append(sequence)
+        if self._bus:
+            self._bus.publish(
+                DomainEvent(
+                    topic="temporal.pattern.learned",
+                    payload={"sequence": sequence, "length": len(sequence)},
+                    correlation_id=f"pattern_{hashlib.sha256(str(sequence).encode()).hexdigest()[:12]}",
                 )
+            )

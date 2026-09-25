@@ -8,7 +8,7 @@ Provides:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import EventBus
@@ -36,27 +36,25 @@ class FeatureExtractor:
         - length_ratio: Document length relative to query
         - position: Average position of query terms in document
         """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+        if not isinstance(document, str):
+            raise ValueError("document is required")
         query_terms = set(query.lower().split())
         doc_terms = document.lower().split()
         doc_set = set(doc_terms)
 
-        # Term overlap (Jaccard)
         if query_terms and doc_set:
             overlap = len(query_terms & doc_set) / len(query_terms | doc_set)
         else:
             overlap = 0.0
 
-        # Phrase matches
         phrase_count = sum(1 for i in range(len(doc_terms))
                           if " ".join(doc_terms[i:i+len(query_terms)]) == query.lower())
 
-        # Length ratio (prefer medium-length documents)
         query_len = len(query_terms)
         doc_len = len(doc_terms)
-        if query_len > 0:
-            length_ratio = min(doc_len / query_len, 5.0) / 5.0  # Normalize, cap at 5x
-        else:
-            length_ratio = 0.5
+        length_ratio = min(doc_len / query_len, 5.0) / 5.0
 
         # Position feature (earlier is better)
         positions = []
@@ -71,6 +69,15 @@ class FeatureExtractor:
             "length_ratio": length_ratio,
             "position": position,
         }
+
+
+def _finite_score(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("result score is required")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError("result score must be finite")
+    return number
 
 
 class FeatureReranker:
@@ -98,26 +105,35 @@ class FeatureReranker:
         pipeline stages keep ``ScoredResult`` identity; dict inputs become
         lightweight records with ``item_id`` and ``features``.
         """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
         self._stats["queries"] += 1
 
         query_terms = tuple(query.lower().split())
         scored = []
         for result in results:
             if isinstance(result, dict):
-                item_id = str(result.get("id") or result.get("item_id") or "")
-                content = str(result.get("text") or result.get("content") or "")
-                original_score = float(result.get("score", 0.5) or 0.0)
+                item_id = result.get("id", result.get("item_id"))
+                content = result.get("text", result.get("content"))
+                if "score" not in result:
+                    raise ValueError("result score is required")
+                original_score = _finite_score(result["score"])
                 original = None
             else:
-                item_id = str(
-                    getattr(result, "item_id", None)
-                    or getattr(result, "fragment_id", None)
-                    or getattr(result, "document_id", "")
-                    or ""
-                )
-                content = str(getattr(result, "content", None) or getattr(result, "text", "") or result)
-                original_score = float(getattr(result, "score", 0.5) or 0.0)
+                item_id = getattr(result, "item_id", None) or getattr(result, "fragment_id", None) or getattr(result, "document_id", None)
+                content = getattr(result, "content", None)
+                if content is None:
+                    content = getattr(result, "text", None)
+                if not hasattr(result, "score"):
+                    raise ValueError("result score is required")
+                original_score = _finite_score(result.score)
                 original = result
+            if not isinstance(item_id, str) or not item_id.strip():
+                raise ValueError("result id is required")
+            if not isinstance(content, str):
+                raise ValueError("result text is required")
 
             features = FeatureExtractor.extract(query, content)
             doc = content.lower()
@@ -144,16 +160,31 @@ class FeatureReranker:
                         "content": content,
                     },
                 )()
+            elif hasattr(original, "fragment_id") and hasattr(original, "metadata"):
+                metadata = dict(getattr(original, "metadata", {}) or {})
+                metadata["rerank_features"] = dict(features)
+                metadata["pre_rerank_score"] = original_score
+                try:
+                    outgoing = replace(
+                        original,
+                        score=float(reranked_score),
+                        metadata=metadata,
+                    )
+                except TypeError:
+                    outgoing = original
             else:
                 outgoing = original
-                if getattr(outgoing, "features", None) is None:
-                    try:
-                        outgoing.features = features
-                    except (AttributeError, TypeError):
-                        pass
             scored.append((reranked_score, outgoing, features))
 
-        scored.sort(key=lambda item: item[0], reverse=True)
+        scored.sort(
+            key=lambda item: (
+                -item[0],
+                str(
+                    getattr(item[1], "fragment_id", None)
+                    or getattr(item[1], "item_id", "")
+                ),
+            )
+        )
         self._stats["reranked"] += len(scored)
         return [result for _, result, _ in scored[:top_k]]
 

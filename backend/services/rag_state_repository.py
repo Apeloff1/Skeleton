@@ -12,6 +12,7 @@ rather than creating another client/pool.
 from __future__ import annotations
 
 import copy
+import math
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -22,6 +23,38 @@ class RAGStateError(RuntimeError):
 
 class RAGStateConflict(RAGStateError):
     """An immutable identity was reused with conflicting ownership/content."""
+
+
+def _finite_number(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RAGStateError(f"{field} must be numeric")
+    number = float(value)
+    if not math.isfinite(number):
+        raise RAGStateError(f"{field} must be finite")
+    return number
+
+
+def _nonnegative_integer(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RAGStateError(f"{field} must be an integer")
+    if value < 0:
+        raise RAGStateError(f"{field} must be non-negative")
+    return value
+
+
+def _bounded_number(
+    value: object,
+    field: str,
+    *,
+    minimum: float,
+    maximum: float,
+) -> float:
+    number = _finite_number(value, field)
+    if not minimum <= number <= maximum:
+        raise RAGStateError(
+            f"{field} must be between {minimum:g} and {maximum:g}"
+        )
+    return number
 
 
 def _required_text(value: object, field: str, *, max_len: int = 512) -> str:
@@ -71,6 +104,7 @@ class RAGStateRepository:
     """Mongo-backed canonical authority for user-owned RAG product state."""
 
     LEARNING = "rag_learning_sessions"
+    CONCEPTS = "rag_concepts"
     PROGRESS = "rag_user_progress"
     COCODING = "rag_cocoding_context"
     FEEDBACK = "rag_feedback"
@@ -118,6 +152,10 @@ class RAGStateRepository:
         self._collection(self.LEARNING).create_index(
             [("user_id", 1), ("timestamp", -1)]
         )
+        self._collection(self.CONCEPTS).create_index("concept_id", unique=True)
+        self._collection(self.CONCEPTS).create_index(
+            [("domain", 1), ("name", 1)]
+        )
         self._collection(self.PROGRESS).create_index(
             [("user_id", 1), ("domain", 1)],
             unique=True,
@@ -148,8 +186,11 @@ class RAGStateRepository:
             "user_id": _required_text(user_id, "user_id"),
             "topic": _required_text(topic, "topic"),
             "content": str(content),
-            "duration_minutes": int(duration_minutes),
-            "mastery_delta": float(mastery_delta),
+            "duration_minutes": _nonnegative_integer(
+                duration_minutes,
+                "duration_minutes",
+            ),
+            "mastery_delta": _finite_number(mastery_delta, "mastery_delta"),
             "timestamp": _utc_iso(timestamp),
             "metadata": _safe_mapping(metadata, "metadata"),
             "authority": "mongo",
@@ -187,6 +228,86 @@ class RAGStateRepository:
             for row in cursor
         ]
 
+    def put_concept(
+        self,
+        *,
+        concept_id: str,
+        name: str,
+        explanation: str,
+        examples: list[str],
+        domain: str,
+        difficulty: float,
+        timestamp: datetime | str | None = None,
+    ) -> dict[str, Any]:
+        candidate = {
+            "concept_id": _required_text(concept_id, "concept_id"),
+            "name": _required_text(name, "name"),
+            "explanation": _required_text(
+                explanation,
+                "explanation",
+                max_len=100_000,
+            ),
+            "examples": [str(item) for item in examples],
+            "domain": _required_text(domain, "domain"),
+            "difficulty": _bounded_number(
+                difficulty,
+                "difficulty",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            "timestamp": _utc_iso(timestamp),
+            "authority": "mongo",
+            "schema_version": 1,
+        }
+        coll = self._collection(self.CONCEPTS)
+        existing = self._without_native_id(
+            coll.find_one({"concept_id": candidate["concept_id"]})
+        )
+        self._assert_identity_match(
+            existing,
+            candidate,
+            immutable_fields=(
+                "name",
+                "explanation",
+                "examples",
+                "domain",
+                "difficulty",
+            ),
+            identity="concept",
+        )
+        if existing is not None:
+            return existing
+        coll.insert_one(copy.deepcopy(candidate))
+        return copy.deepcopy(candidate)
+
+    def get_concept(self, concept_id: str) -> dict[str, Any] | None:
+        concept = _required_text(concept_id, "concept_id")
+        row = self._collection(self.CONCEPTS).find_one(
+            {"concept_id": concept}
+        )
+        return self._without_native_id(row)
+
+    def list_concepts(
+        self,
+        *,
+        domain: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 5000:
+            raise RAGStateError("limit must be between 1 and 5000")
+        query: dict[str, Any] = {}
+        if domain is not None:
+            query["domain"] = _required_text(domain, "domain")
+        cursor = self._collection(self.CONCEPTS).find(query)
+        if hasattr(cursor, "sort"):
+            cursor = cursor.sort("name", 1)
+        if hasattr(cursor, "limit"):
+            cursor = cursor.limit(limit)
+        return [
+            self._without_native_id(row) or {}
+            for row in cursor
+        ][:limit]
+
     def upsert_user_progress(
         self,
         *,
@@ -206,14 +327,21 @@ class RAGStateRepository:
             "progress_id": f"{user}:{normalized_domain}",
             "user_id": user,
             "domain": normalized_domain,
-            "mastery_level": float(mastery_level),
+            "mastery_level": _bounded_number(
+                mastery_level,
+                "mastery_level",
+                minimum=0.0,
+                maximum=1.0,
+            ),
             "concepts_learned": list(concepts),
             "concept_count": len(concepts),
-            "total_hours": float(total_hours),
+            "total_hours": _finite_number(total_hours, "total_hours"),
             "updated_at": _utc_iso(updated_at),
             "authority": "mongo",
             "schema_version": 1,
         }
+        if row["total_hours"] < 0:
+            raise RAGStateError("total_hours must be non-negative")
         self._collection(self.PROGRESS).replace_one(
             {"user_id": user, "domain": normalized_domain},
             copy.deepcopy(row),
@@ -308,6 +436,11 @@ class RAGStateRepository:
         context: Mapping[str, Any] | None = None,
         timestamp: datetime | str | None = None,
     ) -> dict[str, Any]:
+        if rating is not None:
+            if isinstance(rating, bool) or not isinstance(rating, int):
+                raise RAGStateError("rating must be an integer")
+            if not 1 <= rating <= 5:
+                raise RAGStateError("rating must be between 1 and 5")
         candidate = {
             "feedback_id": _required_text(feedback_id, "feedback_id"),
             "user_id": _required_text(user_id, "user_id"),
@@ -339,6 +472,10 @@ class RAGStateRepository:
                 self._without_native_id(row) or {}
                 for row in self._collection(self.LEARNING).find({})
             ],
+            "concepts": [
+                self._without_native_id(row) or {}
+                for row in self._collection(self.CONCEPTS).find({})
+            ],
             "cocoding_context": [
                 self._without_native_id(row) or {}
                 for row in self._collection(self.COCODING).find({})
@@ -353,6 +490,9 @@ class RAGStateRepository:
         return {
             "learning_sessions": int(
                 self._collection(self.LEARNING).count_documents({})
+            ),
+            "concepts": int(
+                self._collection(self.CONCEPTS).count_documents({})
             ),
             "user_progress": int(
                 self._collection(self.PROGRESS).count_documents({})

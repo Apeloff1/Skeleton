@@ -117,6 +117,46 @@ def test_server_default_open_surface_is_probe_only(monkeypatch: pytest.MonkeyPat
         assert sensitive not in prefixes
 
 
+def test_engine_service_prefix_is_exactly_exempt_from_generic_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from skeleton.api import server
+
+    monkeypatch.delenv("SKELETON_PUBLIC_DEV_SURFACES", raising=False)
+    policy = GatePolicy(
+        open_prefixes=server._gate_open_prefixes(),
+        body_limits=server._gate_body_limits(),
+    )
+
+    assert policy.is_open_route("/api/v1/engine/executions")
+    assert policy.is_open_route("/api/v1/engine/media/images/edit")
+    assert not policy.is_open_route("/api/v1/engineer")
+    assert not policy.is_open_route("/api/v1/engines")
+
+    mib = 1024 * 1024
+    assert policy.body_limit("/api/v1/engine/executions", mib) == 4 * mib
+    assert policy.body_limit("/api/v1/engine/media/images/variation", mib) == 34 * mib
+    assert policy.body_limit("/api/v1/engine/media/images/edit", mib) == 70 * mib
+    assert policy.body_limit("/api/v1/swarm/status", mib) == mib
+
+
+def test_every_engine_route_keeps_dedicated_service_token_dependency() -> None:
+    from fastapi.routing import APIRoute
+
+    from skeleton.api.engine_routes import _engine_service_token, router
+
+    routes = [route for route in router.routes if isinstance(route, APIRoute)]
+    assert routes
+    for route in routes:
+        dependency_calls = {
+            dependency.call
+            for dependency in route.dependant.dependencies
+        }
+        assert _engine_service_token in dependency_calls, (
+            f"{sorted(route.methods)} {route.path} lost engine service token auth"
+        )
+
+
 def test_dev_surface_exposure_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
     from skeleton.api import server
 

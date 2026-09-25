@@ -26,6 +26,10 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
+class UncertaintyError(ValueError):
+    """A candidate is not a usable confidence sample."""
+
+
 class GateVerdict(str, Enum):
     ANSWER = "answer"
     ABSTAIN = "abstain"
@@ -91,6 +95,17 @@ class UncertaintyGate:
                 mean_confidence=0.0, agreement=0.0, entropy=0.0,
                 reason="no_candidates",
             )
+        for candidate in candidates:
+            if not isinstance(candidate, Candidate) or not isinstance(candidate.text, str):
+                raise UncertaintyError("candidate text is required")
+            confidence = candidate.confidence
+            if (
+                isinstance(confidence, bool)
+                or not isinstance(confidence, (int, float))
+                or not math.isfinite(float(confidence))
+                or not 0.0 <= float(confidence) <= 1.0
+            ):
+                raise UncertaintyError("candidate confidence must be in [0, 1]")
 
         mean_conf = sum(c.confidence for c in candidates) / len(candidates)
 
@@ -113,8 +128,13 @@ class UncertaintyGate:
         best = max(candidates, key=lambda c: c.confidence)
 
         if effective >= self.answer_threshold and modal_share >= self.min_agreement:
-            verdict = GateVerdict.ANSWER
-            reason = "confident_agreement"
+            if best is None or not best.text.strip():
+                verdict = GateVerdict.ABSTAIN
+                reason = "empty_answer"
+                self.abstentions += 1
+            else:
+                verdict = GateVerdict.ANSWER
+                reason = "confident_agreement"
         elif effective < self.escalate_threshold:
             verdict = GateVerdict.ESCALATE
             reason = "below_escalate_threshold"
@@ -135,5 +155,5 @@ class UncertaintyGate:
             "decisions": self.decisions,
             "abstentions": self.abstentions,
             "escalations": self.escalations,
-            "abstain_rate": round(self.abstentions / max(1, self.decisions), 4),
+            "abstain_rate": None if self.decisions == 0 else round(self.abstentions / self.decisions, 4),
         }

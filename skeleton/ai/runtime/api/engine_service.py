@@ -1716,7 +1716,7 @@ class EngineExecutionService:
         execution = self.repository.get(execution_id)
         result = self.repository.result(execution_id)
         failure_code = None
-        if result is not None and result.status == "failed":
+        if result is not None and result.status in {"failed", "cancelled"}:
             raw = result.usage.get("error_code")
             if isinstance(raw, str):
                 failure_code = raw

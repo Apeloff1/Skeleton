@@ -47,6 +47,10 @@ def rank_quest_candidates(
     max_results: int = 5,
 ) -> tuple[QuestTemplate, ...]:
     """Rank available quests for an adaptive school/game agent."""
+    if isinstance(max_results, bool) or not isinstance(max_results, int) or max_results < 0:
+        raise ValueError("max_results must be a non-negative integer")
+    if not isinstance(quests, tuple) or not isinstance(progress, QuestProgress):
+        raise TypeError("quests and progress are required")
     candidates = [q for q in quests if progress.prerequisite_ready(q) and q.id not in progress.completed]
     scored = []
     for quest in candidates:

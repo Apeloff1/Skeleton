@@ -15,6 +15,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
+_DOC_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+
+
+class KnowledgeError(ValueError):
+    """A document cannot be stored or loaded safely."""
+
+
 @dataclass
 class Document:
     doc_id: str
@@ -46,14 +53,57 @@ class KnowledgeBase:
         self._load()
 
     def _load(self) -> None:
-        if self._file.exists():
-            data = json.loads(self._file.read_text(encoding="utf-8"))
-            for doc_id, d in data.items():
-                self._docs[doc_id] = Document(
-                    doc_id=doc_id, title=d["title"], body=d["body"],
-                    tags=d.get("tags", []), subsystems=d.get("subsystems", []),
-                    version=d.get("version", 1), updated_ns=d.get("updated_ns", 0),
-                )
+        if not self._file.exists():
+            return
+        data = json.loads(self._file.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise KnowledgeError("knowledge file must be an object")
+        for doc_id, raw in data.items():
+            if not isinstance(raw, dict):
+                raise KnowledgeError("knowledge document must be an object")
+            self._docs[doc_id] = self._document(
+                doc_id,
+                raw.get("title"),
+                raw.get("body"),
+                raw.get("tags", []),
+                raw.get("subsystems", []),
+                raw.get("version", 1),
+                raw.get("updated_ns", 0),
+            )
+
+    def _document(
+        self,
+        doc_id: object,
+        title: object,
+        body: object,
+        tags: object,
+        subsystems: object,
+        version: object,
+        updated_ns: object,
+    ) -> Document:
+        if not isinstance(doc_id, str) or _DOC_ID.fullmatch(doc_id) is None:
+            raise KnowledgeError("doc_id must be a safe token")
+        if not isinstance(title, str) or not title.strip():
+            raise KnowledgeError("title is required")
+        if not isinstance(body, str) or not body.strip():
+            raise KnowledgeError("body is required")
+        if not isinstance(tags, list) or any(not isinstance(tag, str) or not tag.strip() for tag in tags):
+            raise KnowledgeError("tags must be non-empty strings")
+        if not isinstance(subsystems, list) or any(not isinstance(name, str) or not name.strip() for name in subsystems):
+            raise KnowledgeError("subsystems must be non-empty strings")
+        if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+            raise KnowledgeError("version must be a positive integer")
+        if isinstance(updated_ns, bool) or not isinstance(updated_ns, int) or updated_ns < 0:
+            raise KnowledgeError("updated_ns must be a non-negative integer")
+        return Document(
+            doc_id=doc_id,
+            title=title.strip(),
+            body=body,
+            tags=list(tags),
+            subsystems=list(subsystems),
+            version=version,
+            updated_ns=updated_ns,
+        )
 
     def _save(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
@@ -65,12 +115,16 @@ class KnowledgeBase:
             tags: Optional[List[str]] = None,
             subsystems: Optional[List[str]] = None) -> Document:
         existing = self._docs.get(doc_id)
-        doc = Document(
-            doc_id=doc_id, title=title, body=body,
-            tags=tags or [], subsystems=subsystems or [],
-            version=(existing.version + 1) if existing else 1,
-            updated_ns=time.time_ns(),
-        )
+        if tags is None:
+            kept_tags = list(existing.tags) if existing else []
+        else:
+            kept_tags = list(tags)
+        if subsystems is None:
+            kept_subsystems = list(existing.subsystems) if existing else []
+        else:
+            kept_subsystems = list(subsystems)
+        version = (existing.version + 1) if existing else 1
+        doc = self._document(doc_id, title, body, kept_tags, kept_subsystems, version, time.time_ns())
         self._docs[doc_id] = doc
         self._save()
         return doc
@@ -93,15 +147,22 @@ class KnowledgeBase:
         return score
 
     def search(self, query: str, limit: int = 10) -> List[Dict[str, Any]]:
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
         terms = [t for t in re.findall(r"\w+", query.lower()) if len(t) > 1]
         if not terms:
             return []
         scored = [(self._score(d, terms), d) for d in self._docs.values()]
-        hits = [d for s, d in sorted(scored, key=lambda x: -x[0]) if s > 0]
-        return [d.to_dict() for d in hits[:limit]]
+        hits = [d for s, d in sorted(scored, key=lambda x: (-x[0], x[1].doc_id)) if s > 0]
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise ValueError("limit must be a non-negative integer")
+        return [
+            {**doc.to_dict(), "body": doc.body}
+            for doc in hits[:limit]
+        ]
 
     def for_subsystem(self, subsystem: str) -> List[Dict[str, Any]]:
-        return [d.to_dict() for d in self._docs.values() if subsystem in d.subsystems]
+        return [{**doc.to_dict(), "body": doc.body} for doc in self._docs.values() if subsystem in doc.subsystems]
 
     def card(self) -> Dict[str, Any]:
         return {

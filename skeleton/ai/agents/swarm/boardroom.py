@@ -78,6 +78,7 @@ class Session:
     opened: float
     chair: str
     closed: Optional[float] = None
+    members: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -101,11 +102,20 @@ class Boardroom:
         self._lock = threading.RLock()
         self._sessions: dict[str, Session] = {}
         self._motions: dict[str, Motion] = {}
+        self._votes: dict[str, dict[str, str]] = {}
 
     def convene(
-        self, title: str, chair: str, agenda: list[str] | None = None
+        self, title: str, chair: str, agenda: list[str] | None = None,
+        members: list[str] | None = None,
     ) -> Session:
         """Open a session with an agenda. Returns the new Session."""
+        if not isinstance(title, str) or not title.strip() or not isinstance(chair, str) or not chair.strip():
+            raise BoardroomError("title and chair are required")
+        roster = tuple(dict.fromkeys(members if members is not None else [chair]))
+        if not roster or chair not in roster or any(not isinstance(member, str) or not member.strip() for member in roster):
+            raise BoardroomError("the chair must sit with the members")
+        if any(not isinstance(item, str) or not item.strip() for item in (agenda or [])):
+            raise BoardroomError("agenda items must be non-empty")
         session = Session(
             id=str(uuid.uuid4()),
             title=title,
@@ -113,6 +123,7 @@ class Boardroom:
             opened=time.time(),
             closed=None,
             chair=chair,
+            members=roster,
         )
         with self._lock:
             self._sessions[session.id] = session
@@ -123,6 +134,7 @@ class Boardroom:
                 opened=session.opened,
                 closed=session.closed,
                 chair=session.chair,
+                members=session.members,
             )
 
     def table_motion(
@@ -161,6 +173,28 @@ class Boardroom:
                 proposal_id,
             )
 
+    def cast_vote(self, motion_id: str, member: str, vote: str) -> Optional[str]:
+        """Record one member's vote. A second vote from the same member replaces it."""
+        if vote not in {"yes", "no", "abstain"}:
+            raise BoardroomError("vote must be yes, no, or abstain")
+        if not isinstance(member, str) or not member.strip():
+            raise BoardroomError("member is required")
+        with self._lock:
+            motion = self._motions.get(motion_id)
+            if motion is None or motion.status is not MotionStatus.TABLED:
+                return None
+            session = self._sessions.get(motion.session_id)
+            if session is None or session.closed is not None or member not in session.members:
+                return None
+            self._votes.setdefault(motion_id, {})[member] = vote
+            return vote
+
+    def _vote_carried(self, session: Session, motion_id: str) -> bool:
+        votes = self._votes.get(motion_id, {})
+        yes = sum(1 for member in session.members if votes.get(member) == "yes")
+        no = sum(1 for member in session.members if votes.get(member) == "no")
+        return yes > no and yes * 2 > len(session.members)
+
     def resolve_motion(
         self,
         motion_id: str,
@@ -175,6 +209,15 @@ class Boardroom:
         with self._lock:
             motion = self._motions.get(motion_id)
             if motion is None or motion.status is not MotionStatus.TABLED:
+                return None
+            if not isinstance(carried, bool):
+                return None
+            if not isinstance(event_id, str) or not event_id.strip():
+                return None
+            session = self._sessions.get(motion.session_id)
+            if session is None or session.closed is not None:
+                return None
+            if carried is not self._vote_carried(session, motion_id):
                 return None
             motion.status = (
                 MotionStatus.RESOLVED if carried else MotionStatus.REJECTED
@@ -204,6 +247,7 @@ class Boardroom:
                 opened=session.opened,
                 closed=session.closed,
                 chair=session.chair,
+                members=session.members,
             )
 
     def session_motions(self, session_id: str) -> list[Motion]:
@@ -232,6 +276,7 @@ class Boardroom:
                     opened=s.opened,
                     closed=s.closed,
                     chair=s.chair,
+                    members=s.members,
                 )
                 for s in self._sessions.values()
             ]

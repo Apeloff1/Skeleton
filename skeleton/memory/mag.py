@@ -47,6 +47,8 @@ class PreferenceEmbedding:
     """User preference vector with incremental updates."""
 
     def __init__(self, dimension: int = 128) -> None:
+        if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+            raise ValueError("dimension must be a positive integer")
         self.dimension = dimension
         self.vector: List[float] = [0.0] * dimension
         self.update_count: int = 0
@@ -55,6 +57,10 @@ class PreferenceEmbedding:
         """Online moving-average update."""
         if len(interaction_vector) != self.dimension:
             raise ValueError(f"Expected dimension {self.dimension}, got {len(interaction_vector)}")
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in interaction_vector):
+            raise ValueError("interaction values must be finite")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(float(weight)) or float(weight) <= 0:
+            raise ValueError("weight must be positive")
         self.update_count += 1
         alpha = weight / self.update_count
         for i in range(self.dimension):
@@ -62,11 +68,17 @@ class PreferenceEmbedding:
 
     def similarity(self, other: "PreferenceEmbedding") -> float:
         """Cosine similarity between preference vectors."""
+        if not isinstance(other, PreferenceEmbedding):
+            raise TypeError("other must be a preference embedding")
+        if self.update_count == 0 or other.update_count == 0:
+            raise ValueError("preference similarity needs an update")
+        if self.dimension != other.dimension:
+            raise ValueError("preference dimensions differ")
         dot = sum(a * b for a, b in zip(self.vector, other.vector))
         norm1 = math.sqrt(sum(a * a for a in self.vector))
         norm2 = math.sqrt(sum(b * b for b in other.vector))
         if norm1 == 0 or norm2 == 0:
-            return 0.0
+            raise ValueError("preference similarity needs a non-zero vector")
         return dot / (norm1 * norm2)
 
 
@@ -91,7 +103,29 @@ class MAGStore(MemoryStore):
         importance: float = 1.0,
         tags: Optional[Set[str]] = None,
     ) -> str:
+        if not isinstance(content, str) or not content:
+            raise ValueError("content must be a non-empty string")
+        if isinstance(emotional_valence, bool) or not isinstance(
+            emotional_valence, (int, float)
+        ):
+            raise TypeError("emotional_valence must be numeric")
+        if not -1.0 <= float(emotional_valence) <= 1.0:
+            raise ValueError("emotional_valence must be in [-1, 1]")
+        if isinstance(importance, bool) or not isinstance(importance, (int, float)):
+            raise TypeError("importance must be numeric")
+        if float(importance) < 0.0:
+            raise ValueError("importance must be non-negative")
+        if tags is not None and not isinstance(tags, set):
+            raise TypeError("tags must be a set when provided")
         episode_id = f"mag_{self.user_id}_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
+
+        previous = self._episodes.get(episode_id)
+        if previous is not None:
+            for tag in previous.tags:
+                self._tag_index[tag].discard(episode_id)
+                if not self._tag_index[tag]:
+                    del self._tag_index[tag]
+
         episode = EpisodicMemory(
             episode_id=episode_id,
             timestamp=time.time(),
@@ -105,6 +139,18 @@ class MAGStore(MemoryStore):
             self._tag_index[tag].add(episode_id)
         return episode_id
 
+    def clusters(self, *, min_size: int = 2) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return tag groups large enough to consolidate, without exposing store internals."""
+
+        if isinstance(min_size, bool) or not isinstance(min_size, int) or min_size < 2:
+            raise ValueError("min_size must be an integer >= 2")
+        grouped: list[tuple[str, tuple[str, ...]]] = []
+        for tag in sorted(self._tag_index):
+            episode_ids = tuple(sorted(episode_id for episode_id in self._tag_index[tag] if episode_id in self._episodes))
+            if len(episode_ids) >= min_size:
+                grouped.append((tag, episode_ids))
+        return tuple(grouped)
+
     def update_preference(self, interaction_vector: List[float], weight: float = 1.0) -> None:
         self._preference.update(interaction_vector, weight)
 
@@ -114,7 +160,7 @@ class MAGStore(MemoryStore):
         self.add_episode(
             chunk.text,
             emotional_valence=chunk.metadata.get("valence", 0.0),
-            importance=chunk.metadata.get("importance", 1.0),
+            importance=chunk.metadata.get("importance", 0.0),
             tags=tags,
         )
 
@@ -126,8 +172,22 @@ class MAGStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
+        if isinstance(top_k, bool) or not isinstance(top_k, int):
+            raise TypeError("top_k must be an integer")
+        if top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        if isinstance(min_score, bool) or not isinstance(min_score, (int, float)):
+            raise TypeError("min_score must be numeric")
+        if metadata_filter is not None and not isinstance(metadata_filter, dict):
+            raise TypeError("metadata_filter must be a mapping")
+        if top_k == 0:
+            return []
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query is required")
         query_time = time.time()
         query_words = set(query_text.lower().split())
+        if not query_words:
+            return []
 
         # Score episodes by retrieval probability + keyword overlap
         scored: List[Tuple[float, EpisodicMemory]] = []
@@ -150,7 +210,9 @@ class MAGStore(MemoryStore):
 
             # Keyword overlap bonus
             content_words = set(episode.content.lower().split())
-            overlap = len(query_words & content_words) / max(len(query_words), 1)
+            overlap = len(query_words & content_words) / len(query_words)
+            if overlap == 0.0:
+                continue
 
             # Emotional resonance (boost if query sentiment matches)
             # Simplified: assume neutral query, use absolute valence as distinctiveness
@@ -161,7 +223,7 @@ class MAGStore(MemoryStore):
             if score >= min_score:
                 scored.append((score, episode))
 
-        scored.sort(key=lambda x: x[0], reverse=True)
+        scored.sort(key=lambda item: (-item[0], item[1].episode_id))
 
         results: List[MemoryQueryResult] = []
         for i, (score, episode) in enumerate(scored[:top_k]):
@@ -184,6 +246,22 @@ class MAGStore(MemoryStore):
             results.append(MemoryQueryResult(chunk=chunk, score=score, rank=i + 1))
 
         return results
+
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Enforce the store's user identity before scoring episodic memory."""
+        if not isinstance(scope, dict) or set(scope) != {"user_id"}:
+            raise ValueError("MAG scope must contain exactly user_id")
+        if not isinstance(scope["user_id"], str) or not scope["user_id"]:
+            raise ValueError("user_id scope must be a non-empty string")
+        if scope["user_id"] != str(self.user_id):
+            return []
+        return self.query(query_text, top_k=top_k)
 
     def delete(self, chunk_id: str) -> bool:
         if chunk_id not in self._episodes:

@@ -27,6 +27,10 @@ from .cascade import CascadeRouter, ModelResponse
 from .uncertainty import Candidate, GateVerdict, UncertaintyGate
 
 
+class RoutedGateError(ValueError):
+    """The routed gate was asked to answer something it cannot account for."""
+
+
 @dataclass
 class RoutedAnswer:
     text: str
@@ -52,8 +56,8 @@ class RoutedGate:
 
     def __init__(self, router: CascadeRouter, gate: UncertaintyGate,
                  *, samples: int = 3) -> None:
-        if samples < 1:
-            raise ValueError("samples must be >= 1")
+        if isinstance(samples, bool) or not isinstance(samples, int) or samples < 1:
+            raise ValueError("samples must be an integer >= 1")
         self.router = router
         self.gate = gate
         self.samples = samples
@@ -61,55 +65,101 @@ class RoutedGate:
         self.abstained = 0
 
     def answer(self, query: str, *, abstain_text: str = "I don't know.") -> RoutedAnswer:
+        if not isinstance(query, str) or not query.strip():
+            raise RoutedGateError("query is required")
+        if not isinstance(abstain_text, str) or not abstain_text.strip():
+            raise RoutedGateError("abstain text is required")
         self.queries += 1
 
-        # 1. hard queries: no sampling waste, straight to strong
         from .cascade import difficulty_estimate
         if difficulty_estimate(query) >= self.router.route_threshold:
-            resp = self.router.strong(query)
+            response = self._call(self.router.strong, query, self.router.strong_cost)
             self.router.decisions += 1
             self.router.strong_direct += 1
-            self.router.total_cost += self.router.strong_cost
-            return RoutedAnswer(text=resp.text, model="strong",
-                                verdict="difficulty_direct",
-                                confidence=resp.confidence,
-                                escalated=False, abstained=False)
+            if response is None:
+                self.abstained += 1
+                return self._abstain(abstain_text, "empty_strong")
+            return RoutedAnswer(
+                text=response.text,
+                model="strong",
+                verdict="difficulty_direct",
+                confidence=response.confidence,
+                escalated=False,
+                abstained=False,
+            )
 
-        # 2. cheap candidates + gate
+        candidates = []
+        for _ in range(self.samples):
+            response = self._call(self.router.cheap, query, self.router.cheap_cost)
+            if response is None:
+                self.router.decisions += 1
+                self.abstained += 1
+                return self._abstain(abstain_text, "empty_sample")
+            candidates.append(response)
         self.router.decisions += 1
-        self.router.total_cost += self.router.cheap_cost
-        candidates = [self.router.cheap(query) for _ in range(self.samples)]
         decision = self.gate.decide([
-            Candidate(text=c.text, confidence=c.confidence) for c in candidates
+            Candidate(text=candidate.text, confidence=candidate.confidence) for candidate in candidates
         ])
 
-        if decision.verdict is GateVerdict.ANSWER and decision.best is not None:
-            return RoutedAnswer(text=decision.best.text, model="cheap",
-                                verdict=decision.reason,
-                                confidence=decision.best.confidence,
-                                escalated=False, abstained=False)
+        if decision.verdict is GateVerdict.ANSWER and decision.best is not None and decision.best.text.strip():
+            return RoutedAnswer(
+                text=decision.best.text,
+                model="cheap",
+                verdict=decision.reason,
+                confidence=decision.best.confidence,
+                escalated=False,
+                abstained=False,
+            )
 
         if decision.verdict is GateVerdict.ABSTAIN:
             self.abstained += 1
-            return RoutedAnswer(text=abstain_text, model="none",
-                                verdict=decision.reason,
-                                confidence=decision.mean_confidence,
-                                escalated=False, abstained=True)
+            return self._abstain(abstain_text, decision.reason)
 
-        # 3. ESCALATE → strong through the cascade's accounting
+        response = self._call(self.router.strong, query, self.router.strong_cost)
         self.router.escalations += 1
-        self.router.total_cost += self.router.strong_cost
-        resp = self.router.strong(query)
-        return RoutedAnswer(text=resp.text, model="strong",
-                            verdict="confidence_escalation",
-                            confidence=resp.confidence,
-                            escalated=True, abstained=False)
+        if response is None:
+            self.abstained += 1
+            return self._abstain(abstain_text, "empty_escalation")
+        return RoutedAnswer(
+            text=response.text,
+            model="strong",
+            verdict="confidence_escalation",
+            confidence=response.confidence,
+            escalated=True,
+            abstained=False,
+        )
+
+    def _call(self, model, query: str, cost: float):
+        response = model(query)
+        if not isinstance(response, ModelResponse) or not isinstance(response.text, str):
+            raise RoutedGateError("model must return a text response")
+        confidence = response.confidence
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0.0 <= float(confidence) <= 1.0
+        ):
+            raise RoutedGateError("model confidence must be in [0, 1]")
+        self.router.total_cost += cost
+        if not response.text.strip():
+            return None
+        return response
+
+    def _abstain(self, text: str, reason: str) -> RoutedAnswer:
+        return RoutedAnswer(
+            text=text,
+            model="none",
+            verdict=reason,
+            confidence=0.0,
+            escalated=False,
+            abstained=True,
+        )
 
     def stats(self) -> Dict[str, Any]:
         return {
             "queries": self.queries,
             "abstained": self.abstained,
-            "abstain_rate": round(self.abstained / max(1, self.queries), 4),
+            "abstain_rate": None if self.queries == 0 else round(self.abstained / self.queries, 4),
             "router": self.router.stats(),
             "gate": self.gate.stats(),
         }

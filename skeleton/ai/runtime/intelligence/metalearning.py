@@ -34,6 +34,8 @@ class MetaLearner:
     """
 
     def __init__(self, parameter_dim: int = 128, bus: Optional[EventBus] = None) -> None:
+        if isinstance(parameter_dim, bool) or not isinstance(parameter_dim, int) or parameter_dim < 1:
+            raise ValueError("parameter_dim must be a positive integer")
         self.parameter_dim = parameter_dim
         self.meta_parameters = Tensor.random(parameter_dim)
         self.task_embeddings: Dict[str, TaskEmbedding] = {}
@@ -46,26 +48,27 @@ class MetaLearner:
         Generate task embedding from support set.
         Uses simple feature statistics as embedding.
         """
-        if not support_set:
-            embedding = Tensor.zeros(self.parameter_dim)
-        else:
-            # Extract numeric features and compute statistics
-            features: List[List[float]] = []
-            for example in support_set:
-                numeric = [v for v in example.values() if isinstance(v, (int, float))]
-                if numeric:
-                    features.append(numeric)
-
-            if not features:
-                embedding = Tensor.zeros(self.parameter_dim)
-            else:
-                # Flatten and pad/truncate to parameter_dim
-                flat = [f for feat in features for f in feat]
-                if len(flat) < self.parameter_dim:
-                    flat.extend([0.0] * (self.parameter_dim - len(flat)))
-                else:
-                    flat = flat[:self.parameter_dim]
-                embedding = Tensor(flat, (self.parameter_dim,))
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("task id is required")
+        if not isinstance(support_set, list) or not support_set:
+            raise ValueError("support set is required")
+        flat: List[float] = []
+        for example in support_set:
+            if not isinstance(example, dict):
+                raise ValueError("support example must be an object")
+            numeric: List[float] = []
+            for value in example.values():
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    continue
+                if value != value or value in (float("inf"), float("-inf")):
+                    raise ValueError("support features must be finite")
+                numeric.append(float(value))
+            if not numeric:
+                raise ValueError("support example needs a finite number")
+            flat.extend(numeric)
+        if len(flat) != self.parameter_dim:
+            raise ValueError("support features must match the parameter dimension")
+        embedding = Tensor(flat, (self.parameter_dim,))
 
         task_emb = TaskEmbedding(
             task_id=task_id,
@@ -90,10 +93,10 @@ class MetaLearner:
         task = self.task_embeddings[task_id]
         params = Tensor(self.meta_parameters.data.copy(), self.meta_parameters.shape)
 
+        if not task.support_set:
+            raise ValueError("support set is required")
         # Inner loop: gradient steps on support set
         for _ in range(self.inner_steps):
-            if not task.support_set:
-                break
             # Compute gradient on random support example
             example = random.choice(task.support_set)
             loss = loss_fn(params, example)
@@ -112,7 +115,7 @@ class MetaLearner:
                     payload={
                         "task_id": task_id,
                         "inner_steps": self.inner_steps,
-                        "final_loss": loss_fn(params, random.choice(task.support_set)) if task.support_set else 0,
+                        "final_loss": loss_fn(params, task.support_set[-1]),
                     },
                     correlation_id=f"meta_{task_id}",
                 )
@@ -127,6 +130,8 @@ class MetaLearner:
         epsilon: float = 1e-5,
     ) -> Tensor:
         """Compute numerical gradient."""
+        if isinstance(epsilon, bool) or not isinstance(epsilon, (int, float)) or float(epsilon) == 0.0:
+            raise ValueError("epsilon must be a non-zero number")
         grad = []
         for i in range(len(params.data)):
             params_plus = Tensor(params.data.copy(), params.shape)

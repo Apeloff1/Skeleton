@@ -34,8 +34,8 @@ class EncounterResult:
 
     @property
     def error(self) -> float:
-        if self.target_ttk <= 0:
-            return 0.0
+        if not self.target_ttk > 0:
+            raise ValueError("target ttk must be positive")
         return abs(self.measured_ttk - self.target_ttk) / self.target_ttk
 
     def to_dict(self) -> Dict[str, Any]:
@@ -76,48 +76,76 @@ class SessionReport:
         }
 
 
+def _number(value: Any, label: str, *, positive: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a number")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError(f"{label} must be finite")
+    if positive and not number > 0:
+        raise ValueError(f"{label} must be positive")
+    if number < 0:
+        raise ValueError(f"{label} must be non-negative")
+    return number
+
+
 def _recipe(pack: Dict[str, Any]) -> Dict[str, Any]:
-    recipes = pack.get("recipes") or []
-    return recipes[0] if recipes else {"damage": 18, "rpm": 360, "heat": 6.2, "family": "kinetic"}
+    recipes = pack.get("recipes")
+    if not isinstance(recipes, list) or not recipes or not isinstance(recipes[0], dict):
+        raise ValueError("a weapon recipe is required")
+    return recipes[0]
 
 
 def simulate_encounter(pack: Dict[str, Any], enemy: Dict[str, Any], *,
                        mode: str = "ideal", dt: float = 1.0 / 60.0,
                        max_t: Optional[float] = None,
                        heat0: float = 0.0) -> EncounterResult:
+    if isinstance(dt, bool) or not isinstance(dt, (int, float)) or not float(dt) > 0:
+        raise ValueError("dt must be positive")
+    heat0 = _number(heat0, "heat0")
     rec = _recipe(pack)
-    dmg = float(rec.get("damage") or 18)
-    rpm = float(rec.get("rpm") or 360)
-    shot_heat = float(rec.get("heat") or 6.2)
-    interval = 60.0 / max(rpm, 1.0)
+    dmg = _number(rec.get("damage"), "damage", positive=True)
+    rpm = _number(rec.get("rpm"), "rpm", positive=True)
+    shot_heat = _number(rec.get("heat"), "heat")
+    interval = 60.0 / rpm
     nominal_dps = dmg * rpm / 60.0
-    primary = float(pack.get("primary_dps") or nominal_dps or 1.0)
-    # scale shot damage so discrete DPS matches the compiler identity
+    primary = _number(pack.get("primary_dps", nominal_dps), "primary_dps", positive=True)
     if nominal_dps > 0:
         dmg *= primary / nominal_dps
-    hp = float(enemy.get("hp") or 1.0)
-    target = float(enemy.get("ttk_target") or (hp / max(primary, 1e-6)))
-    heat_cfg = pack.get("heat") or {}
-    max_heat = float(heat_cfg.get("max_heat") or 100.0)
-    cool = float(heat_cfg.get("passive_cool") or 7.5)
-    crit = float(heat_cfg.get("critical_ratio") or 0.78)
-    rising = float((pack.get("jeeves") or {}).get("heat_rising") or 0.65)
-    collapse_max = float((pack.get("session") or {}).get("collapse_max") or 9999)
-    ceiling = max_t if max_t is not None else min(collapse_max, target * 8.0 + 5.0)
+    hp = _number(enemy.get("hp"), "hp", positive=True)
+    if "ttk_target" in enemy:
+        target = _number(enemy.get("ttk_target"), "ttk_target", positive=True)
+    else:
+        target = hp / primary
+    heat_cfg = pack.get("heat") if isinstance(pack.get("heat"), dict) else {}
+    max_heat = _number(heat_cfg["max_heat"], "max_heat", positive=True) if "max_heat" in heat_cfg else 100.0
+    cool = _number(heat_cfg["passive_cool"], "passive_cool") if "passive_cool" in heat_cfg else 7.5
+    crit = _number(heat_cfg["critical_ratio"], "critical_ratio", positive=True) if "critical_ratio" in heat_cfg else 0.78
+    jeeves = pack.get("jeeves") if isinstance(pack.get("jeeves"), dict) else {}
+    rising = _number(jeeves["heat_rising"], "heat_rising") if "heat_rising" in jeeves else 0.65
+    session = pack.get("session") if isinstance(pack.get("session"), dict) else {}
+    if "collapse_max" not in session:
+        raise ValueError("collapse_max is required")
+    collapse_max = _number(session.get("collapse_max"), "collapse_max", positive=True)
+    if max_t is not None:
+        ceiling = _number(max_t, "max_t", positive=True)
+    else:
+        ceiling = min(collapse_max, target * 8.0 + 5.0)
 
     if mode == "ideal":
-        measured = hp / max(primary, 1e-9)
+        measured = hp / primary
         shots = max(1, int((hp + dmg - 1e-9) // dmg))
+        killed = measured <= collapse_max
         return EncounterResult(
             enemy_id=str(enemy.get("id")), mode=mode, target_ttk=target,
             measured_ttk=measured, shots=int(shots), vents=0, overheat=False,
-            collapsed=False, killed=True,
+            collapsed=not killed, killed=killed,
             events=[SimEvent(measured, "ideal", "closed-form HP/DPS")],
-            heat_end=float(heat0 or 0.0),
+            heat_end=heat0,
         )
 
     hp_left = hp
-    heat = float(heat0 or 0.0)
+    heat = heat0
     t = 0.0
     cooldown = 0.0
     shots = 0
@@ -218,7 +246,7 @@ def simulate_session(
         passed = False
         notes.append("ideal walk failed: " + "; ".join(wr_ideal.notes[:4]))
     walk_payload = wr_therm.to_dict()
-    walk_payload["collapse_max"] = float((pack.get("session") or {}).get("collapse_max") or 0)
+    walk_payload["collapse_max"] = _number((pack.get("session") or {}).get("collapse_max"), "collapse_max", positive=True)
     walk_payload["ideal"] = {
         "t": round(wr_ideal.t, 4),
         "extracted": wr_ideal.extracted,
@@ -235,9 +263,9 @@ def simulate_session(
         )
     return SessionReport(
         era=str(pack.get("era")),
-        primary_dps=float(pack.get("primary_dps") or 0.0),
+        primary_dps=_number(pack.get("primary_dps"), "primary_dps", positive=True),
         encounters=encounters,
-        collapse_max=float((pack.get("session") or {}).get("collapse_max") or 0.0),
+        collapse_max=_number((pack.get("session") or {}).get("collapse_max"), "collapse_max", positive=True),
         passed=passed,
         notes=notes,
         walk=walk_payload,

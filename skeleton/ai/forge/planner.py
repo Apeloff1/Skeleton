@@ -76,17 +76,40 @@ class MaterialisationPlanner:
         self._plans = 0
 
     def plan(self, blueprint: Dict[str, Any]) -> BuildPlan:
-        systems = blueprint.get("systems", [])
-        if not systems:
+        if not isinstance(blueprint, dict):
+            raise BlueprintError("blueprint must be an object")
+        name = blueprint.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise BlueprintError("blueprint name is required")
+        systems = blueprint.get("systems")
+        if not isinstance(systems, list) or not systems:
             raise BlueprintError("cannot plan an empty blueprint")
 
-        deps: Dict[str, List[str]] = {
-            s["id"]: list(s.get("depends_on", []))
-            for s in systems if s.get("id")
-        }
-        costs: Dict[str, Optional[float]] = {
-            s["id"]: s.get("declared_cost") for s in systems if s.get("id")
-        }
+        deps: Dict[str, List[str]] = {}
+        costs: Dict[str, Optional[float]] = {}
+        for system in systems:
+            if not isinstance(system, dict):
+                raise BlueprintError("system must be an object")
+            sid = system.get("id")
+            if not isinstance(sid, str) or not sid.strip():
+                raise BlueprintError("system id is required")
+            if sid in deps:
+                raise BlueprintError("duplicate system id", context={"system": sid})
+            raw = system.get("depends_on", [])
+            if not isinstance(raw, list) or any(not isinstance(dep, str) or not dep.strip() for dep in raw):
+                raise BlueprintError("depends_on must be a list of ids", context={"system": sid})
+            deps[sid] = list(raw)
+            cost = system.get("declared_cost")
+            if cost is None:
+                costs[sid] = None
+            elif isinstance(cost, bool) or not isinstance(cost, (int, float)) or float(cost) != float(cost) or float(cost) < 0 or float(cost) == float("inf"):
+                raise BlueprintError("declared_cost must be a non-negative number", context={"system": sid})
+            else:
+                costs[sid] = float(cost)
+        for sid, parents in deps.items():
+            missing = [dep for dep in parents if dep not in deps]
+            if missing:
+                raise BlueprintError("unknown dependency", context={"system": sid, "missing": missing})
 
         # ---- wave assignment: longest path from a root ---------------------
         wave_of: Dict[str, int] = {}
@@ -108,7 +131,7 @@ class MaterialisationPlanner:
             wave(sid)
 
         n_waves = max(wave_of.values()) + 1
-        plan = BuildPlan(blueprint_name=str(blueprint.get("name", "unnamed")))
+        plan = BuildPlan(blueprint_name=name)
         for w in range(n_waves):
             members = tuple(sorted(s for s, sw in wave_of.items() if sw == w))
             declared = sum(c for m in members if (c := costs.get(m)) is not None)
@@ -168,10 +191,10 @@ class MaterialisationPlanner:
             cost = None
             cfg = getattr(comp, "config", {}) or {}
             if "cost" in cfg:
-                try:
-                    cost = float(cfg["cost"])
-                except (TypeError, ValueError):
-                    cost = None
+                raw_cost = cfg["cost"]
+                if isinstance(raw_cost, bool) or not isinstance(raw_cost, (int, float)) or float(raw_cost) != float(raw_cost) or float(raw_cost) < 0 or float(raw_cost) == float("inf"):
+                    raise BlueprintError("declared_cost must be a non-negative number", context={"system": cid})
+                cost = float(raw_cost)
             systems.append({"id": cid, "depends_on": depends[cid], "declared_cost": cost})
         name = getattr(blueprint, "name", "unnamed")
         if not systems:

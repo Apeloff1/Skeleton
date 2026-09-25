@@ -62,10 +62,22 @@ class ParametricLoRAWriteBack:
         self._checkpoints: List[Dict[str, Any]] = []
 
     def add_layer(self, name: str, lora_A: List[List[float]], lora_B: List[List[float]], rank: Optional[int] = None, alpha: Optional[float] = None) -> LoRALayer:
+        if rank is None:
+            rank = len(lora_A)
+        if isinstance(rank, bool) or not isinstance(rank, int) or rank < 1:
+            raise ValueError("rank must be a positive integer")
+        if alpha is None:
+            alpha = self.default_alpha
+        if isinstance(alpha, bool) or not isinstance(alpha, (int, float)):
+            raise ValueError("alpha must be a number")
+        if len(lora_A) != rank or any(len(row) != len(lora_A[0]) for row in lora_A):
+            raise ValueError("lora_A must be rectangular with one row per rank")
+        if not lora_B or any(len(row) != rank for row in lora_B):
+            raise ValueError("lora_B rows must have width equal to rank")
         layer = LoRALayer(
             name=name,
-            rank=rank or self.default_rank,
-            alpha=alpha or self.default_alpha,
+            rank=rank,
+            alpha=float(alpha),
             lora_A=lora_A,
             lora_B=lora_B,
         )

@@ -46,38 +46,66 @@ _BANDS: list[tuple[str, int, int, str, str]] = [
 ]
 
 
+def _text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _count(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 def _gate_status(key: str, m: dict, upstream_ok: bool) -> tuple[bool, str]:
-    aw = m.get("awareness") or {}
-    ladder = m.get("ladder") or []
+    aw = m.get("awareness") if isinstance(m.get("awareness"), dict) else {}
+    ladder = m.get("ladder") if isinstance(m.get("ladder"), list) else []
     if key == "choices_locked":
-        ok = bool(aw.get("era")) and int(aw.get("choices_logged", 0)) >= 1
+        logged = _count(aw.get("choices_logged"))
+        ok = _text(aw.get("era")) and logged is not None and logged >= 1
         return ok, f"era={aw.get('era')} · {aw.get('choices_logged', 0)} choices logged"
     if key == "world_quality":
-        world = next((r for r in ladder if r["stage"] == "world"), None)
-        ok = bool(world) and world["parity_ok"] and world["quality"]["all_passed"]
+        world = next((row for row in ladder if isinstance(row, dict) and row.get("stage") == "world"), None)
+        quality = world.get("quality") if isinstance(world, dict) else None
+        ok = (
+            isinstance(world, dict)
+            and world.get("parity_ok") is True
+            and isinstance(quality, dict)
+            and quality.get("all_passed") is True
+        )
         return ok, "world stage QA + parity" if ok else "world stage incomplete"
     if key == "gdd_parity":
-        return bool(m.get("parity_locked")), f"parity {m.get('parity_pct')}%"
+        return m.get("parity_locked") is True, f"parity {m.get('parity_pct')}%"
     if key == "grade_escalation":
-        floors = [r["grade_floor"] for r in ladder]
+        floors = []
+        for row in ladder:
+            if not isinstance(row, dict):
+                return False, "grade floors missing"
+            floor = row.get("grade_floor")
+            if isinstance(floor, bool) or not isinstance(floor, (int, float)):
+                return False, "grade floor is not a number"
+            floors.append(float(floor))
+        if len(floors) < 2:
+            return False, "grade floors missing"
         ok = all(floors[i] <= floors[i + 1] for i in range(len(floors) - 1))
-        return ok, "grade floors monotonic"
+        return ok, "grade floors monotonic" if ok else "grade floors are not monotonic"
     if key == "determinism":
-        return bool(m.get("plan_hash")), f"plan {str(m.get('plan_hash'))[:8]}"
+        return _text(m.get("plan_hash")), f"plan {str(m.get('plan_hash') or '')[:8]}"
     if key == "storage_tracked":
-        st = m.get("storage") or {}
-        return ("used_pct" in st), f"{st.get('used_label')} / {st.get('cap_label')}"
+        st = m.get("storage") if isinstance(m.get("storage"), dict) else {}
+        used = st.get("used_pct")
+        ok = isinstance(used, (int, float)) and not isinstance(used, bool) and 0 <= float(used) <= 100
+        return ok, f"{st.get('used_label')} / {st.get('cap_label')}"
     if key == "capacity":
-        cap = m.get("capacity") or {}
-        forged = int(m.get("forged_assets", 0))
-        within = int(cap.get("assets_forged", 0)) <= int(cap.get("asset_capacity", 0))
-        ok = within and forged > 0
+        cap = m.get("capacity") if isinstance(m.get("capacity"), dict) else {}
+        forged = _count(m.get("forged_assets"))
+        made = _count(cap.get("assets_forged"))
+        room = _count(cap.get("asset_capacity"))
+        ok = forged is not None and forged > 0 and made is not None and room is not None and made <= room
         return ok, (f"{forged} forged assets grounded · {cap.get('utilization_pct')}% of cap"
-                    if forged > 0 else "no forged assets to build from yet")
+                    if forged else "no forged assets to build from yet")
     if key == "all_green":
-        cg = m.get("choice_gates") or {}
-        choices_ok = cg.get("all_reflected", True)
-        ok = upstream_ok and choices_ok
+        cg = m.get("choice_gates") if isinstance(m.get("choice_gates"), dict) else {}
+        ok = upstream_ok and cg.get("all_reflected") is True
         return ok, ("all bands green + every choice reflected" if ok
                     else "upstream gate or a choice gate failing")
     return False, "unknown gate"
@@ -88,11 +116,12 @@ def _resolve_file_target(
     file_target: int | None,
     era_file_target: int | None,
 ) -> int:
-    if file_target is not None:
-        return int(file_target)
-    if era_file_target is not None:
-        return int(era_file_target)
-    return DEFAULT_FILE_TARGET
+    chosen = file_target if file_target is not None else era_file_target
+    if chosen is None:
+        return DEFAULT_FILE_TARGET
+    if isinstance(chosen, bool) or not isinstance(chosen, int) or chosen < 1:
+        raise ValueError("file_target must be a positive integer")
+    return chosen
 
 
 def _era_fields(manifest: dict) -> tuple[str, str]:
@@ -119,7 +148,10 @@ def build(
     ``file_target`` / ``era_file_target`` inject the era's industry-standard
     file count (no Prood ``core.eras`` dependency). Default: 1000.
     """
-    forged = int((assets or {}).get("forged", 0))
+    forged_raw = (assets or {}).get("forged", 0)
+    if isinstance(forged_raw, bool) or not isinstance(forged_raw, int) or forged_raw < 0:
+        raise ValueError("forged asset count must be a non-negative integer")
+    forged = forged_raw
     families = (assets or {}).get("families", []) or []
     m = {**manifest, "forged_assets": forged}
     target = _resolve_file_target(
@@ -143,7 +175,7 @@ def build(
             "phase_range": [start, end], "phase_count": end - start + 1,
             "passed": ok, "detail": detail,
             "file_target": band_files,
-            "files_produced": band_files if ok else 0,
+            "files_produced": 0,
         })
         file_bands.append({"band": name, "file_target": band_files,
                            "cumulative": cum_files, "passed": ok})

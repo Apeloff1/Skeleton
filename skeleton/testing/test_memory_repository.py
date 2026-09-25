@@ -299,3 +299,268 @@ def test_expire_due_tombstones_only_elapsed_records() -> None:
         tenant_id="tenant-a",
         namespace="assistant",
     ).version == 1
+
+
+def test_revision_history_records_create_update_and_tombstone_lineage() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create", content="v1"), now=_now())
+    updated = repo.commit(
+        _proposal(
+            key="update",
+            content="v2",
+            target=created.memory_id,
+            expected_version=created.version,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    tombstoned = repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=updated.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    history = repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+
+    assert [revision.version for revision in history] == [1, 2, 3]
+    assert [revision.predecessor_version for revision in history] == [None, 1, 2]
+    assert [revision.mutation for revision in history] == [
+        "create",
+        "update",
+        "tombstone",
+    ]
+    assert [revision.record.content for revision in history] == ["v1", "v2", "v2"]
+    assert history[-1].record == tombstoned
+
+
+def test_projection_outbox_tracks_upserts_and_delete_in_order() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create", content="v1"), now=_now())
+    updated = repo.commit(
+        _proposal(
+            key="update",
+            content="v2",
+            target=created.memory_id,
+            expected_version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=updated.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    events = repo.pending_projection_events()
+
+    assert [(event.memory_version, event.action) for event in events] == [
+        (1, "upsert"),
+        (2, "upsert"),
+        (3, "delete"),
+    ]
+    assert all(event.memory_id == created.memory_id for event in events)
+    assert events[0].record.content == "v1"
+    assert events[1].record.content == "v2"
+    assert events[2].record.state is MemoryState.TOMBSTONED
+
+
+def test_projection_publish_ack_is_idempotent_and_removes_pending_work() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(_proposal(key="create"), now=_now())
+    event = repo.pending_projection_events()[0]
+
+    first = repo.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=1),
+    )
+    second = repo.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=5),
+    )
+
+    assert first.published_at == _now() + timedelta(seconds=1)
+    assert second.published_at == first.published_at
+    assert repo.pending_projection_events() == ()
+
+
+def test_projection_publish_unknown_event_fails_closed() -> None:
+    repo = SQLiteMemoryRepository()
+    with pytest.raises(MemoryNotFound):
+        repo.mark_projection_published(
+            "missing",
+            now=_now(),
+        )
+
+
+def test_idempotent_commit_replay_does_not_duplicate_revision_or_outbox() -> None:
+    repo = SQLiteMemoryRepository()
+    proposal = _proposal(key="same-key", content="v1")
+
+    first = repo.commit(proposal, now=_now())
+    replay = repo.commit(proposal, now=_now() + timedelta(seconds=10))
+
+    assert replay == first
+    assert [row.version for row in repo.history(
+        first.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )] == [1]
+    assert [(row.memory_version, row.action) for row in repo.pending_projection_events()] == [
+        (1, "upsert"),
+    ]
+
+
+def test_failed_stale_update_does_not_emit_revision_or_projection_event() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create", content="v1"), now=_now())
+    repo.commit(
+        _proposal(
+            key="update",
+            content="v2",
+            target=created.memory_id,
+            expected_version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+
+    with pytest.raises(MemoryConflict):
+        repo.commit(
+            _proposal(
+                key="stale",
+                content="stale",
+                target=created.memory_id,
+                expected_version=1,
+            ),
+            now=_now() + timedelta(seconds=2),
+        )
+
+    assert [row.version for row in repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )] == [1, 2]
+    assert [(row.memory_version, row.action) for row in repo.pending_projection_events()] == [
+        (1, "upsert"),
+        (2, "upsert"),
+    ]
+
+
+def test_tombstone_retry_with_original_expected_version_is_idempotent() -> None:
+    repo = SQLiteMemoryRepository()
+    created = repo.commit(_proposal(key="create"), now=_now())
+
+    first = repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=1),
+    )
+    retry = repo.tombstone(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=created.version,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert retry == first
+    assert [row.version for row in repo.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )] == [1, 2]
+    assert [(row.memory_version, row.action) for row in repo.pending_projection_events()] == [
+        (1, "upsert"),
+        (2, "delete"),
+    ]
+
+
+def test_expiry_records_expire_revision_and_delete_projection() -> None:
+    repo = SQLiteMemoryRepository()
+    due = repo.commit(
+        _proposal(
+            key="due-history",
+            content="old",
+            expires_at=_now() + timedelta(seconds=5),
+        ),
+        now=_now(),
+    )
+
+    expired = repo.expire_due(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        now=_now() + timedelta(seconds=10),
+    )
+
+    assert [row.memory_id for row in expired] == [due.memory_id]
+    history = repo.history(
+        due.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    assert [row.mutation for row in history] == ["create", "expire"]
+    events = repo.pending_projection_events()
+    assert [(row.memory_version, row.action) for row in events] == [
+        (1, "upsert"),
+        (2, "delete"),
+    ]
+
+
+def test_revision_and_projection_outbox_survive_repository_restart(tmp_path) -> None:
+    path = tmp_path / "memory-authority.sqlite3"
+    first = SQLiteMemoryRepository(path)
+    created = first.commit(_proposal(key="persist", content="v1"), now=_now())
+    updated = first.commit(
+        _proposal(
+            key="persist-update",
+            content="v2",
+            target=created.memory_id,
+            expected_version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    event = first.pending_projection_events()[0]
+    first.mark_projection_published(
+        event.event_id,
+        now=_now() + timedelta(seconds=2),
+    )
+    first.close()
+
+    reopened = SQLiteMemoryRepository(path)
+
+    history = reopened.history(
+        created.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    )
+    pending = reopened.pending_projection_events()
+    assert [row.version for row in history] == [1, 2]
+    assert [row.record.content for row in history] == ["v1", "v2"]
+    assert [(row.memory_version, row.action) for row in pending] == [(2, "upsert")]
+    assert reopened.get(
+        updated.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+    ).content == "v2"
+
+
+@pytest.mark.parametrize("limit", [0, -1])
+def test_projection_pending_limit_must_be_positive(limit) -> None:
+    repo = SQLiteMemoryRepository()
+    with pytest.raises(ValueError):
+        repo.pending_projection_events(limit=limit)
+
+
+@pytest.mark.parametrize("limit", [True, 1.5, "2"])
+def test_projection_pending_limit_must_be_integer(limit) -> None:
+    repo = SQLiteMemoryRepository()
+    with pytest.raises(TypeError):
+        repo.pending_projection_events(limit=limit)

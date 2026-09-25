@@ -42,6 +42,8 @@ services:
       - SKL_OPERATION_STREAM_PATH=/app/data/operation_stream.sqlite
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
       - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
+      - SKL_ENGINE_ALLOWED_TENANTS_CSV=${SKL_ENGINE_ALLOWED_TENANTS_CSV:-*}
+      - SKL_ENGINE_ALLOWED_CAPABILITIES_CSV=${SKL_ENGINE_ALLOWED_CAPABILITIES_CSV:-*}
       - SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite
       - SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite
       - SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite

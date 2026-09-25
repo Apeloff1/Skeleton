@@ -51,25 +51,35 @@ class ImproveLoop:
     def __init__(self, *, max_iterations: int = 10, patience: int = 3,
                  target: Optional[float] = None,
                  min_gain: float = 0.0) -> None:
-        if max_iterations < 1 or patience < 1:
-            raise ValueError("max_iterations and patience must be >= 1")
+        if isinstance(max_iterations, bool) or not isinstance(max_iterations, int) or max_iterations < 1:
+            raise ValueError("max_iterations must be an integer >= 1")
+        if isinstance(patience, bool) or not isinstance(patience, int) or patience < 1:
+            raise ValueError("patience must be an integer >= 1")
+        if isinstance(min_gain, bool) or not isinstance(min_gain, (int, float)) or min_gain < 0:
+            raise ValueError("min_gain must be non-negative")
         self.max_iterations = max_iterations
         self.patience = patience
         self.target = target
         self.min_gain = min_gain
         self.runs = 0
+        if self.target is not None and (
+            isinstance(self.target, bool)
+            or not isinstance(self.target, (int, float))
+            or self.target != self.target
+        ):
+            raise ValueError("target must be a finite number")
 
     def run(self, seed: Any, generate: GeneratorFn,
             evaluate: EvaluatorFn) -> ImproveResult:
         """Improve on ``seed`` until budget, patience, or target stops us."""
         self.runs += 1
         best = seed
-        best_score = evaluate(seed)
+        best_score = self._score(evaluate(seed))
         result = ImproveResult(best=best, best_score=best_score)
         dry = 0
         for i in range(1, self.max_iterations + 1):
             candidate = generate(best, i)
-            score = evaluate(candidate)
+            score = self._score(evaluate(candidate))
             improved = score > best_score + self.min_gain
             result.iterations.append(Iteration(i, score, improved))
             if improved:
@@ -88,3 +98,9 @@ class ImproveLoop:
         else:
             result.stopped_reason = "budget"
         return result
+
+    @staticmethod
+    def _score(value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+            raise ValueError("evaluator score must be a finite number")
+        return float(value)
