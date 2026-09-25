@@ -126,25 +126,25 @@ class CapabilityAuthorizer:
                 requires_user_action=True,
             )
 
-        # Read-only/no-effect capabilities may be selected by deterministic
-        # routing without a grant, but declared scopes are still enforced.
-        grant_required = descriptor.side_effect not in {
+        # Pure public/read-only capabilities with no declared scopes can be
+        # selected by routing alone. Any scoped capability, and every write,
+        # requires an explicit request-bound grant.
+        grant_required = bool(descriptor.required_scopes) or descriptor.side_effect not in {
             SideEffectClass.NONE,
             SideEffectClass.READ_ONLY,
         }
-        if grant_required and missing:
+        if grant_required and not matching:
             return CapabilityDecision(
                 allowed=False,
                 capability_id=descriptor.capability_id,
                 reason_code="missing-request-bound-grant",
                 missing_scopes=missing,
             )
-
-        if not grant_required and matching and missing:
+        if missing:
             return CapabilityDecision(
                 allowed=False,
                 capability_id=descriptor.capability_id,
-                reason_code="partial-grant-scope-mismatch",
+                reason_code="grant-scope-mismatch",
                 missing_scopes=missing,
             )
 
