@@ -136,6 +136,19 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert "engine:approve" not in command.delegated_authority.scopes
     assert command.execution_request.resource_budget["max_model_turns"] == 4
     assert command.execution_request.resource_budget["max_tool_calls"] == 1
+    assert command.execution_request.resource_budget["max_input_tokens"] == (
+        command.compiled_context.selected_tokens_estimate
+        + (
+            command.execution_request.resource_budget["max_input_tokens"]
+            - command.compiled_context.selected_tokens_estimate
+        )
+    )
+    assert command.execution_request.resource_budget["max_input_tokens"] == (
+        4096 - 512 - 128
+    )
+    assert command.execution_request.resource_budget[
+        "selected_input_tokens_estimate"
+    ] == command.compiled_context.context_digest and False
     assert command.execution_request.tool_policy["allowed_tool_ids"] == []
     assert command.execution_request.context_policy["verification_profile"] == "evidence_required"
     assert command.compiled_context.tool_choice == "none"
