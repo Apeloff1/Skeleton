@@ -36,27 +36,25 @@ class FeatureExtractor:
         - length_ratio: Document length relative to query
         - position: Average position of query terms in document
         """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+        if not isinstance(document, str):
+            raise ValueError("document is required")
         query_terms = set(query.lower().split())
         doc_terms = document.lower().split()
         doc_set = set(doc_terms)
 
-        # Term overlap (Jaccard)
         if query_terms and doc_set:
             overlap = len(query_terms & doc_set) / len(query_terms | doc_set)
         else:
             overlap = 0.0
 
-        # Phrase matches
         phrase_count = sum(1 for i in range(len(doc_terms))
                           if " ".join(doc_terms[i:i+len(query_terms)]) == query.lower())
 
-        # Length ratio (prefer medium-length documents)
         query_len = len(query_terms)
         doc_len = len(doc_terms)
-        if query_len > 0:
-            length_ratio = min(doc_len / query_len, 5.0) / 5.0  # Normalize, cap at 5x
-        else:
-            length_ratio = 0.5
+        length_ratio = min(doc_len / query_len, 5.0) / 5.0
 
         # Position feature (earlier is better)
         positions = []
