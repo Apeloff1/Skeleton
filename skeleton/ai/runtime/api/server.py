@@ -74,6 +74,9 @@ class ServerState:
         self.intelligence: Optional[Any] = None
         self.intelligence_core: Optional[Any] = None
         self.operation_runtime: Optional[Any] = None
+        self.engine_execution_service: Optional[Any] = None
+        self.engine_execution_coordinator: Optional[Any] = None
+        self.engine_tool_receipt_store: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
@@ -229,6 +232,106 @@ class ServerState:
         self.operation_runtime = None
         self.intelligence = self.intelligence_core
 
+    def bind_engine_execution_service(self) -> Any:
+        """Bind durable engine API authority and local execution coordinator."""
+
+        if self.engine_execution_service is not None:
+            return self.engine_execution_service
+
+        from pathlib import Path
+
+        from skeleton.api.engine_authority import (
+            EngineAuthorityRegistry,
+            EngineServiceGrant,
+        )
+        from skeleton.api.engine_runtime import EngineExecutionCoordinator
+        from skeleton.api.engine_service import (
+            EngineExecutionService,
+            SQLiteEngineSubmissionStore,
+        )
+        from skeleton.config.settings import get_settings
+        from skeleton.persistence.execution_repository import (
+            SQLiteExecutionRepository,
+        )
+        from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
+        from skeleton.skills.tool_runtime import AsyncToolRuntime
+
+        settings = get_settings().engine
+        for raw_path in (
+            settings.execution_state_path,
+            settings.submission_state_path,
+            settings.tool_receipt_path,
+        ):
+            if raw_path != ":memory:":
+                Path(raw_path).expanduser().parent.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+
+        repository = SQLiteExecutionRepository(
+            settings.execution_state_path
+        )
+        submissions = SQLiteEngineSubmissionStore(
+            settings.submission_state_path
+        )
+        authorities = EngineAuthorityRegistry(
+            [
+                EngineServiceGrant(
+                    service_principal=settings.service_principal,
+                    scopes=frozenset(
+                        {
+                            "engine:submit",
+                            "engine:read",
+                            "engine:cancel",
+                            "engine:events",
+                            "engine:approve",
+                        }
+                    ),
+                    tenant_ids=settings.allowed_tenants,
+                    capabilities=settings.allowed_capabilities,
+                )
+            ]
+        )
+        service = EngineExecutionService(
+            repository,
+            submissions,
+            authorities,
+        )
+        receipt_store = SQLiteToolReceiptStore(
+            settings.tool_receipt_path
+        )
+        coordinator = EngineExecutionCoordinator(
+            service,
+            tool_runtime=AsyncToolRuntime(
+                receipt_store=receipt_store,
+            ),
+        )
+        self.engine_execution_service = service
+        self.engine_execution_coordinator = coordinator
+        self.engine_tool_receipt_store = receipt_store
+        return service
+
+    async def recover_engine_executions(self) -> tuple[str, ...]:
+        coordinator = self.engine_execution_coordinator
+        if coordinator is None:
+            return ()
+        return await coordinator.recover()
+
+    async def close_engine_execution_service(self) -> None:
+        coordinator = self.engine_execution_coordinator
+        if coordinator is not None:
+            await coordinator.shutdown()
+        service = self.engine_execution_service
+        if service is not None:
+            service.repository.close()
+            service.submissions.close()
+        receipt_store = self.engine_tool_receipt_store
+        if receipt_store is not None:
+            receipt_store.close()
+        self.engine_execution_coordinator = None
+        self.engine_execution_service = None
+        self.engine_tool_receipt_store = None
+
     def wire_from_genesis(self, genesis: Any) -> None:
         self.genesis = genesis
         self.forge = genesis.handles.get("forge")
@@ -331,6 +434,7 @@ def create_app() -> Any:
     from skeleton.api.swarm_ingress_routes import router as swarm_ingress_router
     from skeleton.api.swarm_tenant_broker_routes import router as swarm_tenant_broker_router
     from skeleton.api.swarm_recovery_archive_routes import router as swarm_recovery_archive_router
+    from skeleton.api.engine_routes import router as engine_router
     app.include_router(router, prefix="/api/v1")
     app.include_router(gameforge_router, prefix="/api/v1")
     app.include_router(swarm_router, prefix="/api/v1")
@@ -345,6 +449,7 @@ def create_app() -> Any:
     app.include_router(swarm_ingress_router, prefix="/api/v1")
     app.include_router(swarm_tenant_broker_router, prefix="/api/v1")
     app.include_router(swarm_recovery_archive_router, prefix="/api/v1")
+    app.include_router(engine_router, prefix="/api/v1")
     app.include_router(cockpit_router)
 
     from skeleton.api.middleware import GatePolicy, install_gate
@@ -357,10 +462,13 @@ def create_app() -> Any:
         if state.genesis is None:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
+        state.bind_engine_execution_service()
+        await state.recover_engine_executions()
 
     @app.on_event("shutdown")
     async def shutdown():
         state = get_state()
+        await state.close_engine_execution_service()
         state.close_operation_runtime()
 
     @app.get("/")

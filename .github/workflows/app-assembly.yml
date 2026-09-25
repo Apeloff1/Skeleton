@@ -70,6 +70,10 @@ on:
       - "skeleton/persistence/memory_repository.py"
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/api/engine_authority.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/api/engine_routes.py"
       - "skeleton/memory/policy.py"
       - "skeleton/memory/writeback.py"
       - "skeleton/memory/projection.py"
@@ -85,6 +89,9 @@ on:
       - "skeleton/testing/test_memory_projection.py"
       - "skeleton/testing/test_execution_repository.py"
       - "skeleton/testing/test_execution_runtime.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_engine_routes.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
       - "backend/tests/test_operation_stream_transport.py"
@@ -370,6 +377,7 @@ jobs:
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py skeleton/persistence/execution_repository.py
           skeleton/intelligence/execution_runtime.py
+          skeleton/api/engine_authority.py skeleton/api/engine_service.py skeleton/api/engine_runtime.py skeleton/api/engine_routes.py
           skeleton/memory/policy.py skeleton/memory/writeback.py skeleton/memory/projection.py skeleton/memory/core.py skeleton/memory/vector.py
           skeleton/persistence/operation_runtime.py skeleton/config/settings.py skeleton/api/server.py
           skeleton/frontier/operation_stream.py skeleton/frontier/operation_stream_store.py
@@ -460,6 +468,9 @@ jobs:
           skeleton/testing/test_memory_projection.py
           skeleton/testing/test_execution_repository.py
           skeleton/testing/test_execution_runtime.py
+          skeleton/testing/test_engine_execution_service.py
+          skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_engine_routes.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_tool_runtime.py
           skeleton/testing/test_tool_receipt_store.py
