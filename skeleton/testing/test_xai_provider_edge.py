@@ -34,7 +34,8 @@ def _importer(name: str):
     return _FakeSDK
 
 
-def test_provider_credentials_are_ephemeral_client_inputs() -> None:
+def test_provider_credentials_are_ephemeral_client_inputs(monkeypatch) -> None:
+    monkeypatch.setenv("XAI_SDK_DISABLE_SENSITIVE_TELEMETRY_ATTRIBUTES", "1")
     config = XAIProviderConfig(model="grok-test")
     assert "api_key" not in config.__dataclass_fields__
 
@@ -45,14 +46,16 @@ def test_provider_credentials_are_ephemeral_client_inputs() -> None:
     assert client.init_kwargs["use_insecure_channel"] is False
 
 
-def test_server_side_tools_are_denied_by_default() -> None:
+def test_server_side_tools_are_denied_by_default(monkeypatch) -> None:
+    monkeypatch.setenv("XAI_SDK_DISABLE_SENSITIVE_TELEMETRY_ATTRIBUTES", "1")
     edge = XAIProviderEdge(XAIProviderConfig(model="grok-test"), importer=_importer)
     client = edge.create_client(api_key="secret")
     with pytest.raises(PermissionError, match="server-side tools are disabled"):
         edge.create_chat(client, tools=(object(),))
 
 
-def test_provider_chat_defaults_are_bounded_and_non_persistent() -> None:
+def test_provider_chat_defaults_are_bounded_and_non_persistent(monkeypatch) -> None:
+    monkeypatch.setenv("XAI_SDK_DISABLE_SENSITIVE_TELEMETRY_ATTRIBUTES", "true")
     config = XAIProviderConfig(
         model="grok-test",
         reasoning_effort="high",
