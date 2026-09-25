@@ -104,6 +104,34 @@ def test_provider_bootstrap_excludes_only_external_research_mirrors(tmp_path: Pa
     assert _is_non_runtime_provider_mirror(live) is False
 
 
+def test_provider_bootstrap_detects_aliased_credential_reads(tmp_path: Path) -> None:
+    cases = {
+        "backend/alias_os.py": (
+            "import os as operating_system\n"
+            "from openai import AsyncOpenAI\n"
+            "key = operating_system.getenv('OPENAI_API_KEY')\n"
+        ),
+        "backend/alias_getenv.py": (
+            "from os import getenv as read_env\n"
+            "from openai import AsyncOpenAI\n"
+            "key = read_env('OPENAI_API_KEY')\n"
+        ),
+        "backend/alias_environ.py": (
+            "from os import environ as environment\n"
+            "from openai import AsyncOpenAI\n"
+            "key = environment.get('OPENAI_API_KEY')\n"
+        ),
+    }
+    for relative, source in cases.items():
+        _write(tmp_path, relative, source)
+
+    discovered = discover_provider_surfaces(tmp_path)
+
+    for relative in cases:
+        assert relative in discovered
+        assert "credential" in discovered[relative]["edge_classes"]
+
+
 def test_external_research_mirror_is_not_a_runtime_provider_surface(tmp_path: Path) -> None:
     _write(
         tmp_path,
