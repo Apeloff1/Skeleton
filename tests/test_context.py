@@ -516,6 +516,19 @@ class TestBlend:
         trash = next(e for e in m["enemies"] if e["id"] == "trash")
         assert trash["hp"] == round(m["primary_dps"] * trash["ttk_target"], 1)
 
+    def test_jeeves_lazy_bind_accepts_compiled_blend_pack(self):
+        from skeleton.forge.eras import blend_eras
+        from skeleton.jeeves.core import Jeeves
+
+        pack = blend_eras("arcade_golden_age", "soulslike", 0.5)
+        jeeves = Jeeves()
+        bound = jeeves.bind_pack(pack)
+
+        assert bound["era"] == pack["era"]
+        assert jeeves.era == pack["era"]
+        assert jeeves._brain is not None
+        assert jeeves._brain.era == pack["era"]
+
     def test_pipeline_blend_run(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("", blend=("arcade_golden_age", "soulslike", 0.5))
