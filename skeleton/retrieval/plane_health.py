@@ -14,7 +14,7 @@ import math
 import time
 from dataclasses import dataclass
 from threading import RLock
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Iterable, Optional
 
 
 def _finite(name: str, value: Any) -> float:
@@ -212,20 +212,21 @@ class PlaneHealthTracker:
                 for plane, state in sorted(self._states.items())
             }
 
-    def cache_token(self) -> str:
+    def cache_token(self, planes: Iterable[str] = ()) -> str:
+        """Hash only ranking-relevant open/closed circuit topology."""
+        requested = tuple(sorted(set(planes)))
         with self._lock:
             now = self._clock()
+            names = sorted(set(requested) | set(self._states))
             rows = [
                 (
                     plane,
-                    state.is_open(now),
-                    state.open_until,
+                    self._states.get(plane, self._default(plane)).is_open(now),
                 )
-                for plane, state in sorted(self._states.items())
+                for plane in names
             ]
-            revision = self._revision
         encoded = json.dumps(
-            {"revision": revision, "circuits": rows},
+            {"circuits": rows},
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
