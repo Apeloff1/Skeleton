@@ -37,6 +37,16 @@ def test_materialise_json_emits_file_and_accepts(tmp_path):
     assert rows[-1]["accepted"] is True
 
 
+def test_materialise_json_accepts_short_data_identifier(tmp_path):
+    forge, bp = _bp(tmp_path, "etl")
+    out = forge.materialise(bp, target="json", repair=False)
+
+    assert out["verification"]["accepted"] is True
+    assert out["verification"]["score"] == 1.0
+    assert json.loads(out["files"]["etl.json"])["name"] == "etl"
+    assert out["verification"]["code_verdict"]["advisory"] is True
+
+
 def test_materialise_yaml_emits_file_and_accepts(tmp_path):
     forge, bp = _bp(tmp_path, "YamlAccept")
     out = forge.materialise(bp, target="yaml", repair=False)
