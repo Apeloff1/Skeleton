@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+
+import pytest
 from zipfile import ZipFile
 
 from core.gameforge_artifact_builder import build_source_artifact, build_web_artifact
@@ -205,4 +207,3 @@ def test_quota_rejection_does_not_replace_existing_artifact(tmp_path):
 
     assert final_path.read_bytes() == before
     assert list(tmp_path.glob("*.pending")) == []
-
