@@ -29,6 +29,82 @@ ExecutionEnabled = Callable[[], bool]
 DisabledResponse = Callable[[str], dict[str, Any]]
 
 
+
+
+@dataclass(slots=True)
+class AsyncVaultQueryAdapter:
+    """Own bounded read delegation to the compressed vault port."""
+
+    vault_port: Any
+    max_limit: int = 100
+
+    async def execute(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        topic = str(params.get("topic") or params.get("collection") or "")
+        try:
+            limit = int(params.get("limit", 10))
+        except (TypeError, ValueError) as exc:
+            raise ToolAdapterDenied("vault limit must be an integer") from exc
+        if limit < 1 or limit > self.max_limit:
+            raise ToolAdapterDenied("vault limit exceeds policy")
+        collection = params.get("collection")
+        contains = params.get("contains")
+        if collection:
+            collection_name = str(collection).strip()
+            if not collection_name or len(collection_name) > 128:
+                raise ToolAdapterDenied("vault collection is invalid")
+            if contains is not None and len(str(contains)) > 512:
+                raise ToolAdapterDenied("vault contains filter exceeds policy")
+            rows = await asyncio.to_thread(
+                self.vault_port.query_collection,
+                collection_name,
+                limit,
+                None if contains is None else str(contains),
+            )
+            return {
+                "collection": collection_name,
+                "rows": rows,
+                "count": len(rows),
+            }
+        if len(topic) > 512:
+            raise ToolAdapterDenied("vault topic exceeds policy")
+        matches = await asyncio.to_thread(
+            self.vault_port.query_topic,
+            topic,
+            limit,
+        )
+        return {"topic": topic, "matches": matches}
+
+
+@dataclass(slots=True)
+class AsyncJeevesConsultAdapter:
+    """Own bounded Jeeves knowledge/persona consultation delegation."""
+
+    consultant_port: Any
+    max_limit: int = 20
+
+    async def execute(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        context = str(params.get("context", "lesson")).strip()
+        topic = str(params.get("topic", "")).strip()
+        try:
+            limit = int(params.get("limit", 1))
+        except (TypeError, ValueError) as exc:
+            raise ToolAdapterDenied("Jeeves limit must be an integer") from exc
+        if not context or len(context) > 128:
+            raise ToolAdapterDenied("Jeeves context is invalid")
+        if len(topic) > 1024:
+            raise ToolAdapterDenied("Jeeves topic exceeds policy")
+        if limit < 1 or limit > self.max_limit:
+            raise ToolAdapterDenied("Jeeves limit exceeds policy")
+        result = await self.consultant_port.consult(
+            context,
+            topic=topic,
+            limit=limit,
+        )
+        if not isinstance(result, Mapping):
+            raise RuntimeError("Jeeves consultant returned a non-object result")
+        return dict(result)
+
+
 @dataclass(slots=True)
 class AsyncSandboxCompileAdapter:
     """Own bounded compiler subprocess execution behind sandbox policy."""
@@ -321,6 +397,8 @@ class AsyncArtifactPackageAdapter:
 __all__ = [
     "AsyncArtifactPackageAdapter",
     "AsyncDatabaseQueryAdapter",
+    "AsyncJeevesConsultAdapter",
     "AsyncNetworkSearchAdapter",
     "AsyncSandboxCompileAdapter",
+    "AsyncVaultQueryAdapter",
 ]
