@@ -73,6 +73,23 @@ def _walk_from_cortex(cortex: Any, era: str) -> Optional[Dict[str, Any]]:
     walk = thought.get("walk") if isinstance(thought, dict) else None
     if not isinstance(walk, dict):
         return None
+    # Cortex memory can contain pre-contract forge observations. Treat those as
+    # unavailable history instead of feeding an incomplete legacy receipt into
+    # the strict public adapt_from_walk validator. Explicit caller-supplied
+    # malformed walks still fail closed in adapt_from_walk.
+    extracted = walk.get("extracted")
+    collapsed = walk.get("collapsed")
+    t = walk.get("t")
+    fights = walk.get("fights")
+    hops = walk.get("hops")
+    if not isinstance(extracted, bool) or not isinstance(collapsed, bool):
+        return None
+    if isinstance(t, bool) or not isinstance(t, (int, float)) or float(t) < 0 or float(t) != float(t):
+        return None
+    if isinstance(fights, bool) or not isinstance(fights, int) or fights < 0:
+        return None
+    if isinstance(hops, bool) or not isinstance(hops, int) or hops < 0:
+        return None
     return walk
 
 
