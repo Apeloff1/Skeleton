@@ -396,7 +396,10 @@
         "backend/services/tool_registry.py explicit production manifest authority/risk/idempotency/network/data/cost metadata",
         "skeleton/intelligence/execution_runtime.py enabled-only minimal ProviderToolDefinition projection",
         "skeleton/testing/test_execution_runtime.py provider projection non-leak regression",
-        "skeleton/testing/test_tool_runtime.py manifest governance invariant regression set"
+        "skeleton/testing/test_tool_runtime.py manifest governance invariant regression set",
+        "skeleton/skills/tool_runtime.py AdmissionRuntime cost/tool-call reconciliation from manifest cost_model",
+        "skeleton/skills/tool_runtime.py per-tool max_concurrency semaphore enforcement",
+        "skeleton/testing/test_tool_runtime.py cost-before-effect and concurrency regressions"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
@@ -414,7 +417,6 @@
         "tool manifest schema validation/fuzz coverage against malformed nested schemas",
         "model-visible inventory proof that only admitted/enabled tools are projected",
         "bind governance classification/retention to durable tool results",
-        "bind cost/admission reconciliation across tool/artifact/storage usage",
         "exact-head App Assembly and provider-surface isolation evidence"
       ],
       "blockers": [
