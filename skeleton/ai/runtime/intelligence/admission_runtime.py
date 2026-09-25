@@ -19,6 +19,7 @@ import threading
 import time
 from typing import Any
 
+from skeleton.cognition.telemetry import MetricRegistry
 from skeleton.intelligence.admission import (
     AdmissionDecision,
     AdmissionError,
@@ -47,6 +48,40 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_USAGE_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cost_usd",
+    "wall_seconds",
+    "provider_attempts",
+    "tool_calls",
+    "artifact_bytes",
+)
+
+
+def _observe_usage(
+    metrics: MetricRegistry,
+    prefix: str,
+    usage: UsageEstimate,
+) -> None:
+    for field_name in _USAGE_FIELDS:
+        metrics.observe(
+            f"admission.{prefix}.{field_name}",
+            float(getattr(usage, field_name)),
+        )
+
+
+def _observe_usage_delta(
+    metrics: MetricRegistry,
+    estimated: UsageEstimate,
+    actual: UsageEstimate,
+) -> None:
+    for field_name in _USAGE_FIELDS:
+        metrics.observe(
+            f"admission.delta.{field_name}",
+            float(getattr(actual, field_name))
+            - float(getattr(estimated, field_name)),
+        )
 
 
 def _wall_time(value: float | None, *, field: str) -> float:
@@ -155,8 +190,10 @@ class AdmissionRuntime:
         self,
         *,
         quota_ledger: TenantQuotaLedger | None = None,
+        metrics_registry: MetricRegistry | None = None,
     ) -> None:
         self.quota_ledger = quota_ledger
+        self.metrics_registry = metrics_registry or MetricRegistry()
         self._lock = threading.RLock()
         self._active: dict[str, _ActiveLease] = {}
         self._queue_depth = 0
@@ -233,6 +270,12 @@ class AdmissionRuntime:
                 decision=decision,
                 quota_reservation=reservation,
                 admitted_at=wall,
+            )
+            self.metrics_registry.inc("admission.admitted_total")
+            _observe_usage(
+                self.metrics_registry,
+                "estimated",
+                decision.estimated,
             )
             self._active[request.operation_id] = _ActiveLease(
                 lease=lease,
@@ -562,6 +605,17 @@ class AdmissionRuntime:
                         "quota_completion_unavailable"
                     ) from exc
 
+            self.metrics_registry.inc("admission.completed_total")
+            _observe_usage(
+                self.metrics_registry,
+                "actual",
+                actual,
+            )
+            _observe_usage_delta(
+                self.metrics_registry,
+                active.lease.decision.estimated,
+                actual,
+            )
             self._active.pop(operation)
             return AdmissionCompletion(
                 lease=active.lease,
@@ -593,6 +647,15 @@ class AdmissionRuntime:
                 self.quota_ledger.release(reservation.reservation_id)
             self._active.pop(operation)
             return active.lease
+
+    def telemetry_snapshot(self) -> dict[str, Any]:
+        """Return aggregate resource telemetry without operation or tenant IDs."""
+
+        with self._lock:
+            return {
+                "schema_version": 1,
+                "metrics": self.metrics_registry.snapshot(),
+            }
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
