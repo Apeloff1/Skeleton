@@ -231,6 +231,8 @@ class GovernedToolSurface:
         raw_hits = payload.get("results", [])
         if not isinstance(raw_hits, list):
             raise ToolRuntimeError("network port must return a result list")
+        if len(raw_hits) > self.network_policy.max_results * 4:
+            raise ToolRuntimeError("network port exceeded the result bound")
         hits = []
         for item in raw_hits:
             if not isinstance(item, Mapping):
@@ -249,6 +251,8 @@ class GovernedToolSurface:
         exit_code = payload.get("exit_code", 0)
         if not isinstance(stdout, str) or isinstance(exit_code, bool) or not isinstance(exit_code, int):
             raise ToolRuntimeError("sandbox port returned an invalid result")
+        if exit_code != 0:
+            raise ToolRuntimeError("sandbox compile failed")
         if len(stdout.encode("utf-8")) > int(normalized["max_output_bytes"]):
             raise ToolRuntimeError("sandbox output exceeds the resource bound")
         return self._store(
@@ -263,6 +267,8 @@ class GovernedToolSurface:
         size = payload.get("bytes")
         if not artifact_id or isinstance(size, bool) or not isinstance(size, int):
             raise ToolRuntimeError("artifact port returned an invalid result")
+        if artifact_id != normalized["build_id"]:
+            raise ToolRuntimeError("artifact port returned a different build")
         if size < 0 or size > int(normalized["max_output_bytes"]):
             raise ToolRuntimeError("artifact port exceeded the size bound")
         return self._store(

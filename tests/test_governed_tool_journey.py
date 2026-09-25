@@ -202,3 +202,65 @@ def test_unprojected_query_never_reads_the_row() -> None:
     assert surface.calls == []
     assert result.disposition == "block"
     assert result.error_code == "ToolAdapterDenied"
+
+
+def test_credential_query_urls_are_not_quotable() -> None:
+    runtime, surface = _surface()
+
+    def network(request):
+        return {
+            "results": [
+                {
+                    "title": "Docs",
+                    "url": "https://example.com/docs?access_token=sekret#frag",
+                    "snippet": "token page",
+                },
+                {
+                    "title": "Docs",
+                    "url": "https://example.com/guide#section",
+                    "snippet": "public guide page",
+                },
+            ]
+        }
+
+    surface.network = network
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(
+        _request("network.search", {"query": "docs"}),
+        "Token page. Public guide page.",
+    )
+    excerpts = " ".join(citation.excerpt for citation in result.citations)
+    stored = next(iter(surface.results.values()))
+    urls = [hit["url"] for hit in stored["hits"]]
+    assert "sekret" not in excerpts
+    assert "token page" not in excerpts
+    assert urls == ["https://example.com/guide"]
+    assert result.disposition == "qualified"
+
+
+def test_failed_compile_is_not_quotable() -> None:
+    runtime, surface = _surface()
+    surface.sandbox = lambda request: {"stdout": "secret compile log", "exit_code": 1}
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(
+        _request("sandbox.compile", {"language": "c", "code": "int main(){return 1;}"}),
+        "Secret compile log.",
+    )
+    assert surface.calls
+    assert surface.results == {}
+    assert result.disposition == "block"
+    assert result.error_code == "ToolRuntimeError"
+
+
+def test_artifact_port_cannot_relabel_the_build() -> None:
+    runtime, surface = _surface()
+    surface.artifacts = lambda request: {"artifact_id": "other-build", "bytes": 128}
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(
+        _request("artifact.package", {"build_id": "build-1", "kinds": ["zip"]}),
+        "Packaged build-1.",
+    )
+    assert surface.calls
+    assert surface.results == {}
+    assert result.disposition == "block"
+    assert result.error_code == "ToolRuntimeError"
