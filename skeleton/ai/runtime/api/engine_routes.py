@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from datetime import datetime
+import hmac
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -19,6 +22,12 @@ from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
 )
+from skeleton.provider_runtime import (
+    ProviderError,
+    ProviderImageRequest,
+    ProviderSpeechRequest,
+    ProviderUnavailableError,
+)
 
 
 router = APIRouter(prefix="/engine", tags=["engine"])
@@ -34,6 +43,48 @@ class EngineCancelBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
     reason: str = Field(min_length=1, max_length=2048)
+
+
+class EngineImageGenerateBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    operation_id: str = Field(min_length=1, max_length=512)
+    prompt: str = Field(min_length=1, max_length=16_384)
+    size: str = Field(default="1024x1024", min_length=3, max_length=64)
+    quality: str = Field(default="standard", min_length=1, max_length=64)
+    count: int = Field(default=1, ge=1, le=4)
+
+
+class EngineImageVariationBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    operation_id: str = Field(min_length=1, max_length=512)
+    image_base64: str = Field(min_length=1, max_length=32 * 1024 * 1024)
+    count: int = Field(default=1, ge=1, le=4)
+    size: str = Field(default="1024x1024", min_length=3, max_length=64)
+
+
+class EngineImageEditBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    operation_id: str = Field(min_length=1, max_length=512)
+    image_base64: str = Field(min_length=1, max_length=32 * 1024 * 1024)
+    mask_base64: str | None = Field(
+        default=None,
+        max_length=32 * 1024 * 1024,
+    )
+    prompt: str = Field(min_length=1, max_length=16_384)
+    size: str = Field(default="1024x1024", min_length=3, max_length=64)
+
+
+class EngineSpeechBody(BaseModel):
+    actor_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    operation_id: str = Field(min_length=1, max_length=512)
+    text: str = Field(min_length=1, max_length=16_384)
+    voice: str = Field(default="nova", min_length=1, max_length=128)
+    speed: float = Field(default=1.0, ge=0.25, le=4.0)
+    response_format: str = Field(default="mp3", min_length=2, max_length=16)
 
 
 class EngineToolApprovalBody(BaseModel):
@@ -68,7 +119,34 @@ def _engine_coordinator():
     return getattr(get_state(), "engine_execution_coordinator", None)
 
 
-def _verified_service_principal(request: Request) -> str:
+def _engine_service_token() -> str:
+    from skeleton.config.settings import get_settings
+
+    token = get_settings().engine.service_token.get_secret_value()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine service authentication is not configured",
+        )
+    return token
+
+
+def _verified_service_principal(
+    request: Request,
+    expected_token: str,
+) -> str:
+    authorization = request.headers.get("authorization", "")
+    scheme, separator, presented = authorization.partition(" ")
+    if (
+        not separator
+        or scheme.lower() != "bearer"
+        or not presented
+        or not hmac.compare_digest(presented, expected_token)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="engine service authentication failed",
+        )
     principal = request.headers.get("x-zaibatsu-attester")
     if not principal:
         raise HTTPException(
@@ -76,6 +154,68 @@ def _verified_service_principal(request: Request) -> str:
             detail="verified service principal required",
         )
     return principal
+
+
+def _authorize_media(
+    service: EngineExecutionService,
+    *,
+    principal: str,
+    tenant_id: str,
+    capability: str,
+) -> None:
+    try:
+        grant = service.authorities.grant_for(principal)
+    except EngineAuthorityError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine media authority denied",
+        ) from exc
+    if "engine:media" not in grant.scopes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine media scope denied",
+        )
+    if not grant.allows_tenant(tenant_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine media tenant denied",
+        )
+    if not grant.allows_capability(capability):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="engine media capability denied",
+        )
+
+
+def _media_adapter(coordinator):
+    if coordinator is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine media runtime unavailable",
+        )
+    try:
+        return coordinator.provider_registry.require_active()
+    except ProviderUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine media provider unavailable",
+        ) from exc
+
+
+def _decode_media(raw: str, field: str, *, maximum: int = 20 * 1024 * 1024) -> bytes:
+    try:
+        decoded = base64.b64decode(raw, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=field + " is invalid base64",
+        ) from exc
+    if not decoded or len(decoded) > maximum:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=field + " exceeds media size bound",
+        )
+    return decoded
 
 
 def _raise_engine_error(exc: Exception) -> None:
@@ -115,9 +255,10 @@ async def submit_execution(
     body: EngineSubmitBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
     coordinator=Depends(_engine_coordinator),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         command = EngineExecutionCommand.from_dict(body.command)
         ack = service.submit(
@@ -141,8 +282,9 @@ def execution_status(
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         return service.status(
             execution_id,
@@ -161,8 +303,9 @@ def cancel_execution(
     body: EngineCancelBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         return service.cancel(
             execution_id,
@@ -182,8 +325,9 @@ def pending_tool_approvals(
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         pending = service.pending_tool_approvals(
             execution_id,
@@ -209,9 +353,10 @@ async def approve_tool_call(
     body: EngineToolApprovalBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
     coordinator=Depends(_engine_coordinator),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         approval = service.approve_tool_call(
             execution_id,
@@ -232,6 +377,194 @@ async def approve_tool_call(
     return approval.as_dict()
 
 
+@router.post("/media/images/generate")
+async def generate_engine_image(
+    body: EngineImageGenerateBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    _authorize_media(
+        service,
+        principal=principal,
+        tenant_id=body.tenant_id,
+        capability="media.image",
+    )
+    adapter = _media_adapter(coordinator)
+    try:
+        result = await adapter.generate_image(
+            ProviderImageRequest(
+                prompt=body.prompt,
+                size=body.size,
+                quality=body.quality,
+                count=body.count,
+                model="gpt-image-1",
+                tenant_id=body.tenant_id,
+                operation_id=body.operation_id,
+                purpose="image-generation",
+            )
+        )
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine image generation failed",
+        ) from exc
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "images": [dict(item) for item in result.images],
+        "request_id": result.request_id,
+        "latency_ms": result.latency_ms,
+        "governance_decision_id": result.governance_decision_id,
+        "admission_decision_id": result.admission_decision_id,
+        "data_class": result.data_class,
+    }
+
+
+@router.post("/media/images/variation")
+async def vary_engine_image(
+    body: EngineImageVariationBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    _authorize_media(
+        service,
+        principal=principal,
+        tenant_id=body.tenant_id,
+        capability="media.image",
+    )
+    adapter = _media_adapter(coordinator)
+    image = _decode_media(body.image_base64, "image_base64")
+    try:
+        result = await adapter.create_image_variation(
+            image,
+            count=body.count,
+            size=body.size,
+            tenant_id=body.tenant_id,
+            operation_id=body.operation_id,
+        )
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine image variation failed",
+        ) from exc
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "images": [dict(item) for item in result.images],
+        "request_id": result.request_id,
+        "latency_ms": result.latency_ms,
+        "governance_decision_id": result.governance_decision_id,
+        "admission_decision_id": result.admission_decision_id,
+        "data_class": result.data_class,
+    }
+
+
+@router.post("/media/images/edit")
+async def edit_engine_image(
+    body: EngineImageEditBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    _authorize_media(
+        service,
+        principal=principal,
+        tenant_id=body.tenant_id,
+        capability="media.image",
+    )
+    adapter = _media_adapter(coordinator)
+    image = _decode_media(body.image_base64, "image_base64")
+    mask = (
+        None
+        if body.mask_base64 is None
+        else _decode_media(body.mask_base64, "mask_base64")
+    )
+    try:
+        result = await adapter.edit_image(
+            image,
+            prompt=body.prompt,
+            mask=mask,
+            size=body.size,
+            tenant_id=body.tenant_id,
+            operation_id=body.operation_id,
+        )
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine image edit failed",
+        ) from exc
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "images": [dict(item) for item in result.images],
+        "request_id": result.request_id,
+        "latency_ms": result.latency_ms,
+        "governance_decision_id": result.governance_decision_id,
+        "admission_decision_id": result.admission_decision_id,
+        "data_class": result.data_class,
+    }
+
+
+@router.post("/media/speech")
+async def synthesize_engine_speech(
+    body: EngineSpeechBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+    coordinator=Depends(_engine_coordinator),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    _authorize_media(
+        service,
+        principal=principal,
+        tenant_id=body.tenant_id,
+        capability="media.speech",
+    )
+    adapter = _media_adapter(coordinator)
+    try:
+        result = await adapter.synthesize_speech(
+            ProviderSpeechRequest(
+                text=body.text,
+                voice=body.voice,
+                speed=body.speed,
+                model="tts-1-hd",
+                response_format=body.response_format,
+                tenant_id=body.tenant_id,
+                operation_id=body.operation_id,
+                purpose="expressive-speech-synthesis",
+            )
+        )
+    except ProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine speech synthesis failed",
+        ) from exc
+    if len(result.audio) > 24 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="engine speech result exceeds size bound",
+        )
+    return {
+        "provider": result.provider,
+        "model": result.model,
+        "response_format": result.response_format,
+        "audio_base64": base64.b64encode(result.audio).decode("ascii"),
+        "request_id": result.request_id,
+        "latency_ms": result.latency_ms,
+        "governance_decision_id": result.governance_decision_id,
+        "admission_decision_id": result.admission_decision_id,
+        "data_class": result.data_class,
+    }
+
+
 @router.get("/executions/{execution_id}/events")
 def execution_events(
     execution_id: str,
@@ -239,8 +572,9 @@ def execution_events(
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         return service.events(
             execution_id,
@@ -253,4 +587,9 @@ def execution_events(
         raise
 
 
-__all__ = ["router", "_engine_coordinator", "_engine_service"]
+__all__ = [
+    "router",
+    "_engine_coordinator",
+    "_engine_service",
+    "_engine_service_token",
+]

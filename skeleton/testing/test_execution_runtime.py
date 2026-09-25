@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 import hashlib
 from uuid import uuid4
@@ -35,6 +36,7 @@ def _request(
     allowed_tools=(),
     stop_policy=None,
     budget=None,
+    context_policy=None,
 ) -> AIExecutionRequest:
     return AIExecutionRequest(
         operation_id=str(uuid4()),
@@ -43,6 +45,7 @@ def _request(
         context_policy={
             "tenant_id": "tenant-a",
             "data_class": "internal",
+            **(context_policy or {}),
         },
         tool_policy={
             "tenant_id": "tenant-a",
@@ -520,6 +523,65 @@ async def test_cancellation_while_waiting_for_approval_finalizes_without_effect(
 
 
 @pytest.mark.asyncio
+async def test_cancellation_during_provider_io_fences_late_result() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    class GateProvider:
+        provider_id = "fake"
+        model = "fake-model"
+
+        def __init__(self) -> None:
+            self.requests = []
+
+        async def generate(self, request):
+            self.requests.append(request)
+            started.set()
+            await release.wait()
+            return _text_response(
+                "must-not-become-final-output",
+                response_id="resp-late-cancel",
+            )
+
+    provider = GateProvider()
+    runtime = _runtime(repo, provider, tools)
+    task = asyncio.create_task(
+        runtime.start(
+            _request(),
+            instructions="Answer.",
+            prompt="Wait for cancellation.",
+            context_digest="c" * 64,
+            now=_now(),
+        )
+    )
+
+    await started.wait()
+    current = repo.get("exec-1")
+    repo.request_cancel(
+        "exec-1",
+        expected_version=current.version,
+        now=_now(),
+    )
+    release.set()
+    result = await task
+
+    assert result.state is ExecutionState.CANCELLED
+    assert result.result is not None
+    assert result.result.status == "cancelled"
+    assert result.result.final_output is None
+    assert result.result.usage["error_code"] == "cancellation_requested"
+    assert result.result.provider_receipts == (
+        "provider:fake:resp-late-cancel",
+    )
+    assert result.result.usage["provider_usage"][0]["total_tokens"] == 15
+    checkpoint = repo.latest_checkpoint("exec-1")
+    assert checkpoint is not None
+    assert checkpoint.payload["last_provider"]["late_result_fenced"] is True
+
+
+@pytest.mark.asyncio
 async def test_expired_deadline_fails_before_provider_io() -> None:
     repo = SQLiteExecutionRepository()
     tools = AsyncToolRuntime()
@@ -599,6 +661,94 @@ async def test_default_verification_fails_closed_without_external_evidence() -> 
     assert result.result.verification_receipt["outcome"] == "unknown"
     assert result.result.verification_receipt["policy_satisfied"] is False
     assert "authoritative_support_missing" in result.result.verification_receipt["issues"]
+
+
+@pytest.mark.asyncio
+async def test_assistant_proposal_verification_completes_without_external_evidence() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider([_text_response("proposal", response_id="resp-proposal")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    result = await runtime.start(
+        _request(
+            context_policy={
+                "capability": "assistant.compat",
+                "verification_profile": "assistant_proposal",
+            }
+        ),
+        instructions="Offer a bounded proposal.",
+        prompt="Suggest a refactor.",
+        context_digest="a" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.state is ExecutionState.COMPLETED
+    assert result.result is not None
+    assert result.result.status == "completed"
+    assert result.result.final_output == "proposal"
+    assert result.result.evidence_refs == ()
+    receipt = result.result.verification_receipt
+    assert receipt["verification_profile"] == "assistant_proposal"
+    assert receipt["claim_kind"] == "hypothesis"
+    assert receipt["risk"] == "low"
+    assert receipt["outcome"] == "passed"
+    assert receipt["policy_satisfied"] is True
+    assert receipt["policy"]["level"] == 0
+    assert receipt["policy"]["required_modes"] == ["structural"]
+
+
+@pytest.mark.asyncio
+async def test_assistant_proposal_profile_rejects_tool_enabled_execution() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    await tools.register(_manifest(), lambda _request: {"ok": True})
+    provider = FakeProvider([_text_response("unsafe proposal", response_id="resp-tool-profile")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    with pytest.raises(
+        CognitiveExecutionError,
+        match="tool-free execution",
+    ):
+        await runtime.start(
+            _request(
+                allowed_tools=("repo.read",),
+                context_policy={
+                    "capability": "assistant.compat",
+                    "verification_profile": "assistant_proposal",
+                },
+            ),
+            instructions="Answer.",
+            prompt="Do not call tools.",
+            context_digest="b" * 64,
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_assistant_proposal_profile_rejects_non_assistant_capability() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider([_text_response("proposal", response_id="resp-wrong-cap")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    with pytest.raises(
+        CognitiveExecutionError,
+        match="assistant capability",
+    ):
+        await runtime.start(
+            _request(
+                context_policy={
+                    "capability": "admin.execute",
+                    "verification_profile": "assistant_proposal",
+                }
+            ),
+            instructions="Answer.",
+            prompt="Do something.",
+            context_digest="c" * 64,
+            now=_now(),
+        )
 
 
 def test_verification_adapter_rejects_bare_pass_without_external_evidence() -> None:

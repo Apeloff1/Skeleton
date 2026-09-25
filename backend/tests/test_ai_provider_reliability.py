@@ -14,6 +14,7 @@ from core.ai_provider import (
     ProviderUnavailableError,
 )
 from core.provider_architecture import ProviderArchitectureReceipt
+from core.engine_client import EngineClientConfig, EngineUnavailableError
 from routes import ai as ai_routes
 
 
@@ -146,27 +147,29 @@ def test_invalid_custom_base_url_marks_provider_unavailable(monkeypatch) -> None
     assert adapter.available is False
 
 
-def test_route_boundary_hides_provider_failure_details(monkeypatch, caplog) -> None:
-    registry = ProviderRegistry(
-        [_FailingAdapter()],
-        active="chaos",
-        architecture_loader=lambda provider_id: ProviderArchitectureReceipt(
-            provider_id=provider_id,
-            architecture_tag="arch-map/test",
-            construction_version="test",
-            contract_digest="0" * 64,
-            manual_path="docs/AI_APP_CONSTRUCTION_MANUAL.md",
-            required_documents=("machine/architecture.json",),
-        ),
+def test_route_boundary_hides_engine_failure_details(monkeypatch, caplog) -> None:
+    class _FailingEngine:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, _command):
+            raise EngineUnavailableError("upstream-token=do-not-leak")
+
+    failing = _FailingEngine()
+    monkeypatch.setattr(
+        ai_routes.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: failing),
     )
-    monkeypatch.setattr(ai_routes, "AI_REGISTRY", registry)
 
     result = asyncio.run(ai_routes.call_llm("rules", "hello"))
 
     assert result == {
         "success": False,
-        "error": "AI provider is unavailable",
-        "error_code": "provider_unavailable",
+        "error": "AI engine is unavailable",
+        "error_code": "engine_unavailable",
     }
     assert "upstream-token=do-not-leak" not in caplog.text
-    assert "ProviderInvocationError" in caplog.text
+    assert "AI engine is unavailable" in caplog.text

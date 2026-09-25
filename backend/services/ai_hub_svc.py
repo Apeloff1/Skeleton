@@ -1,27 +1,23 @@
-"""AIHub service routed through the canonical model-provider boundary.
+"""AIHub service routed through the canonical Skeleton engine boundary.
 
-This module preserves the historical AIHub API while eliminating its former
-"universal key" and provider-specific execution assumptions. Runtime model I/O
-must pass through :class:`core.ai_provider.ProviderRegistry`, which in turn
-requires a valid architecture/construction receipt before any provider can
-activate.
-
-Provider names retained in the legacy enum are descriptive compatibility values,
-not declarations of runtime support. Only providers declared in
-`machine/ai_app_construction.json` may report as available.
+The historical AIHub API is preserved, but runtime model I/O is delegated
+through the backend engine-text adapter. Legacy provider enum values remain
+descriptive compatibility labels only and cannot select credentials or models.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import re
 from typing import Any, List
 
-from core.ai_provider import (
-    ProviderError,
-    ProviderRegistry,
-    ProviderRequest,
+from core.engine_client import EngineClient, EngineClientError
+from core.engine_text import (
+    EngineTextError,
+    EngineTextRequest,
+    execute_engine_text,
 )
 
 
@@ -34,57 +30,67 @@ def _llm_provider_enum():
 
 
 class AIHubService:
-    """AI planning/suggestion hub backed by the canonical provider registry."""
+    """AI planning/suggestion hub backed by the canonical engine."""
 
-    def __init__(self, *, registry: ProviderRegistry | None = None) -> None:
-        self._registry = registry or ProviderRegistry.from_env()
+    def __init__(
+        self,
+        *,
+        registry: object | None = None,
+        engine_executor=None,
+    ) -> None:
+        if registry is not None:
+            raise ValueError(
+                "local provider registry injection is disabled; use the canonical engine"
+            )
+        self._engine_executor = engine_executor or execute_engine_text
         self.providers = self._provider_snapshot()
 
     @property
     def api_key(self) -> str:
         """Legacy compatibility flag without returning secret material."""
 
-        return "configured" if self._registry.available else ""
+        return "configured" if self.available else ""
 
     @property
     def available(self) -> bool:
-        return self._registry.available
+        try:
+            return EngineClient.from_env() is not None
+        except EngineClientError:
+            return False
 
     def _provider_snapshot(self) -> dict[Any, dict[str, Any]]:
         LLMProvider = _llm_provider_enum()
-        statuses = {
-            row["id"]: row
-            for row in self._registry.statuses()
-            if isinstance(row, dict) and isinstance(row.get("id"), str)
-        }
-        active = self._registry.active
-        active_model = active.model if active is not None else "unavailable"
 
-        def row(provider_id: str, model: str) -> dict[str, Any]:
-            status = statuses.get(provider_id)
+        def legacy_row() -> dict[str, Any]:
             return {
-                "model": model,
-                "available": bool(status and status.get("available")),
-                "declared": status is not None,
-                "architecture_acknowledged": bool(
-                    status and status.get("architecture_acknowledged")
-                ),
+                "model": "engine-routed",
+                "available": False,
+                "declared": False,
+                "architecture_acknowledged": False,
             }
 
         return {
-            LLMProvider.OPENAI: row("openai", active_model),
-            LLMProvider.ANTHROPIC: row("anthropic", "undeclared"),
-            LLMProvider.GOOGLE: row("google", "undeclared"),
-            LLMProvider.GROK: row("grok", "undeclared"),
+            LLMProvider.OPENAI: legacy_row(),
+            LLMProvider.ANTHROPIC: legacy_row(),
+            LLMProvider.GOOGLE: legacy_row(),
+            LLMProvider.GROK: legacy_row(),
         }
 
     def provider_status(self) -> dict[str, Any]:
-        """Return non-secret provider readiness and receipt metadata."""
+        """Return non-secret engine readiness and ownership metadata."""
 
+        available = self.available
         return {
-            "active": self._registry.active_id,
-            "available": self._registry.available,
-            "providers": self._registry.statuses(),
+            "active": "skeleton-engine" if available else None,
+            "available": available,
+            "providers": [
+                {
+                    "id": "skeleton-engine",
+                    "model": "engine-routed",
+                    "available": available,
+                    "ownership": "engine-process",
+                }
+            ],
         }
 
     async def _generate(
@@ -93,12 +99,29 @@ class AIHubService:
         instructions: str,
         prompt: str,
         max_output_tokens: int | None = None,
+        verification_profile: str = "assistant_proposal",
     ) -> str:
-        adapter = self._registry.require_active()
-        response = await adapter.generate(
-            ProviderRequest(
+        material = json.dumps(
+            {
+                "instructions": instructions,
+                "prompt": prompt,
+                "max_output_tokens": max_output_tokens,
+                "verification_profile": verification_profile,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        response = await self._engine_executor(
+            EngineTextRequest(
                 instructions=instructions,
                 prompt=prompt,
+                idempotency_key=(
+                    "ai-hub:" + hashlib.sha256(material).hexdigest()
+                ),
+                actor_id="ai-hub",
+                capability="assistant.compat",
+                verification_profile=verification_profile,
                 max_output_tokens=max_output_tokens,
             )
         )
@@ -140,7 +163,7 @@ class AIHubService:
                 prompt=prompt,
                 max_output_tokens=1800,
             )
-        except ProviderError:
+        except EngineTextError:
             return self._get_default_suggestions()
 
         parsed = self._extract_json_array(response)
@@ -209,19 +232,20 @@ class AIHubService:
                 instructions=instructions,
                 prompt=prompt,
                 max_output_tokens=2200,
+                verification_profile="evidence_required",
             )
-        except ProviderError:
+        except EngineTextError:
             return {
                 "status": "offline",
                 "domain": domain,
-                "message": "provider_unavailable",
+                "message": "engine_unavailable",
             }
 
         return {
             "status": "success",
             "domain": domain,
             "analysis": response,
-            "provider": self._registry.active_id,
+            "provider": "skeleton-engine",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -247,8 +271,8 @@ class AIHubService:
                 prompt=prompt,
                 max_output_tokens=2600,
             )
-        except ProviderError:
-            return {"status": "offline", "message": "provider_unavailable"}
+        except EngineTextError:
+            return {"status": "offline", "message": "engine_unavailable"}
 
         return {
             "status": "success",
@@ -257,7 +281,7 @@ class AIHubService:
             "estimated_complexity": feature_spec.get(
                 "implementation_difficulty", "medium"
             ),
-            "provider": self._registry.active_id,
+            "provider": "skeleton-engine",
         }
 
 

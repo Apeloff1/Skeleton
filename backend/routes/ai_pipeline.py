@@ -11,6 +11,7 @@
 
 from datetime import datetime
 from enum import Enum
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
@@ -20,7 +21,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
+from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 
 
 ROOT_DIR = Path(__file__).parent.parent
@@ -104,26 +105,36 @@ async def call_gpt4o(
     system_prompt: str | None = None,
     max_tokens: int = 4096,
 ) -> str:
-    """Generate text through the declared provider runtime."""
+    """Generate text through the canonical Skeleton engine boundary."""
+
+    default_system = (
+        "You are an expert programmer and software architect. Provide helpful, "
+        "accurate, and well-documented code and explanations."
+    )
+    instructions = system_prompt or default_system
+    material = hashlib.sha256(
+        (instructions + "\n" + prompt).encode("utf-8")
+    ).hexdigest()
     try:
-        default_system = (
-            "You are an expert programmer and software architect. Provide helpful, "
-            "accurate, and well-documented code and explanations."
-        )
-        adapter = ProviderRegistry.from_env().require_active()
-        response = await adapter.generate(
-            ProviderRequest(
-                instructions=system_prompt or default_system,
+        response = await execute_engine_text(
+            EngineTextRequest(
+                instructions=instructions,
                 prompt=prompt,
+                idempotency_key="ai-pipeline:" + material,
+                actor_id="ai-pipeline",
+                capability="assistant.compat",
+                verification_profile="assistant_proposal",
                 max_output_tokens=max_tokens,
-                model="gpt-4o" if adapter.provider_id == "openai" else None,
                 purpose="ai-pipeline-text-generation",
             )
         )
         return response.text
-    except ProviderError as exc:
-        log.warning("AI pipeline text provider failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="AI text generation failed") from None
+    except EngineTextError as exc:
+        log.warning("AI pipeline text engine failed: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=503,
+            detail="AI text generation failed",
+        ) from None
 
 
 async def generate_image_openai(prompt: str, size: str = "1024x1024") -> Dict[str, Any]:
