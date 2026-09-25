@@ -1915,7 +1915,7 @@
       "plane": "engine-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Phase-1 engine endpoints and phase-2 backend chat delegation are materialized. Phase-3 process isolation is prepared but intentionally gated: active backend ProviderRegistry consumers still exist, so backend runtime-model credentials must remain available until parity is complete. The remaining gap is migration of those consumers, then credential removal, cross-service cancellation/retry proof, and golden-journey closure.",
+      "gap": "Backend text execution now delegates through the authenticated Skeleton engine boundary, including AI assist/chat, compatibility chat, AI hub, game LLM, LAFS grounded text, and the legacy LLM router. The backend still has two intentional local ProviderRegistry media consumers (image generation and expressive TTS), so runtime-model credentials remain transitional until those media paths gain engine parity. Remaining closure work is media cutover, credential removal, deployed cross-service denial/retry/cancel proof, and the golden journey.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -5979,20 +5979,18 @@
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
-        "ships product/application API plus Skeleton compatibility code",
-        "delegates configured product chat execution through backend/core/engine_client.py to the canonical engine API",
-        "still contains active local ProviderRegistry consumers outside the canonical chat cutover",
-        "therefore retains transitional OpenAI/Emergent runtime credentials until the local activation inventory reaches zero",
-        "waits for a healthy Skeleton engine before serving assembled AI ingress"
+        "delegates migrated text AI execution through backend/core/engine_text.py and backend/core/engine_client.py",
+        "authenticates engine transport with required SKL_ENGINE_SERVICE_TOKEN plus granted service principal",
+        "retains only image-generation and expressive-TTS local ProviderRegistry media execution",
+        "therefore retains transitional backend runtime-model credentials until media parity reaches zero"
       ],
       "skeleton_process": [
-        "owns the canonical engine API root and AIExecution orchestration runtime",
-        "receives runtime model-provider credentials in canonical compose",
-        "owns durable engine execution, submission, and tool-receipt state under skeleton_data",
-        "validates service principal plus delegated actor/tenant/capability authority"
+        "owns the canonical engine API, cognitive execution runtime, and runtime provider credentials",
+        "verifies the backend service bearer token in constant time before principal/grant authorization",
+        "owns durable engine execution, submission, and tool-receipt state under skeleton_data"
       ],
-      "cutover_guard": "App Assembly discovers production backend ProviderRegistry.from_env activators. While any remain, backend credentials are required; once none remain, the same gate forbids backend provider credentials.",
-      "remaining_gap": "migrate every active backend provider consumer to the engine boundary, remove transitional backend credentials only after that inventory is zero, then prove cross-service retry/cancel/golden-journey closure"
+      "cutover_guard": "App Assembly inventories production ProviderRegistry.from_env activators and now requires the remaining inventory to be media-only. Backend provider credentials remain required until image/TTS engine parity reaches zero, then the same gate forbids them.",
+      "remaining_gap": "migrate image generation and expressive TTS to engine-owned media execution, remove backend runtime-model credentials, and complete deployed cross-service retry/cancel/authority/golden-journey evidence"
     },
     "target_process_ownership": {
       "backend": {

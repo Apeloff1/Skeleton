@@ -26,6 +26,9 @@ from skeleton.contracts.context import (
 )
 
 
+_SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -132,6 +135,7 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.execution_request.resource_budget["max_model_turns"] == 4
     assert command.execution_request.resource_budget["max_tool_calls"] == 1
     assert command.execution_request.tool_policy["allowed_tool_ids"] == []
+    assert command.execution_request.context_policy["verification_profile"] == "evidence_required"
     assert command.compiled_context.tool_choice == "none"
     assert command.compiled_context.history == (
         ("user", "Earlier question"),
@@ -141,6 +145,69 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.execution_request.context_policy["handoff_digest"] == (
         command.compiled_context.handoff_digest
     )
+
+
+def test_command_from_context_binds_assistant_proposal_profile() -> None:
+    context = _context()
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="proposal-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+    )
+
+    assert command.execution_request.context_policy["verification_profile"] == "assistant_proposal"
+    assert command.execution_request.tool_policy["allowed_tool_ids"] == []
+
+
+def test_command_from_context_rejects_assistant_profile_for_non_assistant_capability() -> None:
+    context = _context()
+    with pytest.raises(EngineProtocolError, match="assistant capability"):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="admin.execute",
+            idempotency_key="proposal-idem",
+            instructions="Policy",
+            prompt="Prompt",
+            verification_profile="assistant_proposal",
+        )
+
+
+def test_rebuilt_command_keeps_submission_digest_across_fresh_authority() -> None:
+    context = _context()
+    started = _now()
+    first = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="retry-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+        created_at=started,
+        deadline=started + timedelta(minutes=2),
+    )
+    retry_started = started + timedelta(seconds=30)
+    retry = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="retry-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+        created_at=retry_started,
+        deadline=retry_started + timedelta(minutes=2),
+    )
+
+    assert first.command_digest != retry.command_digest
+    assert first.submission_digest == retry.submission_digest
+    assert first.execution_request.identity_digest == retry.execution_request.identity_digest
+    assert first.operation.identity_digest == retry.operation.identity_digest
 
 
 def test_command_from_context_rejects_unbounded_or_invalid_history() -> None:
@@ -177,6 +244,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         seen["path"] = request.url.path
         seen["principal"] = request.headers.get("x-zaibatsu-attester")
+        seen["authorization"] = request.headers.get("authorization")
         seen["trace"] = request.headers.get("x-trace-id")
         body = __import__("json").loads(request.content)
         seen["body"] = body
@@ -195,7 +263,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
         )
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
     ack = await client.submit(command)
@@ -203,6 +271,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
     assert ack["execution_id"] == command.execution_request.execution_id
     assert seen["path"] == "/api/v1/engine/executions"
     assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
     assert seen["trace"] == "trace-client-test"
     assert seen["body"]["actor_id"] == "actor-a"
     assert seen["body"]["tenant_id"] == "tenant-a"
@@ -299,6 +368,7 @@ async def test_execute_polls_terminal_result_and_preserves_lineage() -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
             poll_interval_s=0.001,
             execution_timeout_s=2,
         ),
@@ -396,6 +466,7 @@ async def test_terminal_failure_is_not_converted_to_local_success() -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
             poll_interval_s=0.001,
         ),
         transport=httpx.MockTransport(handler),
@@ -429,7 +500,7 @@ async def test_http_failures_map_to_stable_fail_closed_errors(
         return _json(status, {"detail": "bounded failure"})
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
 
@@ -447,7 +518,7 @@ async def test_network_failure_is_engine_unavailable() -> None:
         raise httpx.ConnectError("offline", request=request)
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
 
@@ -513,6 +584,7 @@ async def test_response_size_bound_is_fail_closed() -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
             max_response_bytes=1024,
         ),
         transport=httpx.MockTransport(handler),
@@ -543,7 +615,7 @@ async def test_cancel_is_actor_tenant_and_trace_bound() -> None:
         )
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
     response = await client.cancel(
@@ -561,3 +633,51 @@ async def test_cancel_is_actor_tenant_and_trace_bound() -> None:
         "reason": "user requested cancellation",
     }
     assert seen["trace"] == "trace-cancel"
+
+
+
+def test_engine_client_config_masks_service_token_in_repr() -> None:
+    config = EngineClientConfig(
+        base_url="http://skeleton:8001",
+        service_token=_SERVICE_TOKEN,
+    )
+
+    assert _SERVICE_TOKEN not in repr(config)
+
+
+def test_engine_env_requires_service_token_when_url_configured(monkeypatch) -> None:
+    monkeypatch.setenv("SKELETON_INTERNAL_URL", "http://skeleton:8001")
+    monkeypatch.delenv("SKL_ENGINE_SERVICE_TOKEN", raising=False)
+
+    with pytest.raises(EngineProtocolError, match="service token"):
+        EngineClientConfig.from_env()
+
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_TOKEN", _SERVICE_TOKEN)
+    config = EngineClientConfig.from_env()
+
+    assert config is not None
+    assert config.service_token == _SERVICE_TOKEN
+
+
+@pytest.mark.asyncio
+async def test_client_rejects_missing_service_token_before_transport() -> None:
+    called = False
+
+    async def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return _json(200, {})
+
+    client = EngineClient(
+        EngineClientConfig(base_url="http://skeleton:8001"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EngineAuthorizationError, match="service token"):
+        await client.status(
+            "exec-1",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+        )
+
+    assert called is False

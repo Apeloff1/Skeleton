@@ -216,6 +216,7 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
     assert command.operation.actor_id == "anonymous"
     assert command.operation.tenant_id == "default"
     assert command.operation.capability == "assistant.chat"
+    assert command.execution_request.context_policy["verification_profile"] == "assistant_proposal"
     assert command.delegated_authority.service_principal == "codedock-backend"
     assert command.compiled_context.context_id == body["context"]["context_id"]
     assert command.compiled_context.context_digest == body["context"]["context_digest"]

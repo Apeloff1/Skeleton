@@ -35,6 +35,7 @@ def _request(
     allowed_tools=(),
     stop_policy=None,
     budget=None,
+    context_policy=None,
 ) -> AIExecutionRequest:
     return AIExecutionRequest(
         operation_id=str(uuid4()),
@@ -43,6 +44,7 @@ def _request(
         context_policy={
             "tenant_id": "tenant-a",
             "data_class": "internal",
+            **(context_policy or {}),
         },
         tool_policy={
             "tenant_id": "tenant-a",
@@ -599,6 +601,94 @@ async def test_default_verification_fails_closed_without_external_evidence() -> 
     assert result.result.verification_receipt["outcome"] == "unknown"
     assert result.result.verification_receipt["policy_satisfied"] is False
     assert "authoritative_support_missing" in result.result.verification_receipt["issues"]
+
+
+@pytest.mark.asyncio
+async def test_assistant_proposal_verification_completes_without_external_evidence() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider([_text_response("proposal", response_id="resp-proposal")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    result = await runtime.start(
+        _request(
+            context_policy={
+                "capability": "assistant.compat",
+                "verification_profile": "assistant_proposal",
+            }
+        ),
+        instructions="Offer a bounded proposal.",
+        prompt="Suggest a refactor.",
+        context_digest="a" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.state is ExecutionState.COMPLETED
+    assert result.result is not None
+    assert result.result.status == "completed"
+    assert result.result.final_output == "proposal"
+    assert result.result.evidence_refs == ()
+    receipt = result.result.verification_receipt
+    assert receipt["verification_profile"] == "assistant_proposal"
+    assert receipt["claim_kind"] == "hypothesis"
+    assert receipt["risk"] == "low"
+    assert receipt["outcome"] == "passed"
+    assert receipt["policy_satisfied"] is True
+    assert receipt["policy"]["level"] == 0
+    assert receipt["policy"]["required_modes"] == ["structural"]
+
+
+@pytest.mark.asyncio
+async def test_assistant_proposal_profile_rejects_tool_enabled_execution() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    await tools.register(_manifest(), lambda _request: {"ok": True})
+    provider = FakeProvider([_text_response("unsafe proposal", response_id="resp-tool-profile")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    with pytest.raises(
+        CognitiveExecutionError,
+        match="tool-free execution",
+    ):
+        await runtime.start(
+            _request(
+                allowed_tools=("repo.read",),
+                context_policy={
+                    "capability": "assistant.compat",
+                    "verification_profile": "assistant_proposal",
+                },
+            ),
+            instructions="Answer.",
+            prompt="Do not call tools.",
+            context_digest="b" * 64,
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_assistant_proposal_profile_rejects_non_assistant_capability() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider([_text_response("proposal", response_id="resp-wrong-cap")])
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    with pytest.raises(
+        CognitiveExecutionError,
+        match="assistant capability",
+    ):
+        await runtime.start(
+            _request(
+                context_policy={
+                    "capability": "admin.execute",
+                    "verification_profile": "assistant_proposal",
+                }
+            ),
+            instructions="Answer.",
+            prompt="Do something.",
+            context_digest="c" * 64,
+            now=_now(),
+        )
 
 
 def test_verification_adapter_rejects_bare_pass_without_external_evidence() -> None:

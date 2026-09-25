@@ -98,8 +98,16 @@ on:
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
       - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/ai_provider_compat.py"
+      - "backend/services/ai_assistant_svc.py"
+      - "backend/services/game_llm_service.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_ai_provider_compat.py"
+      - "backend/tests/test_game_llm_engine_cutover.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_ai_assist_engine_cutover.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
       - "skeleton/vault/data_governance.py"
@@ -156,6 +164,7 @@ on:
       - "scripts/check_state_topology.py"
       - "scripts/state_recovery_drill.py"
       - "scripts/check_provider_bootstrap.py"
+      - "tests/test_provider_runtime_boundary.py"
       - "machine/manifest.json"
       - "machine/architecture.json"
       - "machine/ai_app_construction.json"
@@ -489,6 +498,7 @@ jobs:
           skeleton/testing/test_app_runtime_contract.py
           skeleton/testing/test_app_installer.py
           skeleton/testing/test_windows_installer.py
+          tests/test_provider_runtime_boundary.py
           tests/test_jeeves_local_provider_policy.py
           tests/test_jeeves_chat_workspace.py
 
@@ -508,7 +518,11 @@ jobs:
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_tool_registry_canonical_delegate.py
           backend/tests/test_engine_client.py
+          backend/tests/test_engine_text.py
+          backend/tests/test_ai_provider_compat.py
+          backend/tests/test_game_llm_engine_cutover.py
           backend/tests/test_ai_chat_engine_cutover.py
+          backend/tests/test_ai_assist_engine_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py
@@ -532,6 +546,7 @@ jobs:
           SKL_MONGO_URI: mongodb://admin:dummy@mongo:27017/skeleton?authSource=admin
           MONGO_INITDB_ROOT_PASSWORD: dummy
           JWT_SECRET: not-a-real-jwt-secret
+          SKL_ENGINE_SERVICE_TOKEN: ci-engine-service-token-00000000000000000001
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml config --quiet
