@@ -95,7 +95,6 @@ services:
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
       - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
-      - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
       - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
     volumes:
