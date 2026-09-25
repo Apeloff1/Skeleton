@@ -1485,15 +1485,17 @@ class EngineExecutionService:
             if isinstance(item, str) and item.strip()
         }
         last_provider = payload.get("last_provider")
-        if not isinstance(last_provider, Mapping):
-            raise EngineServiceError(
-                "durable approval checkpoint is missing provider lineage"
-            )
-        turn_id = str(last_provider.get("turn_id") or "").strip()
-        if not turn_id:
-            raise EngineServiceError(
-                "durable approval checkpoint is missing provider turn_id"
-            )
+        turn_id: str | None = None
+        if last_provider is not None:
+            if not isinstance(last_provider, Mapping):
+                raise EngineServiceError(
+                    "durable approval checkpoint provider lineage is malformed"
+                )
+            turn_id = str(last_provider.get("turn_id") or "").strip()
+            if not turn_id:
+                raise EngineServiceError(
+                    "durable approval checkpoint is missing provider turn_id"
+                )
         rows: list[dict[str, str]] = []
         for raw in calls:
             if not isinstance(raw, Mapping):
@@ -1531,6 +1533,15 @@ class EngineExecutionService:
                         "skeleton-operation:" + operation.operation_id,
                     )
                 )
+            lineage = (
+                {
+                    "execution_id": execution.execution_id,
+                    "turn_id": turn_id,
+                    "call_id": call_id,
+                }
+                if turn_id is not None
+                else {}
+            )
             tool_request = ToolExecutionRequest(
                 request_id=str(
                     uuid5(
@@ -1542,9 +1553,6 @@ class EngineExecutionService:
                     )
                 ),
                 operation_id=operation_id,
-                execution_id=execution.execution_id,
-                turn_id=turn_id,
-                call_id=call_id,
                 tenant_id=operation.tenant_id,
                 tool_id=tool_id,
                 idempotency_key=idempotency_key,
@@ -1557,6 +1565,7 @@ class EngineExecutionService:
                     + ":provider-call:"
                     + call_id
                 ),
+                **lineage,
             )
             rows.append(
                 {
