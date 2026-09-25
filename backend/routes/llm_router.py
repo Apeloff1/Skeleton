@@ -41,7 +41,7 @@ PROJ = {"_id": 0}
 
 # ─── Legacy planning catalog ────────────────────────────────────────────────
 # Entries may describe providers that are not currently declared for runtime
-# execution. The executable ensemble is always filtered through AI_REGISTRY.
+# execution. Runtime selection is owned by the Skeleton engine.
 # cost_in / cost_out are legacy planning estimates only, never billing truth.
 MODEL_CATALOG = {
     # ── OpenAI ──
