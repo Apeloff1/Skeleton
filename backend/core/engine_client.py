@@ -13,7 +13,7 @@ idempotency, budget and credential-ownership guarantees.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import os
 from time import monotonic
@@ -121,7 +121,7 @@ class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
 
     base_url: str
-    service_token: str | None = None
+    service_token: str | None = field(default=None, repr=False)
     service_principal: str = "codedock-backend"
     request_timeout_s: float = 15.0
     poll_interval_s: float = 0.05
