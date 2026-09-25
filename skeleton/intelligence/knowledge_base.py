@@ -65,9 +65,17 @@ class KnowledgeBase:
             tags: Optional[List[str]] = None,
             subsystems: Optional[List[str]] = None) -> Document:
         existing = self._docs.get(doc_id)
+        if tags is None:
+            kept_tags = list(existing.tags) if existing else []
+        else:
+            kept_tags = list(tags)
+        if subsystems is None:
+            kept_subsystems = list(existing.subsystems) if existing else []
+        else:
+            kept_subsystems = list(subsystems)
         doc = Document(
             doc_id=doc_id, title=title, body=body,
-            tags=tags or [], subsystems=subsystems or [],
+            tags=kept_tags, subsystems=kept_subsystems,
             version=(existing.version + 1) if existing else 1,
             updated_ns=time.time_ns(),
         )
@@ -97,7 +105,9 @@ class KnowledgeBase:
         if not terms:
             return []
         scored = [(self._score(d, terms), d) for d in self._docs.values()]
-        hits = [d for s, d in sorted(scored, key=lambda x: -x[0]) if s > 0]
+        hits = [d for s, d in sorted(scored, key=lambda x: (-x[0], x[1].doc_id)) if s > 0]
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise ValueError("limit must be a non-negative integer")
         return [d.to_dict() for d in hits[:limit]]
 
     def for_subsystem(self, subsystem: str) -> List[Dict[str, Any]]:
