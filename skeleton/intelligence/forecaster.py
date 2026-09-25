@@ -53,7 +53,7 @@ class Forecaster:
 
     def _holt(self, values: List[float], steps: int) -> Dict[str, Any]:
         if len(values) < 3:
-            return {"error": "insufficient data", "samples": len(values)}
+            raise ValueError("forecast needs at least three samples")
         level = values[0]
         trend = values[1] - values[0]
         residuals: List[float] = []
@@ -80,19 +80,21 @@ class Forecaster:
     def forecast(self, metric: str, steps: int = 10) -> Dict[str, Any]:
         if isinstance(steps, bool) or not isinstance(steps, int) or steps < 1:
             raise ValueError("steps must be a positive integer")
-        values = self._series.get(metric, [])
+        if not isinstance(metric, str) or not metric or metric not in self._series:
+            raise ValueError("metric is required")
+        values = self._series[metric]
         result = self._holt(values, steps)
         result["metric"] = metric
         result["samples"] = len(values)
         return result
 
     def time_to_threshold(self, metric: str, threshold: float) -> Dict[str, Any]:
-        values = self._series.get(metric, [])
-        if len(values) < 3:
-            return {"metric": metric, "crosses": False, "reason": "insufficient data"}
+        if isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not math.isfinite(float(threshold)):
+            raise ValueError("threshold must be finite")
+        if metric not in self._series:
+            raise ValueError("metric is required")
+        values = self._series[metric]
         result = self._holt(values, 100)
-        if "error" in result:
-            return {"metric": metric, "crosses": False, **result}
         current = values[-1]
         for point in result["forecast"]:
             if (current < threshold and point["value"] >= threshold) or (current > threshold and point["value"] <= threshold):
@@ -100,10 +102,11 @@ class Forecaster:
         return {"metric": metric, "crosses": False, "threshold": threshold, "current": round(current, 4), "trend": result["trend"]}
 
     def anomalies_foreseen(self, metric: str, zscore: float = 3.0) -> List[Dict[str, Any]]:
+        if isinstance(zscore, bool) or not isinstance(zscore, (int, float)) or not math.isfinite(float(zscore)) or float(zscore) <= 0:
+            raise ValueError("zscore must be positive")
         result = self.forecast(metric, steps=10)
-        if "error" in result:
-            return []
-        return [p for p in result["forecast"] if p["lower"] < 0 < p["upper"] and abs(p["value"]) > zscore * result.get("residual_std", 1)]
+        std = result["residual_std"]
+        return [p for p in result["forecast"] if p["lower"] < 0 < p["upper"] and abs(p["value"]) > float(zscore) * std]
 
     def card(self) -> Dict[str, Any]:
         return {
