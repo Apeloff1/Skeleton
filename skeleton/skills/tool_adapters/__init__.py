@@ -4,8 +4,10 @@ from .citations import Citation, citations_from_result, pack_citations
 from .owners import (
     AsyncArtifactPackageAdapter,
     AsyncDatabaseQueryAdapter,
+    AsyncJeevesConsultAdapter,
     AsyncNetworkSearchAdapter,
     AsyncSandboxCompileAdapter,
+    AsyncVaultQueryAdapter,
 )
 from .policy import (
     ArtifactAdapterPolicy,
@@ -20,8 +22,10 @@ __all__ = [
     "ArtifactAdapterPolicy",
     "AsyncArtifactPackageAdapter",
     "AsyncDatabaseQueryAdapter",
+    "AsyncJeevesConsultAdapter",
     "AsyncNetworkSearchAdapter",
     "AsyncSandboxCompileAdapter",
+    "AsyncVaultQueryAdapter",
     "Citation",
     "DatabaseAdapterPolicy",
     "GovernedToolSurface",
