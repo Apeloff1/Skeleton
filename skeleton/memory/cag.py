@@ -143,6 +143,23 @@ class CAGStore(MemoryStore):
         )
         return [MemoryQueryResult(chunk=chunk, score=1.0, rank=1)]
 
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Require an exact active-persona boundary before context ranking."""
+        if not isinstance(scope, dict) or set(scope) != {"persona_id"}:
+            raise ValueError("CAG scope must contain exactly persona_id")
+        persona_id = scope["persona_id"]
+        if not isinstance(persona_id, str) or not persona_id:
+            raise ValueError("persona_id scope must be a non-empty string")
+        if persona_id != self._active_persona_id:
+            return []
+        return self.query(query_text, top_k=top_k)
+
     def delete(self, chunk_id: str) -> bool:
         # In CAG, deletion means removing a knowledge node from active persona
         if not self._active_persona_id:
