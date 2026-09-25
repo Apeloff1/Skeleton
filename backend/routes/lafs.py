@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 
@@ -266,26 +267,39 @@ async def jeeves_ask(req: JeevesAskReq):
     except Exception:  # noqa: BLE001
         pass
 
-    import os as _os
-    api_key = _os.getenv("EMERGENT_LLM_KEY", "")
     reply, model = None, "extractive"
-    if api_key and (recalled or req.image_base64 or pdf_text):
+    if recalled or pdf_text or req.image_base64:
         try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-            import uuid as _uuid
-            system = ("You are Jeeves, the GameForge master orchestrator. Answer the user "
-                      "GROUNDED in the provided canon knowledge, attached image, and any PDF "
-                      "text. Cite sheet numbers [n]. If canon is insufficient, say so briefly.")
-            provider, mdl = ("openai", "gpt-4o") if req.image_base64 else ("anthropic", "claude-sonnet-4-6")
-            chat = LlmChat(api_key=api_key, session_id=_uuid.uuid4().hex,
-                           system_message=system).with_model(provider, mdl)
-            prompt = f"CANON KNOWLEDGE:\n{context_block}\n\nUSER QUESTION: {req.query}"
-            files = None
+            registry = ProviderRegistry.from_env()
+            adapter = registry.require_active()
+            system = (
+                "You are Jeeves, the GameForge master orchestrator. Answer the user "
+                "only from the provided canon knowledge and PDF text. Cite sheet "
+                "numbers [n]. If the supplied evidence is insufficient, say so briefly. "
+                "An image attachment may be present, but this transitional text path "
+                "cannot inspect image bytes, so never infer image contents."
+            )
+            prompt = (
+                f"CANON KNOWLEDGE:\n{context_block}\n\n"
+                f"USER QUESTION: {req.query}"
+            )
             if req.image_base64:
-                b64 = req.image_base64.split(",", 1)[-1] if req.image_base64.startswith("data:") else req.image_base64
-                files = [ImageContent(image_base64=b64)]
-            reply = await chat.send_message(UserMessage(text=prompt, file_contents=files))
-            model = f"{provider}:{mdl}"
+                prompt += (
+                    "\n\nIMAGE ATTACHMENT: present but not inspected by this "
+                    "transitional text-only compatibility path."
+                )
+            response = await adapter.generate(
+                ProviderRequest(
+                    instructions=system,
+                    prompt=prompt,
+                    max_output_tokens=1600,
+                    purpose="lafs-grounded-answer",
+                )
+            )
+            reply = response.text
+            model = f"{response.provider}:{response.model}"
+        except ProviderError:
+            reply = None
         except Exception:  # noqa: BLE001
             reply = None
     if not reply:
