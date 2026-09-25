@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from uuid import uuid4
 
 import pytest
 
+from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
 from skeleton.frontier.memory import InMemoryStore
+from skeleton.persistence.memory_repository import (
+    MemoryNotFound,
+    SQLiteMemoryRepository,
+)
 from skeleton.retrieval.index import InvertedIndex
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
+    DeletionAction,
     GovernedDataRecord,
     LifecycleState,
 )
@@ -19,6 +27,7 @@ from skeleton.vault.lifecycle_adapters import (
     MemoryDeletionAdapter,
     MongoCollectionLifecycleAdapter,
     RetrievalIndexDeletionAdapter,
+    SQLiteMemoryLifecycleAdapter,
 )
 
 
@@ -253,3 +262,142 @@ async def test_export_preflight_fails_before_partial_reads() -> None:
         await executor.export_tenant("tenant-a")
 
     assert collection.queries == []
+
+
+
+def _memory_proposal(
+    *,
+    tenant_id: str = "tenant-a",
+    namespace: str = "assistant",
+    content: str = "remember",
+) -> MemoryWriteProposal:
+    now = datetime(2026, 9, 25, 20, 0, tzinfo=timezone.utc)
+    return MemoryWriteProposal(
+        proposal_id=str(uuid4()),
+        tenant_id=tenant_id,
+        namespace=namespace,
+        subject_id="subject-a",
+        kind=MemoryKind.SEMANTIC,
+        idempotency_key=str(uuid4()),
+        proposed_at=now,
+        content=content,
+        provenance_refs=("conversation:fixture",),
+        source_operation_id=str(uuid4()),
+        data_class="confidential",
+    )
+
+
+@pytest.mark.asyncio
+async def test_sqlite_memory_lifecycle_export_and_delete_are_tenant_scoped(
+    tmp_path,
+) -> None:
+    repository = SQLiteMemoryRepository(tmp_path / "memory.sqlite3")
+    record = repository.commit(_memory_proposal())
+    lifecycle = DataLifecycleRegistry()
+    lifecycle.register(
+        GovernedDataRecord(
+            record_id=record.memory_id,
+            tenant_id=record.tenant_id,
+            owner_plane="memory",
+            source_ref=SQLiteMemoryLifecycleAdapter.source_ref(
+                record.namespace,
+                record.memory_id,
+            ),
+            data_class=record.data_class,
+            purposes=("model-inference",),
+            deletion_targets=("memory",),
+            created_at=record.created_at.timestamp(),
+        )
+    )
+    adapter = SQLiteMemoryLifecycleAdapter(repository)
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("memory", adapter)
+    adapters.register_export("memory", adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+
+    exported = await executor.export_tenant("tenant-a")
+    assert len(exported.records) == 1
+    assert exported.records[0]["payload"]["memory_id"] == record.memory_id
+    assert exported.records[0]["payload"]["content"] == "remember"
+
+    plan = lifecycle.request_deletion(
+        "tenant-a",
+        record_ids=(record.memory_id,),
+        now=20.0,
+    )
+    result = await executor.execute_deletion_plan(plan, now=21.0)
+    assert result.receipts[-1].state is LifecycleState.DELETED
+
+    with pytest.raises(MemoryNotFound):
+        repository.get(
+            record.memory_id,
+            tenant_id="tenant-a",
+            namespace="assistant",
+        )
+    tombstone = repository.get(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        include_tombstoned=True,
+    )
+    assert tombstone.active is False
+    pending = repository.pending_projection_events()
+    assert pending[-1].action == "delete"
+
+
+@pytest.mark.asyncio
+async def test_sqlite_memory_lifecycle_delete_is_idempotent_after_tombstone(
+    tmp_path,
+) -> None:
+    repository = SQLiteMemoryRepository(tmp_path / "memory.sqlite3")
+    record = repository.commit(_memory_proposal())
+    adapter = SQLiteMemoryLifecycleAdapter(repository)
+    action = DeletionAction(
+        record_id=record.memory_id,
+        tenant_id=record.tenant_id,
+        target="memory",
+        source_ref=SQLiteMemoryLifecycleAdapter.source_ref(
+            record.namespace,
+            record.memory_id,
+        ),
+        reason="tenant-request",
+    )
+
+    await adapter.delete(action)
+    first = repository.get(
+        record.memory_id,
+        tenant_id=record.tenant_id,
+        namespace=record.namespace,
+        include_tombstoned=True,
+    )
+    await adapter.delete(action)
+    second = repository.get(
+        record.memory_id,
+        tenant_id=record.tenant_id,
+        namespace=record.namespace,
+        include_tombstoned=True,
+    )
+
+    assert first == second
+    assert first.active is False
+
+
+@pytest.mark.asyncio
+async def test_sqlite_memory_lifecycle_cross_tenant_export_returns_no_payload(
+    tmp_path,
+) -> None:
+    repository = SQLiteMemoryRepository(tmp_path / "memory.sqlite3")
+    record = repository.commit(_memory_proposal(tenant_id="tenant-a"))
+    adapter = SQLiteMemoryLifecycleAdapter(repository)
+
+    payload = await adapter.export(
+        {
+            "record_id": record.memory_id,
+            "tenant_id": "tenant-b",
+            "source_ref": SQLiteMemoryLifecycleAdapter.source_ref(
+                record.namespace,
+                record.memory_id,
+            ),
+        }
+    )
+    assert payload is None
