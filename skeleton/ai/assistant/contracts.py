@@ -407,7 +407,10 @@ class CapabilityGrant:
 
     def valid_at(self, when: datetime) -> bool:
         instant = _utc(when, "when")
-        return self.expires_at is None or instant < self.expires_at
+        return (
+            instant >= self.granted_at
+            and (self.expires_at is None or instant < self.expires_at)
+        )
 
 
 @dataclass(frozen=True, slots=True)
