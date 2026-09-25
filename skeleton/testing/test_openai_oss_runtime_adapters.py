@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from enum import Enum
-
 import pytest
 
 from skeleton.ai.integrations.openai_oss import (
