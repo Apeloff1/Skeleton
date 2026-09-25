@@ -1,20 +1,4 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  EXPRESSIVE TTS ENGINE — "innlevelse" / immersive storyteller delivery    ║
-║                                                                            ║
-║  The Emergent LLM key only exposes `tts-1` / `tts-1-hd` (the steerable     ║
-║  `gpt-4o-mini-tts` `instructions` param is NOT available through the       ║
-║  proxy). tts-1-hd, however, honours PUNCTUATION & PACING in the input      ║
-║  text — commas, periods, ellipses, em-dashes and line breaks all change    ║
-║  the delivered rhythm.                                                      ║
-║                                                                            ║
-║  So we get augmented tone control two ways:                                ║
-║    1. TONE PRESETS  → pick the voice + speaking-rate that fits the mood.    ║
-║    2. CADENCE SHAPING → rewrite the script with storyteller punctuation     ║
-║       (dramatic em-dash beats, suspense ellipses, breath pauses) so the     ║
-║       HD model performs it with real rhythm & emotional lift.               ║
-╚══════════════════════════════════════════════════════════════════════════╝
-"""
+"""Expressive TTS shaping for engine-owned speech synthesis.\n\nThe backend owns presentation concerns only: tone presets, voice/speed choices,\ncadence shaping, chunking, and the product-facing response shape. Provider\ncredentials, provider transport, governance/admission, and speech execution\nbelong to the Skeleton engine process through EngineClient.\n\nThis keeps the historical immersive storyteller behavior while enforcing the\nStage-5 process boundary: backend may describe the desired speech operation but\ncannot instantiate or authenticate a model provider locally.\n"""
 from __future__ import annotations
 import base64
 import re
