@@ -59,6 +59,10 @@ def test_within_budget_is_admitted_with_deterministic_receipt() -> None:
             UsageEstimate(artifact_bytes=100 * 1024 * 1024 + 1),
             "artifact_budget_exceeded",
         ),
+        (
+            UsageEstimate(storage_bytes=100 * 1024 * 1024 + 1),
+            "storage_budget_exceeded",
+        ),
     ],
 )
 def test_resource_budget_excess_rejects_before_allocation(
@@ -112,6 +116,7 @@ def test_expired_or_impossible_deadline_rejects() -> None:
         lambda: ResourceBudget(max_cost_usd=math.nan),
         lambda: ResourceBudget(max_wall_seconds=0),
         lambda: ResourceBudget(max_provider_attempts=0),
+        lambda: ResourceBudget(max_storage_bytes=-1),
         lambda: ResourceBudget(max_concurrency=0),
     ],
 )
@@ -125,6 +130,7 @@ def test_invalid_budgets_fail_closed(budget) -> None:
     [
         lambda: UsageEstimate(input_tokens=-1),
         lambda: UsageEstimate(cost_usd=math.inf),
+        lambda: UsageEstimate(storage_bytes=-1),
         lambda: UsageEstimate(provider_attempts=0),
     ],
 )
