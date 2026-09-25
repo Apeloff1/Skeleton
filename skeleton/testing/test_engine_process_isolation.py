@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from importlib import resources
 from pathlib import Path
@@ -28,15 +29,43 @@ def _manifest() -> dict[str, object]:
     )
 
 
-def test_runtime_provider_credentials_exist_only_in_engine_process() -> None:
+def _local_provider_consumers() -> tuple[str, ...]:
+    consumers: list[str] = []
+    for path in sorted((ROOT / "backend").rglob("*.py")):
+        relative = path.relative_to(ROOT).as_posix()
+        if "/tests/" in "/" + relative:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "from_env"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "ProviderRegistry"
+            ):
+                consumers.append(relative)
+                break
+    return tuple(consumers)
+
+
+def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
     compose = _compose()
     skeleton = _service_block(compose, "skeleton", "backend")
     backend = _service_block(compose, "backend", "frontend")
+    consumers = _local_provider_consumers()
 
     for credential in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
         marker = credential + "=${"
         assert marker in skeleton
-        assert marker not in backend
+        if consumers:
+            # Stage-5 cutover law: do not remove backend credentials while any
+            # production backend module can still instantiate the local runtime.
+            assert marker in backend, consumers
+        else:
+            assert marker not in backend
 
     # Non-provider product credentials remain backend-owned.  This prevents an
     # overbroad secret migration from changing product payment/auth ownership.
@@ -87,13 +116,14 @@ def test_manifest_declares_engine_as_backend_runtime_dependency() -> None:
     assert "backend/core/engine_client.py" in manifest["required_paths"]
 
 
-def test_backend_compose_cannot_regain_model_provider_credentials() -> None:
+def test_backend_compose_cannot_gain_undeclared_provider_credentials() -> None:
     compose = _compose()
     backend = _service_block(compose, "backend", "frontend")
 
+    # OpenAI/Emergent remain transitional compatibility credentials until the
+    # local ProviderRegistry activation inventory reaches zero. No additional
+    # provider family may appear in the backend process during that migration.
     forbidden = (
-        "OPENAI_API_KEY",
-        "EMERGENT_LLM_KEY",
         "ANTHROPIC_API_KEY",
         "GEMINI_API_KEY",
         "GOOGLE_API_KEY",
