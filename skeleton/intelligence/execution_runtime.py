@@ -87,9 +87,18 @@ class ExecutionVerificationDecision:
                     "passed verification requires outcome=passed"
                 )
             if not refs:
-                raise CognitiveExecutionError(
-                    "passed model-output verification requires external evidence refs"
+                policy = normalized.get("policy")
+                structural_assistant_proposal = (
+                    normalized.get("verification_profile") == "assistant_proposal"
+                    and normalized.get("claim_kind") == ClaimKind.HYPOTHESIS.value
+                    and isinstance(policy, Mapping)
+                    and policy.get("level") == 0
+                    and policy.get("required_modes") == ["structural"]
                 )
+                if not structural_assistant_proposal:
+                    raise CognitiveExecutionError(
+                        "passed model-output verification requires external evidence refs"
+                    )
         object.__setattr__(self, "receipt", normalized)
         object.__setattr__(self, "evidence_refs", tuple(refs))
 
@@ -1545,6 +1554,32 @@ class CognitiveExecutionRuntime:
                 execution.execution_id + ":verification",
             )
         )
+        verification_profile = execution.request.context_policy.get(
+            "verification_profile",
+            "evidence_required",
+        )
+        if verification_profile == "evidence_required":
+            claim_kind = ClaimKind.STRUCTURED_OUTPUT
+        elif verification_profile == "assistant_proposal":
+            capability = execution.request.context_policy.get("capability")
+            allowed_tool_ids = execution.request.tool_policy.get(
+                "allowed_tool_ids",
+                [],
+            )
+            if capability not in {"assistant.chat", "assistant.compat"}:
+                raise CognitiveExecutionError(
+                    "assistant_proposal verification requires assistant capability"
+                )
+            if not isinstance(allowed_tool_ids, list) or allowed_tool_ids:
+                raise CognitiveExecutionError(
+                    "assistant_proposal verification requires tool-free execution"
+                )
+            claim_kind = ClaimKind.HYPOTHESIS
+        else:
+            raise CognitiveExecutionError(
+                "unsupported execution verification_profile"
+            )
+
         claim = VerificationClaim(
             claim_id=_stable_uuid(
                 "skeleton-execution-verification-claim",
@@ -1554,7 +1589,7 @@ class CognitiveExecutionRuntime:
             ),
             tenant_id=tenant_id.strip(),
             text=candidate.strip(),
-            kind=ClaimKind.STRUCTURED_OUTPUT,
+            kind=claim_kind,
             risk=VerificationRisk.LOW,
             created_at=instant,
             operation_id=_tool_operation_uuid(execution.operation_id),
@@ -1581,6 +1616,9 @@ class CognitiveExecutionRuntime:
         receipt = {
             "claim_id": claim.claim_id,
             "claim_digest": claim.digest,
+            "verification_profile": verification_profile,
+            "claim_kind": claim.kind.value,
+            "risk": claim.risk.value,
             "outcome": assessment.outcome.value,
             "policy_satisfied": assessment.policy_satisfied,
             "policy": {
