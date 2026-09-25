@@ -512,6 +512,10 @@ async def test_cross_service_golden_journey_preserves_receipt_lineage(
             return self.responses.pop(0)
 
     tools = AsyncToolRuntime()
+
+    async def read_handler(_request):
+        return "artifact:readme"
+
     await tools.register(
         ToolManifest(
             tool_id="repo.read",
@@ -526,7 +530,7 @@ async def test_cross_service_golden_journey_preserves_receipt_lineage(
             effect=ToolEffect.READ_ONLY,
             approval_required=False,
         ),
-        lambda _request: "artifact:readme",
+        read_handler,
     )
     coordinator = EngineExecutionCoordinator(
         service,
