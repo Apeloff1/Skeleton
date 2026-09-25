@@ -91,27 +91,26 @@ class ToolCoordinator:
     """Authorize assistant capabilities and delegate execution canonically.
 
     ToolCoordinator deliberately owns no tool receipt implementation and never
-    invokes capability side effects directly. Production composition should
-    inject the application's shared AsyncToolRuntime with a durable receipt
-    store and admission runtime. The default remains the same canonical runtime
-    type so isolated tests and library consumers do not acquire a separate
-    execution contract.
+    invokes capability side effects directly. Composition must inject the
+    application's canonical AsyncToolRuntime. Write-class capabilities also
+    require that runtime to carry a durable receipt store, so restart ambiguity
+    cannot silently downgrade to process-local idempotency.
     """
 
     def __init__(
         self,
         registry: CapabilityRegistry,
         *,
+        tool_runtime: AsyncToolRuntime,
         authorizer: CapabilityAuthorizer | None = None,
-        tool_runtime: AsyncToolRuntime | None = None,
     ) -> None:
         if not isinstance(registry, CapabilityRegistry):
             raise TypeError("registry must be CapabilityRegistry")
-        if tool_runtime is not None and not isinstance(tool_runtime, AsyncToolRuntime):
+        if not isinstance(tool_runtime, AsyncToolRuntime):
             raise TypeError("tool_runtime must be AsyncToolRuntime")
         self.registry = registry
         self.authorizer = authorizer or CapabilityAuthorizer()
-        self.tool_runtime = tool_runtime or AsyncToolRuntime()
+        self.tool_runtime = tool_runtime
         self._bindings: dict[str, _BoundCapability] = {}
         self._idempotency_bindings: dict[tuple[str, str], str] = {}
         self._request_call_counts: dict[str, int] = {}
@@ -318,6 +317,28 @@ class ToolCoordinator:
                 finished_at=instant,
                 error_code=decision.reason_code,
                 provenance=("assistant-capability-authorizer",),
+            )
+            return ToolRunResult(receipt=receipt, output=None)
+
+        if (
+            descriptor.side_effect
+            not in {SideEffectClass.NONE, SideEffectClass.READ_ONLY}
+            and self.tool_runtime.receipt_store is None
+        ):
+            receipt = ToolReceipt(
+                proposal_id=proposal.proposal_id,
+                capability_id=proposal.capability_id,
+                status="blocked",
+                output_ref=None,
+                request_digest=request.digest,
+                arguments_digest=proposal.arguments_digest,
+                started_at=instant,
+                finished_at=instant,
+                error_code="durable-receipt-store-required",
+                provenance=(
+                    "assistant-capability-authorizer",
+                    "canonical-tool-runtime-durability-gate",
+                ),
             )
             return ToolRunResult(receipt=receipt, output=None)
 
