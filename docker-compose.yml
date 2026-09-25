@@ -87,10 +87,7 @@ services:
       - MONGO_URL=${MONGO_URL:?MONGO_URL must be set to an authenticated MongoDB URI}
       - ENVIRONMENT=${ENVIRONMENT:-development}
       - DEBUG=${DEBUG:-false}
-      # Transitional Stage-5 compatibility only. Remove these only after every
-      # active backend provider consumer delegates to the Skeleton engine.
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
+      # Runtime model-provider credentials are engine-owned after Stage-5 cutover.
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set to a high-entropy value}
       - STRIPE_API_KEY=${STRIPE_API_KEY:-}
       - CHROMA_PERSIST_DIR=/app/data/chroma
