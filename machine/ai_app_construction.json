@@ -1758,7 +1758,7 @@
       "plane": "tool-runtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, and adapter-owned privileged/read execution surfaces now exist. The flat backend registry delegates vault, Jeeves, compile, package, database, and network work to canonical adapter owners; run_code remains fail-closed. Remaining closure is richer manifest/governance/cost bindings, minimal provider projection evidence, dependency closure, exact-head validation and independent verification.",
+      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, adapter-owned privileged/read execution surfaces, rich governance manifests, and minimal enabled-only provider projection now exist. Remaining closure is runtime governance/cost/admission binding, dependency closure, exact-head validation and independent verification.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
         "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
@@ -1799,12 +1799,16 @@
         "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call",
         "skeleton/skills/tool_adapters/owners.py owns vault/Jeeves/sandbox/database/network/artifact compatibility execution boundaries",
         "backend/services/tool_registry.py privileged/read compatibility handlers are delegation-only and run_code is fail-closed",
-        "backend/tests/test_tool_registry_scoped_adapters.py source regression forbids privileged execution bodies in the flat registry"
+        "backend/tests/test_tool_registry_scoped_adapters.py source regression forbids privileged execution bodies in the flat registry",
+        "skeleton/skills/tool_contract.py ToolManifest now carries output schema, capabilities, authority/risk/side-effect/idempotency/approval classes, network/data/cost policy, result bounds, concurrency and enabled state",
+        "backend/services/tool_registry.py production manifests declare explicit governance metadata for every compatibility tool",
+        "skeleton/intelligence/execution_runtime.py projects only enabled manifests and exposes only tool_id/description/input_schema to providers",
+        "skeleton/testing/test_execution_runtime.py proves disabled tools and internal governance metadata are excluded from provider projection",
+        "skeleton/testing/test_tool_runtime.py validates governance manifest normalization and fail-closed invariants"
       ],
       "outstanding_evidence": [
         "governance lifecycle binding for durable results",
         "cost/admission reconciliation across tool classes",
-        "minimal provider projection evidence",
         "dependency closure and exact-head validation"
       ]
     },
@@ -5242,12 +5246,13 @@
       "skeleton/intelligence/execution_runtime.py binds canonical execution_id, provider turn_id and provider call_id into ToolExecutionRequest",
       "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call",
       "canonical async adapter owners now contain subprocess, database query, network search, artifact package/cleanup, vault and Jeeves execution bodies",
-      "backend compatibility registry contains wiring/delegation only for executable data/I-O tools"
+      "backend compatibility registry contains wiring/delegation only for executable data/I-O tools",
+      "ToolManifest implements the masterplan governance metadata surface with backward-compatible safe defaults",
+      "production backend tool manifests explicitly declare authority, risk, side-effect, idempotency, approval, network/data/cost, result and concurrency metadata",
+      "provider projection skips disabled manifests and strips all internal governance metadata"
     ],
     "remaining": [
-      "manifest metadata completion",
       "governance/cost bindings",
-      "provider projection evidence",
       "dependency closure and exact-head validation"
     ]
   },
