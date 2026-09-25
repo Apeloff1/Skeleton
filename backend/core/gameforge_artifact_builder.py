@@ -16,9 +16,22 @@ from pathlib import Path
 import tempfile
 import time
 import zipfile
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
-from skeleton.artifact_plane.usage import ArtifactUsageMeter
+
+class ArtifactUsageMeter(Protocol):
+    """Structural metering contract; backend stays independent of Skeleton imports."""
+
+    def meter_artifact(
+        self,
+        operation_id: str,
+        artifact_id: str,
+        write_id: str,
+        byte_count: int,
+        *,
+        now_wall: float | None = None,
+    ) -> Any:
+        ...
 
 
 DEFAULT_ARTIFACTS_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "builds"
