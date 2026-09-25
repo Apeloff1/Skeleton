@@ -127,6 +127,8 @@ class MetaLearner:
         epsilon: float = 1e-5,
     ) -> Tensor:
         """Compute numerical gradient."""
+        if isinstance(epsilon, bool) or not isinstance(epsilon, (int, float)) or float(epsilon) == 0.0:
+            raise ValueError("epsilon must be a non-zero number")
         grad = []
         for i in range(len(params.data)):
             params_plus = Tensor(params.data.copy(), params.shape)
