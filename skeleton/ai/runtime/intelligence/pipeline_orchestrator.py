@@ -94,8 +94,12 @@ class PipelineOrchestrator:
         completed = len(self._results)
         successful = sum(1 for result in self._results.values() if result.success)
         blocked = tuple(sorted(name for name in self._stages if name not in self._results))
-        start = self._checkpoints.get("start_ns", 0)
-        end = self._checkpoints.get("end_ns", 0)
+        start = self._checkpoints.get("start_ns")
+        end = self._checkpoints.get("end_ns")
+        if isinstance(start, bool) or isinstance(end, bool) or not isinstance(start, int) or not isinstance(end, int):
+            duration = None
+        else:
+            duration = (end - start) / 1e6
         return {
             "kind": "pipeline-card",
             "pipeline_id": self.pipeline_id,
@@ -105,7 +109,7 @@ class PipelineOrchestrator:
             "failed": completed - successful,
             "blocked": list(blocked),
             "stages": {name: result.to_dict() for name, result in self._results.items()},
-            "duration_ms": (end - start) / 1e6 if end and start else 0.0,
+            "duration_ms": duration,
         }
 
     def _require_acyclic(self) -> None:
