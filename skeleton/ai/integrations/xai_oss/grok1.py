@@ -10,7 +10,6 @@ from pathlib import Path
 @dataclass(frozen=True, slots=True)
 class Grok1Architecture:
     parameters_billions: float = 314.0
-    active_parameters_billions: float = 86.0
     experts: int = 8
     active_experts_per_token: int = 2
     layers: int = 64
