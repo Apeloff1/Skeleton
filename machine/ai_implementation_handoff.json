@@ -1031,7 +1031,14 @@
         "API reconnect recovery can hand an operation cursor between independent workers",
         "API slow-client backpressure and replay-gap recovery remain correct across worker handoff",
         "API cancel-complete race across workers emits exactly one terminal result",
-        "frontend reconnect page continuity, slow-client gap rejection and terminal race fencing regressions"
+        "frontend reconnect page continuity, slow-client gap rejection and terminal race fencing regressions",
+        "fenced expiring per-operation projection lease serializes cross-worker outbox projection",
+        "lease generation fencing prevents stale worker renew/release after takeover",
+        "cross-worker API reconnect preserves cursor continuity across independent transport instances",
+        "slow-client API replay remains operation-local and does not block unrelated operations",
+        "fenced expiring per-operation projection lease with crash-safe takeover",
+        "generation fencing makes stale release/renew inert after worker takeover",
+        "cross-worker API cursor replay and slow-client isolation journeys"
       ],
       "remaining": [
         "exact-head App Assembly and frontend typecheck/test:operation-stream evidence",

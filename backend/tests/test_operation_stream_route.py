@@ -407,3 +407,57 @@ def test_ack_route_compacts_only_after_active_consumers_apply(
 
     operations.close()
     events.close()
+
+
+
+def test_api_reconnect_can_switch_workers_without_cursor_loss(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    operation_path = tmp_path / "shared-operations.sqlite"
+    event_path = tmp_path / "shared-events.sqlite"
+    operations_a = SQLiteOperationStore(operation_path); operations_b = SQLiteOperationStore(operation_path)
+    events_a = SQLiteOperationEventStore(event_path); events_b = SQLiteOperationEventStore(event_path)
+    transport_a = OperationStreamTransport(operations_a, events_a, worker_id="worker-a")
+    transport_b = OperationStreamTransport(operations_b, events_b, worker_id="worker-b")
+    operation = _operation()
+    current = operations_a.create(operation, now=BASE_TIME)
+    current = operations_a.transition(operation.operation_id, OperationState.VALIDATED, expected_version=current.version, now=BASE_TIME + timedelta(seconds=1))
+    try:
+        monkeypatch.setattr(route, "_transport", lambda: transport_a)
+        first = route.operation_event_replay(operation.operation_id, consumer_id="browser-session-a", after_sequence=0, limit=1, user={"tenant_id": "tenant-a", "role": "viewer"})
+        assert [event["sequence"] for event in first["events"]] == [1]
+        ack = route.acknowledge_operation_events(operation.operation_id, route.OperationAckRequest(consumer_id="browser-session-a", sequence=1), user={"tenant_id": "tenant-a", "role": "viewer"})
+        assert ack["consumer"]["acknowledged_through"] == 1
+        current = operations_b.transition(operation.operation_id, OperationState.AUTHORIZED, expected_version=current.version, now=BASE_TIME + timedelta(seconds=2))
+        monkeypatch.setattr(route, "_transport", lambda: transport_b)
+        resumed = route.operation_event_replay(operation.operation_id, consumer_id="browser-session-a", after_sequence=1, limit=64, user={"tenant_id": "tenant-a", "role": "viewer"})
+        assert [event["sequence"] for event in resumed["events"]] == [2, 3]
+        assert [event["type"] for event in resumed["events"]] == ["operation.validated", "operation.authorized"]
+        assert resumed["stream_latest_sequence"] == 3
+    finally:
+        operations_a.close(); operations_b.close(); events_a.close(); events_b.close()
+
+
+def test_slow_browser_replay_on_one_operation_does_not_block_another(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    operation_path = tmp_path / "shared-operations.sqlite"
+    event_path = tmp_path / "shared-events.sqlite"
+    operations_a = SQLiteOperationStore(operation_path); operations_b = SQLiteOperationStore(operation_path)
+    events_a = SQLiteOperationEventStore(event_path); events_b = SQLiteOperationEventStore(event_path)
+    transport_a = OperationStreamTransport(operations_a, events_a, worker_id="worker-a")
+    transport_b = OperationStreamTransport(operations_b, events_b, worker_id="worker-b")
+    slow = _operation(); fast = _operation()
+    slow_current = operations_a.create(slow, now=BASE_TIME)
+    for index, state in enumerate((OperationState.VALIDATED, OperationState.AUTHORIZED, OperationState.ADMITTED), start=1):
+        slow_current = operations_a.transition(slow.operation_id, state, expected_version=slow_current.version, now=BASE_TIME + timedelta(seconds=index))
+    operations_b.create(fast, now=BASE_TIME)
+    transport_b.cancel(fast.operation_id, tenant_id="tenant-a")
+    try:
+        monkeypatch.setattr(route, "_transport", lambda: transport_a)
+        first_page = route.operation_event_replay(slow.operation_id, consumer_id="slow-browser", after_sequence=0, limit=1, user={"tenant_id": "tenant-a", "role": "viewer"})
+        assert [event["sequence"] for event in first_page["events"]] == [1]
+        monkeypatch.setattr(route, "_transport", lambda: transport_b)
+        unrelated = route.operation_event_replay(fast.operation_id, consumer_id="fast-browser", after_sequence=0, limit=64, user={"tenant_id": "tenant-a", "role": "viewer"})
+        assert unrelated["terminal"] is True
+        assert [event["type"] for event in unrelated["events"]] == ["operation.created", "operation.cancelled"]
+        resumed_slow = route.operation_event_replay(slow.operation_id, consumer_id="slow-browser", after_sequence=1, limit=64, user={"tenant_id": "tenant-a", "role": "viewer"})
+        assert [event["sequence"] for event in resumed_slow["events"]] == [2, 3, 4]
+    finally:
+        operations_a.close(); operations_b.close(); events_a.close(); events_b.close()

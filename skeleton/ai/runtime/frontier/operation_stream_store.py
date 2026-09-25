@@ -50,6 +50,20 @@ def _consumer_id(value: str) -> str:
     return normalized
 
 
+_WORKER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+
+
+def _worker_id(value: str) -> str:
+    if not isinstance(value, str):
+        raise StreamContractError("worker_id must be a string")
+    normalized = value.strip()
+    if not _WORKER_ID_RE.fullmatch(normalized):
+        raise StreamContractError(
+            "worker_id must be 1-128 characters using A-Z a-z 0-9 . _ : -"
+        )
+    return normalized
+
+
 def _aware_utc(value: datetime | None = None) -> datetime:
     instant = value or datetime.now(timezone.utc)
     if not isinstance(instant, datetime):
@@ -76,6 +90,28 @@ class StreamConsumerCheckpoint:
             "operation_id": self.operation_id,
             "consumer_id": self.consumer_id,
             "acknowledged_through": self.acknowledged_through,
+            "lease_expires_at": self.lease_expires_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StreamWorkerLease:
+    operation_id: str
+    worker_id: str
+    generation: int
+    lease_expires_at: datetime
+    updated_at: datetime
+
+    @property
+    def active(self) -> bool:
+        return self.lease_expires_at > datetime.now(timezone.utc)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "worker_id": self.worker_id,
+            "generation": self.generation,
             "lease_expires_at": self.lease_expires_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -168,6 +204,19 @@ class SQLiteOperationEventStore:
                 ON operation_stream_consumer(
                     namespace, operation_id, lease_expires_at
                 );
+
+                CREATE TABLE IF NOT EXISTS operation_stream_worker_lease (
+                    namespace TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    worker_id TEXT NOT NULL,
+                    generation INTEGER NOT NULL,
+                    lease_expires_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, operation_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_operation_stream_worker_lease_expiry
+                ON operation_stream_worker_lease(namespace, lease_expires_at);
                 """
             )
 
@@ -643,6 +692,159 @@ class SQLiteOperationEventStore:
                 self._connection.execute("ROLLBACK")
                 raise
 
+    @classmethod
+    def _worker_lease_from_row(cls, row: sqlite3.Row) -> StreamWorkerLease:
+        try:
+            generation = int(row["generation"])
+            if generation < 1:
+                raise ValueError("generation must be positive")
+            return StreamWorkerLease(
+                operation_id=row["operation_id"],
+                worker_id=_worker_id(row["worker_id"]),
+                generation=generation,
+                lease_expires_at=cls._decode_timestamp(row["lease_expires_at"]),
+                updated_at=cls._decode_timestamp(row["updated_at"]),
+            )
+        except (KeyError, TypeError, ValueError, StreamContractError) as exc:
+            if isinstance(exc, StreamStoreCorruptionError):
+                raise
+            raise StreamStoreCorruptionError("persisted stream worker lease is invalid") from exc
+
+    def acquire_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        *,
+        lease_seconds: int = 10,
+        now: datetime | None = None,
+    ) -> StreamWorkerLease | None:
+        """Acquire a fenced per-operation projection lease."""
+        worker = _worker_id(worker_id)
+        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 1 <= lease_seconds <= 300:
+            raise ValueError("lease_seconds must be an integer between 1 and 300")
+        instant = _aware_utc(now)
+        expires = instant + timedelta(seconds=lease_seconds)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_head(operation_id)
+                row = self._connection.execute(
+                    """
+                    SELECT operation_id, worker_id, generation, lease_expires_at, updated_at
+                    FROM operation_stream_worker_lease
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (self.namespace, operation_id),
+                ).fetchone()
+                generation = 1
+                if row is not None:
+                    current = self._worker_lease_from_row(row)
+                    if current.lease_expires_at > instant:
+                        self._connection.execute("COMMIT")
+                        return None
+                    generation = current.generation + 1
+                self._connection.execute(
+                    """
+                    INSERT INTO operation_stream_worker_lease(
+                        namespace, operation_id, worker_id, generation, lease_expires_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(namespace, operation_id)
+                    DO UPDATE SET worker_id = excluded.worker_id,
+                                  generation = excluded.generation,
+                                  lease_expires_at = excluded.lease_expires_at,
+                                  updated_at = excluded.updated_at
+                    """,
+                    (self.namespace, operation_id, worker, generation, expires.isoformat(), instant.isoformat()),
+                )
+                self._connection.execute("COMMIT")
+                return StreamWorkerLease(operation_id, worker, generation, expires, instant)
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def renew_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        generation: int,
+        *,
+        lease_seconds: int = 10,
+        now: datetime | None = None,
+    ) -> StreamWorkerLease | None:
+        """Extend only the exact live lease generation held by this worker."""
+        worker = _worker_id(worker_id)
+        if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+            raise ValueError("generation must be a positive integer")
+        if isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or not 1 <= lease_seconds <= 300:
+            raise ValueError("lease_seconds must be an integer between 1 and 300")
+        instant = _aware_utc(now)
+        expires = instant + timedelta(seconds=lease_seconds)
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT operation_id, worker_id, generation, lease_expires_at, updated_at
+                    FROM operation_stream_worker_lease
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (self.namespace, operation_id),
+                ).fetchone()
+                if row is None:
+                    self._connection.execute("COMMIT")
+                    return None
+                current = self._worker_lease_from_row(row)
+                if current.worker_id != worker or current.generation != generation or current.lease_expires_at <= instant:
+                    self._connection.execute("COMMIT")
+                    return None
+                self._connection.execute(
+                    """
+                    UPDATE operation_stream_worker_lease
+                    SET lease_expires_at = ?, updated_at = ?
+                    WHERE namespace = ? AND operation_id = ? AND worker_id = ? AND generation = ?
+                    """,
+                    (expires.isoformat(), instant.isoformat(), self.namespace, operation_id, worker, generation),
+                )
+                self._connection.execute("COMMIT")
+                return StreamWorkerLease(operation_id, worker, generation, expires, instant)
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def active_worker_lease(
+        self,
+        operation_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> StreamWorkerLease | None:
+        instant = _aware_utc(now)
+        with self._lock:
+            self._ensure_head(operation_id)
+            row = self._connection.execute(
+                """
+                SELECT operation_id, worker_id, generation, lease_expires_at, updated_at
+                FROM operation_stream_worker_lease
+                WHERE namespace = ? AND operation_id = ? AND lease_expires_at > ?
+                """,
+                (self.namespace, operation_id, instant.isoformat()),
+            ).fetchone()
+        return None if row is None else self._worker_lease_from_row(row)
+
+    def release_worker_lease(self, operation_id: str, worker_id: str, generation: int) -> bool:
+        """Release only the matching fenced generation; stale releases are inert."""
+        worker = _worker_id(worker_id)
+        if isinstance(generation, bool) or not isinstance(generation, int) or generation < 1:
+            raise ValueError("generation must be a positive integer")
+        with self._lock:
+            cursor = self._connection.execute(
+                """
+                DELETE FROM operation_stream_worker_lease
+                WHERE namespace = ? AND operation_id = ? AND worker_id = ? AND generation = ?
+                """,
+                (self.namespace, operation_id, worker, generation),
+            )
+            return int(cursor.rowcount) == 1
+
     def active_consumers(
         self,
         operation_id: str,
@@ -777,5 +979,6 @@ class SQLiteOperationEventStore:
 __all__ = [
     "SQLiteOperationEventStore",
     "StreamConsumerCheckpoint",
+    "StreamWorkerLease",
     "StreamStoreCorruptionError",
 ]

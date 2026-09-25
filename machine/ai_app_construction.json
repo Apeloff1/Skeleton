@@ -1998,7 +1998,7 @@
       "plane": "streaming-realtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical durable operation/event persistence, tenant-bound HTTP/SSE transport, frontend idempotent reduction, persisted reconnect cursor, authoritative replay-gap resync, multi-client acknowledgement/compaction, bounded replay batching, provisional-content reconciliation and cancel/complete terminal fencing are implemented. File-backed multi-worker operation/event concurrency, reconnect handoff, shared compaction and terminal racing are now hardened and regression-proven. Remaining work is cross-host/shared-network stream authority plus browser-level assembled-topology disconnect/reconnect, slow-client and cancellation-race automation.",
+      "gap": "Canonical durable operation/event persistence, tenant-bound HTTP/SSE transport, frontend idempotent reduction, persisted reconnect cursor, authoritative replay-gap resync, multi-client acknowledgement/compaction, bounded replay batching, provisional-content reconciliation and cancel/complete terminal fencing are implemented. File-backed multi-worker operation/event concurrency, reconnect handoff, shared compaction and terminal racing are now hardened and regression-proven. Fenced expiring per-operation projection leases with generation takeover fencing now serialize shared outbox projection. Remaining work is cross-host/shared-network stream authority plus browser-level assembled-topology disconnect/reconnect, slow-client and cancellation-race automation.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
         "use skeleton/frontier/operation_stream.py as the stream conformance contract",
@@ -3868,7 +3868,8 @@
         "cancel semantics",
         "dedupe/out-of-order reducer",
         "backpressure and slow-client policy",
-        "terminal event rules"
+        "terminal event rules",
+        "serialize cross-worker outbox projection with an expiring fenced per-operation lease"
       ],
       "tests": [
         "ordered events",
@@ -3880,7 +3881,10 @@
         "multi-worker concurrent projection",
         "cross-worker reconnect handoff",
         "cross-worker slow-client compaction",
-        "cross-worker cancel/complete race"
+        "cross-worker cancel/complete race",
+        "multi-worker projection lease fencing/takeover",
+        "cross-worker API reconnect",
+        "unrelated-operation slow-client isolation"
       ],
       "exit": "frontend can lose transport and resume without duplicating side effects or losing terminal state",
       "progress": {
@@ -3915,7 +3919,8 @@
           "multi-client acknowledgement and compaction strategy",
           "bounded frontend replay pages and bounded SSE replay batches",
           "terminal backlog drains fully across bounded batches",
-          "completion-versus-cancel race preserves exactly one terminal outcome"
+          "completion-versus-cancel race preserves exactly one terminal outcome",
+          "fenced expiring per-operation projection lease serializes cross-worker outbox projection with generation takeover fencing"
         ],
         "remaining": [
           "exact-head App Assembly and frontend typecheck/test:operation-stream evidence",
@@ -3925,7 +3930,8 @@
           "browser-level cancel-complete automation against assembled topology"
         ],
         "evidence": [
-          "shared WAL-backed operation/event stores plus independent-worker exactly-once outbox projection, cross-worker consumer compaction, reconnect handoff and cancel/complete terminal-race regressions"
+          "shared WAL-backed operation/event stores plus independent-worker exactly-once outbox projection, cross-worker consumer compaction, reconnect handoff and cancel/complete terminal-race regressions",
+          "fenced projection lease takeover plus cross-worker API reconnect and operation-local slow-client isolation regressions"
         ]
       }
     },
@@ -6325,7 +6331,9 @@
       "multi-worker concurrent projection",
       "cross-worker reconnect handoff",
       "cross-worker slow-client compaction",
-      "cross-worker cancel/complete race"
+      "cross-worker cancel/complete race",
+      "multi-worker projection lease fencing/takeover",
+      "cross-worker API reconnect"
     ]
   },
   "golden_journey_blueprint": {
