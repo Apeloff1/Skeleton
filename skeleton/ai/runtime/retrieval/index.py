@@ -21,6 +21,10 @@ class InvertedIndex:
     """In-process inverted index with BM25-lite scoring."""
 
     def __init__(self, *, b: float = 0.75, k1: float = 1.5) -> None:
+        if isinstance(b, bool) or not isinstance(b, (int, float)) or not 0.0 <= float(b) <= 1.0:
+            raise ValueError("b must be between 0 and 1")
+        if isinstance(k1, bool) or not isinstance(k1, (int, float)) or float(k1) < 0.0:
+            raise ValueError("k1 must be non-negative")
         self._docs: Dict[str, List[str]] = {}
         self._content: Dict[str, str] = {}
         self._df: Counter[str] = Counter()
@@ -109,7 +113,9 @@ class InvertedIndex:
                     scores.get(doc_id, 0.0) + query_tf * idf * tf
                 )
 
-        ranked = sorted(scores.items(), key=lambda kv: -kv[1])[:top_k]
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
+        ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))[:top_k]
         return tuple(
             ScoredResult(
                 fragment_id=doc_id,
