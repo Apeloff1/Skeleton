@@ -202,7 +202,10 @@ def _mix_of(left: Any) -> Optional[Tuple[int, int, int]]:
     nums = tuple(getattr(left, "numbers", ()) or ())
     if len(nums) < 3:
         return None
-    trash, elite, boss = int(nums[-3]), int(nums[-2]), int(nums[-1])
+    raw = nums[-3:]
+    if any(isinstance(n, bool) or not isinstance(n, (int, float)) or float(n) != int(n) for n in raw):
+        return None
+    trash, elite, boss = (int(n) for n in raw)
     if 0 <= trash <= 8 and 0 <= elite <= 4 and 0 <= boss <= 2:
         return trash, elite, boss
     return None
@@ -269,7 +272,11 @@ class BuilderBrain:
         cortex: Any = None,
         last_walk: Optional[Dict[str, Any]] = None,
     ) -> BuildPlan:
-        era = str(pack.get("era") or "extraction_now")
+        if not isinstance(pack, dict):
+            raise ValueError("pack is required")
+        era = pack.get("era")
+        if not isinstance(era, str) or not era.strip():
+            raise ValueError("era is required")
         cube = tensor or ContextTensor.from_era(era.split("~")[0])
         fp = cube.fingerprint()
         oracle_index = int(reading.index) if reading is not None else -1
@@ -309,8 +316,10 @@ class BuilderBrain:
             stim = f"plan {era} forge mix bias ttk extract"
             rec = own.best_observed_record(stim) if hasattr(own, "best_observed_record") else None
             improved = rec["mix"] if rec else own.best_observed_mix(stim)
-            if improved is not None:
-                trash, elite, boss = int(improved[0]), int(improved[1]), int(improved[2])
+            if improved is not None and len(improved) >= 3 and all(
+                not isinstance(n, bool) and isinstance(n, (int, float)) and float(n) == int(n) for n in improved[:3]
+            ):
+                trash, elite, boss = (int(n) for n in improved[:3])
                 trash, elite, boss, thermal_span, extra = _prune_mix(pack, trash, elite, boss)
                 veto_notes = list(veto_notes) + [
                     f"improved mix trash={trash} elite={elite} boss={boss}"
