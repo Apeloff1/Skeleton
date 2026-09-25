@@ -91,7 +91,10 @@ class KnowledgeGraph:
         return self._annotations.get(t, FactAnnotation(1.0, ""))
 
     def add_many(self, facts: List[Tuple[str, str, str]]) -> int:
-        return sum(1 for s, p, o in facts if self.add(s, p, o))
+        before = len(self._triples)
+        for subject, predicate, obj in facts:
+            self.add(subject, predicate, obj)
+        return len(self._triples) - before
 
     def neighbors(self, entity: str, direction: str = "both") -> List[Triple]:
         entity = entity.lower().strip()
