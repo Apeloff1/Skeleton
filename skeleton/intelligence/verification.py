@@ -60,13 +60,17 @@ class VerificationLoop:
 
     def __init__(self, *, max_rounds: int = 3, min_gain: float = 0.05,
                  accept_threshold: float = 0.9, min_rounds: int = 1) -> None:
-        if max_rounds < 1:
-            raise ValueError("max_rounds must be >= 1")
-        if not 1 <= min_rounds <= max_rounds:
-            raise ValueError("min_rounds must be within [1, max_rounds]")
+        if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
+            raise ValueError("max_rounds must be an integer >= 1")
+        if isinstance(min_rounds, bool) or not isinstance(min_rounds, int) or not 1 <= min_rounds <= max_rounds:
+            raise ValueError("min_rounds must be an integer within [1, max_rounds]")
+        if isinstance(min_gain, bool) or not isinstance(min_gain, (int, float)) or min_gain < 0 or min_gain != min_gain or min_gain == float("inf"):
+            raise ValueError("min_gain must be a finite number >= 0")
+        if isinstance(accept_threshold, bool) or not isinstance(accept_threshold, (int, float)) or not 0 < float(accept_threshold) <= 1:
+            raise ValueError("accept_threshold must be in (0, 1]")
         self.max_rounds = max_rounds
-        self.min_gain = min_gain
-        self.accept_threshold = accept_threshold
+        self.min_gain = float(min_gain)
+        self.accept_threshold = float(accept_threshold)
         self.min_rounds = min_rounds
         self.sessions = 0
 
@@ -78,27 +82,37 @@ class VerificationLoop:
         context: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, VerificationTrace]:
         """Verify → revise → repeat, until gains flatten or quality suffices."""
+        if not isinstance(claim, str) or not claim.strip():
+            raise ValueError("claim is required")
         trace = VerificationTrace(final_claim=claim)
         current = claim
         prev_conf = 0.0
         for _ in range(self.max_rounds):
             verdict = verifier(current, context)
             trace.rounds += 1
-            trace.history.append(round(verdict.confidence, 4))
-            if verdict.revised:
-                current = verdict.revised
+            confidence = verdict.confidence
+            usable = (
+                not isinstance(confidence, bool)
+                and isinstance(confidence, (int, float))
+                and 0.0 <= float(confidence) <= 1.0
+            )
+            recorded = float(confidence) if usable else 0.0
+            trace.history.append(round(recorded, 4))
+            revised = verdict.revised
+            pending_revision = revised is not None
+            if isinstance(revised, str) and revised.strip():
+                current = revised
             trace.final_claim = current
-
-            if verdict.confidence >= self.accept_threshold:
+            issues = verdict.issues or ()
+            if usable and recorded >= self.accept_threshold and not pending_revision and not issues:
                 trace.stopped_reason = "accepted"
                 break
-            gain = verdict.confidence - prev_conf
-            prev_conf = verdict.confidence
-            # Budget forcing: early-stop rules engage only after min_rounds.
+            gain = recorded - prev_conf
+            prev_conf = recorded
             if trace.rounds > 1 and gain < self.min_gain:
                 if trace.rounds < self.min_rounds:
                     trace.forced_rounds += 1
-                    continue  # "wait — think more"
+                    continue
                 trace.stopped_reason = "marginal_gain"
                 break
         else:
