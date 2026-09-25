@@ -93,8 +93,11 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
     )
 
 
-def test_lafs_remains_tracked_as_transitional_local_provider_consumer() -> None:
-    assert "backend/routes/lafs.py" in _local_provider_consumers()
+def test_remaining_local_provider_consumers_are_media_only() -> None:
+    assert set(_local_provider_consumers()) == {
+        "backend/core/expressive_tts.py",
+        "backend/routes/image_generation.py",
+    }
 
 
 def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
@@ -133,6 +136,23 @@ def test_engine_durable_state_is_bound_to_persistent_skeleton_volume() -> None:
 
     assert "skeleton_data:/app/data" in skeleton
     assert ":memory:" not in skeleton
+
+
+def test_engine_service_auth_token_is_scoped_to_backend_and_engine() -> None:
+    compose = _compose()
+    skeleton = _service_block(compose, "skeleton", "backend")
+    backend = _service_block(compose, "backend", "frontend")
+    frontend = _service_block(compose, "frontend", "mongo")
+    marker = (
+        "SKL_ENGINE_SERVICE_TOKEN="
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}"
+    )
+
+    assert marker in skeleton
+    assert marker in backend
+    assert skeleton.count(marker) == 1
+    assert backend.count(marker) == 1
+    assert "SKL_ENGINE_SERVICE_TOKEN=" not in frontend
 
 
 def test_backend_waits_for_healthy_engine_before_serving_ai_ingress() -> None:
@@ -192,3 +212,23 @@ def test_engine_principal_identity_is_explicit_and_matches_backend_client_defaul
     client = (ROOT / "backend/core/engine_client.py").read_text(encoding="utf-8")
     assert 'service_principal: str = "codedock-backend"' in client
     assert '"x-zaibatsu-attester": self.config.service_principal' in client
+
+
+def test_engine_transport_requires_authenticated_service_token() -> None:
+    compose = _compose()
+    skeleton = _service_block(compose, "skeleton", "backend")
+    backend = _service_block(compose, "backend", "frontend")
+    token_binding = (
+        "SKL_ENGINE_SERVICE_TOKEN="
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}"
+    )
+
+    assert token_binding in skeleton
+    assert token_binding in backend
+
+    client = (ROOT / "backend/core/engine_client.py").read_text(encoding="utf-8")
+    routes = (ROOT / "skeleton/api/engine_routes.py").read_text(encoding="utf-8")
+    assert '"authorization": "Bearer " + token' in client
+    assert "SKL_ENGINE_SERVICE_TOKEN" in client
+    assert "hmac.compare_digest" in routes
+    assert "engine service authentication failed" in routes
