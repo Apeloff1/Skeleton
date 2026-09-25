@@ -457,3 +457,123 @@ test('persisted cursor keys are isolated per consumer identity', () => {
     /consumerId is required/,
   );
 });
+
+
+test('disconnect and reconnect replay pages preserve exact accepted cursor continuity', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationReplay(state, {
+    ok: true,
+    operation: snapshot('running'),
+    events: [
+      event(1, 'operation.created'),
+      event(2, 'operation.running'),
+    ],
+    after_sequence: 0,
+    latest_sequence: 2,
+    stream_latest_sequence: 4,
+    has_more: true,
+    terminal: false,
+  });
+
+  assert.equal(state.lastSequence, 2);
+  assert.equal(state.resyncRequired, false);
+  assert.equal(state.terminal, false);
+
+  state = reduceOperationReplay(state, {
+    ok: true,
+    operation: snapshot('completed'),
+    events: [
+      event(3, 'assistant_content', {
+        payload: { text: 'final', mode: 'replace' },
+      }),
+      event(4, 'operation.completed', {
+        payload: {
+          state: 'completed',
+          final_output: 'final',
+          result_ref: 'result:reconnect',
+        },
+      }),
+    ],
+    after_sequence: 2,
+    latest_sequence: 4,
+    stream_latest_sequence: 4,
+    has_more: false,
+    terminal: true,
+  });
+
+  assert.equal(state.lastSequence, 4);
+  assert.equal(state.terminal, true);
+  assert.equal(state.resyncRequired, false);
+  assert.equal(state.displayedAssistantContent, 'final');
+  assert.equal(state.events.length, 4);
+  assert.equal(new Set(state.seenEventIds).size, 4);
+});
+
+test('slow-client page gaps fail closed instead of skipping retained work', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationReplay(state, {
+    ok: true,
+    operation: snapshot('running'),
+    events: [event(1, 'operation.created')],
+    after_sequence: 0,
+    latest_sequence: 1,
+    stream_latest_sequence: 5,
+    has_more: true,
+    terminal: false,
+  });
+  assert.equal(state.lastSequence, 1);
+
+  const next = reduceOperationReplay(state, {
+    ok: true,
+    operation: snapshot('running'),
+    events: [event(3, 'operation.running')],
+    after_sequence: 1,
+    latest_sequence: 3,
+    stream_latest_sequence: 5,
+    has_more: true,
+    terminal: false,
+  });
+
+  assert.equal(next.lastSequence, 1);
+  assert.equal(next.resyncRequired, true);
+  assert.equal(next.error, 'sequence_gap');
+});
+
+test('cancel-complete race is terminal-fenced in both arrival orders', () => {
+  let cancelledFirst = createOperationClientState('op-1');
+  cancelledFirst = reduceOperationEvent(
+    cancelledFirst,
+    event(1, 'operation.cancelled', {
+      payload: { state: 'cancelled' },
+    }),
+  );
+  cancelledFirst = reduceOperationEvent(
+    cancelledFirst,
+    event(2, 'operation.completed', {
+      payload: { state: 'completed', final_output: 'too late' },
+    }),
+  );
+  assert.equal(cancelledFirst.resyncRequired, true);
+  assert.equal(cancelledFirst.error, 'event_after_terminal');
+
+  let completedFirst = createOperationClientState('op-1');
+  completedFirst = reduceOperationEvent(
+    completedFirst,
+    event(1, 'operation.completed', {
+      payload: {
+        state: 'completed',
+        final_output: 'winner',
+        result_ref: 'result:winner',
+      },
+    }),
+  );
+  completedFirst = reduceOperationEvent(
+    completedFirst,
+    event(2, 'operation.cancelled', {
+      payload: { state: 'cancelled' },
+    }),
+  );
+  assert.equal(completedFirst.resyncRequired, true);
+  assert.equal(completedFirst.error, 'event_after_terminal');
+  assert.equal(completedFirst.displayedAssistantContent, 'winner');
+});
