@@ -1758,7 +1758,7 @@
       "plane": "tool-runtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped sandbox/database/network/artifact policies and backend compatibility delegation exist. The credential-bearing nested llm_chat provider path is retired, production compatibility receipts/results are durable, and tool requests/receipts now preserve and fence optional execution/turn/call lineage across restart. Remaining closure is canonical caller adoption of mandatory lineage, adapter-owner cutover for privileged backend I/O handlers, richer manifest/governance/cost bindings, dependency closure and exact-head validation.",
+      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped sandbox/database/network/artifact policies and backend compatibility delegation exist. The credential-bearing nested llm_chat provider path is retired, production compatibility receipts/results are durable, and the canonical cognitive runtime binds execution/turn/provider-call lineage into tool requests with restart-safe receipt fencing. Remaining closure is adapter-owner cutover for privileged backend I/O handlers, richer manifest/governance/cost bindings, provider projection evidence, dependency closure and exact-head validation.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
         "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
@@ -1794,11 +1794,12 @@
         "skeleton/skills/tool_contract.py execution_id/turn_id/call_id request and receipt lineage contracts with approval binding",
         "skeleton/skills/tool_receipt_store.py restart-safe lineage persistence, migration and idempotency fencing",
         "skeleton/testing/test_tool_receipt_store.py lineage replay/conflict/migration regressions",
-        "backend/tests/test_tool_registry_canonical_delegate.py backend lineage propagation and restart replay regression"
+        "backend/tests/test_tool_registry_canonical_delegate.py backend lineage propagation and restart replay regression",
+        "skeleton/intelligence/execution_runtime.py binds canonical execution_id, provider turn_id and provider call_id into ToolExecutionRequest",
+        "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call"
       ],
       "outstanding_evidence": [
         "privileged backend handler adapter-owner cutover",
-        "require and propagate execution/turn/call lineage from canonical cognitive callers; compatibility callers remain migration-optional",
         "governance lifecycle binding for durable results",
         "cost/admission reconciliation across tool classes",
         "minimal provider projection evidence",
@@ -5225,12 +5226,13 @@
       "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
       "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence",
       "canonical request/receipt execution_id/turn_id/call_id lineage persists through sync/async runtime and SQLite replay",
-      "lineage changes are fenced as idempotency conflicts and approval refs bind the exact execution/turn/call context"
+      "lineage changes are fenced as idempotency conflicts and approval refs bind the exact execution/turn/call context",
+      "skeleton/intelligence/execution_runtime.py binds canonical execution_id, provider turn_id and provider call_id into ToolExecutionRequest",
+      "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call"
     ],
     "remaining": [
       "adapter-owner cutover",
       "manifest metadata completion",
-      "mandatory lineage adoption by canonical cognitive execution callers",
       "governance/cost bindings",
       "provider projection evidence",
       "dependency closure and exact-head validation"
