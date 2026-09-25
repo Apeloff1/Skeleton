@@ -350,6 +350,7 @@ def _backend_local_provider_consumers() -> tuple[str, ...]:
             consumers.append(relative)
     return tuple(consumers)
 
+
 def audit_compose_modes() -> None:
     base = read("docker-compose.yml")
     hot = read("docker-compose.hot.yml")
