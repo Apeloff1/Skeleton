@@ -311,6 +311,7 @@ def test_metered_usage_cannot_be_discarded_by_release() -> None:
     with pytest.raises(QuotaConflict, match="cannot release reservation after metered usage"):
         runtime.release("op-metered-release")
 
+
 def test_completion_emits_payload_free_estimate_actual_delta_telemetry() -> None:
     runtime = AdmissionRuntime()
     request = _request(
@@ -331,6 +332,7 @@ def test_completion_emits_payload_free_estimate_actual_delta_telemetry() -> None
             provider_attempts=1,
             tool_calls=2,
             artifact_bytes=64,
+            storage_bytes=32,
         ),
         now_wall=11.0,
     )
@@ -358,6 +360,9 @@ def test_completion_emits_payload_free_estimate_actual_delta_telemetry() -> None
     assert metrics["samples"]["admission.delta.tool_calls"] == (2.0,)
     assert metrics["samples"]["admission.actual.artifact_bytes"] == (64.0,)
     assert metrics["samples"]["admission.delta.artifact_bytes"] == (64.0,)
+    assert metrics["samples"]["admission.estimated.storage_bytes"] == (0.0,)
+    assert metrics["samples"]["admission.actual.storage_bytes"] == (32.0,)
+    assert metrics["samples"]["admission.delta.storage_bytes"] == (32.0,)
 
     serialized = repr(telemetry)
     assert "op-telemetry" not in serialized
