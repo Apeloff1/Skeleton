@@ -14,6 +14,7 @@ from core.databases import client as _SHARED_MONGO_CLIENT
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+import hashlib
 import os
 import json
 from typing import Optional, Dict, Any, List
@@ -23,10 +24,11 @@ from loguru import logger
 
 load_dotenv()
 
-from core.ai_provider import (
-    ProviderError,
-    ProviderRegistry,
-    ProviderRequest,
+from core.engine_client import EngineClient, EngineClientError
+from core.engine_text import (
+    EngineTextError,
+    EngineTextRequest,
+    execute_engine_text,
 )
 
 
@@ -41,20 +43,29 @@ class GameLLMService:
         model: str = "gpt-4o",
         provider: str = "openai",
         *,
-        registry: ProviderRegistry | None = None,
+        registry: object | None = None,
+        engine_executor=None,
     ) -> None:
-        self.model = model
-        self.provider = (provider or "openai").strip().lower()
-        self._registry = registry or ProviderRegistry.from_env()
+        if registry is not None:
+            raise ValueError(
+                "local provider registry injection is disabled; use the canonical engine"
+            )
+        # Retain legacy hints only as compatibility metadata. They never select
+        # provider/model execution after the engine cutover.
+        self.requested_model = str(model or "").strip() or "gpt-4o"
+        self.requested_provider = (
+            str(provider or "").strip().lower() or "openai"
+        )
+        self.model = "engine-routed"
+        self.provider = "skeleton-engine"
+        self._engine_executor = engine_executor or execute_engine_text
 
     @property
     def available(self) -> bool:
-        active = self._registry.active
-        return bool(
-            self._registry.available
-            and active is not None
-            and active.provider_id == self.provider
-        )
+        try:
+            return EngineClient.from_env() is not None
+        except EngineClientError:
+            return False
 
     @property
     def api_key(self) -> str:
@@ -63,10 +74,18 @@ class GameLLMService:
 
     def provider_status(self) -> dict[str, Any]:
         return {
-            "requested_provider": self.provider,
-            "active_provider": self._registry.active_id,
+            "requested_provider": self.requested_provider,
+            "requested_model": self.requested_model,
+            "active_provider": "skeleton-engine" if self.available else None,
+            "active_model": self.model if self.available else None,
             "available": self.available,
-            "providers": self._registry.statuses(),
+            "providers": [
+                {
+                    "id": "skeleton-engine",
+                    "available": self.available,
+                    "ownership": "engine-process",
+                }
+            ],
         }
 
     async def _provider_generate(
@@ -74,17 +93,26 @@ class GameLLMService:
         *,
         system_message: str,
         prompt: str,
+        session_id: str | None = None,
     ) -> str:
-        adapter = self._registry.require_active()
-        if adapter.provider_id != self.provider:
-            raise ProviderError(
-                f"requested provider is not active: {self.provider}"
+        material = "\n".join(
+            (
+                str(session_id or ""),
+                system_message,
+                prompt,
             )
-        response = await adapter.generate(
-            ProviderRequest(
+        ).encode("utf-8")
+        response = await self._engine_executor(
+            EngineTextRequest(
                 instructions=system_message,
                 prompt=prompt,
-                model=self.model,
+                idempotency_key=(
+                    "game-llm:"
+                    + hashlib.sha256(material).hexdigest()
+                ),
+                actor_id="game-llm-service",
+                capability="assistant.compat",
+                max_output_tokens=16_384,
             )
         )
         return response.text
@@ -183,8 +211,8 @@ class GameLLMService:
         if not self.available:
             return {
                 "success": False,
-                "error": "LLM provider unavailable",
-                "error_code": "provider_unavailable",
+                "error": "LLM engine unavailable",
+                "error_code": "engine_unavailable",
                 "provider": self.provider,
                 "fallback": True,
             }
@@ -193,6 +221,7 @@ class GameLLMService:
             response = await self._provider_generate(
                 system_message=system_prompt,
                 prompt=user_prompt,
+                session_id=session_id,
             )
             return {
                 "success": True,
@@ -202,15 +231,15 @@ class GameLLMService:
                 "fallback": False,
                 "rag_chars": len(rag_block),
             }
-        except ProviderError as exc:
+        except EngineTextError as exc:
             logger.warning(
-                "GameLLMService provider failure: {}",
+                "GameLLMService engine failure: {}",
                 type(exc).__name__,
             )
             return {
                 "success": False,
                 "error": "llm_request_failed",
-                "error_code": "provider_failure",
+                "error_code": "engine_failure",
                 "provider": self.provider,
                 "fallback": True,
             }
