@@ -66,6 +66,8 @@ class InMemoryTFIDFStore(MemoryStore):
     def add(self, chunk: MemoryChunk) -> None:
         if not isinstance(chunk, MemoryChunk):
             raise TypeError("chunk must be MemoryChunk")
+        if not isinstance(chunk.text, str) or not self._tokenize(chunk.text):
+            raise ValueError("text must contain a token")
 
         previous = self._chunks.get(chunk.id)
         if previous is not None:
@@ -98,6 +100,10 @@ class InMemoryTFIDFStore(MemoryStore):
             raise TypeError("metadata_filter must be a mapping")
         if top_k == 0 or not self._chunks:
             return []
+        if not isinstance(query_text, str) or not query_text.strip():
+            raise ValueError("query is required")
+        if not self._tokenize(query_text):
+            raise ValueError("query must contain a token")
 
         idf = self._compute_idf()
         query_vec = self._vectorise(query_text, idf)
@@ -116,8 +122,9 @@ class InMemoryTFIDFStore(MemoryStore):
 
             chunk_vec = self._vectorise(chunk.text, idf)
             score = self._cosine_similarity(query_vec, chunk_vec)
-            if score >= min_score:
-                results.append((score, chunk))
+            if score <= 0.0 or score < min_score:
+                continue
+            results.append((score, chunk))
 
         results.sort(key=lambda item: (-item[0], item[1].id))
         return [
