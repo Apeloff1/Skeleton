@@ -94,7 +94,7 @@ class EvalSuite:
             "suite": self.name,
             "ran": total,
             "passed": passed_count,
-            "pass_rate": round(passed_count / total, 4) if total else 0.0,
+            "pass_rate": None if total == 0 else round(passed_count / total, 4),
             "results": [r.to_dict() for r in results],
             "regressions": self._diff_baseline(results),
             "timestamp_ns": time.time_ns(),
