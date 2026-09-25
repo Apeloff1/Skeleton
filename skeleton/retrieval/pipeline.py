@@ -25,6 +25,7 @@ from skeleton.retrieval.fusion import ScoredResult
 from skeleton.retrieval.highlight import Highlighter
 from skeleton.retrieval.query import PrefetchedQuery, QueryPlan, QueryPlanner
 from skeleton.retrieval.query_language import QueryParser, QueryTerm
+from skeleton.retrieval.reranker_contract import CanonicalReranker, RerankReceipt
 
 
 def _planner_execute_kwargs(
@@ -55,6 +56,7 @@ class SearchOutcome:
     plan: QueryPlan
     results: Tuple[ScoredResult, ...]
     rendered: str
+    rerank_receipts: Tuple[RerankReceipt, ...] = ()
 
 
 class SearchPipeline:
@@ -77,6 +79,7 @@ class SearchPipeline:
         rule_reranker: Optional[Any] = None,
         feature_reranker: Optional[Any] = None,
         ranker: Optional[Any] = None,
+        rerank_pipeline: Optional[CanonicalReranker] = None,
         speculative_prefetch: bool = False,
     ) -> None:
         self._planner = planner
@@ -84,7 +87,17 @@ class SearchPipeline:
         self._renderer = renderer
         self._rule_reranker = rule_reranker
         self._feature_reranker = feature_reranker
+        legacy = tuple(
+            stage
+            for stage in (rule_reranker, feature_reranker, ranker)
+            if stage is not None
+        )
+        if rerank_pipeline is not None and legacy:
+            raise ValueError(
+                "rerank_pipeline cannot be combined with legacy rerank stages"
+            )
         self._ranker = ranker
+        self._rerank_pipeline = rerank_pipeline
         self._speculative_prefetch = speculative_prefetch
 
     def prepare(self, query: str) -> PrefetchedQuery:
@@ -143,10 +156,18 @@ class SearchPipeline:
                 ),
             )
         )
-        results = self._apply_stages(query, results, top_k=top_k)
+        results, rerank_receipts = self._apply_stages(
+            query,
+            results,
+            top_k=top_k,
+        )
         rendered = "" if not render else self._render(query, results, terms)
         return SearchOutcome(
-            query=query, plan=plan, results=results, rendered=rendered
+            query=query,
+            plan=plan,
+            results=results,
+            rendered=rendered,
+            rerank_receipts=rerank_receipts,
         )
 
     def _apply_stages(
@@ -155,7 +176,16 @@ class SearchPipeline:
         results: Tuple[ScoredResult, ...],
         *,
         top_k: Optional[int],
-    ) -> Tuple[ScoredResult, ...]:
+    ) -> Tuple[Tuple[ScoredResult, ...], Tuple[RerankReceipt, ...]]:
+        if self._rerank_pipeline is not None:
+            limit = top_k if top_k is not None else len(results)
+            outcome = self._rerank_pipeline.run(
+                query,
+                results,
+                top_k=limit,
+            )
+            return outcome.results, outcome.receipts
+
         # Stage 1 — rule-based boost (metadata predicates)
         if self._rule_reranker is not None and results:
             results = tuple(self._rule_reranker.rerank(results, top_k=top_k))
@@ -175,7 +205,7 @@ class SearchPipeline:
         # Stage 3 — diversity + recency post-rank
         if self._ranker is not None and results:
             results = tuple(self._ranker.rank(list(results), top_k=top_k or len(results)))
-        return results
+        return results, ()
 
     def _render(
         self,
