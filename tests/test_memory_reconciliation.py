@@ -6,7 +6,14 @@ import pytest
 
 from skeleton.memory.reconciliation import (
     MemoryAction,
+    MemoryConflictCandidate,
+    MemoryConflictLedger,
+    MemoryConflictResolution,
+    MemoryConflictResolver,
+    MemoryGCDisposition,
+    MemoryGCPlanner,
     MemoryQualityPolicy,
+    MemoryReachability,
     MemoryRecord,
     MemoryReconciler,
     TombstoneLedger,
@@ -192,3 +199,309 @@ def test_memory_record_rejects_invalid_quality_state(field, value) -> None:
     kwargs[field] = value
     with pytest.raises(ValueError):
         MemoryRecord(**kwargs)
+
+
+
+def _candidate(
+    record_id: str,
+    payload: str,
+    *,
+    scope: str = "tenant-a:user-a:project-a",
+    claim: str = "favorite-language",
+    confidence: float = 0.8,
+    provenance_count: int = 2,
+    updated_at: float = 100.0,
+) -> MemoryConflictCandidate:
+    import hashlib
+
+    return MemoryConflictCandidate(
+        record_id=record_id,
+        scope_key=scope,
+        claim_key=claim,
+        payload_digest=hashlib.sha256(payload.encode()).hexdigest(),
+        confidence=confidence,
+        provenance_count=provenance_count,
+        updated_at=updated_at,
+    )
+
+
+def test_conflict_builder_rejects_cross_scope_candidates() -> None:
+    resolver = MemoryConflictResolver()
+    with pytest.raises(ValueError, match="cross memory scopes"):
+        resolver.build(
+            (
+                _candidate("a", "python", scope="tenant-a:user-a"),
+                _candidate("b", "rust", scope="tenant-a:user-b"),
+            ),
+            created_at=100.0,
+        )
+
+
+def test_conflict_builder_requires_divergent_payloads() -> None:
+    resolver = MemoryConflictResolver()
+    with pytest.raises(ValueError, match="divergent payload"):
+        resolver.build(
+            (
+                _candidate("a", "same"),
+                _candidate("b", "same"),
+            ),
+            created_at=100.0,
+        )
+
+
+def test_ambiguous_conflict_remains_explicitly_unresolved() -> None:
+    resolver = MemoryConflictResolver()
+    conflict = resolver.build(
+        (
+            _candidate("a", "python", confidence=0.8, provenance_count=2),
+            _candidate("b", "rust", confidence=0.75, provenance_count=2),
+        ),
+        created_at=100.0,
+    )
+
+    resolved = resolver.resolve(conflict)
+
+    assert resolved.resolution is MemoryConflictResolution.UNRESOLVED
+    assert resolved.winner_id is None
+    assert resolved.superseded_ids == ()
+
+
+def test_conflict_resolves_only_with_confidence_and_provenance_dominance() -> None:
+    resolver = MemoryConflictResolver()
+    conflict = resolver.build(
+        (
+            _candidate("winner", "python", confidence=0.95, provenance_count=5),
+            _candidate("loser", "rust", confidence=0.60, provenance_count=2),
+        ),
+        created_at=100.0,
+    )
+
+    resolved = resolver.resolve(conflict)
+
+    assert resolved.resolution is MemoryConflictResolution.SUPERSEDE
+    assert resolved.winner_id == "winner"
+    assert resolved.superseded_ids == ("loser",)
+    assert resolved.reason == "confidence-and-provenance-dominance"
+
+
+def test_quality_review_blocks_automatic_conflict_resolution() -> None:
+    resolver = MemoryConflictResolver()
+    conflict = resolver.build(
+        (
+            _candidate("winner", "python", confidence=0.95, provenance_count=5),
+            _candidate("loser", "rust", confidence=0.60, provenance_count=2),
+        ),
+        created_at=100.0,
+    )
+
+    resolved = resolver.resolve(
+        conflict,
+        quality_actions={
+            "winner": MemoryAction.RETAIN,
+            "loser": MemoryAction.REVIEW,
+        },
+    )
+
+    assert resolved.resolution is MemoryConflictResolution.UNRESOLVED
+
+
+def test_quality_unique_retain_can_supersede_tombstoned_alternatives() -> None:
+    resolver = MemoryConflictResolver()
+    conflict = resolver.build(
+        (
+            _candidate("winner", "python", confidence=0.6, provenance_count=1),
+            _candidate("loser", "rust", confidence=0.9, provenance_count=5),
+        ),
+        created_at=100.0,
+    )
+
+    resolved = resolver.resolve(
+        conflict,
+        quality_actions={
+            "winner": MemoryAction.RETAIN,
+            "loser": MemoryAction.TOMBSTONE,
+        },
+    )
+
+    assert resolved.resolution is MemoryConflictResolution.SUPERSEDE
+    assert resolved.winner_id == "winner"
+    assert resolved.reason == "quality-policy-unique-retain"
+
+
+def test_keep_both_requires_explicit_reason() -> None:
+    resolver = MemoryConflictResolver()
+    conflict = resolver.build(
+        (_candidate("a", "python"), _candidate("b", "rust")),
+        created_at=100.0,
+    )
+
+    with pytest.raises(ValueError, match="requires a reason"):
+        resolver.keep_both(conflict, reason="")
+
+    resolved = resolver.keep_both(
+        conflict,
+        reason="both are scoped temporal observations",
+    )
+    assert resolved.resolution is MemoryConflictResolution.KEEP_BOTH
+    assert resolved.reason == "both are scoped temporal observations"
+
+
+def test_conflict_ledger_refuses_to_replace_unresolved_claim() -> None:
+    resolver = MemoryConflictResolver()
+    ledger = MemoryConflictLedger()
+    first = resolver.build(
+        (_candidate("a", "python"), _candidate("b", "rust")),
+        created_at=100.0,
+    )
+    second = resolver.build(
+        (_candidate("a", "python"), _candidate("c", "go")),
+        created_at=101.0,
+    )
+    ledger.open(first)
+
+    with pytest.raises(ValueError, match="cannot replace unresolved"):
+        ledger.open(second)
+
+
+def test_conflict_ledger_resolution_and_snapshot_round_trip() -> None:
+    resolver = MemoryConflictResolver()
+    ledger = MemoryConflictLedger()
+    conflict = resolver.build(
+        (
+            _candidate("a", "python", confidence=0.95, provenance_count=5),
+            _candidate("b", "rust", confidence=0.5, provenance_count=1),
+        ),
+        created_at=100.0,
+    )
+    ledger.open(conflict)
+    resolved = resolver.resolve(conflict)
+    ledger.resolve(resolved)
+
+    snapshot = ledger.snapshot()
+    restored = MemoryConflictLedger.from_snapshot(copy.deepcopy(snapshot))
+
+    assert restored.snapshot() == snapshot
+    assert restored.unresolved() == ()
+    assert restored.get(conflict.conflict_id) == resolved
+
+
+def test_gc_tombstones_only_unprotected_low_quality_memory() -> None:
+    planner = MemoryGCPlanner(
+        MemoryReconciler(
+            MemoryQualityPolicy(
+                half_life_s=1.0,
+                retain_threshold=0.8,
+                tombstone_threshold=0.4,
+                hard_contradiction_limit=1,
+            )
+        )
+    )
+    poor = _record(
+        "poor",
+        confidence=0.1,
+        importance=0.1,
+        access_count=0,
+        provenance_count=0,
+        contradiction_count=1,
+        last_accessed_at=0.0,
+    )
+
+    plan = planner.plan((poor,), now=100.0)
+
+    assert plan.tombstone_ids == ("poor",)
+    assert plan.review_ids == ()
+    assert plan.entries[0].disposition is MemoryGCDisposition.TOMBSTONE
+
+
+@pytest.mark.parametrize(
+    "reachability,reason",
+    (
+        (MemoryReachability(record_id="poor", roots=("project:active",)), "reachable-from-root"),
+        (MemoryReachability(record_id="poor", legal_hold=True), "legal-hold"),
+        (MemoryReachability(record_id="poor", audit_required=True), "audit-required"),
+        (
+            MemoryReachability(record_id="poor", retention_until=200.0),
+            "retention-window-active",
+        ),
+    ),
+)
+def test_gc_protections_block_tombstone(reachability, reason) -> None:
+    planner = MemoryGCPlanner(
+        MemoryReconciler(
+            MemoryQualityPolicy(
+                half_life_s=1.0,
+                retain_threshold=0.8,
+                tombstone_threshold=0.4,
+                hard_contradiction_limit=1,
+            )
+        )
+    )
+    poor = _record(
+        "poor",
+        confidence=0.1,
+        importance=0.1,
+        access_count=0,
+        provenance_count=0,
+        contradiction_count=1,
+        last_accessed_at=0.0,
+    )
+
+    plan = planner.plan(
+        (poor,),
+        reachability=(reachability,),
+        now=100.0,
+    )
+
+    assert plan.tombstone_ids == ()
+    assert plan.review_ids == ("poor",)
+    assert reason in plan.entries[0].reasons
+    assert "deletion-blocked" in plan.entries[0].reasons
+
+
+def test_expired_retention_window_no_longer_blocks_gc() -> None:
+    planner = MemoryGCPlanner(
+        MemoryReconciler(
+            MemoryQualityPolicy(
+                half_life_s=1.0,
+                retain_threshold=0.8,
+                tombstone_threshold=0.4,
+                hard_contradiction_limit=1,
+            )
+        )
+    )
+    poor = _record(
+        "poor",
+        confidence=0.1,
+        importance=0.1,
+        access_count=0,
+        provenance_count=0,
+        contradiction_count=1,
+        last_accessed_at=0.0,
+    )
+
+    plan = planner.plan(
+        (poor,),
+        reachability=(
+            MemoryReachability(record_id="poor", retention_until=99.0),
+        ),
+        now=100.0,
+    )
+
+    assert plan.tombstone_ids == ("poor",)
+
+
+def test_gc_rejects_unknown_reachability_record() -> None:
+    with pytest.raises(ValueError, match="unknown memory"):
+        MemoryGCPlanner().plan(
+            (_record("known"),),
+            reachability=(MemoryReachability(record_id="unknown"),),
+            now=100.0,
+        )
+
+
+def test_gc_plan_is_deterministic_by_record_id() -> None:
+    plan = MemoryGCPlanner().plan(
+        (_record("z"), _record("a")),
+        now=100.0,
+    )
+    assert [entry.record_id for entry in plan.entries] == ["a", "z"]
