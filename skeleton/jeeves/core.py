@@ -1568,6 +1568,11 @@ class Jeeves:
         from skeleton.jeeves.builder import BuilderBrain
         if vision:
             pack = self.bind_era(vision)
+        if pack is None and self._brain is not None:
+            # Reuse the already-bound compiled authority. This matters for
+            # synthetic blend ids, which are valid compiled packs but are not
+            # catalog era names and therefore must not be recompiled.
+            pack = dict(self._brain.pack)
         if pack is None:
             from skeleton.forge.eras import compile_era
             pack = compile_era(self.era)
