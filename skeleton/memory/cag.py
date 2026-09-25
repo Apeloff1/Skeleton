@@ -31,6 +31,10 @@ class PersonaContext:
 
     def add_knowledge(self, key: str, facts: List[str], importance: float = 1.0) -> None:
         """Add facts to the knowledge graph with importance weighting."""
+        if key in self.knowledge_graph:
+            previous = self.knowledge_graph[key]
+            self.current_tokens -= sum(self.estimate_tokens(f) for f in previous)
+            self.current_tokens = max(0, self.current_tokens)
         self.knowledge_graph[key] = facts
         self.importance_scores[key] = importance
         self.current_tokens += sum(self.estimate_tokens(f) for f in facts)
