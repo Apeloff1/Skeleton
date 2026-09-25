@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from datetime import datetime, timezone
+import hashlib
 from uuid import uuid4
 
 import pytest
@@ -725,3 +726,40 @@ async def test_async_pending_durable_reservation_fails_closed_without_effect(
     assert receipt.error_code == "execution_in_doubt"
     assert receipt.metered_tool_calls == 0
     assert calls == []
+
+def test_tool_request_requires_complete_execution_lineage() -> None:
+    with pytest.raises(ToolContractError, match="must be supplied together"):
+        ToolExecutionRequest(
+            request_id=str(uuid4()),
+            operation_id=str(uuid4()),
+            execution_id=str(uuid4()),
+            tenant_id="tenant-a",
+            tool_id="repo.read",
+            idempotency_key="partial-lineage",
+            arguments={"path": "README.md"},
+            requested_at=_now(),
+        )
+
+
+def test_approval_binding_preserves_legacy_identity_and_binds_full_lineage() -> None:
+    request = _request(key="approval-legacy")
+    legacy_material = "\x1f".join(
+        (
+            request.operation_id,
+            request.tenant_id,
+            request.tool_id,
+            request.arguments_digest,
+        )
+    ).encode("utf-8")
+    legacy_ref = "approval:" + hashlib.sha256(legacy_material).hexdigest()
+
+    assert approval_ref_for_request(request) == legacy_ref
+
+    lineaged = replace(
+        request,
+        execution_id=str(uuid4()),
+        turn_id=str(uuid4()),
+        call_id=str(uuid4()),
+    )
+    assert approval_ref_for_request(lineaged) != legacy_ref
+
