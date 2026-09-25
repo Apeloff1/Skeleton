@@ -1,0 +1,116 @@
+name: AI P0 Current-Main Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/ai-p0-current-main-validation.yml"
+      - "backend/**"
+      - "frontend/**"
+      - "skeleton/**"
+      - "machine/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-p0-current-main-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.11.16"
+  NODE_VERSION: "24.20.0"
+
+jobs:
+  python-runtime:
+    name: Python runtime contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: .:backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Install validation dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r backend/requirements.txt
+          python -m pip install --disable-pip-version-check "pytest==8.4.2" "pytest-asyncio==1.4.0"
+
+      - name: Run current-main AI/runtime contracts
+        run: |
+          python -m pytest -q             backend/tests/test_ai_chat_conversation_authority.py             backend/tests/test_operation_stream_transport.py             backend/tests/test_operation_stream_route.py             skeleton/testing/test_provider_contract.py             skeleton/testing/test_verification_runtime.py             skeleton/testing/test_execution_repository.py             skeleton/testing/test_execution_runtime.py             skeleton/testing/test_tool_runtime.py             skeleton/testing/test_engine_execution_service.py             skeleton/testing/test_engine_execution_coordinator.py
+
+  frontend-runtime:
+    name: Frontend Jeeves + operation stream
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "${{ env.NODE_VERSION }}"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          corepack enable
+          yarn install --frozen-lockfile --ignore-scripts
+          node ./scripts/patch-node-modules.js
+
+      - name: Run Jeeves authority contracts
+        working-directory: frontend
+        run: yarn test:jeeves
+
+      - name: Run operation stream contracts
+        working-directory: frontend
+        run: yarn test:operation-stream
+
+      - name: Typecheck Jeeves surfaces
+        working-directory: frontend
+        run: yarn typecheck:jeeves
+
+  verification-signed:
+    name: verification_signed
+    needs:
+      - python-runtime
+      - frontend-runtime
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    steps:
+      - name: Emit fail-closed verification receipt
+        env:
+          PYTHON_RESULT: "${{ needs.python-runtime.result }}"
+          FRONTEND_RESULT: "${{ needs.frontend-runtime.result }}"
+          HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          set -euo pipefail
+          if [ "$PYTHON_RESULT" != "success" ] || [ "$FRONTEND_RESULT" != "success" ]; then
+            printf 'verification_signed=false python=%s frontend=%s head=%s\n' "$PYTHON_RESULT" "$FRONTEND_RESULT" "$HEAD_SHA"
+            exit 1
+          fi
+          {
+            echo "### P0 validation receipt"
+            echo ""
+            echo "- verification_signed: true"
+            echo "- head_sha: `$HEAD_SHA`"
+            echo "- python_runtime: $PYTHON_RESULT"
+            echo "- frontend_runtime: $FRONTEND_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf 'verification_signed=true head=%s\n' "$HEAD_SHA"
