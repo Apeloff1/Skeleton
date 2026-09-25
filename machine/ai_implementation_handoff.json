@@ -541,10 +541,13 @@
         "skeleton/intelligence/execution_runtime.py propagates canonical execution/provider-turn/provider-call identities into every cognitive tool request",
         "skeleton/testing/test_execution_runtime.py verifies receipt lineage against persisted provider turn",
         "skeleton/skills/tool_adapters/owners.py owns compatibility side-effect/read execution bodies outside the flat backend registry",
-        "backend/services/tool_registry.py delegates vault/Jeeves/compile/package/database/network handlers to canonical owners"
+        "backend/services/tool_registry.py delegates vault/Jeeves/compile/package/database/network handlers to canonical owners",
+        "skeleton/skills/tool_contract.py implements rich governance metadata on canonical ToolManifest",
+        "backend/services/tool_registry.py declares explicit metadata per production compatibility tool",
+        "skeleton/intelligence/execution_runtime.py provider inventory is enabled-only and minimal",
+        "skeleton/testing/test_execution_runtime.py proves governance metadata never crosses provider boundary"
       ],
       "remaining": [
-        "finish canonical manifest richness for authority/risk/data/cost/result metadata",
         "bind governance lifecycle policy to durable tool result references",
         "bind monotonic cost/admission reconciliation for all expensive tool classes",
         "prove minimal provider tool projection and current-head provider-surface isolation",
