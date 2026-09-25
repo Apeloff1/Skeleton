@@ -416,6 +416,77 @@ async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) ->
 
 
 @pytest.mark.asyncio
+async def test_coordinator_fences_late_provider_result_after_cancel(tmp_path) -> None:
+    service = _service(tmp_path)
+    _, command = _bundle(execution_id="exec-cancel-race")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+
+    gate = asyncio.Event()
+    provider = FakeProvider(text="must never become visible success", gate=gate)
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(provider),
+        tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified_execution,
+    )
+
+    await coordinator.ensure_started(command)
+    for _ in range(100):
+        if provider.requests:
+            break
+        await asyncio.sleep(0)
+    else:
+        raise AssertionError("provider request did not start")
+
+    cancelled = service.cancel(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert cancelled.cancellation_requested is True
+
+    gate.set()
+    result = await _wait_result(
+        service,
+        command.execution_request.execution_id,
+    )
+
+    assert result.status == "cancelled"
+    assert result.final_output is None
+    assert result.usage["error_code"] == "cancellation_requested"
+    assert len(provider.requests) == 1
+    assert result.provider_receipts
+
+    checkpoint = service.repository.latest_checkpoint(
+        command.execution_request.execution_id
+    )
+    assert checkpoint is not None
+    last_provider = checkpoint.payload["last_provider"]
+    assert last_provider["late_result_fenced"] is True
+    assert last_provider["text"] == "must never become visible success"
+
+    status = service.status(
+        command.execution_request.execution_id,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert status.execution_state == "cancelled"
+    assert status.failure_code == "cancellation_requested"
+
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
 async def test_coordinator_restart_recovery_uses_durable_submission(tmp_path) -> None:
     service = _service(tmp_path)
     _, command = _bundle()
