@@ -1285,7 +1285,6 @@ def _operation_state(execution_state: ExecutionState) -> OperationState:
     return OperationState.RUNNING
 
 
-
 class EngineExecutionService:
     """Authenticated durable engine submit/status/cancel/events boundary."""
 
