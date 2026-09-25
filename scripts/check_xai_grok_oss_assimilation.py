@@ -101,7 +101,7 @@ def validate() -> list[str]:
     else:
         prompts = excluded.get("grok-prompts", {})
         cookbook = excluded.get("xai-cookbook", {})
-        if prompts.get("license_expression") != "AGPL-3.0-only":
+        if prompts.get("license_expression") != "AGPL-3.0":
             errors.append("grok-prompts AGPL disposition drifted")
         if cookbook.get("license_expression") != "LicenseRef-xAI-Beta-Testing":
             errors.append("xai-cookbook custom-license disposition drifted")
