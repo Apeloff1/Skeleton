@@ -1030,5 +1030,3 @@ class TestOmni:
         got = (plan.enemy_mix["trash"], plan.enemy_mix["elite"], plan.enemy_mix["boss"])
         assert got != (6, 2, 0), got
         assert any("invented mix" in n for n in plan.notes), plan.notes
-
-
