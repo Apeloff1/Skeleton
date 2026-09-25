@@ -93,6 +93,7 @@ on:
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_engine_routes.py"
       - "skeleton/testing/test_engine_media_routes.py"
+      - "skeleton/testing/test_engine_cross_service_boundary.py"
       - "skeleton/testing/test_engine_process_isolation.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
@@ -492,6 +493,7 @@ jobs:
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_engine_routes.py
           skeleton/testing/test_engine_media_routes.py
+          skeleton/testing/test_engine_cross_service_boundary.py
           skeleton/testing/test_engine_process_isolation.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_tool_runtime.py
