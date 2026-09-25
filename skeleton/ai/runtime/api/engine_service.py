@@ -1484,6 +1484,16 @@ class EngineExecutionService:
             for item in pending_ids
             if isinstance(item, str) and item.strip()
         }
+        last_provider = payload.get("last_provider")
+        if not isinstance(last_provider, Mapping):
+            raise EngineServiceError(
+                "durable approval checkpoint is missing provider lineage"
+            )
+        turn_id = str(last_provider.get("turn_id") or "").strip()
+        if not turn_id:
+            raise EngineServiceError(
+                "durable approval checkpoint is missing provider turn_id"
+            )
         rows: list[dict[str, str]] = []
         for raw in calls:
             if not isinstance(raw, Mapping):
@@ -1532,6 +1542,9 @@ class EngineExecutionService:
                     )
                 ),
                 operation_id=operation_id,
+                execution_id=execution.execution_id,
+                turn_id=turn_id,
+                call_id=call_id,
                 tenant_id=operation.tenant_id,
                 tool_id=tool_id,
                 idempotency_key=idempotency_key,
