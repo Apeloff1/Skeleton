@@ -23,7 +23,11 @@ from skeleton.skills.tool_contract import (
     ToolManifest,
     approval_ref_for_request,
 )
-from skeleton.skills.tool_runtime import (\n    AsyncToolRuntime,\n    ToolExecutionConflict,\n    ToolNotFound,\n)
+from skeleton.skills.tool_runtime import (
+    AsyncToolRuntime,
+    ToolExecutionConflict,
+    ToolNotFound,
+)
 
 from .capabilities import CapabilityAuthorizer, CapabilityRegistry
 from .contracts import (
