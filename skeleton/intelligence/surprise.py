@@ -45,29 +45,38 @@ class OnlineGaussian:
         self.m2: float = 0.0
 
     def update(self, x: float) -> None:
+        if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(float(x)):
+            raise SurpriseError("value must be finite", context={"value": repr(x)})
         self.n += 1
-        delta = x - self.mean
+        delta = float(x) - self.mean
         self.mean += delta / self.n
-        self.m2 += delta * (x - self.mean)
+        self.m2 += delta * (float(x) - self.mean)
 
     @property
-    def variance(self) -> float:
-        return self.m2 / (self.n - 1) if self.n > 1 else 0.0
+    def variance(self) -> float | None:
+        if self.n < 2:
+            return None
+        return self.m2 / (self.n - 1)
 
     @property
-    def std(self) -> float:
-        return math.sqrt(self.variance)
+    def std(self) -> float | None:
+        variance = self.variance
+        if variance is None:
+            return None
+        return math.sqrt(variance)
 
     def z_score(self, x: float) -> float:
+        if isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(float(x)):
+            raise SurpriseError("value must be finite", context={"value": repr(x)})
         if self.n < 2:
-            return 0.0
+            raise SurpriseError("z-score needs two observations", context={"n": self.n})
         sd = self.std
         if sd < 1e-12:
-            return 0.0 if abs(x - self.mean) < 1e-12 else float("inf")
-        return (x - self.mean) / sd
+            return 0.0 if abs(float(x) - self.mean) < 1e-12 else float("inf")
+        return (float(x) - self.mean) / sd
 
-    def snapshot(self) -> Dict[str, float]:
-        return {"n": self.n, "mean": self.mean, "m2": self.m2}
+    def snapshot(self) -> Dict[str, float | None]:
+        return {"n": self.n, "mean": None if self.n == 0 else self.mean, "variance": self.variance}
 
 
 @dataclass
@@ -102,10 +111,14 @@ class SurpriseScorer:
 
     def observe(self, channel: str, value: float, *,
                 learn: bool = True, now: Optional[float] = None) -> SurpriseReading:
-        if not math.isfinite(value):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
             raise SurpriseError("value must be finite", context={"channel": channel, "value": repr(value)})
         now = time.time() if now is None else now
         stats = self._channels.setdefault(channel, OnlineGaussian())
+        if stats.n < 2:
+            if learn:
+                stats.update(value)
+            raise SurpriseError("surprise needs two observations", context={"channel": channel, "n": stats.n})
 
         z = stats.z_score(value)
         z_capped = min(abs(z) if math.isfinite(z) else self.max_z, self.max_z)
