@@ -824,9 +824,13 @@
       "plane": "product-experience",
       "stage": 7,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
+        "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+      ],
       "closure_evidence_required": [
         "browser E2E suite",
         "API trace continuity",
@@ -834,10 +838,14 @@
         "degraded-mode assertions"
       ],
       "outstanding_evidence": [
-        "browser E2E suite",
-        "API trace continuity",
-        "artifact/result assertions",
-        "degraded-mode assertions"
+        "assembled browser E2E suite across frontend/backend/engine boundaries",
+        "assembled API/browser trace continuity through operation stream replay",
+        "browser-visible artifact/result linkage assertions",
+        "engine-outage and browser degraded-mode assertions",
+        "write-tool approval expiry and resume fault journey",
+        "governance delete/export assembled journey",
+        "all declared lower-stage dependency gaps closed",
+        "exact-head App Assembly and focused Stage-7 journey validation"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
@@ -852,7 +860,9 @@
         "dependency must close: gap-verification-evidence-contract",
         "dependency must close: gap-cognitive-execution-loop",
         "dependency must close: gap-engine-application-execution-boundary",
-        "dependency must close: gap-streaming-protocol"
+        "dependency must close: gap-streaming-protocol",
+        "assembled browser/API Stage-7 closure evidence remains outstanding",
+        "exact-head Stage-7 validation remains outstanding"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
