@@ -45,7 +45,7 @@ def test_compose_only_dependency_edge_is_rejected() -> None:
     manifest = _manifest()
     compose_model = _compose_model_from_manifest(manifest)
     backend = compose_model["services"]["backend"]
-    backend["depends_on"]["skeleton"] = {
+    backend["depends_on"]["chroma"] = {
         "condition": "service_started",
         "required": True,
     }
@@ -53,7 +53,9 @@ def test_compose_only_dependency_edge_is_rejected() -> None:
     errors = parity_errors(manifest, compose_model)
 
     assert errors == [
-        "backend: depends_on drift: manifest=['mongo'] compose=['mongo', 'skeleton']"
+        "backend: depends_on drift: "
+        "manifest=['mongo', 'skeleton'] "
+        "compose=['chroma', 'mongo', 'skeleton']"
     ]
 
 
