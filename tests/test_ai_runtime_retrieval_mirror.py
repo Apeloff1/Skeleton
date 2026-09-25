@@ -33,12 +33,27 @@ def test_retrieval_runtime_mirror_is_exact(relative: str) -> None:
 
 @pytest.mark.parametrize(
     "relative",
-    ("core.py", "rag.py", "cag.py", "mag.py", "reconciliation.py"),
+    ("core.py", "rag.py", "cag.py", "mag.py", "projection.py", "reconciliation.py"),
 )
 def test_scoped_memory_runtime_mirror_is_exact(relative: str) -> None:
     root = Path(__file__).resolve().parents[1]
     canonical = (root / "skeleton" / "memory" / relative).read_text(encoding="utf-8")
     mirror = (
         root / "skeleton" / "ai" / "runtime" / "memory" / relative
+    ).read_text(encoding="utf-8")
+    assert mirror == canonical, relative
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ("__init__.py", "memory_repository.py"),
+)
+def test_persistence_runtime_mirror_is_exact(relative: str) -> None:
+    root = Path(__file__).resolve().parents[1]
+    canonical = (root / "skeleton" / "persistence" / relative).read_text(
+        encoding="utf-8"
+    )
+    mirror = (
+        root / "skeleton" / "ai" / "runtime" / "persistence" / relative
     ).read_text(encoding="utf-8")
     assert mirror == canonical, relative
