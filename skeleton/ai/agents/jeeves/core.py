@@ -1451,10 +1451,13 @@ class Jeeves:
     def observe_run(self, *, era: str, walk: dict[str, Any], plan: dict[str, Any],
                     vision: str = "") -> dict[str, Any]:
         """Ingest a finished forge-run so own-system can recall extract outcomes."""
-        extracted = bool((walk or {}).get("extracted"))
-        collapsed = bool((walk or {}).get("collapsed"))
-        hops = (walk or {}).get("hops")
-        cores = (walk or {}).get("cores")
+        normalized_walk = dict(walk or {})
+        extracted = bool(normalized_walk.get("extracted"))
+        collapsed = bool(normalized_walk.get("collapsed"))
+        normalized_walk["extracted"] = extracted
+        normalized_walk["collapsed"] = collapsed
+        hops = normalized_walk.get("hops")
+        cores = normalized_walk.get("cores")
         bias = (plan or {}).get("room_bias") or "balanced"
         mix = (plan or {}).get("enemy_mix") or {}
         trash = float(mix.get("trash") or 0)
@@ -1465,7 +1468,7 @@ class Jeeves:
         slack = ((collapse - t) / collapse) if (extracted and collapse > 0 and t > 0) else (
             0.0 if (collapsed or not extracted) else 1.0
         )
-        self.last_walk = dict(walk or {})
+        self.last_walk = dict(normalized_walk)
         self.last_walk["era"] = era
         self.last_walk["bias"] = bias
         self.last_walk["slack"] = slack
@@ -1481,7 +1484,7 @@ class Jeeves:
             f"forge run {era} {vision} extract {extracted} "
             f"hops {hops} cores {cores} bias {bias}"
         )
-        trace = self.think(stim, context={"walk": walk, "plan": plan, "era": era, "reference": (ref or {}).get("ref")})
+        trace = self.think(stim, context={"walk": normalized_walk, "plan": plan, "era": era, "reference": (ref or {}).get("ref")})
         from skeleton.cortex.distill import ability_from
         from skeleton.cortex.port import Thought
         observed = Thought(
@@ -1534,8 +1537,16 @@ class Jeeves:
         }
 
     def bind_pack(self, pack: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(pack, dict):
+            raise TypeError("pack must be an object")
+        # A compiled blend carries a synthetic era id such as
+        # "arcade_golden_age~soulslike@0.50". Lazy TacticalBrain creation
+        # must not try to recompile that synthetic id as a catalog era.
+        # Create the brain from the current canonical default first, then
+        # bind the already-compiled authoritative pack.
+        brain = self._brain_get()
+        pack = brain.bind_pack(pack)
         self.era = str(pack.get("era") or self.era)
-        pack = self._brain_get().bind_pack(pack)
         self._bus.emit("jeeves.era.bound", {"era": pack["era"], "dps": pack["primary_dps"]})
         return pack
 
@@ -1560,6 +1571,11 @@ class Jeeves:
         from skeleton.jeeves.builder import BuilderBrain
         if vision:
             pack = self.bind_era(vision)
+        if pack is None and self._brain is not None:
+            # Reuse the already-bound compiled authority. This matters for
+            # synthetic blend ids, which are valid compiled packs but are not
+            # catalog era names and therefore must not be recompiled.
+            pack = dict(self._brain.pack)
         if pack is None:
             from skeleton.forge.eras import compile_era
             pack = compile_era(self.era)
