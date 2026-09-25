@@ -554,6 +554,10 @@ def command_from_context(
         )
 
     reserved_output = int(context.budget.reserved_output_tokens)
+    if reserved_output <= 0:
+        raise EngineProtocolError(
+            "compiled context requires positive output reserve"
+        )
     if max_output_tokens is None:
         resolved_output_tokens = reserved_output
     else:
