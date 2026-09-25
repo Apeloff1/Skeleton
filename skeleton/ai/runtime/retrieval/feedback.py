@@ -1,6 +1,6 @@
 """Retrieval feedback — close the plane-weight learning loop (BACKLOG F-2).
 
-HTTP stays thin: validate used/all planes, then :meth:`QuadRetriever.observe`.
+HTTP stays thin: validate used/all planes, then QuadRetriever.observe.
 Pure enough to unit-test without booting the FastAPI app.
 """
 
@@ -20,7 +20,7 @@ def _normalize_planes(raw: Sequence[Any], *, field: str) -> List[str]:
             f"unknown plane(s){' in ' + field if field != 'used_planes' else ''}: {', '.join(unknown)}",
             context={"unknown": unknown, "allowed": list(PLANES), "field": field},
         )
-    return planes
+    return list(dict.fromkeys(planes))
 
 
 def record_plane_feedback(
@@ -29,7 +29,7 @@ def record_plane_feedback(
     *,
     all_planes: Optional[Iterable[Any]] = None,
 ) -> Dict[str, Any]:
-    """Validate plane names and feed them into ``quad.observe``."""
+    """Validate plane names and feed them into quad.observe."""
     if used_planes is None:
         raise RetrievalFeedbackError(
             "used_planes is required",
@@ -44,12 +44,23 @@ def record_plane_feedback(
 
     considered = None
     if all_planes is not None:
-        if not isinstance(all_planes, (list, tuple)):
+        if not isinstance(all_planes, (list, tuple)) or not all_planes:
             raise RetrievalFeedbackError(
-                "all_planes must be a list when provided",
+                "all_planes must be a non-empty list when provided",
                 context={"field": "all_planes"},
             )
         considered = _normalize_planes(list(all_planes), field="all_planes")
+        missing = sorted(set(used) - set(considered))
+        if missing:
+            raise RetrievalFeedbackError(
+                "used_planes must be a subset of all_planes",
+                context={
+                    "field": "all_planes",
+                    "missing": missing,
+                    "used_planes": used,
+                    "all_planes": considered,
+                },
+            )
 
     stats = quad.observe(used, all_planes=considered)
     return {"status": "ok", "used_planes": used, "learner": stats}
