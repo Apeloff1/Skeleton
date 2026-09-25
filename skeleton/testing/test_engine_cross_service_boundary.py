@@ -296,6 +296,9 @@ async def test_cross_service_cancel_fences_late_provider_result(tmp_path) -> Non
     assert len(result_events) == 1
     assert result_events[0]["result"]["status"] == "cancelled"
     assert result_events[0]["result"]["final_output"] is None
-    assert result_events[0]["result"]["error_code"] == "cancellation_requested"
+    assert (
+        result_events[0]["result"]["usage"]["error_code"]
+        == "cancellation_requested"
+    )
 
     await coordinator.shutdown()
