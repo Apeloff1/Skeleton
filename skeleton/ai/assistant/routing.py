@@ -96,7 +96,7 @@ def infer_signals(request: AssistantRequest) -> IntentSignals:
     metadata = request.metadata
 
     artifact = _artifact_from_metadata(metadata)
-    if artifact is None:
+    if artifact is None and _CREATE_ARTIFACT.search(text):
         for kind, pattern in _ARTIFACT_PATTERNS:
             if pattern.search(text):
                 artifact = kind
