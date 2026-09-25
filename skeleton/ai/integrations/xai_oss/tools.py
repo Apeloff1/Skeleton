@@ -201,6 +201,21 @@ class XAIToolBuilder:
         extra_headers: dict[str, str] | None = None,
     ):
         self.policy.require(XAIToolKind.MCP)
+        if authorization is not None and (
+            not authorization or "\\r" in authorization or "\\n" in authorization
+        ):
+            raise ValueError("MCP authorization must be non-empty and single-line")
+        if extra_headers is not None:
+            for name, value in extra_headers.items():
+                if (
+                    not name
+                    or not value
+                    or "\\r" in name
+                    or "\\n" in name
+                    or "\\r" in value
+                    or "\\n" in value
+                ):
+                    raise ValueError("MCP extra headers must be non-empty and single-line")
         module = self._tools()
         return module.mcp(
             server_url=spec.server_url,
