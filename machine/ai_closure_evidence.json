@@ -399,7 +399,10 @@
         "skeleton/testing/test_tool_runtime.py manifest governance invariant regression set",
         "skeleton/skills/tool_runtime.py AdmissionRuntime cost/tool-call reconciliation from manifest cost_model",
         "skeleton/skills/tool_runtime.py per-tool max_concurrency semaphore enforcement",
-        "skeleton/testing/test_tool_runtime.py cost-before-effect and concurrency regressions"
+        "skeleton/testing/test_tool_runtime.py cost-before-effect and concurrency regressions",
+        "backend/services/tool_registry.py governed CompatibilityResultStore with restart-persistent lifecycle metadata and fail-closed registration",
+        "backend/services/tool_registry.py output-schema/result-size enforcement plus retention/capacity deletion lifecycle",
+        "backend/tests/test_tool_registry_canonical_delegate.py governed result restart/fail-closed/capacity/retention regression suite"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
