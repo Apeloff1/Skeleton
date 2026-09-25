@@ -68,6 +68,57 @@ def _parse_ok(text: str, target: str) -> tuple[bool, str]:
         return False, f"parse_error: {type(exc).__name__}"
 
 
+def _semantic_issues(text: str, target: str) -> tuple[str, ...]:
+    """Validate the canonical structured Forge artefact contract.
+
+    JSON/YAML output is data, not executable source code.  Parseability and the
+    Forge envelope are hard gates; generic CodeVerifier heuristics remain
+    advisory evidence because code-likeness is not a meaningful acceptance
+    criterion for a serialized blueprint.
+    """
+
+    try:
+        payload = json.loads(text) if target == "json" else _yaml.safe_load(text)
+    except Exception:
+        return ()
+
+    if not isinstance(payload, dict):
+        return ("forge structured artefact root must be an object",)
+
+    required = {
+        "blueprint_id": str,
+        "name": str,
+        "era": str,
+        "topology": dict,
+        "execution_order": list,
+        "plan": dict,
+    }
+    issues: list[str] = []
+    for key, expected_type in required.items():
+        value = payload.get(key)
+        if not isinstance(value, expected_type):
+            issues.append(f"forge structured artefact {key} has invalid type")
+            continue
+        if isinstance(value, str) and not value.strip():
+            issues.append(f"forge structured artefact {key} is empty")
+
+    order = payload.get("execution_order")
+    if isinstance(order, list) and (
+        not order
+        or any(not isinstance(item, str) or not item.strip() for item in order)
+        or len(order) != len(set(order))
+    ):
+        issues.append("forge structured artefact execution_order is invalid")
+
+    topology = payload.get("topology")
+    if isinstance(topology, dict):
+        components = topology.get("components")
+        if not isinstance(components, (dict, list)) or not components:
+            issues.append("forge structured artefact topology has no components")
+
+    return tuple(issues)
+
+
 def _verification_dict(
     *,
     accepted: bool,
@@ -144,11 +195,20 @@ def verify_structured(
     issues: list[str] = []
     if not parsed:
         issues.append(parse_err or "parse_error")
-    issues.extend(list(verdict.issues))
-    # Parse gate is hard; CodeVerifier confidence is the soft score.
-    score = 0.0 if not parsed else float(verdict.confidence)
-    accepted = bool(parsed and score >= threshold)
-    reason = "accepted" if accepted else ("parse_error" if not parsed else "low_score")
+    semantic_issues = () if not parsed else _semantic_issues(text, target)
+    issues.extend(semantic_issues)
+
+    # Structured Forge output is data, not source code. Parseability plus the
+    # canonical Forge envelope are the hard acceptance boundary. CodeVerifier
+    # remains attached above as advisory evidence, but its code-likeness score
+    # cannot reject valid JSON/YAML serialization.
+    accepted = bool(parsed and not semantic_issues)
+    score = 1.0 if accepted else 0.0
+    reason = (
+        "accepted"
+        if accepted
+        else ("parse_error" if not parsed else "semantic_invalid")
+    )
     payload = _verification_dict(
         accepted=accepted,
         score=score,
