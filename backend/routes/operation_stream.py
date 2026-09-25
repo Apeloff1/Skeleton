@@ -181,6 +181,32 @@ def operation_event_replay(
     return {"ok": True, **batch.as_dict()}
 
 
+@router.get("/{operation_id}/events/resync")
+def operation_event_resync(
+    operation_id: str,
+    consumer_id: str = Query(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=_CONSUMER_PATTERN,
+    ),
+    user=Depends(require_role("viewer")),
+) -> dict[str, Any]:
+    """Return authoritative operation state and a safe retained replay floor."""
+
+    tenant_id = _principal_tenant(user)
+    try:
+        snapshot = _transport().resync_snapshot(
+            operation_id,
+            tenant_id=tenant_id,
+            consumer_id=consumer_id,
+            consumer_lease_seconds=_CONSUMER_LEASE_SECONDS,
+        )
+    except Exception as exc:
+        raise _map_transport_error(exc) from None
+    return {"ok": True, **snapshot.as_dict()}
+
+
 @router.post("/{operation_id}/events/ack")
 def acknowledge_operation_events(
     operation_id: str,
@@ -191,7 +217,7 @@ def acknowledge_operation_events(
 
     tenant_id = _principal_tenant(user)
     try:
-        checkpoint = _transport().acknowledge(
+        acknowledgement = _transport().acknowledge_and_compact(
             operation_id,
             tenant_id=tenant_id,
             consumer_id=body.consumer_id,
@@ -200,7 +226,7 @@ def acknowledge_operation_events(
         )
     except Exception as exc:
         raise _map_transport_error(exc) from None
-    return {"ok": True, "consumer": checkpoint.as_dict()}
+    return {"ok": True, **acknowledgement.as_dict()}
 
 
 @router.get("/{operation_id}/events")
@@ -303,6 +329,7 @@ __all__ = [
     "router",
     "operation_event_replay",
     "acknowledge_operation_events",
+    "operation_event_resync",
     "_last_event_sequence",
     "_principal_tenant",
 ]
