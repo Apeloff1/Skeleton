@@ -657,7 +657,12 @@
         "bounded image/speech transport normalization tests",
         "application image/TTS routes delegate to engine media boundary",
         "source-level process-isolation invariant requires zero backend ProviderRegistry.from_env activators",
-        "canonical Compose contains no backend runtime model-provider credential"
+        "canonical Compose contains no backend runtime model-provider credential",
+        "backend->engine authenticated submit/status/cancel boundary test",
+        "delegated tenant/capability/token denial test",
+        "submit retry returns same operation/execution without duplicate provider work",
+        "idempotent cancel plus late-result fencing test",
+        "cross-service golden journey preserves operation/turn/provider/tool/evidence/result lineage"
       ],
       "closure_evidence_required": [
         "backend->engine authenticated submit test",
@@ -673,12 +678,8 @@
       ],
       "outstanding_evidence": [
         "exact-head App Assembly proves zero production backend ProviderRegistry.from_env activators",
-        "backend->engine authenticated submit test against deployed service boundary",
-        "delegated tenant/user/scope validation test across deployed service boundary",
-        "submit retry returns same operation/execution rather than duplicate work across deployed service boundary",
-        "idempotent cancel and late-result fencing test across service transport",
-        "provider execution occurs only in Skeleton service in production topology",
-        "cross-service golden journey preserves operation/turn/receipt lineage"
+        "exact-head canonical Compose validation proves runtime model-provider credentials exist only in Skeleton engine process",
+        "all declared lower-stage dependency gaps are closed"
       ],
       "blockers": [
         "dependency must close: gap-cognitive-execution-loop",
