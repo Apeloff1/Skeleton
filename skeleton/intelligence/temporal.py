@@ -30,6 +30,9 @@ class TemporalEvent:
         return other.before(self)
 
     def overlaps(self, other: "TemporalEvent") -> bool:
+        for event in (self, other):
+            if event.duration is not None and event.duration < 0:
+                raise ValueError("duration must be non-negative")
         if self.duration is None or other.duration is None:
             return False
         return (
@@ -103,13 +106,17 @@ class TemporalReasoner:
                 confidence = 0.5 + 0.5 * (len(pattern) / (len(pattern) + 10))
                 predictions.setdefault(next_event, []).append(confidence)
 
-        # Average confidences
-        result = [
-            (eid, sum(confs) / len(confs))
-            for eid, confs in predictions.items()
-            if sum(confs) / len(confs) >= confidence_threshold
-        ]
-        return sorted(result, key=lambda x: x[1], reverse=True)
+        # Frequency is evidence. Averaging identical confidences threw it
+        # away, so a pattern seen twice scored the same as a pattern seen once.
+        result = []
+        for eid, confs in predictions.items():
+            miss = 1.0
+            for conf in confs:
+                miss *= 1.0 - conf
+            confidence = 1.0 - miss
+            if confidence >= confidence_threshold:
+                result.append((eid, confidence))
+        return sorted(result, key=lambda item: (-item[1], item[0]))
 
     def allen_relation(self, a: TemporalEvent, b: TemporalEvent) -> str:
         """
@@ -117,6 +124,9 @@ class TemporalReasoner:
         Returns one of: before, meets, overlaps, starts, during, finishes,
         equal, after, met-by, overlapped-by, started-by, contains, finished-by.
         """
+        for event in (a, b):
+            if event.duration is not None and event.duration < 0:
+                raise ValueError("duration must be non-negative")
         if a.duration is None or b.duration is None:
             # Point events: use simple before/after/equal
             if a.timestamp < b.timestamp:
