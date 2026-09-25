@@ -94,14 +94,20 @@
         "provider text usage reconciliation from returned token usage",
         "image/speech artifact-byte reconciliation",
         "media provider admission through the shared runtime",
-        "quota exhaustion and shared saturation regression coverage"
+        "quota exhaustion and shared saturation regression coverage",
+        "skeleton/intelligence/quota_sqlite.py restart-safe quota/window owner",
+        "skeleton/testing/test_tenant_quota_sqlite.py durable restart/race evidence",
+        "skeleton/intelligence/admission_runtime.py aggregate estimate/actual/delta telemetry",
+        "skeleton/testing/test_admission_runtime.py payload-free telemetry regression",
+        "skeleton/skills/tool_runtime.py manifest-aware tool usage accounting"
       ],
       "remaining": [
-        "durable tenant quota/window persistence and restart recovery",
-        "estimate-vs-actual cost telemetry in the canonical observability plane",
-        "actual tool and storage usage accounting",
         "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment"
+        "cross-process/distributed pressure feed for multi-worker deployment",
+        "bind actual storage usage to artifact/storage admission receipts",
+        "admit every expensive non-provider action before allocation",
+        "add shared multi-worker pressure coordination",
+        "collect fresh exact-head cost/admission telemetry and quota verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
