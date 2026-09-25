@@ -7,10 +7,20 @@ ids, and a digest. It does not paste episode bodies into shared retrieval.
 from __future__ import annotations
 
 import hashlib
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
-from skeleton.kernel.primitives import EventBus
 from skeleton.memory.types import MemoryChunk
+
+
+@runtime_checkable
+class _EventEmitter(Protocol):
+    def emit(
+        self,
+        topic: str,
+        payload: dict[str, Any],
+        *,
+        correlation_id: str = "",
+    ) -> Any: ...
 
 
 class DreamError(RuntimeError):
@@ -20,13 +30,13 @@ class DreamError(RuntimeError):
 class DreamEngine:
     """Consolidate MAG tag clusters into idempotent RAG theme records."""
 
-    def __init__(self, mag: Any, rag: Any, bus: EventBus | None = None) -> None:
+    def __init__(self, mag: Any, rag: Any, bus: _EventEmitter | None = None) -> None:
         if not hasattr(mag, "clusters") or not hasattr(mag, "user_id"):
             raise TypeError("mag must expose user_id and clusters()")
         if not hasattr(rag, "add"):
             raise TypeError("rag must expose add()")
-        if bus is not None and not isinstance(bus, EventBus):
-            raise TypeError("bus must be an EventBus")
+        if bus is not None and not isinstance(bus, _EventEmitter):
+            raise TypeError("bus must expose emit()")
         self._mag = mag
         self._rag = rag
         self._bus = bus
