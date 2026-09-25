@@ -18,7 +18,10 @@
 from __future__ import annotations
 import base64
 import re
+import uuid
 from typing import Dict, List, Optional
+
+from core.engine_client import EngineClient, EngineClientError
 
 TTS_LIMIT = 4096
 
@@ -166,20 +169,24 @@ async def generate_expressive_tts(
     if not spoken:
         raise ValueError("No text to speak")
 
-    from core.ai_provider import ProviderRegistry, ProviderSpeechRequest
-
-    adapter = ProviderRegistry.from_env().require_active()
-    response = await adapter.synthesize_speech(
-        ProviderSpeechRequest(
-            text=spoken,
-            model="tts-1-hd",
-            voice=voice,
-            speed=speed,
-            response_format="mp3",
-            purpose="expressive-speech-synthesis",
-        )
+    client = EngineClient.from_env()
+    if client is None:
+        raise EngineClientError("canonical engine is not configured")
+    operation_id = str(uuid.uuid4())
+    response = await client.synthesize_speech(
+        actor_id="expressive-tts",
+        tenant_id="default",
+        operation_id=operation_id,
+        text=spoken,
+        voice=voice,
+        speed=speed,
+        response_format="mp3",
+        trace_id="expressive-tts:" + operation_id,
     )
-    audio_b64 = base64.b64encode(response.audio).decode("ascii")
+    audio = response.get("audio")
+    if not isinstance(audio, (bytes, bytearray)) or not audio:
+        raise EngineClientError("engine speech response is missing audio")
+    audio_b64 = base64.b64encode(bytes(audio)).decode("ascii")
     return {
         "audio_base64": audio_b64,
         "format": "mp3",
