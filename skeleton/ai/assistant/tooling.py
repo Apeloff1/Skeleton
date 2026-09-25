@@ -50,7 +50,7 @@ class ToolCoordinator:
         self.registry = registry
         self.authorizer = authorizer or CapabilityAuthorizer()
         self._handlers: dict[str, CapabilityHandler] = {}
-        self._receipts: dict[str, tuple[str, ToolRunResult]] = {}
+        self._receipts: dict[tuple[str, str], tuple[str, ToolRunResult]] = {}
         self._request_call_counts: dict[str, int] = {}
 
     def bind(self, capability_id: str, handler: CapabilityHandler) -> None:
@@ -104,7 +104,8 @@ class ToolCoordinator:
             raise ToolCoordinatorError("capability input exceeds declared bound")
 
         binding = self._proposal_binding(proposal)
-        prior = self._receipts.get(proposal.idempotency_key)
+        idempotency_scope = (request.digest, proposal.idempotency_key)
+        prior = self._receipts.get(idempotency_scope)
         if prior is not None:
             prior_binding, result = prior
             if prior_binding != binding:
@@ -222,7 +223,7 @@ class ToolCoordinator:
             )
             result = ToolRunResult(receipt=receipt, output=None)
 
-        self._receipts[proposal.idempotency_key] = (binding, result)
+        self._receipts[idempotency_scope] = (binding, result)
         return result
 
     def reset_request_budget(self, request_digest: str) -> None:
