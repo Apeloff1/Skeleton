@@ -74,6 +74,8 @@ class McpOffer:
     tool_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
+        if not isinstance(self.tier, McpTier):
+            object.__setattr__(self, "tier", McpTier(str(self.tier)))
         if not self.server_name.strip():
             raise ValueError("server_name must be non-empty")
         if len(set(self.tool_ids)) != len(self.tool_ids):
