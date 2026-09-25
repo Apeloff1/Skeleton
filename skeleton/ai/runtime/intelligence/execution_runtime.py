@@ -895,6 +895,84 @@ class CognitiveExecutionRuntime:
             )
         )
 
+        # Provider I/O may outlive a concurrent cancellation request (or the
+        # execution deadline). Never transition using the stale pre-call
+        # execution snapshot. Re-read canonical state, account for the provider
+        # work that actually happened, and fence the late result before it can
+        # become user-visible success.
+        durable_after_provider = self.repository.get(
+            execution.execution_id
+        )
+        if (
+            durable_after_provider.cancellation_requested
+            or self._deadline_expired(payload, now=now)
+        ):
+            late_provider_ref = (
+                "provider:"
+                + response.provider
+                + ":"
+                + str(
+                    response.response_id
+                    or response.request_id
+                    or turn_id
+                )
+            )
+            late_receipts = list(
+                payload.get("provider_receipts", [])
+            )
+            late_receipts.append(late_provider_ref)
+            late_usage = list(payload.get("usage_events", []))
+            late_usage.append(response.usage.as_dict())
+            payload.update(
+                {
+                    "provider_receipts": late_receipts,
+                    "usage_events": late_usage,
+                    "last_provider": {
+                        "turn_id": turn_id,
+                        "turn_index": turn_index,
+                        "provider_ref": late_provider_ref,
+                        "provider_request_id": response.request_id,
+                        "provider_response_id": response.response_id,
+                        "text": response.text,
+                        "structured_output": (
+                            None
+                            if response.structured_output is None
+                            else dict(response.structured_output)
+                        ),
+                        "tool_calls": [
+                            call.as_dict()
+                            for call in response.tool_calls
+                        ],
+                        "finish_reason": response.finish_reason.value,
+                        "usage": response.usage.as_dict(),
+                        "late_result_fenced": True,
+                    },
+                }
+            )
+            durable_after_provider, _ = self._checkpoint(
+                durable_after_provider,
+                payload,
+                now=now,
+            )
+            if durable_after_provider.cancellation_requested:
+                return self._finalize_non_success(
+                    durable_after_provider,
+                    payload,
+                    status="cancelled",
+                    error_code="cancellation_requested",
+                    now=now,
+                )
+            return self._finalize_non_success(
+                durable_after_provider,
+                payload,
+                status="failed",
+                error_code="execution_deadline_exceeded",
+                now=now,
+            )
+
+        execution = durable_after_provider
+
+
         execution = self._transition(
             execution,
             ExecutionState.PROVIDER_COMPLETED,
