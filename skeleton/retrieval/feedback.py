@@ -64,3 +64,46 @@ def record_plane_feedback(
 
     stats = quad.observe(used, all_planes=considered)
     return {"status": "ok", "used_planes": used, "learner": stats}
+
+
+def record_attributed_feedback(
+    quad: Any,
+    receipt_id: str,
+    used_fragment_ids: Iterable[Any],
+) -> Dict[str, Any]:
+    """Apply feedback to one concrete retrieval receipt exactly once."""
+    if not isinstance(receipt_id, str) or not receipt_id.strip():
+        raise RetrievalFeedbackError(
+            "receipt_id must be a non-empty string",
+            context={"field": "receipt_id"},
+        )
+    if isinstance(used_fragment_ids, (str, bytes)) or not isinstance(
+        used_fragment_ids, (list, tuple)
+    ):
+        raise RetrievalFeedbackError(
+            "used_fragment_ids must be a list",
+            context={"field": "used_fragment_ids"},
+        )
+    if any(not isinstance(item, str) or not item for item in used_fragment_ids):
+        raise RetrievalFeedbackError(
+            "used_fragment_ids must contain non-empty strings",
+            context={"field": "used_fragment_ids"},
+        )
+
+    try:
+        stats = quad.observe_receipt(receipt_id.strip(), list(used_fragment_ids))
+    except (KeyError, ValueError, TypeError) as exc:
+        raise RetrievalFeedbackError(
+            str(exc),
+            context={
+                "field": "receipt_id",
+                "receipt_id": receipt_id.strip(),
+            },
+        ) from exc
+
+    return {
+        "status": "ok",
+        "receipt_id": receipt_id.strip(),
+        "used_fragment_ids": list(dict.fromkeys(used_fragment_ids)),
+        "learner": stats,
+    }
