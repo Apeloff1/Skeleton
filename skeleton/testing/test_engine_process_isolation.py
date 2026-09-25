@@ -150,6 +150,8 @@ def test_engine_service_auth_token_is_scoped_to_backend_and_engine() -> None:
 
     assert marker in skeleton
     assert marker in backend
+    assert skeleton.count(marker) == 1
+    assert backend.count(marker) == 1
     assert "SKL_ENGINE_SERVICE_TOKEN=" not in frontend
 
 
