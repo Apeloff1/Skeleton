@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from skeleton.skills.tool_contract import approval_ref_for_request
+from skeleton.skills.tool_runtime import ToolExecutionConflict
 
 
 @pytest.fixture
@@ -509,7 +510,7 @@ async def test_backend_delegate_rejects_idempotency_reuse_with_changed_call_line
     assert first["ok"] is True
 
     with pytest.raises(
-        registry.ToolExecutionConflict,
+        ToolExecutionConflict,
         match="different tool or arguments",
     ):
         await registry.invoke_canonical(
