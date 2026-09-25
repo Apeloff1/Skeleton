@@ -11,7 +11,10 @@ from skeleton.api.engine_service import (
     EngineExecutionService,
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
-from skeleton.intelligence.execution_runtime import CognitiveExecutionRuntime
+from skeleton.intelligence.execution_runtime import (
+    CognitiveExecutionRuntime,
+    VerificationHook,
+)
 from skeleton.provider_runtime import (
     AIMessage,
     ProviderRegistry,
@@ -39,12 +42,14 @@ class EngineExecutionCoordinator:
         *,
         provider_registry: ProviderRegistry | None = None,
         tool_runtime: AsyncToolRuntime | None = None,
+        verification_hook: VerificationHook | None = None,
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
         self.service = service
         self.provider_registry = provider_registry or ProviderRegistry.from_env()
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
+        self.verification_hook = verification_hook
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._closed = False
@@ -171,6 +176,7 @@ class EngineExecutionCoordinator:
             self.service.repository,
             provider,
             self.tool_runtime,
+            verification_hook=self.verification_hook,
         )
         history = tuple(
             AIMessage(role=role, content=content)
