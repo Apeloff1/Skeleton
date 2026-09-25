@@ -349,3 +349,68 @@ test('authoritative terminal output is independently content bounded', () => {
   assert.equal(state.error, 'authoritative_content_exceeds_content_budget');
   assert.equal(state.terminal, false);
 });
+
+test('same event id with altered payload is a duplicate conflict', () => {
+  let state = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+      event_id: 'stable-event',
+      payload: { delta: 'first' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+      event_id: 'stable-event',
+      payload: { delta: 'tampered' },
+    }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'duplicate_event_id_conflict');
+  assert.equal(state.lastSequence, 1);
+  assert.equal(state.provisionalContent, 'first');
+});
+
+test('same event id with reordered payload keys remains an exact duplicate', () => {
+  const accepted = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    event(1, 'operation.running', {
+      event_id: 'stable-event',
+      payload: { state: 'running', version: 2, trace_id: 'trace-1' },
+    }),
+  );
+  const duplicate = reduceOperationEvent(
+    accepted,
+    event(1, 'operation.running', {
+      event_id: 'stable-event',
+      payload: { trace_id: 'trace-1', version: 2, state: 'running' },
+    }),
+  );
+
+  assert.deepEqual(duplicate, accepted);
+});
+
+test('malformed payload fails closed instead of crashing reducer', () => {
+  const malformed = event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+    payload: null,
+  });
+  const state = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    malformed,
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'invalid_event_identity');
+  assert.equal(state.lastSequence, 0);
+});
+
+test('missing event timestamp fails closed', () => {
+  const state = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    event(1, 'operation.running', { timestamp: '' }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'invalid_event_identity');
+});
