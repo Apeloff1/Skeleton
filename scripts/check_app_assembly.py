@@ -301,29 +301,119 @@ def audit_endpoint_boundary() -> None:
 
 
 def _provider_registry_names(tree: ast.AST) -> set[str]:
-    """Return local names that are imported as ProviderRegistry."""
+    """Return all local names that resolve to ProviderRegistry."""
 
     names = {"ProviderRegistry"}
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.ImportFrom):
-            continue
-        for alias in node.names:
-            if alias.name == "ProviderRegistry":
-                names.add(alias.asname or alias.name)
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    if alias.name == "ProviderRegistry":
+                        local = alias.asname or alias.name
+                        if local not in names:
+                            names.add(local)
+                            changed = True
+                continue
+
+            value: ast.AST | None = None
+            targets: list[ast.AST] = []
+            if isinstance(node, ast.Assign):
+                value = node.value
+                targets = list(node.targets)
+            elif isinstance(node, ast.AnnAssign):
+                value = node.value
+                targets = [node.target]
+            if value is None:
+                continue
+
+            registry_value = (
+                isinstance(value, ast.Name) and value.id in names
+            ) or (
+                isinstance(value, ast.Attribute)
+                and value.attr == "ProviderRegistry"
+            )
+            if not registry_value:
+                continue
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id not in names:
+                    names.add(target.id)
+                    changed = True
     return names
 
 
-def _is_provider_registry_from_env_call(node: ast.Call, names: set[str]) -> bool:
+def _provider_registry_activation_aliases(
+    tree: ast.AST,
+    names: set[str],
+) -> set[str]:
+    """Return local callables assigned from ProviderRegistry.from_env."""
+
+    aliases: set[str] = set()
+    for node in ast.walk(tree):
+        value: ast.AST | None = None
+        targets: list[ast.AST] = []
+        if isinstance(node, ast.Assign):
+            value = node.value
+            targets = list(node.targets)
+        elif isinstance(node, ast.AnnAssign):
+            value = node.value
+            targets = [node.target]
+        if not isinstance(value, ast.Attribute) or value.attr != "from_env":
+            continue
+        receiver = value.value
+        registry_receiver = (
+            isinstance(receiver, ast.Name) and receiver.id in names
+        ) or (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "ProviderRegistry"
+        )
+        if not registry_receiver:
+            continue
+        for target in targets:
+            if isinstance(target, ast.Name):
+                aliases.add(target.id)
+    return aliases
+
+
+def _is_provider_registry_from_env_call(
+    node: ast.Call,
+    names: set[str],
+    activation_aliases: set[str] | None = None,
+) -> bool:
+    aliases = activation_aliases or set()
     func = node.func
-    if not isinstance(func, ast.Attribute) or func.attr != "from_env":
-        return False
 
-    receiver = func.value
-    if isinstance(receiver, ast.Name):
-        return receiver.id in names
+    if isinstance(func, ast.Name):
+        return func.id in aliases
 
-    # Also catch qualified calls such as provider_runtime.ProviderRegistry.from_env().
-    return isinstance(receiver, ast.Attribute) and receiver.attr == "ProviderRegistry"
+    if isinstance(func, ast.Attribute) and func.attr == "from_env":
+        receiver = func.value
+        if isinstance(receiver, ast.Name):
+            return receiver.id in names
+        return (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "ProviderRegistry"
+        )
+
+    # Catch getattr(Registry, "from_env")() without evaluating arbitrary code.
+    if (
+        isinstance(func, ast.Call)
+        and isinstance(func.func, ast.Name)
+        and func.func.id == "getattr"
+        and len(func.args) >= 2
+        and isinstance(func.args[1], ast.Constant)
+        and func.args[1].value == "from_env"
+    ):
+        receiver = func.args[0]
+        return (
+            isinstance(receiver, ast.Name) and receiver.id in names
+        ) or (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "ProviderRegistry"
+        )
+
+    return False
 
 
 def _backend_local_provider_consumers() -> tuple[str, ...]:
@@ -342,14 +432,21 @@ def _backend_local_provider_consumers() -> tuple[str, ...]:
             continue
 
         provider_registry_names = _provider_registry_names(tree)
+        activation_aliases = _provider_registry_activation_aliases(
+            tree,
+            provider_registry_names,
+        )
         if any(
             isinstance(node, ast.Call)
-            and _is_provider_registry_from_env_call(node, provider_registry_names)
+            and _is_provider_registry_from_env_call(
+                node,
+                provider_registry_names,
+                activation_aliases,
+            )
             for node in ast.walk(tree)
         ):
             consumers.append(relative)
     return tuple(consumers)
-
 
 def audit_compose_modes() -> None:
     base = read("docker-compose.yml")
