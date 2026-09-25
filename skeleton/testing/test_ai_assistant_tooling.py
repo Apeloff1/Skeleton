@@ -34,11 +34,15 @@ def _write_descriptor() -> CapabilityDescriptor:
 
 
 @pytest.mark.asyncio
-async def test_external_write_needs_explicit_action_and_request_bound_grant() -> None:
+async def test_external_write_needs_explicit_action_and_request_bound_grant(tmp_path) -> None:
     registry = CapabilityRegistry()
     descriptor = _write_descriptor()
     registry.register(descriptor)
-    coordinator = ToolCoordinator(registry)
+    receipt_store = SQLiteToolReceiptStore(tmp_path / "external-write.sqlite3")
+    coordinator = ToolCoordinator(
+        registry,
+        tool_runtime=AsyncToolRuntime(receipt_store=receipt_store),
+    )
 
     calls = {"count": 0}
 
@@ -99,6 +103,7 @@ async def test_external_write_needs_explicit_action_and_request_bound_grant() ->
     assert replay.replayed is True
     assert replay.receipt == executed.receipt
     assert calls["count"] == 1
+    receipt_store.close()
 
 
 @pytest.mark.asyncio
@@ -110,7 +115,7 @@ async def test_idempotency_key_conflict_fails_closed_after_execution() -> None:
         side_effect=SideEffectClass.READ_ONLY,
     )
     registry.register(descriptor)
-    coordinator = ToolCoordinator(registry)
+    coordinator = ToolCoordinator(registry, tool_runtime=AsyncToolRuntime())
     coordinator.bind(descriptor.capability_id, lambda args: {"value": args["q"]})
 
     request = AssistantRequest(request_id="tool-2", text="Look it up.")
@@ -146,7 +151,7 @@ async def test_scoped_read_capability_also_requires_request_bound_grant() -> Non
         required_scopes=frozenset({"files:read"}),
     )
     registry.register(descriptor)
-    coordinator = ToolCoordinator(registry)
+    coordinator = ToolCoordinator(registry, tool_runtime=AsyncToolRuntime())
     coordinator.bind(descriptor.capability_id, lambda args: {"ok": True})
 
     request = AssistantRequest(request_id="tool-3", text="Read my file.")
@@ -173,7 +178,7 @@ async def test_capability_specific_input_bound_is_enforced() -> None:
         max_input_bytes=8,
     )
     registry.register(descriptor)
-    coordinator = ToolCoordinator(registry)
+    coordinator = ToolCoordinator(registry, tool_runtime=AsyncToolRuntime())
     coordinator.bind(descriptor.capability_id, lambda args: {"ok": True})
     request = AssistantRequest(request_id="tool-4", text="Lookup.")
     proposal = ToolProposal(
@@ -197,7 +202,7 @@ async def test_same_idempotency_text_is_isolated_across_requests() -> None:
         side_effect=SideEffectClass.READ_ONLY,
     )
     registry.register(descriptor)
-    coordinator = ToolCoordinator(registry)
+    coordinator = ToolCoordinator(registry, tool_runtime=AsyncToolRuntime())
     calls = {"count": 0}
 
     def handler(args):
