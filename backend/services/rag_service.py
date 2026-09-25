@@ -221,6 +221,12 @@ class RAGService:
             return False
 
     @staticmethod
+    def _canonical_concept_content(row: Dict[str, Any]) -> str:
+        content = f"{row.get('name', '')}\n\n{row.get('explanation', '')}\n\nExamples:\n"
+        content += "\n".join(f"- {item}" for item in row.get("examples", []))
+        return content
+
+    @staticmethod
     def _canonical_cocoding_content(row: Dict[str, Any]) -> str:
         content = f"Context: {row.get('context', '')}\n\nCode:\n"
         content += "\n---\n".join(str(item) for item in row.get("code_snippets", []))
@@ -329,28 +335,32 @@ class RAGService:
         domain: str,
         difficulty: float = 0.5
     ) -> str:
-        """Store a concept explanation."""
-        collection = self._get_collection("concepts")
-        
-        content = f"{name}\n\n{explanation}\n\nExamples:\n" + "\n".join(f"- {e}" for e in examples)
-        
-        metadata = {
-            "concept_id": concept_id,
-            "name": name,
-            "domain": domain,
-            "difficulty": difficulty,
-            "example_count": len(examples),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        collection.add(
-            documents=[content],
-            metadatas=[metadata],
-            ids=[concept_id]
+        """Commit a concept to Mongo before projecting it to Chroma."""
+        row = self.state.put_concept(
+            concept_id=concept_id,
+            name=name,
+            explanation=explanation,
+            examples=examples,
+            domain=domain,
+            difficulty=difficulty,
+            timestamp=self._utc_now(),
         )
-        
-        return concept_id
-    
+        self._project_add(
+            "concepts",
+            document=self._canonical_concept_content(row),
+            metadata={
+                "concept_id": row["concept_id"],
+                "name": row["name"],
+                "domain": row["domain"],
+                "difficulty": row["difficulty"],
+                "example_count": len(row["examples"]),
+                "timestamp": row["timestamp"],
+                "authority": "mongo",
+            },
+            record_id=row["concept_id"],
+        )
+        return row["concept_id"]
+
     def search_concepts(
         self,
         query: str,
@@ -358,31 +368,58 @@ class RAGService:
         max_difficulty: Optional[float] = None,
         limit: int = 5
     ) -> List[Dict]:
-        """Search for relevant concepts."""
+        """Retrieve via Chroma but validate concept hits against Mongo authority."""
         collection = self._get_collection("concepts")
-        
+
         where_filter = {}
         if domain:
             where_filter["domain"] = domain
-        
-        results = collection.query(
-            query_texts=[query],
-            n_results=limit,
-            where=where_filter if where_filter else None
-        )
-        
-        concepts = []
-        if results["documents"]:
-            for i, doc in enumerate(results["documents"][0]):
-                meta = results["metadatas"][0][i] if results["metadatas"] else {}
-                if max_difficulty and meta.get("difficulty", 0) > max_difficulty:
-                    continue
-                concepts.append({
-                    "content": doc,
-                    "metadata": meta,
-                    "relevance": 1 - (results["distances"][0][i] if results["distances"] else 0)
-                })
-        
+
+        try:
+            results = collection.query(
+                query_texts=[query],
+                n_results=limit,
+                where=where_filter if where_filter else None,
+            )
+        except Exception:
+            results = {}
+
+        ids = (results.get("ids") or [[]])[0] if results else []
+        distances = (results.get("distances") or [[]])[0] if results else []
+        concepts: List[Dict] = []
+        for i, projected_id in enumerate(ids):
+            canonical = self.state.get_concept(str(projected_id))
+            if canonical is None:
+                continue
+            if domain and canonical["domain"] != domain:
+                continue
+            if (
+                max_difficulty is not None
+                and canonical["difficulty"] > max_difficulty
+            ):
+                continue
+            concepts.append(
+                {
+                    "content": self._canonical_concept_content(canonical),
+                    "metadata": {
+                        "concept_id": canonical["concept_id"],
+                        "name": canonical["name"],
+                        "domain": canonical["domain"],
+                        "difficulty": canonical["difficulty"],
+                        "example_count": len(canonical["examples"]),
+                        "timestamp": canonical["timestamp"],
+                        "authority": "mongo",
+                    },
+                    "relevance": (
+                        1 - distances[i]
+                        if i < len(distances)
+                        else 1.0
+                    ),
+                }
+            )
+            if len(concepts) >= limit:
+                break
+
         return concepts
     
     # =========================================================================
@@ -578,6 +615,7 @@ class RAGService:
         """Idempotently import legacy Chroma-owned product state into Mongo."""
         migrated = {
             "learning_sessions": 0,
+            "concepts": 0,
             "user_progress": 0,
             "cocoding_context": 0,
             "feedback": 0,
@@ -618,6 +656,34 @@ class RAGService:
                     metadata={"migrated_from": "chroma"},
                 )
                 migrated["learning_sessions"] += 1
+            except RAGStateConflict:
+                migrated["conflicts"] += 1
+            except Exception:
+                migrated["skipped"] += 1
+
+        for record_id, document, meta in legacy_rows("concepts"):
+            try:
+                name = str(meta.get("name") or "").strip()
+                domain = str(meta.get("domain") or "").strip()
+                if not name or not domain:
+                    migrated["skipped"] += 1
+                    continue
+                explanation = document
+                marker = "\n\nExamples:\n"
+                if document.startswith(name + "\n\n"):
+                    explanation = document[len(name) + 2 :]
+                if marker in explanation:
+                    explanation = explanation.split(marker, 1)[0]
+                self.state.put_concept(
+                    concept_id=record_id,
+                    name=name,
+                    explanation=explanation or name,
+                    examples=list(meta.get("examples") or []),
+                    domain=domain,
+                    difficulty=float(meta.get("difficulty", 0.5)),
+                    timestamp=str(meta.get("timestamp") or self._utc_now()),
+                )
+                migrated["concepts"] += 1
             except RAGStateConflict:
                 migrated["conflicts"] += 1
             except Exception:
@@ -698,6 +764,7 @@ class RAGService:
         inventory = self.state.projection_inventory()
         rebuilt = {
             "learning_sessions": 0,
+            "concepts": 0,
             "cocoding_context": 0,
             "feedback": 0,
             "failed": 0,
@@ -719,6 +786,23 @@ class RAGService:
                 record_id=row["session_id"],
             )
             rebuilt["learning_sessions" if ok else "failed"] += 1
+
+        for row in inventory["concepts"]:
+            ok = self._project_add(
+                "concepts",
+                document=self._canonical_concept_content(row),
+                metadata={
+                    "concept_id": row["concept_id"],
+                    "name": row["name"],
+                    "domain": row["domain"],
+                    "difficulty": row["difficulty"],
+                    "example_count": len(row.get("examples") or []),
+                    "timestamp": row["timestamp"],
+                    "authority": "mongo",
+                },
+                record_id=row["concept_id"],
+            )
+            rebuilt["concepts" if ok else "failed"] += 1
 
         for row in inventory["cocoding_context"]:
             ok = self._project_add(
