@@ -62,6 +62,14 @@ class ProvenanceLedger:
 
     def record(self, source: str, operation: str, input_data: Any, output_data: Any, parent_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> ProvenanceEntry:
         """Record a data transformation in the ledger."""
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError("source is required")
+        if not isinstance(operation, str) or not operation.strip():
+            raise ValueError("operation is required")
+        if parent_id is not None and parent_id not in self._entries:
+            raise ValueError("parent is not recorded")
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError("metadata must be an object")
         import uuid
         entry = ProvenanceEntry(
             entry_id=str(uuid.uuid4())[:12],
@@ -109,6 +117,8 @@ class ProvenanceLedger:
 
     def trace(self, entry_id: str) -> List[ProvenanceEntry]:
         """Trace the full lineage chain for an entry."""
+        if entry_id not in self._entries:
+            raise KeyError(entry_id)
         self._stats["queries"] += 1
 
         # Find which chain contains this entry
@@ -119,7 +129,7 @@ class ProvenanceLedger:
                 break
 
         if not chain_entries:
-            return []
+            raise KeyError(entry_id)
 
         # Build ordered lineage
         lineage = []
@@ -134,8 +144,8 @@ class ProvenanceLedger:
     def verify(self, entry_id: str, current_data: Any) -> bool:
         """Verify that current data matches the recorded provenance hash."""
         entry = self._entries.get(entry_id)
-        if not entry:
-            return False
+        if entry is None:
+            raise KeyError(entry_id)
 
         current_hash = ProvenanceEntry.hash_data(current_data)
         return current_hash == entry.output_hash
