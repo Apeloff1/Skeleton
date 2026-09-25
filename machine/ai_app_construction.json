@@ -1758,7 +1758,7 @@
       "plane": "tool-runtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped sandbox/database/network/artifact policies and backend compatibility delegation exist. The credential-bearing nested llm_chat provider path is retired, production compatibility receipts/results are durable, and the canonical cognitive runtime binds execution/turn/provider-call lineage into tool requests with restart-safe receipt fencing. Remaining closure is adapter-owner cutover for privileged backend I/O handlers, richer manifest/governance/cost bindings, provider projection evidence, dependency closure and exact-head validation.",
+      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, and adapter-owned privileged/read execution surfaces now exist. The flat backend registry delegates vault, Jeeves, compile, package, database, and network work to canonical adapter owners; run_code remains fail-closed. Remaining closure is richer manifest/governance/cost bindings, minimal provider projection evidence, dependency closure, exact-head validation and independent verification.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
         "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
@@ -1796,10 +1796,12 @@
         "skeleton/testing/test_tool_receipt_store.py lineage replay/conflict/migration regressions",
         "backend/tests/test_tool_registry_canonical_delegate.py backend lineage propagation and restart replay regression",
         "skeleton/intelligence/execution_runtime.py binds canonical execution_id, provider turn_id and provider call_id into ToolExecutionRequest",
-        "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call"
+        "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call",
+        "skeleton/skills/tool_adapters/owners.py owns vault/Jeeves/sandbox/database/network/artifact compatibility execution boundaries",
+        "backend/services/tool_registry.py privileged/read compatibility handlers are delegation-only and run_code is fail-closed",
+        "backend/tests/test_tool_registry_scoped_adapters.py source regression forbids privileged execution bodies in the flat registry"
       ],
       "outstanding_evidence": [
-        "privileged backend handler adapter-owner cutover",
         "governance lifecycle binding for durable results",
         "cost/admission reconciliation across tool classes",
         "minimal provider projection evidence",
@@ -5160,27 +5162,37 @@
         {
           "tool": "compile_code",
           "issue": "spawns local compiler subprocess from backend",
-          "target": "dedicated sandbox/executor adapter with quotas and artifact receipts"
+          "target": "dedicated sandbox/executor adapter with quotas and artifact receipts",
+          "resolution": "delegates to AsyncSandboxCompileAdapter; compiler subprocess/resource limits are owned under skeleton/skills/tool_adapters",
+          "status": "resolved_pending_validation"
         },
         {
           "tool": "run_code",
           "issue": "compatibility stub points toward playground but no canonical tool contract",
-          "target": "sandbox execution tool adapter only"
+          "target": "sandbox execution tool adapter only",
+          "resolution": "remains fail-closed and performs no inline execution in the backend process",
+          "status": "resolved_pending_validation"
         },
         {
           "tool": "package_build",
           "issue": "performs build and artifact persistence from flat registry",
-          "target": "governed build capability with idempotency/artifact receipts"
+          "target": "governed build capability with idempotency/artifact receipts",
+          "resolution": "delegates build lookup, packaging, bounds, metadata persistence and cleanup to AsyncArtifactPackageAdapter",
+          "status": "resolved_pending_validation"
         },
         {
           "tool": "mongo_query",
           "issue": "accepts arbitrary collection/filter projection against application database",
-          "target": "replace with scoped named repository/query tools and allowlists"
+          "target": "replace with scoped named repository/query tools and allowlists",
+          "resolution": "delegates bounded scoped database reads to AsyncDatabaseQueryAdapter",
+          "status": "resolved_pending_validation"
         },
         {
           "tool": "web_search",
           "issue": "direct network/search library execution without canonical egress/data/result policy",
-          "target": "network tool adapter with timeout, egress class, result bounds and provenance"
+          "target": "network tool adapter with timeout, egress class, result bounds and provenance",
+          "resolution": "delegates egress, search execution and result sanitization to AsyncNetworkSearchAdapter",
+          "status": "resolved_pending_validation"
         }
       ]
     },
@@ -5228,10 +5240,11 @@
       "canonical request/receipt execution_id/turn_id/call_id lineage persists through sync/async runtime and SQLite replay",
       "lineage changes are fenced as idempotency conflicts and approval refs bind the exact execution/turn/call context",
       "skeleton/intelligence/execution_runtime.py binds canonical execution_id, provider turn_id and provider call_id into ToolExecutionRequest",
-      "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call"
+      "skeleton/testing/test_execution_runtime.py proves model-tool-model receipt lineage matches persisted provider turn and provider call",
+      "canonical async adapter owners now contain subprocess, database query, network search, artifact package/cleanup, vault and Jeeves execution bodies",
+      "backend compatibility registry contains wiring/delegation only for executable data/I-O tools"
     ],
     "remaining": [
-      "adapter-owner cutover",
       "manifest metadata completion",
       "governance/cost bindings",
       "provider projection evidence",
