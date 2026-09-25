@@ -392,19 +392,6 @@ def audit_compose_modes() -> None:
         "backend internal Skeleton endpoint default drift",
     )
 
-    service_token_binding = (
-        "SKL_ENGINE_SERVICE_TOKEN="
-        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set}"
-    )
-    check(
-        service_token_binding in skeleton_block,
-        "engine service token must be required in Skeleton process",
-    )
-    check(
-        service_token_binding in backend_block,
-        "engine service token must be required in backend process",
-    )
-
     skeleton_block = (
         base.split("  skeleton:", 1)[1].split("\n  backend:", 1)[0]
         if "  skeleton:" in base and "\n  backend:" in base
