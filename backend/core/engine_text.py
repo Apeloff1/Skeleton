@@ -333,7 +333,10 @@ async def execute_engine_text(
             "turn:" + envelope.turn_id,
         ),
     )
-    terminal: EngineTerminalResult = await active_client.execute(command)
+    try:
+        terminal: EngineTerminalResult = await active_client.execute(command)
+    except EngineClientError as exc:
+        raise EngineTextError("canonical engine text execution failed") from exc
     return EngineTextResponse(
         text=terminal.final_output,
         execution_id=terminal.execution_id,
