@@ -900,4 +900,3 @@ async def test_async_media_failure_releases_admission_lease() -> None:
         )
 
     assert adapter.admission_runtime.snapshot()["active_operations"] == ()
-
