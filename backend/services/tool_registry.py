@@ -725,6 +725,13 @@ class _CompatibilityResultStore:
             lifecycle = self.governance.lifecycle.get(str(ref))
             if lifecycle["state"] != LifecycleState.ACTIVE.value:
                 return None
+            retention_until = lifecycle.get("retention_until")
+            if (
+                retention_until is not None
+                and float(retention_until)
+                <= datetime.now(timezone.utc).timestamp()
+            ):
+                return None
             if lifecycle["tenant_id"] != str(row["tenant_id"]):
                 raise RuntimeError("tool result governance tenant mismatch")
             value = json.loads(row["result_json"])
@@ -744,6 +751,34 @@ class _CompatibilityResultStore:
                 """,
                 (result_ref, str(action.tenant_id)),
             )
+
+    async def execute_retention_expiry(
+        self,
+        *,
+        now: float | None = None,
+    ) -> tuple[str, ...]:
+        timestamp = (
+            datetime.now(timezone.utc).timestamp()
+            if now is None
+            else float(now)
+        )
+        deleted: list[str] = []
+        plans = self.governance.plan_retention_expiry(now=timestamp)
+        for plan in plans:
+            for action in plan.actions:
+                if action.target != self._DELETION_TARGET:
+                    raise RuntimeError(
+                        "unexpected tool result deletion target"
+                    )
+                await self.delete(action)
+                self.governance.acknowledge_deletion(
+                    plan.plan_id,
+                    action.record_id,
+                    action.target,
+                    now=timestamp,
+                )
+                deleted.append(action.record_id)
+        return tuple(deleted)
 
     def close(self) -> None:
         self._connection.close()
