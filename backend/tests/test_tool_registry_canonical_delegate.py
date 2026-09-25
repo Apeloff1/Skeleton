@@ -745,3 +745,45 @@ async def test_result_store_enforces_manifest_output_schema_and_size(
     ).fetchone()[0] == 0
     store.close()
 
+@pytest.mark.asyncio
+async def test_result_store_executes_retention_expiry_and_acknowledges_deletion(
+    registry,
+):
+    store = registry._CompatibilityResultStore(
+        ":memory:",
+        retention_seconds=60,
+    )
+    manifest = registry._TOOL_MANIFESTS["vault_query"]
+    request = registry.ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="vault_query",
+        idempotency_key="retention-expiry",
+        arguments={"topic": "retention"},
+        requested_at=datetime.now(timezone.utc),
+    )
+    result_ref = await store.put(
+        request,
+        {"ok": True, "value": "retained"},
+        manifest=manifest,
+    )
+    lifecycle = store.governance.lifecycle.get(result_ref)
+    assert (await store.get(result_ref))["value"] == "retained"
+
+    deleted = await store.execute_retention_expiry(
+        now=float(lifecycle["retention_until"]) + 1.0,
+    )
+
+    assert deleted == (result_ref,)
+    assert await store.get(result_ref) is None
+    assert store.governance.lifecycle.get(result_ref)["state"] == "deleted"
+    receipts = store.governance.lifecycle.receipts(tenant_id="tenant-a")
+    assert any(
+        item.record_id == result_ref
+        and item.target == "tool-result"
+        and item.state.value == "deleted"
+        for item in receipts
+    )
+    store.close()
+
