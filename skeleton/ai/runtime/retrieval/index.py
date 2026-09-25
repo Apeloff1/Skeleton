@@ -45,6 +45,8 @@ class InvertedIndex:
         if not isinstance(text, str):
             raise TypeError("text must be a string")
         tokens = self._tokenise(text)
+        if not tokens:
+            raise ValueError("text must contain a token")
         term_counts = Counter(tokens)
         new_terms = set(term_counts)
 
@@ -186,12 +188,20 @@ class InvertedIndex:
     def search(
         self, query: str, *, top_k: int = 10
     ) -> Tuple[ScoredResult, ...]:
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
         query_counts = Counter(self._tokenise(query))
         if not query_counts:
+            raise ValueError("query must contain a token")
+        if not self._docs:
             return tuple()
 
-        n_docs = max(len(self._docs), 1)
-        avgdl = (self._total_doc_length / n_docs) or 1.0
+        n_docs = len(self._docs)
+        avgdl = self._total_doc_length / n_docs
+        if avgdl <= 0:
+            raise ValueError("index has no tokens")
         scores: Dict[str, float] = {}
         for token, query_tf in query_counts.items():
             postings = self._postings.get(token)
@@ -202,15 +212,15 @@ class InvertedIndex:
                 continue
             idf = math.log((n_docs - df + 0.5) / (df + 0.5) + 1)
             for doc_id, tf_raw in postings.items():
-                dl = self._doc_length.get(doc_id, 1) or 1
+                dl = self._doc_length[doc_id]
+                if dl <= 0:
+                    raise ValueError("document has no tokens")
                 norm = 1 - self.b + self.b * (dl / avgdl)
                 tf = tf_raw / (tf_raw + self.k1 * norm)
                 scores[doc_id] = (
                     scores.get(doc_id, 0.0) + query_tf * idf * tf
                 )
 
-        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
-            raise ValueError("top_k must be a non-negative integer")
         ranked = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))[:top_k]
         return tuple(
             ScoredResult(
