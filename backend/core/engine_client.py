@@ -337,12 +337,14 @@ def command_from_context(
     instructions: str,
     prompt: str,
     objective: str | None = None,
+    verification_profile: str = "evidence_required",
     history: Sequence[Mapping[str, str]] = (),
     service_principal: str = "codedock-backend",
     created_at: datetime | None = None,
     deadline: datetime | None = None,
     trace_id: str | None = None,
     max_model_turns: int = 4,
+    max_output_tokens: int | None = None,
     max_tool_calls: int = 1,
     max_repeat_tool_batches: int = 1,
     context_seed_refs: Sequence[str] = (),
@@ -382,6 +384,20 @@ def command_from_context(
         "objective",
         maximum=65_536,
     )
+    profile = _text(
+        str(verification_profile).strip(),
+        "verification_profile",
+        maximum=64,
+    )
+    if profile not in {"evidence_required", "assistant_proposal"}:
+        raise EngineProtocolError("verification_profile is unsupported")
+    if profile == "assistant_proposal" and cap not in {
+        "assistant.chat",
+        "assistant.compat",
+    }:
+        raise EngineProtocolError(
+            "assistant_proposal verification requires assistant capability"
+        )
     started = _aware(
         created_at or datetime.now(timezone.utc),
         "created_at",
@@ -426,14 +442,20 @@ def command_from_context(
             "max_tool_calls",
             maximum=1024,
         ),
+        "max_elapsed_seconds": (due - started).total_seconds(),
     }
+    if max_output_tokens is not None:
+        resource_budget["max_output_tokens"] = _positive_int(
+            max_output_tokens,
+            "max_output_tokens",
+            maximum=131_072,
+        )
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
             max_repeat_tool_batches,
             "max_repeat_tool_batches",
             maximum=64,
         ),
-        "deadline": due.isoformat(),
     }
 
     operation = OperationEnvelope(
@@ -479,6 +501,7 @@ def command_from_context(
         context_policy={
             "tenant_id": context.tenant_id,
             "capability": cap,
+            "verification_profile": profile,
             "data_class": handoff.data_class,
             "context_id": context.context_id,
             "context_digest": context.context_digest,
