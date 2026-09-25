@@ -442,6 +442,7 @@ def command_from_context(
             "max_tool_calls",
             maximum=1024,
         ),
+        "max_elapsed_seconds": (due - started).total_seconds(),
     }
     if max_output_tokens is not None:
         resource_budget["max_output_tokens"] = _positive_int(
@@ -455,7 +456,6 @@ def command_from_context(
             "max_repeat_tool_batches",
             maximum=64,
         ),
-        "deadline": due.isoformat(),
     }
 
     operation = OperationEnvelope(
