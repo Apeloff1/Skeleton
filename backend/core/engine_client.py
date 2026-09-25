@@ -337,6 +337,7 @@ def command_from_context(
     instructions: str,
     prompt: str,
     objective: str | None = None,
+    verification_profile: str = "evidence_required",
     history: Sequence[Mapping[str, str]] = (),
     service_principal: str = "codedock-backend",
     created_at: datetime | None = None,
@@ -382,6 +383,20 @@ def command_from_context(
         "objective",
         maximum=65_536,
     )
+    profile = _text(
+        str(verification_profile).strip(),
+        "verification_profile",
+        maximum=64,
+    )
+    if profile not in {"evidence_required", "assistant_proposal"}:
+        raise EngineProtocolError("verification_profile is unsupported")
+    if profile == "assistant_proposal" and cap not in {
+        "assistant.chat",
+        "assistant.compat",
+    }:
+        raise EngineProtocolError(
+            "assistant_proposal verification requires assistant capability"
+        )
     started = _aware(
         created_at or datetime.now(timezone.utc),
         "created_at",
@@ -479,6 +494,7 @@ def command_from_context(
         context_policy={
             "tenant_id": context.tenant_id,
             "capability": cap,
+            "verification_profile": profile,
             "data_class": handoff.data_class,
             "context_id": context.context_id,
             "context_digest": context.context_digest,
