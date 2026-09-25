@@ -1090,7 +1090,7 @@
       ],
       "work_package": "WP-P0-GOLDEN-JOURNEYS",
       "blueprint": "golden_journey_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "Prove full user-to-model/tool/memory/artifact lifecycle.",
       "target_files": {
         "contracts": [
@@ -1140,8 +1140,22 @@
         "degraded-mode assertions"
       ],
       "closure_gate": "canonical journeys pass against assembled topology",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
+        "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+      ],
+      "remaining": [
+        "assemble browser prompt-only and multi-turn journeys",
+        "assemble browser/API retrieval and read-tool trace continuity",
+        "assemble write-tool-with-approval including approval-expiry recovery",
+        "assemble browser artifact/result linkage",
+        "assemble reconnect/slow-client/cancel-complete race against Stage-6 transport",
+        "assemble provider-outage and engine-outage degraded UX",
+        "assemble governance delete/export journey",
+        "inject remaining provider/checkpoint/process/database faults",
+        "collect exact-head CI evidence and independent signoff after dependencies close"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     }
   ],
