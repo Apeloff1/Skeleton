@@ -1451,10 +1451,13 @@ class Jeeves:
     def observe_run(self, *, era: str, walk: dict[str, Any], plan: dict[str, Any],
                     vision: str = "") -> dict[str, Any]:
         """Ingest a finished forge-run so own-system can recall extract outcomes."""
-        extracted = bool((walk or {}).get("extracted"))
-        collapsed = bool((walk or {}).get("collapsed"))
-        hops = (walk or {}).get("hops")
-        cores = (walk or {}).get("cores")
+        normalized_walk = dict(walk or {})
+        extracted = bool(normalized_walk.get("extracted"))
+        collapsed = bool(normalized_walk.get("collapsed"))
+        normalized_walk["extracted"] = extracted
+        normalized_walk["collapsed"] = collapsed
+        hops = normalized_walk.get("hops")
+        cores = normalized_walk.get("cores")
         bias = (plan or {}).get("room_bias") or "balanced"
         mix = (plan or {}).get("enemy_mix") or {}
         trash = float(mix.get("trash") or 0)
@@ -1465,7 +1468,7 @@ class Jeeves:
         slack = ((collapse - t) / collapse) if (extracted and collapse > 0 and t > 0) else (
             0.0 if (collapsed or not extracted) else 1.0
         )
-        self.last_walk = dict(walk or {})
+        self.last_walk = dict(normalized_walk)
         self.last_walk["era"] = era
         self.last_walk["bias"] = bias
         self.last_walk["slack"] = slack
@@ -1481,7 +1484,7 @@ class Jeeves:
             f"forge run {era} {vision} extract {extracted} "
             f"hops {hops} cores {cores} bias {bias}"
         )
-        trace = self.think(stim, context={"walk": walk, "plan": plan, "era": era, "reference": (ref or {}).get("ref")})
+        trace = self.think(stim, context={"walk": normalized_walk, "plan": plan, "era": era, "reference": (ref or {}).get("ref")})
         from skeleton.cortex.distill import ability_from
         from skeleton.cortex.port import Thought
         observed = Thought(
