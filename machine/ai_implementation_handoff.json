@@ -962,7 +962,8 @@
           "skeleton/testing/test_operation_stream_store.py",
           "backend/tests/test_operation_stream_transport.py",
           "backend/tests/test_operation_stream_route.py",
-          "browser reconnect/cancel-race tests"
+          "browser reconnect/cancel-race tests",
+          "backend/tests/test_operation_stream_multiworker.py"
         ]
       },
       "ordered_steps": [
@@ -1021,10 +1022,10 @@
         "bounded frontend replay pages and bounded SSE server batches",
         "terminal backlog drains across multiple bounded batches before stream close",
         "completion-versus-cancel race produces exactly one terminal operation event",
-        "persisted reconnect cursor storage is namespaced per consumer to prevent cross-tab cursor skipping"
+        "persisted reconnect cursor storage is namespaced per consumer to prevent cross-tab cursor skipping",
+        "shared WAL-backed operation/event stores plus independent-worker exactly-once outbox projection, cross-worker consumer compaction, reconnect handoff and cancel/complete terminal-race regressions"
       ],
       "remaining": [
-        "distributed stream ownership for multi-worker deployment",
         "browser/API disconnect-reconnect recovery journey",
         "browser/API slow-client backpressure journey",
         "browser/API cancel-complete race journey",
