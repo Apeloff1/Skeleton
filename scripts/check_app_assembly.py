@@ -299,6 +299,36 @@ def audit_endpoint_boundary() -> None:
     )
 
 
+
+def _backend_local_provider_consumers() -> tuple[str, ...]:
+    """Return production backend modules that still activate ProviderRegistry locally."""
+
+    consumers: list[str] = []
+    backend_root = ROOT / "backend"
+    for path in sorted(backend_root.rglob("*.py")):
+        relative = path.relative_to(ROOT).as_posix()
+        if "/tests/" in "/" + relative:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+        except (OSError, SyntaxError) as exc:
+            check(False, f"cannot inspect backend provider consumer {relative}: {exc}")
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if (
+                isinstance(func, ast.Attribute)
+                and func.attr == "from_env"
+                and isinstance(func.value, ast.Name)
+                and func.value.id == "ProviderRegistry"
+            ):
+                consumers.append(relative)
+                break
+    return tuple(consumers)
+
+
 def audit_compose_modes() -> None:
     base = read("docker-compose.yml")
     hot = read("docker-compose.hot.yml")
@@ -339,6 +369,54 @@ def audit_compose_modes() -> None:
         "SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}" in base,
         "backend internal Skeleton endpoint default drift",
     )
+
+    skeleton_block = (
+        base.split("  skeleton:", 1)[1].split("\n  backend:", 1)[0]
+        if "  skeleton:" in base and "\n  backend:" in base
+        else ""
+    )
+    backend_block = (
+        base.split("  backend:", 1)[1].split("\n  frontend:", 1)[0]
+        if "  backend:" in base and "\n  frontend:" in base
+        else ""
+    )
+    local_provider_consumers = _backend_local_provider_consumers()
+    for provider_secret in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
+        check(
+            provider_secret + "=" in skeleton_block,
+            f"Skeleton engine must receive runtime provider credential: {provider_secret}",
+        )
+        if local_provider_consumers:
+            check(
+                provider_secret + "=" in backend_block,
+                (
+                    "backend provider credential removed before local-provider parity: "
+                    + provider_secret
+                    + "; consumers="
+                    + ",".join(local_provider_consumers)
+                ),
+            )
+        else:
+            check(
+                provider_secret + "=" not in backend_block,
+                f"backend retained runtime provider credential after cutover: {provider_secret}",
+            )
+
+    for durable_path in (
+        "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite",
+        "SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite",
+        "SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite",
+    ):
+        check(
+            durable_path in skeleton_block,
+            f"Skeleton engine durable state binding missing: {durable_path}",
+        )
+
+    check(
+        "skeleton:\n        condition: service_healthy" in backend_block,
+        "backend must wait for healthy Skeleton engine before AI ingress",
+    )
+
     frontend_block = base.split("  frontend:", 1)[1].split("\n  mongo:", 1)[0] if "  frontend:" in base and "\n  mongo:" in base else ""
     check(
         "backend:\n        condition: service_healthy" in frontend_block,
