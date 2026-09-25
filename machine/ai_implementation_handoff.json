@@ -103,7 +103,10 @@
         "skeleton/intelligence/quota_sqlite.py plus skeleton/testing/test_tenant_quota_sqlite.py prove restart-safe quota windows",
         "skeleton/intelligence/admission_runtime.py exposes identity-free estimate/actual/delta resource telemetry",
         "skeleton/artifact_plane/usage.py meters artifact/storage writes through durable quota events",
-        "backend/services/tool_registry.py charges manifest-aware tool usage before side effects"
+        "backend/services/tool_registry.py charges manifest-aware tool usage before side effects",
+        "skeleton/intelligence/admission.py and quota.py separate artifact_bytes from storage_bytes",
+        "skeleton/intelligence/quota_sqlite.py migrates durable pre-storage schemas in place and persists storage usage independently",
+        "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent storage budget/restart behavior"
       ],
       "remaining": [
         "admission at every expensive non-provider action",
@@ -112,10 +115,10 @@
         "admit every expensive non-provider action before allocation",
         "add shared multi-worker pressure coordination",
         "collect fresh exact-head cost/admission telemetry and quota verification",
-        "split storage_bytes from artifact_bytes in the budget/quota contract",
         "bind admission to every remaining expensive non-provider action",
         "add shared cross-process/distributed pressure coordination",
-        "collect exact-head and independent closure evidence"
+        "collect exact-head and independent closure evidence",
+        "validate independent storage byte migration on exact head"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
