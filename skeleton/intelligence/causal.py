@@ -29,23 +29,35 @@ class CausalGraph:
     def add_edge(self, cause: str, effect: str) -> None:
         if cause not in self.variables or effect not in self.variables:
             raise ValueError("Both variables must be defined")
+        if cause == effect:
+            raise ValueError("causal edge cannot be a self-loop")
+        if (cause, effect) in self.edges:
+            return
         self.edges.append((cause, effect))
         self.variables[effect].parents.append(cause)
 
     def is_ancestor(self, potential_ancestor: str, node: str) -> bool:
-        """Check if potential_ancestor is an ancestor of node."""
+        """Check if potential_ancestor is a strict ancestor of node.
+
+        Walk parents. The previous walk followed children and also treated
+        a node as its own ancestor, which inverted the backdoor adjustment.
+        """
+        if potential_ancestor == node:
+            return False
         visited = set()
         queue = [node]
         while queue:
             current = queue.pop(0)
-            if current == potential_ancestor:
-                return True
             if current in visited:
                 continue
             visited.add(current)
-            for var_name, var in self.variables.items():
-                if current in var.parents:
-                    queue.append(var_name)
+            var = self.variables.get(current)
+            if var is None:
+                continue
+            for parent in var.parents:
+                if parent == potential_ancestor:
+                    return True
+                queue.append(parent)
         return False
 
     def get_backdoor_paths(self, treatment: str, outcome: str) -> List[List[str]]:
