@@ -6,6 +6,9 @@ from uuid import uuid4
 import httpx
 import pytest
 
+TEST_ENGINE_TOKEN = "unit-test-engine-service-token-000000000001"
+
+
 from core.engine_client import (
     EngineAuthorizationError,
     EngineClient,
@@ -245,6 +248,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
         seen["path"] = request.url.path
         seen["principal"] = request.headers.get("x-zaibatsu-attester")
         seen["authorization"] = request.headers.get("authorization")
+        seen["authorization"] = request.headers.get("authorization")
         seen["trace"] = request.headers.get("x-trace-id")
         body = __import__("json").loads(request.content)
         seen["body"] = body
@@ -271,6 +275,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
     assert ack["execution_id"] == command.execution_request.execution_id
     assert seen["path"] == "/api/v1/engine/executions"
     assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + TEST_ENGINE_TOKEN
     assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
     assert seen["trace"] == "trace-client-test"
     assert seen["body"]["actor_id"] == "actor-a"
@@ -582,6 +587,7 @@ async def test_response_size_bound_is_fail_closed() -> None:
     client = EngineClient(
         EngineClientConfig(service_token=_SERVICE_TOKEN, 
             base_url="http://skeleton:8001",
+            service_token=TEST_ENGINE_TOKEN,
             max_response_bytes=1024,
         ),
         transport=httpx.MockTransport(handler),
@@ -657,7 +663,10 @@ async def test_client_rejects_missing_service_token_before_transport() -> None:
         return _json(200, {})
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=TEST_ENGINE_TOKEN,
+        ),
         transport=httpx.MockTransport(handler),
     )
 
