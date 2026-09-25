@@ -120,14 +120,16 @@ async def test_ai_hub_falls_back_without_provider() -> None:
     assert result[0]["id"] == "smart_completion"
 
 
-def test_legacy_assistant_source_has_no_provider_sdk_or_shadow_runtime() -> None:
+def test_legacy_assistant_source_delegates_to_engine_without_local_provider() -> None:
     source = (ROOT / "services/ai_assistant_svc.py").read_text(encoding="utf-8")
 
     assert "from openai import" not in source
     assert "import openai" not in source
     assert "skeleton.frontier.model_runtime" not in source
-    assert "ProviderRegistry" in source
-    assert "ProviderRequest" in source
+    assert "ProviderRegistry" not in source
+    assert "ProviderRequest" not in source
+    assert "EngineTextRequest" in source
+    assert "execute_engine_text" in source
 
 
 def test_hub_source_has_no_universal_provider_key_or_legacy_chat_shim() -> None:
