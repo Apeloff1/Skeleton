@@ -341,3 +341,72 @@ def test_ack_route_compacts_only_after_active_consumers_apply(
 
     operations.close()
     events.close()
+
+@pytest.mark.asyncio
+async def test_sse_reconnect_resumes_after_last_event_id_without_duplicates(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    transport, operations, events = _runtime(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        ("validated", "authorized"),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    first = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="browser-before-disconnect",
+        after_sequence=0,
+    )
+    assert [event.sequence for event in first.events] == [1, 2, 3]
+
+    for index, state in enumerate(
+        ("admitted", "running", "completed"),
+        start=3,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    monkeypatch.setattr(route, "_transport", lambda: transport)
+    response = await route.operation_events(
+        _Request("3"),
+        operation.operation_id,
+        consumer_id="browser-after-restart",
+        after_sequence=None,
+        user={"tenant_id": "tenant-a", "role": "viewer"},
+    )
+
+    chunks: list[str] = []
+    async for chunk in response.body_iterator:
+        chunks.append(
+            chunk.decode("utf-8")
+            if isinstance(chunk, bytes)
+            else chunk
+        )
+    payload = "".join(chunks)
+
+    assert "id: 1\n" not in payload
+    assert "id: 2\n" not in payload
+    assert "id: 3\n" not in payload
+    assert "id: 4\nevent: operation.admitted" in payload
+    assert "id: 5\nevent: operation.running" in payload
+    assert "id: 6\nevent: operation.completed" in payload
+    assert payload.count("event: operation.") == 3
+    assert "event: stream.resync_required" not in payload
+
+    operations.close()
+    events.close()
+
