@@ -30,8 +30,6 @@ def _count(value, label: str) -> int:
 
 
 def _flag(value, label: str) -> bool:
-    if value is None:
-        return False
     if not isinstance(value, bool):
         raise ValueError(f"{label} must be boolean")
     return value
@@ -64,7 +62,7 @@ def generate_rooms(
         raise ValueError("seed is required")
     rng = _rng(seed)
     n = rng.randint(lo, min(hi, lo + 8, 24))
-    bias = plan.get("room_bias", "balanced")
+    bias = plan.get("room_bias", pack.get("room_bias"))
     if not isinstance(bias, str) or bias not in _BIAS:
         raise ValueError(f"unknown room_bias {bias!r}")
     bag = _BIAS[bias]

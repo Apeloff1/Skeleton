@@ -15,7 +15,10 @@ def latest_repair_plan(*, root=None) -> Dict[str, Any]:
     failure = latest_failure(root=root, surface="forge")
     if not failure:
         return {"kind": "forge-repair-plan", "ok": 0, "reason": "no-failure", "targets": [], "stored_prose": 0}
-    return {"kind": "forge-repair-plan", "ok": 1, "reason": str(failure.get("reason") or "unknown"), "surface": "forge", "weakest_path": failure.get("weakest_path") or "", "targets": _targets(failure), "stored_prose": 0}
+    reason = failure.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        return {"kind": "forge-repair-plan", "ok": 0, "reason": "missing-reason", "targets": [], "stored_prose": 0}
+    return {"kind": "forge-repair-plan", "ok": 1, "reason": reason, "surface": "forge", "weakest_path": failure.get("weakest_path") or "", "targets": _targets(failure), "stored_prose": 0}
 
 
 def candidate_failures(*, root=None, limit: int = 5) -> Dict[str, Any]:
@@ -70,24 +73,24 @@ def _select_target(before: Dict[str, Any], evidence: Dict[str, Any]) -> str:
 
 
 def _targets(failure: Dict[str, Any]) -> List[Dict[str, Any]]:
-    reason = str(failure.get("reason") or "unknown")
-    weakest = str(failure.get("weakest_path") or "")
+    reason = failure.get("reason")
+    if not isinstance(reason, str) or not reason.strip():
+        return []
+    weakest = failure.get("weakest_path") if isinstance(failure.get("weakest_path"), str) else ""
     summary = dict(failure.get("summary") or {})
     evidence = dict(failure.get("evidence") or {})
     top = list(evidence.get("top_file_reports") or [])
-    hard_first = []
+    targets: List[Dict[str, Any]] = []
     for item in top:
-        if item.get("hard_issues"):
-            hard_first.append({"target": item.get("path") or weakest or "generated script", "action": "clear hard verification failures first"})
-    targets: List[Dict[str, Any]] = hard_first[:]
+        if item.get("hard_issues") and isinstance(item.get("path"), str) and item["path"]:
+            targets.append({"target": item["path"], "action": "clear hard verification failures first"})
     if reason == "project_closure":
         targets.append({"target": "project graph", "action": "restore missing required files or references"})
-    if reason in {"unsafe_code", "low_score"}:
-        targets.append({"target": weakest or "generated script", "action": "repair weakest emitted file first"})
-    if int(summary.get("blocking_issues") or 0) > 0:
+    if reason in {"unsafe_code", "low_score"} and weakest:
+        targets.append({"target": weakest, "action": "repair weakest emitted file first"})
+    blocking = summary.get("blocking_issues")
+    if isinstance(blocking, int) and not isinstance(blocking, bool) and blocking > 0:
         targets.append({"target": "blocking issues", "action": "clear hard verification failures before soft tuning"})
-    if not targets:
-        targets.append({"target": weakest or "forge output", "action": "re-emit and re-verify once"})
     return targets
 
 

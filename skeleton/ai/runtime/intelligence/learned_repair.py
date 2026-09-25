@@ -33,10 +33,20 @@ def load_learned_policy(root=None) -> Dict[str, Any]:
         return _default_learned_policy()
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return _default_learned_policy()
+    except json.JSONDecodeError as exc:
+        raise ValueError("learned policy is not JSON") from exc
+    if not isinstance(data, dict):
+        raise ValueError("learned policy must be an object")
     base = _default_learned_policy()
-    base.update(data)
+    for key, value in base.items():
+        if key not in data:
+            continue
+        incoming = data[key]
+        if isinstance(value, dict) and not isinstance(incoming, dict):
+            raise ValueError(f"{key} must be an object")
+        base[key] = incoming
+    if base.get("version") != 1:
+        raise ValueError("unsupported learned policy version")
     return base
 
 
@@ -58,10 +68,14 @@ def _extract_action_key(action: Dict[str, Any]) -> str:
 def learn_from_repair(result: Dict[str, Any], *, root=None) -> Dict[str, Any]:
     """Update the learned policy from a single repair result."""
     policy = load_learned_policy(root)
-    surface = str(result.get("surface") or "unknown")
-    reason = str(result.get("reason") or "unknown")
+    surface = result.get("surface")
+    reason = result.get("reason")
+    if not isinstance(surface, str) or not surface.strip() or not isinstance(reason, str) or not reason.strip():
+        raise ValueError("surface and reason are required")
     accepted = result.get("ok") is True or result.get("ok") == 1 or result.get("accepted") is True or result.get("accepted") == 1
-    actions = list(result.get("actions") or [])
+    actions = result.get("actions") or []
+    if not isinstance(actions, list):
+        raise ValueError("actions must be a list")
 
     # Track surface strategy outcomes
     strategies = policy.setdefault("surface_strategies", {})

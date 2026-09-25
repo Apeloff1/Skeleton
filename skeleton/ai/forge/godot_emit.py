@@ -26,6 +26,13 @@ def _required(container: Any, key: str, label: str, *, positive: bool = True) ->
     return number
 
 
+def _flag(plan: Dict[str, Any], pack: Dict[str, Any], key: str) -> bool:
+    source = plan if key in plan else pack
+    if key not in source or not isinstance(source[key], bool):
+        raise ValueError(f"{key} must be boolean")
+    return source[key]
+
+
 def _gd_recipes(recipes: List[dict]) -> str:
     lines = []
     for r in recipes:
@@ -64,8 +71,29 @@ def emit_godot(
     sprint_m = _required(player, "sprint_multiplier", "sprint_multiplier")
     collapse = _required(session, "collapse_max", "collapse_max")
     plan = build_plan or {}
-    hw = pack.get("hardware") or {}
-    vw, vh = (hw.get("viewport") or [1280, 720])[:2]
+    hw = pack.get("hardware")
+    if not isinstance(hw, dict):
+        raise ValueError("hardware is required")
+    key = hw.get("key")
+    if not isinstance(key, str) or not key.strip():
+        raise ValueError("hardware key is required")
+    viewport = hw.get("viewport")
+    if (
+        not isinstance(viewport, (list, tuple))
+        or len(viewport) != 2
+        or isinstance(viewport[0], bool)
+        or isinstance(viewport[1], bool)
+        or not isinstance(viewport[0], int)
+        or not isinstance(viewport[1], int)
+        or viewport[0] <= 0
+        or viewport[1] <= 0
+    ):
+        raise ValueError("viewport must be two positive integers")
+    vw, vh = viewport
+    if not isinstance(hw.get("pixel_snap"), bool):
+        raise ValueError("pixel_snap must be boolean")
+    armed = _flag(plan, pack, "spawn_weapon")
+    late = _flag(plan, pack, "extract_late")
     files: Dict[str, str] = {}
     files["project.godot"] = (
         '; Engine configuration file.\n'
@@ -85,7 +113,7 @@ def emit_godot(
         'GameState="*res://scripts/autoloads/game_state.gd"\n'
         'Jeeves="*res://scripts/autoloads/jeeves.gd"\n'
         'InputBind="*res://scripts/autoloads/input_bind.gd"\n'
-        f'\n; era={era} generation={hw.get("key", "modern")}\n'
+        f'\n; era={era} generation={key}\n'
     )
     files["scripts/autoloads/event_bus.gd"] = (
         "extends Node\n"
@@ -145,7 +173,6 @@ def emit_godot(
         "			return true\n"
         "	return false\n"
     )
-    armed = bool(plan.get("spawn_weapon"))
     files["scripts/autoloads/game_state.gd"] = (
         "extends Node\n"
         "enum RunPhase { IDLE, RUNNING, EXTRACTING, FAILED, SUCCESS }\n"
@@ -156,8 +183,8 @@ def emit_godot(
         "var data_cores_held: Array = []\n"
         f"var spawn_weapon: bool = {str(armed).lower()}\n"
         f"var current_room: String = \"r00\"\n"
-        f"var generation: String = \"{hw.get('key') or 'modern'}\"\n"
-        f"var extract_late: bool = {str(bool(plan.get('extract_late'))).lower()}\n"
+        f"var generation: String = \"{key}\"\n"
+        f"var extract_late: bool = {str(late).lower()}\n"
         f"var extract_room: String = \"r00\"\n\n"
         "func start_run() -> void:\n"
         "	phase = RunPhase.RUNNING\n"
@@ -403,20 +430,37 @@ def emit_godot(
         "fire={\"deadzone\": 0.5, \"events\": []}\n"
     )
     from skeleton.forge.world import generate_rooms, assert_connected, assert_occupancy
-    graph = generate_rooms(pack, seed=str(plan.get("seed") or pack.get("era")), plan=plan)
+    world_plan = dict(plan)
+    world_plan["spawn_weapon"] = armed
+    world_plan["extract_late"] = late
+    if "room_bias" not in world_plan and "room_bias" in pack:
+        world_plan["room_bias"] = pack["room_bias"]
+    seed = plan.get("seed")
+    graph = generate_rooms(pack, seed=seed if isinstance(seed, str) and seed.strip() else None, plan=world_plan)
     assert_connected(graph)
     assert_occupancy(graph)
     files["data/rooms.json"] = json.dumps(graph, indent=2)
-    files["data/build_plan.json"] = json.dumps(plan, indent=2)
+    files["data/build_plan.json"] = json.dumps(world_plan, indent=2)
     files["data/hardware.json"] = json.dumps(hw, indent=2)
     files["scenes/levels/run_level.tscn"] = _level_tscn(graph, hw)
-    files["scripts/world/world_map.gd"] = _world_map_gd(plan, graph)
+    files["scripts/world/world_map.gd"] = _world_map_gd(world_plan, graph, era=era)
     return files
 
 
-def _world_map_gd(plan: Dict[str, Any], graph: Optional[Dict[str, Any]] = None) -> str:
-    era = (plan.get("era") or (graph or {}).get("era") or "extraction_now")
-    seed = plan.get("seed") or (graph or {}).get("seed") or era
+def _world_map_gd(plan: Dict[str, Any], graph: Optional[Dict[str, Any]] = None, *, era: str) -> str:
+    if not isinstance(era, str) or not era.strip():
+        raise ValueError("era is required")
+    plan_era = plan.get("era")
+    if plan_era is not None and plan_era != era:
+        raise ValueError("plan era does not match the pack")
+    graph_era = (graph or {}).get("era") if isinstance(graph, dict) else None
+    if graph_era is not None and graph_era != era:
+        raise ValueError("graph era does not match the pack")
+    seed = plan.get("seed") if isinstance(plan.get("seed"), str) and plan.get("seed").strip() else None
+    if seed is None and isinstance(graph, dict) and isinstance(graph.get("seed"), str) and graph.get("seed").strip():
+        seed = graph["seed"]
+    if seed is None:
+        raise ValueError("seed is required")
     n = int((graph or {}).get("count") or 0)
     rooms = (graph or {}).get("rooms") or []
     edges = (graph or {}).get("edges") or []
