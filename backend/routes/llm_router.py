@@ -257,7 +257,7 @@ async def route_complete(task: str, prompt: str, system: str = "",
     """Execute one compatibility completion through the canonical engine.
 
     The legacy model catalog remains planning metadata only. Provider/model
-    selection and failover are engine-owned; this route does not create a
+    provider/model selection and failover are engine-owned; this route does not create a
     second provider runtime or pretend to pin a vendor model locally.
     """
     task = (task or "default").lower()
