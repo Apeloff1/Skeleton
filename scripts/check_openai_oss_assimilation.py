@@ -77,8 +77,41 @@ def validate() -> list[str]:
                 continue
             if not FULL_SHA.fullmatch(blob):
                 errors.append(f"{source_id}: invalid upstream blob SHA for {source_path}")
-            elif _git_blob_sha(path) != blob:
-                errors.append(f"{source_id}: byte drift from upstream blob: {source_path}")
+            normalization = item.get("normalization")
+            actual_blob = _git_blob_sha(path)
+            if normalization is None:
+                if FULL_SHA.fullmatch(blob) and actual_blob != blob:
+                    errors.append(
+                        f"{source_id}: byte drift from upstream blob: {source_path}"
+                    )
+            elif normalization == "strip-trailing-whitespace-v1":
+                destination_blob = str(item.get("destination_blob_sha", ""))
+                if not FULL_SHA.fullmatch(destination_blob):
+                    errors.append(
+                        f"{source_id}: normalized snapshot lacks destination blob SHA: {source_path}"
+                    )
+                elif actual_blob != destination_blob:
+                    errors.append(
+                        f"{source_id}: normalized snapshot blob drift: {source_path}"
+                    )
+                try:
+                    normalized_text = path.read_text(encoding="utf-8")
+                except (OSError, UnicodeDecodeError) as exc:
+                    errors.append(
+                        f"{source_id}: cannot read normalized snapshot {source_path}: {exc}"
+                    )
+                else:
+                    if any(
+                        line.endswith((" ", "\t"))
+                        for line in normalized_text.splitlines()
+                    ):
+                        errors.append(
+                            f"{source_id}: trailing whitespace remains after normalization: {source_path}"
+                        )
+            else:
+                errors.append(
+                    f"{source_id}: unknown snapshot normalization {normalization!r}"
+                )
             if destination.endswith("LICENSE.upstream.txt"):
                 license_seen = True
             elif not destination.endswith(".txt"):
