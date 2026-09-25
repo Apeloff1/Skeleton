@@ -75,13 +75,30 @@ def _speed(pack: Dict[str, Any]) -> float:
     return max(float((pack.get("player") or {}).get("speed") or 180.0), 1.0)
 
 
+def _positive(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a positive number")
+    number = float(value)
+    if not number > 0 or number != number or number == float("inf"):
+        raise ValueError(f"{label} must be a positive number")
+    return number
+
+
+def _flag(value: Any, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{label} must be boolean")
+    return value
+
+
 def _ttk(pack: Dict[str, Any], tier: str) -> float:
     enemies = pack.get("enemies") or []
-    for e in enemies:
-        if e.get("id") == tier:
-            return float(e.get("ttk_target") or 0.0)
-    ttk = pack.get("ttk") or {}
-    return float(ttk.get(tier) or 1.0)
+    for enemy in enemies:
+        if isinstance(enemy, dict) and enemy.get("id") == tier and "ttk_target" in enemy:
+            return _positive(enemy.get("ttk_target"), "ttk_target")
+    ttk = pack.get("ttk") if isinstance(pack.get("ttk"), dict) else {}
+    if tier not in ttk:
+        raise ValueError(f"missing ttk for {tier}")
+    return _positive(ttk[tier], "ttk")
 
 
 def _enemy(pack: Dict[str, Any], tier: str) -> Optional[Dict[str, Any]]:
@@ -193,13 +210,13 @@ def _resolve_room(
         steps.append(WalkStep(t, rid, "heat", f"dwell={dwell:.3f} heat={heat:.1f}"))
         return t, cores, fights, t >= collapse, heat, vents
     if kind == "combat":
-        from skeleton.forge.sim import simulate_encounter
         for occ in room.get("occupants") or []:
             if occ.get("kind") != "enemy":
                 continue
             tier = str(occ.get("tier") or "trash")
             enemy = _enemy(pack, tier)
             if mode == "thermal" and enemy is not None:
+                from skeleton.forge.sim import simulate_encounter
                 remaining = max(0.05, collapse - t)
                 result = simulate_encounter(
                     pack, enemy, mode="thermal", heat0=heat, max_t=remaining,
@@ -243,8 +260,16 @@ def walk_graph(
     spawn = next(r["id"] for r in graph["rooms"] if r["kind"] == "spawn")
     extract = next(r["id"] for r in graph["rooms"] if r["kind"] == "extract")
     adj = _adj(graph, pack)
-    collapse = float((pack.get("session") or {}).get("collapse_max") or 9999)
-    extract_late = bool(plan.get("extract_late") or graph.get("extract_late"))
+    session = pack.get("session") if isinstance(pack.get("session"), dict) else {}
+    if "collapse_max" not in session:
+        raise ValueError("collapse_max is required")
+    collapse = _positive(session.get("collapse_max"), "collapse_max")
+    if "extract_late" in plan:
+        extract_late = _flag(plan.get("extract_late"), "extract_late")
+    elif "extract_late" in graph:
+        extract_late = _flag(graph.get("extract_late"), "extract_late")
+    else:
+        extract_late = False
     core_sources = [r["id"] for r in graph["rooms"] if r["kind"] in {"loot", "combat"}]
     required = 1 if (extract_late and core_sources) else 0
 
