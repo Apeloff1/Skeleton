@@ -101,6 +101,7 @@ on:
       - "backend/routes/ai_toolkit_enhanced.py"
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
+      - "backend/tests/test_operation_stream_multiworker.py"
       - "backend/core/engine_client.py"
       - "backend/routes/image_generation.py"
       - "backend/core/expressive_tts.py"
@@ -526,6 +527,7 @@ jobs:
           backend/tests/test_ai_provider_request_validation.py
           backend/tests/test_operation_stream_transport.py
           backend/tests/test_operation_stream_route.py
+          backend/tests/test_operation_stream_multiworker.py
           backend/tests/test_conversations_api.py
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_tool_registry_canonical_delegate.py
