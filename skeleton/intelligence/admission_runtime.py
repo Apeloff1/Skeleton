@@ -719,9 +719,10 @@ class AdmissionRuntime:
                         "quota_completion_unavailable"
                     ) from exc
 
-            self._release_shared_pressure(
-                active.shared_pressure_lease
-            ) if active.shared_pressure_lease is not None else None
+            if active.shared_pressure_lease is not None:
+                self._release_shared_pressure(
+                    active.shared_pressure_lease
+                )
             self.metrics_registry.inc("admission.completed_total")
             _observe_usage(
                 self.metrics_registry,
