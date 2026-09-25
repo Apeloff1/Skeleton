@@ -558,7 +558,37 @@ class EngineExecutionCommand:
 
     @property
     def command_digest(self) -> str:
+        """Full audit digest including temporal authority material."""
+
         return _digest(self.as_dict(include_authority_digest=True))
+
+    @property
+    def submission_digest(self) -> str:
+        """Stable semantic digest used for idempotent submission replay.
+
+        Delegated authority timestamps, operation timestamps, trace timestamps,
+        and other freshness material are intentionally excluded. The service
+        validates the fresh authority before replay lookup; this digest decides
+        only whether the requested work is semantically the same work.
+        """
+
+        return _digest(
+            {
+                "schema_version": self.schema_version,
+                "operation_id": self.operation.operation_id,
+                "operation_identity_digest": self.operation.identity_digest,
+                "execution_id": self.execution_request.execution_id,
+                "execution_identity_digest": (
+                    self.execution_request.identity_digest
+                ),
+                "compiled_context_handoff_digest": (
+                    self.compiled_context.handoff_digest
+                ),
+                "context_seed_refs": list(self.context_seed_refs),
+                "resource_budget": dict(self.resource_budget),
+                "stream_preferences": dict(self.stream_preferences),
+            }
+        )
 
     def as_dict(self, *, include_authority_digest: bool = True) -> dict[str, Any]:
         authority = self.delegated_authority.as_dict()
@@ -966,7 +996,19 @@ class SQLiteEngineSubmissionStore:
                     key,
                 ).fetchone()
                 if row is not None:
-                    if row["command_digest"] != command.command_digest:
+                    try:
+                        stored_payload = json.loads(row["command_json"])
+                        stored_command = EngineExecutionCommand.from_dict(
+                            stored_payload
+                        )
+                    except (json.JSONDecodeError, EngineServiceError) as exc:
+                        raise EngineServiceError(
+                            "stored engine submission is corrupt"
+                        ) from exc
+                    if (
+                        stored_command.submission_digest
+                        != command.submission_digest
+                    ):
                         raise EngineSubmissionConflict(
                             "engine idempotency identity was reused with different command"
                         )
@@ -986,7 +1028,7 @@ class SQLiteEngineSubmissionStore:
                     (
                         *key,
                         command.execution_request.execution_id,
-                        command.command_digest,
+                        command.submission_digest,
                         json.dumps(
                             command.as_dict(),
                             sort_keys=True,
@@ -1274,7 +1316,10 @@ class EngineExecutionService:
             idempotency_key=command.operation.idempotency_key,
         )
         if existing is not None:
-            if existing.command.command_digest != command.command_digest:
+            if (
+                existing.command.submission_digest
+                != command.submission_digest
+            ):
                 raise EngineSubmissionConflict(
                     "engine idempotency identity was reused with different command"
                 )
@@ -1294,7 +1339,7 @@ class EngineExecutionService:
                 "tenant_id": command.operation.tenant_id,
                 "operation_id": command.operation.operation_id,
                 "idempotency_key": command.operation.idempotency_key,
-                "command_digest": command.command_digest,
+                "submission_digest": command.submission_digest,
             }
         )
         ack = EngineExecutionAck(
