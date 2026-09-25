@@ -44,6 +44,12 @@ class PlaneResult:
     from_cache: bool = False
 
 
+def _freshness_row(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if metadata is None:
+        return {"tracked": False, "stale": True}
+    return {"tracked": True, **metadata}
+
+
 class QuadRetriever:
     """Unified retrieval across RAG, CAG, MAG, and KAG planes.
 
@@ -302,11 +308,7 @@ class QuadRetriever:
         freshness = self._freshness.metadata(plane_name)
         for item in normalized:
             metadata = dict(item.metadata)
-            metadata["index_freshness"] = (
-                {"tracked": False, "stale": None}
-                if freshness is None
-                else {"tracked": True, **freshness}
-            )
+            metadata["index_freshness"] = _freshness_row(freshness)
             item.metadata = metadata
         return normalized
 
@@ -334,19 +336,19 @@ class QuadRetriever:
             per_plane: Dict[str, Dict[str, Any]] = {}
             for plane in planes:
                 metadata = self._freshness.metadata(plane)
-                per_plane[plane] = (
-                    {"tracked": False, "stale": None}
-                    if metadata is None
-                    else {"tracked": True, **metadata}
-                )
+                per_plane[plane] = _freshness_row(metadata)
             copied = replace(result, metadata=dict(result.metadata))
             copied.metadata["fusion_freshness"] = per_plane
-            copied.metadata["stale"] = any(
-                row.get("stale") is True for row in per_plane.values()
-            )
-            copied.metadata["freshness_complete"] = all(
-                row.get("tracked") is True for row in per_plane.values()
-            )
+            if not per_plane:
+                copied.metadata["stale"] = True
+                copied.metadata["freshness_complete"] = False
+            else:
+                copied.metadata["stale"] = any(
+                    row.get("stale") is True for row in per_plane.values()
+                )
+                copied.metadata["freshness_complete"] = all(
+                    row.get("tracked") is True for row in per_plane.values()
+                )
             refreshed.append(copied)
         return refreshed
 
