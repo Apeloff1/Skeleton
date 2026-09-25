@@ -309,6 +309,13 @@ class ToolExecutionRequest:
     def __post_init__(self) -> None:
         _uuid(self.request_id, "request_id")
         _uuid(self.operation_id, "operation_id")
+        lineage = (self.execution_id, self.turn_id, self.call_id)
+        if any(value is not None for value in lineage) and not all(
+            value is not None for value in lineage
+        ):
+            raise ToolContractError(
+                "execution_id, turn_id and call_id must be supplied together"
+            )
         for field in ("execution_id", "turn_id", "call_id"):
             value = getattr(self, field)
             if value is not None:
@@ -339,17 +346,13 @@ def approval_ref_for_request(request: ToolExecutionRequest) -> str:
 
     if not isinstance(request, ToolExecutionRequest):
         raise TypeError("request must be ToolExecutionRequest")
-    material = "\x1f".join(
-        (
-            request.operation_id,
-            request.execution_id or "",
-            request.turn_id or "",
-            request.call_id or "",
-            request.tenant_id,
-            request.tool_id,
-            request.arguments_digest,
+    parts = [request.operation_id]
+    if request.execution_id is not None:
+        parts.extend(
+            (request.execution_id, request.turn_id or "", request.call_id or "")
         )
-    ).encode("utf-8")
+    parts.extend((request.tenant_id, request.tool_id, request.arguments_digest))
+    material = "\x1f".join(parts).encode("utf-8")
     return "approval:" + hashlib.sha256(material).hexdigest()
 
 
@@ -379,6 +382,13 @@ class ToolExecutionReceipt:
         _uuid(self.receipt_id, "receipt_id")
         _uuid(self.request_id, "request_id")
         _uuid(self.operation_id, "operation_id")
+        lineage = (self.execution_id, self.turn_id, self.call_id)
+        if any(value is not None for value in lineage) and not all(
+            value is not None for value in lineage
+        ):
+            raise ToolContractError(
+                "execution_id, turn_id and call_id must be supplied together"
+            )
         for field in ("execution_id", "turn_id", "call_id"):
             value = getattr(self, field)
             if value is not None:
