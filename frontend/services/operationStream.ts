@@ -59,6 +59,7 @@ export interface OperationResyncSnapshotPayload {
   latest_sequence: number;
   terminal: boolean;
   active_consumer_count: number;
+  canonical_result?: import('./operationStreamReducer').OperationCanonicalResult | null;
 }
 
 function delay(ms: number, signal?: AbortSignal): Promise<void> {
@@ -386,7 +387,17 @@ export async function resyncOperation(
     };
 
     if (snapshot.terminal && snapshot.latest_sequence === floor) {
-      return state;
+      return reduceOperationReplay(state, {
+        ok: true,
+        operation: snapshot.operation,
+        events: [],
+        after_sequence: floor,
+        latest_sequence: floor,
+        stream_latest_sequence: floor,
+        has_more: false,
+        terminal: true,
+        canonical_result: snapshot.canonical_result ?? null,
+      });
     }
 
     const replayed = await replayOperation(state, signal);
