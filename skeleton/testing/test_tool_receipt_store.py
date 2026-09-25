@@ -155,3 +155,130 @@ def test_durable_store_rejects_idempotency_key_reuse_with_different_args(
 
     with pytest.raises(Exception, match="different tool or arguments"):
         store.reserve(conflicting, now=_now())
+
+def test_durable_receipt_preserves_execution_turn_call_lineage_across_restart(
+    tmp_path,
+) -> None:
+    path = tmp_path / "tool-lineage-receipts.sqlite3"
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    call_id = str(uuid4())
+    request = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="lineage-restart-key",
+        arguments={"path": "README.md"},
+        requested_at=_now(),
+    )
+    calls = []
+
+    first_store = SQLiteToolReceiptStore(path)
+    first_runtime = ToolRuntime(receipt_store=first_store)
+    first_runtime.register(
+        _manifest(),
+        lambda _request: calls.append("first") or "artifact:lineage",
+    )
+    original = first_runtime.execute(request, now=_now())
+    first_store.close()
+
+    assert original.execution_id == execution_id
+    assert original.turn_id == turn_id
+    assert original.call_id == call_id
+    assert original.as_dict()["execution_id"] == execution_id
+    assert original.as_dict()["turn_id"] == turn_id
+    assert original.as_dict()["call_id"] == call_id
+
+    reopened = SQLiteToolReceiptStore(path)
+    second_runtime = ToolRuntime(receipt_store=reopened)
+    second_runtime.register(
+        _manifest(),
+        lambda _request: calls.append("duplicate") or "artifact:duplicate",
+    )
+    replay = second_runtime.execute(request, now=_now())
+
+    assert replay == original
+    assert replay.execution_id == execution_id
+    assert replay.turn_id == turn_id
+    assert replay.call_id == call_id
+    assert calls == ["first"]
+
+
+def test_durable_store_rejects_lineage_change_for_same_idempotency_identity(
+    tmp_path,
+) -> None:
+    path = tmp_path / "tool-lineage-conflict.sqlite3"
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    first = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="lineage-conflict-key",
+        arguments={"path": "README.md"},
+        requested_at=_now(),
+    )
+    store = SQLiteToolReceiptStore(path)
+    store.reserve(first, now=_now())
+
+    conflicting = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key=first.idempotency_key,
+        arguments={"path": "README.md"},
+        requested_at=_now(),
+    )
+
+    with pytest.raises(Exception, match="different tool or arguments"):
+        store.reserve(conflicting, now=_now())
+
+
+def test_existing_receipt_database_migrates_nullable_lineage_columns(tmp_path) -> None:
+    import sqlite3
+
+    path = tmp_path / "legacy-tool-receipts.sqlite3"
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE tool_execution_receipt (
+            namespace TEXT NOT NULL,
+            tenant_id TEXT NOT NULL,
+            operation_id TEXT NOT NULL,
+            idempotency_key TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            tool_id TEXT NOT NULL,
+            arguments_digest TEXT NOT NULL,
+            state TEXT NOT NULL,
+            reserved_at TEXT NOT NULL,
+            receipt_json TEXT,
+            completed_at TEXT,
+            PRIMARY KEY(namespace, tenant_id, operation_id, idempotency_key)
+        );
+        """
+    )
+    connection.close()
+
+    store = SQLiteToolReceiptStore(path)
+    columns = {
+        row[1]
+        for row in store._connection.execute(
+            "PRAGMA table_info(tool_execution_receipt)"
+        ).fetchall()
+    }
+
+    assert {"execution_id", "turn_id", "call_id"}.issubset(columns)
+
