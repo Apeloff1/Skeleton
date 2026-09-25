@@ -18,6 +18,12 @@ from skeleton.kernel.events import DomainEvent, EventBus
 from skeleton.kernel.ids import BlueprintId
 
 
+def _pair(end: Any) -> tuple[str, str] | None:
+    if isinstance(end, tuple) and len(end) == 2 and all(isinstance(part, str) and part.strip() for part in end):
+        return end
+    return None
+
+
 @dataclass(frozen=True)
 class Port:
     name: str
@@ -63,12 +69,19 @@ class Blueprint:
         self.components[component.instance_id] = component
 
     def connect(self, src: tuple[str, str], dst: tuple[str, str]) -> None:
+        if _pair(src) is None or _pair(dst) is None:
+            raise BlueprintError("wire ends must be (component, port)")
         self.wires.append(Wire(src=src, dst=dst))
 
     def validate(self) -> list[str]:
         problems: list[str] = []
         for wire in self.wires:
-            for end, direction in ((wire.src, "out"), (wire.dst, "in")):
+            src = _pair(wire.src)
+            dst = _pair(wire.dst)
+            if src is None or dst is None:
+                problems.append("wire ends must be (component, port)")
+                continue
+            for end, direction in ((src, "out"), (dst, "in")):
                 comp_id, port_name = end
                 comp = self.components.get(comp_id)
                 if comp is None:
@@ -81,20 +94,24 @@ class Blueprint:
                     continue
                 if port.direction != direction:
                     problems.append(f"{comp_id}.{port_name} is a {port.direction}-port; expected {direction}")
-            src_comp = self.components.get(wire.src[0])
-            dst_comp = self.components.get(wire.dst[0])
+            src_comp = self.components.get(src[0])
+            dst_comp = self.components.get(dst[0])
             if src_comp is not None and dst_comp is not None:
                 try:
-                    s = src_comp.port(wire.src[1])
-                    d = dst_comp.port(wire.dst[1])
+                    s = src_comp.port(src[1])
+                    d = dst_comp.port(dst[1])
                     if s.port_type != d.port_type:
-                        problems.append(f"type mismatch {wire.src[0]}.{wire.src[1]} ({s.port_type}) -> {wire.dst[0]}.{wire.dst[1]} ({d.port_type})")
+                        problems.append(f"type mismatch {src[0]}.{src[1]} ({s.port_type}) -> {dst[0]}.{dst[1]} ({d.port_type})")
                 except BlueprintError:
                     pass
         edges: dict[str, list[str]] = {c: [] for c in self.components}
         for wire in self.wires:
-            if wire.src[0] in edges and wire.dst[0] in edges:
-                edges[wire.src[0]].append(wire.dst[0])
+            src = _pair(wire.src)
+            dst = _pair(wire.dst)
+            if src is None or dst is None:
+                continue
+            if src[0] in edges and dst[0] in edges:
+                edges[src[0]].append(dst[0])
         visited: set[str] = set()
         stack: set[str] = set()
 
@@ -514,16 +531,26 @@ class Forge:
     def _topological_order(blueprint: Blueprint) -> list[str]:
         indegree = {c: 0 for c in blueprint.components}
         for wire in blueprint.wires:
-            if wire.dst[0] in indegree:
-                indegree[wire.dst[0]] += 1
+            src = _pair(wire.src)
+            dst = _pair(wire.dst)
+            if src is None or dst is None:
+                raise MaterialisationError("wire ends must be (component, port)")
+            if dst[0] in indegree:
+                indegree[dst[0]] += 1
         queue = sorted([c for c, d in indegree.items() if d == 0])
         order: list[str] = []
         while queue:
             node = queue.pop(0)
             order.append(node)
             for wire in blueprint.wires:
-                if wire.src[0] == node and wire.dst[0] in indegree:
-                    indegree[wire.dst[0]] -= 1
-                    if indegree[wire.dst[0]] == 0:
-                        queue.append(wire.dst[0])
+                src = _pair(wire.src)
+                dst = _pair(wire.dst)
+                if src is None or dst is None:
+                    continue
+                if src[0] == node and dst[0] in indegree:
+                    indegree[dst[0]] -= 1
+                    if indegree[dst[0]] == 0:
+                        queue.append(dst[0])
+        if len(order) != len(blueprint.components):
+            raise MaterialisationError("blueprint execution order is incomplete")
         return order
