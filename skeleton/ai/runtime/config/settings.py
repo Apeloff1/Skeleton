@@ -9,7 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from skeleton.kernel.errors import ConfigurationError
@@ -79,9 +79,26 @@ class EngineSettings(BaseSettings):
     execution_state_path: str = ":memory:"
     submission_state_path: str = ":memory:"
     tool_receipt_path: str = ":memory:"
+    service_token: SecretStr = Field(default=SecretStr(""), repr=False)
     service_principal: str = "codedock-backend"
     allowed_tenants_csv: str = "*"
     allowed_capabilities_csv: str = "*"
+
+    @field_validator("service_token", mode="before")
+    @classmethod
+    def _service_token(cls, value: object) -> object:
+        raw = (
+            value.get_secret_value()
+            if isinstance(value, SecretStr)
+            else value
+        )
+        if not isinstance(raw, str):
+            raise ValueError("engine service token must be text")
+        if raw and (raw != raw.strip() or len(raw) < 32):
+            raise ValueError(
+                "engine service token must be normalized and at least 32 characters"
+            )
+        return raw
 
     @property
     def allowed_tenants(self) -> frozenset[str]:
