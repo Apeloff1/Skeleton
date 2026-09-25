@@ -61,6 +61,9 @@ _AI_SURFACE_PATH_TERMS = (
     "/ai.",
 )
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
+_NON_RUNTIME_PROVIDER_MIRROR_PREFIXES = (
+    "skeleton/ai/research/external/",
+)
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
         "urllib.request",
@@ -179,50 +182,78 @@ def _network_transport_imports(path: Path) -> list[str]:
 
 def _credential_environment_reads(path: Path) -> list[str]:
     """Return credential names actually read from os.getenv/os.environ APIs."""
+
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except (OSError, SyntaxError):
         return []
 
     hits: set[str] = set()
+    os_module_names = {"os"}
+    getenv_names: set[str] = set()
+    environ_names: set[str] = set()
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "os":
+                    os_module_names.add(alias.asname or alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module == "os":
+            for alias in node.names:
+                if alias.name == "getenv":
+                    getenv_names.add(alias.asname or alias.name)
+                elif alias.name == "environ":
+                    environ_names.add(alias.asname or alias.name)
 
     def constant_string(node: ast.AST | None) -> str | None:
-        return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+        return (
+            node.value
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+            else None
+        )
+
+    def credential_name(node: ast.AST | None) -> str | None:
+        name = constant_string(node)
+        return name if name in _AI_CREDENTIAL_MARKERS else None
+
+    def is_environ_value(node: ast.AST) -> bool:
+        if isinstance(node, ast.Name):
+            return node.id in environ_names
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == "environ"
+            and isinstance(node.value, ast.Name)
+            and node.value.id in os_module_names
+        )
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
             func = node.func
-            is_getenv = (
+            direct_getenv = (
+                isinstance(func, ast.Name)
+                and func.id in getenv_names
+            )
+            module_getenv = (
                 isinstance(func, ast.Attribute)
                 and func.attr == "getenv"
                 and isinstance(func.value, ast.Name)
-                and func.value.id == "os"
+                and func.value.id in os_module_names
             )
-            is_environ_get = (
+            environ_get = (
                 isinstance(func, ast.Attribute)
                 and func.attr == "get"
-                and isinstance(func.value, ast.Attribute)
-                and func.value.attr == "environ"
-                and isinstance(func.value.value, ast.Name)
-                and func.value.value.id == "os"
+                and is_environ_value(func.value)
             )
-            if (is_getenv or is_environ_get) and node.args:
-                name = constant_string(node.args[0])
-                if name in _AI_CREDENTIAL_MARKERS:
+            if (direct_getenv or module_getenv or environ_get) and node.args:
+                name = credential_name(node.args[0])
+                if name:
                     hits.add(name)
-        elif isinstance(node, ast.Subscript):
-            value = node.value
-            if (
-                isinstance(value, ast.Attribute)
-                and value.attr == "environ"
-                and isinstance(value.value, ast.Name)
-                and value.value.id == "os"
-            ):
-                name = constant_string(node.slice)
-                if name in _AI_CREDENTIAL_MARKERS:
-                    hits.add(name)
-    return sorted(hits)
+        elif isinstance(node, ast.Subscript) and is_environ_value(node.value):
+            name = credential_name(node.slice)
+            if name:
+                hits.add(name)
 
+    return sorted(hits)
 
 def _credential_markers(path: Path) -> list[str]:
     """Return credential edges from real environment reads or declared key slots.
@@ -244,6 +275,14 @@ def _credential_markers(path: Path) -> list[str]:
         ):
             hits.add(node.id)
     return sorted(hits)
+
+
+def _is_non_runtime_provider_mirror(relative: str) -> bool:
+    normalized = relative.replace("\\", "/")
+    return any(
+        normalized.startswith(prefix)
+        for prefix in _NON_RUNTIME_PROVIDER_MIRROR_PREFIXES
+    )
 
 
 def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
@@ -300,6 +339,7 @@ def discover_provider_surfaces(repo_root: Path) -> dict[str, dict[str, list[str]
                 or relative.startswith("tests/")
                 or "/testing/" in "/" + relative
                 or path.name.startswith("test_")
+                or _is_non_runtime_provider_mirror(relative)
             ):
                 continue
             try:
@@ -751,6 +791,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 or relative.startswith("tests/")
                 or "/testing/" in "/" + relative
                 or path.name.startswith("test_")
+                or _is_non_runtime_provider_mirror(relative)
             ):
                 continue
             if relative not in sdk_surface_owners:
