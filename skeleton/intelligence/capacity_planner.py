@@ -7,6 +7,7 @@ and tracks committed vs actual capacity for budget alignment.
 """
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
@@ -20,16 +21,24 @@ class ResourcePool:
     usage: List[float] = field(default_factory=list)
     warn_fraction: float = 0.8
 
-    def current_usage(self) -> float:
-        return self.usage[-1] if self.usage else 0.0
+    def current_usage(self) -> float | None:
+        if not self.usage:
+            return None
+        return float(self.usage[-1])
 
-    def headroom(self) -> float:
-        return max(0.0, self.capacity - self.current_usage())
+    def headroom(self) -> float | None:
+        usage = self.current_usage()
+        if usage is None:
+            return None
+        return self.capacity - usage
 
-    def utilization(self) -> float:
+    def utilization(self) -> float | None:
+        usage = self.current_usage()
+        if usage is None:
+            return None
         if self.capacity <= 0:
-            return 1.0 if self.current_usage() > 0 else 0.0
-        return self.current_usage() / self.capacity
+            return 1.0 if usage > 0 else 0.0
+        return usage / self.capacity
 
 
 
@@ -61,8 +70,12 @@ class CapacityPlanner:
         return pool
 
     def record_usage(self, pool: str, usage: float) -> None:
+        if pool not in self._pools:
+            raise KeyError(pool)
+        if isinstance(usage, bool) or not isinstance(usage, (int, float)) or not math.isfinite(float(usage)) or float(usage) < 0:
+            raise ValueError("usage must be a finite non-negative number")
         p = self._pools[pool]
-        p.usage.append(usage)
+        p.usage.append(float(usage))
         if len(p.usage) > 200:
             p.usage.pop(0)
         if self._forecaster:
@@ -107,13 +120,12 @@ class CapacityPlanner:
         return result
 
     def saturation_estimate(self, pool: str) -> Dict[str, Any]:
-        p = self._pools.get(pool)
-        if not p:
-            return {"pool": pool, "error": "unknown pool"}
-        if len(p.usage) >= 2:
-            growth = p.usage[-1] - p.usage[-2]
-        else:
-            growth = 0.0
+        if pool not in self._pools:
+            raise KeyError(pool)
+        p = self._pools[pool]
+        if len(p.usage) < 2:
+            raise ValueError("saturation needs two usage samples")
+        growth = p.usage[-1] - p.usage[-2]
         if growth <= 0:
             return {"pool": pool, "saturates": False, "growth_per_step": round(growth, 4)}
         steps = p.headroom() / growth
@@ -128,8 +140,14 @@ class CapacityPlanner:
     def analyze(self) -> List[Dict[str, Any]]:
         self._recommendations.clear()
         for name, p in self._pools.items():
-            if p.utilization() >= p.warn_fraction:
-                est = self.saturation_estimate(name)
+            used = p.utilization()
+            if used is None:
+                continue
+            if used >= p.warn_fraction:
+                if len(p.usage) >= 2:
+                    est = self.saturation_estimate(name)
+                else:
+                    est = {"pool": name, "saturates": None, "reason": "need two usage samples"}
                 suggested = round(p.capacity * 1.5, 1)
                 rec = {
                     "pool": name,
@@ -141,7 +159,7 @@ class CapacityPlanner:
                     "urgency": "high" if p.utilization() >= 0.95 else "medium",
                 }
                 self._recommendations.append(rec)
-            elif p.utilization() < 0.2 and len(p.usage) > 10:
+            elif used < 0.2 and len(p.usage) > 10:
                 self._recommendations.append({
                     "pool": name,
                     "action": "scale_down",
@@ -159,8 +177,8 @@ class CapacityPlanner:
                 "capacity": p.capacity,
                 "usage": p.current_usage(),
                 "unit": p.unit,
-                "utilization": round(p.utilization(), 3),
-                "headroom": round(p.headroom(), 2),
+                "utilization": None if p.utilization() is None else round(p.utilization(), 3),
+                "headroom": None if p.headroom() is None else round(p.headroom(), 2),
             } for n, p in self._pools.items()},
             "recommendations": self.analyze(),
         }
