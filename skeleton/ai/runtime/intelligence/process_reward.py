@@ -53,12 +53,22 @@ class Trajectory:
     scores: List[StepScore] = field(default_factory=list)
 
     def aggregate(self, *, recency_weight: float = 0.7) -> float:
-        """Recency-weighted mean of step values."""
+        """Recency-weighted mean of step values.
+
+        ``recency_weight`` is a decay in ``[0, 1]``. Above 1 the oldest
+        step would dominate, and a negative weight can sum to zero.
+        """
         if not self.scores:
             return 0.0
+        if (
+            isinstance(recency_weight, bool)
+            or not isinstance(recency_weight, (int, float))
+            or not 0.0 <= float(recency_weight) <= 1.0
+        ):
+            raise ValueError("recency_weight must be between 0 and 1")
         n = len(self.scores)
-        weights = [recency_weight ** (n - 1 - i) for i in range(n)]
-        total_w = sum(weights)
+        weights = [float(recency_weight) ** (n - 1 - i) for i in range(n)]
+        total_w = sum(weights) or 1.0
         return sum(s.value * w for s, w in zip(self.scores, weights)) / total_w
 
 
