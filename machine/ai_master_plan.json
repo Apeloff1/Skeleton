@@ -749,18 +749,33 @@
       "implementation_paths": [
         "skeleton/memory",
         "skeleton/vault",
-        "planned:skeleton/memory/reconciliation.py"
+        "skeleton/memory/reconciliation.py",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/projection.py"
       ],
       "tests": [
         "planned:skeleton/testing/test_memory_promotion.py",
         "planned:skeleton/testing/test_memory_poisoning.py",
-        "planned:skeleton/testing/test_memory_deletion.py"
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py",
+        "skeleton/testing/test_memory_projection.py",
+        "tests/test_memory_reconciliation.py"
       ],
       "evaluations": [
         "planned:memory usefulness/interference evaluation",
         "planned:long-horizon stale-memory regression"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/projection.py",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py",
+        "skeleton/testing/test_memory_projection.py",
+        "tests/test_memory_reconciliation.py"
+      ],
       "risks": [
         "memory poisoning",
         "tombstone resurrection",
@@ -768,8 +783,8 @@
         "stale contradiction"
       ],
       "gaps": [
-        "durable project-memory owner needs convergence",
-        "memory quality/GC scoring needs implementation"
+        "bind the implemented canonical memory repository and projection dispatcher into all production memory write/read entrypoints and recovery drills",
+        "bind deterministic quality/reconciliation decisions into governed promotion, GC, retention and unresolved-conflict workflows"
       ],
       "accountability_id": "ACC-VOL-010",
       "completion_checkbox": false,
@@ -804,18 +819,41 @@
       "implementation_paths": [
         "skeleton/retrieval",
         "backend/services/rag_service.py",
-        "backend/services/rag_state_repository.py"
+        "backend/services/rag_state_repository.py",
+        "skeleton/retrieval/reranker_contract.py",
+        "skeleton/retrieval/index.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/scope.py",
+        "skeleton/retrieval/plane_health.py"
       ],
       "tests": [
         "tests/test_retrieval_pipeline_internals.py",
         "tests/test_quad_retrieval_internals.py",
-        "planned:skeleton/testing/test_retrieval_tenant_scope.py"
+        "tests/test_retrieval_scope.py",
+        "tests/test_retrieval_freshness.py",
+        "tests/test_retrieval_receipts.py",
+        "tests/test_canonical_reranker.py",
+        "tests/test_index_checkpoint.py",
+        "tests/test_retrieval_plane_health.py",
+        "tests/test_fusion_lineage.py"
       ],
       "evaluations": [
         "planned:retrieval relevance/freshness suite",
         "planned:poisoning and stale-index adversarial eval"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/retrieval/reranker_contract.py",
+        "skeleton/retrieval/index.py",
+        "skeleton/retrieval/freshness.py",
+        "skeleton/retrieval/receipts.py",
+        "skeleton/retrieval/scope.py",
+        "skeleton/retrieval/plane_health.py",
+        "tests/test_canonical_reranker.py",
+        "tests/test_index_checkpoint.py",
+        "tests/test_retrieval_scope.py",
+        "tests/test_retrieval_freshness.py"
+      ],
       "risks": [
         "stale index",
         "tenant filter applied after ranking",
@@ -823,8 +861,8 @@
         "embedding incompatibility"
       ],
       "gaps": [
-        "canonical reranker interface is incomplete",
-        "index migration/freshness service needs implementation"
+        "bind the canonical reranker receipts and scoped retrieval contract into every product/backend retrieval entrypoint",
+        "extend implemented index checkpoint/freshness semantics across external vector backends and release recovery rehearsal"
       ],
       "accountability_id": "ACC-VOL-011",
       "completion_checkbox": false,
@@ -17840,15 +17878,21 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/persistence"
+        "skeleton/persistence",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/persistence/memory_repository.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_gc.py"
+        "planned:skeleton/testing/test_memory_gc.py",
+        "tests/test_memory_reconciliation.py"
       ],
       "evaluations": [
         "planned:GC resurrection/retention evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/memory/reconciliation.py",
+        "tests/test_memory_reconciliation.py"
+      ],
       "risks": [
         "useful memory deleted",
         "tombstone removed"
@@ -17887,22 +17931,27 @@
       ],
       "implementation_paths": [
         "skeleton/eval",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/memory/reconciliation.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_quality.py"
+        "planned:skeleton/testing/test_memory_quality.py",
+        "tests/test_memory_reconciliation.py"
       ],
       "evaluations": [
         "planned:stale/false-memory benchmark"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/memory/reconciliation.py",
+        "tests/test_memory_reconciliation.py"
+      ],
       "risks": [
         "self-confirming memory",
         "low-quality memory retained"
       ],
       "gaps": [
-        "build memory eval corpus",
-        "bind promotion/GC"
+        "build a source/current-truth memory evaluation corpus and calibration benchmarks",
+        "bind implemented quality scoring to governed promotion, contradiction resolution and GC decisions"
       ],
       "accountability_id": "ACC-VOL-362",
       "completion_checkbox": false,
@@ -17981,22 +18030,31 @@
       ],
       "implementation_paths": [
         "skeleton/persistence",
-        "skeleton/ai"
+        "skeleton/ai",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_versioning.py"
+        "planned:skeleton/testing/test_memory_versioning.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py"
       ],
       "evaluations": [
         "planned:concurrent update evaluation"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py"
+      ],
       "risks": [
         "lost update",
         "rollback resurrects deleted memory"
       ],
       "gaps": [
-        "define revision model",
-        "bind reconciliation"
+        "bind immutable revision history into memory API/export and operator rollback workflows",
+        "define governed rollback/supersession behavior without violating tombstones or provenance lineage"
       ],
       "accountability_id": "ACC-VOL-364",
       "completion_checkbox": false,
@@ -18028,22 +18086,29 @@
       ],
       "implementation_paths": [
         "skeleton/ai",
-        "skeleton/eval"
+        "skeleton/eval",
+        "skeleton/memory/reconciliation.py",
+        "skeleton/persistence/memory_repository.py"
       ],
       "tests": [
-        "planned:skeleton/testing/test_memory_reconciliation.py"
+        "planned:skeleton/testing/test_memory_reconciliation.py",
+        "tests/test_memory_reconciliation.py"
       ],
       "evaluations": [
         "planned:conflict resolution benchmark"
       ],
-      "evidence": [],
+      "evidence": [
+        "skeleton/memory/reconciliation.py",
+        "skeleton/persistence/memory_repository.py",
+        "tests/test_memory_reconciliation.py"
+      ],
       "risks": [
         "false merge",
         "newer but wrong memory wins"
       ],
       "gaps": [
-        "define reconciliation policy",
-        "bind memory quality"
+        "extend deterministic quality decisions into explicit unresolved conflict sets and supersession/merge receipts",
+        "bind reconciliation decisions to canonical revision history and governed memory write promotion"
       ],
       "accountability_id": "ACC-VOL-365",
       "completion_checkbox": false,
