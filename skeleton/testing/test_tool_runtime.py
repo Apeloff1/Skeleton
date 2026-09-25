@@ -762,4 +762,3 @@ def test_approval_binding_preserves_legacy_identity_and_binds_full_lineage() -> 
         call_id=str(uuid4()),
     )
     assert approval_ref_for_request(lineaged) != legacy_ref
-
