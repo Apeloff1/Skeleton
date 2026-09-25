@@ -1211,7 +1211,9 @@ def provider_request_from_context(
 
     if resource_budget is None:
         resource_budget = ResourceBudget(
-            max_input_tokens=envelope.budget.max_context_tokens,
+            max_input_tokens=envelope.budget.input_capacity(
+                tools_enabled=bool(envelope.tool_schema_segments)
+            ),
             max_output_tokens=reserved_output,
         )
     if not isinstance(resource_budget, ResourceBudget):
@@ -1389,6 +1391,7 @@ def _actual_provider_usage(
         provider_attempts=max(1, int(attempts_used)),
         tool_calls=estimate.tool_calls,
         artifact_bytes=estimate.artifact_bytes,
+        storage_bytes=estimate.storage_bytes,
     )
 
 
@@ -1589,6 +1592,7 @@ def _media_actual_usage(
         provider_attempts=1,
         tool_calls=estimate.tool_calls,
         artifact_bytes=max(0, int(artifact_bytes)),
+        storage_bytes=estimate.storage_bytes,
     )
 
 
