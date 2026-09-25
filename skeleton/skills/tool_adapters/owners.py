@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import os
 import subprocess
 import tempfile
-from typing import Any, Awaitable, Callable, Mapping
+from typing import Any, Callable, Mapping
 
 from skeleton.skills.tool_adapters.policy import (
     ArtifactAdapterPolicy,
