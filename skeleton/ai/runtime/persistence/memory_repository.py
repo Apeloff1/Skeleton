@@ -91,6 +91,10 @@ class MemoryProjectionEvent:
             raise MemoryRepositoryError("projection event id must be non-empty")
         if self.action not in _PROJECTION_ACTIONS:
             raise MemoryRepositoryError("projection action is invalid")
+        if self.action == "upsert" and self.record.state is not MemoryState.ACTIVE:
+            raise MemoryRepositoryError("upsert projection event requires active memory")
+        if self.action == "delete" and self.record.state is not MemoryState.TOMBSTONED:
+            raise MemoryRepositoryError("delete projection event requires tombstoned memory")
         if self.record.memory_id != self.memory_id or self.record.version != self.memory_version:
             raise MemoryRepositoryError("projection event record identity/version mismatch")
         if self.record.tenant_id != self.tenant_id or self.record.namespace != self.namespace:
@@ -1136,15 +1140,27 @@ class MongoMemoryRepository:
             "committed_at": _iso(revision.committed_at),
             "record": revision.record.as_dict(),
         }
+        revision_key = {
+            "repository_namespace": self.repository_namespace,
+            "memory_id": revision.memory_id,
+            "version": revision.version,
+        }
         await self.revisions.update_one(
-            {
-                "repository_namespace": self.repository_namespace,
-                "memory_id": revision.memory_id,
-                "version": revision.version,
-            },
+            revision_key,
             {"$setOnInsert": revision_doc},
             upsert=True,
         )
+        stored_revision = await self.revisions.find_one(revision_key)
+        if stored_revision is None:
+            raise MemoryRepositoryError("memory revision persistence disappeared")
+        comparable_revision = {
+            key: stored_revision.get(key)
+            for key in revision_doc
+        }
+        if comparable_revision != revision_doc:
+            raise MemoryRepositoryError(
+                "memory revision identity replayed with divergent content"
+            )
 
         event = MemoryProjectionEvent(
             event_id=_projection_event_id(record, projection_action),
@@ -1168,14 +1184,32 @@ class MongoMemoryRepository:
             "published_at": None,
             "record": event.record.as_dict(),
         }
+        event_key = {
+            "repository_namespace": self.repository_namespace,
+            "event_id": event.event_id,
+        }
         await self.projection_outbox.update_one(
-            {
-                "repository_namespace": self.repository_namespace,
-                "event_id": event.event_id,
-            },
+            event_key,
             {"$setOnInsert": event_doc},
             upsert=True,
         )
+        stored_event = await self.projection_outbox.find_one(event_key)
+        if stored_event is None:
+            raise MemoryRepositoryError("projection event persistence disappeared")
+        comparable_event = {
+            key: stored_event.get(key)
+            for key in event_doc
+            if key != "published_at"
+        }
+        expected_event = {
+            key: value
+            for key, value in event_doc.items()
+            if key != "published_at"
+        }
+        if comparable_event != expected_event:
+            raise MemoryRepositoryError(
+                "projection event identity replayed with divergent content"
+            )
 
     @staticmethod
     def _revision_from_doc(doc: dict[str, Any]) -> MemoryRevision:
@@ -1611,7 +1645,10 @@ class MongoMemoryRepository:
         namespace: str,
         expected_version: int,
         now: datetime | None = None,
+        _mutation: str = "tombstone",
     ) -> MemoryRecord:
+        if _mutation not in {"tombstone", "expire"}:
+            raise ValueError("memory tombstone mutation must be tombstone or expire")
         instant = _utc(now)
         current = await self.get(
             memory_id,
@@ -1624,7 +1661,7 @@ class MongoMemoryRepository:
                 raise MemoryConflict("memory version conflict")
             await self._ensure_revision_and_projection(
                 current,
-                mutation="tombstone",
+                mutation=_mutation,
                 predecessor_version=current.version - 1,
                 projection_action="delete",
                 committed_at=current.updated_at,
@@ -1653,7 +1690,7 @@ class MongoMemoryRepository:
         record = self._record_from_doc(updated)
         await self._ensure_revision_and_projection(
             record,
-            mutation="tombstone",
+            mutation=_mutation,
             predecessor_version=current.version,
             projection_action="delete",
             committed_at=instant,
@@ -1693,6 +1730,7 @@ class MongoMemoryRepository:
                     namespace=current.namespace,
                     expected_version=current.version,
                     now=instant,
+                    _mutation="expire",
                 )
             )
         return tuple(expired)
