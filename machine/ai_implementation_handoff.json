@@ -880,14 +880,17 @@
         "skeleton/api/engine_service.py",
         "skeleton/api/engine_runtime.py",
         "backend/core/engine_client.py",
-        "backend/routes/ai.py",
+        "backend/routes/ai.py canonical chat cutover",
         "backend/tests/test_engine_client.py",
         "backend/tests/test_ai_chat_engine_cutover.py",
-        "skeleton/testing/test_engine_process_isolation.py",
-        "docker-compose.yml",
-        "skeleton/app/manifest.json"
+        "skeleton/testing/test_engine_process_isolation.py parity-aware credential gate",
+        "scripts/check_app_assembly.py ProviderRegistry activation inventory",
+        "docker-compose.yml dual-materialized transitional credentials plus durable engine state",
+        "skeleton/app/manifest.json backend->engine dependency"
       ],
       "remaining": [
+        "migrate all production backend ProviderRegistry.from_env activators to engine-owned execution",
+        "remove transitional backend runtime-model credentials only after the activation inventory reaches zero",
         "prove delegated tenant/user/scope denial across the real cross-service boundary",
         "prove submit retry/query behavior against the deployed engine endpoint without duplicate execution",
         "prove idempotent cancel plus late-result fencing across service transport",
