@@ -417,7 +417,11 @@ class QuadRetriever:
     ) -> None:
         """Insert one structured triple into KAG (lazy-register the plane)."""
 
-        del confidence, provenance
+        from skeleton.retrieval.kag import validate_fact_confidence
+
+        confidence = validate_fact_confidence(confidence)
+        if not isinstance(provenance, str):
+            raise TypeError("provenance must be a string")
 
         with self._state_lock:
             kag = self._planes.get("kag")
@@ -431,7 +435,13 @@ class QuadRetriever:
 
         added = 0
         if hasattr(kag, "graph"):
-            kag.graph.add(subject, predicate, obj)
+            kag.graph.add(
+                subject,
+                predicate,
+                obj,
+                confidence=confidence,
+                provenance=provenance,
+            )
             added = 1
 
         with self._state_lock:
