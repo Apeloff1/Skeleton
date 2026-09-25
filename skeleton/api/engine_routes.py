@@ -72,7 +72,7 @@ def _engine_coordinator():
 def _engine_service_token() -> str:
     from skeleton.config.settings import get_settings
 
-    token = get_settings().engine.service_token
+    token = get_settings().engine.service_token.get_secret_value()
     if not token:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
