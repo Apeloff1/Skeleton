@@ -158,11 +158,11 @@ class RepetitionScheduler:
     def retention(self, episode_id: str) -> float:
         """Current predicted recall probability for an episode."""
         card = self._cards.get(episode_id)
-        if card is None or card.last_reviewed is None:
-            return 1.0 if card is None else math.exp(
-                -(self._now() - card.next_due + card.interval(self.floor))
-                / max(card.stability * card.ease, 1e-9)
-            )
+        if card is None:
+            raise ValueError("episode is not enrolled")
+        if card.last_reviewed is None:
+            elapsed = self._now() - card.next_due + card.interval(self.floor)
+            return math.exp(-elapsed / max(card.stability * card.ease, 1e-9))
         elapsed = self._now() - card.last_reviewed
         return math.exp(-elapsed / max(card.stability * card.ease, 1e-9))
 
@@ -173,7 +173,7 @@ class RepetitionScheduler:
             "due_now": len([c for c in cards if c.next_due <= self._now()]),
             "total_reviews": sum(c.reviews for c in cards),
             "total_lapses": sum(c.lapses for c in cards),
-            "mean_stability_h": round(
+            "mean_stability_h": None if not cards else round(
                 sum(c.stability for c in cards) / len(cards) / 3600, 2
-            ) if cards else 0.0,
+            ),
         }

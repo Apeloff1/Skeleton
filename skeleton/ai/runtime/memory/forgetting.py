@@ -91,6 +91,12 @@ class EvictionCandidate:
     recalls: int
 
 
+def _unit(value: float, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= float(value) <= 1.0:
+        raise ForgettingError(f"{label} must be in [0, 1]", context={label: value})
+    return float(value)
+
+
 class ForgettingCurve:
     """Tracks traces for a store and answers "what may we forget?"."""
 
@@ -121,8 +127,8 @@ class ForgettingCurve:
             memory_id=memory_id,
             created_at=now,
             last_recalled_at=now,
-            importance=min(max(importance, 0.0), 1.0),
-            salience=min(max(salience, 0.0), 1.0),
+            importance=_unit(importance, "importance"),
+            salience=_unit(salience, "salience"),
         )
         self._traces[memory_id] = trace
         return trace
@@ -141,7 +147,10 @@ class ForgettingCurve:
     def score(self, memory_id: str, now: Optional[float] = None) -> float:
         trace = self._traces.get(memory_id)
         if trace is None:
-            return 0.0
+            raise ForgettingError(
+                "score for unregistered memory",
+                context={"memory_id": memory_id},
+            )
         return retrievability(trace, now, half_life_s=self.half_life_s)
 
     def eviction_candidates(self, now: Optional[float] = None,
