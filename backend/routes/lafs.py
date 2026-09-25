@@ -7,12 +7,13 @@ propagation and contextual acquisition. Mongo-persisted (fork-safe).
 """
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, HTTPException
-from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
+from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 
@@ -270,14 +271,12 @@ async def jeeves_ask(req: JeevesAskReq):
     reply, model = None, "extractive"
     if recalled or pdf_text or req.image_base64:
         try:
-            registry = ProviderRegistry.from_env()
-            adapter = registry.require_active()
             system = (
                 "You are Jeeves, the GameForge master orchestrator. Answer the user "
                 "only from the provided canon knowledge and PDF text. Cite sheet "
                 "numbers [n]. If the supplied evidence is insufficient, say so briefly. "
-                "An image attachment may be present, but this transitional text path "
-                "cannot inspect image bytes, so never infer image contents."
+                "An image attachment may be present, but this text-only compatibility "
+                "path cannot inspect image bytes, so never infer image contents."
             )
             prompt = (
                 f"CANON KNOWLEDGE:\n{context_block}\n\n"
@@ -286,21 +285,36 @@ async def jeeves_ask(req: JeevesAskReq):
             if req.image_base64:
                 prompt += (
                     "\n\nIMAGE ATTACHMENT: present but not inspected by this "
-                    "transitional text-only compatibility path."
+                    "text-only compatibility path."
                 )
-            response = await adapter.generate(
-                ProviderRequest(
+            identity = "\x00".join(
+                (
+                    req.query,
+                    context_block,
+                    pdf_text,
+                    "image-present" if req.image_base64 else "image-absent",
+                )
+            )
+            response = await execute_engine_text(
+                EngineTextRequest(
                     instructions=system,
                     prompt=prompt,
+                    idempotency_key=(
+                        "lafs-jeeves:"
+                        + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+                    ),
+                    tenant_id="default",
+                    actor_id="lafs-jeeves",
+                    capability="assistant.compat",
+                    verification_profile="assistant_proposal",
                     max_output_tokens=1600,
+                    data_class="internal",
                     purpose="lafs-grounded-answer",
                 )
             )
             reply = response.text
-            model = f"{response.provider}:{response.model}"
-        except ProviderError:
-            reply = None
-        except Exception:  # noqa: BLE001
+            model = "skeleton-engine"
+        except EngineTextError:
             reply = None
     if not reply:
         if recalled or pdf_text:
