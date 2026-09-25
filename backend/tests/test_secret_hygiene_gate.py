@@ -83,8 +83,12 @@ def test_credential_bearing_database_uri_fails_without_echoing_secret(
 ) -> None:
     candidate = tmp_path / "workflow.yml"
     secret_value = "ci-mongo-password"
+    credential_uri = (
+        "mongodb://"
+        + f"admin:{secret_value}@mongo:27017/app?authSource=admin"
+    )
     candidate.write_text(
-        f"MONGO_URL: mongodb://admin:{secret_value}@mongo:27017/app?authSource=admin\n",
+        f"MONGO_URL: {credential_uri}\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(checker, "REPO_ROOT", tmp_path)
