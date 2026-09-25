@@ -2161,7 +2161,7 @@
       "plane": "product-experience",
       "priority": "P0",
       "status": "open",
-      "gap": "Product assembly is structurally validated, but canonical AI golden journeys need one cross-plane E2E suite.",
+      "gap": "Deterministic engine-level golden journeys now assemble canonical retrieval, provider, governed tool execution, durable tool receipts, artifact actions, verification, cancellation fencing, outage behavior and restart ambiguity without live provider secrets. Remaining closure is assembled frontend/backend/engine browser evidence, the rest of the mandatory fault matrix, exact-head validation, and declared lower-stage dependency closure.",
       "construction": [
         "define prompt-only journey",
         "define retrieval-backed journey",
@@ -2175,6 +2175,21 @@
         "API trace continuity",
         "artifact/result assertions",
         "degraded-mode assertions"
+      ],
+      "evidence_present": [
+        "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
+        "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
+        "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+      ],
+      "outstanding_evidence": [
+        "assembled browser E2E suite",
+        "browser/API trace continuity across reconnect/replay",
+        "browser artifact/result assertions",
+        "engine-outage/degraded UX assertions",
+        "approval-expiry and remaining fault-injection journeys",
+        "governance delete/export journey",
+        "lower-stage dependency closure",
+        "exact-head validation and independent signoff"
       ]
     },
     {
@@ -6331,7 +6346,7 @@
   "golden_journey_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress",
     "gap": "gap-e2e-golden-journeys",
     "topology": "frontend -> backend product/conversation API -> authenticated Skeleton engine execution -> canonical provider/tool/memory/retrieval/artifact planes -> operation event projection -> frontend",
     "test_modes": {
@@ -6483,7 +6498,19 @@
       "state repository assertions",
       "no-secret/no-duplicate-side-effect assertions"
     ],
-    "closure_rule": "all mandatory journeys and applicable conditional capability journeys pass on the assembled topology; deterministic CI remains green without live provider credentials"
+    "closure_rule": "all mandatory journeys and applicable conditional capability journeys pass on the assembled topology; deterministic CI remains green without live provider credentials",
+    "current_evidence": [
+      "skeleton/testing/test_ai_golden_journeys.py deterministic retrieval/tool/provider/artifact/outage/cancel/restart-ambiguity harness",
+      "backend/tests/test_engine_cross_service_closure.py authenticated engine API provider/tool/verification lineage journey",
+      "skeleton/testing/test_engine_execution_coordinator.py durable restart, approval-resume, cancellation and provider-outage evidence"
+    ],
+    "remaining": [
+      "assembled browser/API journeys",
+      "approval-expiry and remaining process/database fault injection",
+      "governance delete/export journey",
+      "exact-head CI evidence",
+      "lower-stage dependency closure and independent signoff"
+    ]
   },
   "memory_runtime_blueprint": {
     "schema_version": 1,

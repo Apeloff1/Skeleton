@@ -91,6 +91,7 @@ on:
       - "skeleton/testing/test_execution_runtime.py"
       - "skeleton/testing/test_engine_execution_service.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_ai_golden_journeys.py"
       - "skeleton/testing/test_engine_routes.py"
       - "skeleton/testing/test_engine_media_routes.py"
       - "skeleton/testing/test_engine_process_isolation.py"
@@ -504,6 +505,7 @@ jobs:
           skeleton/testing/test_execution_runtime.py
           skeleton/testing/test_engine_execution_service.py
           skeleton/testing/test_engine_execution_coordinator.py
+          skeleton/testing/test_ai_golden_journeys.py
           skeleton/testing/test_engine_routes.py
           skeleton/testing/test_engine_media_routes.py
           skeleton/testing/test_engine_process_isolation.py
