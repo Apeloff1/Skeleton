@@ -10,6 +10,7 @@ import threading
 from typing import Awaitable, Callable, Protocol
 from uuid import uuid4
 
+from skeleton.intelligence.admission import UsageEstimate
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.skills.tool_contract import (
     ToolContractError,
@@ -59,6 +60,47 @@ def _utc(value: datetime | None = None) -> datetime:
     if not isinstance(instant, datetime) or instant.tzinfo is None or instant.utcoffset() is None:
         raise ToolRuntimeError("timestamps must be timezone-aware")
     return instant.astimezone(timezone.utc)
+
+
+def _estimated_tool_cost_usd(manifest: ToolManifest) -> float:
+    raw = (manifest.cost_model or {}).get("estimated_cost_usd", 0.0)
+    if isinstance(raw, bool):
+        raise ToolRuntimeError("estimated_cost_usd must be non-negative numeric")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ToolRuntimeError(
+            "estimated_cost_usd must be non-negative numeric"
+        ) from exc
+    if value < 0 or value == float("inf") or value != value:
+        raise ToolRuntimeError("estimated_cost_usd must be non-negative numeric")
+    return value
+
+
+def _meter_manifest_usage(
+    admission_runtime,
+    request: ToolExecutionRequest,
+    manifest: ToolManifest,
+    *,
+    started: datetime,
+) -> None:
+    event_id = f"tool:{request.request_id}"
+    cost_usd = _estimated_tool_cost_usd(manifest)
+    record_usage = getattr(admission_runtime, "record_usage_event", None)
+    if callable(record_usage):
+        record_usage(
+            request.operation_id,
+            event_id,
+            "tool",
+            UsageEstimate(tool_calls=1, cost_usd=cost_usd),
+            now_wall=started.timestamp(),
+        )
+        return
+    admission_runtime.meter_tool_call(
+        request.operation_id,
+        event_id,
+        now_wall=started.timestamp(),
+    )
 
 
 def _receipt_id(request: ToolExecutionRequest, manifest: ToolManifest) -> str:
@@ -309,10 +351,11 @@ class ToolRuntime:
             # to have an active operation lease when budget enforcement is used.
             if self.admission_runtime is not None:
                 try:
-                    self.admission_runtime.meter_tool_call(
-                        request.operation_id,
-                        f"tool:{request.request_id}",
-                        now_wall=started.timestamp(),
+                    _meter_manifest_usage(
+                        self.admission_runtime,
+                        request,
+                        manifest,
+                        started=started,
                     )
                 except Exception:
                     receipt = ToolExecutionReceipt(
@@ -448,6 +491,7 @@ class AsyncToolRuntime:
         self._inflight: dict[
             tuple[str, str, str], asyncio.Future[ToolExecutionReceipt]
         ] = {}
+        self._tool_semaphores: dict[str, asyncio.Semaphore] = {}
 
     async def register(
         self,
@@ -480,6 +524,10 @@ class AsyncToolRuntime:
                     "tool_id already registered with different manifest"
                 )
             self._registry[manifest.tool_id] = candidate
+            if manifest.tool_id not in self._tool_semaphores:
+                self._tool_semaphores[manifest.tool_id] = asyncio.Semaphore(
+                    manifest.max_concurrency
+                )
         return manifest
 
     async def manifest(self, tool_id: str) -> ToolManifest:
@@ -681,10 +729,11 @@ class AsyncToolRuntime:
         try:
             if self.admission_runtime is not None:
                 try:
-                    self.admission_runtime.meter_tool_call(
-                        request.operation_id,
-                        f"tool:{request.request_id}",
-                        now_wall=started.timestamp(),
+                    _meter_manifest_usage(
+                        self.admission_runtime,
+                        request,
+                        registered.manifest,
+                        started=started,
                     )
                 except Exception:
                     receipt = ToolExecutionReceipt(
@@ -706,17 +755,21 @@ class AsyncToolRuntime:
                         metered_tool_calls=0,
                     )
                 else:
+                    semaphore = self._tool_semaphores[request.tool_id]
+                    async with semaphore:
+                        receipt = await self._execute_registered(
+                            registered,
+                            request,
+                            started=started,
+                        )
+            else:
+                semaphore = self._tool_semaphores[request.tool_id]
+                async with semaphore:
                     receipt = await self._execute_registered(
                         registered,
                         request,
                         started=started,
                     )
-            else:
-                receipt = await self._execute_registered(
-                    registered,
-                    request,
-                    started=started,
-                )
             if self.receipt_store is not None:
                 receipt = self.receipt_store.commit(
                     request,
