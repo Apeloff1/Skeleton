@@ -123,7 +123,10 @@ class QuadRetriever:
         )
         with self._state_lock:
             self._invalidate_cache_locked()
-        return state.metadata(self._freshness._clock())
+        metadata = self._freshness.metadata(name)
+        if metadata is None:
+            raise RuntimeError("freshness state disappeared after update")
+        return metadata
 
     def freshness_snapshot(self) -> Dict[str, Any]:
         return self._freshness.snapshot()
@@ -394,6 +397,9 @@ class QuadRetriever:
             else PlaneWeightLearner.from_snapshot(learner_payload)
         )
         receipts = ReceiptLedger.from_snapshot(state.get("receipts"))
+        retained_receipts = len(receipts.recent(receipts.max_entries))
+        if sequence < retained_receipts:
+            raise ValueError("receipt_sequence cannot trail retained receipt count")
         freshness = FreshnessRegistry.from_snapshot(state.get("freshness"))
 
         with self._state_lock:
@@ -596,7 +602,7 @@ class QuadRetriever:
             # cache was cleared. It must not repopulate that cache with stale results.
             if use_cache:
                 with self._state_lock:
-                    if generation == self._cache_generation:
+                    if generation == self._cache_generation and not failures:
                         self._cache.put(cache_key, tuple(fused))
 
             if self._bus:
@@ -647,7 +653,13 @@ class QuadRetriever:
         """Apply feedback exactly once against fragments actually returned."""
         from skeleton.retrieval.plane_weights import PlaneWeightLearner
 
-        used_fragments = tuple(dict.fromkeys(str(item) for item in used_fragment_ids))
+        if isinstance(used_fragment_ids, (str, bytes)) or not isinstance(
+            used_fragment_ids, (list, tuple, set)
+        ):
+            raise TypeError("used_fragment_ids must be a list, tuple, or set")
+        if any(not isinstance(item, str) or not item for item in used_fragment_ids):
+            raise ValueError("used_fragment_ids must contain non-empty strings")
+        used_fragments = tuple(dict.fromkeys(used_fragment_ids))
         with self._state_lock:
             receipt = self._receipts.require_available(receipt_id_value)
             unknown = sorted(set(used_fragments) - set(receipt.fragment_ids))
