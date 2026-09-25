@@ -96,6 +96,21 @@ def _append_session(session: RepairSession, root=None) -> None:
             path.write_text("\n".join(lines[-256:]) + "\n", encoding="utf-8")
 
 
+def _explicit_yes(value: Any) -> bool:
+    return value is True or value == 1
+
+
+def _finite_score(blob: Any) -> float | None:
+    if not isinstance(blob, dict):
+        return None
+    score = blob.get("score")
+    if isinstance(score, bool) or not isinstance(score, (int, float)):
+        return None
+    if score != score or score in (float("inf"), float("-inf")):
+        return None
+    return float(score)
+
+
 def _learned_max_passes(surface: str, root=None, default: int = 3) -> int:
     """Learn from history: if prior sessions on this surface never
     improved after pass N, cap future sessions at N+1."""
@@ -177,15 +192,21 @@ def run_multi_pass(
 
     for pass_n in range(1, max_passes + 1):
         result = repair_fn(*fn_args, **current_input, root=root)
-        before_score = float((result.get("before") or {}).get("score") or 0.0)
-        after_score = float((result.get("after") or {}).get("score") or before_score)
+        before_score = _finite_score(result.get("before"))
+        after_score = _finite_score(result.get("after"))
+        if before_score is None or after_score is None:
+            before_score = 0.0 if before_score is None else before_score
+            after_score = before_score if after_score is None else after_score
+            accepted = False
+        else:
+            accepted = _explicit_yes(result.get("ok")) or _explicit_yes(result.get("accepted"))
         attempt = RepairAttempt(
             pass_n=pass_n,
             surface=surface,
             before_score=before_score,
             after_score=after_score,
             actions=list(result.get("actions") or []),
-            accepted=bool(result.get("ok") or result.get("accepted")),
+            accepted=accepted,
             reason=str(result.get("reason") or "unknown"),
         )
         session.attempts.append(attempt)
