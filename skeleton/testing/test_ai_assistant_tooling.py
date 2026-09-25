@@ -287,7 +287,19 @@ async def test_assistant_tool_execution_replays_from_canonical_durable_receipt(
         tool_runtime=AsyncToolRuntime(receipt_store=first_store),
     )
     first.bind(descriptor.capability_id, handler)
-    first_result = await first.execute(proposal, request, now=NOW)
+    grant = CapabilityGrant(
+        capability_id=descriptor.capability_id,
+        request_digest=request.digest,
+        granted_scopes=frozenset(),
+        granted_at=NOW - timedelta(minutes=1),
+        expires_at=NOW + timedelta(minutes=5),
+    )
+    first_result = await first.execute(
+        proposal,
+        request,
+        grants=(grant,),
+        now=NOW,
+    )
 
     assert first_result.receipt.status == "succeeded"
     assert first_result.receipt.output_ref == "artifact:fixture-build"
@@ -305,7 +317,12 @@ async def test_assistant_tool_execution_replays_from_canonical_durable_receipt(
         tool_runtime=AsyncToolRuntime(receipt_store=restarted_store),
     )
     restarted.bind(descriptor.capability_id, handler)
-    replay = await restarted.execute(proposal, request, now=NOW)
+    replay = await restarted.execute(
+        proposal,
+        request,
+        grants=(grant,),
+        now=NOW,
+    )
 
     assert replay.replayed is True
     assert replay.receipt.status == "succeeded"
@@ -410,7 +427,19 @@ async def test_write_capability_fails_closed_without_durable_receipt_store() -> 
         idempotency_key="fixture",
     )
 
-    result = await coordinator.execute(proposal, request, now=NOW)
+    grant = CapabilityGrant(
+        capability_id=descriptor.capability_id,
+        request_digest=request.digest,
+        granted_scopes=frozenset(),
+        granted_at=NOW - timedelta(minutes=1),
+        expires_at=NOW + timedelta(minutes=5),
+    )
+    result = await coordinator.execute(
+        proposal,
+        request,
+        grants=(grant,),
+        now=NOW,
+    )
     assert result.receipt.status == "blocked"
     assert result.receipt.error_code == "durable-receipt-store-required"
     assert calls["count"] == 0
