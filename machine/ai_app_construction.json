@@ -2269,7 +2269,7 @@
       "plane": "model-provider",
       "priority": "P0",
       "status": "open",
-      "gap": "Provider transport and credentials are structurally centralized in skeleton/provider_runtime.py across text, image, speech, backend compatibility, and Jeeves compatibility; closure awaits current-head discovery/SDK-isolation CI evidence.",
+      "gap": "Provider transport and credentials are structurally centralized in skeleton/provider_runtime.py across async/sync text, structured/tool interaction, image generation/variation/editing, speech, backend compatibility, and Jeeves compatibility. Focused async/media regressions and fail-closed media input validation now exist; closure awaits fresh exact-head provider discovery/SDK/network isolation CI evidence and independent verification.",
       "construction": [
         "promote async runtime provider implementation to skeleton/provider_runtime.py",
         "add dependency-free synchronous adapter under the same governance/admission/receipt boundary",
@@ -2287,7 +2287,10 @@
         "provider-surface inventory gate reports only declared credential-bearing owners",
         "SDK isolation scans backend and skeleton source",
         "media provider boundary regression suite",
-        "application media surfaces contain no direct provider credentials or SDK imports"
+        "application media surfaces contain no direct provider credentials or SDK imports",
+        "skeleton/testing/test_provider_contract.py async OpenAI runtime regression coverage for normalized text, deadlines, image generation, variation/edit, speech and admission cleanup",
+        "skeleton/provider_runtime.py fail-closed validation for variation/edit sizes, edit mask bytes and finite speech speed",
+        "skeleton/testing/test_provider_contract.py malformed media inputs are rejected before provider I/O"
       ],
       "verification_state": "pending-current-head-ci"
     }
@@ -7442,7 +7445,9 @@
       "text/image/speech regression",
       "Jeeves/tool shadow provider denial",
       "undeclared provider denial",
-      "compatibility application modules contain no provider credential reads or raw provider SDK/network transport"
+      "compatibility application modules contain no provider credential reads or raw provider SDK/network transport",
+      "async text/image/variation/edit/speech canonical runtime regressions",
+      "malformed media size/mask/speed fail-closed before provider I/O"
     ],
     "application_isolation_surfaces": [
       {
