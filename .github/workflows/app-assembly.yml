@@ -98,8 +98,13 @@ on:
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
       - "backend/core/engine_client.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/ai_provider_compat.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_text.py"
+      - "backend/tests/test_ai_provider_compat.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_ai_assist_engine_cutover.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
       - "skeleton/vault/data_governance.py"
@@ -508,7 +513,10 @@ jobs:
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_tool_registry_canonical_delegate.py
           backend/tests/test_engine_client.py
+          backend/tests/test_engine_text.py
+          backend/tests/test_ai_provider_compat.py
           backend/tests/test_ai_chat_engine_cutover.py
+          backend/tests/test_ai_assist_engine_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py
