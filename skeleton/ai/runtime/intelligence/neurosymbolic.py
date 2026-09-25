@@ -113,6 +113,8 @@ class NeuralSymbolicEngine:
         return best
 
     def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
+        if len(a) != len(b):
+            raise ValueError("embedding dimensions differ")
         dot = sum(x * y for x, y in zip(a, b))
         norm_a = math.sqrt(sum(x * x for x in a))
         norm_b = math.sqrt(sum(x * x for x in b))
