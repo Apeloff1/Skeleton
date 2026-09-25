@@ -45,6 +45,11 @@ class QueryParser:
                 continue
             if ":" in token:
                 field_name, _, value = token.partition(":")
+                if not field_name.strip() or not value:
+                    raise RetrievalError(
+                        "query field needs a name and a value",
+                        context={"query": query, "token": token},
+                    )
                 terms.append(
                     QueryTerm(raw=value, field=field_name, negated=negated)
                 )
