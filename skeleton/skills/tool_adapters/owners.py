@@ -25,7 +25,6 @@ from skeleton.skills.tool_adapters.policy import (
 
 
 DatabaseProvider = Callable[[], Any]
-PackageBuilder = Callable[..., Awaitable[Mapping[str, Any]]]
 ExecutionEnabled = Callable[[], bool]
 DisabledResponse = Callable[[str], dict[str, Any]]
 
@@ -224,7 +223,7 @@ class AsyncArtifactPackageAdapter:
     """Own build lookup, package execution, bounds, persistence, and cleanup."""
 
     database_provider: DatabaseProvider
-    package_builder: PackageBuilder
+    package_builder: Any
     policy: ArtifactAdapterPolicy = field(default_factory=ArtifactAdapterPolicy)
     execution_enabled: ExecutionEnabled = lambda: True
     disabled_response: DisabledResponse = lambda name: {
@@ -250,7 +249,7 @@ class AsyncArtifactPackageAdapter:
                 "error": f"build_id not found: {build_id}",
             }
 
-        raw_output = await self.package_builder(
+        raw_output = await self.package_builder.package_build(
             document,
             kinds=scoped["kinds"],
         )
