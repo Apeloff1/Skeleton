@@ -459,17 +459,15 @@ class _CompatibilityResultStore:
             default=str,
         )
         encoded = encoded_text.encode("utf-8")
-        identity = "\x1f".join(
-            (
-                request.operation_id,
-                request.execution_id or "",
-                request.turn_id or "",
-                request.call_id or "",
-                request.tool_id,
-                request.idempotency_key,
-                request.arguments_digest,
+        identity_parts = [request.operation_id]
+        if request.execution_id is not None:
+            identity_parts.extend(
+                (request.execution_id, request.turn_id or "", request.call_id or "")
             )
-        ).encode("utf-8")
+        identity_parts.extend(
+            (request.tool_id, request.idempotency_key, request.arguments_digest)
+        )
+        identity = "\x1f".join(identity_parts).encode("utf-8")
         ref = "legacy-tool-result:" + hashlib.sha256(
             identity + b"\x1f" + encoded
         ).hexdigest()
@@ -581,19 +579,13 @@ async def _package_compensator(
                         os.remove(path)
                     except (FileNotFoundError, OSError):
                         pass
-    material = (
-        request.operation_id
-        + "\x1f"
-        + (request.execution_id or "")
-        + "\x1f"
-        + (request.turn_id or "")
-        + "\x1f"
-        + (request.call_id or "")
-        + "\x1f"
-        + request.tool_id
-        + "\x1f"
-        + request.idempotency_key
-    ).encode("utf-8")
+    identity_parts = [request.operation_id]
+    if request.execution_id is not None:
+        identity_parts.extend(
+            (request.execution_id, request.turn_id or "", request.call_id or "")
+        )
+    identity_parts.extend((request.tool_id, request.idempotency_key))
+    material = "\x1f".join(identity_parts).encode("utf-8")
     return "compensation:" + hashlib.sha256(material).hexdigest()
 
 
