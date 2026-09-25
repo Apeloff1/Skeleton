@@ -375,4 +375,3 @@ def test_idempotent_replay_does_not_double_count_admission_telemetry() -> None:
     telemetry = runtime.telemetry_snapshot()["metrics"]
     assert telemetry["counters"]["admission.admitted_total"] == 1
     assert telemetry["samples"]["admission.estimated.input_tokens"] == (10.0,)
-
