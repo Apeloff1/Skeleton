@@ -609,16 +609,16 @@ class TestHardware:
         assert era == "8bit"
         assert scores["8bit"] >= 2
 
-    def test_pipeline_defaults_generation_when_vision_has_no_hardware_signal(self):
+    def test_pipeline_leaves_generation_unbound_without_hardware_signal(self):
         from skeleton.context.pipeline import GameForgeRun
-        from skeleton.forge.hardware import DEFAULT_GENERATION, detect_generation
+        from skeleton.forge.hardware import detect_generation
 
         with pytest.raises(ValueError):
             detect_generation("cozy wholesome farm")
 
         out = GameForgeRun().execute("cozy wholesome farm")
         assert out["succeeded"], out["run"]
-        assert out["generation"] == DEFAULT_GENERATION
+        assert out["generation"] is None
 
     def test_pack_stamps_and_emit_viewport(self):
         from skeleton.forge.eras import compile_era
