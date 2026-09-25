@@ -77,6 +77,8 @@ class ServerState:
         self.engine_execution_service: Optional[Any] = None
         self.engine_execution_coordinator: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
+        self.engine_admission_runtime: Optional[Any] = None
+        self.engine_pressure_ledger: Optional[Any] = None
         self.governance_lifecycle: Optional[Any] = None
         self.governance_registry: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
@@ -284,9 +286,15 @@ class ServerState:
             SQLiteEngineSubmissionStore,
         )
         from skeleton.config.settings import get_settings
+        from skeleton.intelligence.admission_runtime import AdmissionRuntime
+        from skeleton.intelligence.shared_pressure import (
+            SharedPressurePolicy,
+            SqliteSharedPressureLedger,
+        )
         from skeleton.persistence.execution_repository import (
             SQLiteExecutionRepository,
         )
+        from skeleton.provider_runtime import ProviderRegistry
         from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
         from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -295,6 +303,7 @@ class ServerState:
             settings.execution_state_path,
             settings.submission_state_path,
             settings.tool_receipt_path,
+            settings.pressure_state_path,
         ):
             if raw_path != ":memory:":
                 Path(raw_path).expanduser().parent.mkdir(
@@ -335,8 +344,53 @@ class ServerState:
         receipt_store = SQLiteToolReceiptStore(
             settings.tool_receipt_path
         )
+
+        pressure_ledger = None
+        if settings.pressure_state_path != ":memory:":
+            pressure_ledger = SqliteSharedPressureLedger(
+                settings.pressure_state_path
+            )
+            pressure_ledger.configure(
+                SharedPressurePolicy(
+                    scope=settings.pressure_scope,
+                    max_concurrency=settings.pressure_max_concurrency,
+                    max_queue_depth=settings.pressure_max_queue_depth,
+                    max_tenant_concurrency=(
+                        settings.pressure_max_tenant_concurrency
+                    ),
+                    max_tenant_queue_depth=(
+                        settings.pressure_max_tenant_queue_depth
+                    ),
+                    soft_shed_fraction=(
+                        settings.pressure_soft_shed_fraction
+                    ),
+                    protect_priority_at_or_below=(
+                        settings.pressure_protect_priority_at_or_below
+                    ),
+                    default_lease_seconds=settings.pressure_lease_seconds,
+                ),
+                replace=True,
+            )
+
+        admission_runtime = AdmissionRuntime(
+            shared_pressure_ledger=pressure_ledger,
+            shared_pressure_scope=(
+                settings.pressure_scope
+                if pressure_ledger is not None
+                else None
+            ),
+            shared_pressure_owner_id=(
+                settings.pressure_owner_id
+                if pressure_ledger is not None
+                else None
+            ),
+        )
+        provider_registry = ProviderRegistry.from_env(
+            admission_runtime=admission_runtime,
+        )
         coordinator = EngineExecutionCoordinator(
             service,
+            provider_registry=provider_registry,
             tool_runtime=AsyncToolRuntime(
                 receipt_store=receipt_store,
             ),
@@ -344,6 +398,8 @@ class ServerState:
         self.engine_execution_service = service
         self.engine_execution_coordinator = coordinator
         self.engine_tool_receipt_store = receipt_store
+        self.engine_admission_runtime = admission_runtime
+        self.engine_pressure_ledger = pressure_ledger
         return service
 
     async def recover_engine_executions(self) -> tuple[str, ...]:
@@ -366,6 +422,8 @@ class ServerState:
         self.engine_execution_coordinator = None
         self.engine_execution_service = None
         self.engine_tool_receipt_store = None
+        self.engine_admission_runtime = None
+        self.engine_pressure_ledger = None
 
     def wire_from_genesis(self, genesis: Any) -> None:
         self.genesis = genesis
