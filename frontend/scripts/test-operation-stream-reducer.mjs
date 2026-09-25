@@ -159,6 +159,194 @@ test('terminal replay can reconstruct terminal state from the event stream', () 
   assert.equal(next.resyncRequired, false);
 });
 
+test('assistant content is provisional and exact duplicates do not double-apply', () => {
+  let state = createOperationClientState('op-1');
+  const first = event(1, 'assistant_content', {
+    payload: { text: 'Hello ', mode: 'append' },
+  });
+  state = reduceOperationEvent(state, first);
+  state = reduceOperationEvent(state, first);
+
+  assert.equal(state.lastSequence, 1);
+  assert.equal(state.provisionalAssistantContent, 'Hello ');
+  assert.equal(state.displayedAssistantContent, 'Hello ');
+  assert.equal(state.canonicalAssistantContent, null);
+  assert.equal(state.contentState, 'provisional');
+  assert.equal(state.contentReconciled, false);
+
+  state = reduceOperationEvent(
+    state,
+    event(2, 'assistant_content', {
+      payload: { text: 'world', mode: 'append' },
+    }),
+  );
+  assert.equal(state.displayedAssistantContent, 'Hello world');
+});
+
+test('assistant content replace mode resets provisional projection only', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, 'assistant_content', {
+      payload: { text: 'partial', mode: 'append' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'assistant_content', {
+      payload: { text: 'replaced', mode: 'replace' },
+    }),
+  );
+
+  assert.equal(state.provisionalAssistantContent, 'replaced');
+  assert.equal(state.displayedAssistantContent, 'replaced');
+  assert.equal(state.contentState, 'provisional');
+});
+
+test('completed terminal replaces provisional display with canonical output', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, 'assistant_content', {
+      payload: { text: 'draft', mode: 'append' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', {
+      payload: {
+        state: 'completed',
+        final_output: 'canonical answer',
+        result_ref: 'result:1',
+        message_id: 'message:1',
+      },
+    }),
+  );
+
+  assert.equal(state.lastSequence, 2);
+  assert.equal(state.terminal, true);
+  assert.equal(state.connection, 'terminal');
+  assert.equal(state.canonicalAssistantContent, 'canonical answer');
+  assert.equal(state.displayedAssistantContent, 'canonical answer');
+  assert.equal(state.contentState, 'canonical');
+  assert.equal(state.contentReconciled, true);
+  assert.equal(state.terminalResultRef, 'result:1');
+  assert.equal(state.terminalMessageId, 'message:1');
+  assert.equal(state.terminalEventId, 'event-2');
+});
+
+test('failed or cancelled terminal discards provisional assistant content', () => {
+  let failed = createOperationClientState('op-1');
+  failed = reduceOperationEvent(
+    failed,
+    event(1, 'assistant_content', {
+      payload: { text: 'unsafe partial', mode: 'append' },
+    }),
+  );
+  failed = reduceOperationEvent(
+    failed,
+    event(2, 'operation.failed', {
+      payload: {
+        state: 'failed',
+        failure_code: 'provider_unavailable',
+      },
+    }),
+  );
+
+  assert.equal(failed.displayedAssistantContent, '');
+  assert.equal(failed.provisionalAssistantContent, '');
+  assert.equal(failed.contentState, 'discarded');
+  assert.equal(failed.failureCode, 'provider_unavailable');
+
+  let cancelled = createOperationClientState('op-1');
+  cancelled = reduceOperationEvent(
+    cancelled,
+    event(1, 'assistant_content', {
+      payload: { text: 'partial', mode: 'append' },
+    }),
+  );
+  cancelled = reduceOperationEvent(
+    cancelled,
+    event(2, 'operation.cancelled', {
+      payload: { state: 'cancelled' },
+    }),
+  );
+  assert.equal(cancelled.displayedAssistantContent, '');
+  assert.equal(cancelled.contentState, 'discarded');
+});
+
+test('rejected assistant payload never advances the accepted cursor', () => {
+  const state = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    event(1, 'assistant_content', {
+      payload: { mode: 'append' },
+    }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'invalid_assistant_content');
+  assert.equal(state.lastSequence, 0);
+  assert.equal(state.events.length, 0);
+  assert.equal(state.seenEventIds.length, 0);
+});
+
+test('completed terminal without canonical content cannot promote provisional text', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, 'assistant_content', {
+      payload: { text: 'draft only', mode: 'append' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', {
+      payload: { state: 'completed' },
+    }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'completed_without_canonical_content');
+  assert.equal(state.lastSequence, 1);
+  assert.equal(state.displayedAssistantContent, 'draft only');
+  assert.equal(state.terminal, false);
+});
+
+test('server terminal snapshot can reconcile from canonical result', () => {
+  const state = createOperationClientState('op-1');
+  const next = reduceOperationReplay(state, {
+    ok: true,
+    operation: snapshot('completed'),
+    events: [],
+    after_sequence: 0,
+    latest_sequence: 0,
+    terminal: true,
+    canonical_result: {
+      status: 'completed',
+      final_output: 'snapshot answer',
+      result_ref: 'result:snapshot',
+    },
+  });
+
+  assert.equal(next.terminal, true);
+  assert.equal(next.contentReconciled, true);
+  assert.equal(next.displayedAssistantContent, 'snapshot answer');
+  assert.equal(next.terminalResultRef, 'result:snapshot');
+});
+
+test('generic terminal event requires an explicit terminal state', () => {
+  const state = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    event(1, 'terminal', {
+      payload: { final_output: 'answer' },
+    }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'invalid_terminal_state');
+  assert.equal(state.lastSequence, 0);
+});
+
 test('unsupported stream schema forces resync instead of silent downgrade', () => {
   const state = reduceOperationEvent(
     createOperationClientState('op-1'),
