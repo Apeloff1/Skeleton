@@ -172,7 +172,7 @@ class TestGameForgeRun:
             "soulslike extraction with bonfire rest and estus",
             target="godot",
         )
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["complete"]
         assert out["mass"] == 1.0
         assert out["era"] == "soulslike"
@@ -353,7 +353,7 @@ class TestAuthoredPlan:
     def test_pipeline_forge_is_cortex_authored(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("cozy wholesome farm")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["build_plan"]["authored"] == "cortex"
 
     def test_injected_left_changes_mix_keeps_right_bias(self):
@@ -448,7 +448,7 @@ class TestProjectorAndIntake:
             overwrite=True,
             target="godot",
         )
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["complete"]
         assert out["era"] == "soulslike"
         assert out["sim"]["passed"] is True
@@ -519,7 +519,7 @@ class TestBlend:
     def test_pipeline_blend_run(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("", blend=("arcade_golden_age", "soulslike", 0.5))
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert "~" in out["era"]
         assert out["sim"]["passed"] is True
         chunk = out["files"]["scripts/player/player_controller.gd"].split("speed: float = ", 1)[1]
@@ -533,7 +533,7 @@ class TestBlend:
         c.apply("BLEND ERA arcade_golden_age soulslike 0.5")
         c.apply("ROLL ORACLE")
         out = GameForgeRun(cockpit=c).execute("")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert "~" in out["era"]
         assert out["build_plan"]["seed"]
 
@@ -601,7 +601,7 @@ class TestHardware:
             detect_generation("cozy wholesome farm")
 
         out = GameForgeRun().execute("cozy wholesome farm")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["generation"] == DEFAULT_GENERATION
 
     def test_pack_stamps_and_emit_viewport(self):
@@ -621,7 +621,7 @@ class TestHardware:
     def test_pipeline_generation(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("nes soulslike bonfire estus", generation="8bit")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert out["generation"] == "8bit"
         assert "viewport_width=256" in out["files"]["project.godot"]
         assert out["files"]["scripts/autoloads/game_state.gd"].count("8bit") >= 1
@@ -643,7 +643,7 @@ class TestLive:
         reset_live(wipe_disk=True)
         a = GameForgeRun.live()
         out = a.execute("cozy wholesome farm")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         size1 = live_cortex().own.size
         assert size1 > 0
         b = GameForgeRun.live()
@@ -692,7 +692,7 @@ class TestLive:
         size = live_cortex().own.size
         assert size > 0
         out = GameForgeRun.live().execute("soulslike extraction bonfire estus")
-        assert out["succeeded"]
+        assert out["succeeded"], out["run"]
         assert live_cortex().own.size >= size
         assert out["build_plan"]["authored"] == "own"
         mix = out["build_plan"]["enemy_mix"]
