@@ -16,6 +16,7 @@ from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
     EngineExecutionService,
+    EngineServiceError,
     EngineSubmissionConflict,
     SQLiteEngineSubmissionStore,
 )
