@@ -706,16 +706,16 @@
       "logical_location": "SKL_MONGO_DATABASE.memory_records via canonical memory repository",
       "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-canonical",
+      "status": "durable-repository-implemented",
       "data_classes": [
         "internal",
         "confidential"
       ],
       "transaction_scope": "single canonical memory record/version plus lifecycle metadata; repository transaction where multi-record lifecycle updates require it",
-      "consistency": "durable writes require Mongo acknowledgement; tenant/user/namespace/version/provenance remain canonical independently of vector/cache projections",
+      "consistency": "durable SQLite reference and Mongo repository contracts enforce tenant/user namespace authority, idempotent writes, optimistic version fencing, immutable predecessor-linked revisions, tombstones, expiry, and durable projection-outbox intent; derived vector/MAG/CAG/index state remains non-authoritative and advances only from canonical records",
       "retention": "governance-controlled by retention_class and expiry; deletion/export are first-class lifecycle operations",
       "backup_restore": "required; restore canonical memory before rebuilding vector, MAG/CAG compatibility, or process-local projections",
-      "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe key, version and status",
+      "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe/idempotency key, complete version/revision lineage, tombstone state, and unpublished projection-outbox events",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-memory-durable-authority",
@@ -723,7 +723,13 @@
         "machine/ai_app_construction.json",
         "skeleton/frontier/memory.py",
         "skeleton/frontier/retrieval_context.py",
-        "skeleton/memory/frontier_adapter.py"
+        "skeleton/memory/frontier_adapter.py",
+        "skeleton/contracts/memory_record.py",
+        "skeleton/persistence/memory_repository.py",
+        "skeleton/memory/projection.py",
+        "skeleton/testing/test_memory_repository.py",
+        "skeleton/testing/test_mongo_memory_repository.py",
+        "skeleton/testing/test_memory_projection.py"
       ]
     }
   ],
