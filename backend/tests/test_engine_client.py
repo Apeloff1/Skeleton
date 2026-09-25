@@ -636,6 +636,15 @@ async def test_cancel_is_actor_tenant_and_trace_bound() -> None:
 
 
 
+def test_engine_client_config_masks_service_token_in_repr() -> None:
+    config = EngineClientConfig(
+        base_url="http://skeleton:8001",
+        service_token=_SERVICE_TOKEN,
+    )
+
+    assert _SERVICE_TOKEN not in repr(config)
+
+
 def test_engine_env_requires_service_token_when_url_configured(monkeypatch) -> None:
     monkeypatch.setenv("SKELETON_INTERNAL_URL", "http://skeleton:8001")
     monkeypatch.delenv("SKL_ENGINE_SERVICE_TOKEN", raising=False)
