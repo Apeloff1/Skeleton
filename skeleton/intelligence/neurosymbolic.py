@@ -41,6 +41,16 @@ class NeuralSymbolicEngine:
         self._bus = bus
 
     def add_rule(self, rule: SymbolicRule) -> None:
+        if not isinstance(rule, SymbolicRule):
+            raise TypeError("rule is required")
+        if not isinstance(rule.premises, (list, tuple)) or not rule.premises:
+            raise ValueError("a rule needs premises")
+        if any(not isinstance(item, str) or not item.strip() for item in rule.premises):
+            raise ValueError("premises must be strings")
+        if not isinstance(rule.conclusion, str) or not rule.conclusion.strip():
+            raise ValueError("conclusion is required")
+        if isinstance(rule.confidence, bool) or not isinstance(rule.confidence, (int, float)) or not 0 < float(rule.confidence) <= 1 or float(rule.confidence) != float(rule.confidence):
+            raise ValueError("rule confidence must be in (0, 1]")
         self._rules.append(rule)
         if self._bus:
             self._bus.publish(
@@ -57,18 +67,21 @@ class NeuralSymbolicEngine:
             )
 
     def add_fact(self, fact: str, embedding: Optional[Tensor] = None) -> None:
+        if not isinstance(fact, str) or not fact.strip():
+            raise ValueError("fact is required")
         self._facts.add(fact)
-        if embedding:
+        if embedding is not None:
             self._embeddings[fact] = embedding
-        elif fact not in self._embeddings:
-            # Generate simple embedding
-            self._embeddings[fact] = Tensor.random(64)
 
     def infer(self, goal: str, max_depth: int = 10) -> Tuple[bool, List[SymbolicRule], float]:
         """
         Attempt to prove goal from facts and rules.
         Returns (proved, proof_chain, confidence).
         """
+        if not isinstance(goal, str) or not goal.strip():
+            raise ValueError("goal is required")
+        if isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth < 1:
+            raise ValueError("max_depth must be an integer >= 1")
         if goal in self._facts:
             return True, [], 1.0
 
@@ -83,7 +96,9 @@ class NeuralSymbolicEngine:
             for rule in self._rules:
                 if rule.conclusion in proven:
                     continue
-                # Check if premises are satisfied (exact or neural similarity)
+                if not rule.premises:
+                    continue
+                # Check if premises are satisfied (exact or a supplied embedding).
                 premise_satisfied = all(
                     p in proven or self._neural_match(p, proven) > 0.8
                     for p in rule.premises
@@ -92,8 +107,8 @@ class NeuralSymbolicEngine:
                     new_facts.append(rule.conclusion)
                     proven.add(rule.conclusion)
                     proof_chain.append(rule)
-                    if rule.conclusion == goal or self._neural_match(rule.conclusion, {goal}) > 0.9:
-                        confidence = min(rule.confidence for rule in proof_chain) if proof_chain else 1.0
+                    if rule.conclusion == goal:
+                        confidence = min(rule.confidence for rule in proof_chain)
                         return True, proof_chain, confidence
             frontier = new_facts
             depth += 1
