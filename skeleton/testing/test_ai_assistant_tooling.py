@@ -4,6 +4,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
+from skeleton.skills.tool_runtime import AsyncToolRuntime
+
 from skeleton.ai.assistant import (
     AssistantRequest,
     CapabilityDescriptor,
@@ -236,3 +239,133 @@ def test_grant_is_not_valid_before_issuance() -> None:
     )
     assert grant.valid_at(NOW - timedelta(seconds=1)) is False
     assert grant.valid_at(NOW) is True
+
+
+
+@pytest.mark.asyncio
+async def test_assistant_tool_execution_replays_from_canonical_durable_receipt(
+    tmp_path,
+) -> None:
+    registry = CapabilityRegistry()
+    descriptor = CapabilityDescriptor(
+        capability_id="artifact.package",
+        kind=CapabilityKind.ARTIFACT,
+        side_effect=SideEffectClass.REVERSIBLE_WRITE,
+    )
+    registry.register(descriptor)
+    db_path = tmp_path / "assistant-tool-receipts.sqlite3"
+    calls = {"count": 0}
+
+    async def handler(arguments):
+        calls["count"] += 1
+        return {
+            "output_ref": "artifact:" + str(arguments["build_id"]),
+            "build_id": arguments["build_id"],
+        }
+
+    request = AssistantRequest(
+        request_id="durable-tool-request",
+        text="Package the deterministic build.",
+    )
+    proposal = ToolProposal(
+        proposal_id="durable-tool-proposal",
+        capability_id=descriptor.capability_id,
+        arguments={"build_id": "fixture-build"},
+        request_digest=request.digest,
+        side_effect=descriptor.side_effect,
+        idempotency_key="fixture",
+    )
+
+    first_store = SQLiteToolReceiptStore(db_path)
+    first = ToolCoordinator(
+        registry,
+        tool_runtime=AsyncToolRuntime(receipt_store=first_store),
+    )
+    first.bind(descriptor.capability_id, handler)
+    first_result = await first.execute(proposal, request, now=NOW)
+
+    assert first_result.receipt.status == "succeeded"
+    assert first_result.receipt.output_ref == "artifact:fixture-build"
+    assert "canonical-async-tool-runtime" in first_result.receipt.provenance
+    assert any(
+        item.startswith("canonical-receipt:")
+        for item in first_result.receipt.provenance
+    )
+    assert calls["count"] == 1
+    first_store.close()
+
+    restarted_store = SQLiteToolReceiptStore(db_path)
+    restarted = ToolCoordinator(
+        registry,
+        tool_runtime=AsyncToolRuntime(receipt_store=restarted_store),
+    )
+    restarted.bind(descriptor.capability_id, handler)
+    replay = await restarted.execute(proposal, request, now=NOW)
+
+    assert replay.replayed is True
+    assert replay.receipt.status == "succeeded"
+    assert replay.receipt.output_ref == first_result.receipt.output_ref
+    assert replay.output is None
+    assert calls["count"] == 1
+    restarted_store.close()
+
+
+@pytest.mark.asyncio
+async def test_restart_conflict_is_rejected_by_canonical_receipt_identity(
+    tmp_path,
+) -> None:
+    registry = CapabilityRegistry()
+    descriptor = CapabilityDescriptor(
+        capability_id="public.lookup.restart",
+        kind=CapabilityKind.PUBLIC_WEB,
+        side_effect=SideEffectClass.READ_ONLY,
+    )
+    registry.register(descriptor)
+    db_path = tmp_path / "assistant-tool-conflict.sqlite3"
+
+    first_request = AssistantRequest(
+        request_id="restart-conflict-request",
+        text="Lookup a value.",
+    )
+    first_proposal = ToolProposal(
+        proposal_id="restart-conflict-a",
+        capability_id=descriptor.capability_id,
+        arguments={"q": "a"},
+        request_digest=first_request.digest,
+        side_effect=descriptor.side_effect,
+        idempotency_key="fixture",
+    )
+
+    first_store = SQLiteToolReceiptStore(db_path)
+    first = ToolCoordinator(
+        registry,
+        tool_runtime=AsyncToolRuntime(receipt_store=first_store),
+    )
+    first.bind(
+        descriptor.capability_id,
+        lambda args: {"output_ref": "lookup:" + str(args["q"])},
+    )
+    assert (await first.execute(first_proposal, first_request, now=NOW)).receipt.status == "succeeded"
+    first_store.close()
+
+    conflicting_proposal = ToolProposal(
+        proposal_id="restart-conflict-b",
+        capability_id=descriptor.capability_id,
+        arguments={"q": "b"},
+        request_digest=first_request.digest,
+        side_effect=descriptor.side_effect,
+        idempotency_key="fixture",
+    )
+    restarted_store = SQLiteToolReceiptStore(db_path)
+    restarted = ToolCoordinator(
+        registry,
+        tool_runtime=AsyncToolRuntime(receipt_store=restarted_store),
+    )
+    restarted.bind(
+        descriptor.capability_id,
+        lambda args: {"output_ref": "lookup:" + str(args["q"])},
+    )
+
+    with pytest.raises(ToolCoordinatorError, match="idempotency"):
+        await restarted.execute(conflicting_proposal, first_request, now=NOW)
+    restarted_store.close()
