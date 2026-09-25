@@ -130,9 +130,7 @@ class ToolCoordinator:
                 error_code=decision.reason_code,
                 provenance=("assistant-capability-authorizer",),
             )
-            result = ToolRunResult(receipt=receipt, output=None)
-            self._receipts[proposal.idempotency_key] = (binding, result)
-            return result
+            return ToolRunResult(receipt=receipt, output=None)
 
         count = self._request_call_counts.get(request.digest, 0)
         if count >= request.max_tool_calls:
@@ -148,9 +146,7 @@ class ToolCoordinator:
                 error_code="tool-call-budget-exhausted",
                 provenance=("assistant-tool-budget",),
             )
-            result = ToolRunResult(receipt=receipt, output=None)
-            self._receipts[proposal.idempotency_key] = (binding, result)
-            return result
+            return ToolRunResult(receipt=receipt, output=None)
 
         handler = self._handlers.get(proposal.capability_id)
         if handler is None:
