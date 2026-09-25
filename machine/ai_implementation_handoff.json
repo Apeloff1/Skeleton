@@ -537,12 +537,13 @@
         "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence",
         "skeleton/skills/tool_contract.py and tool_runtime.py preserve execution/turn/call lineage when supplied",
         "skeleton/skills/tool_receipt_store.py migrates existing stores and fences lineage changes across restart",
-        "backend/services/tool_registry.py propagates execution/turn/call lineage through compatibility delegation"
+        "backend/services/tool_registry.py propagates execution/turn/call lineage through compatibility delegation",
+        "skeleton/intelligence/execution_runtime.py propagates canonical execution/provider-turn/provider-call identities into every cognitive tool request",
+        "skeleton/testing/test_execution_runtime.py verifies receipt lineage against persisted provider turn"
       ],
       "remaining": [
         "move compile/build/database/network execution bodies out of flat compatibility registry",
         "finish canonical manifest richness for authority/risk/data/cost/result metadata",
-        "make execution_id/turn_id/call_id mandatory at canonical cognitive execution callers and prove end-to-end propagation",
         "bind governance lifecycle policy to durable tool result references",
         "bind monotonic cost/admission reconciliation for all expensive tool classes",
         "prove minimal provider tool projection and current-head provider-surface isolation",
