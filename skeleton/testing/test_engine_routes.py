@@ -29,7 +29,7 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 
 
 def _now() -> datetime:
-    return datetime(2026, 9, 23, 20, 15, tzinfo=timezone.utc)
+    return datetime.now(timezone.utc)
 
 
 def _service_and_command(tmp_path):
@@ -161,7 +161,11 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
     headers = {"x-zaibatsu-attester": "backend-service"}
     submitted = client.post(
         "/api/v1/engine/executions",
-        json={"command": command.as_dict()},
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "command": command.as_dict(),
+        },
         headers=headers,
     )
     assert submitted.status_code == 202
@@ -169,7 +173,11 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
 
     replay = client.post(
         "/api/v1/engine/executions",
-        json={"command": command.as_dict()},
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "command": command.as_dict(),
+        },
         headers=headers,
     )
     assert replay.status_code == 202
