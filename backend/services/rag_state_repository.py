@@ -12,6 +12,7 @@ rather than creating another client/pool.
 from __future__ import annotations
 
 import copy
+import math
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -22,6 +23,30 @@ class RAGStateError(RuntimeError):
 
 class RAGStateConflict(RAGStateError):
     """An immutable identity was reused with conflicting ownership/content."""
+
+
+def _finite_number(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise RAGStateError(f"{field} must be numeric")
+    number = float(value)
+    if not math.isfinite(number):
+        raise RAGStateError(f"{field} must be finite")
+    return number
+
+
+def _bounded_number(
+    value: object,
+    field: str,
+    *,
+    minimum: float,
+    maximum: float,
+) -> float:
+    number = _finite_number(value, field)
+    if not minimum <= number <= maximum:
+        raise RAGStateError(
+            f"{field} must be between {minimum:g} and {maximum:g}"
+        )
+    return number
 
 
 def _required_text(value: object, field: str, *, max_len: int = 512) -> str:
@@ -154,12 +179,14 @@ class RAGStateRepository:
             "topic": _required_text(topic, "topic"),
             "content": str(content),
             "duration_minutes": int(duration_minutes),
-            "mastery_delta": float(mastery_delta),
+            "mastery_delta": _finite_number(mastery_delta, "mastery_delta"),
             "timestamp": _utc_iso(timestamp),
             "metadata": _safe_mapping(metadata, "metadata"),
             "authority": "mongo",
             "schema_version": 1,
         }
+        if candidate["duration_minutes"] < 0:
+            raise RAGStateError("duration_minutes must be non-negative")
         coll = self._collection(self.LEARNING)
         existing = self._without_native_id(coll.find_one({"session_id": candidate["session_id"]}))
         self._assert_identity_match(
@@ -213,13 +240,16 @@ class RAGStateRepository:
             ),
             "examples": [str(item) for item in examples],
             "domain": _required_text(domain, "domain"),
-            "difficulty": float(difficulty),
+            "difficulty": _bounded_number(
+                difficulty,
+                "difficulty",
+                minimum=0.0,
+                maximum=1.0,
+            ),
             "timestamp": _utc_iso(timestamp),
             "authority": "mongo",
             "schema_version": 1,
         }
-        if not 0.0 <= candidate["difficulty"] <= 1.0:
-            raise RAGStateError("difficulty must be between 0 and 1")
         coll = self._collection(self.CONCEPTS)
         existing = self._without_native_id(
             coll.find_one({"concept_id": candidate["concept_id"]})
@@ -288,14 +318,21 @@ class RAGStateRepository:
             "progress_id": f"{user}:{normalized_domain}",
             "user_id": user,
             "domain": normalized_domain,
-            "mastery_level": float(mastery_level),
+            "mastery_level": _bounded_number(
+                mastery_level,
+                "mastery_level",
+                minimum=0.0,
+                maximum=1.0,
+            ),
             "concepts_learned": list(concepts),
             "concept_count": len(concepts),
-            "total_hours": float(total_hours),
+            "total_hours": _finite_number(total_hours, "total_hours"),
             "updated_at": _utc_iso(updated_at),
             "authority": "mongo",
             "schema_version": 1,
         }
+        if row["total_hours"] < 0:
+            raise RAGStateError("total_hours must be non-negative")
         self._collection(self.PROGRESS).replace_one(
             {"user_id": user, "domain": normalized_domain},
             copy.deepcopy(row),
@@ -390,6 +427,11 @@ class RAGStateRepository:
         context: Mapping[str, Any] | None = None,
         timestamp: datetime | str | None = None,
     ) -> dict[str, Any]:
+        if rating is not None:
+            if isinstance(rating, bool) or not isinstance(rating, int):
+                raise RAGStateError("rating must be an integer")
+            if not 1 <= rating <= 5:
+                raise RAGStateError("rating must be between 1 and 5")
         candidate = {
             "feedback_id": _required_text(feedback_id, "feedback_id"),
             "user_id": _required_text(user_id, "user_id"),
