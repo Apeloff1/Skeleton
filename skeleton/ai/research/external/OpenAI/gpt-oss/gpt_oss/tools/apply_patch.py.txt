@@ -497,7 +497,7 @@ def remove_file(path: str) -> None:
 def apply_patch(
     text: str,
     open_fn: Callable[[str], str] = open_file,
-    write_fn: Callable[[str, str], None] = write_file, 
+    write_fn: Callable[[str, str], None] = write_file,
     remove_fn: Callable[[str], None] = remove_file,
 ) -> str:
     if not text.startswith("*** Begin Patch"):
