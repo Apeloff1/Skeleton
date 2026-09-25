@@ -92,6 +92,7 @@ on:
       - "skeleton/testing/test_engine_execution_service.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
       - "skeleton/testing/test_engine_routes.py"
+      - "skeleton/testing/test_engine_media_routes.py"
       - "skeleton/testing/test_engine_process_isolation.py"
       - "backend/core/operation_stream_transport.py"
       - "backend/routes/operation_stream.py"
@@ -101,11 +102,15 @@ on:
       - "backend/tests/test_operation_stream_transport.py"
       - "backend/tests/test_operation_stream_route.py"
       - "backend/core/engine_client.py"
+      - "backend/routes/image_generation.py"
+      - "backend/core/expressive_tts.py"
       - "backend/core/engine_text.py"
       - "backend/core/ai_provider_compat.py"
       - "backend/services/ai_assistant_svc.py"
       - "backend/services/game_llm_service.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_media_client.py"
+      - "backend/tests/test_engine_media_cutover.py"
       - "backend/tests/test_engine_text_route_cutovers.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
@@ -403,6 +408,7 @@ jobs:
           skeleton/intelligence/admission_runtime.py skeleton/intelligence/quota.py skeleton/intelligence/quota_sqlite.py
           backend/core/ai_provider.py backend/core/ai_provider_compat.py backend/core/provider_architecture.py
           backend/core/engine_client.py backend/core/engine_text.py
+          backend/routes/image_generation.py backend/core/expressive_tts.py
           backend/routes/ai.py backend/routes/lafs.py backend/routes/llm_router.py
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/rag_state_repository.py backend/services/rag_service.py
@@ -485,6 +491,7 @@ jobs:
           skeleton/testing/test_engine_execution_service.py
           skeleton/testing/test_engine_execution_coordinator.py
           skeleton/testing/test_engine_routes.py
+          skeleton/testing/test_engine_media_routes.py
           skeleton/testing/test_engine_process_isolation.py
           skeleton/testing/test_context_compiler.py
           skeleton/testing/test_tool_runtime.py
@@ -519,6 +526,8 @@ jobs:
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_tool_registry_canonical_delegate.py
           backend/tests/test_engine_client.py
+          backend/tests/test_engine_media_client.py
+          backend/tests/test_engine_media_cutover.py
           backend/tests/test_engine_text.py
           backend/tests/test_ai_provider_compat.py
           backend/tests/test_game_llm_engine_cutover.py
