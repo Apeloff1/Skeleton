@@ -91,7 +91,29 @@ class MAGStore(MemoryStore):
         importance: float = 1.0,
         tags: Optional[Set[str]] = None,
     ) -> str:
+        if not isinstance(content, str) or not content:
+            raise ValueError("content must be a non-empty string")
+        if isinstance(emotional_valence, bool) or not isinstance(
+            emotional_valence, (int, float)
+        ):
+            raise TypeError("emotional_valence must be numeric")
+        if not -1.0 <= float(emotional_valence) <= 1.0:
+            raise ValueError("emotional_valence must be in [-1, 1]")
+        if isinstance(importance, bool) or not isinstance(importance, (int, float)):
+            raise TypeError("importance must be numeric")
+        if float(importance) < 0.0:
+            raise ValueError("importance must be non-negative")
+        if tags is not None and not isinstance(tags, set):
+            raise TypeError("tags must be a set when provided")
         episode_id = f"mag_{self.user_id}_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
+
+        previous = self._episodes.get(episode_id)
+        if previous is not None:
+            for tag in previous.tags:
+                self._tag_index[tag].discard(episode_id)
+                if not self._tag_index[tag]:
+                    del self._tag_index[tag]
+
         episode = EpisodicMemory(
             episode_id=episode_id,
             timestamp=time.time(),
@@ -126,8 +148,16 @@ class MAGStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
-        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
-            raise ValueError("top_k must be a non-negative integer")
+        if isinstance(top_k, bool) or not isinstance(top_k, int):
+            raise TypeError("top_k must be an integer")
+        if top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        if isinstance(min_score, bool) or not isinstance(min_score, (int, float)):
+            raise TypeError("min_score must be numeric")
+        if metadata_filter is not None and not isinstance(metadata_filter, dict):
+            raise TypeError("metadata_filter must be a mapping")
+        if top_k == 0:
+            return []
         query_time = time.time()
         query_words = set(query_text.lower().split())
 
@@ -163,7 +193,7 @@ class MAGStore(MemoryStore):
             if score >= min_score:
                 scored.append((score, episode))
 
-        scored.sort(key=lambda x: x[0], reverse=True)
+        scored.sort(key=lambda item: (-item[0], item[1].episode_id))
 
         results: List[MemoryQueryResult] = []
         for i, (score, episode) in enumerate(scored[:top_k]):
