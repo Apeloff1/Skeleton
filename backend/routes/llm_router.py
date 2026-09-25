@@ -39,6 +39,12 @@ router = APIRouter(prefix="/api/llm-router", tags=["llm-router"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "codedock")]
 PROJ = {"_id": 0}
 
+# Compatibility-only sentinel for legacy route imports. It is intentionally
+# empty and is never read from the environment or used to activate a provider.
+EMERGENT_LLM_KEY = ""
+
+# Provider/model selection and failover are engine-owned.
+
 # ─── Legacy planning catalog ────────────────────────────────────────────────
 # Entries may describe providers that are not currently declared for runtime
 # execution. Runtime selection is owned by the Skeleton engine.
