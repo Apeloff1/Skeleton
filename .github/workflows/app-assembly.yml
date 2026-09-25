@@ -100,6 +100,7 @@ on:
       - "backend/core/engine_client.py"
       - "backend/tests/test_engine_client.py"
       - "backend/tests/test_ai_chat_engine_cutover.py"
+      - "backend/tests/test_ai_assist_engine_cutover.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
       - "skeleton/vault/data_governance.py"
@@ -509,6 +510,7 @@ jobs:
           backend/tests/test_tool_registry_canonical_delegate.py
           backend/tests/test_engine_client.py
           backend/tests/test_ai_chat_engine_cutover.py
+          backend/tests/test_ai_assist_engine_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_model_router.py
