@@ -900,3 +900,89 @@ async def test_async_media_failure_releases_admission_lease() -> None:
         )
 
     assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+@pytest.mark.asyncio
+async def test_async_image_variation_rejects_unsupported_size_before_io() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="image variation size is unsupported",
+    ):
+        await adapter.create_image_variation(
+            b"source-image",
+            size="999x999",
+            operation_id="bad-variation-size",
+        )
+
+    assert client.images.variation_calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_image_edit_rejects_bad_mask_and_size_before_io() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="image edit mask must be non-empty bytes",
+    ):
+        await adapter.edit_image(
+            b"source-image",
+            prompt="edit",
+            mask="not-bytes",  # type: ignore[arg-type]
+            operation_id="bad-edit-mask",
+        )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="image edit size is unsupported",
+    ):
+        await adapter.edit_image(
+            b"source-image",
+            prompt="edit",
+            size="999x999",
+            operation_id="bad-edit-size",
+        )
+
+    assert client.images.edit_calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_speech_rejects_non_numeric_speed_before_io() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="speech provider speed is unsupported",
+    ):
+        await adapter.synthesize_speech(
+            ProviderSpeechRequest(
+                text="hello",
+                speed="fast",  # type: ignore[arg-type]
+                operation_id="bad-speech-speed",
+            )
+        )
+
+    assert client.audio.speech.calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
