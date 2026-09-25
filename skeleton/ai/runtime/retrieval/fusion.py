@@ -42,6 +42,13 @@ class ScoredResult:
         }
 
 
+
+def _take(items, top_k: int):
+    if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+        raise ValueError("top_k must be a non-negative integer")
+    return items[:top_k]
+
+
 class Fuser:
     """Fuse results from multiple retrieval planes."""
 
@@ -58,7 +65,7 @@ class Fuser:
         elif self.strategy == FusionStrategy.FIRST:
             # Return first plane's results
             first = next(iter(results_by_plane.values()), [])
-            return first[:top_k]
+            return _take(first, top_k)
         else:
             return self._rrf_fuse(results_by_plane, top_k)
 
@@ -74,7 +81,7 @@ class Fuser:
                 if fid not in fragments:
                     fragments[fid] = result
 
-        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
+        ranked = _take(sorted(scores.items(), key=lambda x: x[1], reverse=True), top_k)
         return [fragments[fid] for fid, _ in ranked]
 
     def _weighted_fuse(self, results_by_plane: Dict[str, List[ScoredResult]], top_k: int) -> List[ScoredResult]:
@@ -91,7 +98,7 @@ class Fuser:
                 if fid not in fragments:
                     fragments[fid] = result
 
-        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
+        ranked = _take(sorted(scores.items(), key=lambda x: x[1], reverse=True), top_k)
         return [fragments[fid] for fid, _ in ranked]
 
     def stats(self) -> Dict[str, Any]:
@@ -120,7 +127,7 @@ class Ranker:
 
         scored.sort(key=lambda x: x[0], reverse=True)
         self._reranked += len(scored)
-        return [r for _, r in scored[:top_k]]
+        return _take([r for _, r in scored], top_k)
 
     def stats(self) -> Dict[str, Any]:
         return {"queries": self._queries, "reranked": self._reranked}
