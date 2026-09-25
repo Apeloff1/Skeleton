@@ -64,11 +64,21 @@ class InMemoryTFIDFStore(MemoryStore):
         return dot / (norm1 * norm2)
 
     def add(self, chunk: MemoryChunk) -> None:
+        if not isinstance(chunk, MemoryChunk):
+            raise TypeError("chunk must be MemoryChunk")
+
+        previous = self._chunks.get(chunk.id)
+        if previous is not None:
+            for token in set(self._tokenize(previous.text)):
+                self._doc_freq[token] -= 1
+                if self._doc_freq[token] <= 0:
+                    del self._doc_freq[token]
+        else:
+            self._total_docs += 1
+
         self._chunks[chunk.id] = chunk
-        tokens = set(self._tokenize(chunk.text))
-        for t in tokens:
-            self._doc_freq[t] += 1
-        self._total_docs += 1
+        for token in set(self._tokenize(chunk.text)):
+            self._doc_freq[token] += 1
 
     def query(
         self,
@@ -78,7 +88,15 @@ class InMemoryTFIDFStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
-        if not self._chunks:
+        if isinstance(top_k, bool) or not isinstance(top_k, int):
+            raise TypeError("top_k must be an integer")
+        if top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        if isinstance(min_score, bool) or not isinstance(min_score, (int, float)):
+            raise TypeError("min_score must be numeric")
+        if metadata_filter is not None and not isinstance(metadata_filter, dict):
+            raise TypeError("metadata_filter must be a mapping")
+        if top_k == 0 or not self._chunks:
             return []
 
         idf = self._compute_idf()
@@ -101,7 +119,7 @@ class InMemoryTFIDFStore(MemoryStore):
             if score >= min_score:
                 results.append((score, chunk))
 
-        results.sort(key=lambda x: x[0], reverse=True)
+        results.sort(key=lambda item: (-item[0], item[1].id))
         return [
             MemoryQueryResult(chunk=chunk, score=score, rank=i + 1)
             for i, (score, chunk) in enumerate(results[:top_k])
