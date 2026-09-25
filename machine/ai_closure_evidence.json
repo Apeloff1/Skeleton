@@ -166,7 +166,11 @@
         "skeleton/jeeves/providers.py canonical-runtime compatibility facade",
         "backend/services/tool_registry.py declared provider-isolation surface with retired llm_chat alias",
         "backend/tests/test_tool_registry_canonical_delegate.py provider credential/SDK source isolation regression",
-        "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation"
+        "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation",
+        "skeleton/testing/test_provider_contract.py canonical async provider text/deadline regression suite",
+        "skeleton/testing/test_provider_contract.py canonical image generation/variation/edit and speech regression suite",
+        "skeleton/testing/test_provider_contract.py provider media failure releases admission lease",
+        "skeleton/provider_runtime.py fail-closed media input validation before provider I/O"
       ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
@@ -179,11 +183,11 @@
       ],
       "outstanding_evidence": [
         "exact-head provider-surface inventory receipt with no unexplained credential/network/SDK edges",
-        "exact-head canonical async/synchronous provider regression suites",
-        "exact-head media provider boundary regression suite",
         "exact-head application isolation scan including backend tool registry",
         "independent verification before closure",
-        "exact-head provider bootstrap inventory and SDK/network isolation gate"
+        "exact-head provider bootstrap inventory and SDK/network isolation gate",
+        "fresh exact-head execution of canonical async/synchronous provider regression suites",
+        "fresh exact-head execution of media provider boundary regression suite"
       ],
       "blockers": [],
       "close_when": [
