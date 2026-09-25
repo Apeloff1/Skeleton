@@ -9,8 +9,13 @@ from uuid import uuid4
 import pytest
 
 from skeleton.skills.tool_contract import (
+    ToolApprovalPolicy,
+    ToolAuthorityClass,
     ToolContractError,
     ToolEffect,
+    ToolIdempotencyMode,
+    ToolRiskClass,
+    ToolSideEffectClass,
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
@@ -762,3 +767,129 @@ def test_approval_binding_preserves_legacy_identity_and_binds_full_lineage() -> 
         call_id=str(uuid4()),
     )
     assert approval_ref_for_request(lineaged) != legacy_ref
+
+def test_manifest_governance_metadata_is_normalized_and_serialized() -> None:
+    manifest = ToolManifest(
+        tool_id="repo.write",
+        version="2.1.0",
+        description="Write one bounded repository object",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        output_schema={"type": "object"},
+        capabilities=("repository.write", "repository.write"),
+        authority_class=ToolAuthorityClass.WRITE,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.LOCAL_REVERSIBLE,
+        idempotency_mode=ToolIdempotencyMode.RESERVATION_FENCE,
+        approval_policy=ToolApprovalPolicy.ALWAYS,
+        network_policy="none",
+        data_policy="internal:repository",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=65536,
+        max_concurrency=4,
+        effect=ToolEffect.REVERSIBLE,
+    )
+
+    payload = manifest.as_dict()
+    assert manifest.capabilities == ("repository.write",)
+    assert manifest.approval_required is True
+    assert payload["authority_class"] == "write"
+    assert payload["risk_class"] == "high"
+    assert payload["side_effect_class"] == "local_reversible"
+    assert payload["idempotency_mode"] == "reservation_fence"
+    assert payload["approval_policy"] == "always"
+    assert payload["network_policy"] == "none"
+    assert payload["data_policy"] == "internal:repository"
+    assert payload["cost_model"] == {
+        "kind": "request",
+        "estimated_units": 1,
+    }
+    assert payload["result_size_limit"] == 65536
+    assert payload["max_concurrency"] == 4
+    assert payload["enabled"] is True
+
+
+def test_non_read_manifest_requires_explicit_idempotency_mode() -> None:
+    with pytest.raises(
+        ToolContractError,
+        match="non-read authority requires an idempotency mode",
+    ):
+        ToolManifest(
+            tool_id="repo.write",
+            version="1.0.0",
+            description="Unsafe write manifest",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+            },
+            authority_class=ToolAuthorityClass.WRITE,
+        )
+
+
+def test_critical_or_irreversible_manifest_requires_approval_policy() -> None:
+    with pytest.raises(
+        ToolContractError,
+        match="critical tools require non-never approval policy",
+    ):
+        ToolManifest(
+            tool_id="ops.critical",
+            version="1.0.0",
+            description="Critical operator action",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+            },
+            risk_class=ToolRiskClass.CRITICAL,
+        )
+
+    with pytest.raises(
+        ToolContractError,
+        match="irreversible side effects require approval policy",
+    ):
+        ToolManifest(
+            tool_id="repo.erase",
+            version="1.0.0",
+            description="Irreversible local change",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+            },
+            authority_class=ToolAuthorityClass.DESTRUCTIVE,
+            risk_class=ToolRiskClass.HIGH,
+            side_effect_class=ToolSideEffectClass.LOCAL_IRREVERSIBLE,
+            idempotency_mode=ToolIdempotencyMode.RESERVATION_FENCE,
+        )
+
+
+def test_manifest_output_schema_and_bounds_fail_closed() -> None:
+    with pytest.raises(ToolContractError):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Bad output contract",
+            input_schema={"type": "object"},
+            output_schema={"type": "definitely-not-json"},
+        )
+
+    with pytest.raises(ToolContractError, match="result_size_limit"):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Oversized result contract",
+            input_schema={"type": "object"},
+            result_size_limit=2 * 1024 * 1024 * 1024,
+        )
+
+    with pytest.raises(ToolContractError, match="max_concurrency"):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Invalid concurrency contract",
+            input_schema={"type": "object"},
+            max_concurrency=0,
+        )
+
