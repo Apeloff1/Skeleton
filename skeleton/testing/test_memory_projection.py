@@ -268,3 +268,160 @@ def test_real_tfidf_upsert_replaces_prior_terms_without_counter_drift() -> None:
     assert store.stats()["documents"] == 1
     assert store.query("alpha", top_k=5) == []
     assert store.query("beta", top_k=5)[0].chunk.chunk_id == first.memory_id
+
+
+def test_outbox_dispatch_applies_versions_in_order_and_acks() -> None:
+    repo = SQLiteMemoryRepository()
+    first = repo.commit(
+        _proposal(key="dispatch-create", content="alpha"),
+        now=_now(),
+    )
+    repo.commit(
+        _proposal(
+            key="dispatch-update",
+            content="beta",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now(),
+    )
+    store = FakeStore()
+    coordinator = MemoryProjectionCoordinator(repo)
+
+    report = coordinator.dispatch_pending(
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        limit=10,
+        now=_now(),
+    )
+
+    assert report.degraded is False
+    assert report.attempted_events == 2
+    assert report.published_events == 2
+    assert report.blocked_event_id is None
+    assert report.remaining_pending_sample == 0
+    assert [attempt.memory_version for attempt in report.attempts] == [1, 2]
+    assert all(attempt.published for attempt in report.attempts)
+    assert store.items[first.memory_id].text == "beta"
+    assert store.items[first.memory_id].metadata["canonical_version"] == 2
+    assert repo.pending_projection_events() == ()
+
+
+def test_outbox_failure_blocks_later_versions_until_retry() -> None:
+    repo = SQLiteMemoryRepository()
+    first = repo.commit(
+        _proposal(key="dispatch-fail-create", content="v1"),
+        now=_now(),
+    )
+    repo.commit(
+        _proposal(
+            key="dispatch-fail-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now(),
+    )
+    healthy = FakeStore()
+    failing = FakeStore(fail_add=True)
+    coordinator = MemoryProjectionCoordinator(repo)
+    projections = (
+        LegacyMemoryStoreProjection("healthy", healthy),
+        LegacyMemoryStoreProjection("failing", failing),
+    )
+
+    blocked = coordinator.dispatch_pending(
+        projections=projections,
+        limit=10,
+        now=_now(),
+    )
+
+    assert blocked.degraded is True
+    assert blocked.attempted_events == 1
+    assert blocked.published_events == 0
+    assert blocked.blocked_event_id is not None
+    assert blocked.attempts[0].memory_version == 1
+    assert blocked.attempts[0].published is False
+    assert len(repo.pending_projection_events()) == 2
+    assert healthy.items[first.memory_id].text == "v1"
+
+    failing.fail_add = False
+    recovered = coordinator.dispatch_pending(
+        projections=projections,
+        limit=10,
+        now=_now(),
+    )
+
+    assert recovered.degraded is False
+    assert recovered.published_events == 2
+    assert repo.pending_projection_events() == ()
+    assert healthy.items[first.memory_id].text == "v2"
+    assert failing.items[first.memory_id].text == "v2"
+
+
+def test_outbox_tombstone_removes_derived_memory() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(key="dispatch-delete", content="temporary"),
+        now=_now(),
+    )
+    store = FakeStore()
+    projection = LegacyMemoryStoreProjection("rag", store)
+    coordinator = MemoryProjectionCoordinator(repo)
+
+    initial = coordinator.dispatch_pending(
+        projections=(projection,),
+        now=_now(),
+    )
+    assert initial.published_events == 1
+    assert record.memory_id in store.items
+
+    repo.tombstone(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=1,
+        now=_now(),
+    )
+    deleted = coordinator.dispatch_pending(
+        projections=(projection,),
+        now=_now(),
+    )
+
+    assert deleted.published_events == 1
+    assert deleted.attempts[0].action == "delete"
+    assert record.memory_id not in store.items
+    assert repo.pending_projection_events() == ()
+
+
+def test_outbox_dispatch_requires_nonempty_unique_projection_names() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(_proposal(key="dispatch-validation", content="x"), now=_now())
+    coordinator = MemoryProjectionCoordinator(repo)
+
+    import pytest
+
+    with pytest.raises(ValueError, match="at least one projection"):
+        coordinator.dispatch_pending(projections=())
+
+    one = LegacyMemoryStoreProjection("duplicate", FakeStore())
+    two = LegacyMemoryStoreProjection("duplicate", FakeStore())
+    with pytest.raises(ValueError, match="unique"):
+        coordinator.dispatch_pending(projections=(one, two))
+
+
+def test_outbox_dispatch_limit_preserves_pending_tail() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(_proposal(key="dispatch-limit-one", content="one"), now=_now())
+    repo.commit(_proposal(key="dispatch-limit-two", content="two"), now=_now())
+    store = FakeStore()
+    coordinator = MemoryProjectionCoordinator(repo)
+
+    first = coordinator.dispatch_pending(
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        limit=1,
+        now=_now(),
+    )
+
+    assert first.published_events == 1
+    assert first.remaining_pending_sample == 1
+    assert len(repo.pending_projection_events()) == 1
