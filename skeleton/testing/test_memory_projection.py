@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
 from uuid import uuid4
 
-from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
+from skeleton.contracts.memory_record import (
+    MemoryKind,
+    MemoryWriteProposal,
+    memory_payload_digest,
+)
 from skeleton.memory.core import CAGStore, InMemoryTFIDFStore, MAGStore
 from skeleton.memory.projection import (
     CAGStoreProjection,
@@ -479,15 +484,44 @@ def test_current_projection_event_must_match_canonical_record() -> None:
         _proposal(key="canonical-fence", content="canonical"),
         now=_now(),
     )
-    # Corrupt only the durable outbox snapshot; canonical authority remains intact.
+    # Corrupt only the durable outbox snapshot while keeping that snapshot
+    # internally self-consistent. The canonical fence must reject divergence
+    # from authority rather than relying on MemoryRecord validation to catch it.
     with repo._lock:
-        repo._connection.execute(
+        row = repo._connection.execute(
             """
-            UPDATE canonical_memory_projection_outbox
-            SET record_json = REPLACE(record_json, 'canonical', 'tampered')
+            SELECT record_json
+            FROM canonical_memory_projection_outbox
             WHERE repository_namespace = ? AND memory_id = ?
             """,
             (repo.repository_namespace, record.memory_id),
+        ).fetchone()
+        assert row is not None
+        snapshot = json.loads(row["record_json"])
+        snapshot["content"] = "tampered"
+        snapshot["payload_digest"] = memory_payload_digest(
+            kind=snapshot["kind"],
+            content=snapshot["content"],
+            content_ref=snapshot.get("content_ref"),
+            provenance_refs=tuple(snapshot.get("provenance_refs") or ()),
+        )
+        repo._connection.execute(
+            """
+            UPDATE canonical_memory_projection_outbox
+            SET record_json = ?
+            WHERE repository_namespace = ? AND memory_id = ?
+            """,
+            (
+                json.dumps(
+                    snapshot,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                ),
+                repo.repository_namespace,
+                record.memory_id,
+            ),
         )
 
     report = MemoryProjectionCoordinator(repo).dispatch_pending(
