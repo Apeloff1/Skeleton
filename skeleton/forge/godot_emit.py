@@ -9,6 +9,23 @@ import json
 from typing import Any, Dict, List, Optional
 
 
+
+def _required(container: Any, key: str, label: str, *, positive: bool = True) -> float:
+    if not isinstance(container, dict) or key not in container:
+        raise ValueError(f"{label} is required")
+    value = container[key]
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a number")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError(f"{label} must be finite")
+    if positive and not number > 0:
+        raise ValueError(f"{label} must be positive")
+    if number < 0:
+        raise ValueError(f"{label} must be non-negative")
+    return number
+
+
 def _gd_recipes(recipes: List[dict]) -> str:
     lines = []
     for r in recipes:
@@ -26,20 +43,26 @@ def emit_godot(
     title: str = "FORGE-RUN",
     build_plan: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, str]:
-    heat = pack.get("heat") or {}
-    player = pack.get("player") or {}
-    jeeves = pack.get("jeeves") or {}
-    session = pack.get("session") or {}
-    era = pack.get("era", "extraction_now")
-    mh = float(heat.get("max_heat") or 100)
-    cool = float(heat.get("passive_cool") or 7.5)
-    crit = float(heat.get("critical_ratio") or 0.78)
-    kin = float(heat.get("kinetic_heat") or 6.2)
-    ene = float(heat.get("energy_heat") or 11.5)
-    sprint = float(heat.get("sprint_heat_per_sec") or 11.0)
-    speed = float(player.get("speed") or 180)
-    sprint_m = float(player.get("sprint_multiplier") or 1.4)
-    collapse = float(session.get("collapse_max") or 300)
+    if not isinstance(pack, dict):
+        raise ValueError("pack is required")
+    if not isinstance(title, str) or not title.strip():
+        raise ValueError("title is required")
+    era = pack.get("era")
+    if not isinstance(era, str) or not era.strip():
+        raise ValueError("era is required")
+    heat = pack.get("heat") if isinstance(pack.get("heat"), dict) else {}
+    player = pack.get("player") if isinstance(pack.get("player"), dict) else {}
+    jeeves = pack.get("jeeves") if isinstance(pack.get("jeeves"), dict) else {}
+    session = pack.get("session") if isinstance(pack.get("session"), dict) else {}
+    mh = _required(heat, "max_heat", "max_heat")
+    cool = _required(heat, "passive_cool", "passive_cool", positive=False)
+    crit = _required(heat, "critical_ratio", "critical_ratio")
+    kin = _required(heat, "kinetic_heat", "kinetic_heat", positive=False)
+    ene = _required(heat, "energy_heat", "energy_heat", positive=False)
+    sprint = _required(heat, "sprint_heat_per_sec", "sprint_heat_per_sec", positive=False)
+    speed = _required(player, "speed", "speed")
+    sprint_m = _required(player, "sprint_multiplier", "sprint_multiplier")
+    collapse = _required(session, "collapse_max", "collapse_max")
     plan = build_plan or {}
     hw = pack.get("hardware") or {}
     vw, vh = (hw.get("viewport") or [1280, 720])[:2]
