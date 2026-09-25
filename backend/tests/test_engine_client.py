@@ -387,6 +387,251 @@ async def test_execute_polls_terminal_result_and_preserves_lineage() -> None:
 
 
 @pytest.mark.asyncio
+async def test_execute_recovers_ambiguous_submit_by_query_without_resubmit() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    post_calls = 0
+    status_calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_calls, status_calls
+        if request.method == "POST" and request.url.path.endswith("/executions"):
+            post_calls += 1
+            raise httpx.ReadTimeout("submit response lost", request=request)
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            status_calls += 1
+            state = "provider_pending" if status_calls == 1 else "completed"
+            return _json(
+                200,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "operation_state": "running" if state != "completed" else "completed",
+                    "execution_state": state,
+                    "latest_checkpoint_version": 1,
+                    "result_ref": None if state != "completed" else "execution-result:" + execution_id,
+                    "failure_code": None,
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": False,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}/events"
+        ):
+            return _json(
+                200,
+                {
+                    "execution_id": execution_id,
+                    "events": [
+                        {
+                            "event_id": "state",
+                            "sequence": 0,
+                            "type": "execution.state",
+                            "state": "completed",
+                        },
+                        {
+                            "event_id": "result",
+                            "sequence": 1,
+                            "type": "execution.result",
+                            "result": {
+                                "schema_version": 1,
+                                "operation_id": command.operation.operation_id,
+                                "execution_id": execution_id,
+                                "status": "completed",
+                                "final_output": "recovered answer",
+                                "verification": "verification:recovered",
+                                "verification_receipt": {
+                                    "outcome": "passed",
+                                    "policy_satisfied": True,
+                                },
+                                "evidence_refs": ["evidence:recovered"],
+                                "route_receipts": [],
+                                "provider_receipts": ["provider:recovered"],
+                                "tool_receipts": [],
+                                "memory_refs": [],
+                                "artifact_refs": [],
+                                "usage": {"model_turns": 1, "tool_calls": 0},
+                                "stream_terminal_event": "stream-terminal:recovered",
+                                "completed_at": _now().isoformat(),
+                            },
+                        },
+                    ],
+                    "next_sequence": 2,
+                },
+            )
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+            poll_interval_s=0.001,
+            execution_timeout_s=2,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    result = await client.execute(command)
+
+    assert result.final_output == "recovered answer"
+    assert post_calls == 1
+    assert status_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_queries_before_single_resubmit_when_first_submit_not_found() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    calls: list[str] = []
+    post_calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_calls
+        calls.append(request.method + " " + request.url.path)
+        if request.method == "POST" and request.url.path.endswith("/executions"):
+            post_calls += 1
+            if post_calls == 1:
+                raise httpx.ReadTimeout("submit response lost", request=request)
+            return _json(
+                202,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "state": "admitted",
+                    "accepted_at": _now().isoformat(),
+                    "idempotency_digest": "d" * 64,
+                    "status_ref": "status",
+                    "events_ref": "events",
+                    "trace_id": command.operation.trace_id,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            if post_calls == 1:
+                return _json(404, {"detail": "unknown engine execution"})
+            return _json(
+                200,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "operation_state": "completed",
+                    "execution_state": "completed",
+                    "latest_checkpoint_version": 1,
+                    "result_ref": "execution-result:" + execution_id,
+                    "failure_code": None,
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": False,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}/events"
+        ):
+            return _json(
+                200,
+                {
+                    "execution_id": execution_id,
+                    "events": [
+                        {
+                            "event_id": "result",
+                            "sequence": 0,
+                            "type": "execution.result",
+                            "result": {
+                                "schema_version": 1,
+                                "operation_id": command.operation.operation_id,
+                                "execution_id": execution_id,
+                                "status": "completed",
+                                "final_output": "retried answer",
+                                "verification": "verification:retry",
+                                "verification_receipt": {
+                                    "outcome": "passed",
+                                    "policy_satisfied": True,
+                                },
+                                "evidence_refs": ["evidence:retry"],
+                                "route_receipts": [],
+                                "provider_receipts": ["provider:retry"],
+                                "tool_receipts": [],
+                                "memory_refs": [],
+                                "artifact_refs": [],
+                                "usage": {"model_turns": 1, "tool_calls": 0},
+                                "stream_terminal_event": "stream-terminal:retry",
+                                "completed_at": _now().isoformat(),
+                            },
+                        }
+                    ],
+                    "next_sequence": 1,
+                },
+            )
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+            poll_interval_s=0.001,
+            execution_timeout_s=2,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    result = await client.execute(command)
+
+    assert result.final_output == "retried answer"
+    assert post_calls == 2
+    assert calls[:3] == [
+        "POST /api/v1/engine/executions",
+        f"GET /api/v1/engine/executions/{execution_id}",
+        "POST /api/v1/engine/executions",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_execute_rejects_mismatched_recovered_submit_identity() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    post_calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_calls
+        if request.method == "POST":
+            post_calls += 1
+            raise httpx.ReadTimeout("submit response lost", request=request)
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            return _json(
+                200,
+                {
+                    "operation_id": str(uuid4()),
+                    "execution_id": execution_id,
+                    "operation_state": "running",
+                    "execution_state": "provider_pending",
+                    "latest_checkpoint_version": 0,
+                    "result_ref": None,
+                    "failure_code": None,
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": False,
+                },
+            )
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="recovered engine status operation identity mismatch",
+    ):
+        await client.execute(command)
+    assert post_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_terminal_failure_is_not_converted_to_local_success() -> None:
     command = _command()
     execution_id = command.execution_request.execution_id
