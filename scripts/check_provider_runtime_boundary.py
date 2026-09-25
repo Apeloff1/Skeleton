@@ -28,6 +28,7 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOTS = ("backend", "skeleton")
 SKIP_PARTS = {"tests", "test", "__pycache__", ".venv", "venv", "node_modules"}
+NON_RUNTIME_MIRROR_PREFIXES = (Path("skeleton/ai/research/external"),)
 GOOGLE_MODULES = ("google.genai", "google.generativeai")
 LOCAL_EMERGENT_COMPAT_MODULE = "emergentintegrations.llm.chat"
 CANONICAL_PROVIDER_RUNTIME = Path("skeleton/provider_runtime.py")
@@ -50,6 +51,11 @@ def _runtime_python_files(root: Path) -> Iterable[Path]:
         for path in sorted(base.rglob("*.py")):
             rel = path.relative_to(root)
             if any(part in SKIP_PARTS for part in rel.parts):
+                continue
+            if any(
+                rel == prefix or prefix in rel.parents
+                for prefix in NON_RUNTIME_MIRROR_PREFIXES
+            ):
                 continue
             yield path
 
