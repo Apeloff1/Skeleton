@@ -1,0 +1,140 @@
+name: Engine Container Boundary
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "pyproject.toml"
+      - "backend/core/engine_client.py"
+      - "skeleton/api/engine_*.py"
+      - "skeleton/api/middleware.py"
+      - "skeleton/api/server.py"
+      - "skeleton/config/settings.py"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/persistence/execution_repository.py"
+      - "scripts/check_engine_container_boundary.py"
+      - ".github/workflows/engine-container-boundary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-container-boundary-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine-container-boundary:
+    name: Engine Container Boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHON_VERSION: "3.11.16"
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ci-mongo-password
+      MONGO_INITDB_DATABASE: tutolage
+      MONGO_URL: mongodb://admin:ci-mongo-password@mongo:27017/tutolage?authSource=admin
+      SKL_MONGO_URI: mongodb://admin:ci-mongo-password@mongo:27017/skeleton?authSource=admin
+      JWT_SECRET: ci-jwt-secret-00000000000000000000000000000001
+      SKL_ENGINE_SERVICE_TOKEN: ci-engine-service-token-00000000000000000001
+      SKL_ENGINE_SERVICE_PRINCIPAL: codedock-backend
+      SKL_ENGINE_ALLOWED_TENANTS_CSV: tenant-a
+      SKL_ENGINE_ALLOWED_CAPABILITIES_CSV: assistant.chat
+      SKELETON_PORT: "18010"
+      OPENAI_API_KEY: ""
+      EMERGENT_LLM_KEY: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+
+      - name: Install smoke client runtime
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -e . httpx==0.28.1
+
+      - name: Build and start canonical engine topology
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.yml up -d --build mongo skeleton
+
+      - name: Wait for Skeleton health
+        run: |
+          set -euo pipefail
+          ready=false
+          for _ in $(seq 1 120); do
+            if curl --fail --silent --show-error               http://127.0.0.1:${SKELETON_PORT}/api/v1/health/live >/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            docker compose -f docker-compose.yml ps
+            docker compose -f docker-compose.yml logs --no-color skeleton mongo
+            exit 1
+          fi
+
+      - name: Exercise authenticated engine boundary
+        env:
+          PYTHONPATH: ".:backend"
+          SKELETON_INTERNAL_URL: http://127.0.0.1:18010
+        run: |
+          set -euo pipefail
+          python scripts/check_engine_container_boundary.py
+
+      - name: Assert provider credentials are engine-only
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import subprocess
+
+          raw = subprocess.check_output(
+              [
+                  "docker",
+                  "compose",
+                  "-f",
+                  "docker-compose.yml",
+                  "config",
+                  "--format",
+                  "json",
+              ],
+              text=True,
+          )
+          compose = json.loads(raw)
+          services = compose["services"]
+          engine_env = services["skeleton"]["environment"]
+          backend_env = services["backend"]["environment"]
+
+          for key in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
+              if key not in engine_env:
+                  raise SystemExit(f"{key} missing from Skeleton engine service")
+              if key in backend_env:
+                  raise SystemExit(f"{key} leaked into backend service")
+
+          if "SKL_ENGINE_SERVICE_TOKEN" not in engine_env:
+              raise SystemExit("engine service token missing from Skeleton")
+          if "SKL_ENGINE_SERVICE_TOKEN" not in backend_env:
+              raise SystemExit("engine service token missing from backend")
+          PY
+
+      - name: Capture container logs
+        if: failure()
+        run: docker compose -f docker-compose.yml logs --no-color skeleton mongo
+
+      - name: Tear down engine topology
+        if: always()
+        run: docker compose -f docker-compose.yml down --volumes --remove-orphans
