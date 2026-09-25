@@ -800,6 +800,12 @@ class CognitiveExecutionRuntime:
                     100 * 1024 * 1024,
                 )
             ),
+            max_storage_bytes=int(
+                execution_budget.get(
+                    "max_storage_bytes",
+                    100 * 1024 * 1024,
+                )
+            ),
             max_concurrency=int(
                 execution_budget.get("max_concurrency", 32)
             ),
