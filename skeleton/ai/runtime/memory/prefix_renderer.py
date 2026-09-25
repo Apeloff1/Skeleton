@@ -28,6 +28,8 @@ from typing import Iterable, Optional
 
 # Approx tokens: 4 chars/token is the standard conservative estimate.
 def estimate_tokens(text: str) -> int:
+    if not text:
+        return 0
     return max(1, len(text) // 4)
 
 
