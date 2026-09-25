@@ -146,25 +146,20 @@ function canonicalResultFromPayload(
   const messageId = source.message_id ?? payload.message_id;
   const failureCode = source.failure_code ?? payload.failure_code;
 
-  return {
-    status,
-    final_output:
-      finalOutput === null || typeof finalOutput === 'string'
-        ? finalOutput
-        : undefined,
-    result_ref:
-      resultRef === null || typeof resultRef === 'string'
-        ? resultRef
-        : undefined,
-    message_id:
-      messageId === null || typeof messageId === 'string'
-        ? messageId
-        : undefined,
-    failure_code:
-      failureCode === null || typeof failureCode === 'string'
-        ? failureCode
-        : undefined,
-  };
+  const result: OperationCanonicalResult = { status };
+  if (finalOutput === null || typeof finalOutput === 'string') {
+    result.final_output = finalOutput;
+  }
+  if (resultRef === null || typeof resultRef === 'string') {
+    result.result_ref = resultRef;
+  }
+  if (messageId === null || typeof messageId === 'string') {
+    result.message_id = messageId;
+  }
+  if (failureCode === null || typeof failureCode === 'string') {
+    result.failure_code = failureCode;
+  }
+  return result;
 }
 
 function reconcileTerminalResult(
