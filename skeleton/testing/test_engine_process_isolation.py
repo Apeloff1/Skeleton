@@ -215,7 +215,7 @@ def test_engine_transport_requires_authenticated_service_token() -> None:
     backend = _service_block(compose, "backend", "frontend")
     token_binding = (
         "SKL_ENGINE_SERVICE_TOKEN="
-        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set}"
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}"
     )
 
     assert token_binding in skeleton
