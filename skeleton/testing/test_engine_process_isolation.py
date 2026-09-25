@@ -93,28 +93,20 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
     )
 
 
-def test_remaining_local_provider_consumers_are_media_only() -> None:
-    assert set(_local_provider_consumers()) == {
-        "backend/core/expressive_tts.py",
-        "backend/routes/image_generation.py",
-    }
+def test_backend_has_no_local_provider_runtime_activation() -> None:
+    assert _local_provider_consumers() == ()
 
 
-def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
+def test_runtime_provider_credentials_are_engine_only_after_cutover() -> None:
     compose = _compose()
     skeleton = _service_block(compose, "skeleton", "backend")
     backend = _service_block(compose, "backend", "frontend")
-    consumers = _local_provider_consumers()
 
+    assert _local_provider_consumers() == ()
     for credential in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
         marker = credential + "=${"
         assert marker in skeleton
-        if consumers:
-            # Stage-5 cutover law: do not remove backend credentials while any
-            # production backend module can still instantiate the local runtime.
-            assert marker in backend, consumers
-        else:
-            assert marker not in backend
+        assert marker not in backend
 
     # Non-provider product credentials remain backend-owned.  This prevents an
     # overbroad secret migration from changing product payment/auth ownership.
