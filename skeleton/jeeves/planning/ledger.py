@@ -42,9 +42,11 @@ class PlanLedger:
             return tuple(self._events)
 
     def append(self, plan_id: str, kind: EventKind, detail: str) -> PlanEvent:
-        if not plan_id or len(plan_id) != 64:
+        if not isinstance(plan_id, str) or len(plan_id) != 64 or any(c not in "0123456789abcdef" for c in plan_id):
             raise ValueError("invalid plan id")
-        if not detail or len(detail) > 4096:
+        if not isinstance(kind, EventKind):
+            raise ValueError("event kind is required")
+        if not isinstance(detail, str) or not detail or len(detail) > 4096:
             raise ValueError("invalid event detail")
         key = (plan_id, kind, detail)
         with self._lock:
@@ -63,7 +65,12 @@ class PlanLedger:
         return self.append(plan.id, EventKind.CREATED, plan.state.value)
 
     def record_admission(self, result: AdmissionResult) -> PlanEvent:
-        kind = EventKind.ADMITTED if result.decision is AdmissionDecision.ACCEPT else EventKind.REJECTED
+        if result.decision is AdmissionDecision.ACCEPT:
+            kind = EventKind.ADMITTED
+        elif result.decision is AdmissionDecision.REJECT:
+            kind = EventKind.REJECTED
+        else:
+            raise ValueError("a hold is not an admission or a rejection")
         return self.append(result.plan_id, kind, result.decision.value)
 
     def verify(self) -> bool:
