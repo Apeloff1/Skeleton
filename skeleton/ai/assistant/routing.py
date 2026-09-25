@@ -39,7 +39,11 @@ _EXTERNAL_ACTION = re.compile(
 )
 _FUTURE = re.compile(
     r"\b(remind me|notify me|every (day|week|month|hour)|each (day|week|month)|"
-    r"when .* becomes|monitor|watch for|tomorrow|next week|in \d+ (minutes?|hours?|days?))\b",
+    r"when .* becomes|monitor|watch for|in \d+ (minutes?|hours?|days?))\b",
+    re.IGNORECASE,
+)
+_CREATE_ARTIFACT = re.compile(
+    r"\b(create|make|generate|build|produce|draft|write|prepare|export|render|design)\b",
     re.IGNORECASE,
 )
 _IMAGE = re.compile(
