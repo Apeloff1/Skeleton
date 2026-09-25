@@ -20,12 +20,17 @@ class Heuristic:
     maximum: float
 
     def score(self, value: float) -> float:
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or not isfinite(float(value)):
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(float(value)):
             raise ValueError("heuristic input must be finite")
-        if self.maximum <= self.minimum:
+        if isinstance(self.weight, bool) or not isinstance(self.weight, (int, float)) or not 0 < float(self.weight) <= 1:
+            raise ValueError("heuristic weight must be in (0, 1]")
+        if isinstance(self.minimum, bool) or isinstance(self.maximum, bool) or not isinstance(self.minimum, (int, float)) or not isinstance(self.maximum, (int, float)) or not self.maximum > self.minimum:
             raise ValueError("invalid heuristic range")
-        normalized = (float(value) - self.minimum) / (self.maximum - self.minimum)
-        return max(0.0, min(1.0, normalized)) * self.weight
+        number = float(value)
+        if not self.minimum <= number <= self.maximum:
+            raise ValueError("heuristic input is outside its range")
+        normalized = (number - self.minimum) / (self.maximum - self.minimum)
+        return normalized * float(self.weight)
 
 HEURISTICS: tuple[Heuristic, ...] = (
     Heuristic("heuristic_001", HeuristicKind.RISK, 0.2, 0.0, 100.0),
@@ -252,15 +257,17 @@ HEURISTICS: tuple[Heuristic, ...] = (
 
 
 def rank(values: dict[str, float]) -> tuple[tuple[str, float], ...]:
-    scored=[]
-    for h in HEURISTICS:
-        if h.name in values:
-            scored.append((h.name, h.score(values[h.name])))
+    if not isinstance(values, dict):
+        raise TypeError("heuristic values must be an object")
+    known = {item.name for item in HEURISTICS}
+    missing = [item.name for item in HEURISTICS if item.name not in values]
+    unknown = [name for name in values if name not in known]
+    if missing or unknown:
+        raise ValueError("heuristic values must name every heuristic and nothing else")
+    scored = [(item.name, item.score(values[item.name])) for item in HEURISTICS]
     return tuple(sorted(scored, key=lambda item: (-item[1], item[0])))
 
 
 def aggregate(values: dict[str, float]) -> float:
     ranked = rank(values)
-    if not ranked:
-        return 0.0
     return sum(score for _, score in ranked) / len(ranked)
