@@ -358,7 +358,6 @@ async def call_llm(
 ) -> Dict[str, Any]:
     """Compatibility text execution through the canonical engine boundary."""
 
-    del max_output_tokens  # Engine resource budgeting is canonical and bounded downstream.
     try:
         client = EngineClient.from_env()
     except EngineClientError:
@@ -452,6 +451,7 @@ async def call_llm(
             deadline=now + timedelta(seconds=client.config.execution_timeout_s),
             trace_id="ai-compat:" + context_envelope.operation_id,
             max_model_turns=4,
+            max_output_tokens=max_output_tokens,
             max_tool_calls=1,
             max_repeat_tool_batches=1,
             context_seed_refs=(
