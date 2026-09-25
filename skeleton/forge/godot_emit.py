@@ -461,14 +461,26 @@ def _world_map_gd(plan: Dict[str, Any], graph: Optional[Dict[str, Any]] = None, 
         seed = graph["seed"]
     if seed is None:
         raise ValueError("seed is required")
-    n = int((graph or {}).get("count") or 0)
-    rooms = (graph or {}).get("rooms") or []
-    edges = (graph or {}).get("edges") or []
+    if not isinstance(graph, dict):
+        raise ValueError("graph is required")
+    rooms = graph.get("rooms")
+    edges = graph.get("edges")
+    if not isinstance(rooms, list) or not isinstance(edges, list):
+        raise ValueError("graph rooms and edges are required")
+    count = graph.get("count")
+    if isinstance(count, bool) or not isinstance(count, int) or count != len(rooms):
+        raise ValueError("room count does not match the graph")
+    n = count
     room_lits = []
-    for r in rooms:
+    for room in rooms:
+        if not isinstance(room, dict) or "x" not in room or "y" not in room:
+            raise ValueError("room coordinates are required")
+        x, y = room["x"], room["y"]
+        if isinstance(x, bool) or isinstance(y, bool) or not isinstance(x, (int, float)) or not isinstance(y, (int, float)):
+            raise ValueError("room coordinates must be numbers")
         room_lits.append(
             '{"id": "%s", "kind": "%s", "x": %s, "y": %s}'
-            % (r["id"], r["kind"], r.get("x", 0), r.get("y", 0))
+            % (room["id"], room["kind"], x, y)
         )
     edge_lits = ['{"from": "%s", "to": "%s"}' % (e["from"], e["to"]) for e in edges]
     rooms_s = ", ".join(room_lits) or ""

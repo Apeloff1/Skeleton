@@ -73,6 +73,15 @@ class FeatureExtractor:
         }
 
 
+def _finite_score(value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("result score is required")
+    number = float(value)
+    if number != number or number in (float("inf"), float("-inf")):
+        raise ValueError("result score must be finite")
+    return number
+
+
 class FeatureReranker:
     """Re-rank results using feature-based scoring.
 
@@ -98,26 +107,35 @@ class FeatureReranker:
         pipeline stages keep ``ScoredResult`` identity; dict inputs become
         lightweight records with ``item_id`` and ``features``.
         """
+        if not isinstance(query, str) or not query.strip():
+            raise ValueError("query is required")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
         self._stats["queries"] += 1
 
         query_terms = tuple(query.lower().split())
         scored = []
         for result in results:
             if isinstance(result, dict):
-                item_id = str(result.get("id") or result.get("item_id") or "")
-                content = str(result.get("text") or result.get("content") or "")
-                original_score = float(result.get("score", 0.5) or 0.0)
+                item_id = result.get("id", result.get("item_id"))
+                content = result.get("text", result.get("content"))
+                if "score" not in result:
+                    raise ValueError("result score is required")
+                original_score = _finite_score(result["score"])
                 original = None
             else:
-                item_id = str(
-                    getattr(result, "item_id", None)
-                    or getattr(result, "fragment_id", None)
-                    or getattr(result, "document_id", "")
-                    or ""
-                )
-                content = str(getattr(result, "content", None) or getattr(result, "text", "") or result)
-                original_score = float(getattr(result, "score", 0.5) or 0.0)
+                item_id = getattr(result, "item_id", None) or getattr(result, "fragment_id", None) or getattr(result, "document_id", None)
+                content = getattr(result, "content", None)
+                if content is None:
+                    content = getattr(result, "text", None)
+                if not hasattr(result, "score"):
+                    raise ValueError("result score is required")
+                original_score = _finite_score(result.score)
                 original = result
+            if not isinstance(item_id, str) or not item_id.strip():
+                raise ValueError("result id is required")
+            if not isinstance(content, str):
+                raise ValueError("result text is required")
 
             features = FeatureExtractor.extract(query, content)
             doc = content.lower()
