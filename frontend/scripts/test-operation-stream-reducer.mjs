@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  MAX_OPERATION_CONTENT_CHARS,
+  OPERATION_OUTPUT_DELTA_TYPE,
+  OPERATION_OUTPUT_SNAPSHOT_TYPE,
   OPERATION_STREAM_SCHEMA_VERSION,
   createOperationClientState,
   reduceOperationEvent,
@@ -167,4 +170,182 @@ test('unsupported stream schema forces resync instead of silent downgrade', () =
 
   assert.equal(state.resyncRequired, true);
   assert.equal(state.error, 'unsupported_schema_version');
+});
+
+test('provisional output deltas append once and exact duplicate replay is ignored', () => {
+  let state = createOperationClientState('op-1');
+  const delta = event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+    payload: { delta: 'hello ' },
+  });
+  state = reduceOperationEvent(state, delta);
+  state = reduceOperationEvent(state, delta);
+  state = reduceOperationEvent(
+    state,
+    event(2, OPERATION_OUTPUT_DELTA_TYPE, {
+      payload: { delta: 'world' },
+    }),
+  );
+
+  assert.equal(state.provisionalContent, 'hello world');
+  assert.equal(state.displayContent, 'hello world');
+  assert.equal(state.contentState, 'provisional');
+  assert.equal(state.terminalReconciled, false);
+  assert.equal(state.lastSequence, 2);
+});
+
+test('output snapshot replaces provisional content without changing authority', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+      payload: { delta: 'partial' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, OPERATION_OUTPUT_SNAPSHOT_TYPE, {
+      payload: { content: 'normalized provisional snapshot' },
+    }),
+  );
+
+  assert.equal(state.provisionalContent, 'normalized provisional snapshot');
+  assert.equal(state.authoritativeContent, null);
+  assert.equal(state.displayContent, 'normalized provisional snapshot');
+  assert.equal(state.contentState, 'provisional');
+  assert.equal(state.terminalReconciled, false);
+});
+
+test('completed terminal result replaces provisional content authoritatively', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+      payload: { delta: 'draft answer' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', {
+      payload: {
+        state: 'completed',
+        result: { final_output: 'verified final answer' },
+      },
+    }),
+  );
+
+  assert.equal(state.terminal, true);
+  assert.equal(state.provisionalContent, 'draft answer');
+  assert.equal(state.authoritativeContent, 'verified final answer');
+  assert.equal(state.displayContent, 'verified final answer');
+  assert.equal(state.contentState, 'authoritative');
+  assert.equal(state.terminalReconciled, true);
+});
+
+test('completed terminal without result preserves provisional label instead of promoting it', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+      payload: { delta: 'still provisional' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', {
+      payload: { state: 'completed' },
+    }),
+  );
+
+  assert.equal(state.terminal, true);
+  assert.equal(state.displayContent, 'still provisional');
+  assert.equal(state.authoritativeContent, null);
+  assert.equal(state.contentState, 'provisional');
+  assert.equal(state.terminalReconciled, false);
+});
+
+for (const terminalType of ['operation.failed', 'operation.cancelled']) {
+  test(`${terminalType} discards provisional output from user-visible final content`, () => {
+    let state = createOperationClientState('op-1');
+    state = reduceOperationEvent(
+      state,
+      event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+        payload: { delta: 'unsafe partial answer' },
+      }),
+    );
+    state = reduceOperationEvent(
+      state,
+      event(2, terminalType, {
+        payload: {
+          state: terminalType.replace('operation.', ''),
+          error_code: 'bounded_failure',
+        },
+      }),
+    );
+
+    assert.equal(state.terminal, true);
+    assert.equal(state.provisionalContent, 'unsafe partial answer');
+    assert.equal(state.displayContent, '');
+    assert.equal(state.authoritativeContent, null);
+    assert.equal(state.contentState, 'discarded');
+    assert.equal(state.terminalReconciled, true);
+  });
+}
+
+test('malformed terminal result forces resync instead of accepting ambiguous final output', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, OPERATION_OUTPUT_DELTA_TYPE, {
+      payload: { delta: 'draft' },
+    }),
+  );
+  state = reduceOperationEvent(
+    state,
+    event(2, 'operation.completed', {
+      payload: { state: 'completed', result: { final_output: 42 } },
+    }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'invalid_terminal_result');
+  assert.equal(state.lastSequence, 1);
+  assert.equal(state.terminal, false);
+});
+
+test('provisional output is bounded and over-budget deltas fail closed', () => {
+  let state = createOperationClientState('op-1');
+  state = reduceOperationEvent(
+    state,
+    event(1, OPERATION_OUTPUT_SNAPSHOT_TYPE, {
+      payload: { content: 'x'.repeat(MAX_OPERATION_CONTENT_CHARS) },
+    }),
+  );
+  assert.equal(state.resyncRequired, false);
+  assert.equal(state.provisionalContent.length, MAX_OPERATION_CONTENT_CHARS);
+
+  state = reduceOperationEvent(
+    state,
+    event(2, OPERATION_OUTPUT_DELTA_TYPE, {
+      payload: { delta: 'overflow' },
+    }),
+  );
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'provisional_content_exceeds_content_budget');
+  assert.equal(state.lastSequence, 1);
+});
+
+test('authoritative terminal output is independently content bounded', () => {
+  const state = reduceOperationEvent(
+    createOperationClientState('op-1'),
+    event(1, 'operation.completed', {
+      payload: {
+        state: 'completed',
+        final_output: 'x'.repeat(MAX_OPERATION_CONTENT_CHARS + 1),
+      },
+    }),
+  );
+
+  assert.equal(state.resyncRequired, true);
+  assert.equal(state.error, 'authoritative_content_exceeds_content_budget');
+  assert.equal(state.terminal, false);
 });
