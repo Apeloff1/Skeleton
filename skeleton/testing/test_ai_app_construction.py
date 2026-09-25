@@ -226,6 +226,7 @@ def test_stream_gap_tracks_only_unfinished_transport_and_client_work() -> None:
     assert "durable stream storage adapter" not in package["progress"]["remaining"]
     assert "tenant-bound backend operation transport service" in package["progress"]["completed"]
     assert "backend SSE or WebSocket transport" not in package["progress"]["remaining"]
+    assert "persisted frontend reconnect cursor and authoritative replay-gap resync" in package["progress"]["completed"]
     remaining = set(package["progress"]["remaining"])
     assert "frontend reconnect/resume cursor" not in remaining
     assert "browser/API disconnect-reconnect recovery journey" not in remaining
