@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from skeleton.skills.tool_runtime import AsyncToolRuntime
+
 from .artifacts import ArtifactRoute, ArtifactRouter
 from .automation import AutomationPolicy
 from .capabilities import CapabilityRegistry
@@ -68,6 +70,7 @@ class AssistantControlPlane:
     def __init__(
         self,
         *,
+        tool_runtime: AsyncToolRuntime,
         registry: CapabilityRegistry | None = None,
         router: AssistantRouter | None = None,
         context_compiler: ContextCompiler | None = None,
@@ -81,7 +84,12 @@ class AssistantControlPlane:
         self.memory_policy = memory_policy or MemoryPolicy()
         self.artifact_router = artifact_router or ArtifactRouter()
         self.automation_policy = automation_policy or AutomationPolicy()
-        self.tools = ToolCoordinator(self.registry)
+        if not isinstance(tool_runtime, AsyncToolRuntime):
+            raise TypeError("tool_runtime must be AsyncToolRuntime")
+        self.tools = ToolCoordinator(
+            self.registry,
+            tool_runtime=tool_runtime,
+        )
 
     def _missing_required(self, route: RoutingPlan) -> tuple[CapabilityKind, ...]:
         missing: list[CapabilityKind] = []

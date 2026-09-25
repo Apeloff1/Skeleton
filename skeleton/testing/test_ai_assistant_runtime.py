@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from skeleton.skills.tool_runtime import AsyncToolRuntime
+
 from skeleton.ai.assistant import (
     ArtifactKind,
     AssistantControlPlane,
@@ -76,7 +78,7 @@ def test_automation_policy_rejects_subhour_recurring_watches() -> None:
 
 def test_control_plane_reports_missing_required_surface_then_resolves_it() -> None:
     registry = CapabilityRegistry()
-    plane = AssistantControlPlane(registry=registry)
+    plane = AssistantControlPlane(registry=registry, tool_runtime=AsyncToolRuntime())
     request = AssistantRequest(
         request_id="run-1",
         text="What is the current release status?",
@@ -128,7 +130,7 @@ def test_artifact_route_is_exposed_from_preparation() -> None:
             side_effect=SideEffectClass.REVERSIBLE_WRITE,
         )
     )
-    plane = AssistantControlPlane(registry=registry)
+    plane = AssistantControlPlane(registry=registry, tool_runtime=AsyncToolRuntime())
     request = AssistantRequest(request_id="run-2", text="Create a PDF report.")
     prepared = plane.prepare(request)
     assert prepared.signals.requests_artifact is ArtifactKind.PDF

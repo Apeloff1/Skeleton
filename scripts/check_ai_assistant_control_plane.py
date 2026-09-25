@@ -18,6 +18,17 @@ FORBIDDEN_SOURCE_MARKERS = (
     "from openai import",
     "import openai",
 )
+TOOLING_PATH = ROOT / "skeleton" / "ai" / "assistant" / "tooling.py"
+REQUIRED_TOOLING_MARKERS = (
+    "AsyncToolRuntime",
+    "ToolExecutionRequest",
+    "canonical-async-tool-runtime",
+    "durable-receipt-store-required",
+)
+FORBIDDEN_TOOLING_MARKERS = (
+    "self._receipts",
+    "self._handlers",
+)
 
 
 def validate() -> list[str]:
@@ -70,6 +81,96 @@ def validate() -> list[str]:
             errors.append(
                 f"assistant module crosses provider boundary: {raw}: {', '.join(hits)}"
             )
+
+    if not TOOLING_PATH.is_file():
+        errors.append("assistant tooling module is missing")
+    else:
+        try:
+            tooling_source = TOOLING_PATH.read_text(encoding="utf-8")
+            tooling_tree = ast.parse(tooling_source)
+        except (OSError, UnicodeDecodeError, SyntaxError) as exc:
+            errors.append(f"cannot inspect assistant tooling authority: {exc}")
+        else:
+            missing_markers = [
+                marker
+                for marker in REQUIRED_TOOLING_MARKERS
+                if marker not in tooling_source
+            ]
+            if missing_markers:
+                errors.append(
+                    "assistant tooling lost canonical-runtime delegation markers: "
+                    + ", ".join(missing_markers)
+                )
+            forbidden_hits = [
+                marker
+                for marker in FORBIDDEN_TOOLING_MARKERS
+                if marker in tooling_source
+            ]
+            if forbidden_hits:
+                errors.append(
+                    "assistant tooling regained shadow execution state: "
+                    + ", ".join(forbidden_hits)
+                )
+
+            coordinator = next(
+                (
+                    node
+                    for node in tooling_tree.body
+                    if isinstance(node, ast.ClassDef)
+                    and node.name == "ToolCoordinator"
+                ),
+                None,
+            )
+            if coordinator is None:
+                errors.append("assistant tooling must define ToolCoordinator")
+            else:
+                init = next(
+                    (
+                        node
+                        for node in coordinator.body
+                        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                        and node.name == "__init__"
+                    ),
+                    None,
+                )
+                if init is None:
+                    errors.append("ToolCoordinator must define an explicit constructor")
+                else:
+                    kwonly = {
+                        arg.arg: default
+                        for arg, default in zip(
+                            init.args.kwonlyargs,
+                            init.args.kw_defaults,
+                        )
+                    }
+                    if "tool_runtime" not in kwonly:
+                        errors.append(
+                            "ToolCoordinator must require injected tool_runtime"
+                        )
+                    elif kwonly["tool_runtime"] is not None:
+                        errors.append(
+                            "ToolCoordinator tool_runtime must not have a default"
+                        )
+
+                canonical_execute = False
+                for node in ast.walk(coordinator):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    func = node.func
+                    if (
+                        isinstance(func, ast.Attribute)
+                        and func.attr == "execute"
+                        and isinstance(func.value, ast.Attribute)
+                        and func.value.attr == "tool_runtime"
+                        and isinstance(func.value.value, ast.Name)
+                        and func.value.value.id == "self"
+                    ):
+                        canonical_execute = True
+                        break
+                if not canonical_execute:
+                    errors.append(
+                        "ToolCoordinator must delegate admitted calls to self.tool_runtime.execute"
+                    )
 
     exclusions = data.get("explicit_exclusions")
     if not isinstance(exclusions, list):
