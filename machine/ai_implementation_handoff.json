@@ -1012,14 +1012,23 @@
         "cancellation bridge into durable OperationEnvelope state",
         "transactional outbox drain before replay",
         "explicit post-header replay-gap resync event",
-        "focused tenant-isolation/cancel/replay/terminal SSE tests"
+        "focused tenant-isolation/cancel/replay/terminal SSE tests",
+        "frontend event-id dedupe plus strict monotonic sequence reducer",
+        "provisional assistant content reconciles only against canonical terminal output",
+        "persisted reconnect cursor advances only after accepted reducer payload",
+        "authoritative compaction-gap resync snapshot and replay floor",
+        "multi-client acknowledgement compacts only through the slowest active consumer",
+        "bounded frontend replay pages and bounded SSE server batches",
+        "terminal backlog drains across multiple bounded batches before stream close",
+        "completion-versus-cancel race produces exactly one terminal operation event",
+        "persisted reconnect cursor storage is namespaced per consumer to prevent cross-tab cursor skipping"
       ],
       "remaining": [
-        "frontend reducer with sequence and event-id dedupe",
-        "frontend reconnect/resume cursor",
-        "multi-client acknowledgement/compaction strategy",
         "distributed stream ownership for multi-worker deployment",
-        "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+        "browser/API disconnect-reconnect recovery journey",
+        "browser/API slow-client backpressure journey",
+        "browser/API cancel-complete race journey",
+        "exact-head App Assembly and frontend typecheck/test:operation-stream evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
