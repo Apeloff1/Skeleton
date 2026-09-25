@@ -23,7 +23,7 @@ from skeleton.skills.tool_contract import (
     ToolManifest,
     approval_ref_for_request,
 )
-from skeleton.skills.tool_runtime import AsyncToolRuntime, ToolNotFound
+from skeleton.skills.tool_runtime import (\n    AsyncToolRuntime,\n    ToolExecutionConflict,\n    ToolNotFound,\n)
 
 from .capabilities import CapabilityAuthorizer, CapabilityRegistry
 from .contracts import (
@@ -393,10 +393,13 @@ class ToolCoordinator:
             if not replayed:
                 self._request_call_counts[request.digest] = count + 1
 
-        canonical_receipt = await self.tool_runtime.execute(
-            canonical_request,
-            now=instant,
-        )
+        try:
+            canonical_receipt = await self.tool_runtime.execute(
+                canonical_request,
+                now=instant,
+            )
+        except ToolExecutionConflict as exc:
+            raise ToolCoordinatorError(str(exc)) from exc
         key = (
             canonical_request.tenant_id,
             canonical_request.operation_id,
