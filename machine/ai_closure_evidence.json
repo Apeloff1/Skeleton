@@ -71,7 +71,11 @@
         "skeleton/intelligence/admission_runtime.py independent storage usage metering and telemetry",
         "skeleton/artifact_plane/usage.py storage writes meter storage_bytes rather than artifact_bytes",
         "skeleton/testing/test_artifact_usage.py proves artifact/storage budget independence",
-        "skeleton/testing/test_tenant_quota_sqlite.py proves restart-safe storage usage and legacy schema migration"
+        "skeleton/testing/test_tenant_quota_sqlite.py proves restart-safe storage usage and legacy schema migration",
+        "skeleton/intelligence/shared_pressure.py restart-safe SQLite cross-process concurrency and queue coordinator",
+        "skeleton/testing/test_shared_pressure.py cross-process overbooking, tenant fairness, queue caps, lease expiry, owner fencing, soft shedding and atomic promotion regressions",
+        "skeleton/intelligence/admission_runtime.py shared pressure snapshot/acquire/release integration",
+        "skeleton/ai/runtime/intelligence/shared_pressure.py byte-identical canonical AI runtime mirror"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -81,7 +85,6 @@
       ],
       "outstanding_evidence": [
         "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment",
         "fresh exact-head durable quota/admission verification",
         "fresh exact-head estimate-vs-actual admission telemetry verification",
         "actual storage usage accounting across artifact/storage write paths",
@@ -90,7 +93,6 @@
       ],
       "blockers": [
         "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment",
         "actual storage usage accounting across artifact/storage write paths"
       ],
       "close_when": [
