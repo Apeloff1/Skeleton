@@ -121,6 +121,7 @@ class EngineClientConfig:
     """Bounded application-side engine transport configuration."""
 
     base_url: str
+    service_token: str | None = None
     service_principal: str = "codedock-backend"
     request_timeout_s: float = 15.0
     poll_interval_s: float = 0.05
@@ -133,6 +134,18 @@ class EngineClientConfig:
         if not (base.startswith("http://") or base.startswith("https://")):
             raise EngineProtocolError("engine base_url must use http or https")
         object.__setattr__(self, "base_url", base)
+        token = self.service_token
+        if token is not None:
+            if (
+                not isinstance(token, str)
+                or token != token.strip()
+                or len(token) < 32
+                or len(token) > 4096
+            ):
+                raise EngineProtocolError(
+                    "engine service token must be normalized and at least 32 characters"
+                )
+            object.__setattr__(self, "service_token", token)
         object.__setattr__(
             self,
             "service_principal",
@@ -189,9 +202,15 @@ class EngineClientConfig:
         raw_url = os.getenv("SKELETON_INTERNAL_URL")
         if raw_url is None or not raw_url.strip():
             return None
+        raw_token = os.getenv("SKL_ENGINE_SERVICE_TOKEN")
+        if raw_token is None or not raw_token.strip():
+            raise EngineProtocolError(
+                "engine service token is required when engine URL is configured"
+            )
         try:
             return cls(
                 base_url=raw_url.strip(),
+                service_token=raw_token.strip(),
                 service_principal=(
                     os.getenv(
                         "SKL_ENGINE_SERVICE_PRINCIPAL",
@@ -607,7 +626,13 @@ class EngineClient:
         )
 
     def _headers(self, *, trace_id: str | None = None) -> dict[str, str]:
+        token = self.config.service_token
+        if token is None:
+            raise EngineAuthorizationError(
+                "engine service token is not configured"
+            )
         headers = {
+            "authorization": "Bearer " + token,
             "x-zaibatsu-attester": self.config.service_principal,
             "accept": "application/json",
         }
