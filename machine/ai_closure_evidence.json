@@ -101,7 +101,17 @@
         "retention-expiry deletion planning",
         "multi-target deletion receipts",
         "registry-derived most-restrictive classification",
-        "registry-derived provider context enforced across text, image, and speech provider I/O"
+        "registry-derived provider context enforced across text, image, and speech provider I/O",
+        "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
+        "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
+        "SQLiteMemoryLifecycleAdapter provides tenant-scoped canonical memory export/tombstone deletion",
+        "GovernedMemoryWriter requires governance registration and reconciles classification/retention",
+        "memory governance persistence failure tombstones canonical memory fail-closed",
+        "machine/state_topology.json declares governance lifecycle as authoritative state",
+        "skeleton/testing/test_data_lifecycle.py restart/deletion-plan/receipt durability evidence",
+        "skeleton/testing/test_lifecycle_adapters.py canonical SQLite memory lifecycle evidence",
+        "skeleton/testing/test_governance_runtime_binding.py production runtime persistence evidence",
+        "skeleton/testing/test_memory_writeback.py canonical write registration/reconciliation evidence"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -110,18 +120,20 @@
         "retention expiry test"
       ],
       "outstanding_evidence": [
-        "register memory/retrieval/artifact records at their canonical write boundaries",
-        "propagate deletion actions through real storage adapters",
-        "bind export inventory to durable domain repositories",
-        "bridge provider privacy ceilings into every application route",
-        "audit retention/deletion access through the canonical observability plane"
+        "conversation/retrieval/artifact canonical write registration",
+        "memory derived projection/index deletion completion acknowledgement",
+        "conversation/retrieval/artifact physical delete/export/retention adapters",
+        "provider/tool privacy ceilings enforced across every application route",
+        "canonical audit linkage for lifecycle registration/delete/export/retention",
+        "exact-head Stage-0/App Assembly verification and independent signoff"
       ],
       "blockers": [
-        "register memory/retrieval/artifact records at their canonical write boundaries",
-        "propagate deletion actions through real storage adapters",
-        "bind export inventory to durable domain repositories",
-        "bridge provider privacy ceilings into every application route",
-        "audit retention/deletion access through the canonical observability plane"
+        "conversation/retrieval/artifact canonical write registration",
+        "memory derived projection/index deletion completion acknowledgement",
+        "conversation/retrieval/artifact physical delete/export/retention adapters",
+        "provider/tool privacy ceilings enforced across every application route",
+        "canonical audit linkage for lifecycle registration/delete/export/retention",
+        "exact-head Stage-0/App Assembly verification and independent signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",

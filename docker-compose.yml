@@ -47,6 +47,7 @@ services:
       - SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite
       - SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite
       - SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite
+      - SKL_GOVERNANCE_LIFECYCLE_PATH=/app/data/governance_lifecycle.sqlite
       - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     depends_on:

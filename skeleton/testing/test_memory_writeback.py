@@ -15,8 +15,10 @@ from skeleton.memory.writeback import (
     GovernedMemoryWriter,
     MemoryStageConflict,
     MemoryWriteDenied,
+    MemoryWritebackError,
 )
 from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.vault.governance_registry import GovernanceRegistry
 
 
 def _now():
@@ -65,7 +67,7 @@ def test_policy_can_require_review_for_restricted_data() -> None:
 
 def test_stage_is_side_effect_free_until_commit() -> None:
     repo = SQLiteMemoryRepository()
-    writer = GovernedMemoryWriter(repo)
+    writer = GovernedMemoryWriter(repo, governance=GovernanceRegistry())
     proposal = _proposal()
 
     staged = writer.stage(proposal)
@@ -86,7 +88,7 @@ def test_stage_is_side_effect_free_until_commit() -> None:
 
 def test_denied_proposal_never_mutates_repository() -> None:
     repo = SQLiteMemoryRepository()
-    writer = GovernedMemoryWriter(repo)
+    writer = GovernedMemoryWriter(repo, governance=GovernanceRegistry())
     proposal = _proposal(provenance=())
     writer.stage(proposal)
 
@@ -102,7 +104,7 @@ def test_denied_proposal_never_mutates_repository() -> None:
 
 def test_review_hold_requires_explicit_approval() -> None:
     repo = SQLiteMemoryRepository()
-    writer = GovernedMemoryWriter(repo)
+    writer = GovernedMemoryWriter(repo, governance=GovernanceRegistry())
     proposal = _proposal(data_class="restricted")
     writer.stage(proposal)
 
@@ -119,7 +121,7 @@ def test_review_hold_requires_explicit_approval() -> None:
 
 def test_proposal_identity_replay_is_exact_or_conflict() -> None:
     repo = SQLiteMemoryRepository()
-    writer = GovernedMemoryWriter(repo)
+    writer = GovernedMemoryWriter(repo, governance=GovernanceRegistry())
     proposal_id = str(uuid4())
     first = _proposal(proposal_id=proposal_id, content="one")
     writer.stage(first)
@@ -156,3 +158,93 @@ def test_policy_can_disable_source_operation_requirement() -> None:
     )
 
     assert engine.evaluate(proposal).allowed
+
+
+
+def test_commit_registers_memory_in_governance_registry() -> None:
+    repo = SQLiteMemoryRepository()
+    governance = GovernanceRegistry()
+    writer = GovernedMemoryWriter(repo, governance=governance)
+    proposal = _proposal()
+    writer.stage(proposal)
+
+    record = writer.commit(proposal.proposal_id, now=_now())
+    governed = governance.lifecycle.get(record.memory_id)
+
+    assert governed["tenant_id"] == record.tenant_id
+    assert governed["owner_plane"] == "memory"
+    assert governed["source_ref"] == (
+        f"memory://{record.namespace}/{record.memory_id}"
+    )
+    assert governed["data_class"] == record.data_class
+    assert governed["purposes"] == [
+        "model-inference",
+        "retrieval-synthesis",
+    ]
+    assert governed["deletion_targets"] == ["memory"]
+
+
+def test_memory_update_reconciles_governance_classification_and_retention() -> None:
+    repo = SQLiteMemoryRepository()
+    governance = GovernanceRegistry()
+    writer = GovernedMemoryWriter(repo, governance=governance)
+
+    create = _proposal(content="one", data_class="internal")
+    writer.stage(create)
+    first = writer.commit(create.proposal_id, now=_now())
+
+    expiry = datetime(2026, 10, 1, 20, 0, tzinfo=timezone.utc)
+    update = MemoryWriteProposal(
+        proposal_id=str(uuid4()),
+        tenant_id=first.tenant_id,
+        namespace=first.namespace,
+        subject_id=first.subject_id,
+        kind=first.kind,
+        idempotency_key="write-update",
+        proposed_at=_now(),
+        content="two",
+        provenance_refs=("conversation:2",),
+        source_operation_id=str(uuid4()),
+        target_memory_id=first.memory_id,
+        expected_version=first.version,
+        expires_at=expiry,
+        data_class="confidential",
+    )
+    writer.stage(update)
+    second = writer.commit(update.proposal_id, now=_now())
+
+    governed = governance.lifecycle.get(second.memory_id)
+    assert governed["data_class"] == "confidential"
+    assert governed["retention_until"] == expiry.timestamp()
+    assert governed["created_at"] == first.created_at.timestamp()
+
+
+def test_governance_persistence_failure_tombstones_memory_fail_closed(
+    monkeypatch,
+) -> None:
+    repo = SQLiteMemoryRepository()
+    governance = GovernanceRegistry()
+    writer = GovernedMemoryWriter(repo, governance=governance)
+    proposal = _proposal()
+    writer.stage(proposal)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("governance unavailable")
+
+    monkeypatch.setattr(governance, "reconcile_canonical_write", fail)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="governance registration failed; memory was tombstoned",
+    ):
+        writer.commit(proposal.proposal_id, now=_now())
+
+    rows = repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+    assert len(rows) == 1
+    assert rows[0].active is False
+    assert repo.pending_projection_events()[-1].action == "delete"

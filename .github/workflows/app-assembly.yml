@@ -140,6 +140,7 @@ on:
       - "skeleton/testing/test_data_lifecycle.py"
       - "skeleton/testing/test_governance_registry.py"
       - "skeleton/testing/test_governance_audit.py"
+      - "skeleton/testing/test_governance_runtime_binding.py"
       - "skeleton/testing/test_lifecycle_adapters.py"
       - "skeleton/testing/test_cost_admission.py"
       - "docker-compose.yml"
@@ -484,6 +485,7 @@ jobs:
           skeleton/testing/test_data_lifecycle.py
           skeleton/testing/test_governance_registry.py
           skeleton/testing/test_governance_audit.py
+          skeleton/testing/test_governance_runtime_binding.py
           skeleton/testing/test_lifecycle_adapters.py
           skeleton/testing/test_cost_admission.py
           skeleton/testing/test_admission_runtime.py

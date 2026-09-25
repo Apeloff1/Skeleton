@@ -22,6 +22,8 @@ on:
       - "skeleton/testing/test_data_lifecycle.py"
       - "skeleton/testing/test_governance_registry.py"
       - "skeleton/testing/test_governance_audit.py"
+      - "skeleton/testing/test_governance_runtime_binding.py"
+      - "skeleton/testing/test_memory_writeback.py"
       - "skeleton/testing/test_lifecycle_adapters.py"
       - "skeleton/intelligence/admission.py"
       - "skeleton/intelligence/admission_runtime.py"
@@ -113,6 +115,8 @@ jobs:
           skeleton/testing/test_governance_registry.py
           skeleton/testing/test_lifecycle_adapters.py
           skeleton/testing/test_governance_audit.py
+          skeleton/testing/test_governance_runtime_binding.py
+          skeleton/testing/test_memory_writeback.py
 
       - name: Record governance verification head
         run: echo "Governance lifecycle verified at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
