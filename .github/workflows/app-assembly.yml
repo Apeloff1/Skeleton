@@ -402,10 +402,12 @@ jobs:
           skeleton/vault/data_governance.py skeleton/vault/data_lifecycle.py
           skeleton/vault/governance_registry.py skeleton/vault/governance_audit.py skeleton/vault/lifecycle_adapters.py skeleton/intelligence/admission.py
           skeleton/intelligence/admission_runtime.py skeleton/intelligence/quota.py skeleton/intelligence/quota_sqlite.py
-          backend/core/ai_provider.py backend/core/provider_architecture.py
+          backend/core/ai_provider.py backend/core/ai_provider_compat.py backend/core/provider_architecture.py
+          backend/core/engine_client.py backend/core/engine_text.py
+          backend/routes/ai.py backend/routes/lafs.py backend/routes/llm_router.py
           backend/services/ai_assistant_svc.py backend/services/ai_hub_svc.py
           backend/services/rag_state_repository.py backend/services/rag_service.py
-          backend/services/game_llm_service.py backend/routes/llm_router.py
+          backend/services/game_llm_service.py
           scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/check_ai_execution_frontier.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
           scripts/check_state_topology.py scripts/check_provider_bootstrap.py
 
