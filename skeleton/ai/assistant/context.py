@@ -123,12 +123,14 @@ class ContextCompiler:
         selected: list[ContextCandidate] = []
         used = 0
 
+        control_size = sum(len(item.content) for item in controls)
+        if control_size > budget:
+            raise AssistantContractError(
+                "trusted control context exceeds request context budget"
+            )
         control_budget = min(
             budget,
-            max(
-                self.reserve_control_chars,
-                min(sum(len(item.content) for item in controls), budget),
-            ),
+            max(self.reserve_control_chars, control_size),
         )
         for item in controls:
             size = len(item.content)
