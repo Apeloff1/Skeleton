@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -21,6 +22,7 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.operation import OperationEnvelope
+from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
@@ -36,6 +38,26 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 def _now() -> datetime:
     return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+
+
+def _verified_execution(
+    _request: AIExecutionRequest,
+    candidate: str,
+    context_digest: str,
+) -> ExecutionVerificationDecision:
+    return ExecutionVerificationDecision(
+        passed=True,
+        receipt={
+            "outcome": "passed",
+            "policy_satisfied": True,
+            "verifier_id": "test:engine-coordinator",
+            "candidate_digest": hashlib.sha256(
+                candidate.encode("utf-8")
+            ).hexdigest(),
+            "context_digest": context_digest,
+        },
+        evidence_refs=("evidence:test-engine-coordinator",),
+    )
 
 
 class FakeProvider:
@@ -242,6 +264,7 @@ async def test_coordinator_golden_trace_preserves_compiled_context_lineage(
         service,
         provider_registry=FakeRegistry(provider),
         tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified_execution,
     )
 
     await coordinator.ensure_started(command)
@@ -249,7 +272,7 @@ async def test_coordinator_golden_trace_preserves_compiled_context_lineage(
 
     assert result.status == "completed"
     assert result.final_output == "engine answer"
-    assert result.verification_receipt["outcome"] == "verified"
+    assert result.verification_receipt["outcome"] == "passed"
     assert len(provider.requests) == 1
     request = provider.requests[0]
     assert request.instructions == "Follow the canonical policy."
@@ -307,6 +330,7 @@ async def test_coordinator_duplicate_launch_runs_one_provider_turn(tmp_path) -> 
         service,
         provider_registry=FakeRegistry(provider),
         tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified_execution,
     )
 
     await coordinator.ensure_started(command)
@@ -337,6 +361,7 @@ async def test_coordinator_restart_recovery_uses_durable_submission(tmp_path) ->
         service,
         provider_registry=FakeRegistry(provider),
         tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified_execution,
     )
     recovered_ids = await recovered.recover()
     result = await _wait_result(service, command.execution_request.execution_id)
@@ -364,6 +389,7 @@ async def test_coordinator_provider_unavailable_becomes_durable_failure(
         service,
         provider_registry=FakeRegistry(unavailable=True),
         tool_runtime=AsyncToolRuntime(),
+        verification_hook=_verified_execution,
     )
 
     await coordinator.ensure_started(command)
@@ -527,6 +553,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         service,
         provider_registry=FakeRegistry(first_provider),
         tool_runtime=tools,
+        verification_hook=_verified_execution,
     )
 
     await coordinator.ensure_started(command)
@@ -558,7 +585,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         call_id=pending[0]["call_id"],
         tool_id=pending[0]["tool_id"],
         arguments_digest=pending[0]["arguments_digest"],
-        idempotency_key="approve-call-write",
+        idempotency_key=pending[0]["idempotency_key"],
         expires_at=min(
             operation.deadline,
             command.delegated_authority.expires_at,
@@ -600,6 +627,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
         service,
         provider_registry=FakeRegistry(final_provider),
         tool_runtime=restarted_tools,
+        verification_hook=_verified_execution,
     )
 
     await restarted.ensure_execution("exec-approval")
@@ -607,7 +635,7 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
 
     assert result.status == "completed"
     assert result.final_output == "write confirmed"
-    assert result.verification_receipt["outcome"] == "verified"
+    assert result.verification_receipt["outcome"] == "passed"
     assert effects == [approval.approval_ref]
     assert result.usage["tool_calls"] == 1
     assert len(result.tool_receipts) == 1
