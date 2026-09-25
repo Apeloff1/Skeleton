@@ -126,6 +126,8 @@ class MAGStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 0:
+            raise ValueError("top_k must be a non-negative integer")
         query_time = time.time()
         query_words = set(query_text.lower().split())
 
