@@ -17,6 +17,8 @@ class Suggester:
     def suggest(self, prefix: str, *, limit: int = 5) -> Tuple[str, ...]:
         if not prefix:
             return tuple()
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise ValueError("limit must be a non-negative integer")
         lowered = prefix.lower()
         matches = [t for t in self._terms if t.lower().startswith(lowered)]
         return tuple(matches[:limit])
