@@ -109,6 +109,8 @@ on:
       - "backend/services/ai_assistant_svc.py"
       - "backend/services/game_llm_service.py"
       - "backend/tests/test_engine_client.py"
+      - "backend/tests/test_engine_http_boundary.py"
+      - "backend/tests/test_engine_live_process_boundary.py"
       - "backend/tests/test_engine_cross_service_closure.py"
       - "backend/tests/test_engine_cross_service_boundary.py"
       - "backend/tests/test_engine_media_client.py"
@@ -528,6 +530,8 @@ jobs:
           backend/tests/test_tool_registry_scoped_adapters.py
           backend/tests/test_tool_registry_canonical_delegate.py
           backend/tests/test_engine_client.py
+          backend/tests/test_engine_http_boundary.py
+          backend/tests/test_engine_live_process_boundary.py
           backend/tests/test_engine_cross_service_closure.py
           backend/tests/test_engine_cross_service_boundary.py
           backend/tests/test_engine_media_client.py
