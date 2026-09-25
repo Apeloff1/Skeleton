@@ -37,6 +37,13 @@ from skeleton.intelligence.quota import (
     QuotaUsageEvent,
     TenantQuotaLedger,
 )
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
+    SharedPressureError,
+    SharedPressureExceeded,
+    SharedPressureLease,
+    SqliteSharedPressureLedger,
+)
 
 
 class AdmissionRuntimeError(RuntimeError):
@@ -182,6 +189,7 @@ class _ActiveLease:
     lease: AdmissionLease
     request_fingerprint: str
     unknown_usage: dict[str, UnknownUsageMarker]
+    shared_pressure_lease: SharedPressureLease | None = None
 
 
 class AdmissionRuntime:
@@ -192,9 +200,41 @@ class AdmissionRuntime:
         *,
         quota_ledger: TenantQuotaLedger | None = None,
         metrics_registry: MetricRegistry | None = None,
+        shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
+        shared_pressure_scope: str | None = None,
+        shared_pressure_owner_id: str | None = None,
     ) -> None:
+        pressure_values = (
+            shared_pressure_ledger,
+            shared_pressure_scope,
+            shared_pressure_owner_id,
+        )
+        if any(value is not None for value in pressure_values) and not all(
+            value is not None for value in pressure_values
+        ):
+            raise ValueError(
+                "shared pressure ledger, scope, and owner_id must be configured together"
+            )
         self.quota_ledger = quota_ledger
         self.metrics_registry = metrics_registry or MetricRegistry()
+        self.shared_pressure_ledger = shared_pressure_ledger
+        self.shared_pressure_scope = (
+            None
+            if shared_pressure_scope is None
+            else str(shared_pressure_scope).strip()
+        )
+        self.shared_pressure_owner_id = (
+            None
+            if shared_pressure_owner_id is None
+            else str(shared_pressure_owner_id).strip()
+        )
+        if shared_pressure_ledger is not None and (
+            not self.shared_pressure_scope
+            or not self.shared_pressure_owner_id
+        ):
+            raise ValueError(
+                "shared pressure scope and owner_id must be non-empty"
+            )
         self._lock = threading.RLock()
         self._active: dict[str, _ActiveLease] = {}
         self._queue_depth = 0
@@ -242,15 +282,55 @@ class AdmissionRuntime:
                     )
                 return current.lease
 
+            shared_snapshot = None
+            if self.shared_pressure_ledger is not None:
+                try:
+                    shared_snapshot = self.shared_pressure_ledger.snapshot(
+                        self.shared_pressure_scope,
+                        tenant_id=request.tenant_id,
+                        now=wall,
+                    )
+                except SharedPressureError as exc:
+                    raise AdmissionRuntimeError(
+                        "shared_pressure_unavailable"
+                    ) from exc
+
             pressure = RuntimePressure(
-                active_operations=len(self._active),
-                queue_depth=self._queue_depth,
+                active_operations=max(
+                    len(self._active),
+                    0 if shared_snapshot is None else shared_snapshot.active,
+                ),
+                queue_depth=max(
+                    self._queue_depth,
+                    0 if shared_snapshot is None else shared_snapshot.queued,
+                ),
             )
             evaluated = replace(request, pressure=pressure)
             decision = require_admission(
                 evaluated,
                 now_monotonic=now_monotonic,
             )
+
+            shared_lease: SharedPressureLease | None = None
+            if self.shared_pressure_ledger is not None:
+                try:
+                    shared_lease = self.shared_pressure_ledger.acquire(
+                        self.shared_pressure_scope,
+                        request.tenant_id,
+                        request.operation_id,
+                        self.shared_pressure_owner_id,
+                        priority=request.priority,
+                        lease_seconds=request.budget.max_wall_seconds,
+                        now=wall,
+                    )
+                except SharedPressureExceeded as exc:
+                    raise AdmissionError(str(exc)) from exc
+                except SharedPressureConflict as exc:
+                    raise AdmissionRuntimeConflict(str(exc)) from exc
+                except SharedPressureError as exc:
+                    raise AdmissionRuntimeError(
+                        "shared_pressure_unavailable"
+                    ) from exc
 
             reservation: QuotaReservation | None = None
             if self.quota_ledger is not None:
@@ -262,8 +342,12 @@ class AdmissionRuntime:
                         now=wall,
                     )
                 except QuotaExceeded as exc:
+                    if shared_lease is not None:
+                        self._release_shared_pressure(shared_lease)
                     raise AdmissionError(str(exc)) from exc
                 except (QuotaConflict, QuotaError) as exc:
+                    if shared_lease is not None:
+                        self._release_shared_pressure(shared_lease)
                     raise AdmissionError("tenant_quota_unavailable") from exc
 
             lease = AdmissionLease(
@@ -282,8 +366,27 @@ class AdmissionRuntime:
                 lease=lease,
                 request_fingerprint=fingerprint,
                 unknown_usage={},
+                shared_pressure_lease=shared_lease,
             )
             return lease
+
+    def _release_shared_pressure(
+        self,
+        lease: SharedPressureLease,
+    ) -> None:
+        ledger = self.shared_pressure_ledger
+        owner = self.shared_pressure_owner_id
+        if ledger is None or owner is None:
+            return
+        try:
+            ledger.release(lease.lease_id, owner)
+        except SharedPressureError:
+            # Shared pressure leases are time-bounded. Terminal accounting must
+            # not become unrecoverable because an already-expired pressure lease
+            # was reaped by another worker.
+            self.metrics_registry.inc(
+                "admission.shared_pressure_release_error_total"
+            )
 
     def record_usage_event(
         self,
@@ -616,6 +719,9 @@ class AdmissionRuntime:
                         "quota_completion_unavailable"
                     ) from exc
 
+            self._release_shared_pressure(
+                active.shared_pressure_lease
+            ) if active.shared_pressure_lease is not None else None
             self.metrics_registry.inc("admission.completed_total")
             _observe_usage(
                 self.metrics_registry,
@@ -656,6 +762,8 @@ class AdmissionRuntime:
                         "quota reservation exists without a quota ledger"
                     )
                 self.quota_ledger.release(reservation.reservation_id)
+            if active.shared_pressure_lease is not None:
+                self._release_shared_pressure(active.shared_pressure_lease)
             self._active.pop(operation)
             return active.lease
 
