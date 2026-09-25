@@ -374,3 +374,43 @@ async def test_restart_conflict_is_rejected_by_canonical_receipt_identity(
     with pytest.raises(ToolCoordinatorError, match="idempotency"):
         await restarted.execute(conflicting_proposal, first_request, now=NOW)
     restarted_store.close()
+
+
+
+@pytest.mark.asyncio
+async def test_write_capability_fails_closed_without_durable_receipt_store() -> None:
+    registry = CapabilityRegistry()
+    descriptor = CapabilityDescriptor(
+        capability_id="artifact.write",
+        kind=CapabilityKind.ARTIFACT,
+        side_effect=SideEffectClass.REVERSIBLE_WRITE,
+    )
+    registry.register(descriptor)
+    coordinator = ToolCoordinator(
+        registry,
+        tool_runtime=AsyncToolRuntime(),
+    )
+    calls = {"count": 0}
+
+    async def handler(arguments):
+        calls["count"] += 1
+        return {"output_ref": "artifact:" + str(arguments["name"])}
+
+    coordinator.bind(descriptor.capability_id, handler)
+    request = AssistantRequest(
+        request_id="durability-gate",
+        text="Create an artifact.",
+    )
+    proposal = ToolProposal(
+        proposal_id="durability-gate-proposal",
+        capability_id=descriptor.capability_id,
+        arguments={"name": "fixture"},
+        request_digest=request.digest,
+        side_effect=descriptor.side_effect,
+        idempotency_key="fixture",
+    )
+
+    result = await coordinator.execute(proposal, request, now=NOW)
+    assert result.receipt.status == "blocked"
+    assert result.receipt.error_code == "durable-receipt-store-required"
+    assert calls["count"] == 0
