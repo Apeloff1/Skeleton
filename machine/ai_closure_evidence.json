@@ -59,7 +59,13 @@
         "skeleton/testing/test_admission_runtime.py admission telemetry regression suite",
         "skeleton/artifact_plane/usage.py artifact/storage write usage adapter",
         "skeleton/testing/test_artifact_usage.py storage usage category, replay, budget and unknown-resolution regressions",
-        "backend/services/tool_registry.py manifest-aware tool call and estimated-cost metering"
+        "backend/services/tool_registry.py manifest-aware tool call and estimated-cost metering",
+        "skeleton/intelligence/admission.py independent max_storage_bytes/storage_bytes admission dimension",
+        "skeleton/intelligence/quota.py independent storage tenant quota and usage accounting",
+        "skeleton/intelligence/quota_sqlite.py additive storage quota schema migration with legacy ceiling backfill",
+        "skeleton/artifact_plane/usage.py storage writes and unknown usage resolve on storage_bytes rather than artifact_bytes",
+        "skeleton/testing/test_artifact_usage.py independent artifact/storage budget regressions",
+        "skeleton/testing/test_tenant_quota_sqlite.py restart-safe storage usage plus pre-storage schema migration regression"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -73,14 +79,13 @@
         "fresh exact-head durable quota/admission verification",
         "fresh exact-head estimate-vs-actual admission telemetry verification",
         "actual storage usage accounting across artifact/storage write paths",
-        "distinct storage_bytes budget dimension instead of charging storage against the shared artifact_bytes ceiling",
-        "exact-head validation of tool/artifact/storage metering and estimate-vs-actual telemetry"
+        "exact-head validation of tool/artifact/storage metering and estimate-vs-actual telemetry",
+        "fresh exact-head validation of independent storage byte admission and SQLite migration"
       ],
       "blockers": [
         "admission at every expensive non-provider action",
         "cross-process/distributed pressure feed for multi-worker deployment",
-        "actual storage usage accounting across artifact/storage write paths",
-        "distinct storage_bytes budget dimension instead of charging storage against the shared artifact_bytes ceiling"
+        "actual storage usage accounting across artifact/storage write paths"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
