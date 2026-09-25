@@ -60,6 +60,7 @@ export interface OperationClientState {
   operationId: string;
   lastSequence: number;
   seenEventIds: string[];
+  seenEventFingerprints: Array<{ eventId: string; fingerprint: string }>;
   events: OperationStreamEvent[];
   operationState: string | null;
   terminal: boolean;
@@ -82,6 +83,31 @@ const TERMINAL_TYPES = new Set([
 function validSequence(value: unknown): value is number {
   return Number.isInteger(value) && Number(value) > 0;
 }
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return '[' + value.map((item) => canonicalJson(item)).join(',') + ']';
+  }
+  const object = value as Record<string, unknown>;
+  return '{' + Object.keys(object)
+    .sort()
+    .map((key) => JSON.stringify(key) + ':' + canonicalJson(object[key]))
+    .join(',') + '}';
+}
+
+function eventFingerprint(event: OperationStreamEvent): string {
+  return [
+    String(event.schema_version),
+    event.operation_id,
+    event.event_id,
+    String(event.sequence),
+    event.type,
+    event.timestamp,
+    canonicalJson(event.payload),
+  ].join('|');
+}
+
 
 function boundedContent(
   value: string,
@@ -245,6 +271,7 @@ export function createOperationClientState(
     operationId: normalized,
     lastSequence,
     seenEventIds: [],
+    seenEventFingerprints: [],
     events: [],
     operationState: null,
     terminal: false,
@@ -278,14 +305,29 @@ export function reduceOperationEvent(
     || !event.event_id.trim()
     || typeof event.type !== 'string'
     || !event.type.trim()
+    || typeof event.timestamp !== 'string'
+    || !event.timestamp.trim()
+    || !event.payload
+    || typeof event.payload !== 'object'
+    || Array.isArray(event.payload)
     || !validSequence(event.sequence)
   ) {
     return failOperationResync(state, 'invalid_event_identity');
   }
 
+  const fingerprint = eventFingerprint(event);
   const seenIndex = state.seenEventIds.indexOf(event.event_id);
   if (seenIndex >= 0) {
-    if (event.sequence <= state.lastSequence) return state;
+    const accepted = state.seenEventFingerprints.find(
+      (item) => item.eventId === event.event_id,
+    );
+    if (
+      event.sequence <= state.lastSequence
+      && accepted
+      && accepted.fingerprint === fingerprint
+    ) {
+      return state;
+    }
     return failOperationResync(state, 'duplicate_event_id_conflict');
   }
 
@@ -307,12 +349,17 @@ export function reduceOperationEvent(
   const seenEventIds = [...state.seenEventIds, event.event_id].slice(
     -MAX_RETAINED_EVENT_IDS,
   );
+  const seenEventFingerprints = [
+    ...state.seenEventFingerprints,
+    { eventId: event.event_id, fingerprint },
+  ].slice(-MAX_RETAINED_EVENT_IDS);
   const events = [...state.events, event].slice(-MAX_RETAINED_OPERATION_EVENTS);
 
   return {
     ...contentState,
     lastSequence: event.sequence,
     seenEventIds,
+    seenEventFingerprints,
     events,
     operationState:
       typeof payloadState === 'string' ? payloadState : state.operationState,
