@@ -44,7 +44,7 @@ This is a license boundary, not a capability claim.
 
 The open-weight Grok-1 release contributes architecture knowledge and reference
 inference code. The Skeleton descriptor records the published model shape:
-314B total parameters, 86B active parameters, 8 experts with 2 active per
+314B total parameters, 8 experts with 2 active per
 token, 64 layers, 48 query heads, 8 key/value heads, 6144 embedding width,
 131072-token vocabulary, and an 8192-token maximum context.
 
