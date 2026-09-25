@@ -92,6 +92,7 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
         for node in qualified_calls
     )
 
+
 def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
     compose = _compose()
     skeleton = _service_block(compose, "skeleton", "backend")
