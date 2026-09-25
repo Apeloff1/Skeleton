@@ -25,6 +25,7 @@ from skeleton.api.engine_service import (
     SQLiteEngineSubmissionStore,
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
+from skeleton.config.settings import EngineSettings
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 
@@ -147,6 +148,13 @@ def _client(service: EngineExecutionService) -> TestClient:
     app.dependency_overrides[_engine_service_token] = lambda: _SERVICE_TOKEN
     app.dependency_overrides[_engine_coordinator] = lambda: None
     return TestClient(app)
+
+
+def test_engine_service_token_is_masked_in_settings_repr() -> None:
+    settings = EngineSettings(service_token=_SERVICE_TOKEN)
+
+    assert _SERVICE_TOKEN not in repr(settings)
+    assert settings.service_token.get_secret_value() == _SERVICE_TOKEN
 
 
 def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_path) -> None:
