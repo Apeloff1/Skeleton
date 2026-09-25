@@ -1,172 +1,106 @@
 {
   "schema_version": 1,
+  "import_mode": "research_quarantine",
   "source_repository": "Apeloff1/Tutolage",
-  "source_ref": "main",
-  "imported_into": "Apeloff1/Skeleton",
-  "import_mode": "public-source-research-quarantine",
-  "canonical_runtime_authority": false,
+  "source_branch": "main",
+  "source_visibility": "public",
+  "destination_root": "skeleton/ai/research/external/Tutolage",
+  "authority": "non_production_research_lineage",
+  "promotion_rule": "No imported file becomes a canonical runtime/provider/agent owner without explicit convergence, tests, evaluation, and accountability evidence.",
+  "transformations": {
+    "trailing_whitespace_normalization": "Applied per-file only where needed for Skeleton repository hygiene; semantic source content otherwise preserved."
+  },
   "files": [
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/ai.py",
       "source_blob_sha": "8cc2ba8dbe7232bb3e55bbb8d2f023551cd2f44c",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/ai.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/ai.py",
+      "imported_blob_sha": "d7ba775960ad2b8b54da6274c9ee51d51ca0e7c8",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/ai_log_vault.py",
       "source_blob_sha": "5e6a40b4ff65e701bfebcdc722ab407b8c584720",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/ai_log_vault.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/ai_log_vault.py",
+      "imported_blob_sha": "3fdd9e01b192f3c43f9613a95eb9f0e087f959f4",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/ai_pipeline.py",
       "source_blob_sha": "7b9c7185b1ba1ac9e1465c4550e257dc6d7bc7d5",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/ai_pipeline.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/ai_pipeline.py",
+      "imported_blob_sha": "77a35f6c682477cc3e75d7d33de512f571586667",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/ai_toolkit_enhanced.py",
       "source_blob_sha": "8e8eb1f15cbc8339cafcd0b64bd8d4c6a835e335",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/ai_toolkit_enhanced.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/ai_toolkit_enhanced.py",
+      "imported_blob_sha": "9f8ce09c2ecfb766cf3540dcbe0a0534e4b48574",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/jeeves_core.py",
       "source_blob_sha": "63ae468ba6411c6cab37f8f7ab127e74d9105fcf",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_core.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_core.py",
+      "imported_blob_sha": "bddfc7597312d9e90011e5c5f27e3d15ba067bae",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/jeeves_eq.py",
       "source_blob_sha": "acec68dd6b4ae475fb37cdfa8262a929cad64e66",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_eq.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_eq.py",
+      "imported_blob_sha": "30dbf6573fb6553f22eee559ab0ac105a6ffe701",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/jeeves_tutor.py",
       "source_blob_sha": "7dcbf81a1662bfe89df17bbef8e2e000aeb4cfb9",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_tutor.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_tutor.py",
+      "imported_blob_sha": "013f73f37951ce7da7f528a2137317e15f02e127",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/jeeves_voice.py",
       "source_blob_sha": "775232d57d76a256ac128c889116a2e73222caeb",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_voice.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_voice.py",
+      "imported_blob_sha": "a7acd536004b4f5dff281367bfa1d247e516197b",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/routes/multi_agent.py",
       "source_blob_sha": "4ad27e276f6a606f77c6088fefd9695a9053e476",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/multi_agent.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/routes/multi_agent.py",
+      "imported_blob_sha": "bffc60ef7b3278f0f9f3b8b4ac68780f47dc71bb",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "backend/services/rag_service.py",
       "source_blob_sha": "b67167f1135744e74827ce03b0bf5d766e800cf4",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/services/rag_service.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/backend/services/rag_service.py",
+      "imported_blob_sha": "5af68ec08213ac367401498c346a1cd635b16e5d",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "frontend/features/AI/AISuggestionsModal.tsx",
       "source_blob_sha": "ce81d3cef772971ef540eba4d9d02ade1b33a651",
-      "destination": "skeleton/ai/research/external/Tutolage/frontend/features/AI/AISuggestionsModal.tsx",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/frontend/features/AI/AISuggestionsModal.tsx",
+      "imported_blob_sha": "ce81d3cef772971ef540eba4d9d02ade1b33a651",
+      "normalized_trailing_whitespace": false
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "frontend/features/Jeeves/JeevesModal.tsx",
       "source_blob_sha": "1edd0b74afc00709f3d071f359f19ae5acaec9d9",
-      "destination": "skeleton/ai/research/external/Tutolage/frontend/features/Jeeves/JeevesModal.tsx",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/frontend/features/Jeeves/JeevesModal.tsx",
+      "imported_blob_sha": "de214e131e54c84e2870c5fbadb2c6670b0be558",
+      "normalized_trailing_whitespace": true
     },
     {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
       "source_path": "frontend/features/JeevesEQ/JeevesEQModal.tsx",
       "source_blob_sha": "167341347034549cf265dda3e1cbaa099829cf53",
-      "destination": "skeleton/ai/research/external/Tutolage/frontend/features/JeevesEQ/JeevesEQModal.tsx",
-      "classification": "research-quarantine",
-      "promotion_authority": false
-    },
-    {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
-      "source_path": "backend/routes/ai_debugger.py",
-      "source_blob_sha": "9f0b2e56de2de111c2d6cda09d45459651b9b64f",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/ai_debugger.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
-    },
-    {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
-      "source_path": "backend/routes/jeeves_hyperion.py",
-      "source_blob_sha": "1d0064cb4ad3d2b30eb211c7df95d3d16803e38c",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_hyperion.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
-    },
-    {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
-      "source_path": "backend/routes/jeeves_synergy.py",
-      "source_blob_sha": "ec6c8b4b506ebdd567fb4181992955132d865ca2",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_synergy.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
-    },
-    {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
-      "source_path": "backend/tests/test_jeeves_core.py",
-      "source_blob_sha": "6fe40d9e421366d6404d48635879c24fa7877892",
-      "destination": "skeleton/ai/research/external/Tutolage/backend/tests/test_jeeves_core.py",
-      "classification": "research-quarantine",
-      "promotion_authority": false
-    },
-    {
-      "source_repository": "Apeloff1/Tutolage",
-      "source_ref": "main",
-      "source_path": "frontend/features/AI/index.ts",
-      "source_blob_sha": "0b2139c06cba1e3614e1f4852c4e5adb25d4581d",
-      "destination": "skeleton/ai/research/external/Tutolage/frontend/features/AI/index.ts",
-      "classification": "research-quarantine",
-      "promotion_authority": false
+      "destination_path": "skeleton/ai/research/external/Tutolage/frontend/features/JeevesEQ/JeevesEQModal.tsx",
+      "imported_blob_sha": "fdaa0ffef41df235307f101112546d6bfba951b9",
+      "normalized_trailing_whitespace": true
     }
   ]
 }
