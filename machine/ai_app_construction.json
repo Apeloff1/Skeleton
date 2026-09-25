@@ -1758,7 +1758,7 @@
       "plane": "tool-runtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Tool execution is split between declarative skeleton/skills manifests and an application-owned flat backend tool registry that lacks canonical typed schemas, authority/risk/approval metadata, idempotency semantics and durable receipts. The backend registry also contains a nested credential-bearing LLM tool, creating a shadow provider path. A fully functional agentic AI cannot safely expose this surface directly to models.",
+      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped sandbox/database/network/artifact policies and backend compatibility delegation exist. The credential-bearing nested llm_chat provider path is retired, and production compatibility receipts/results are bound to durable backend state. Remaining closure is adapter-owner cutover for privileged backend I/O handlers, richer manifest/lineage/governance/cost bindings, dependency closure and exact-head validation.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
         "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
@@ -1782,6 +1782,23 @@
         "network tool timeout/result-bound/provenance tests",
         "compatibility registry delegates to canonical runtime",
         "tool receipt lineage binds operation/execution/turn/call identity"
+      ],
+      "evidence_present": [
+        "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
+        "skeleton/skills/tool_runtime.py canonical sync/async governed runtime",
+        "skeleton/skills/tool_receipt_store.py durable idempotency reservation and replay fencing",
+        "skeleton/skills/tool_adapters/ scoped sandbox/database/network/artifact policy adapters",
+        "backend/services/tool_registry.py compatibility delegation with retired nested llm_chat provider path",
+        "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
+        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence"
+      ],
+      "outstanding_evidence": [
+        "privileged backend handler adapter-owner cutover",
+        "full execution/turn/call receipt lineage",
+        "governance lifecycle binding for durable results",
+        "cost/admission reconciliation across tool classes",
+        "minimal provider projection evidence",
+        "dependency closure and exact-head validation"
       ]
     },
     {
@@ -4956,7 +4973,7 @@
   "tool_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress",
     "gap": "gap-tool-runtime-convergence",
     "conceptual_split": {
       "skill": {
@@ -5116,7 +5133,9 @@
         {
           "tool": "llm_chat",
           "issue": "owns EMERGENT_LLM_KEY and raw LLM transport inside tool registry",
-          "target": "retire credential path; nested model invocation becomes orchestration/model-provider capability"
+          "target": "retire credential path; nested model invocation becomes orchestration/model-provider capability",
+          "resolution": "retired from TOOLS and _TOOL_MANIFESTS; compatibility alias returns deterministic provider_tool_retired response and points callers to the Skeleton engine provider boundary",
+          "status": "resolved_pending_validation"
         },
         {
           "tool": "compile_code",
@@ -5177,6 +5196,23 @@
       "restricted fields are redacted before model exposure",
       "errors use stable codes; raw exceptions/credentials are never returned to the model",
       "result provenance includes tool/version/call/receipt identity"
+    ],
+    "current_evidence": [
+      "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
+      "skeleton/skills/tool_runtime.py canonical sync/async governed runtime",
+      "skeleton/skills/tool_receipt_store.py durable idempotency reservation and replay fencing",
+      "skeleton/skills/tool_adapters/ scoped sandbox/database/network/artifact policy adapters",
+      "backend/services/tool_registry.py compatibility delegation with retired nested llm_chat provider path",
+      "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
+      "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence"
+    ],
+    "remaining": [
+      "adapter-owner cutover",
+      "manifest metadata completion",
+      "full receipt lineage",
+      "governance/cost bindings",
+      "provider projection evidence",
+      "dependency closure and exact-head validation"
     ]
   },
   "context_compiler_blueprint": {
@@ -7360,11 +7396,13 @@
         ]
       },
       {
-        "path": "skeleton/jeeves/providers.py",
-        "role": "Jeeves compatibility facade",
+        "path": "backend/core/expressive_tts.py",
+        "role": "speech presentation adapter delegating synthesis to authenticated Skeleton engine media boundary",
         "required_tokens": [
-          "OpenAISyncProviderAdapter",
-          "ProviderRequest"
+          "EngineClient",
+          "synthesize_speech",
+          "shape_cadence",
+          "resolve_tone"
         ],
         "forbidden_edge_classes": [
           "credential",
@@ -7388,13 +7426,25 @@
         ]
       },
       {
-        "path": "backend/core/expressive_tts.py",
-        "role": "speech presentation adapter delegating synthesis to authenticated Skeleton engine media boundary",
+        "path": "backend/services/tool_registry.py",
+        "role": "legacy tool compatibility facade; model-provider work is engine-owned",
         "required_tokens": [
-          "EngineClient",
-          "synthesize_speech",
-          "shape_cadence",
-          "resolve_tone"
+          "provider_tool_retired",
+          "skeleton-engine-provider-boundary",
+          "SQLiteToolReceiptStore"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "skeleton/jeeves/providers.py",
+        "role": "Jeeves compatibility facade",
+        "required_tokens": [
+          "OpenAISyncProviderAdapter",
+          "ProviderRequest"
         ],
         "forbidden_edge_classes": [
           "credential",
@@ -7403,7 +7453,7 @@
         ]
       }
     ],
-    "application_isolation_rule": "Application, media, compatibility and presentation modules may prepare or delegate provider work but may not own provider credentials, vendor SDK clients, or raw provider transport."
+    "application_isolation_rule": "Application, media, compatibility, presentation and tool-registry modules may prepare or delegate provider work but may not own provider credentials, vendor SDK clients, or raw provider transport."
   },
   "functional_ai_acceptance_matrix": {
     "schema_version": 1,

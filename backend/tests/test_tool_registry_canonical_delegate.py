@@ -37,9 +37,28 @@ def _approval_for(
     return approval_ref_for_request(request)
 
 
-def _reset_canonical(registry):
-    registry._CANONICAL_RUNTIME = registry.AsyncToolRuntime()
-    registry._CANONICAL_RESULT_STORE = registry._CompatibilityResultStore()
+def _reset_canonical(
+    registry,
+    *,
+    receipt_path: str = ":memory:",
+    result_path: str = ":memory:",
+):
+    prior_runtime = getattr(registry, "_CANONICAL_RUNTIME", None)
+    prior_store = getattr(registry, "_CANONICAL_RESULT_STORE", None)
+    if prior_runtime is not None and prior_runtime.receipt_store is not None:
+        try:
+            prior_runtime.receipt_store.close()
+        except Exception:
+            pass
+    if prior_store is not None:
+        try:
+            prior_store.close()
+        except Exception:
+            pass
+    registry._CANONICAL_RUNTIME = registry.AsyncToolRuntime(
+        receipt_store=registry.SQLiteToolReceiptStore(receipt_path)
+    )
+    registry._CANONICAL_RESULT_STORE = registry._CompatibilityResultStore(result_path)
     registry._CANONICAL_INIT_LOCK = asyncio.Lock()
     registry._CANONICAL_READY = False
 
@@ -271,7 +290,117 @@ def test_registry_describe_declares_canonical_authority(registry):
 
     assert description["authority"] == "canonical-tool-runtime"
     assert description["count"] == len(registry.TOOLS)
+    assert description["retired_tools"]["llm_chat"]["delegate"] == (
+        "skeleton-engine-provider-boundary"
+    )
     assert all("effect" in item for item in description["tools"])
     package = next(item for item in description["tools"] if item["name"] == "package_build")
     assert package["approval_required"] is True
     assert package["idempotency_required"] is True
+
+
+
+@pytest.mark.asyncio
+async def test_canonical_delegate_replays_result_after_process_restart(
+    registry,
+    monkeypatch,
+    tmp_path,
+):
+    receipt_path = str(tmp_path / "tool-receipts.sqlite3")
+    result_path = str(tmp_path / "tool-results.sqlite3")
+    operation_id = str(uuid4())
+    calls = {"count": 0}
+
+    async def first_handler(params):
+        calls["count"] += 1
+        return {"ok": True, "value": params["topic"], "generation": 1}
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", first_handler)
+    _reset_canonical(
+        registry,
+        receipt_path=receipt_path,
+        result_path=result_path,
+    )
+    first = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "durability"},
+        operation_id=operation_id,
+        tenant_id="tenant-a",
+        idempotency_key="fixture",
+        request_id=str(uuid4()),
+    )
+    assert first["ok"] is True
+    assert first["generation"] == 1
+    assert calls["count"] == 1
+
+    async def must_not_replay_effect(_params):
+        calls["count"] += 1
+        raise AssertionError("durable canonical receipt must fence duplicate effect")
+
+    monkeypatch.setitem(registry.TOOLS, "vault_query", must_not_replay_effect)
+    _reset_canonical(
+        registry,
+        receipt_path=receipt_path,
+        result_path=result_path,
+    )
+    replay = await registry.invoke_canonical(
+        "vault_query",
+        {"topic": "durability"},
+        operation_id=operation_id,
+        tenant_id="tenant-a",
+        idempotency_key="fixture",
+        request_id=str(uuid4()),
+    )
+
+    assert replay["ok"] is True
+    assert replay["value"] == "durability"
+    assert replay["generation"] == 1
+    assert replay["receipt"]["receipt_id"] == first["receipt"]["receipt_id"]
+    assert calls["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_retired_llm_tool_never_reads_provider_credentials(registry, monkeypatch):
+    monkeypatch.setenv("EMERGENT_LLM_KEY", "must-not-be-read")
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-read")
+
+    result = await registry.invoke(
+        "llm_chat",
+        {"prompt": "hello"},
+    )
+
+    assert result == {
+        "ok": False,
+        "error": "provider_tool_retired",
+        "tool": "llm_chat",
+        "delegate": "skeleton-engine-provider-boundary",
+    }
+    assert "llm_chat" not in registry.TOOLS
+    assert "llm_chat" not in registry._TOOL_MANIFESTS
+
+
+def test_tool_registry_source_contains_no_shadow_provider_bootstrap() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "services"
+        / "tool_registry.py"
+    ).read_text(encoding="utf-8")
+
+    forbidden = (
+        "emergentintegrations",
+        "LlmChat(",
+        "UserMessage(",
+        "EMERGENT_LLM_KEY",
+        "OPENAI_API_KEY",
+    )
+    assert all(marker not in source for marker in forbidden)
+
+
+def test_backend_topology_persists_canonical_tool_receipts_and_results() -> None:
+    compose = (
+        Path(__file__).resolve().parents[2]
+        / "docker-compose.yml"
+    ).read_text(encoding="utf-8")
+    assert "BACKEND_TOOL_RECEIPT_PATH=/app/data/backend_tool_receipts.sqlite3" in compose
+    assert "BACKEND_TOOL_RESULT_PATH=/app/data/backend_tool_results.sqlite3" in compose
+    assert 'com.skeleton.state.role: "declared-mixed-tool-authority-and-derived"' in compose

@@ -3,6 +3,7 @@ from pathlib import Path
 from scripts.check_provider_bootstrap import (
     _is_non_runtime_provider_mirror,
     discover_provider_surfaces,
+    validate_provider_bootstrap,
 )
 from scripts.check_provider_runtime_boundary import audit_repository
 
@@ -185,3 +186,44 @@ def test_lafs_has_no_shadow_or_local_provider_runtime() -> None:
 
     discovered = discover_provider_surfaces(ROOT)
     assert relative not in discovered
+
+
+
+def test_backend_tool_registry_is_declared_provider_isolation_surface() -> None:
+    import json
+
+    contract = json.loads(
+        (ROOT / "machine" / "ai_app_construction.json").read_text(encoding="utf-8")
+    )
+    surfaces = {
+        item["path"]: item
+        for item in contract["provider_surface_convergence_blueprint"][
+            "application_isolation_surfaces"
+        ]
+    }
+    entry = surfaces["backend/services/tool_registry.py"]
+
+    assert set(entry["forbidden_edge_classes"]) == {
+        "credential",
+        "network_transport",
+        "sdk_client",
+    }
+    assert "provider_tool_retired" in entry["required_tokens"]
+    assert "skeleton-engine-provider-boundary" in entry["required_tokens"]
+    assert "SQLiteToolReceiptStore" in entry["required_tokens"]
+
+
+def test_backend_tool_registry_has_no_provider_edge_after_llm_retirement() -> None:
+    relative = "backend/services/tool_registry.py"
+    source = (ROOT / relative).read_text(encoding="utf-8")
+
+    assert "EMERGENT_LLM_KEY" not in source
+    assert "OPENAI_API_KEY" not in source
+    assert "emergentintegrations" not in source
+    assert "LlmChat(" not in source
+    assert "provider_tool_retired" in source
+    assert "skeleton-engine-provider-boundary" in source
+
+    discovered = discover_provider_surfaces(ROOT)
+    assert relative not in discovered
+    assert validate_provider_bootstrap(ROOT) == []
