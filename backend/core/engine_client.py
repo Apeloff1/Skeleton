@@ -189,31 +189,39 @@ class EngineClientConfig:
         raw_url = os.getenv("SKELETON_INTERNAL_URL")
         if raw_url is None or not raw_url.strip():
             return None
-        return cls(
-            base_url=raw_url.strip(),
-            service_principal=(
-                os.getenv("SKL_ENGINE_SERVICE_PRINCIPAL", "codedock-backend").strip()
-                or "codedock-backend"
-            ),
-            request_timeout_s=float(
-                os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")
-            ),
-            poll_interval_s=float(
-                os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")
-            ),
-            execution_timeout_s=float(
-                os.getenv("SKELETON_ENGINE_EXECUTION_TIMEOUT_S", "120")
-            ),
-            max_response_bytes=int(
-                os.getenv(
-                    "SKELETON_ENGINE_MAX_RESPONSE_BYTES",
-                    str(4 * 1024 * 1024),
-                )
-            ),
-            max_poll_attempts=int(
-                os.getenv("SKELETON_ENGINE_MAX_POLL_ATTEMPTS", "2400")
-            ),
-        )
+        try:
+            return cls(
+                base_url=raw_url.strip(),
+                service_principal=(
+                    os.getenv(
+                        "SKL_ENGINE_SERVICE_PRINCIPAL",
+                        "codedock-backend",
+                    ).strip()
+                    or "codedock-backend"
+                ),
+                request_timeout_s=float(
+                    os.getenv("SKELETON_ENGINE_REQUEST_TIMEOUT_S", "15")
+                ),
+                poll_interval_s=float(
+                    os.getenv("SKELETON_ENGINE_POLL_INTERVAL_S", "0.05")
+                ),
+                execution_timeout_s=float(
+                    os.getenv("SKELETON_ENGINE_EXECUTION_TIMEOUT_S", "120")
+                ),
+                max_response_bytes=int(
+                    os.getenv(
+                        "SKELETON_ENGINE_MAX_RESPONSE_BYTES",
+                        str(4 * 1024 * 1024),
+                    )
+                ),
+                max_poll_attempts=int(
+                    os.getenv("SKELETON_ENGINE_MAX_POLL_ATTEMPTS", "2400")
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            raise EngineProtocolError(
+                "engine environment configuration is invalid"
+            ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,6 +336,7 @@ def command_from_context(
     idempotency_key: str,
     instructions: str,
     prompt: str,
+    objective: str | None = None,
     history: Sequence[Mapping[str, str]] = (),
     service_principal: str = "codedock-backend",
     created_at: datetime | None = None,
@@ -351,11 +360,28 @@ def command_from_context(
         maximum=512,
     )
     instruction_text = _text(
-        instructions,
+        str(instructions).strip(),
         "instructions",
         maximum=1_000_000,
     )
-    prompt_text = _text(prompt, "prompt", maximum=1_000_000)
+    prompt_text = _text(
+        str(prompt).strip(),
+        "prompt",
+        maximum=1_000_000,
+    )
+    objective_text = _text(
+        (
+            str(objective).strip()
+            if objective is not None
+            else (
+                prompt_text
+                if len(prompt_text) <= 65_536
+                else "Execute canonical context turn " + context.turn_id
+            )
+        ),
+        "objective",
+        maximum=65_536,
+    )
     started = _aware(
         created_at or datetime.now(timezone.utc),
         "created_at",
@@ -381,7 +407,7 @@ def command_from_context(
                 f"history[{index}].role is not supported"
             )
         content = _text(
-            item.get("content"),
+            str(item.get("content") or "").strip(),
             f"history[{index}].content",
             maximum=1_000_000,
         )
@@ -449,7 +475,7 @@ def command_from_context(
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
         execution_id=context.execution_id,
-        objective=prompt_text,
+        objective=objective_text,
         context_policy={
             "tenant_id": context.tenant_id,
             "capability": cap,
