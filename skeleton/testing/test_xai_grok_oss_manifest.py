@@ -44,7 +44,7 @@ def test_runtime_registry_matches_machine_provenance() -> None:
 
 
 def test_non_permissive_sources_remain_metadata_only() -> None:
-    assert SOURCES["grok-prompts"].license_expression == "AGPL-3.0-only"
+    assert SOURCES["grok-prompts"].license_expression == "AGPL-3.0"
     assert SOURCES["grok-prompts"].disposition is LicenseDisposition.METADATA_ONLY
     assert SOURCES["grok-prompts"].snapshot_root is None
 
