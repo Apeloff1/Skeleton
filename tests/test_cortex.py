@@ -154,7 +154,7 @@ class TestPipelineAndCockpit:
         j = Jeeves()
         out = j.observe_run(
             era="soulslike",
-            walk={"extracted": True, "collapsed": False, "hops": 3, "cores": 1, "t": 10, "collapse_max": 20},
+            walk={"extracted": True, "collapsed": False, "hops": 3, "fights": 1, "cores": 1, "t": 10, "collapse_max": 20},
             plan={"room_bias": "balanced", "enemy_mix": {"trash": 4, "elite": 2, "boss": 1}},
             vision="like elden ring",
         )
