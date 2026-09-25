@@ -213,7 +213,7 @@ volumes:
   skeleton_data:
     driver: local
     labels:
-      com.skeleton.state.role: "declared-mixed-operation-authority-and-stream-projection"
+      com.skeleton.state.role: "authoritative-operation-and-engine-state-plus-stream-projection"
       com.skeleton.recovery.order: "40"
   chroma_data:
     driver: local
