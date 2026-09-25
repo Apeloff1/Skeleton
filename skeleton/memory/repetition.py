@@ -111,11 +111,14 @@ class RepetitionScheduler:
         card.reviews += 1
         card.last_reviewed = now
 
+        interval_scale = 1.0
         if outcome == Outcome.RECALLED:
             card.stability *= card.ease
             card.ease *= self.ease_growth
         elif outcome == Outcome.STRUGGLED:
-            pass  # stability and ease unchanged — same interval again
+            # Stability stays put, but the next deadline is sooner than a
+            # clean recall. The contract says a struggle shortens the interval.
+            interval_scale = 0.5
         elif outcome == Outcome.FORGOTTEN:
             card.stability = 3600.0
             card.ease = max(1.0, card.ease * self.ease_shrink)
@@ -123,7 +126,7 @@ class RepetitionScheduler:
         else:
             raise ValueError(f"unknown outcome {outcome!r}")
 
-        card.next_due = now + card.interval(self.floor)
+        card.next_due = now + card.interval(self.floor) * interval_scale
 
         if self._bus:
             self._bus.publish(
