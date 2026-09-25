@@ -73,6 +73,8 @@ class XAIProviderEdge:
     def create_client(self, *, api_key: str):
         if not isinstance(api_key, str) or not api_key.strip():
             raise ValueError("api_key must be supplied ephemerally and non-empty")
+        if not self.config.allow_sensitive_telemetry:
+            require_sensitive_telemetry_disabled()
         module = load_optional(
             source("xai-sdk-python"),
             "xai_sdk",
