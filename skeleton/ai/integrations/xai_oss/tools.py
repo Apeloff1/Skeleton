@@ -121,6 +121,16 @@ class ImageGenerationSpec:
 class XAIServerToolPolicy:
     allowed_kinds: FrozenSet[XAIToolKind] = frozenset()
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "allowed_kinds",
+            frozenset(
+                kind if isinstance(kind, XAIToolKind) else XAIToolKind(str(kind))
+                for kind in self.allowed_kinds
+            ),
+        )
+
     def allows(self, kind: XAIToolKind) -> bool:
         normalized = kind if isinstance(kind, XAIToolKind) else XAIToolKind(str(kind))
         return normalized in self.allowed_kinds
