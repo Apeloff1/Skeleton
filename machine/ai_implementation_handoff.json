@@ -534,12 +534,15 @@
         "skeleton/skills/tool_adapters/ scoped sandbox/database/network/artifact policy adapters",
         "backend/services/tool_registry.py compatibility delegation with retired nested llm_chat provider path",
         "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
-        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence"
+        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence",
+        "skeleton/skills/tool_contract.py and tool_runtime.py preserve execution/turn/call lineage when supplied",
+        "skeleton/skills/tool_receipt_store.py migrates existing stores and fences lineage changes across restart",
+        "backend/services/tool_registry.py propagates execution/turn/call lineage through compatibility delegation"
       ],
       "remaining": [
         "move compile/build/database/network execution bodies out of flat compatibility registry",
         "finish canonical manifest richness for authority/risk/data/cost/result metadata",
-        "bind execution_id/turn_id/call_id into canonical request and receipt lineage",
+        "make execution_id/turn_id/call_id mandatory at canonical cognitive execution callers and prove end-to-end propagation",
         "bind governance lifecycle policy to durable tool result references",
         "bind monotonic cost/admission reconciliation for all expensive tool classes",
         "prove minimal provider tool projection and current-head provider-surface isolation",
