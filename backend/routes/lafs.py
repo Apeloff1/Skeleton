@@ -288,7 +288,7 @@ async def jeeves_ask(req: JeevesAskReq):
                     "text-only engine path."
                 )
             identity = hashlib.sha256(
-                (req.query + "\x1f" + context_block).encode("utf-8")
+                (system + "\x1f" + prompt).encode("utf-8")
             ).hexdigest()
             response = await execute_engine_text(
                 EngineTextRequest(
