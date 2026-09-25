@@ -134,3 +134,16 @@ def test_artifact_route_is_exposed_from_preparation() -> None:
     assert prepared.signals.requests_artifact is ArtifactKind.PDF
     assert prepared.artifact_route is not None
     assert prepared.artifact_route.capability_id == "artifact.pdf"
+
+
+def test_condition_watch_requires_an_rrule_not_just_a_vevent() -> None:
+    policy = AutomationPolicy()
+    one_shot = AutomationBuilder.condition(
+        title="Invalid Watch",
+        instruction="Check condition.",
+        condition_description="condition becomes true",
+        recurrence_vevent="BEGIN:VEVENT\nDTSTART:20260926T080000\nEND:VEVENT",
+    )
+    decision = policy.admit(one_shot)
+    assert decision.allowed is False
+    assert decision.reason_code == "condition-watch-requires-recurrence"
