@@ -76,11 +76,11 @@ class ProvenanceLedger:
 
         self._entries[entry.entry_id] = entry
 
-        # Track chain
-        root = parent_id or entry.entry_id
-        if root not in self._chains:
-            self._chains[root] = []
-        self._chains[root].append(entry.entry_id)
+        # A child of a non-root parent still belongs to the original chain.
+        root = self._chain_root(entry.entry_id)
+        chain = self._chains.setdefault(root, [])
+        if entry.entry_id not in chain:
+            chain.append(entry.entry_id)
 
         self._stats["recorded"] += 1
 
@@ -92,6 +92,20 @@ class ProvenanceLedger:
             })
 
         return entry
+
+
+    def _chain_root(self, entry_id: str) -> str:
+        seen = set()
+        current = entry_id
+        while current and current not in seen:
+            seen.add(current)
+            entry = self._entries.get(current)
+            if entry is None or not entry.parent_id:
+                return current
+            if entry.parent_id not in self._entries:
+                return entry.parent_id
+            current = entry.parent_id
+        return entry_id
 
     def trace(self, entry_id: str) -> List[ProvenanceEntry]:
         """Trace the full lineage chain for an entry."""
