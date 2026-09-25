@@ -210,11 +210,13 @@ def hex_to_color(hx: str) -> Tuple[float, float, float]:
 
 
 def detect_generation(text: str) -> Tuple[str, Dict[str, int]]:
-    blob = (text or "").lower()
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("generation text is required")
+    blob = text.lower()
     scores = {k: sum(1 for w in words if w in blob) for k, words in _KEYWORDS.items()}
     best = max(scores, key=lambda k: (scores[k], -GENERATIONS[k]["order"]))
     if scores[best] <= 0:
-        return DEFAULT_GENERATION, scores
+        raise ValueError("no generation in text")
     return best, scores
 
 
