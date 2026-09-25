@@ -2187,18 +2187,7 @@
         "budget denial test",
         "route-under-budget test",
         "concurrency saturation test",
-        "cost telemetry test",
-        "skeleton/intelligence/quota_sqlite.py restart-safe SQLite tenant quota/window persistence",
-        "skeleton/testing/test_tenant_quota_sqlite.py restart, race and durable reservation regression coverage",
-        "skeleton/intelligence/admission_runtime.py aggregate estimate/actual/delta telemetry through cognition MetricRegistry",
-        "skeleton/testing/test_admission_runtime.py payload-free admission telemetry and idempotent replay coverage",
-        "skeleton/skills/tool_runtime.py manifest-aware tool call/cost admission metering",
-        "skeleton/intelligence/quota_sqlite.py restart-safe SQLite tenant quota reservations and completion ledger",
-        "skeleton/testing/test_tenant_quota_sqlite.py restart recovery and multi-worker reservation regression coverage",
-        "skeleton/intelligence/admission_runtime.py aggregate estimate/actual/delta telemetry across all UsageEstimate dimensions",
-        "skeleton/testing/test_admission_runtime.py payload-free telemetry and idempotent replay regression coverage",
-        "skeleton/artifact_plane/usage.py deterministic artifact/storage usage adapter",
-        "skeleton/testing/test_artifact_usage.py storage category, replay, budget and unknown-usage resolution coverage"
+        "cost telemetry test"
       ],
       "status_detail": "shared AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, artifact/storage usage categories, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; distinct storage-byte ceilings, distributed pressure and broader expensive-plane admission remain"
     },
@@ -2298,10 +2287,7 @@
         "provider-surface inventory gate reports only declared credential-bearing owners",
         "SDK isolation scans backend and skeleton source",
         "media provider boundary regression suite",
-        "application media surfaces contain no direct provider credentials or SDK imports",
-        "skeleton/testing/test_provider_contract.py async OpenAI runtime regression coverage for normalized text, deadlines, image generation, variation/edit, speech and admission cleanup",
-        "skeleton/provider_runtime.py fail-closed validation for variation/edit sizes, edit mask bytes and finite speech speed",
-        "skeleton/testing/test_provider_contract.py malformed media inputs are rejected before provider I/O"
+        "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "verification_state": "pending-current-head-ci"
     }
