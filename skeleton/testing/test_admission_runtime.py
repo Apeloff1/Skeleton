@@ -310,3 +310,69 @@ def test_metered_usage_cannot_be_discarded_by_release() -> None:
 
     with pytest.raises(QuotaConflict, match="cannot release reservation after metered usage"):
         runtime.release("op-metered-release")
+
+def test_completion_emits_payload_free_estimate_actual_delta_telemetry() -> None:
+    runtime = AdmissionRuntime()
+    request = _request(
+        "op-telemetry",
+        tenant_id="tenant-secret",
+        input_tokens=100,
+        cost_usd=1.0,
+    )
+
+    runtime.admit(request, now_wall=10.0)
+    runtime.complete(
+        "op-telemetry",
+        UsageEstimate(
+            input_tokens=80,
+            output_tokens=7,
+            cost_usd=0.4,
+            wall_seconds=0.6,
+            provider_attempts=1,
+            tool_calls=2,
+            artifact_bytes=64,
+        ),
+        now_wall=11.0,
+    )
+
+    telemetry = runtime.telemetry_snapshot()
+    metrics = telemetry["metrics"]
+
+    assert telemetry["schema_version"] == 1
+    assert metrics["counters"]["admission.admitted_total"] == 1
+    assert metrics["counters"]["admission.completed_total"] == 1
+
+    assert metrics["samples"]["admission.estimated.input_tokens"] == (100.0,)
+    assert metrics["samples"]["admission.actual.input_tokens"] == (80.0,)
+    assert metrics["samples"]["admission.delta.input_tokens"] == (-20.0,)
+
+    assert metrics["samples"]["admission.estimated.output_tokens"] == (5.0,)
+    assert metrics["samples"]["admission.actual.output_tokens"] == (7.0,)
+    assert metrics["samples"]["admission.delta.output_tokens"] == (2.0,)
+
+    assert metrics["samples"]["admission.estimated.cost_usd"] == (1.0,)
+    assert metrics["samples"]["admission.actual.cost_usd"] == (0.4,)
+    assert metrics["samples"]["admission.delta.cost_usd"] == pytest.approx((-0.6,))
+
+    assert metrics["samples"]["admission.actual.tool_calls"] == (2.0,)
+    assert metrics["samples"]["admission.delta.tool_calls"] == (2.0,)
+    assert metrics["samples"]["admission.actual.artifact_bytes"] == (64.0,)
+    assert metrics["samples"]["admission.delta.artifact_bytes"] == (64.0,)
+
+    serialized = repr(telemetry)
+    assert "op-telemetry" not in serialized
+    assert "tenant-secret" not in serialized
+
+
+def test_idempotent_replay_does_not_double_count_admission_telemetry() -> None:
+    runtime = AdmissionRuntime()
+    request = _request("op-telemetry-replay")
+
+    first = runtime.admit(request, now_wall=10.0)
+    second = runtime.admit(request, now_wall=11.0)
+
+    assert second == first
+    telemetry = runtime.telemetry_snapshot()["metrics"]
+    assert telemetry["counters"]["admission.admitted_total"] == 1
+    assert telemetry["samples"]["admission.estimated.input_tokens"] == (10.0,)
+
