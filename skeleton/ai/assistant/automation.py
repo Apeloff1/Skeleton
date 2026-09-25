@@ -59,7 +59,7 @@ class AutomationPolicy:
 
     def admit(self, intent: AutomationIntent) -> AutomationAdmission:
         if intent.timing_mode is TimingMode.CONDITION:
-            if intent.schedule is None:
+            if intent.schedule is None or _RRULE.search(intent.schedule) is None:
                 return AutomationAdmission(False, "condition-watch-requires-recurrence")
             interval = self._estimated_interval_seconds(intent.schedule)
             if interval is not None and interval < self.minimum_recurring_seconds:
