@@ -93,30 +93,22 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
     )
 
 
-def test_remaining_local_provider_consumers_are_media_only() -> None:
-    assert set(_local_provider_consumers()) == {
-        "backend/core/expressive_tts.py",
-        "backend/routes/image_generation.py",
-    }
+def test_backend_has_no_local_provider_runtime_activation() -> None:
+    assert _local_provider_consumers() == ()
 
 
-def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
+def test_runtime_provider_credentials_are_engine_only_after_cutover() -> None:
     compose = _compose()
     skeleton = _service_block(compose, "skeleton", "backend")
     backend = _service_block(compose, "backend", "frontend")
-    consumers = _local_provider_consumers()
 
+    assert _local_provider_consumers() == ()
     for credential in ("OPENAI_API_KEY", "EMERGENT_LLM_KEY"):
         marker = credential + "=${"
         assert marker in skeleton
-        if consumers:
-            # Stage-5 cutover law: do not remove backend credentials while any
-            # production backend module can still instantiate the local runtime.
-            assert marker in backend, consumers
-        else:
-            assert marker not in backend
+        assert marker not in backend
 
-    # Non-provider product credentials remain backend-owned.  This prevents an
+    # Non-provider product credentials remain backend-owned. This prevents an
     # overbroad secret migration from changing product payment/auth ownership.
     assert "JWT_SECRET=${JWT_SECRET:" in backend
     assert "STRIPE_API_KEY=${STRIPE_API_KEY:-}" in backend
@@ -182,14 +174,13 @@ def test_manifest_declares_engine_as_backend_runtime_dependency() -> None:
     assert "backend/core/engine_client.py" in manifest["required_paths"]
 
 
-def test_backend_compose_cannot_gain_undeclared_provider_credentials() -> None:
+def test_backend_compose_has_no_runtime_model_provider_credentials() -> None:
     compose = _compose()
     backend = _service_block(compose, "backend", "frontend")
 
-    # OpenAI/Emergent remain transitional compatibility credentials until the
-    # local ProviderRegistry activation inventory reaches zero. No additional
-    # provider family may appear in the backend process during that migration.
     forbidden = (
+        "OPENAI_API_KEY",
+        "EMERGENT_LLM_KEY",
         "ANTHROPIC_API_KEY",
         "GEMINI_API_KEY",
         "GOOGLE_API_KEY",
@@ -212,6 +203,18 @@ def test_engine_principal_identity_is_explicit_and_matches_backend_client_defaul
     client = (ROOT / "backend/core/engine_client.py").read_text(encoding="utf-8")
     assert 'service_principal: str = "codedock-backend"' in client
     assert '"x-zaibatsu-attester": self.config.service_principal' in client
+
+
+def test_engine_media_authority_scope_and_capabilities_are_explicit() -> None:
+    server = (ROOT / "skeleton/api/server.py").read_text(encoding="utf-8")
+    routes = (ROOT / "skeleton/api/engine_routes.py").read_text(encoding="utf-8")
+
+    assert '"engine:media"' in server
+    assert 'capability="media.image"' in routes
+    assert 'capability="media.speech"' in routes
+    assert '"engine:media" not in grant.scopes' in routes
+    assert "grant.allows_tenant" in routes
+    assert "grant.allows_capability" in routes
 
 
 def test_engine_transport_requires_authenticated_service_token() -> None:
