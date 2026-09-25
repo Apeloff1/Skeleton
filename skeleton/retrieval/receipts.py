@@ -47,6 +47,7 @@ class RetrievalReceipt:
     receipt_id: str
     query_digest: str
     generation: int
+    scope_digest: str
     considered_planes: Tuple[str, ...]
     candidate_planes: Tuple[str, ...]
     failed_planes: Tuple[str, ...]
@@ -58,6 +59,8 @@ class RetrievalReceipt:
     def __post_init__(self) -> None:
         if not self.receipt_id or not self.query_digest:
             raise ValueError("receipt_id and query_digest are required")
+        if not isinstance(self.scope_digest, str):
+            raise ValueError("scope_digest must be a string")
         if isinstance(self.generation, bool) or self.generation < 0:
             raise ValueError("generation must be non-negative")
         if isinstance(self.created_ns, bool) or self.created_ns < 0:
@@ -92,6 +95,7 @@ class RetrievalReceipt:
             "receipt_id": self.receipt_id,
             "query_digest": self.query_digest,
             "generation": self.generation,
+            "scope_digest": self.scope_digest,
             "considered_planes": list(self.considered_planes),
             "candidate_planes": list(self.candidate_planes),
             "failed_planes": list(self.failed_planes),
@@ -135,6 +139,7 @@ class RetrievalReceipt:
             receipt_id=str(payload.get("receipt_id") or ""),
             query_digest=str(payload.get("query_digest") or ""),
             generation=generation,
+            scope_digest=str(payload.get("scope_digest") or ""),
             considered_planes=_string_tuple(
                 "considered_planes", payload.get("considered_planes") or ()
             ),
