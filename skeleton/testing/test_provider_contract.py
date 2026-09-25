@@ -985,4 +985,3 @@ async def test_async_speech_rejects_non_numeric_speed_before_io() -> None:
 
     assert client.audio.speech.calls == []
     assert adapter.admission_runtime.snapshot()["active_operations"] == ()
-
