@@ -62,19 +62,21 @@ def _utc(value: datetime | None = None) -> datetime:
 
 
 def _receipt_id(request: ToolExecutionRequest, manifest: ToolManifest) -> str:
-    material = "\x1f".join(
+    parts = [request.operation_id]
+    if request.execution_id is not None:
+        parts.extend(
+            (request.execution_id, request.turn_id or "", request.call_id or "")
+        )
+    parts.extend(
         (
-            request.operation_id,
-            request.execution_id or "",
-            request.turn_id or "",
-            request.call_id or "",
             request.tenant_id,
             request.tool_id,
             manifest.version,
             request.idempotency_key,
             request.arguments_digest,
         )
-    ).encode("utf-8")
+    )
+    material = "\x1f".join(parts).encode("utf-8")
     digest = hashlib.sha256(material).hexdigest()
     # Receipt remains canonical UUID-shaped while deterministically derived.
     return str(
