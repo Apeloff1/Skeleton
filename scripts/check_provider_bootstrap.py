@@ -61,6 +61,9 @@ _AI_SURFACE_PATH_TERMS = (
     "/ai.",
 )
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
+_NON_RUNTIME_PROVIDER_MIRROR_PREFIXES = (
+    "skeleton/ai/research/external/",
+)
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
         "urllib.request",
@@ -246,6 +249,14 @@ def _credential_markers(path: Path) -> list[str]:
     return sorted(hits)
 
 
+def _is_non_runtime_provider_mirror(relative: str) -> bool:
+    normalized = relative.replace("\\", "/")
+    return any(
+        normalized.startswith(prefix)
+        for prefix in _NON_RUNTIME_PROVIDER_MIRROR_PREFIXES
+    )
+
+
 def _provider_surface_signals(path: Path, source: str) -> dict[str, list[str]]:
     credential_markers = _credential_markers(path)
     sdk_imports = sorted(set(_provider_sdk_imports(path)))
@@ -300,6 +311,7 @@ def discover_provider_surfaces(repo_root: Path) -> dict[str, dict[str, list[str]
                 or relative.startswith("tests/")
                 or "/testing/" in "/" + relative
                 or path.name.startswith("test_")
+                or _is_non_runtime_provider_mirror(relative)
             ):
                 continue
             try:
@@ -751,6 +763,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                 or relative.startswith("tests/")
                 or "/testing/" in "/" + relative
                 or path.name.startswith("test_")
+                or _is_non_runtime_provider_mirror(relative)
             ):
                 continue
             if relative not in sdk_surface_owners:
