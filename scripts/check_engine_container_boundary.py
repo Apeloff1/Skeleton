@@ -173,6 +173,7 @@ async def _run(base_url: str, token: str) -> None:
     if latest["execution_id"] != context.execution_id:
         raise AssertionError("container status execution identity mismatch")
     if latest["execution_state"] not in {
+        "created",
         "admitted",
         "queued",
         "running",
