@@ -21,7 +21,7 @@ from skeleton.skills.tool_adapters.policy import (
     ToolAdapterDenied,
 )
 from skeleton.skills.tool_contract import ToolEffect, ToolExecutionRequest, ToolManifest
-from skeleton.skills.tool_runtime import ToolRuntime
+from skeleton.skills.tool_runtime import ToolRuntime, ToolRuntimeError
 
 
 Port = Callable[[Mapping[str, Any]], Mapping[str, Any]]
@@ -177,7 +177,7 @@ class GovernedToolSurface:
         self.calls.append(PortCall(tool_id=tool_id, request=dict(request)))
         payload = port(request)
         if not isinstance(payload, Mapping):
-            raise ToolAdapterDenied("tool port must return an object")
+            raise ToolRuntimeError("tool port must return an object")
         return payload
 
     def _query(self, request: ToolExecutionRequest) -> str:
@@ -185,9 +185,9 @@ class GovernedToolSurface:
         payload = self._invoke("repository.query", normalized, self.database)
         rows = payload.get("rows")
         if not isinstance(rows, list) or any(not isinstance(row, Mapping) for row in rows):
-            raise ToolAdapterDenied("database port must return row objects")
+            raise ToolRuntimeError("database port must return row objects")
         if len(rows) > int(normalized["limit"]):
-            raise ToolAdapterDenied("database port exceeded the admitted limit")
+            raise ToolRuntimeError("database port exceeded the admitted limit")
         return self._store("repository.query", {"kind": "database", "rows": [dict(row) for row in rows]})
 
     def _search(self, request: ToolExecutionRequest) -> str:
@@ -195,7 +195,7 @@ class GovernedToolSurface:
         payload = self._invoke("network.search", normalized, self.network)
         raw_hits = payload.get("results", [])
         if not isinstance(raw_hits, list):
-            raise ToolAdapterDenied("network port must return a result list")
+            raise ToolRuntimeError("network port must return a result list")
         hits = []
         for item in raw_hits:
             if not isinstance(item, Mapping):
@@ -213,9 +213,9 @@ class GovernedToolSurface:
         stdout = payload.get("stdout", "")
         exit_code = payload.get("exit_code", 0)
         if not isinstance(stdout, str) or isinstance(exit_code, bool) or not isinstance(exit_code, int):
-            raise ToolAdapterDenied("sandbox port returned an invalid result")
+            raise ToolRuntimeError("sandbox port returned an invalid result")
         if len(stdout.encode("utf-8")) > int(normalized["max_output_bytes"]):
-            raise ToolAdapterDenied("sandbox output exceeds the resource bound")
+            raise ToolRuntimeError("sandbox output exceeds the resource bound")
         return self._store(
             "sandbox.compile",
             {"kind": "sandbox", "stdout": stdout, "exit_code": exit_code},
@@ -227,9 +227,9 @@ class GovernedToolSurface:
         artifact_id = str(payload.get("artifact_id") or "")
         size = payload.get("bytes")
         if not artifact_id or isinstance(size, bool) or not isinstance(size, int):
-            raise ToolAdapterDenied("artifact port returned an invalid result")
+            raise ToolRuntimeError("artifact port returned an invalid result")
         if size < 0 or size > int(normalized["max_output_bytes"]):
-            raise ToolAdapterDenied("artifact port exceeded the size bound")
+            raise ToolRuntimeError("artifact port exceeded the size bound")
         return self._store(
             "artifact.package",
             {

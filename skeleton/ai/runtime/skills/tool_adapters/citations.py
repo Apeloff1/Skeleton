@@ -68,9 +68,9 @@ def citations_from_result(source_ref: str, payload: Mapping[str, Any]) -> tuple[
         for hit in hits:
             if not isinstance(hit, Mapping):
                 continue
-            excerpt = str(hit.get("snippet") or hit.get("title") or "")
+            excerpt = str(hit.get("snippet") or "")
             citation = _citation(source_ref, excerpt)
-            if citation is not None and excerpt.strip() in str(hit.get("snippet") or hit.get("title") or ""):
+            if citation is not None and citation.excerpt in excerpt:
                 found.append(citation)
     elif kind == "sandbox":
         citation = _citation(source_ref, str(payload.get("stdout") or ""))
@@ -86,8 +86,9 @@ def citations_from_result(source_ref: str, payload: Mapping[str, Any]) -> tuple[
 def pack_citations(citations: tuple[Citation, ...] | list[Citation], *, budget_tokens: int) -> tuple[Citation, ...]:
     """Keep whole citations, in order, until the budget is spent.
 
-    A citation that does not fit is skipped. It is never sliced, because a
-    sliced excerpt would no longer be the stored quote.
+    The first citation that does not fit ends the pack. Later smaller
+    citations are not pulled forward, and a citation is never sliced,
+    because a sliced excerpt would no longer be the stored quote.
     """
 
     if isinstance(budget_tokens, bool) or not isinstance(budget_tokens, int) or budget_tokens < 0:
@@ -96,7 +97,7 @@ def pack_citations(citations: tuple[Citation, ...] | list[Citation], *, budget_t
     used = 0
     for citation in citations:
         if used + citation.tokens > budget_tokens:
-            continue
+            break
         kept.append(citation)
         used += citation.tokens
     return tuple(kept)

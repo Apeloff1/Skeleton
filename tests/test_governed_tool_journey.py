@@ -61,7 +61,7 @@ def test_forbidden_query_never_reaches_the_database() -> None:
         "Ada is the maintainer.",
     )
     assert surface.calls == []
-    assert result.disposition == "abstain"
+    assert result.disposition == "block"
     assert result.receipt_status == ToolExecutionStatus.FAILED.value
     assert result.error_code == "ToolAdapterDenied"
 
@@ -150,5 +150,41 @@ def test_disallowed_language_does_not_enter_the_sandbox() -> None:
         "print(1)",
     )
     assert surface.calls == []
-    assert result.disposition == "abstain"
+    assert result.disposition == "block"
     assert result.error_code == "ToolAdapterDenied"
+
+
+def test_negation_is_not_supported_by_a_positive_quote() -> None:
+    runtime, surface = _surface()
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(
+        _request("repository.query", {"collection": "notes"}),
+        "Ada is not the maintainer.",
+    )
+    assert result.disposition == "abstain"
+    assert result.ungrounded_sentences == ("Ada is not the maintainer.",)
+
+
+def test_citation_budget_does_not_skip_ahead() -> None:
+    from skeleton.skills.tool_adapters.citations import Citation, pack_citations
+
+    citations = (
+        Citation("a", "ref", "one", 2),
+        Citation("b", "ref", "two two", 5),
+        Citation("c", "ref", "three", 1),
+    )
+    packed = pack_citations(citations, budget_tokens=3)
+    assert [item.citation_id for item in packed] == ["a"]
+
+
+def test_a_broken_port_is_not_reported_as_a_policy_denial() -> None:
+    runtime, surface = _surface()
+    surface.database = lambda request: "not-an-object"
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(
+        _request("repository.query", {"collection": "notes"}),
+        "Ada is the maintainer.",
+    )
+    assert surface.calls
+    assert result.disposition == "block"
+    assert result.error_code == "ToolRuntimeError"

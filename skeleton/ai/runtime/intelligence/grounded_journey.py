@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from enum import Enum
 import re
+import threading
+from typing import Any
 
 from skeleton.skills.tool_adapters.citations import Citation, citations_from_result, pack_citations
 from skeleton.skills.tool_adapters.surface import GovernedToolSurface
@@ -14,18 +16,11 @@ from skeleton.skills.tool_runtime import ToolRuntime
 
 _STOP = frozenset({
     "the", "and", "for", "with", "that", "this", "from", "are", "was", "were",
-    "has", "have", "had", "not", "but", "you", "your", "its", "into", "over",
+    "has", "have", "had", "but", "you", "your", "its", "into", "over",
 })
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 _TOKEN = re.compile(r"[a-z0-9]+")
-
-
-def _tokens(text: str) -> set[str]:
-    return {
-        token
-        for token in _TOKEN.findall(text.lower())
-        if len(token) > 2 and token not in _STOP
-    }
+_NEGATION = frozenset({"not", "no", "never", "without", "nor"})
 
 
 def _sentences(answer: str) -> tuple[str, ...]:
@@ -35,19 +30,43 @@ def _sentences(answer: str) -> tuple[str, ...]:
     return tuple(part for part in _SENTENCE.split(cleaned) if part.strip())
 
 
+_NEGATION = frozenset({"not", "no", "never", "without", "nor"})
+
+
+def _tokens(text: str) -> set[str]:
+    return {
+        token
+        for token in _TOKEN.findall(text.lower())
+        if token in _NEGATION or (len(token) > 2 and token not in _STOP)
+    }
+
+
 def _supports(sentence: str, citations: tuple[Citation, ...]) -> bool:
+    """A sentence is supported only by one whole citation.
+
+    Every content word has to appear in that citation, including negation.
+    Partial overlap is not support: "not the maintainer" must not ride on
+    a quote that only says "maintainer".
+    """
+
     needed = _tokens(sentence)
     if not needed:
-        return True
-    folded = sentence.strip().lower()
+        return False
+    folded = " ".join(sentence.lower().split())
     for citation in citations:
-        excerpt = citation.excerpt.lower()
+        excerpt = " ".join(citation.excerpt.lower().split())
         if folded in excerpt:
             return True
-        have = _tokens(citation.excerpt)
-        if have and len(needed & have) / len(needed) >= 0.6:
+        if needed <= _tokens(citation.excerpt):
             return True
     return False
+
+
+class JourneyDisposition(str, Enum):
+    ANSWER = "answer"
+    QUALIFIED = "qualified"
+    ABSTAIN = "abstain"
+    BLOCK = "block"
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,18 +96,20 @@ class JourneyLedger:
     """Remember one grounded outcome per operation. A second answer conflicts."""
 
     entries: dict[str, JourneyResult] = field(default_factory=dict)
+    _lock: threading.RLock = field(default_factory=threading.RLock, repr=False)
 
     def remember(self, operation_id: str, result: JourneyResult) -> JourneyResult:
         key = operation_id.strip()
         if not key:
             raise ValueError("operation_id is required")
-        existing = self.entries.get(key)
-        if existing is None:
-            self.entries[key] = result
-            return result
-        if existing.to_dict() != result.to_dict():
-            raise ValueError("operation_id replayed with a different grounded outcome")
-        return existing
+        with self._lock:
+            existing = self.entries.get(key)
+            if existing is None:
+                self.entries[key] = result
+                return result
+            if existing.to_dict() != result.to_dict():
+                raise ValueError("operation_id replayed with a different grounded outcome")
+            return existing
 
 
 class GroundedJourney:
@@ -129,12 +150,14 @@ class GroundedJourney:
         sentences = _sentences(proposed_answer)
         grounded = tuple(sentence for sentence in sentences if _supports(sentence, citations))
         ungrounded = tuple(sentence for sentence in sentences if sentence not in grounded)
-        if receipt.status is not ToolExecutionStatus.SUCCEEDED or not sentences or not grounded:
-            disposition = "abstain"
+        if receipt.status is not ToolExecutionStatus.SUCCEEDED:
+            disposition = JourneyDisposition.BLOCK
+        elif not sentences or not grounded:
+            disposition = JourneyDisposition.ABSTAIN
         elif ungrounded:
-            disposition = "qualified"
+            disposition = JourneyDisposition.QUALIFIED
         else:
-            disposition = "answer"
+            disposition = JourneyDisposition.ANSWER
         result = JourneyResult(
             disposition=disposition,
             receipt_status=receipt.status.value,
@@ -147,4 +170,4 @@ class GroundedJourney:
         return self.ledger.remember(request.operation_id, result)
 
 
-__all__ = ["GroundedJourney", "JourneyLedger", "JourneyResult"]
+__all__ = ["GroundedJourney", "JourneyDisposition", "JourneyLedger", "JourneyResult"]
