@@ -160,7 +160,11 @@ class ForgettingCurve:
                     )
                 )
         doomed.sort(key=lambda c: (c.retrievability, -c.age_s))
-        return doomed[:limit] if limit else doomed
+        if limit is None:
+            return doomed
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
+            raise ValueError("limit must be a non-negative integer or None")
+        return doomed[:limit]
 
     def sweep(self, now: Optional[float] = None) -> Tuple[str, ...]:
         """Drop every sub-floor trace; returns the evicted ids."""
