@@ -88,10 +88,13 @@ def test_assist_executes_through_engine_and_preserves_policy_context(
     assert command.compiled_context.tool_choice == "none"
     assert "def f(value)" in command.compiled_context.prompt
     assert "Prefer early returns." in command.compiled_context.prompt
-    assert any(
-        source_id == "backend.ai.mode.refactor@1"
-        for source_id, _digest in command.compiled_context.source_snapshot
+    # source_snapshot intentionally binds immutable segment UUIDs, not mutable
+    # human-readable source labels. Policy identity is carried by the compiled
+    # instructions and the deterministic context binding.
+    assert command.compiled_context.instructions == (
+        route.AI_MODES["refactor"]["instruction_policy"].instructions
     )
+    assert command.compiled_context.source_snapshot
 
 
 def test_assist_engine_outage_returns_limited_mode_without_local_provider(
