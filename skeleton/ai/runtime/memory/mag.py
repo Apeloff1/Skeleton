@@ -47,6 +47,8 @@ class PreferenceEmbedding:
     """User preference vector with incremental updates."""
 
     def __init__(self, dimension: int = 128) -> None:
+        if isinstance(dimension, bool) or not isinstance(dimension, int) or dimension < 1:
+            raise ValueError("dimension must be a positive integer")
         self.dimension = dimension
         self.vector: List[float] = [0.0] * dimension
         self.update_count: int = 0
@@ -55,6 +57,10 @@ class PreferenceEmbedding:
         """Online moving-average update."""
         if len(interaction_vector) != self.dimension:
             raise ValueError(f"Expected dimension {self.dimension}, got {len(interaction_vector)}")
+        if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in interaction_vector):
+            raise ValueError("interaction values must be finite")
+        if isinstance(weight, bool) or not isinstance(weight, (int, float)) or not math.isfinite(float(weight)) or float(weight) <= 0:
+            raise ValueError("weight must be positive")
         self.update_count += 1
         alpha = weight / self.update_count
         for i in range(self.dimension):
@@ -62,11 +68,17 @@ class PreferenceEmbedding:
 
     def similarity(self, other: "PreferenceEmbedding") -> float:
         """Cosine similarity between preference vectors."""
+        if not isinstance(other, PreferenceEmbedding):
+            raise TypeError("other must be a preference embedding")
+        if self.update_count == 0 or other.update_count == 0:
+            raise ValueError("preference similarity needs an update")
+        if self.dimension != other.dimension:
+            raise ValueError("preference dimensions differ")
         dot = sum(a * b for a, b in zip(self.vector, other.vector))
         norm1 = math.sqrt(sum(a * a for a in self.vector))
         norm2 = math.sqrt(sum(b * b for b in other.vector))
         if norm1 == 0 or norm2 == 0:
-            return 0.0
+            raise ValueError("preference similarity needs a non-zero vector")
         return dot / (norm1 * norm2)
 
 
