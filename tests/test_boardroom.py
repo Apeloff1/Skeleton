@@ -51,6 +51,7 @@ def test_table_motion_rejects_closed_or_unknown(room: Boardroom):
 def test_resolve_motion_carried_with_fabric_event(room: Boardroom):
     session = room.convene("sit", "bob", [])
     motion, _ = room.table_motion(session.id, "alice", "Ship boardroom")
+    assert room.cast_vote(motion.id, "bob", "yes") == "yes"
     fabric_event = "merkle:evt-deadbeef"
     resolved = room.resolve_motion(motion.id, True, event_id=fabric_event)
     assert resolved is not None
@@ -61,6 +62,7 @@ def test_resolve_motion_carried_with_fabric_event(room: Boardroom):
 def test_resolve_motion_rejected(room: Boardroom):
     session = room.convene("sit", "bob", [])
     motion, _ = room.table_motion(session.id, "alice", "No")
+    assert room.cast_vote(motion.id, "bob", "no") == "no"
     rejected = room.resolve_motion(motion.id, False, event_id="merkle:evt-01")
     assert rejected is not None
     assert rejected.status is MotionStatus.REJECTED
@@ -70,6 +72,7 @@ def test_resolve_motion_rejected(room: Boardroom):
 def test_resolve_motion_idempotent_refuse(room: Boardroom):
     session = room.convene("sit", "bob", [])
     motion, _ = room.table_motion(session.id, "alice", "Once")
+    assert room.cast_vote(motion.id, "bob", "yes") == "yes"
     assert room.resolve_motion(motion.id, True, event_id="e1") is not None
     assert room.resolve_motion(motion.id, False, event_id="e2") is None
     assert room.resolve_motion("missing", True) is None
@@ -81,6 +84,19 @@ def test_adjourn_closes_session(room: Boardroom):
     assert closed is not None
     assert closed.closed is not None
     assert room.adjourn(session.id) is None  # already closed
+
+
+def test_a_motion_does_not_carry_without_a_majority() -> None:
+    room = Boardroom()
+    session = room.convene("sit", "bob", members=["bob", "cara", "dee"])
+    motion, _ = room.table_motion(session.id, "alice", "Ship")
+    room.cast_vote(motion.id, "bob", "yes")
+    assert room.resolve_motion(motion.id, True, event_id="e1") is None
+    assert room.session_motions(session.id)[0].status is MotionStatus.TABLED
+    room.cast_vote(motion.id, "cara", "yes")
+    carried = room.resolve_motion(motion.id, True, event_id="e1")
+    assert carried is not None
+    assert carried.status is MotionStatus.RESOLVED
 
 
 def test_session_motions_and_sessions_lists(room: Boardroom):
