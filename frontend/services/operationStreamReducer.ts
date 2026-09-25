@@ -350,14 +350,34 @@ export function reduceOperationEvent(
     return failOperationResync(state, 'invalid_terminal_state');
   }
 
+  // Project payload effects before committing sequence/event identity. A
+  // rejected payload must leave the accepted cursor untouched so replay can
+  // start from the last fully reduced event.
+  let projected: OperationClientState = state;
+
+  if (PROVISIONAL_CONTENT_TYPES.has(event.type)) {
+    projected = reduceProvisionalContent(projected, event);
+    if (projected.resyncRequired) return projected;
+  }
+
+  if (terminalStateValue !== null) {
+    projected = reconcileTerminalResult(
+      projected,
+      canonicalResultFromPayload(event.payload),
+      terminalStateValue,
+      event.event_id,
+    );
+    if (projected.resyncRequired) return projected;
+  }
+
   const payloadState = event.payload?.state;
   const seenEventIds = [...state.seenEventIds, event.event_id].slice(
     -MAX_RETAINED_EVENT_IDS,
   );
   const events = [...state.events, event].slice(-MAX_RETAINED_OPERATION_EVENTS);
 
-  let next: OperationClientState = {
-    ...state,
+  return {
+    ...projected,
     lastSequence: event.sequence,
     seenEventIds,
     events,
@@ -369,22 +389,6 @@ export function reduceOperationEvent(
     connection: terminalStateValue !== null ? 'terminal' : 'following',
     error: null,
   };
-
-  if (PROVISIONAL_CONTENT_TYPES.has(event.type)) {
-    next = reduceProvisionalContent(next, event);
-    if (next.resyncRequired) return next;
-  }
-
-  if (terminalStateValue !== null) {
-    next = reconcileTerminalResult(
-      next,
-      canonicalResultFromPayload(event.payload),
-      terminalStateValue,
-      event.event_id,
-    );
-  }
-
-  return next;
 }
 
 export function reduceOperationReplay(
