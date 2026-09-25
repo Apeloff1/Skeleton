@@ -33,7 +33,7 @@ def test_retrieval_runtime_mirror_is_exact(relative: str) -> None:
 
 @pytest.mark.parametrize(
     "relative",
-    ("rag.py", "cag.py", "mag.py", "reconciliation.py"),
+    ("core.py", "rag.py", "cag.py", "mag.py", "reconciliation.py"),
 )
 def test_scoped_memory_runtime_mirror_is_exact(relative: str) -> None:
     root = Path(__file__).resolve().parents[1]
