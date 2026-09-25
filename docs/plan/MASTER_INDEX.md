@@ -40,6 +40,10 @@ Current execution frontier: [`EXECUTION_FRONTIER_2026-09-24.md`](EXECUTION_FRONT
 
 Machine execution frontier: [`machine/ai_execution_frontier_20260924.json`](../../machine/ai_execution_frontier_20260924.json)
 
+OpenAI OSS assimilation lane: [`OPENAI_OSS_ASSIMILATION_2026-09-25.md`](OPENAI_OSS_ASSIMILATION_2026-09-25.md)
+
+Machine OpenAI OSS provenance: [`machine/openai_oss_assimilation.json`](../../machine/openai_oss_assimilation.json)
+
 Foundational volume depth pass: [`VOLUME_DEPTH_000_040.md`](VOLUME_DEPTH_000_040.md)
 
 Sequential volume depth pass: [`VOLUME_DEPTH_041_080.md`](VOLUME_DEPTH_041_080.md)
@@ -132,8 +136,10 @@ Repository work on this plan must respect the existing PR #1904 bootstrap stack:
 40. `machine/ai_engineering_task_matrix.json`
 41. `docs/plan/EXECUTION_FRONTIER_2026-09-24.md`
 42. `machine/ai_execution_frontier_20260924.json`
+43. `docs/plan/OPENAI_OSS_ASSIMILATION_2026-09-25.md`
+44. `machine/openai_oss_assimilation.json`
 
-The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the current implementation-depth frontier and its machine-checkable reconciliation contract.
+The first ten remain the present implementation/construction authority. Items 11–40 form the frozen long-range planning, risk, sequencing, depth, adversarial-closure, exotic-research and engineering-validation stack. Items 41–42 define the current implementation-depth frontier and its machine-checkable reconciliation contract. Items 43–44 deepen the frozen research/provider/runtime volumes with pinned OpenAI OSS provenance and bounded interoperability; they do not add a new architecture volume or completion authority.
 
 ## Index laws
 
