@@ -354,3 +354,67 @@ def test_no_active_consumers_never_advances_compaction_implicitly(
         assert store.safe_compaction_sequence(operation_id) == 0
         assert store.compact_acknowledged(operation_id) == 0
         assert store.head(operation_id)["compacted_through"] == 0
+
+
+
+def test_worker_projection_lease_is_fenced_and_takeover_waits_for_expiry(tmp_path: Path) -> None:
+    path = tmp_path / "events.sqlite"
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 25, 20, 0, tzinfo=timezone.utc)
+    store_a = SQLiteOperationEventStore(path)
+    store_b = SQLiteOperationEventStore(path)
+    try:
+        first = store_a.acquire_worker_lease(operation_id, "worker-a", lease_seconds=10, now=base)
+        assert first is not None and first.generation == 1
+        assert store_b.acquire_worker_lease(operation_id, "worker-b", lease_seconds=10, now=base + timedelta(seconds=5)) is None
+        renewed = store_a.renew_worker_lease(operation_id, "worker-a", first.generation, lease_seconds=10, now=base + timedelta(seconds=5))
+        assert renewed is not None and renewed.generation == first.generation
+        takeover = store_b.acquire_worker_lease(operation_id, "worker-b", lease_seconds=10, now=base + timedelta(seconds=16))
+        assert takeover is not None and takeover.generation == first.generation + 1
+        assert store_a.release_worker_lease(operation_id, "worker-a", first.generation) is False
+        active = store_b.active_worker_lease(operation_id, now=base + timedelta(seconds=16))
+        assert active is not None and active.worker_id == "worker-b" and active.generation == takeover.generation
+        assert store_b.release_worker_lease(operation_id, "worker-b", takeover.generation) is True
+    finally:
+        store_a.close()
+        store_b.close()
+
+
+def test_same_worker_cannot_reenter_live_lease_and_generation_advances_after_expiry(
+    tmp_path: Path,
+) -> None:
+    operation_id = str(uuid4())
+    base = datetime(2026, 9, 25, 21, 0, tzinfo=timezone.utc)
+    with SQLiteOperationEventStore(tmp_path / "events.sqlite") as store:
+        first = store.acquire_worker_lease(
+            operation_id,
+            "worker-a",
+            lease_seconds=30,
+            now=base,
+        )
+        assert first is not None
+        assert store.acquire_worker_lease(
+            operation_id,
+            "worker-a",
+            lease_seconds=30,
+            now=base + timedelta(seconds=1),
+        ) is None
+
+        second = store.acquire_worker_lease(
+            operation_id,
+            "worker-a",
+            lease_seconds=30,
+            now=base + timedelta(seconds=31),
+        )
+        assert second is not None
+        assert second.generation == first.generation + 1
+        assert store.release_worker_lease(
+            operation_id,
+            "worker-a",
+            first.generation,
+        ) is False
+        assert store.release_worker_lease(
+            operation_id,
+            "worker-a",
+            second.generation,
+        ) is True
