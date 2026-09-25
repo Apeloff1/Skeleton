@@ -336,8 +336,8 @@ def test_architecture_summary_reports_deep_structure_counts() -> None:
         "execution_hosts": 4,
         "execution_profiles": 10,
         "plane_execution": 27,
-        "startup_groups": 3,
-        "shutdown_groups": 3,
+        "startup_groups": 4,
+        "shutdown_groups": 4,
     }
 
 
@@ -441,9 +441,17 @@ def test_structural_validator_rejects_startup_dependency_in_same_group() -> None
     architecture = _load(REPO_ROOT / ARCHITECTURE_PATH)
     broken = deepcopy(architecture)
     lifecycle = broken["structural_blueprint"]["runtime_lifecycle"]
-    core = next(group for group in lifecycle["startup_groups"] if group["id"] == "core-services")
-    product = next(group for group in lifecycle["startup_groups"] if group["id"] == "product-shell")
-    core["nodes"].append("frontend")
+    application = next(
+        group
+        for group in lifecycle["startup_groups"]
+        if group["id"] == "application-service"
+    )
+    product = next(
+        group
+        for group in lifecycle["startup_groups"]
+        if group["id"] == "product-shell"
+    )
+    application["nodes"].append("frontend")
     product["nodes"].remove("frontend")
     zones = {zone["id"]: zone for zone in broken["zones"]}
     errors: list[str] = []

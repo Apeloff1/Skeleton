@@ -17,7 +17,8 @@ def test_default_plan_is_dependency_closed_and_layered():
     assert set(plan.requested) == set(manifest.default_services)
     assert set(plan.services) == set(manifest.default_services)
     assert plan.layers[0] == ("mongo",)
-    assert set(plan.layers[1]) == {"backend", "skeleton"}
+    assert plan.layers[1] == ("skeleton",)
+    assert plan.layers[2] == ("backend",)
     assert plan.layers[-1] == ("frontend",)
 
 
