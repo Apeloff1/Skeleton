@@ -67,6 +67,8 @@ class QuadRetriever:
         self._state_lock = RLock()
         self._cache_generation = 0
         self._inflight: Dict[str, Event] = {}
+        self._weight_learner = None
+        self._static_weights = {"rag": 1.0, "cag": 0.8, "mag": 0.7, "kag": 0.9}
         self._stats = {
             "queries": 0,
             "cache_hits": 0,
@@ -306,7 +308,7 @@ class QuadRetriever:
                 for plane_name in results_by_plane:
                     self._plane_history.append(plane_name)
 
-            fused = self._fuser.fuse(results_by_plane, top_k=k)
+            fused = self._fuse(results_by_plane, k)
 
             # Generation checking closes a subtle invalidation race: a query that
             # started before register_plane()/ingest_document() may finish after the
@@ -341,6 +343,43 @@ class QuadRetriever:
         finally:
             if use_cache and owns_flight and flight is not None:
                 self._finish_inflight(cache_key, flight)
+
+
+    @property
+    def weights(self) -> Dict[str, float]:
+        """Static plane weights, or the attached learner's effective weights."""
+        learner = self._weight_learner
+        if learner is None:
+            return dict(self._static_weights)
+        return learner.effective_weights()
+
+    def observe(self, used_planes, *, all_planes=None) -> Dict[str, Any]:
+        """Record which planes a consumer actually used and return learner stats."""
+        from skeleton.retrieval.plane_weights import attach_learner
+
+        with self._state_lock:
+            if self._weight_learner is None:
+                attach_learner(self)
+            self._weight_learner.observe(used_planes, all_planes=all_planes)
+            return self._weight_learner.stats()
+
+    def _fuse(self, results_by_plane: Dict[str, List[ScoredResult]], top_k: int) -> List[ScoredResult]:
+        """RRF by default. An attached learner scales each plane's contribution."""
+        learner = self._weight_learner
+        if learner is None:
+            return self._fuser.fuse(results_by_plane, top_k=top_k)
+        weights = learner.effective_weights()
+        scores: Dict[str, float] = {}
+        fragments: Dict[str, ScoredResult] = {}
+        for plane, results in results_by_plane.items():
+            weight = float(weights.get(plane, 1.0))
+            for rank, result in enumerate(results, 1):
+                fragment_id = result.fragment_id
+                scores[fragment_id] = scores.get(fragment_id, 0.0) + weight / (self._fuser.k + rank)
+                if fragment_id not in fragments:
+                    fragments[fragment_id] = result
+        ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:top_k]
+        return [fragments[fragment_id] for fragment_id, _ in ranked]
 
     def ingest_document(
         self,
@@ -452,10 +491,13 @@ class QuadRetriever:
 
     def stats(self) -> Dict[str, Any]:
         with self._state_lock:
-            return {
+            payload = {
                 **self._stats,
                 "planes_used": list(self._plane_history),
                 "planes_registered": len(self._planes),
                 "cache_size": self._cache.size(),
                 "cache_generation": self._cache_generation,
             }
+            if self._weight_learner is not None:
+                payload["learner"] = self._weight_learner.stats()
+            return payload

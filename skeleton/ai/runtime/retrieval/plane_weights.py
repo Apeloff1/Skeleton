@@ -92,6 +92,9 @@ def attach_learner(quad, learner: Optional[PlaneWeightLearner] = None) -> PlaneW
     weights instead of the static table, and ``quad.observe(...)`` feeds
     outcomes back. Idempotent.
     """
+    existing = getattr(quad, "_weight_learner", None)
+    if learner is None and existing is not None:
+        return existing
     learner = learner or PlaneWeightLearner(getattr(quad, "weights", None))
     quad._weight_learner = learner
     return learner
