@@ -7162,7 +7162,7 @@
   "provider_surface_convergence_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress",
     "gap": "gap-provider-surface-convergence",
     "canonical_owner": "skeleton/provider_runtime.py",
     "objective": "There is exactly one runtime model-provider transport/credential owner; every other provider-facing module is a declaration, adapter or compatibility facade without independent credentials or raw provider network execution.",
