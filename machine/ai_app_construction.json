@@ -1915,7 +1915,7 @@
       "plane": "engine-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Backend text and media execution now delegate through the authenticated Skeleton engine boundary. Canonical Compose no longer injects runtime-model credentials into the backend process; image generation/edit/variation and expressive TTS use authenticated engine media endpoints backed by the existing governed provider runtime. Remaining closure work is exact-head parity validation plus deployed cross-service delegated-authority, retry/query, cancel/late-result fencing, and golden-journey evidence.",
+      "gap": "Canonical text, chat, legacy compatibility, image generation/edit/variation, and speech execution are delegated to the Skeleton engine. Canonical Compose removes runtime model-provider credentials from backend and retains them only in the engine process. Authenticated evidence now covers in-process HTTP submit/retry/denial/cancel/tool+verification lineage and a real TCP separate-process submit/retry/status/tenant-denial/cancel boundary. Closure remains open for exact-head validation, containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure.",
       "construction": [
         "define an internal versioned engine execution API around AIExecutionRequest/OperationEnvelope",
         "backend product/conversation routes submit admitted execution commands rather than instantiating provider/orchestrator runtime locally",
@@ -1939,6 +1939,21 @@
         "backend contains no runtime model credential after cutover",
         "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
+      ],
+      "evidence_present": [
+        "authenticated EngineClient -> FastAPI submit/status/cancel integration regression",
+        "fresh-authority semantic retry reuses the same operation/execution across HTTP",
+        "tenant/principal/capability denials normalize to authorization failures",
+        "HTTP cancellation race fences late provider success",
+        "HTTP golden journey preserves provider/tool/verification/result lineage",
+        "canonical Compose and AST isolation prove a single source-level provider execution owner",
+        "real TCP separate-process engine-client boundary regression"
+      ],
+      "outstanding_evidence": [
+        "exact-head App Assembly on the post-merge hardening lane",
+        "containerized/deployed runtime attestation that provider I/O occurs only in the Skeleton process",
+        "deployed cross-service golden journey preserves operation/turn/verification/provider/tool/result lineage",
+        "declared dependency-gap closure"
       ]
     },
     {
@@ -5975,25 +5990,25 @@
   "engine_application_boundary_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "in-progress",
+    "status": "implemented-pending-deployed-closure",
     "gap": "gap-engine-application-execution-boundary",
     "current_state": {
       "backend_process": [
-        "delegates migrated text AI execution through backend/core/engine_text.py and backend/core/engine_client.py",
-        "delegates image generation, image variation/edit, and expressive TTS through authenticated engine media client methods",
-        "authenticates engine transport with required SKL_ENGINE_SERVICE_TOKEN plus granted service principal",
-        "does not receive OPENAI_API_KEY or EMERGENT_LLM_KEY in canonical Compose",
-        "retains product/conversation/cache/projection ownership but no runtime provider credential ownership"
+        "owns product/application ingress, conversation state, caching, and compatibility response shapes",
+        "delegates canonical chat, assist, legacy text, image generation/edit/variation, and expressive speech through authenticated engine clients",
+        "contains no production ProviderRegistry.from_env activation by construction invariant",
+        "receives no runtime model-provider credentials in canonical Compose",
+        "waits for a healthy Skeleton engine before serving assembled AI ingress"
       ],
       "skeleton_process": [
-        "owns the canonical engine API, cognitive execution runtime, runtime provider credentials, and media provider transport",
-        "verifies backend bearer token before service-principal grant checks",
-        "requires engine:media plus tenant/capability grant before image or speech provider I/O",
+        "owns canonical text/image/speech provider credentials and transport",
+        "owns the canonical engine API root and AIExecution orchestration runtime",
+        "owns authenticated media execution with engine:media scope plus tenant/capability checks",
         "owns durable engine execution, submission, and tool-receipt state under skeleton_data",
-        "applies existing provider governance/admission/quota controls to engine-side image and speech execution"
+        "validates authenticated service principal and delegated execution authority"
       ],
-      "cutover_guard": "App Assembly AST-scans every production backend Python module for ProviderRegistry.from_env activation. Canonical Compose now forbids backend runtime-model credentials; exact-head validation must prove the activation inventory is zero.",
-      "remaining_gap": "prove exact-head zero backend provider activators and complete deployed cross-service retry/query, delegated-authority denial, cancel/late-result fencing, and operation/turn/verification/provider/tool/result golden-journey evidence"
+      "cutover_guard": "App Assembly AST-scans all production backend Python for ProviderRegistry.from_env activation and forbids backend runtime model credentials when the inventory is zero.",
+      "remaining_gap": "exact-head validation plus containerized/deployed provider-owner attestation, deployed golden journey, and dependency-gap closure"
     },
     "target_process_ownership": {
       "backend": {
