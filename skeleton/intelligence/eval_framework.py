@@ -69,7 +69,7 @@ class EvalSuite:
             "suite": self.name,
             "ran": total,
             "passed": passed_count,
-            "pass_rate": round(passed_count / total, 4) if total else 1.0,
+            "pass_rate": round(passed_count / total, 4) if total else 0.0,
             "results": [r.to_dict() for r in results],
             "regressions": self._diff_baseline(results),
             "timestamp_ns": time.time_ns(),
@@ -96,6 +96,8 @@ class EvalSuite:
         ), encoding="utf-8")
 
     def flakiness(self, fn: Callable[[Dict[str, Any]], Any], runs: int = 3) -> Dict[str, float]:
+        if isinstance(runs, bool) or not isinstance(runs, int) or runs < 1:
+            raise ValueError("runs must be a positive integer")
         outcomes: Dict[str, List[bool]] = {}
         for _ in range(runs):
             report = self.run(fn)
