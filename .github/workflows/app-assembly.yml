@@ -544,6 +544,7 @@ jobs:
           SKL_MONGO_URI: mongodb://admin:dummy@mongo:27017/skeleton?authSource=admin
           MONGO_INITDB_ROOT_PASSWORD: dummy
           JWT_SECRET: not-a-real-jwt-secret
+          SKL_ENGINE_SERVICE_TOKEN: ci-engine-service-token-00000000000000000001
         run: |
           set -euo pipefail
           docker compose -f docker-compose.yml config --quiet
