@@ -7,6 +7,7 @@ Provides:
 
 from __future__ import annotations
 
+import math
 import time
 from typing import Any, Dict, List, Optional
 
@@ -21,8 +22,12 @@ class Ranker:
     """
 
     def __init__(self, recency_weight: float = 0.2, diversity_weight: float = 0.1):
-        self.recency_weight = recency_weight
-        self.diversity_weight = diversity_weight
+        if isinstance(recency_weight, bool) or not isinstance(recency_weight, (int, float)) or float(recency_weight) < 0:
+            raise ValueError("recency weight must be non-negative")
+        if isinstance(diversity_weight, bool) or not isinstance(diversity_weight, (int, float)) or float(diversity_weight) < 0:
+            raise ValueError("diversity weight must be non-negative")
+        self.recency_weight = float(recency_weight)
+        self.diversity_weight = float(diversity_weight)
         self._ranked = 0
 
     def rank(self, results: List[Any], top_k: Optional[int] = None) -> List[Any]:
@@ -34,12 +39,20 @@ class Ranker:
 
         prelim = []
         for r in results:
-            base = getattr(r, "score", 0.5)
+            if not hasattr(r, "score"):
+                raise ValueError("result score is required")
+            base = r.score
+            if isinstance(base, bool) or not isinstance(base, (int, float)) or not math.isfinite(float(base)):
+                raise ValueError("result score must be finite")
             metadata = getattr(r, "metadata", None)
-            raw_ts = metadata.get("timestamp", now) if isinstance(metadata, dict) else now
-            ts = raw_ts if isinstance(raw_ts, (int, float)) and not isinstance(raw_ts, bool) else now
-            age_hours = max(0.0, (now - float(ts)) / 3600.0)
-            recency = 1.0 / (1.0 + age_hours / 24.0)
+            if isinstance(metadata, dict) and "timestamp" in metadata:
+                raw_ts = metadata["timestamp"]
+                if isinstance(raw_ts, bool) or not isinstance(raw_ts, (int, float)) or not math.isfinite(float(raw_ts)):
+                    raise ValueError("timestamp must be finite")
+                age_hours = max(0.0, (now - float(raw_ts)) / 3600.0)
+                recency = 1.0 / (1.0 + age_hours / 24.0)
+            else:
+                recency = 0.0
             content = getattr(r, "content", "") or getattr(getattr(r, "chunk", None), "text", "")
             if not isinstance(content, str):
                 content = str(content or "")
