@@ -62,6 +62,8 @@ class PrivacyAccountant:
         self._history: List[PrivacySpend] = []
 
     def can_spend(self, epsilon: float, plane: str = "") -> bool:
+        if isinstance(epsilon, bool) or not isinstance(epsilon, (int, float)) or epsilon <= 0:
+            return False
         if self._spent_total + epsilon > self.session_budget:
             return False
         if plane and self._spent_by_plane.get(plane, 0.0) + epsilon > self.per_plane_budget:
@@ -116,7 +118,11 @@ class SeededNoise:
     def laplace(rng: random.Random, scale: float) -> float:
         """Sample Laplace(0, scale) via inverse CDF."""
         u = rng.random() - 0.5
-        return -scale * math.copysign(math.log(1 - 2 * abs(u)), u)
+        # random() can be 0, which makes the inverse-CDF argument 0 and log() raise.
+        span = max(1.0 - 2.0 * abs(u), 1e-16)
+        if u == 0.0:
+            return 0.0
+        return -scale * math.copysign(math.log(span), u)
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +150,11 @@ class LaplaceMechanism:
         """Noised mean over a clamped range. Mean sensitivity = range / n."""
         if not values:
             return None
+        lo, hi = value_range
+        if hi < lo:
+            raise ValueError("value_range low must be <= high")
         if not self.accountant.spend(epsilon, "laplace", "mean", plane):
             return None
-        lo, hi = value_range
         clamped = [max(lo, min(hi, v)) for v in values]
         sensitivity = (hi - lo) / len(clamped)
         scale = sensitivity / epsilon
@@ -179,6 +187,8 @@ class ExponentialMechanism:
         """Pick an option with probability ∝ exp(ε·score / 2Δu)."""
         if not options:
             return None
+        if isinstance(sensitivity, bool) or not isinstance(sensitivity, (int, float)) or sensitivity <= 0:
+            raise ValueError("sensitivity must be positive")
         if not self.accountant.spend(epsilon, "exponential", "select", plane):
             return None
         rng = self.noise.rng_for(query_id)
