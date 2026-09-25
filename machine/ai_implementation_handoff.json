@@ -183,7 +183,7 @@
       "depends_on": [],
       "work_package": "WP-P0-PROVIDER-SURFACES",
       "blueprint": "provider_surface_convergence_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
       "target_files": {
         "contracts": [
@@ -231,8 +231,20 @@
         "application provider credential isolation"
       ],
       "closure_gate": "no credential-bearing model edge exists outside a declared receipt-governed surface",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/testing/test_provider_contract.py",
+        "tests/test_provider_runtime_boundary.py",
+        "backend/tests/test_ai_provider_media.py",
+        "scripts/check_provider_bootstrap.py",
+        "scripts/check_provider_runtime_boundary.py",
+        "backend/core/ai_provider.py compatibility facade",
+        "skeleton/jeeves/providers.py canonical-runtime compatibility facade"
+      ],
+      "remaining": [
+        "confirm exact-head provider-surface inventory and SDK-isolation CI",
+        "finish application provider credential isolation before engine credential cutover",
+        "prove no undeclared credential-bearing or raw provider transport surfaces remain"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
@@ -824,7 +836,7 @@
       ],
       "work_package": "WP-P0-ENGINE-BOUNDARY",
       "blueprint": "engine_application_boundary_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "Align runtime process ownership with architecture ownership: backend owns product/conversation ingress and delegates canonical AI execution to the Skeleton engine process.",
       "target_files": {
         "contracts": [
@@ -875,8 +887,28 @@
         "process credential isolation"
       ],
       "closure_gate": "production AI requests entering backend execute provider/model/tool cognition only in the Skeleton engine process with authenticated idempotent cross-service contracts and no local provider fallback",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/api/engine_routes.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/api/engine_runtime.py",
+        "backend/core/engine_client.py",
+        "backend/routes/ai.py canonical chat cutover",
+        "backend/tests/test_engine_client.py",
+        "backend/tests/test_ai_chat_engine_cutover.py",
+        "skeleton/testing/test_engine_process_isolation.py parity-aware credential gate",
+        "scripts/check_app_assembly.py ProviderRegistry activation inventory",
+        "docker-compose.yml dual-materialized transitional credentials plus durable engine state",
+        "skeleton/app/manifest.json backend->engine dependency"
+      ],
+      "remaining": [
+        "migrate all production backend ProviderRegistry.from_env activators to engine-owned execution",
+        "remove transitional backend runtime-model credentials only after the activation inventory reaches zero",
+        "prove delegated tenant/user/scope denial across the real cross-service boundary",
+        "prove submit retry/query behavior against the deployed engine endpoint without duplicate execution",
+        "prove idempotent cancel plus late-result fencing across service transport",
+        "prove cross-service golden journey with operation/turn/verification/provider/tool/result lineage",
+        "retire or invert remaining backend local-provider compatibility execution paths"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
