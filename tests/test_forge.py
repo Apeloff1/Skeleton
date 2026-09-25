@@ -158,3 +158,47 @@ class TestPlannerFromBlueprint:
         assert plan.waves[0].systems == ("in",)
         assert "out" in plan.waves[-1].systems
         assert plan.critical_path[0] == "in"
+
+
+
+class TestStructuredMaterialisationVerification:
+    def test_structured_json_rejects_parseable_non_forge_payload(self):
+        from skeleton.forge.structured_verify import verify_structured
+
+        report = verify_structured(
+            {"not-forge.json": '{"hello":"world"}'},
+            target="json",
+            request="not-forge",
+            accept_threshold=0.99,
+        )
+
+        assert report["accepted"] is False
+        assert report["reason"] == "semantic_invalid"
+        assert any(
+            "blueprint_id" in issue
+            for issue in report["blocking_issues"]
+        )
+        assert report["code_verdict"] is not None
+
+    def test_structured_json_acceptance_is_not_code_likeness_dependent(self):
+        from skeleton.forge.structured_verify import verify_structured
+
+        text = """{
+          "blueprint_id": "bp-1",
+          "name": "etl",
+          "era": "extraction_now",
+          "topology": {"components": {"source": {"kind": "source"}}},
+          "execution_order": ["source"],
+          "plan": {}
+        }"""
+        report = verify_structured(
+            {"etl.json": text},
+            target="json",
+            request="etl",
+            accept_threshold=0.99,
+        )
+
+        assert report["accepted"] is True
+        assert report["score"] == 1.0
+        assert report["reason"] == "accepted"
+        assert report["code_verdict"] is not None
