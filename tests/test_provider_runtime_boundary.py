@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from scripts.check_provider_bootstrap import (
+    _is_non_runtime_provider_mirror,
+    discover_provider_surfaces,
+)
 from scripts.check_provider_runtime_boundary import audit_repository
 
 
@@ -80,6 +84,42 @@ def test_frontier_and_agent_core_reject_provider_sdk_imports(tmp_path: Path) -> 
     violations = audit_repository(tmp_path)
 
     assert sum("provider SDK import" in item for item in violations) == 2
+
+
+def test_provider_bootstrap_excludes_only_external_research_mirrors(tmp_path: Path) -> None:
+    external = (
+        "skeleton/ai/research/external/Tutolage/backend/routes/legacy.py"
+    )
+    live = "skeleton/ai/research/live_provider.py"
+    source = "import os\nfrom openai import AsyncOpenAI\nOPENAI_API_KEY = os.getenv('OPENAI_API_KEY')\n"
+
+    _write(tmp_path, external, source)
+    _write(tmp_path, live, source)
+
+    discovered = discover_provider_surfaces(tmp_path)
+
+    assert external not in discovered
+    assert live in discovered
+    assert _is_non_runtime_provider_mirror(external) is True
+    assert _is_non_runtime_provider_mirror(live) is False
+
+
+def test_external_research_mirror_is_not_a_runtime_provider_surface(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "skeleton/ai/research/external/Tutolage/backend/routes/legacy.py",
+        "from openai import AsyncOpenAI\n",
+    )
+
+    assert audit_repository(tmp_path) == []
+
+
+def test_live_ai_research_surface_still_rejects_provider_sdk_imports(tmp_path: Path) -> None:
+    _write(tmp_path, "skeleton/ai/research/live.py", "import openai\n")
+
+    violations = audit_repository(tmp_path)
+
+    assert any("provider SDK import" in item for item in violations)
 
 
 def test_backend_openai_sdk_import_is_rejected(tmp_path: Path) -> None:
