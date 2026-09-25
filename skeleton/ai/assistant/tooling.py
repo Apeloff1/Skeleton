@@ -93,6 +93,15 @@ class ToolCoordinator:
         descriptor = self.registry.get(proposal.capability_id)
         if descriptor.side_effect is not proposal.side_effect:
             raise ToolCoordinatorError("proposal side-effect classification mismatch")
+        encoded_arguments = json.dumps(
+            dict(proposal.arguments),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        if len(encoded_arguments) > descriptor.max_input_bytes:
+            raise ToolCoordinatorError("capability input exceeds declared bound")
 
         binding = self._proposal_binding(proposal)
         prior = self._receipts.get(proposal.idempotency_key)
