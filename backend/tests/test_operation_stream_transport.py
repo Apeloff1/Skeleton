@@ -13,9 +13,16 @@ from core.operation_stream_transport import (
     encode_sse_heartbeat,
 )
 from skeleton.contracts.operation import OperationEnvelope, OperationState
-from skeleton.frontier.operation_stream import ReplayCursor, StreamReplayGapError
+from skeleton.frontier.operation_stream import (
+    ReplayCursor,
+    StreamBackpressureError,
+    StreamReplayGapError,
+)
 from skeleton.frontier.operation_stream_store import SQLiteOperationEventStore
-from skeleton.persistence.operation_store import SQLiteOperationStore
+from skeleton.persistence.operation_store import (
+    OperationStoreConflict,
+    SQLiteOperationStore,
+)
 
 
 BASE_TIME = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
@@ -399,3 +406,152 @@ def test_acknowledge_and_compact_waits_for_slowest_active_consumer(
 
     operations.close()
     events.close()
+
+def test_slow_client_forces_backpressure_until_lease_expiry_frees_capacity(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "slow-operations.sqlite")
+    events = SQLiteOperationEventStore(
+        tmp_path / "slow-events.sqlite",
+        capacity_per_operation=3,
+    )
+    transport = OperationStreamTransport(operations, events)
+    operation = _operation(idempotency_key="slow-client")
+    current = operations.create(operation, now=BASE_TIME)
+    current = operations.transition(
+        operation.operation_id,
+        OperationState.VALIDATED,
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=1),
+    )
+    current = operations.transition(
+        operation.operation_id,
+        OperationState.AUTHORIZED,
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=2),
+    )
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    assert events.head(operation.operation_id)["latest_sequence"] == 3
+
+    events.register_consumer(
+        operation.operation_id,
+        "fast-client",
+        lease_seconds=300,
+        now=BASE_TIME + timedelta(seconds=3),
+    )
+    events.register_consumer(
+        operation.operation_id,
+        "slow-client",
+        lease_seconds=1,
+        now=BASE_TIME + timedelta(seconds=3),
+    )
+    events.acknowledge_consumer(
+        operation.operation_id,
+        "fast-client",
+        3,
+        lease_seconds=300,
+        now=BASE_TIME + timedelta(seconds=3),
+    )
+    assert (
+        events.compact_acknowledged(
+            operation.operation_id,
+            now=BASE_TIME + timedelta(seconds=3),
+        )
+        == 0
+    )
+
+    current = operations.transition(
+        operation.operation_id,
+        OperationState.ADMITTED,
+        expected_version=current.version,
+        now=BASE_TIME + timedelta(seconds=4),
+    )
+    with pytest.raises(StreamBackpressureError, match="capacity"):
+        transport.dispatch_pending(
+            operation.operation_id,
+            tenant_id="tenant-a",
+        )
+    assert len(
+        operations.pending_outbox(operation_id=operation.operation_id)
+    ) == 1
+
+    compacted = events.compact_acknowledged(
+        operation.operation_id,
+        now=BASE_TIME + timedelta(seconds=5),
+    )
+    assert compacted == 3
+    assert events.head(operation.operation_id)["compacted_through"] == 3
+
+    delivered = transport.dispatch_pending(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+    assert [event.sequence for event in delivered] == [4]
+    assert [event.type for event in delivered] == ["operation.admitted"]
+    assert operations.pending_outbox(operation_id=operation.operation_id) == ()
+
+    operations.close()
+    events.close()
+
+
+def test_completion_wins_cancel_race_without_cancelled_terminal_event(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation(idempotency_key="cancel-complete-race")
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+            OperationState.ADMITTED,
+            OperationState.RUNNING,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    original_transition = operations.transition
+
+    def racing_transition(operation_id, target, **kwargs):
+        if OperationState(target) is OperationState.CANCELLED:
+            latest = operations.get(operation_id)
+            original_transition(
+                operation_id,
+                OperationState.COMPLETED,
+                expected_version=latest.version,
+                now=BASE_TIME + timedelta(seconds=20),
+            )
+            raise OperationStoreConflict("simulated cancel/complete race")
+        return original_transition(operation_id, target, **kwargs)
+
+    monkeypatch.setattr(operations, "transition", racing_transition)
+
+    result = transport.cancel(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+
+    assert result.changed is False
+    assert result.operation.envelope.state is OperationState.COMPLETED
+    replay = events.replay(ReplayCursor(operation.operation_id))
+    assert replay[-1].type == "operation.completed"
+    assert replay[-1].terminal is True
+    assert all(event.type != "operation.cancelled" for event in replay)
+
+    second = transport.cancel(
+        operation.operation_id,
+        tenant_id="tenant-a",
+    )
+    assert second.changed is False
+    assert second.operation.envelope.state is OperationState.COMPLETED
+
+    operations.close()
+    events.close()
+
