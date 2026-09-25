@@ -241,10 +241,31 @@ async def test_privileged_compatibility_handlers_delegate_to_adapter_owners(
             "count": 0,
         }
 
+    async def vault(params):
+        calls.append(("vault", dict(params)))
+        return {"topic": params.get("topic", ""), "matches": {}}
+
+    async def jeeves(params):
+        calls.append(("jeeves", dict(params)))
+        return {
+            "catchphrase": "",
+            "knowledge": "",
+            "mannerism": {},
+            "citation": "",
+        }
+
+    monkeypatch.setattr(registry._VAULT_OWNER, "execute", vault)
+    monkeypatch.setattr(registry._JEEVES_OWNER, "execute", jeeves)
     monkeypatch.setattr(registry._SANDBOX_OWNER, "execute", sandbox)
     monkeypatch.setattr(registry._DATABASE_OWNER, "execute", database)
     monkeypatch.setattr(registry._NETWORK_OWNER, "execute", network)
 
+    vault_result = await registry._tool_vault_query(
+        {"topic": "physics"}
+    )
+    jeeves_result = await registry._tool_jeeves_consult(
+        {"context": "lesson", "topic": "physics"}
+    )
     compile_result = await registry._tool_compile_code(
         {"language": "c", "code": "int main(void){return 0;}"}
     )
@@ -255,10 +276,14 @@ async def test_privileged_compatibility_handlers_delegate_to_adapter_owners(
         {"query": "bounded search"}
     )
 
+    assert vault_result["topic"] == "physics"
+    assert jeeves_result["knowledge"] == ""
     assert compile_result["ok"] is True
     assert database_result["ok"] is True
     assert network_result["ok"] is True
     assert [item[0] for item in calls] == [
+        "vault",
+        "jeeves",
         "sandbox",
         "database",
         "network",
@@ -278,9 +303,14 @@ def test_backend_registry_contains_no_privileged_execution_body() -> None:
         "from ddgs import",
         "os.remove(",
         "binary_builder.package_build(",
+        "vault_loader.query_collection(",
+        "vault_loader.query_topic(",
+        "jeeves_consultant.consult(",
         ".find(scoped[",
     )
     assert all(marker not in source for marker in forbidden)
+    assert "AsyncVaultQueryAdapter" in source
+    assert "AsyncJeevesConsultAdapter" in source
     assert "AsyncSandboxCompileAdapter" in source
     assert "AsyncDatabaseQueryAdapter" in source
     assert "AsyncNetworkSearchAdapter" in source
