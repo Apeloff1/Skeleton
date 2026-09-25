@@ -70,7 +70,7 @@ def _envelope():
         _segment(
             "Explain the bounded provider request.",
             kind=ContextKind.USER_MESSAGE,
-            trust=ContextTrust.USER_AUTHORED,
+            trust=ContextTrust.AUTHORIZED_USER_DATA,
             source_id="user-message",
         ),
     )
