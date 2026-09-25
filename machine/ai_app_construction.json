@@ -1998,7 +1998,7 @@
       "plane": "streaming-realtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical operation/event persistence plus a tenant-bound authenticated backend SSE adapter now implement replay cursors, heartbeat/idle behavior, cancellation projection and retry-safe outbox dispatch; frontend resume/reducer behavior, multi-client acknowledgement and end-to-end recovery evidence remain.",
+      "gap": "Canonical durable operation/event persistence, tenant-bound HTTP/SSE transport, frontend idempotent reduction, persisted reconnect cursor, authoritative replay-gap resync, multi-client acknowledgement/compaction, bounded replay batching, provisional-content reconciliation and cancel/complete terminal fencing are implemented. Remaining work is distributed multi-worker stream ownership plus browser-level disconnect/reconnect, slow-client and cancellation-race closure evidence.",
       "construction": [
         "use skeleton/contracts/operation.py as the operation identity/state contract",
         "use skeleton/frontier/operation_stream.py as the stream conformance contract",
@@ -3903,14 +3903,20 @@
           "cancellation bridge into durable OperationEnvelope state",
           "transactional outbox drain before replay",
           "explicit post-header replay-gap resync event",
-          "focused tenant-isolation/cancel/replay/terminal SSE tests"
+          "focused tenant-isolation/cancel/replay/terminal SSE tests",
+          "frontend reducer with event-id dedupe and strict sequence/gap rejection",
+          "provisional assistant content with canonical terminal reconciliation",
+          "persisted frontend reconnect cursor and authoritative replay-gap resync",
+          "multi-client acknowledgement and compaction strategy",
+          "bounded frontend replay pages and bounded SSE replay batches",
+          "terminal backlog drains fully across bounded batches",
+          "completion-versus-cancel race preserves exactly one terminal outcome"
         ],
         "remaining": [
-          "frontend reducer with sequence and event-id dedupe",
-          "frontend reconnect/resume cursor",
-          "multi-client acknowledgement/compaction strategy",
           "distributed stream ownership for multi-worker deployment",
-          "end-to-end slow-client, disconnect/reconnect and cancel-race browser tests"
+          "browser/API disconnect-reconnect recovery journey",
+          "browser/API slow-client backpressure journey",
+          "browser/API cancel-complete race journey"
         ]
       }
     },
@@ -6192,7 +6198,7 @@
   "realtime_delivery_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress",
     "gap": "gap-streaming-protocol",
     "canonical_source": "skeleton/frontier/operation_stream.py",
     "durable_store": "skeleton/frontier/operation_stream_store.py",
