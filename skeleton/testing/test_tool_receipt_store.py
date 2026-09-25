@@ -281,4 +281,3 @@ def test_existing_receipt_database_migrates_nullable_lineage_columns(tmp_path) -
     }
 
     assert {"execution_id", "turn_id", "call_id"}.issubset(columns)
-
