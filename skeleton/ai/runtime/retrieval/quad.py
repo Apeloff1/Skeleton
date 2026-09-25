@@ -11,6 +11,7 @@ extracted from the text, so the knowledge graph self-populates.
 
 from __future__ import annotations
 
+import math
 import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -168,6 +169,15 @@ class QuadRetriever:
             source = f"{source}:{path}" if source else path
         return source
 
+    @staticmethod
+    def _required_score(value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("result score is required")
+        number = float(value)
+        if not math.isfinite(number):
+            raise ValueError("result score must be finite")
+        return number
+
     @classmethod
     def _normalize_result(cls, plane_name: str, result: Any) -> Optional[ScoredResult]:
         """Normalize plane-native results into the fusion contract.
@@ -181,6 +191,7 @@ class QuadRetriever:
         returns a shallow dataclass copy so callers can safely reuse their result.
         """
         if isinstance(result, ScoredResult):
+            cls._required_score(result.score)
             if result.plane in (None, "", "rag") and plane_name != "rag":
                 return replace(result, plane=plane_name)
             return result
@@ -202,10 +213,12 @@ class QuadRetriever:
                 or getattr(chunk, "source_tier", "")
                 or plane_name
             )
+            if not hasattr(result, "score"):
+                raise ValueError("result score is required")
             return ScoredResult(
                 fragment_id=fragment_id,
                 content=content,
-                score=float(getattr(result, "score", 0.0)),
+                score=cls._required_score(result.score),
                 plane=str(native_plane),
                 provenance=str(
                     getattr(result, "provenance", "")
@@ -221,10 +234,12 @@ class QuadRetriever:
             content = result.get("content") or result.get("text") or result.get("value") or ""
             raw_metadata = result.get("metadata") or {}
             metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
+            if "score" not in result:
+                raise ValueError("result score is required")
             return ScoredResult(
                 fragment_id=str(fragment_id),
                 content=str(content),
-                score=float(result.get("score", 0.0)),
+                score=cls._required_score(result["score"]),
                 plane=str(result.get("plane") or plane_name),
                 provenance=str(
                     result.get("provenance") or cls._metadata_provenance(metadata)
