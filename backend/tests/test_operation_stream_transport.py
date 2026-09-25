@@ -558,3 +558,29 @@ def test_acknowledge_and_compact_waits_for_slowest_active_consumer(
 
     operations.close()
     events.close()
+
+
+
+def test_projection_lease_serializes_workers_and_allows_clean_takeover(tmp_path: Path) -> None:
+    operation_path = tmp_path / "shared-operations.sqlite"
+    event_path = tmp_path / "shared-events.sqlite"
+    operations_a = SQLiteOperationStore(operation_path)
+    operations_b = SQLiteOperationStore(operation_path)
+    events_a = SQLiteOperationEventStore(event_path)
+    events_b = SQLiteOperationEventStore(event_path)
+    transport_b = OperationStreamTransport(operations_b, events_b, worker_id="worker-b", projection_lease_seconds=60)
+    operation = _operation()
+    operations_a.create(operation, now=BASE_TIME)
+    try:
+        held = events_a.acquire_worker_lease(operation.operation_id, "worker-a", lease_seconds=60)
+        assert held is not None
+        assert transport_b.dispatch_pending(operation.operation_id, tenant_id="tenant-a") == ()
+        assert len(operations_b.pending_outbox(operation_id=operation.operation_id)) == 1
+        assert events_b.head(operation.operation_id)["latest_sequence"] == 0
+        assert events_a.release_worker_lease(operation.operation_id, "worker-a", held.generation) is True
+        delivered = transport_b.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+        assert [event.type for event in delivered] == ["operation.created"]
+        assert operations_b.pending_outbox(operation_id=operation.operation_id) == ()
+        assert [event.sequence for event in events_b.replay(ReplayCursor(operation.operation_id))] == [1]
+    finally:
+        operations_a.close(); operations_b.close(); events_a.close(); events_b.close()
