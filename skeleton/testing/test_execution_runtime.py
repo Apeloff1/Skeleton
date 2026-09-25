@@ -206,10 +206,10 @@ async def test_direct_provider_completion_is_verified_and_atomically_finalized()
 async def test_model_tool_model_round_trip_uses_canonical_receipt_lineage() -> None:
     repo = SQLiteExecutionRepository()
     tools = AsyncToolRuntime()
-    tool_calls = []
+    tool_requests = []
 
     async def handler(request):
-        tool_calls.append(dict(request.arguments))
+        tool_requests.append(request)
         return "artifact:readme"
 
     await tools.register(_manifest(), handler)
@@ -231,7 +231,14 @@ async def test_model_tool_model_round_trip_uses_canonical_receipt_lineage() -> N
     )
 
     assert result.result.final_output == "final answer"
-    assert tool_calls == [{"path": "README.md"}]
+    assert [dict(item.arguments) for item in tool_requests] == [
+        {"path": "README.md"}
+    ]
+    assert len(tool_requests) == 1
+    provider_turn = repo.turns(request.execution_id)[0]
+    assert tool_requests[0].execution_id == request.execution_id
+    assert tool_requests[0].turn_id == provider_turn.turn_id
+    assert tool_requests[0].call_id == "call-1"
     assert result.result.usage["model_turns"] == 2
     assert result.result.usage["tool_calls"] == 1
     assert len(result.result.tool_receipts) == 1
