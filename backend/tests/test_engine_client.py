@@ -136,19 +136,13 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert "engine:approve" not in command.delegated_authority.scopes
     assert command.execution_request.resource_budget["max_model_turns"] == 4
     assert command.execution_request.resource_budget["max_tool_calls"] == 1
-    assert command.execution_request.resource_budget["max_input_tokens"] == (
-        command.compiled_context.selected_tokens_estimate
-        + (
-            command.execution_request.resource_budget["max_input_tokens"]
-            - command.compiled_context.selected_tokens_estimate
-        )
+    resource_budget = command.execution_request.resource_budget
+    assert resource_budget["max_input_tokens"] == 4096 - 512 - 128
+    assert 0 < resource_budget["selected_input_tokens_estimate"] <= (
+        resource_budget["max_input_tokens"]
     )
-    assert command.execution_request.resource_budget["max_input_tokens"] == (
-        4096 - 512 - 128
-    )
-    assert command.execution_request.resource_budget[
-        "selected_input_tokens_estimate"
-    ] == command.compiled_context.context_digest and False
+    assert resource_budget["max_output_tokens"] == 512
+    assert resource_budget["max_tool_result_tokens"] == 0
     assert command.execution_request.tool_policy["allowed_tool_ids"] == []
     assert command.execution_request.context_policy["verification_profile"] == "evidence_required"
     assert command.compiled_context.tool_choice == "none"
@@ -1165,3 +1159,42 @@ async def test_client_rejects_missing_service_token_before_transport() -> None:
         )
 
     assert called is False
+
+def test_command_from_context_rejects_output_above_compiled_reserve() -> None:
+    context = _context()
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="max_output_tokens exceeds compiled context reserve",
+    ):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="output-over-reserve",
+            instructions="Policy",
+            prompt="Prompt",
+            max_output_tokens=context.budget.reserved_output_tokens + 1,
+        )
+
+
+def test_command_from_context_allows_smaller_explicit_output_budget() -> None:
+    context = _context()
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="output-under-reserve",
+        instructions="Policy",
+        prompt="Prompt",
+        max_output_tokens=128,
+    )
+
+    assert command.execution_request.resource_budget["max_output_tokens"] == 128
+    assert command.execution_request.resource_budget["max_input_tokens"] == (
+        context.budget.input_capacity(tools_enabled=False)
+    )
+    assert command.execution_request.resource_budget[
+        "selected_input_tokens_estimate"
+    ] == context.selected_tokens_estimate
+
