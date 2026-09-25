@@ -168,25 +168,38 @@ class Forge:
         self.register_kind("jeeves", (Port("telemetry", "state", "in"), Port("advice", "event", "out")))
 
     def register_kind(self, kind: str, ports: tuple[Port, ...]) -> None:
-        if not kind.strip():
-            raise BlueprintError("kind name must be non-empty")
-        self._kinds[kind] = tuple(ports)
+        if not isinstance(kind, str) or not kind.strip() or kind != kind.strip():
+            raise BlueprintError("kind name must be a non-empty string")
+        if kind in self._kinds:
+            raise BlueprintError("kind is already registered", context={"kind": kind})
+        if not isinstance(ports, tuple) or not ports or any(not isinstance(port, Port) for port in ports):
+            raise BlueprintError("kind needs at least one port")
+        names = [port.name for port in ports]
+        if len(names) != len(set(names)):
+            raise BlueprintError("duplicate port name", context={"kind": kind})
+        self._kinds[kind] = ports
 
     def available_kinds(self) -> list[str]:
         return sorted(self._kinds)
 
     def new_blueprint(self, name: str) -> Blueprint:
-        if not name.strip():
-            raise BlueprintError("blueprint name must be non-empty")
+        if not isinstance(name, str) or not name.strip() or name != name.strip():
+            raise BlueprintError("blueprint name must be a non-empty string")
         bp = Blueprint(blueprint_id=str(BlueprintId.new()), name=name)
         self._bus.emit("forge.blueprint.created", {"blueprint_id": bp.blueprint_id, "name": name})
         return bp
 
     def instantiate(self, blueprint: Blueprint, kind: str, instance_id: str, *, config: dict[str, Any] | None = None) -> Component:
+        if not isinstance(instance_id, str) or not instance_id.strip():
+            raise BlueprintError("instance id is required")
+        if config is None:
+            config = {}
+        elif not isinstance(config, dict):
+            raise BlueprintError("config must be an object")
         ports = self._kinds.get(kind)
         if ports is None:
             raise BlueprintError("unknown component kind", context={"kind": kind, "available": self.available_kinds()})
-        component = Component(instance_id=instance_id, kind=kind, ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports), config=dict(config or {}))
+        component = Component(instance_id=instance_id, kind=kind, ports=tuple(Port(p.name, p.port_type, p.direction) for p in ports), config=dict(config))
         blueprint.add_component(component)
         return component
 
