@@ -23,6 +23,7 @@ from skeleton.retrieval.cache import ResultCache
 from skeleton.retrieval.extraction import TripleExtractor
 from skeleton.retrieval.freshness import FreshnessRegistry
 from skeleton.retrieval.fusion import Fuser, FusionStrategy, ScoredResult
+from skeleton.retrieval.plane_health import PlaneHealthTracker
 from skeleton.retrieval.receipts import (
     ReceiptLedger,
     RetrievalReceipt,
@@ -67,6 +68,7 @@ class QuadRetriever:
         extractor: Optional[TripleExtractor] = None,
         cache: Optional[ResultCache] = None,
         freshness: Optional[FreshnessRegistry] = None,
+        health: Optional[PlaneHealthTracker] = None,
         *,
         receipt_limit: int = 256,
     ) -> None:
@@ -76,6 +78,7 @@ class QuadRetriever:
         self._cache = cache if cache is not None else ResultCache()
         self._extractor = extractor or TripleExtractor()
         self._freshness = freshness if freshness is not None else FreshnessRegistry()
+        self._health = health if health is not None else PlaneHealthTracker()
         self._receipts = ReceiptLedger(max_entries=receipt_limit)
         self._receipt_sequence = 0
         self._plane_history: deque[str] = deque(maxlen=self._PLANE_HISTORY_LIMIT)
@@ -237,26 +240,41 @@ class QuadRetriever:
         scope: Optional[RetrievalScope] = None,
     ) -> List[ScoredResult]:
         """Execute one plane and normalize its native result objects."""
-        if scope is not None:
-            scoped = getattr(retriever, "query_scoped", None)
-            if not callable(scoped):
-                raise ScopedRetrievalError(
-                    f"retrieval plane {plane_name!r} cannot enforce pre-ranking scope"
+        self._health.before_call(plane_name)
+        started = time.perf_counter()
+        try:
+            if scope is not None:
+                scoped = getattr(retriever, "query_scoped", None)
+                if not callable(scoped):
+                    raise ScopedRetrievalError(
+                        f"retrieval plane {plane_name!r} cannot enforce pre-ranking scope"
+                    )
+                plane_results = scoped(
+                    query,
+                    top_k=k,
+                    scope=scope.to_dict(),
                 )
-            plane_results = scoped(
-                query,
-                top_k=k,
-                scope=scope.to_dict(),
-            )
-        elif hasattr(retriever, "query"):
-            if plane_name == "cag":
-                plane_results = retriever.query(query)
+            elif hasattr(retriever, "query"):
+                if plane_name == "cag":
+                    plane_results = retriever.query(query)
+                else:
+                    plane_results = retriever.query(query, top_k=k)
+            elif hasattr(retriever, "retrieve"):
+                plane_results = retriever.retrieve(query, k=k)
             else:
-                plane_results = retriever.query(query, top_k=k)
-        elif hasattr(retriever, "retrieve"):
-            plane_results = retriever.retrieve(query, k=k)
+                plane_results = []
+        except Exception as exc:
+            self._health.record_failure(
+                plane_name,
+                (time.perf_counter() - started) * 1000.0,
+                exc,
+            )
+            raise
         else:
-            return []
+            self._health.record_success(
+                plane_name,
+                (time.perf_counter() - started) * 1000.0,
+            )
 
         normalized = [
             item
@@ -464,6 +482,7 @@ class QuadRetriever:
                 "receipts": len(self._receipts.recent(self._receipts.max_entries)),
                 "learner": None if learner is None else learner.stats(),
                 "freshness_revision": self._freshness.revision,
+                "plane_health": self._health.snapshot(),
             }
 
     def recent_receipts(self, limit: int = 20) -> Tuple[RetrievalReceipt, ...]:
@@ -573,9 +592,11 @@ class QuadRetriever:
 
         considered_planes = tuple(name for name, _ in plane_items)
         freshness_token = self._freshness.cache_token()
+        health_token = self._health.cache_token(considered_planes)
         scope_token = _scope.digest if _scope is not None else "unscoped"
         cache_key = (
-            f"{generation}:{freshness_token}:{scope_token}:{k}:{query_digest(query)}"
+            f"{generation}:{freshness_token}:{health_token}:"
+            f"{scope_token}:{k}:{query_digest(query)}"
         )
         if use_cache:
             cached = self._cache.get(cache_key)
@@ -656,6 +677,7 @@ class QuadRetriever:
                         failed_planes=(),
                         results=cached_list,
                         source="cache",
+                        scope_digest_value="" if _scope is None else _scope.digest,
                     )
                     if _receipt_sink is not None:
                         _receipt_sink.append(receipt)
