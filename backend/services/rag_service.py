@@ -800,39 +800,58 @@ rag_service = RAGService()
 # =============================================================================
 
 def store_memory(memory_type: str, content: str, metadata: Optional[Dict] = None) -> str:
-    """Store a memory of any type."""
-    if memory_type == "learning_session":
+    """Store a supported memory type without allowing projection-only authority.
+
+    User-owned memory types must commit to their Mongo authority first. Unknown
+    types fail closed rather than falling back to a Chroma-only write.
+    """
+    kind = str(memory_type).strip()
+    if not kind:
+        raise ValueError("memory_type is required")
+    details = dict(metadata or {})
+
+    if kind == "learning_session":
+        user_id = str(details.get("user_id") or "").strip()
+        if not user_id:
+            raise ValueError("learning_session memory requires user_id")
         return rag_service.store_learning_session(
-            user_id=metadata.get("user_id", "unknown"),
-            topic=metadata.get("topic", "general"),
+            user_id=user_id,
+            topic=str(details.get("topic") or "general"),
             content=content,
-            duration_minutes=metadata.get("duration_minutes", 0)
+            duration_minutes=int(details.get("duration_minutes") or 0),
+            mastery_delta=float(details.get("mastery_delta") or 0.0),
+            metadata=details.get("metadata"),
         )
-    elif memory_type == "concept":
+    if kind == "concept":
+        # Concepts are content/catalog retrieval material, not canonical
+        # user-memory authority. Keep this explicit instead of treating an
+        # arbitrary unknown memory type as a projection-backed concept.
         return rag_service.store_concept(
-            concept_id=metadata.get("concept_id", hashlib.sha256(content.encode()).hexdigest()[:8]),
-            name=metadata.get("name", "Unnamed Concept"),
+            concept_id=str(
+                details.get("concept_id")
+                or hashlib.sha256(content.encode()).hexdigest()[:8]
+            ),
+            name=str(details.get("name") or "Unnamed Concept"),
             explanation=content,
-            examples=metadata.get("examples", []),
-            domain=metadata.get("domain", "general")
+            examples=list(details.get("examples") or []),
+            domain=str(details.get("domain") or "general"),
+            difficulty=float(details.get("difficulty", 0.5)),
         )
-    elif memory_type == "feedback":
+    if kind == "feedback":
+        user_id = str(details.get("user_id") or "").strip()
+        if not user_id:
+            raise ValueError("feedback memory requires user_id")
         return rag_service.store_feedback(
-            user_id=metadata.get("user_id", "unknown"),
-            feedback_type=metadata.get("feedback_type", "general"),
+            user_id=user_id,
+            feedback_type=str(details.get("feedback_type") or "general"),
             content=content,
-            rating=metadata.get("rating")
+            rating=details.get("rating"),
+            context=details.get("context"),
         )
-    else:
-        # Generic storage
-        collection = rag_service._get_collection("learning_sessions")
-        memory_id = hashlib.sha256(content.encode()).hexdigest()[:16]
-        collection.add(
-            documents=[content],
-            metadatas=[{"type": memory_type, **(metadata or {})}],
-            ids=[memory_id]
-        )
-        return memory_id
+
+    raise ValueError(
+        f"unsupported memory_type {kind!r}; projection-only generic memory writes are forbidden"
+    )
 
 
 def search_memory(query: str, memory_type: Optional[str] = None, limit: int = 5) -> List[Dict]:
