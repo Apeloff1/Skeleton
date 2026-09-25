@@ -1,10 +1,9 @@
-"""AI assistant routes backed by the canonical provider runtime.
+"""AI assistant routes backed by the canonical Skeleton engine boundary.
 
-The API surface remains compatible with the existing coding assistant while
-provider execution now lives behind ``core.ai_provider``. This keeps vendor
-SDK details out of HTTP handlers, preserves conversation history, reports
-provider readiness accurately, and avoids leaking raw provider exceptions to
-clients.
+The public coding-assistant surface remains stable while model execution,
+provider credentials, durable execution state, and verification are owned by
+the Skeleton engine process. HTTP handlers compile bounded context and submit
+delegated engine commands; they do not instantiate provider transports.
 """
 
 from __future__ import annotations
@@ -446,6 +445,7 @@ async def call_llm(
             instructions=policy.instructions,
             prompt=str(user_prompt).strip(),
             objective="Execute backend AI compatibility request",
+            verification_profile="assistant_proposal",
             history=history or (),
             service_principal=client.config.service_principal,
             created_at=now,
@@ -725,6 +725,7 @@ async def ai_chat(
                     "Respond to canonical chat turn "
                     + user_message.message_id
                 ),
+                verification_profile="assistant_proposal",
                 history=history,
                 service_principal=engine_client.config.service_principal,
                 created_at=datetime.now(timezone.utc),
@@ -827,7 +828,7 @@ async def ai_chat(
     if not result["success"]:
         return {
             "success": False,
-            "response": "The AI provider is unavailable right now. Check provider configuration and retry.",
+            "response": "The AI engine is unavailable right now. Retry the request.",
             "ai_generated": False,
             "provider": "skeleton-engine" if _engine_configured() else None,
             "model": _active_model(),
