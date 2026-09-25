@@ -56,7 +56,9 @@ class PersonaContext:
         scored: List[Tuple[float, str, List[str]]] = []
         for key, facts in self.knowledge_graph.items():
             overlap = len(set(key.lower().split()) & query_words)
-            importance = self.importance_scores.get(key, 1.0)
+            if key not in self.importance_scores:
+                raise ValueError("importance is required")
+            importance = self.importance_scores[key]
             score = overlap * 0.3 + importance * 0.7
             scored.append((score, key, facts))
 
@@ -117,8 +119,14 @@ class CAGStore(MemoryStore):
         # Extract key from metadata or use chunk id
         key = chunk.metadata.get("topic", chunk.id)
         facts = chunk.text.split("\n") if "\n" in chunk.text else [chunk.text]
-        importance = chunk.metadata.get("importance", 1.0)
-        persona.add_knowledge(key, facts, importance)
+        importance = chunk.metadata.get("importance", 0.0)
+        if (
+            isinstance(importance, bool)
+            or not isinstance(importance, (int, float))
+            or not 0.0 <= float(importance) <= 1.0
+        ):
+            raise ValueError("importance must be in [0, 1]")
+        persona.add_knowledge(key, facts, float(importance))
 
     def query(
         self,
@@ -132,20 +140,30 @@ class CAGStore(MemoryStore):
             raise TypeError("top_k must be an integer")
         if top_k < 0:
             raise ValueError("top_k must be non-negative")
-        if top_k == 0 or not self._active_persona_id:
+        if top_k == 0:
             return []
+        if not self._active_persona_id:
+            raise RagQueryError("No active persona")
         persona = self._personas[self._active_persona_id]
+        query_words = set(query_text.lower().split())
+        if not query_words or not persona.knowledge_graph:
+            return []
+        best = 0.0
+        for key in persona.knowledge_graph:
+            overlap = len(set(key.lower().split()) & query_words)
+            best = max(best, overlap / len(query_words))
+        if best == 0.0:
+            return []
         context = persona.get_context_window(query_text)
 
-        # Return the context as a single synthetic chunk
         chunk = MemoryChunk(
             id=f"cag_{self._active_persona_id}",
             text=context,
             metadata={"persona": persona.name, "tier": "cag"},
             source_tier="cag",
-            confidence=1.0,
+            confidence=best,
         )
-        return [MemoryQueryResult(chunk=chunk, score=1.0, rank=1)]
+        return [MemoryQueryResult(chunk=chunk, score=best, rank=1)]
 
     def query_scoped(
         self,
@@ -161,7 +179,7 @@ class CAGStore(MemoryStore):
         if not isinstance(persona_id, str) or not persona_id:
             raise ValueError("persona_id scope must be a non-empty string")
         if persona_id != self._active_persona_id:
-            return []
+            raise ValueError("persona scope does not match the active persona")
         return self.query(query_text, top_k=top_k)
 
     def delete(self, chunk_id: str) -> bool:
