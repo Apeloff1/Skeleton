@@ -20,6 +20,7 @@ from skeleton.intelligence.quota import (
     TenantQuotaLedger,
 )
 from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
     SharedPressurePolicy,
     SqliteSharedPressureLedger,
 )
@@ -405,9 +406,8 @@ def _shared_pressure_runtime(
                 default_lease_seconds=30.0,
             )
         )
-    except Exception as exc:
-        if "already configured" not in str(exc):
-            raise
+    except SharedPressureConflict:
+        pass
     return AdmissionRuntime(
         quota_ledger=quota_ledger,
         shared_pressure_ledger=pressure,
@@ -502,4 +502,3 @@ def test_shared_pressure_configuration_is_all_or_none(tmp_path) -> None:
             shared_pressure_scope="ai-work",
             shared_pressure_owner_id="worker-a",
         )
-
