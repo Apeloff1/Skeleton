@@ -209,6 +209,42 @@ class QuadRetriever:
                 self._inflight.pop(cache_key, None)
             flight.set()
 
+    def _invalidate_cache_locked(self) -> None:
+        """Advance result generation after any ranking-affecting state change."""
+        self._cache_generation += 1
+        self._cache.clear()
+
+    def attach_weight_learner(self, learner: Any) -> Any:
+        """Attach/replace adaptive fusion state and invalidate prior rankings."""
+        required = ("effective_weights", "observe", "stats")
+        if learner is None or any(not callable(getattr(learner, name, None)) for name in required):
+            raise TypeError("learner must provide effective_weights(), observe(), and stats()")
+        with self._state_lock:
+            if learner is self._weight_learner:
+                return learner
+            self._weight_learner = learner
+            self._invalidate_cache_locked()
+        return learner
+
+    def export_weight_state(self) -> Optional[Dict[str, Any]]:
+        """Return a durable learner checkpoint when adaptive fusion is enabled."""
+        with self._state_lock:
+            learner = self._weight_learner
+            if learner is None:
+                return None
+            snapshot = getattr(learner, "snapshot", None)
+            if not callable(snapshot):
+                raise TypeError("attached learner does not support durable snapshots")
+            return snapshot()
+
+    def restore_weight_state(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Restore adaptive fusion state and invalidate rankings from old weights."""
+        from skeleton.retrieval.plane_weights import PlaneWeightLearner
+
+        learner = PlaneWeightLearner.from_snapshot(state)
+        self.attach_weight_learner(learner)
+        return learner.stats()
+
     def retrieve(self, query: str, k: int = 8, use_cache: bool = True) -> List[ScoredResult]:
         """Query registered planes concurrently and fuse deterministic results."""
         t0 = time.perf_counter()
@@ -348,20 +384,36 @@ class QuadRetriever:
     @property
     def weights(self) -> Dict[str, float]:
         """Static plane weights, or the attached learner's effective weights."""
-        learner = self._weight_learner
-        if learner is None:
-            return dict(self._static_weights)
-        return learner.effective_weights()
+        with self._state_lock:
+            learner = self._weight_learner
+            if learner is None:
+                return dict(self._static_weights)
+            return learner.effective_weights()
 
     def observe(self, used_planes, *, all_planes=None) -> Dict[str, Any]:
-        """Record which planes a consumer actually used and return learner stats."""
-        from skeleton.retrieval.plane_weights import attach_learner
+        """Record feedback and invalidate rankings learned under old weights."""
+        from skeleton.retrieval.plane_weights import PlaneWeightLearner
 
+        used = tuple(used_planes)
+        considered = tuple(all_planes) if all_planes is not None else None
         with self._state_lock:
             if self._weight_learner is None:
-                attach_learner(self)
-            self._weight_learner.observe(used_planes, all_planes=all_planes)
-            return self._weight_learner.stats()
+                self._weight_learner = PlaneWeightLearner(self._static_weights)
+            self._weight_learner.observe(used, all_planes=considered)
+            self._invalidate_cache_locked()
+            stats = self._weight_learner.stats()
+
+        if self._bus:
+            self._bus.emit(
+                "retrieval.feedback.updated",
+                {
+                    "used_planes": sorted(set(used)),
+                    "all_planes": sorted(set(considered)) if considered is not None else None,
+                    "updates": stats["updates"],
+                    "weights": stats["weights"],
+                },
+            )
+        return stats
 
     def _fuse(self, results_by_plane: Dict[str, List[ScoredResult]], top_k: int) -> List[ScoredResult]:
         """RRF by default. An attached learner scales each plane's contribution."""
