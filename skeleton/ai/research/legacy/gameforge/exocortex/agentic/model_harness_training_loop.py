@@ -65,7 +65,7 @@ class ModelHarnessTrainingLoop:
         """Full cycle: Discover -> Add -> Train -> Improve. Repeats."""
         cycle_id = len(self.cycles) + 1
         cycle = ModelHarnessCycle(cycle_id=cycle_id)
-
+        
         # Discover (sim: from context or idle_training)
         discovered = [
             HarnessPrimitive(f"loop_{cycle_id}_reasoning", "loop", f"Reasoning loop for {prompt_context}"),
@@ -73,15 +73,15 @@ class ModelHarnessTrainingLoop:
             HarnessPrimitive(f"ralph_loop_{cycle_id}", "ralph_loop", "Early exit prevention loop")
         ]
         cycle.discovered_primitives = discovered
-
+        
         for prim in discovered:
             update = self.add_to_harness(prim)
             cycle.harness_updates.append(update)
-
+        
         # Train
         new_perf = self.train_next_model(with_harness=True)
         cycle.model_improvement = new_perf - (new_perf - 0.05)
-
+        
         cycle.status = "completed" if new_perf > 0.8 else "active"
         self.cycles.append(cycle)
         return cycle

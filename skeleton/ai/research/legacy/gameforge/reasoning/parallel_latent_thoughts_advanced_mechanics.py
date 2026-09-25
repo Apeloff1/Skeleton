@@ -13,7 +13,7 @@ class ParallelLatentThoughtsAdvancedMechanics:
         self.streams = {}
         self.attention_weights = {}
 
-    def initialize_parallel_streams(self, session_id: str, num_streams: int = 8,
+    def initialize_parallel_streams(self, session_id: str, num_streams: int = 8, 
                                     base_attention: float = 1.0) -> Dict:
         """Initialize multiple parallel latent thought streams with attention."""
         streams = {}
@@ -33,15 +33,15 @@ class ParallelLatentThoughtsAdvancedMechanics:
         """Perform cross-stream attention and re-weighting."""
         if session_id not in self.streams:
             return {"error": "Session not found"}
-
+        
         streams = self.streams[session_id]
-
+        
         # Simulate attention-based reweighting
         total_coherence = sum(s["coherence"] for s in streams.values())
         for i, stream in streams.items():
             new_weight = stream["coherence"] / total_coherence if total_coherence > 0 else 1.0
             self.attention_weights[session_id][i] = new_weight
-
+        
         return {
             "attention_weights_updated": self.attention_weights[session_id],
             "synthesis_quality": total_coherence / len(streams)
@@ -51,7 +51,7 @@ class ParallelLatentThoughtsAdvancedMechanics:
         """Synthesize final understanding from all parallel streams."""
         if session_id not in self.streams:
             return "No streams found"
-
+        
         streams = self.streams[session_id]
         synthesis = "Synthesized understanding from {} parallel latent streams with attention weighting.".format(len(streams))
         return synthesis

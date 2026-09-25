@@ -20,7 +20,7 @@ class LatentSpaceSerialReasoningEngine:
         Each iteration refines the latent state without emitting tokens until final answer.
         """
         loop_id = f"loop_{agent_id}_{datetime.now().timestamp()}"
-
+        
         loop_state = {
             "loop_id": loop_id,
             "agent_id": agent_id,
@@ -34,7 +34,7 @@ class LatentSpaceSerialReasoningEngine:
             "status": "running",
             "started_at": datetime.now().isoformat()
         }
-
+        
         self.active_loops[loop_id] = loop_state
         return loop_state
 
@@ -42,10 +42,10 @@ class LatentSpaceSerialReasoningEngine:
         """Run one iteration of latent serial reasoning."""
         if loop_id not in self.active_loops:
             return {"error": "Loop not found"}
-
+        
         loop = self.active_loops[loop_id]
         loop["current_iteration"] += 1
-
+        
         # Simulate latent refinement (in real system this would be internal model state)
         refinement = {
             "iteration": loop["current_iteration"],
@@ -53,14 +53,14 @@ class LatentSpaceSerialReasoningEngine:
             "parallel_thoughts_generated": 3,
             "confidence": 0.7 + (loop["current_iteration"] * 0.03)
         }
-
+        
         loop["refinements"].append(refinement)
-
+        
         if loop["current_iteration"] >= loop["max_iterations"]:
             loop["status"] = "completed"
             final_answer = self._synthesize_final_answer(loop)
             return {"status": "completed", "final_answer": final_answer, "iterations": loop["current_iteration"]}
-
+        
         return {"status": "running", "iteration": loop["current_iteration"], "refinement": refinement}
 
     def _synthesize_final_answer(self, loop: Dict) -> str:

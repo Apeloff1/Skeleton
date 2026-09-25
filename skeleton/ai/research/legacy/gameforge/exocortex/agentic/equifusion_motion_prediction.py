@@ -67,9 +67,9 @@ class EquiFusionMotionPrediction:
         """
         if kinematics_name not in self.kinematics_cache:
             self.register_kinematics(kinematics_name, [f"joint_{i}" for i in range(self.num_joints)], [[i, i+1] for i in range(self.num_joints-1)])
-
+        
         predicted = self.equivariant_latent_diffusion(observation, kinematics_name)
-
+        
         pred = MotionPrediction(
             input_observation=observation,
             predicted_motion=predicted,

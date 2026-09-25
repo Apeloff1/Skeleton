@@ -155,7 +155,7 @@ class HybridRAGEngine:
         """Full agentic hybrid RAG + generation loop (read → retrieve → reason → generate)."""
         rag_query = HybridRAGQuery(query=query, agent_decision=True, sources=["mcp", "web", "local"])
         retrieved = self.agentic_retrieve(rag_query, agent_context)
-
+        
         # Grok reflection on retrieval quality
         if grok_thinking:
             grok = grok_thinking.grok_think(f"RAG for {query}", context={"retrieved": len(retrieved)})

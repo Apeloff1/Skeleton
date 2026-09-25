@@ -57,23 +57,23 @@ class AssetValidator:
     def validate(self, path: str, asset_type: str) -> Dict[str, Any]:
         """Validate an asset file."""
         p = Path(path)
-
+        
         if not p.exists():
             return {"valid": False, "error": "file_not_found"}
-
+        
         ext = p.suffix.lower().lstrip(".")
         supported = self.SUPPORTED_FORMATS.get(asset_type, [])
-
+        
         if ext not in supported:
             return {"valid": False, "error": f"unsupported_format: {ext}", "supported": supported}
-
+        
         # Compute checksum
         try:
             with open(p, "rb") as f:
                 checksum = hashlib.blake2b(f.read(), digest_size=32).hexdigest()
         except Exception as e:
             return {"valid": False, "error": str(e)}
-
+        
         return {
             "valid": True,
             "checksum": checksum,
@@ -99,7 +99,7 @@ class AssetLibrary:
         validation = self._validator.validate(path, asset_type)
         if not validation["valid"]:
             return validation
-
+        
         import uuid
         asset = Asset(
             asset_id=str(uuid.uuid4())[:12],
@@ -111,22 +111,22 @@ class AssetLibrary:
             metadata=metadata or {},
             tags=tags or [],
         )
-
+        
         self._assets[asset.asset_id] = asset
         self._by_type.setdefault(asset_type, []).append(asset.asset_id)
-
+        
         for tag in (tags or []):
             self._by_tag.setdefault(tag, []).append(asset.asset_id)
-
+        
         self._stats["ingested"] += 1
-
+        
         if self._bus:
             self._bus.emit("acquired.asset.ingested", {
                 "asset_id": asset.asset_id,
                 "name": name,
                 "type": asset_type,
             })
-
+        
         return {"valid": True, "asset_id": asset.asset_id, "asset": asset.to_dict()}
 
     def get(self, asset_id: str) -> Optional[Asset]:
@@ -137,17 +137,17 @@ class AssetLibrary:
     def find(self, asset_type: Optional[str] = None, tag: Optional[str] = None) -> List[Asset]:
         """Find assets by type or tag."""
         results = set()
-
+        
         if asset_type:
             results.update(self._by_type.get(asset_type, []))
-
+        
         if tag:
             tag_results = set(self._by_tag.get(tag, []))
             if results:
                 results &= tag_results
             else:
                 results = tag_results
-
+        
         return [self._assets[aid] for aid in results if aid in self._assets]
 
     def stats(self) -> Dict[str, Any]:
@@ -187,12 +187,12 @@ class AssetIngestor:
                 metadata=item.get("metadata"),
             )
             results.append(result)
-
+        
         self._batch_queue.clear()
-
+        
         successful = sum(1 for r in results if r.get("valid"))
         failed = len(results) - successful
-
+        
         return {
             "processed": len(results),
             "successful": successful,

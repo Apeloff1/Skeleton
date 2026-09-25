@@ -40,7 +40,7 @@ class GrokThinkingEngine:
         reasoning = f"Grok thinking on '{prompt[:60]}...': Prioritize truth over pleasing. Context from MCP/DiP/exocortex used. Self-corrected assumptions. Output optimized for game creation truth + utility."
         if max_truth:
             reasoning += " Maximal truth mode: No sugarcoating. If data weak, say so. If better path exists via open source libs (Godot/Pygame/RLlib), recommend it."
-
+        
         result = {
             "grok_thinking_steps": steps,
             "reasoning": reasoning,
