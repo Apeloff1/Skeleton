@@ -18,6 +18,7 @@ from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
+import hashlib
 import logging
 import uuid
 import re
@@ -26,7 +27,7 @@ import re
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
+from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 
 logger = logging.getLogger("CodeDock.AIDebugger")
 router = APIRouter(prefix="/debugger", tags=["AI Debugger"])
@@ -81,25 +82,39 @@ def _debugger_http_error(operation: str, exc: Exception) -> HTTPException:
 
 
 async def call_debugger_ai(prompt: str, system_prompt: str) -> str:
+    """Execute debugger analysis through the canonical Skeleton engine."""
+
+    material = hashlib.sha256(
+        (system_prompt + "\n" + prompt).encode("utf-8")
+    ).hexdigest()
     try:
-        adapter = ProviderRegistry.from_env().require_active()
-        response = await adapter.generate(
-            ProviderRequest(
+        response = await execute_engine_text(
+            EngineTextRequest(
                 instructions=system_prompt,
                 prompt=prompt,
-                model="gpt-4o" if adapter.provider_id == "openai" else None,
+                idempotency_key="ai-debugger:" + material,
+                actor_id="ai-debugger",
+                capability="assistant.compat",
+                verification_profile="assistant_proposal",
+                max_output_tokens=16_384,
                 purpose="code-debugging",
             )
         )
         return response.text
-    except ProviderError as exc:
-        logger.warning("AI debugger provider failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=503, detail="AI debugger provider failed") from None
+    except EngineTextError as exc:
+        logger.warning("AI debugger engine failed: %s", type(exc).__name__)
+        raise HTTPException(
+            status_code=503,
+            detail="AI debugger engine failed",
+        ) from None
     except HTTPException:
         raise
     except Exception as exc:
         logger.warning("AI debugger boundary failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=500, detail="AI debugger provider failed") from None
+        raise HTTPException(
+            status_code=500,
+            detail="AI debugger request failed",
+        ) from None
 
 # ============================================================================
 # DEBUGGER ENDPOINTS

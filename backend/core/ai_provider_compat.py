@@ -1,26 +1,25 @@
-"""Narrow compatibility facade for retiring ``emergentintegrations.llm.chat``.
+"""Narrow compatibility facade for retired legacy LLM chat callers.
 
-Older backend call sites keep their historical builder/message surface while
-supported text generation is routed through :mod:`core.ai_provider`. This is a
-migration bridge, not a second provider runtime. New code must use
-``ProviderRegistry`` / ``ProviderRequest`` directly.
-
-Legacy provider/model hints are advisory. The configured ``AI_PROVIDER`` remains
-authoritative, credentials come from the canonical provider environment, and
-unsupported multimodal operations fail explicitly instead of fabricating data.
+Older backend call sites retain their historical builder/message surface while
+text generation is delegated to the canonical Skeleton engine. This module
+does not read provider credentials, instantiate provider adapters, or perform
+provider network transport.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any
 
-from core.ai_provider import (
-    AIMessage,
-    ProviderRegistry,
-    ProviderRequest,
-    ProviderUnavailableError,
+from core.engine_text import (
+    EngineTextError,
+    EngineTextRequest,
+    EngineTextResponse,
+    execute_engine_text,
 )
+from skeleton.provider_runtime import ProviderUnavailableError
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -41,7 +40,7 @@ class UserMessage:
 
 
 class ChatResponse(str):
-    """String response that also exposes the legacy ``.content`` attribute."""
+    """String response that also exposes the legacy content attribute."""
 
     @property
     def content(self) -> str:
@@ -49,7 +48,7 @@ class ChatResponse(str):
 
 
 class LlmChat:
-    """Builder-compatible facade backed by the canonical provider registry."""
+    """Builder-compatible facade backed by the canonical engine text adapter."""
 
     def __init__(
         self,
@@ -67,11 +66,10 @@ class LlmChat:
         if system_message is None and positional:
             system_message = positional.pop(0)
         if positional:
-            raise TypeError("LlmChat accepts at most three legacy positional arguments")
+            raise TypeError(
+                "LlmChat accepts at most three legacy positional arguments"
+            )
 
-        # ``api_key`` is accepted solely for source compatibility. Credentials
-        # are intentionally resolved by the canonical provider runtime so a
-        # legacy universal key is never forwarded to an unrelated vendor API.
         self._legacy_api_key_present = bool(api_key)
         self.session_id = str(session_id or "")
         self.system_message = str(system_message or "")
@@ -79,9 +77,10 @@ class LlmChat:
         self._model_hint: str | None = None
         self._max_output_tokens: int | None = None
         self._params: dict[str, Any] = {}
-        self._history: list[AIMessage] = []
+        self._history: list[dict[str, str]] = []
 
     def with_model(self, provider: str, model: str) -> "LlmChat":
+        # Compatibility metadata only. Provider/model routing is engine-owned.
         self._provider_hint = (provider or "").strip().lower() or None
         self._model_hint = (model or "").strip() or None
         return self
@@ -102,8 +101,7 @@ class LlmChat:
         return self
 
     def with_temperature(self, temperature: float) -> "LlmChat":
-        # Accepted for migration compatibility. The neutral provider contract
-        # does not currently expose sampling controls, so this remains metadata.
+        # Accepted for migration compatibility. Sampling remains engine-owned.
         self._params["temperature"] = float(temperature)
         return self
 
@@ -117,35 +115,58 @@ class LlmChat:
             raise TypeError("legacy chat message must provide text/content")
         return str(text)
 
-    async def send_message(self, message: Any) -> ChatResponse:
-        prompt = self._prompt_text(message)
-        registry = ProviderRegistry.from_env()
-        adapter = registry.require_active()
+    def _idempotency_key(self, prompt: str) -> str:
+        material = json.dumps(
+            {
+                "session_id": self.session_id,
+                "turn_index": len(self._history),
+                "prompt": prompt,
+                "history": self._history,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        return "legacy-llm-chat:" + hashlib.sha256(material).hexdigest()
 
-        # Only honor a model hint when it belongs to the configured provider.
-        # Cross-provider legacy hints (for example Claude/Gemini) must not make
-        # an OpenAI request claim to be another provider.
-        model = self._model_hint if self._provider_hint == adapter.provider_id else None
-        response = await adapter.generate(
-            ProviderRequest(
-                instructions=self.system_message,
-                prompt=prompt,
-                history=tuple(self._history),
-                max_output_tokens=self._max_output_tokens,
-                model=model,
-            )
+    async def send_message(self, message: Any) -> ChatResponse:
+        prompt = self._prompt_text(message).strip()
+        if not prompt:
+            raise ValueError("legacy chat prompt must be non-empty")
+        instructions = (
+            self.system_message.strip()
+            or "Respond helpfully to the user request."
         )
-        self._history.append(AIMessage(role="user", content=prompt))
-        self._history.append(AIMessage(role="assistant", content=response.text))
+        request = EngineTextRequest(
+            instructions=instructions,
+            prompt=prompt,
+            idempotency_key=self._idempotency_key(prompt),
+            history=tuple(self._history),
+            tenant_id="default",
+            actor_id="legacy-llm-chat",
+            capability="assistant.compat",
+            max_output_tokens=self._max_output_tokens,
+        )
+        try:
+            response: EngineTextResponse = await execute_engine_text(request)
+        except EngineTextError as exc:
+            raise ProviderUnavailableError(
+                "canonical engine text execution is unavailable"
+            ) from exc
+
+        self._history.append({"role": "user", "content": prompt})
+        self._history.append(
+            {"role": "assistant", "content": response.text}
+        )
         return ChatResponse(response.text)
 
     async def chat(self, message: Any) -> ChatResponse:
-        """Legacy alias for :meth:`send_message`."""
+        """Legacy alias for send_message."""
 
         return await self.send_message(message)
 
     async def generate(self, message: Any) -> ChatResponse:
-        """Legacy alias for :meth:`send_message`."""
+        """Legacy alias for send_message."""
 
         return await self.send_message(message)
 
@@ -154,7 +175,7 @@ class LlmChat:
     ) -> tuple[str, list[dict[str, Any]]]:
         del message
         raise ProviderUnavailableError(
-            "legacy multimodal generation is not implemented by the canonical text provider runtime"
+            "legacy multimodal generation is not implemented by the engine text compatibility boundary"
         )
 
 

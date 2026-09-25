@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from functools import lru_cache
 import json
 import os
 import sys
@@ -121,10 +122,63 @@ def _sdk_root(name: str) -> str:
     return name.split(".", 1)[0]
 
 
-def _imported_modules(path: Path) -> list[str]:
+@lru_cache(maxsize=16_384)
+def _cached_python_tree(
+    path_text: str,
+    mtime_ns: int,
+    size: int,
+) -> ast.AST | None:
+    """Parse one unchanged Python file once per validator process."""
+
+    del mtime_ns, size  # Cache-key material; content is read only on cache miss.
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
+        return ast.parse(Path(path_text).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, SyntaxError):
+        return None
+
+
+def _python_tree(path: Path) -> ast.AST | None:
+    try:
+        stat = path.stat()
+    except OSError:
+        return None
+    return _cached_python_tree(
+        str(path.resolve()),
+        int(stat.st_mtime_ns),
+        int(stat.st_size),
+    )
+
+
+@lru_cache(maxsize=16_384)
+def _cached_source(
+    path_text: str,
+    mtime_ns: int,
+    size: int,
+) -> str:
+    """Read one unchanged Python source file once per validator process."""
+
+    del mtime_ns, size
+    try:
+        return Path(path_text).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def _python_source(path: Path) -> str:
+    try:
+        stat = path.stat()
+    except OSError:
+        return ""
+    return _cached_source(
+        str(path.resolve()),
+        int(stat.st_mtime_ns),
+        int(stat.st_size),
+    )
+
+
+def _imported_modules(path: Path) -> list[str]:
+    tree = _python_tree(path)
+    if tree is None:
         return []
     modules: list[str] = []
     for node in ast.walk(tree):
@@ -157,9 +211,8 @@ def _shadow_provider_runtime_imports(path: Path) -> list[str]:
 
 def _network_transport_imports(path: Path) -> list[str]:
     hits: list[str] = []
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
+    tree = _python_tree(path)
+    if tree is None:
         return hits
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -183,9 +236,8 @@ def _network_transport_imports(path: Path) -> list[str]:
 def _credential_environment_reads(path: Path) -> list[str]:
     """Return credential names actually read from os.getenv/os.environ APIs."""
 
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
+    tree = _python_tree(path)
+    if tree is None:
         return []
 
     hits: set[str] = set()
@@ -262,9 +314,8 @@ def _credential_markers(path: Path) -> list[str]:
     classifying modules that explicitly own a provider credential variable.
     """
     hits = set(_credential_environment_reads(path))
-    try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError):
+    tree = _python_tree(path)
+    if tree is None:
         return sorted(hits)
 
     for node in ast.walk(tree):
@@ -342,9 +393,8 @@ def discover_provider_surfaces(repo_root: Path) -> dict[str, dict[str, list[str]
                 or _is_non_runtime_provider_mirror(relative)
             ):
                 continue
-            try:
-                source = path.read_text(encoding="utf-8")
-            except OSError:
+            source = _python_source(path)
+            if not source:
                 continue
             signals = _provider_surface_signals(path, source)
             edge_classes: list[str] = []
@@ -802,10 +852,7 @@ def validate_provider_bootstrap(repo_root: Path = ROOT) -> list[str]:
                         f"{relative}: {', '.join(hits)}"
                     )
 
-            try:
-                source = path.read_text(encoding="utf-8")
-            except OSError:
-                source = ""
+            source = _python_source(path)
             signals = _provider_surface_signals(path, source)
             if (
                 relative not in network_surface_owners

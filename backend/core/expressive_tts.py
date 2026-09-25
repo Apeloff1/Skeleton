@@ -1,24 +1,11 @@
-"""
-╔══════════════════════════════════════════════════════════════════════════╗
-║  EXPRESSIVE TTS ENGINE — "innlevelse" / immersive storyteller delivery    ║
-║                                                                            ║
-║  The Emergent LLM key only exposes `tts-1` / `tts-1-hd` (the steerable     ║
-║  `gpt-4o-mini-tts` `instructions` param is NOT available through the       ║
-║  proxy). tts-1-hd, however, honours PUNCTUATION & PACING in the input      ║
-║  text — commas, periods, ellipses, em-dashes and line breaks all change    ║
-║  the delivered rhythm.                                                      ║
-║                                                                            ║
-║  So we get augmented tone control two ways:                                ║
-║    1. TONE PRESETS  → pick the voice + speaking-rate that fits the mood.    ║
-║    2. CADENCE SHAPING → rewrite the script with storyteller punctuation     ║
-║       (dramatic em-dash beats, suspense ellipses, breath pauses) so the     ║
-║       HD model performs it with real rhythm & emotional lift.               ║
-╚══════════════════════════════════════════════════════════════════════════╝
-"""
+"""Expressive TTS shaping for engine-owned speech synthesis.\n\nThe backend owns presentation concerns only: tone presets, voice/speed choices,\ncadence shaping, chunking, and the product-facing response shape. Provider\ncredentials, provider transport, governance/admission, and speech execution\nbelong to the Skeleton engine process through EngineClient.\n\nThis keeps the historical immersive storyteller behavior while enforcing the\nStage-5 process boundary: backend may describe the desired speech operation but\ncannot instantiate or authenticate a model provider locally.\n"""
 from __future__ import annotations
 import base64
 import re
+import uuid
 from typing import Dict, List, Optional
+
+from core.engine_client import EngineClient, EngineClientError
 
 TTS_LIMIT = 4096
 
@@ -166,20 +153,24 @@ async def generate_expressive_tts(
     if not spoken:
         raise ValueError("No text to speak")
 
-    from core.ai_provider import ProviderRegistry, ProviderSpeechRequest
-
-    adapter = ProviderRegistry.from_env().require_active()
-    response = await adapter.synthesize_speech(
-        ProviderSpeechRequest(
-            text=spoken,
-            model="tts-1-hd",
-            voice=voice,
-            speed=speed,
-            response_format="mp3",
-            purpose="expressive-speech-synthesis",
-        )
+    client = EngineClient.from_env()
+    if client is None:
+        raise EngineClientError("canonical engine is not configured")
+    operation_id = str(uuid.uuid4())
+    response = await client.synthesize_speech(
+        actor_id="expressive-tts",
+        tenant_id="default",
+        operation_id=operation_id,
+        text=spoken,
+        voice=voice,
+        speed=speed,
+        response_format="mp3",
+        trace_id="expressive-tts:" + operation_id,
     )
-    audio_b64 = base64.b64encode(response.audio).decode("ascii")
+    audio = response.get("audio")
+    if not isinstance(audio, (bytes, bytearray)) or not audio:
+        raise EngineClientError("engine speech response is missing audio")
+    audio_b64 = base64.b64encode(bytes(audio)).decode("ascii")
     return {
         "audio_base64": audio_b64,
         "format": "mp3",

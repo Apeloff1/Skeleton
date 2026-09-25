@@ -27,12 +27,13 @@ from dotenv import load_dotenv
 import uuid
 import os
 import re
+import hashlib
 import json
 
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from core.ai_provider import ProviderError, ProviderRegistry, ProviderRequest
+from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -147,18 +148,30 @@ QUALITY_METRICS = {
 # ============================================================================
 
 async def call_ai(prompt: str, system_prompt: str = None) -> str:
-    """Call the declared provider through the canonical engine runtime."""
+    """Execute tool-free software-engineering analysis through the engine."""
+
+    instructions = (
+        system_prompt
+        or "You are a precise software engineering assistant."
+    )
+    material = hashlib.sha256(
+        (instructions + "\n" + prompt).encode("utf-8")
+    ).hexdigest()
     try:
-        adapter = ProviderRegistry.from_env().require_active()
-        response = await adapter.generate(
-            ProviderRequest(
-                instructions=system_prompt or "You are a precise software engineering assistant.",
+        response = await execute_engine_text(
+            EngineTextRequest(
+                instructions=instructions,
                 prompt=prompt,
+                idempotency_key="ai-toolkit:" + material,
+                actor_id="ai-toolkit",
+                capability="assistant.compat",
+                verification_profile="assistant_proposal",
+                max_output_tokens=16_384,
                 purpose="software-engineering-assistance",
             )
         )
         return response.text
-    except ProviderError:
+    except EngineTextError:
         return "llm_request_failed"
 
 

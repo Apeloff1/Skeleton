@@ -16,12 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from core.http_errors import internal_http_error
-from core.ai_provider import (
-    ProviderError,
-    ProviderImageRequest,
-    ProviderRegistry,
-    ProviderRequest,
-)
+from core.engine_client import EngineClient, EngineClientError
+from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
 from skeleton.context.instruction_policy import InstructionPolicy
 import uuid
 import base64
@@ -120,39 +116,35 @@ class ImageEditRequest(BaseModel):
 # ============================================================================
 
 async def generate_with_openai(prompt: str, size: str, quality: str, count: int) -> dict:
-    """Generate images through the declared canonical OpenAI provider."""
+    """Generate images through the authenticated Skeleton engine media boundary."""
     try:
-        adapter = ProviderRegistry.from_env().require_active()
-        if adapter.provider_id != "openai":
-            return {
-                "provider": adapter.provider_id,
-                "error": "OpenAI image provider is not active",
-                "error_code": "provider_not_active",
-                "status": "failed",
-            }
-        response = await adapter.generate_image(
-            ProviderImageRequest(
-                prompt=prompt,
-                size=size,
-                quality=quality,
-                count=count,
-                model="gpt-image-1",
-                purpose="image-generation",
-            )
+        client = EngineClient.from_env()
+        if client is None:
+            raise EngineClientError("engine is not configured")
+        operation_id = str(uuid.uuid4())
+        response = await client.generate_image(
+            actor_id="image-generation",
+            tenant_id="default",
+            operation_id=operation_id,
+            prompt=prompt,
+            size=size,
+            quality=quality,
+            count=count,
+            trace_id="image-generation:" + operation_id,
         )
         return {
-            "provider": response.provider,
-            "model": response.model,
-            "images": list(response.images),
+            "provider": response.get("provider", "skeleton-engine"),
+            "model": response.get("model", "engine-routed"),
+            "images": list(response.get("images", [])),
             "status": "success",
-            "governance_decision_id": response.governance_decision_id,
-            "admission_decision_id": response.admission_decision_id,
+            "governance_decision_id": response.get("governance_decision_id"),
+            "admission_decision_id": response.get("admission_decision_id"),
         }
-    except ProviderError:
+    except EngineClientError:
         return {
-            "provider": "openai",
+            "provider": "skeleton-engine",
             "error": "image generation failed",
-            "error_code": "provider_failure",
+            "error_code": "engine_failure",
             "status": "failed",
         }
 
@@ -370,24 +362,29 @@ async def create_variation(request: ImageVariationRequest):
     request_id = str(uuid.uuid4())
     try:
         image_bytes = base64.b64decode(request.image_base64, validate=True)
-        adapter = ProviderRegistry.from_env().require_active()
-        response = await adapter.create_image_variation(
+        client = EngineClient.from_env()
+        if client is None:
+            raise EngineClientError("engine is not configured")
+        response = await client.create_image_variation(
             image_bytes,
+            actor_id="image-generation",
+            tenant_id="default",
+            operation_id=request_id,
             count=request.count,
             size="1024x1024",
-            operation_id=request_id,
+            trace_id="image-variation:" + request_id,
         )
         return {
             "id": request_id,
             "status": "success",
-            "provider": response.provider,
-            "model": response.model,
-            "variations": list(response.images),
-            "governance_decision_id": response.governance_decision_id,
-            "admission_decision_id": response.admission_decision_id,
+            "provider": response.get("provider", "skeleton-engine"),
+            "model": response.get("model", "engine-routed"),
+            "variations": list(response.get("images", [])),
+            "governance_decision_id": response.get("governance_decision_id"),
+            "admission_decision_id": response.get("admission_decision_id"),
             "timestamp": datetime.utcnow().isoformat(),
         }
-    except (ValueError, ProviderError) as exc:
+    except (ValueError, EngineClientError) as exc:
         raise internal_http_error("Image generation failed", exc) from None
 
 
@@ -404,26 +401,34 @@ async def edit_image(request: ImageEditRequest):
             if request.mask_base64
             else None
         )
-        adapter = ProviderRegistry.from_env().require_active()
-        response = await adapter.edit_image(
+        client = EngineClient.from_env()
+        if client is None:
+            raise EngineClientError("engine is not configured")
+        response = await client.edit_image(
             image_bytes,
             prompt=request.prompt,
+            actor_id="image-generation",
+            tenant_id="default",
+            operation_id=request_id,
             mask=mask_bytes,
             size="1024x1024",
-            operation_id=request_id,
+            trace_id="image-edit:" + request_id,
         )
+        images = response.get("images", [])
+        if not isinstance(images, list) or not images:
+            raise EngineClientError("engine image edit returned no image")
         return {
             "id": request_id,
             "status": "success",
-            "provider": response.provider,
-            "model": response.model,
-            "edited_image": response.images[0],
+            "provider": response.get("provider", "skeleton-engine"),
+            "model": response.get("model", "engine-routed"),
+            "edited_image": images[0],
             "prompt": request.prompt,
-            "governance_decision_id": response.governance_decision_id,
-            "admission_decision_id": response.admission_decision_id,
+            "governance_decision_id": response.get("governance_decision_id"),
+            "admission_decision_id": response.get("admission_decision_id"),
             "timestamp": datetime.utcnow().isoformat(),
         }
-    except (ValueError, ProviderError) as exc:
+    except (ValueError, EngineClientError) as exc:
         raise internal_http_error("Image generation failed", exc) from None
 
 
@@ -454,11 +459,15 @@ Create a vivid, specific prompt that includes:
 Output only the enhanced prompt, no explanations."""
 
     try:
-        adapter = ProviderRegistry.from_env().require_active()
-        response = await adapter.generate(
-            ProviderRequest(
+        response = await execute_engine_text(
+            EngineTextRequest(
                 instructions=IMAGE_PROMPT_ENHANCEMENT_POLICY.instructions,
                 prompt=enhancement_prompt,
+                idempotency_key="image-prompt-enhancement:" + request_id,
+                actor_id="image-generation",
+                capability="assistant.compat",
+                verification_profile="assistant_proposal",
+                max_output_tokens=2_048,
                 purpose="image-prompt-enhancement",
             )
         )
@@ -467,9 +476,9 @@ Output only the enhanced prompt, no explanations."""
             "original_prompt": prompt,
             "enhanced_prompt": response.text,
             "style": style,
-            "provider": response.provider,
-            "model": response.model,
+            "provider": "skeleton-engine",
+            "model": "engine-routed",
             "timestamp": datetime.utcnow().isoformat(),
         }
-    except ProviderError as exc:
+    except EngineTextError as exc:
         raise internal_http_error("Image generation failed", exc) from None

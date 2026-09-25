@@ -16,6 +16,7 @@ from core.engine_client import (
     EngineUnavailableError,
     command_from_context,
 )
+from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -24,6 +25,9 @@ from skeleton.contracts.context import (
     ContextTrust,
     context_digest_payload,
 )
+
+
+_SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
 
 
 def _now() -> datetime:
@@ -129,9 +133,11 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.delegated_authority.tenant_id == "tenant-a"
     assert "engine:submit" in command.delegated_authority.scopes
     assert "engine:read" in command.delegated_authority.scopes
+    assert "engine:approve" not in command.delegated_authority.scopes
     assert command.execution_request.resource_budget["max_model_turns"] == 4
     assert command.execution_request.resource_budget["max_tool_calls"] == 1
     assert command.execution_request.tool_policy["allowed_tool_ids"] == []
+    assert command.execution_request.context_policy["verification_profile"] == "evidence_required"
     assert command.compiled_context.tool_choice == "none"
     assert command.compiled_context.history == (
         ("user", "Earlier question"),
@@ -141,6 +147,150 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.execution_request.context_policy["handoff_digest"] == (
         command.compiled_context.handoff_digest
     )
+
+
+def test_command_from_context_binds_assistant_proposal_profile() -> None:
+    context = _context()
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="proposal-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+    )
+
+    assert command.execution_request.context_policy["verification_profile"] == "assistant_proposal"
+    assert command.execution_request.tool_policy["allowed_tool_ids"] == []
+
+
+def test_command_from_context_rejects_assistant_profile_for_non_assistant_capability() -> None:
+    context = _context()
+    with pytest.raises(EngineProtocolError, match="assistant capability"):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="admin.execute",
+            idempotency_key="proposal-idem",
+            instructions="Policy",
+            prompt="Prompt",
+            verification_profile="assistant_proposal",
+        )
+
+
+def test_rebuilt_command_keeps_submission_digest_across_fresh_authority() -> None:
+    context = _context()
+    started = _now()
+    first = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="retry-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+        created_at=started,
+        deadline=started + timedelta(minutes=2),
+    )
+    retry_started = started + timedelta(seconds=30)
+    retry = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="retry-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+        created_at=retry_started,
+        deadline=retry_started + timedelta(minutes=2),
+    )
+
+    assert first.command_digest != retry.command_digest
+    assert first.submission_digest == retry.submission_digest
+    assert first.execution_request.identity_digest == retry.execution_request.identity_digest
+    assert first.operation.identity_digest == retry.operation.identity_digest
+
+
+def test_command_from_context_binds_tool_definitions_and_choice() -> None:
+    context = _context()
+    tool = ProviderToolDefinition(
+        tool_id="repo.read",
+        description="Read one repository file.",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+    )
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="tool-idem",
+        instructions="Use the allowed tool when required.",
+        prompt="Read README.md.",
+        tools=(tool,),
+        tool_choice="required",
+        max_tool_calls=2,
+    )
+
+    assert command.compiled_context.tools == (tool,)
+    assert command.compiled_context.tool_choice == "required"
+    assert command.execution_request.tool_policy["allowed_tool_ids"] == [
+        "repo.read"
+    ]
+    assert command.execution_request.context_policy["tool_choice"] == "required"
+    assert command.execution_request.context_policy["specific_tool_id"] is None
+    assert "engine:approve" in command.delegated_authority.scopes
+
+
+def test_command_from_context_rejects_tools_for_assistant_proposal() -> None:
+    context = _context()
+    tool = ProviderToolDefinition(
+        tool_id="repo.read",
+        description="Read one repository file.",
+        input_schema={"type": "object"},
+    )
+    with pytest.raises(
+        EngineProtocolError,
+        match="tool-free execution",
+    ):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="proposal-tool-idem",
+            instructions="Policy",
+            prompt="Prompt",
+            verification_profile="assistant_proposal",
+            tools=(tool,),
+        )
+
+
+def test_command_from_context_rejects_specific_tool_not_offered() -> None:
+    context = _context()
+    tool = ProviderToolDefinition(
+        tool_id="repo.read",
+        description="Read one repository file.",
+        input_schema={"type": "object"},
+    )
+    with pytest.raises(
+        EngineProtocolError,
+        match="not offered",
+    ):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="specific-tool-idem",
+            instructions="Policy",
+            prompt="Prompt",
+            tools=(tool,),
+            tool_choice="specific",
+            specific_tool_id="repo.write",
+        )
 
 
 def test_command_from_context_rejects_unbounded_or_invalid_history() -> None:
@@ -177,6 +327,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         seen["path"] = request.url.path
         seen["principal"] = request.headers.get("x-zaibatsu-attester")
+        seen["authorization"] = request.headers.get("authorization")
         seen["trace"] = request.headers.get("x-trace-id")
         body = __import__("json").loads(request.content)
         seen["body"] = body
@@ -195,7 +346,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
         )
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
     ack = await client.submit(command)
@@ -203,6 +354,7 @@ async def test_submit_sends_exact_principal_trace_and_command() -> None:
     assert ack["execution_id"] == command.execution_request.execution_id
     assert seen["path"] == "/api/v1/engine/executions"
     assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
     assert seen["trace"] == "trace-client-test"
     assert seen["body"]["actor_id"] == "actor-a"
     assert seen["body"]["tenant_id"] == "tenant-a"
@@ -299,6 +451,7 @@ async def test_execute_polls_terminal_result_and_preserves_lineage() -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
             poll_interval_s=0.001,
             execution_timeout_s=2,
         ),
@@ -314,6 +467,251 @@ async def test_execute_polls_terminal_result_and_preserves_lineage() -> None:
     assert result.provider_receipts == ("provider:receipt-a",)
     assert result.memory_refs == ("memory:one",)
     assert result.artifact_refs == ("artifact:one",)
+
+
+@pytest.mark.asyncio
+async def test_execute_recovers_ambiguous_submit_by_query_without_resubmit() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    post_calls = 0
+    status_calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_calls, status_calls
+        if request.method == "POST" and request.url.path.endswith("/executions"):
+            post_calls += 1
+            raise httpx.ReadTimeout("submit response lost", request=request)
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            status_calls += 1
+            state = "provider_pending" if status_calls == 1 else "completed"
+            return _json(
+                200,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "operation_state": "running" if state != "completed" else "completed",
+                    "execution_state": state,
+                    "latest_checkpoint_version": 1,
+                    "result_ref": None if state != "completed" else "execution-result:" + execution_id,
+                    "failure_code": None,
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": False,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}/events"
+        ):
+            return _json(
+                200,
+                {
+                    "execution_id": execution_id,
+                    "events": [
+                        {
+                            "event_id": "state",
+                            "sequence": 0,
+                            "type": "execution.state",
+                            "state": "completed",
+                        },
+                        {
+                            "event_id": "result",
+                            "sequence": 1,
+                            "type": "execution.result",
+                            "result": {
+                                "schema_version": 1,
+                                "operation_id": command.operation.operation_id,
+                                "execution_id": execution_id,
+                                "status": "completed",
+                                "final_output": "recovered answer",
+                                "verification": "verification:recovered",
+                                "verification_receipt": {
+                                    "outcome": "passed",
+                                    "policy_satisfied": True,
+                                },
+                                "evidence_refs": ["evidence:recovered"],
+                                "route_receipts": [],
+                                "provider_receipts": ["provider:recovered"],
+                                "tool_receipts": [],
+                                "memory_refs": [],
+                                "artifact_refs": [],
+                                "usage": {"model_turns": 1, "tool_calls": 0},
+                                "stream_terminal_event": "stream-terminal:recovered",
+                                "completed_at": _now().isoformat(),
+                            },
+                        },
+                    ],
+                    "next_sequence": 2,
+                },
+            )
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+            poll_interval_s=0.001,
+            execution_timeout_s=2,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    result = await client.execute(command)
+
+    assert result.final_output == "recovered answer"
+    assert post_calls == 1
+    assert status_calls == 2
+
+
+@pytest.mark.asyncio
+async def test_execute_queries_before_single_resubmit_when_first_submit_not_found() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    calls: list[str] = []
+    post_calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_calls
+        calls.append(request.method + " " + request.url.path)
+        if request.method == "POST" and request.url.path.endswith("/executions"):
+            post_calls += 1
+            if post_calls == 1:
+                raise httpx.ReadTimeout("submit response lost", request=request)
+            return _json(
+                202,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "state": "admitted",
+                    "accepted_at": _now().isoformat(),
+                    "idempotency_digest": "d" * 64,
+                    "status_ref": "status",
+                    "events_ref": "events",
+                    "trace_id": command.operation.trace_id,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            if post_calls == 1:
+                return _json(404, {"detail": "unknown engine execution"})
+            return _json(
+                200,
+                {
+                    "operation_id": command.operation.operation_id,
+                    "execution_id": execution_id,
+                    "operation_state": "completed",
+                    "execution_state": "completed",
+                    "latest_checkpoint_version": 1,
+                    "result_ref": "execution-result:" + execution_id,
+                    "failure_code": None,
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": False,
+                },
+            )
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}/events"
+        ):
+            return _json(
+                200,
+                {
+                    "execution_id": execution_id,
+                    "events": [
+                        {
+                            "event_id": "result",
+                            "sequence": 0,
+                            "type": "execution.result",
+                            "result": {
+                                "schema_version": 1,
+                                "operation_id": command.operation.operation_id,
+                                "execution_id": execution_id,
+                                "status": "completed",
+                                "final_output": "retried answer",
+                                "verification": "verification:retry",
+                                "verification_receipt": {
+                                    "outcome": "passed",
+                                    "policy_satisfied": True,
+                                },
+                                "evidence_refs": ["evidence:retry"],
+                                "route_receipts": [],
+                                "provider_receipts": ["provider:retry"],
+                                "tool_receipts": [],
+                                "memory_refs": [],
+                                "artifact_refs": [],
+                                "usage": {"model_turns": 1, "tool_calls": 0},
+                                "stream_terminal_event": "stream-terminal:retry",
+                                "completed_at": _now().isoformat(),
+                            },
+                        }
+                    ],
+                    "next_sequence": 1,
+                },
+            )
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+            poll_interval_s=0.001,
+            execution_timeout_s=2,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    result = await client.execute(command)
+
+    assert result.final_output == "retried answer"
+    assert post_calls == 2
+    assert calls[:3] == [
+        "POST /api/v1/engine/executions",
+        f"GET /api/v1/engine/executions/{execution_id}",
+        "POST /api/v1/engine/executions",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_execute_rejects_mismatched_recovered_submit_identity() -> None:
+    command = _command()
+    execution_id = command.execution_request.execution_id
+    post_calls = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal post_calls
+        if request.method == "POST":
+            post_calls += 1
+            raise httpx.ReadTimeout("submit response lost", request=request)
+        if request.method == "GET" and request.url.path.endswith(
+            f"/executions/{execution_id}"
+        ):
+            return _json(
+                200,
+                {
+                    "operation_id": str(uuid4()),
+                    "execution_id": execution_id,
+                    "operation_state": "running",
+                    "execution_state": "provider_pending",
+                    "latest_checkpoint_version": 0,
+                    "result_ref": None,
+                    "failure_code": None,
+                    "updated_at": _now().isoformat(),
+                    "cancellation_requested": False,
+                },
+            )
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="recovered engine status operation identity mismatch",
+    ):
+        await client.execute(command)
+    assert post_calls == 1
 
 
 @pytest.mark.asyncio
@@ -396,6 +794,7 @@ async def test_terminal_failure_is_not_converted_to_local_success() -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
             poll_interval_s=0.001,
         ),
         transport=httpx.MockTransport(handler),
@@ -429,7 +828,7 @@ async def test_http_failures_map_to_stable_fail_closed_errors(
         return _json(status, {"detail": "bounded failure"})
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
 
@@ -442,12 +841,155 @@ async def test_http_failures_map_to_stable_fail_closed_errors(
 
 
 @pytest.mark.asyncio
+async def test_pending_approval_query_validates_bound_identity() -> None:
+    execution_id = "exec-approval"
+    digest = "a" * 64
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == (
+            "/api/v1/engine/executions/"
+            + execution_id
+            + "/tool-approvals/pending"
+        )
+        assert request.url.params["actor_id"] == "actor-a"
+        assert request.url.params["tenant_id"] == "tenant-a"
+        return _json(
+            200,
+            {
+                "execution_id": execution_id,
+                "pending": [
+                    {
+                        "call_id": "call-1",
+                        "tool_id": "repo.write",
+                        "arguments_digest": digest,
+                        "idempotency_key": "approval-idem",
+                        "approval_ref": "approval:bound-ref",
+                    }
+                ],
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    pending = await client.pending_tool_approvals(
+        execution_id,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+    )
+
+    assert pending == (
+        {
+            "call_id": "call-1",
+            "tool_id": "repo.write",
+            "arguments_digest": digest,
+            "idempotency_key": "approval-idem",
+            "approval_ref": "approval:bound-ref",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_approve_tool_call_posts_exact_pending_identity() -> None:
+    execution_id = "exec-approval"
+    digest = "b" * 64
+    expiry = _now() + timedelta(minutes=1)
+    seen = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["body"] = __import__("json").loads(request.content)
+        return _json(
+            202,
+            {
+                "schema_version": 1,
+                "approval_id": "approval-id",
+                "approval_ref": "approval:bound-ref",
+                "execution_id": execution_id,
+                "call_id": "call-1",
+                "tool_id": "repo.write",
+                "arguments_digest": digest,
+                "actor_id": "actor-a",
+                "tenant_id": "tenant-a",
+                "idempotency_key": "approval-idem",
+                "issued_at": _now().isoformat(),
+                "expires_at": expiry.isoformat(),
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    approval = await client.approve_tool_call(
+        execution_id,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        call_id="call-1",
+        tool_id="repo.write",
+        arguments_digest=digest,
+        idempotency_key="approval-idem",
+        expires_at=expiry,
+    )
+
+    assert seen["path"] == (
+        "/api/v1/engine/executions/"
+        + execution_id
+        + "/tool-approvals"
+    )
+    assert seen["body"]["arguments_digest"] == digest
+    assert seen["body"]["idempotency_key"] == "approval-idem"
+    assert approval["approval_ref"] == "approval:bound-ref"
+
+
+@pytest.mark.asyncio
+async def test_pending_approval_rejects_malformed_server_identity() -> None:
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return _json(
+            200,
+            {
+                "execution_id": "exec-approval",
+                "pending": [
+                    {
+                        "call_id": "call-1",
+                        "tool_id": "repo.write",
+                        "arguments_digest": "bad",
+                        "idempotency_key": "approval-idem",
+                        "approval_ref": "approval:bound-ref",
+                    }
+                ],
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    with pytest.raises(EngineProtocolError, match="arguments_digest"):
+        await client.pending_tool_approvals(
+            "exec-approval",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+        )
+
+
+@pytest.mark.asyncio
 async def test_network_failure_is_engine_unavailable() -> None:
     async def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("offline", request=request)
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
 
@@ -513,6 +1055,7 @@ async def test_response_size_bound_is_fail_closed() -> None:
     client = EngineClient(
         EngineClientConfig(
             base_url="http://skeleton:8001",
+            service_token=_SERVICE_TOKEN,
             max_response_bytes=1024,
         ),
         transport=httpx.MockTransport(handler),
@@ -543,7 +1086,7 @@ async def test_cancel_is_actor_tenant_and_trace_bound() -> None:
         )
 
     client = EngineClient(
-        EngineClientConfig(base_url="http://skeleton:8001"),
+        EngineClientConfig(service_token=_SERVICE_TOKEN, base_url="http://skeleton:8001"),
         transport=httpx.MockTransport(handler),
     )
     response = await client.cancel(
@@ -561,3 +1104,51 @@ async def test_cancel_is_actor_tenant_and_trace_bound() -> None:
         "reason": "user requested cancellation",
     }
     assert seen["trace"] == "trace-cancel"
+
+
+
+def test_engine_client_config_masks_service_token_in_repr() -> None:
+    config = EngineClientConfig(
+        base_url="http://skeleton:8001",
+        service_token=_SERVICE_TOKEN,
+    )
+
+    assert _SERVICE_TOKEN not in repr(config)
+
+
+def test_engine_env_requires_service_token_when_url_configured(monkeypatch) -> None:
+    monkeypatch.setenv("SKELETON_INTERNAL_URL", "http://skeleton:8001")
+    monkeypatch.delenv("SKL_ENGINE_SERVICE_TOKEN", raising=False)
+
+    with pytest.raises(EngineProtocolError, match="service token"):
+        EngineClientConfig.from_env()
+
+    monkeypatch.setenv("SKL_ENGINE_SERVICE_TOKEN", _SERVICE_TOKEN)
+    config = EngineClientConfig.from_env()
+
+    assert config is not None
+    assert config.service_token == _SERVICE_TOKEN
+
+
+@pytest.mark.asyncio
+async def test_client_rejects_missing_service_token_before_transport() -> None:
+    called = False
+
+    async def handler(_: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return _json(200, {})
+
+    client = EngineClient(
+        EngineClientConfig(base_url="http://skeleton:8001"),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EngineAuthorizationError, match="service token"):
+        await client.status(
+            "exec-1",
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+        )
+
+    assert called is False

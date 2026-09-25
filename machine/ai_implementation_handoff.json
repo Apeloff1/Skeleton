@@ -843,18 +843,23 @@
           "machine/ai_runtime_schemas.json"
         ],
         "runtime": [
-          "skeleton/api execution routes",
-          "backend/core/engine_client.py"
+          "skeleton/api/engine_routes.py",
+          "skeleton/api/engine_runtime.py",
+          "backend/core/engine_client.py",
+          "backend/core/engine_text.py"
         ],
         "persistence": [],
         "integration": [
-          "backend routes",
+          "backend AI text routes/services",
+          "backend/routes/image_generation.py",
+          "backend/core/expressive_tts.py",
           "skeleton/app/manifest.json",
           "docker-compose.yml"
         ],
         "tests": [
           "service/delegated auth tests",
           "submit idempotency tests",
+          "engine media route/client tests",
           "engine outage tests",
           "process credential isolation tests"
         ]
@@ -888,26 +893,36 @@
       ],
       "closure_gate": "production AI requests entering backend execute provider/model/tool cognition only in the Skeleton engine process with authenticated idempotent cross-service contracts and no local provider fallback",
       "current_evidence": [
-        "skeleton/api/engine_routes.py",
-        "skeleton/api/engine_service.py",
-        "skeleton/api/engine_runtime.py",
-        "backend/core/engine_client.py",
-        "backend/routes/ai.py canonical chat cutover",
-        "backend/tests/test_engine_client.py",
-        "backend/tests/test_ai_chat_engine_cutover.py",
-        "skeleton/testing/test_engine_process_isolation.py parity-aware credential gate",
-        "scripts/check_app_assembly.py ProviderRegistry activation inventory",
-        "docker-compose.yml dual-materialized transitional credentials plus durable engine state",
-        "skeleton/app/manifest.json backend->engine dependency"
+        "skeleton/api/engine_routes.py authenticated execution and media routes",
+        "skeleton/api/engine_service.py stable semantic submission idempotency digest",
+        "skeleton/api/engine_runtime.py engine-owned provider registry",
+        "backend/core/engine_client.py authenticated text/media transport",
+        "backend/core/engine_text.py reusable bounded compatibility adapter",
+        "backend/routes/ai.py chat/assist engine cutover",
+        "backend/core/ai_provider_compat.py legacy LlmChat engine cutover",
+        "backend/services/ai_assistant_svc.py engine text cutover",
+        "backend/services/ai_hub_svc.py engine text cutover with evidence-required SOTA profile",
+        "backend/services/game_llm_service.py engine text cutover",
+        "backend/routes/llm_router.py engine-owned model/provider routing boundary",
+        "backend/routes/ai_debugger.py engine text cutover",
+        "backend/routes/ai_pipeline.py engine text cutover",
+        "backend/routes/ai_toolkit_enhanced.py engine text cutover",
+        "backend/routes/image_generation.py engine image generate/variation/edit cutover",
+        "backend/core/expressive_tts.py engine speech cutover",
+        "skeleton/testing/test_engine_media_routes.py authenticated scope/capability/base64 media proof",
+        "backend/tests/test_engine_media_client.py bounded media transport proof",
+        "backend/tests/test_engine_media_cutover.py application media delegation proof",
+        "skeleton/testing/test_engine_process_isolation.py parity-aware credential isolation gate",
+        "scripts/check_app_assembly.py production AST ProviderRegistry activation inventory",
+        "docker-compose.yml engine-only runtime provider credential binding"
       ],
       "remaining": [
-        "migrate all production backend ProviderRegistry.from_env activators to engine-owned execution",
-        "remove transitional backend runtime-model credentials only after the activation inventory reaches zero",
-        "prove delegated tenant/user/scope denial across the real cross-service boundary",
+        "obtain exact-head App Assembly proof that production backend ProviderRegistry.from_env activation inventory is zero",
+        "prove delegated tenant/user/scope denial across the deployed cross-service boundary",
         "prove submit retry/query behavior against the deployed engine endpoint without duplicate execution",
         "prove idempotent cancel plus late-result fencing across service transport",
         "prove cross-service golden journey with operation/turn/verification/provider/tool/result lineage",
-        "retire or invert remaining backend local-provider compatibility execution paths"
+        "retire or invert backend/core/ai_provider.py once all non-runtime compatibility imports are no longer required"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },

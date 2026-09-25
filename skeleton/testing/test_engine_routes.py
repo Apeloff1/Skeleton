@@ -15,6 +15,7 @@ from skeleton.api.engine_authority import (
 from skeleton.api.engine_routes import (
     _engine_coordinator,
     _engine_service,
+    _engine_service_token,
     router,
 )
 from skeleton.api.engine_service import (
@@ -24,8 +25,12 @@ from skeleton.api.engine_service import (
     SQLiteEngineSubmissionStore,
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
+from skeleton.config.settings import EngineSettings
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+
+
+_SERVICE_TOKEN = "test-engine-service-token-" + ("x" * 32)
 
 
 def _now() -> datetime:
@@ -140,8 +145,16 @@ def _client(service: EngineExecutionService) -> TestClient:
     app = FastAPI()
     app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[_engine_service] = lambda: service
+    app.dependency_overrides[_engine_service_token] = lambda: _SERVICE_TOKEN
     app.dependency_overrides[_engine_coordinator] = lambda: None
     return TestClient(app)
+
+
+def test_engine_service_token_is_masked_in_settings_repr() -> None:
+    settings = EngineSettings(service_token=_SERVICE_TOKEN)
+
+    assert _SERVICE_TOKEN not in repr(settings)
+    assert settings.service_token.get_secret_value() == _SERVICE_TOKEN
 
 
 def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_path) -> None:
@@ -158,7 +171,35 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
     )
     assert missing.status_code == 401
 
-    headers = {"x-zaibatsu-attester": "backend-service"}
+    spoofed_principal = client.post(
+        "/api/v1/engine/executions",
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "command": command.as_dict(),
+        },
+        headers={"x-zaibatsu-attester": "backend-service"},
+    )
+    assert spoofed_principal.status_code == 401
+
+    bad_token = client.post(
+        "/api/v1/engine/executions",
+        json={
+            "actor_id": "actor-a",
+            "tenant_id": "tenant-a",
+            "command": command.as_dict(),
+        },
+        headers={
+            "x-zaibatsu-attester": "backend-service",
+            "authorization": "Bearer " + ("z" * 40),
+        },
+    )
+    assert bad_token.status_code == 401
+
+    headers = {
+        "x-zaibatsu-attester": "backend-service",
+        "authorization": "Bearer " + _SERVICE_TOKEN,
+    }
     submitted = client.post(
         "/api/v1/engine/executions",
         json={
@@ -220,7 +261,10 @@ def test_engine_routes_require_verified_service_principal_and_round_trip(tmp_pat
 def test_engine_routes_reject_cross_actor_execution_access(tmp_path) -> None:
     service, command = _service_and_command(tmp_path)
     client = _client(service)
-    headers = {"x-zaibatsu-attester": "backend-service"}
+    headers = {
+        "x-zaibatsu-attester": "backend-service",
+        "authorization": "Bearer " + _SERVICE_TOKEN,
+    }
     submitted = client.post(
         "/api/v1/engine/executions",
         json={

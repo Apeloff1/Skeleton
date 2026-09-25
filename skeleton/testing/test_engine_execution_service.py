@@ -41,16 +41,20 @@ def _operation(
     actor_id: str = "actor-a",
     capability: str = "assistant.chat",
     idempotency_key: str = "idem-1",
+    created_at: datetime | None = None,
+    deadline: datetime | None = None,
+    trace_id: str = "trace-1",
 ) -> OperationEnvelope:
+    started = created_at or _now()
     return OperationEnvelope(
         operation_id=operation_id or str(uuid4()),
         tenant_id=tenant_id,
         actor_id=actor_id,
         capability=capability,
-        created_at=_now(),
-        deadline=_now() + timedelta(minutes=10),
+        created_at=started,
+        deadline=deadline or (started + timedelta(minutes=10)),
         idempotency_key=idempotency_key,
-        trace_id="trace-1",
+        trace_id=trace_id,
     )
 
 
@@ -79,6 +83,7 @@ def _execution_request(
     *,
     execution_id: str = "exec-1",
     objective: str = "Answer the request.",
+    created_at: datetime | None = None,
 ) -> AIExecutionRequest:
     return AIExecutionRequest(
         operation_id=operation.operation_id,
@@ -106,7 +111,7 @@ def _execution_request(
             "max_tool_calls": 4,
         },
         stop_policy={"max_repeat_tool_batches": 1},
-        created_at=_now(),
+        created_at=created_at or _now(),
     )
 
 
@@ -122,6 +127,7 @@ def _authority(
         "engine:events",
         "engine:approve",
     ),
+    issued_at: datetime | None = None,
     expires_at: datetime | None = None,
 ) -> DelegatedAuthority:
     return DelegatedAuthority(
@@ -130,8 +136,8 @@ def _authority(
         tenant_id=operation.tenant_id,
         scopes=tuple(scopes),
         capability=operation.capability,
-        issued_at=_now(),
-        expires_at=expires_at or (_now() + timedelta(minutes=5)),
+        issued_at=issued_at or _now(),
+        expires_at=expires_at or ((issued_at or _now()) + timedelta(minutes=5)),
         request_binding=engine_request_binding(operation, execution_request),
     )
 
@@ -189,6 +195,42 @@ def _service(tmp_path, *, registry=None):
     )
 
 
+def test_command_rejects_tool_policy_handoff_mismatch() -> None:
+    operation = _operation()
+    base = _execution_request(operation)
+    request = AIExecutionRequest(
+        operation_id=base.operation_id,
+        execution_id=base.execution_id,
+        objective=base.objective,
+        context_policy=dict(base.context_policy),
+        tool_policy={
+            "tenant_id": operation.tenant_id,
+            "allowed_tool_ids": ["repo.read"],
+        },
+        resource_budget=dict(base.resource_budget),
+        stop_policy=dict(base.stop_policy),
+        created_at=base.created_at,
+    )
+    authority = _authority(operation, request)
+
+    with pytest.raises(
+        EngineServiceError,
+        match="tools do not match execution tool policy",
+    ):
+        EngineExecutionCommand(
+            operation=operation,
+            execution_request=request,
+            delegated_authority=authority,
+            compiled_context=_handoff(
+                operation,
+                execution_id=request.execution_id,
+            ),
+            context_seed_refs=("conversation:thread-1",),
+            resource_budget=dict(request.resource_budget),
+            stream_preferences={"mode": "events"},
+        )
+
+
 def test_submit_is_idempotent_and_ack_survives_service_restart(tmp_path) -> None:
     command = _command()
     service = _service(tmp_path)
@@ -215,6 +257,62 @@ def test_submit_is_idempotent_and_ack_survives_service_restart(tmp_path) -> None
     assert first.state == "admitted"
     assert first.status_ref.endswith("/exec-1")
     assert first.events_ref.endswith("/exec-1/events")
+
+
+def test_submit_retry_accepts_fresh_temporal_authority_for_same_work(
+    tmp_path,
+) -> None:
+    operation_id = str(uuid4())
+    first_operation = _operation(operation_id=operation_id)
+    first_request = _execution_request(first_operation)
+    first_command = _command(
+        operation=first_operation,
+        execution_request=first_request,
+        authority=_authority(first_operation, first_request),
+    )
+    service = _service(tmp_path)
+    first_ack = service.submit(
+        first_command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+
+    retry_started = _now() + timedelta(seconds=30)
+    retry_operation = _operation(
+        operation_id=operation_id,
+        created_at=retry_started,
+        deadline=retry_started + timedelta(minutes=10),
+        trace_id="trace-retry",
+    )
+    retry_request = _execution_request(
+        retry_operation,
+        created_at=retry_started,
+    )
+    retry_command = _command(
+        operation=retry_operation,
+        execution_request=retry_request,
+        authority=_authority(
+            retry_operation,
+            retry_request,
+            issued_at=retry_started,
+            expires_at=retry_started + timedelta(minutes=5),
+        ),
+    )
+
+    assert retry_command.command_digest != first_command.command_digest
+    assert retry_command.submission_digest == first_command.submission_digest
+
+    replay = service.submit(
+        retry_command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=retry_started,
+    )
+
+    assert replay == first_ack
 
 
 def test_submit_conflicting_retry_is_rejected(tmp_path) -> None:
