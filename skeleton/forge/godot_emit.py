@@ -27,10 +27,14 @@ def _required(container: Any, key: str, label: str, *, positive: bool = True) ->
 
 
 def _flag(plan: Dict[str, Any], pack: Dict[str, Any], key: str) -> bool:
-    source = plan if key in plan else pack
-    if key not in source or not isinstance(source[key], bool):
+    value = plan.get(key) if key in plan else pack.get(key)
+    if value is None:
+        value = pack.get(key)
+    if value is None:
+        return False
+    if not isinstance(value, bool):
         raise ValueError(f"{key} must be boolean")
-    return source[key]
+    return value
 
 
 def _gd_recipes(recipes: List[dict]) -> str:
