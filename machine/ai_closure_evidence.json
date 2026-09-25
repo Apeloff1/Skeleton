@@ -391,7 +391,12 @@
         "skeleton/testing/test_execution_runtime.py end-to-end model-tool-model lineage regression",
         "skeleton/skills/tool_adapters/owners.py canonical async execution owners for vault/Jeeves/sandbox/database/network/artifact surfaces",
         "backend/services/tool_registry.py delegation-only executable compatibility handlers",
-        "backend/tests/test_tool_registry_scoped_adapters.py no-privileged-body source regression plus delegation tests"
+        "backend/tests/test_tool_registry_scoped_adapters.py no-privileged-body source regression plus delegation tests",
+        "skeleton/skills/tool_contract.py rich typed ToolManifest governance metadata and invariants",
+        "backend/services/tool_registry.py explicit production manifest authority/risk/idempotency/network/data/cost metadata",
+        "skeleton/intelligence/execution_runtime.py enabled-only minimal ProviderToolDefinition projection",
+        "skeleton/testing/test_execution_runtime.py provider projection non-leak regression",
+        "skeleton/testing/test_tool_runtime.py manifest governance invariant regression set"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
