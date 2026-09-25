@@ -135,6 +135,21 @@ def test_engine_durable_state_is_bound_to_persistent_skeleton_volume() -> None:
     assert ":memory:" not in skeleton
 
 
+def test_engine_service_auth_token_is_scoped_to_backend_and_engine() -> None:
+    compose = _compose()
+    skeleton = _service_block(compose, "skeleton", "backend")
+    backend = _service_block(compose, "backend", "frontend")
+    frontend = _service_block(compose, "frontend", "mongo")
+    marker = (
+        "SKL_ENGINE_SERVICE_TOKEN="
+        "${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}"
+    )
+
+    assert marker in skeleton
+    assert marker in backend
+    assert "SKL_ENGINE_SERVICE_TOKEN=" not in frontend
+
+
 def test_backend_waits_for_healthy_engine_before_serving_ai_ingress() -> None:
     compose = _compose()
     backend = _service_block(compose, "backend", "frontend")
