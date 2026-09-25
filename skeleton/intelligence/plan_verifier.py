@@ -50,6 +50,10 @@ class PlanVerifier:
         root=None,
         cognition: "Cognition | None" = None,
     ) -> None:
+        if accept_at is not None and (
+            isinstance(accept_at, bool) or not isinstance(accept_at, (int, float)) or not 0 < float(accept_at) <= 1
+        ):
+            raise ValueError("accept_at must be in (0, 1]")
         self.accept_at = accept_at if accept_at is not None else threshold_for("plan", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
@@ -160,11 +164,10 @@ class PlanVerifier:
         return max(0.0, score)
 
     def _grounding(self, plan: Mapping[str, Any], vision: str, issues: list[str]) -> float:
-        if not vision.strip():
-            return 1.0
         tokens = [t for t in vision.lower().replace("_", " ").split() if len(t) >= 4]
         if not tokens:
-            return 1.0
+            issues.append("hard: plan has no vision to ground against")
+            return 0.0
         hay = " ".join(str(plan.get(k) or "") for k in ("era", "title", "room_bias", "citation", "url")).lower()
         hits = sum(1 for t in tokens if t in hay)
         score = hits / len(tokens)
