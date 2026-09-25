@@ -181,6 +181,7 @@ def test_feedback_identity_is_idempotent_and_stats_cover_authority() -> None:
 
     assert repo.stats() == {
         "learning_sessions": 0,
+        "concepts": 0,
         "user_progress": 0,
         "cocoding_context": 0,
         "feedback": 1,
@@ -194,7 +195,63 @@ def test_ensure_indexes_declares_unique_identity_constraints() -> None:
     repo.ensure_indexes()
 
     assert db[repo.LEARNING].indexes
+    assert db[repo.CONCEPTS].indexes
     assert db[repo.PROGRESS].indexes
     assert db[repo.COCODING].indexes
     assert db[repo.FEEDBACK].indexes
     assert any(kwargs.get("unique") for _, kwargs in db[repo.PROGRESS].indexes)
+
+
+def test_concept_identity_is_idempotent_and_conflicts_fail_closed() -> None:
+    db = _Database()
+    repo = RAGStateRepository(db)
+
+    first = repo.put_concept(
+        concept_id="concept-1",
+        name="Recursion",
+        explanation="A function calls itself.",
+        examples=["factorial"],
+        domain="python",
+        difficulty=0.4,
+        timestamp="2026-09-21T18:00:00Z",
+    )
+    replay = repo.put_concept(
+        concept_id="concept-1",
+        name="Recursion",
+        explanation="A function calls itself.",
+        examples=["factorial"],
+        domain="python",
+        difficulty=0.4,
+        timestamp="2026-09-21T19:00:00Z",
+    )
+
+    assert replay == first
+    assert repo.get_concept("concept-1") == first
+    assert repo.list_concepts(domain="python") == [first]
+    assert db[repo.CONCEPTS].count_documents({}) == 1
+
+    with pytest.raises(RAGStateConflict, match="explanation"):
+        repo.put_concept(
+            concept_id="concept-1",
+            name="Recursion",
+            explanation="Conflicting replacement.",
+            examples=["factorial"],
+            domain="python",
+            difficulty=0.4,
+            timestamp="2026-09-21T20:00:00Z",
+        )
+
+
+def test_concept_difficulty_is_bounded() -> None:
+    db = _Database()
+    repo = RAGStateRepository(db)
+
+    with pytest.raises(Exception, match="difficulty"):
+        repo.put_concept(
+            concept_id="bad",
+            name="Bad",
+            explanation="Bad difficulty",
+            examples=[],
+            domain="python",
+            difficulty=1.5,
+        )
