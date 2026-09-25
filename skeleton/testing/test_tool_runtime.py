@@ -893,3 +893,149 @@ def test_manifest_output_schema_and_bounds_fail_closed() -> None:
             max_concurrency=0,
         )
 
+def test_manifest_cost_model_is_metered_before_sync_handler() -> None:
+    events = []
+
+    class Meter:
+        def record_usage_event(
+            self,
+            operation_id,
+            event_id,
+            category,
+            delta,
+            *,
+            now_wall=None,
+        ):
+            events.append(
+                (
+                    "meter",
+                    operation_id,
+                    event_id,
+                    category,
+                    delta.tool_calls,
+                    delta.cost_usd,
+                )
+            )
+            return object()
+
+    runtime = ToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+    manifest = ToolManifest(
+        tool_id="repo.read",
+        version="1.0.0",
+        description="metered read",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        cost_model={
+            "kind": "request",
+            "estimated_cost_usd": 0.25,
+        },
+    )
+    runtime.register(
+        manifest,
+        lambda request: events.append(("handler", request.operation_id))
+        or "artifact:metered",
+    )
+    request = _request()
+
+    receipt = runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert events[0][0] == "meter"
+    assert events[0][1] == request.operation_id
+    assert events[0][3:] == ("tool", 1, 0.25)
+    assert events[1] == ("handler", request.operation_id)
+
+
+@pytest.mark.asyncio
+async def test_async_manifest_max_concurrency_is_enforced_per_tool() -> None:
+    runtime = AsyncToolRuntime()
+    entered_first = asyncio.Event()
+    release_first = asyncio.Event()
+    entered_second = asyncio.Event()
+    active = 0
+    peak = 0
+    calls = 0
+
+    async def handler(_request):
+        nonlocal active, peak, calls
+        calls += 1
+        active += 1
+        peak = max(peak, active)
+        try:
+            if calls == 1:
+                entered_first.set()
+                await release_first.wait()
+            else:
+                entered_second.set()
+            await asyncio.sleep(0)
+            return f"artifact:{calls}"
+        finally:
+            active -= 1
+
+    manifest = ToolManifest(
+        tool_id="repo.read",
+        version="1.0.0",
+        description="serialized read",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        max_concurrency=1,
+    )
+    await runtime.register(manifest, handler)
+
+    first = asyncio.create_task(
+        runtime.execute(
+            _request(
+                operation_id=str(uuid4()),
+                key="concurrency-first",
+            ),
+            now=_now(),
+        )
+    )
+    await entered_first.wait()
+
+    second = asyncio.create_task(
+        runtime.execute(
+            _request(
+                operation_id=str(uuid4()),
+                key="concurrency-second",
+            ),
+            now=_now(),
+        )
+    )
+    await asyncio.sleep(0)
+    assert entered_second.is_set() is False
+
+    release_first.set()
+    first_receipt, second_receipt = await asyncio.gather(first, second)
+
+    assert first_receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert second_receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert entered_second.is_set() is True
+    assert peak == 1
+    assert calls == 2
+
+
+def test_manifest_rejects_invalid_estimated_cost() -> None:
+    with pytest.raises(
+        ToolContractError,
+        match="estimated_cost_usd must be non-negative numeric",
+    ):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="bad cost",
+            input_schema={"type": "object"},
+            cost_model={
+                "kind": "request",
+                "estimated_cost_usd": -0.01,
+            },
+        )
+
