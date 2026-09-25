@@ -315,4 +315,3 @@ def test_backend_registry_contains_no_privileged_execution_body() -> None:
     assert "AsyncDatabaseQueryAdapter" in source
     assert "AsyncNetworkSearchAdapter" in source
     assert "AsyncArtifactPackageAdapter" in source
-
