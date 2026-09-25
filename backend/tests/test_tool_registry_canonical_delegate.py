@@ -786,4 +786,3 @@ async def test_result_store_executes_retention_expiry_and_acknowledges_deletion(
         for item in receipts
     )
     store.close()
-
