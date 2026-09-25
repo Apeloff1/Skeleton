@@ -65,7 +65,13 @@
         "skeleton/intelligence/quota_sqlite.py additive storage quota schema migration with legacy ceiling backfill",
         "skeleton/artifact_plane/usage.py storage writes and unknown usage resolve on storage_bytes rather than artifact_bytes",
         "skeleton/testing/test_artifact_usage.py independent artifact/storage budget regressions",
-        "skeleton/testing/test_tenant_quota_sqlite.py restart-safe storage usage plus pre-storage schema migration regression"
+        "skeleton/testing/test_tenant_quota_sqlite.py restart-safe storage usage plus pre-storage schema migration regression",
+        "skeleton/intelligence/admission.py distinct max_storage_bytes and storage_bytes admission contract",
+        "skeleton/intelligence/quota.py independent in-memory storage quota dimension and enforcement",
+        "skeleton/intelligence/admission_runtime.py independent storage usage metering and telemetry",
+        "skeleton/artifact_plane/usage.py storage writes meter storage_bytes rather than artifact_bytes",
+        "skeleton/testing/test_artifact_usage.py proves artifact/storage budget independence",
+        "skeleton/testing/test_tenant_quota_sqlite.py proves restart-safe storage usage and legacy schema migration"
       ],
       "closure_evidence_required": [
         "budget denial test",
