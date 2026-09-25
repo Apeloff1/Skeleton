@@ -107,6 +107,30 @@ class InMemoryTFIDFStore(MemoryStore):
             for i, (score, chunk) in enumerate(results[:top_k])
         ]
 
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Apply exact metadata scope before TF-IDF scoring."""
+        if not isinstance(scope, dict) or not scope:
+            raise ValueError("scope must be a non-empty mapping")
+        if any(
+            not isinstance(key, str)
+            or not key
+            or not isinstance(value, str)
+            or not value
+            for key, value in scope.items()
+        ):
+            raise ValueError("scope keys and values must be non-empty strings")
+        return self.query(
+            query_text,
+            top_k=top_k,
+            metadata_filter=dict(scope),
+        )
+
     def delete(self, chunk_id: str) -> bool:
         if chunk_id not in self._chunks:
             return False
@@ -212,6 +236,30 @@ class ChromaDBStore(MemoryStore):
             return self._fallback.query(
                 query_text, top_k=top_k, metadata_filter=metadata_filter, min_score=min_score
             )
+
+    def query_scoped(
+        self,
+        query_text: str,
+        *,
+        top_k: int = 5,
+        scope: Dict[str, str],
+    ) -> List[MemoryQueryResult]:
+        """Apply Chroma/fallback metadata scope before nearest-neighbor ranking."""
+        if not isinstance(scope, dict) or not scope:
+            raise ValueError("scope must be a non-empty mapping")
+        if any(
+            not isinstance(key, str)
+            or not key
+            or not isinstance(value, str)
+            or not value
+            for key, value in scope.items()
+        ):
+            raise ValueError("scope keys and values must be non-empty strings")
+        return self.query(
+            query_text,
+            top_k=top_k,
+            metadata_filter=dict(scope),
+        )
 
     def delete(self, chunk_id: str) -> bool:
         if self._available and self._collection:
