@@ -344,6 +344,7 @@ def command_from_context(
     deadline: datetime | None = None,
     trace_id: str | None = None,
     max_model_turns: int = 4,
+    max_output_tokens: int | None = None,
     max_tool_calls: int = 1,
     max_repeat_tool_batches: int = 1,
     context_seed_refs: Sequence[str] = (),
@@ -442,6 +443,12 @@ def command_from_context(
             maximum=1024,
         ),
     }
+    if max_output_tokens is not None:
+        resource_budget["max_output_tokens"] = _positive_int(
+            max_output_tokens,
+            "max_output_tokens",
+            maximum=131_072,
+        )
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
             max_repeat_tool_batches,
