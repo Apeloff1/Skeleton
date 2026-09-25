@@ -48,9 +48,10 @@ class PlaneArm:
     trials: int = 0
 
     @property
-    def rate(self) -> float:
-        """Laplace-smoothed win rate; 0.5 prior keeps cold planes explorable."""
-        return (self.wins + 1) / (self.trials + 2)
+    def rate(self) -> float | None:
+        if self.trials == 0:
+            return None
+        return self.wins / self.trials
 
 
 class PlaneWeightLearner:
@@ -74,7 +75,15 @@ class PlaneWeightLearner:
         if upper <= lower:
             raise ValueError("ceil must be greater than floor")
 
-        base = dict(base_weights or {})
+        if base_weights is None:
+            base = {plane: 1.0 for plane in PLANES}
+        elif not isinstance(base_weights, dict):
+            raise ValueError("base weights must be an object")
+        else:
+            missing = [plane for plane in PLANES if plane not in base_weights]
+            if missing:
+                raise ValueError("base weights are incomplete")
+            base = dict(base_weights)
         unknown = sorted(set(base) - set(PLANES))
         if unknown:
             raise ValueError(f"unknown plane weight(s): {', '.join(unknown)}")
@@ -84,7 +93,7 @@ class PlaneWeightLearner:
         self.ceil = upper
         self._arms: Dict[str, PlaneArm] = {}
         for plane in PLANES:
-            weight = _finite_number(f"base weight for {plane}", base.get(plane, 1.0))
+            weight = _finite_number(f"base weight for {plane}", base[plane])
             if not self.floor <= weight <= self.ceil:
                 raise ValueError(
                     f"base weight for {plane} must be within [{self.floor}, {self.ceil}]"
@@ -201,7 +210,10 @@ class PlaneWeightLearner:
             "state_version": STATE_VERSION,
             "updates": self.updates,
             "weights": self.effective_weights(),
-            "rates": {plane: round(arm.rate, 4) for plane, arm in self._arms.items()},
+            "rates": {
+                plane: None if arm.rate is None else round(arm.rate, 4)
+                for plane, arm in self._arms.items()
+            },
         }
 
 
