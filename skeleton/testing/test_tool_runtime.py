@@ -1038,4 +1038,3 @@ def test_manifest_rejects_invalid_estimated_cost() -> None:
                 "estimated_cost_usd": -0.01,
             },
         )
-
