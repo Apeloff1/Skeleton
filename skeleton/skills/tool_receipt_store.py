@@ -210,7 +210,7 @@ class SQLiteToolReceiptStore:
                     or row["call_id"] != request.call_id
                 ):
                     raise ToolReceiptConflict(
-                        "idempotency key replayed with different tool or arguments"
+                        "idempotency key replayed with different tool or arguments or lineage"
                     )
                 if row["state"] == "committed":
                     receipt = _receipt_from_json(row["receipt_json"])
