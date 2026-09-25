@@ -25,7 +25,9 @@ from skeleton.persistence.execution_repository import (
 from skeleton.persistence.memory_repository import (
     MemoryConflict,
     MemoryNotFound,
+    MemoryProjectionEvent,
     MemoryRepositoryError,
+    MemoryRevision,
     MongoMemoryRepository,
     SQLiteMemoryRepository,
 )
@@ -69,7 +71,9 @@ __all__ = [
     "SQLiteConversationRepository",
     "MemoryConflict",
     "MemoryNotFound",
+    "MemoryProjectionEvent",
     "MemoryRepositoryError",
+    "MemoryRevision",
     "MongoMemoryRepository",
     "SQLiteMemoryRepository",
     "OperationOutboxEvent",
