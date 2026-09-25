@@ -164,3 +164,18 @@ def test_hub_source_has_no_local_provider_or_legacy_chat_shim() -> None:
     assert "ProviderRequest" not in source
     assert "EngineTextRequest" in source
     assert "execute_engine_text" in source
+
+
+def test_lafs_and_llm_router_delegate_to_engine() -> None:
+    lafs_source = (ROOT / "routes" / "lafs.py").read_text(encoding="utf-8")
+    router_source = (ROOT / "routes" / "llm_router.py").read_text(encoding="utf-8")
+
+    for source in (lafs_source, router_source):
+        assert "ProviderRegistry.from_env()" not in source
+        assert "ProviderRequest(" not in source
+        assert "EngineTextRequest" in source
+        assert "execute_engine_text" in source
+
+    assert 'verification_profile="evidence_required"' in lafs_source
+    assert 'verification_profile="assistant_proposal"' in router_source
+    assert "model_pinning_unavailable" in router_source
