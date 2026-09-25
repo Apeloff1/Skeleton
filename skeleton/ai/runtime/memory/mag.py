@@ -127,6 +127,18 @@ class MAGStore(MemoryStore):
             self._tag_index[tag].add(episode_id)
         return episode_id
 
+    def clusters(self, *, min_size: int = 2) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return tag groups large enough to consolidate, without exposing store internals."""
+
+        if isinstance(min_size, bool) or not isinstance(min_size, int) or min_size < 2:
+            raise ValueError("min_size must be an integer >= 2")
+        grouped: list[tuple[str, tuple[str, ...]]] = []
+        for tag in sorted(self._tag_index):
+            episode_ids = tuple(sorted(episode_id for episode_id in self._tag_index[tag] if episode_id in self._episodes))
+            if len(episode_ids) >= min_size:
+                grouped.append((tag, episode_ids))
+        return tuple(grouped)
+
     def update_preference(self, interaction_vector: List[float], weight: float = 1.0) -> None:
         self._preference.update(interaction_vector, weight)
 

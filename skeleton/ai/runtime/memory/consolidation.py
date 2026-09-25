@@ -40,6 +40,8 @@ class ConsolidationCycle:
 
     def cycle(self, max_concepts: int = 10) -> Dict[str, Any]:
         """Run one consolidation pass."""
+        if isinstance(max_concepts, bool) or not isinstance(max_concepts, int) or max_concepts < 0:
+            raise ValueError("max_concepts must be a non-negative integer")
         self._stats["cycles"] += 1
         due = self._krem.due()[:max_concepts]
 
@@ -65,11 +67,8 @@ class ConsolidationCycle:
         # 3. Dream consolidation: fold refreshed concepts into themes
         themes: List[Dict[str, Any]] = []
         if self._dream is not None:
-            try:
-                themes = self._dream.dream(min_cluster=2)
-                self._stats["themes"] += len(themes)
-            except Exception:
-                themes = []
+            themes = self._dream.dream(min_cluster=2)
+            self._stats["themes"] += len(themes)
 
         report = {
             "cycle": self._stats["cycles"],
