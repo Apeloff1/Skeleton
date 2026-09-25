@@ -17,15 +17,23 @@ PRODUCTION_THRESHOLD = 0.72
 STAGING_THRESHOLD = 0.55
 
 
+def _filled(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return len(value) > 0
+    return False
+
+
 def _score_item(item: Mapping[str, Any]) -> Dict[str, Any]:
     """Heuristic artefact scoring: completeness of expected fields."""
     expected = ("title", "summary", "content", "files")
-    present = sum(1 for k in expected if item.get(k))
+    present = sum(1 for key in expected if _filled(item.get(key)))
     completeness = present / len(expected)
-    files = item.get("files") or {}
-    file_bonus = min(len(files) / 10.0, 1.0) if isinstance(files, dict) else 0.0
+    files = item.get("files") if isinstance(item.get("files"), dict) else {}
+    file_bonus = min(len(files) / 10.0, 1.0)
     score = round(0.7 * completeness + 0.3 * file_bonus, 4)
-    return {"score": score, "completeness": completeness, "file_count": len(files) if isinstance(files, dict) else 0}
+    return {"score": score, "completeness": completeness, "file_count": len(files)}
 
 
 def polish_loop(
@@ -97,6 +105,7 @@ def evaluate(item: Mapping[str, Any] | None = None, **_: Any) -> Dict[str, Any]:
         "kind": "forge-quality",
         "score": scored["score"],
         "ok": int(scored["score"] >= PRODUCTION_THRESHOLD),
+        "passed": scored["score"] >= PRODUCTION_THRESHOLD,
         "stored_prose": 0,
     }
 
@@ -116,6 +125,9 @@ def persist_quality(row: Mapping[str, Any] | None = None, *, root=None, **_: Any
     payload["stored_prose"] = 0
     try:
         append_quality(payload, root=root)
-    except Exception:
-        pass
+    except Exception as exc:
+        payload["stored"] = 0
+        payload["error"] = type(exc).__name__
+        return payload
+    payload["stored"] = 1
     return payload
