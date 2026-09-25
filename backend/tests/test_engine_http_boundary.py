@@ -406,7 +406,8 @@ async def test_backend_client_crosses_authenticated_engine_boundary_idempotently
     )
     assert status["operation_id"] == context.operation_id
     assert status["execution_id"] == context.execution_id
-    assert status["execution_state"] == "admitted"
+    assert status["operation_state"] == "admitted"
+    assert status["execution_state"] == "created"
     assert status["cancellation_requested"] is False
 
     with pytest.raises(EngineAuthorizationError):
@@ -536,10 +537,12 @@ async def test_http_cancel_fences_late_provider_result(tmp_path) -> None:
     command = _command(context, started=_now())
 
     execute_task = asyncio.create_task(client.execute(command))
-    for _ in range(100):
+    for _ in range(200):
         if provider.requests:
             break
-        await asyncio.sleep(0)
+        # Give the scheduled coordinator enough wall-clock time on loaded CI
+        # runners while retaining a tight bounded wait.
+        await asyncio.sleep(0.005)
     else:
         execute_task.cancel()
         raise AssertionError("provider request did not start")
