@@ -136,6 +136,15 @@ class MongoConversationAuthority:
                 [("thread_id", ASCENDING), ("branch_id", ASCENDING), ("sequence", ASCENDING)],
                 name="conversation_branch_sequence",
             )
+            await self.messages.create_index(
+                [
+                    ("operation_id", ASCENDING),
+                    ("author_type", ASCENDING),
+                    ("_commit_state", ASCENDING),
+                ],
+                name="conversation_operation_result",
+                sparse=True,
+            )
         except PyMongoError as exc:
             raise ConversationStorageUnavailable(
                 "conversation indexes are unavailable"
@@ -692,6 +701,60 @@ class MongoConversationAuthority:
             artifact_refs=artifact_refs,
             data_class=prior.data_class,
         )
+
+    async def assistant_message_for_operation(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> ConversationMessage | None:
+        """Resolve committed canonical assistant output for one operation.
+
+        The lookup is tenant/owner bound through the owning thread. Prepared
+        messages are never exposed as canonical resync state.
+        """
+
+        operation = str(operation_id).strip()
+        if not operation or len(operation) > 512:
+            raise ValueError("operation_id must be non-empty bounded text")
+        tenant = str(tenant_id).strip()
+        owner = str(owner_id).strip()
+        if not tenant or not owner:
+            raise ValueError("tenant_id and owner_id are required")
+
+        try:
+            docs = await (
+                self.messages.find(
+                    {
+                        "operation_id": operation,
+                        "author_type": ConversationAuthorType.ASSISTANT.value,
+                        "_commit_state": "committed",
+                    }
+                )
+                .sort("sequence", DESCENDING)
+                .limit(8)
+                .to_list(length=8)
+            )
+        except PyMongoError as exc:
+            raise ConversationStorageUnavailable(
+                "conversation operation result is unavailable"
+            ) from exc
+
+        for doc in docs:
+            thread_id = str(doc.get("thread_id") or "")
+            if not thread_id:
+                continue
+            try:
+                await self.get_thread(
+                    thread_id,
+                    tenant_id=tenant,
+                    owner_id=owner,
+                )
+            except ConversationNotFound:
+                continue
+            return _message_from_doc(doc)
+        return None
 
     async def list_messages(
         self,
