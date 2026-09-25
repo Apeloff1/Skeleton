@@ -60,7 +60,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN addgroup -S -g 10001 appuser \
-    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser
+    && adduser -S -D -u 10001 -G appuser -s /sbin/nologin appuser \
+    && mkdir -p /app/data \
+    && chown appuser:appuser /app/data
 
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
