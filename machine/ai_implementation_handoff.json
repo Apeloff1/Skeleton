@@ -824,7 +824,7 @@
       ],
       "work_package": "WP-P0-ENGINE-BOUNDARY",
       "blueprint": "engine_application_boundary_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "Align runtime process ownership with architecture ownership: backend owns product/conversation ingress and delegates canonical AI execution to the Skeleton engine process.",
       "target_files": {
         "contracts": [
@@ -875,8 +875,25 @@
         "process credential isolation"
       ],
       "closure_gate": "production AI requests entering backend execute provider/model/tool cognition only in the Skeleton engine process with authenticated idempotent cross-service contracts and no local provider fallback",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/api/engine_routes.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/api/engine_runtime.py",
+        "backend/core/engine_client.py",
+        "backend/routes/ai.py",
+        "backend/tests/test_engine_client.py",
+        "backend/tests/test_ai_chat_engine_cutover.py",
+        "skeleton/testing/test_engine_process_isolation.py",
+        "docker-compose.yml",
+        "skeleton/app/manifest.json"
+      ],
+      "remaining": [
+        "prove delegated tenant/user/scope denial across the real cross-service boundary",
+        "prove submit retry/query behavior against the deployed engine endpoint without duplicate execution",
+        "prove idempotent cancel plus late-result fencing across service transport",
+        "prove cross-service golden journey with operation/turn/verification/provider/tool/result lineage",
+        "retire or invert remaining backend local-provider compatibility execution paths"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
