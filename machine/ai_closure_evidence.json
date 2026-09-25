@@ -163,7 +163,10 @@
         "scripts/check_provider_bootstrap.py",
         "scripts/check_provider_runtime_boundary.py",
         "backend/core/ai_provider.py compatibility facade",
-        "skeleton/jeeves/providers.py canonical-runtime compatibility facade"
+        "skeleton/jeeves/providers.py canonical-runtime compatibility facade",
+        "backend/services/tool_registry.py declared provider-isolation surface with retired llm_chat alias",
+        "backend/tests/test_tool_registry_canonical_delegate.py provider credential/SDK source isolation regression",
+        "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation"
       ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
@@ -175,13 +178,12 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "outstanding_evidence": [
-        "canonical async provider regression suite",
-        "canonical synchronous provider transport regression suite",
-        "Jeeves source has no model credentials or raw provider network I/O",
-        "provider-surface inventory gate reports only declared credential-bearing owners",
-        "SDK isolation scans backend and skeleton source",
-        "media provider boundary regression suite",
-        "application media surfaces contain no direct provider credentials or SDK imports"
+        "exact-head provider-surface inventory receipt with no unexplained credential/network/SDK edges",
+        "exact-head canonical async/synchronous provider regression suites",
+        "exact-head media provider boundary regression suite",
+        "exact-head application isolation scan including backend tool registry",
+        "independent verification before closure",
+        "exact-head provider bootstrap inventory and SDK/network isolation gate"
       ],
       "blockers": [],
       "close_when": [
@@ -371,9 +373,17 @@
       "plane": "tool-runtime",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
+        "skeleton/skills/tool_runtime.py canonical sync/async governed runtime",
+        "skeleton/skills/tool_receipt_store.py durable idempotency reservation and replay fencing",
+        "skeleton/skills/tool_adapters/ scoped sandbox/database/network/artifact policy adapters",
+        "backend/services/tool_registry.py compatibility delegation with retired nested llm_chat provider path",
+        "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
+        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence"
+      ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
         "model-visible tool inventory contains only declared enabled tools",
@@ -387,21 +397,20 @@
         "tool receipt lineage binds operation/execution/turn/call identity"
       ],
       "outstanding_evidence": [
-        "tool manifest schema validation/fuzz tests",
-        "model-visible tool inventory contains only declared enabled tools",
-        "no tool module owns model provider credentials or raw provider SDK/network transport",
-        "authority/risk/approval denial tests",
-        "idempotency reservation and replay tests",
-        "sandbox boundary tests for code execution/build tools",
-        "database tool collection/tenant scope denial tests",
-        "network tool timeout/result-bound/provenance tests",
-        "compatibility registry delegates to canonical runtime",
-        "tool receipt lineage binds operation/execution/turn/call identity"
+        "tool manifest schema validation/fuzz coverage against malformed nested schemas",
+        "model-visible inventory proof that only admitted/enabled tools are projected",
+        "move remaining privileged backend I/O handlers behind canonical adapter owners",
+        "complete execution/turn/call lineage fields on canonical tool receipts",
+        "bind governance classification/retention to durable tool results",
+        "bind cost/admission reconciliation across tool/artifact/storage usage",
+        "exact-head App Assembly and provider-surface isolation evidence"
       ],
       "blockers": [
         "dependency must close: gap-governance-registry",
         "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence"
+        "dependency must close: gap-provider-surface-convergence",
+        "remaining privileged backend I/O handlers need adapter-owner cutover",
+        "full execution/turn/call receipt lineage remains incomplete"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
