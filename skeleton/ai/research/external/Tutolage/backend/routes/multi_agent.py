@@ -35,7 +35,7 @@ AGENT_ROLES = {
         "system": "You are a senior software architect. Break down coding tasks into clear, sequential steps. Output structured plans."
     },
     "coder": {
-        "name": "Coder Agent", 
+        "name": "Coder Agent",
         "role": "Writes clean, efficient code",
         "system": "You are an expert programmer. Write clean, efficient, well-documented code. Follow best practices."
     },
@@ -49,7 +49,7 @@ AGENT_ROLES = {
         "role": "Optimizes code for performance and readability",
         "system": "You are a performance engineer. Optimize code for speed, memory, and readability without changing functionality."
     },
-    
+
     # Debug Swarm
     "analyzer": {
         "name": "Analyzer Agent",
@@ -71,7 +71,7 @@ AGENT_ROLES = {
         "role": "Validates that solutions are complete and correct",
         "system": "You are a validation expert. Verify that solutions fully address the problem and don't introduce new issues."
     },
-    
+
     # Teaching Ensemble
     "explainer": {
         "name": "Explainer Agent",
@@ -93,7 +93,7 @@ AGENT_ROLES = {
         "role": "Assesses skill level and progress",
         "system": "You evaluate coding skills objectively. Identify strengths, weaknesses, and growth areas."
     },
-    
+
     # Asset Factory
     "designer": {
         "name": "Designer Agent",
@@ -115,7 +115,7 @@ AGENT_ROLES = {
         "role": "Prepares assets for export and integration",
         "system": "You prepare assets for game engines. Handle formats, optimization, and integration requirements."
     },
-    
+
     # Game Builder
     "architect": {
         "name": "Game Architect Agent",
@@ -198,21 +198,21 @@ async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, An
     """Run a single agent"""
     if not LLM_AVAILABLE or not EMERGENT_KEY:
         return {"agent": agent_id, "error": "LLM not available", "output": ""}
-    
+
     agent = AGENT_ROLES.get(agent_id)
     if not agent:
         return {"agent": agent_id, "error": "Unknown agent", "output": ""}
-    
+
     try:
         chat = LlmChat(
             api_key=EMERGENT_KEY,
             system_message=agent["system"]
         ).with_model("openai", "gpt-4o")
-        
+
         prompt = f"{task}\n\nContext:\n{context}" if context else task
         response = await chat.send_message(UserMessage(text=prompt))
         output = response.content if hasattr(response, 'content') else str(response)
-        
+
         return {
             "agent": agent_id,
             "name": agent["name"],
@@ -225,11 +225,11 @@ async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, An
 
 async def run_agent_system(system_id: str, task: str, code: str = "", language: str = "python", max_iterations: int = 3) -> Dict[str, Any]:
     """Run a complete multi-agent system"""
-    
+
     system = AGENT_SYSTEMS.get(system_id)
     if not system:
         raise HTTPException(status_code=404, detail="Agent system not found")
-    
+
     execution_id = str(uuid.uuid4())[:8]
     results = {
         "execution_id": execution_id,
@@ -239,20 +239,20 @@ async def run_agent_system(system_id: str, task: str, code: str = "", language: 
         "agents": [],
         "final_output": None
     }
-    
+
     context = f"Language: {language}\nCode:\n```{language}\n{code}\n```" if code else f"Language: {language}"
     current_output = ""
-    
+
     for agent_id in system["agents"]:
         agent_task = f"{task}\n\nPrevious agent output:\n{current_output}" if current_output else task
         agent_result = await run_agent(agent_id, agent_task, context)
         results["agents"].append(agent_result)
         current_output = agent_result.get("output", "")
-    
+
     results["final_output"] = current_output
     results["completed_at"] = datetime.utcnow().isoformat()
     results["total_agents"] = len(system["agents"])
-    
+
     return results
 
 # ============================================================================
@@ -305,7 +305,7 @@ async def run_system(system_id: str, request: MultiAgentRequest):
     """Run a multi-agent system"""
     if system_id not in AGENT_SYSTEMS:
         raise HTTPException(status_code=404, detail="System not found")
-    
+
     result = await run_agent_system(
         system_id,
         request.task,
@@ -313,7 +313,7 @@ async def run_system(system_id: str, request: MultiAgentRequest):
         request.language,
         request.max_iterations
     )
-    
+
     return result
 
 @router.post("/code-architect")
@@ -346,5 +346,5 @@ async def run_single_agent(agent_id: str, request: AgentTask):
     """Run a single agent"""
     if agent_id not in AGENT_ROLES:
         raise HTTPException(status_code=404, detail="Agent not found")
-    
+
     return await run_agent(agent_id, request.task, request.context or "")

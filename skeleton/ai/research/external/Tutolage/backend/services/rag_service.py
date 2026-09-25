@@ -24,14 +24,14 @@ _collections: Dict[str, Any] = {}
 def get_chroma_client():
     """Get or create ChromaDB client (lazy initialization)."""
     global _chroma_client
-    
+
     if _chroma_client is None:
         try:
             import chromadb
             from chromadb.config import Settings
-            
+
             persist_dir = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
-            
+
             _chroma_client = chromadb.Client(Settings(
                 anonymized_telemetry=False,
                 is_persistent=True,
@@ -43,32 +43,32 @@ def get_chroma_client():
         except Exception as e:
             print(f"ChromaDB initialization error: {e}")
             _chroma_client = MockChromaClient()
-    
+
     return _chroma_client
 
 
 class MockChromaClient:
     """Mock ChromaDB client for when ChromaDB is not available."""
-    
+
     def __init__(self):
         self._collections: Dict[str, "MockCollection"] = {}
-    
+
     def get_or_create_collection(self, name: str, **kwargs) -> "MockCollection":
         if name not in self._collections:
             self._collections[name] = MockCollection(name)
         return self._collections[name]
-    
+
     def list_collections(self) -> List[str]:
         return list(self._collections.keys())
 
 
 class MockCollection:
     """Mock collection for when ChromaDB is not available."""
-    
+
     def __init__(self, name: str):
         self.name = name
         self._documents: List[Dict] = []
-    
+
     def add(self, documents: List[str], metadatas: List[Dict], ids: List[str]):
         for doc, meta, id_ in zip(documents, metadatas, ids):
             self._documents.append({
@@ -76,14 +76,14 @@ class MockCollection:
                 "document": doc,
                 "metadata": meta
             })
-    
+
     def query(self, query_texts: List[str], n_results: int = 5, where: Optional[Dict] = None):
         # Simple mock - return most recent documents
         filtered = self._documents
         if where:
-            filtered = [d for d in self._documents 
+            filtered = [d for d in self._documents
                        if all(d["metadata"].get(k) == v for k, v in where.items())]
-        
+
         results = filtered[-n_results:]
         return {
             "documents": [[d["document"] for d in results]],
@@ -91,30 +91,30 @@ class MockCollection:
             "distances": [[0.1] * len(results)],
             "ids": [[d["id"] for d in results]]
         }
-    
+
     def count(self) -> int:
         return len(self._documents)
-    
+
     def get(self, ids: Optional[List[str]] = None, where: Optional[Dict] = None):
         if ids:
             results = [d for d in self._documents if d["id"] in ids]
         elif where:
-            results = [d for d in self._documents 
+            results = [d for d in self._documents
                       if all(d["metadata"].get(k) == v for k, v in where.items())]
         else:
             results = self._documents
-        
+
         return {
             "documents": [d["document"] for d in results],
             "metadatas": [d["metadata"] for d in results],
             "ids": [d["id"] for d in results]
         }
-    
+
     def delete(self, ids: Optional[List[str]] = None, where: Optional[Dict] = None):
         if ids:
             self._documents = [d for d in self._documents if d["id"] not in ids]
         elif where:
-            self._documents = [d for d in self._documents 
+            self._documents = [d for d in self._documents
                              if not all(d["metadata"].get(k) == v for k, v in where.items())]
 
 
@@ -125,7 +125,7 @@ class MockCollection:
 class RAGService:
     """
     RAG Service for Jeeves long-term memory.
-    
+
     Collections:
     - learning_sessions: User learning session history
     - concepts: Concept explanations and examples
@@ -133,7 +133,7 @@ class RAGService:
     - cocoding_context: Co-coding session context
     - feedback: User feedback and ratings
     """
-    
+
     COLLECTIONS = [
         "learning_sessions",
         "concepts",
@@ -141,11 +141,11 @@ class RAGService:
         "cocoding_context",
         "feedback"
     ]
-    
+
     def __init__(self):
         self.client = get_chroma_client()
         self._init_collections()
-    
+
     def _init_collections(self):
         """Initialize all collections."""
         global _collections
@@ -154,7 +154,7 @@ class RAGService:
                 name=f"jeeves_{name}",
                 metadata={"description": f"Jeeves {name} memory"}
             )
-    
+
     def _get_collection(self, name: str):
         """Get a collection by name."""
         full_name = f"jeeves_{name}"
@@ -164,11 +164,11 @@ class RAGService:
                 metadata={"description": f"Jeeves {name} memory"}
             )
         return _collections[full_name]
-    
+
     # =========================================================================
     # Learning Sessions
     # =========================================================================
-    
+
     def store_learning_session(
         self,
         user_id: str,
@@ -180,11 +180,11 @@ class RAGService:
     ) -> str:
         """Store a learning session in memory."""
         collection = self._get_collection("learning_sessions")
-        
+
         session_id = hashlib.md5(
             f"{user_id}:{topic}:{datetime.utcnow().isoformat()}".encode()
         ).hexdigest()[:16]
-        
+
         full_metadata = {
             "user_id": user_id,
             "topic": topic,
@@ -193,15 +193,15 @@ class RAGService:
             "timestamp": datetime.utcnow().isoformat(),
             **(metadata or {})
         }
-        
+
         collection.add(
             documents=[content],
             metadatas=[full_metadata],
             ids=[session_id]
         )
-        
+
         return session_id
-    
+
     def get_user_sessions(
         self,
         user_id: str,
@@ -210,17 +210,17 @@ class RAGService:
     ) -> List[Dict]:
         """Retrieve user's learning sessions."""
         collection = self._get_collection("learning_sessions")
-        
+
         where_filter = {"user_id": user_id}
         if topic:
             where_filter["topic"] = topic
-        
+
         results = collection.query(
             query_texts=["learning session"],
             n_results=limit,
             where=where_filter
         )
-        
+
         sessions = []
         if results["documents"]:
             for i, doc in enumerate(results["documents"][0]):
@@ -228,13 +228,13 @@ class RAGService:
                     "content": doc,
                     "metadata": results["metadatas"][0][i] if results["metadatas"] else {}
                 })
-        
+
         return sessions
-    
+
     # =========================================================================
     # Concepts
     # =========================================================================
-    
+
     def store_concept(
         self,
         concept_id: str,
@@ -246,9 +246,9 @@ class RAGService:
     ) -> str:
         """Store a concept explanation."""
         collection = self._get_collection("concepts")
-        
+
         content = f"{name}\n\n{explanation}\n\nExamples:\n" + "\n".join(f"- {e}" for e in examples)
-        
+
         metadata = {
             "concept_id": concept_id,
             "name": name,
@@ -257,15 +257,15 @@ class RAGService:
             "example_count": len(examples),
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         collection.add(
             documents=[content],
             metadatas=[metadata],
             ids=[concept_id]
         )
-        
+
         return concept_id
-    
+
     def search_concepts(
         self,
         query: str,
@@ -275,17 +275,17 @@ class RAGService:
     ) -> List[Dict]:
         """Search for relevant concepts."""
         collection = self._get_collection("concepts")
-        
+
         where_filter = {}
         if domain:
             where_filter["domain"] = domain
-        
+
         results = collection.query(
             query_texts=[query],
             n_results=limit,
             where=where_filter if where_filter else None
         )
-        
+
         concepts = []
         if results["documents"]:
             for i, doc in enumerate(results["documents"][0]):
@@ -297,13 +297,13 @@ class RAGService:
                     "metadata": meta,
                     "relevance": 1 - (results["distances"][0][i] if results["distances"] else 0)
                 })
-        
+
         return concepts
-    
+
     # =========================================================================
     # User Progress
     # =========================================================================
-    
+
     def update_user_progress(
         self,
         user_id: str,
@@ -314,15 +314,15 @@ class RAGService:
     ) -> str:
         """Update user progress for a domain."""
         collection = self._get_collection("user_progress")
-        
+
         progress_id = f"{user_id}:{domain}"
-        
+
         content = json.dumps({
             "mastery_level": mastery_level,
             "concepts_learned": concepts_learned,
             "total_hours": total_hours
         })
-        
+
         metadata = {
             "user_id": user_id,
             "domain": domain,
@@ -331,27 +331,27 @@ class RAGService:
             "total_hours": total_hours,
             "updated_at": datetime.utcnow().isoformat()
         }
-        
+
         # Delete existing and add new (upsert)
         try:
             collection.delete(ids=[progress_id])
         except Exception:
             pass
-        
+
         collection.add(
             documents=[content],
             metadatas=[metadata],
             ids=[progress_id]
         )
-        
+
         return progress_id
-    
+
     def get_user_progress(self, user_id: str) -> Dict[str, Any]:
         """Get all progress for a user."""
         collection = self._get_collection("user_progress")
-        
+
         results = collection.get(where={"user_id": user_id})
-        
+
         progress = {}
         if results["documents"]:
             for i, doc in enumerate(results["documents"]):
@@ -361,13 +361,13 @@ class RAGService:
                     "data": json.loads(doc) if doc.startswith("{") else {},
                     "metadata": meta
                 }
-        
+
         return progress
-    
+
     # =========================================================================
     # Co-coding Context
     # =========================================================================
-    
+
     def store_cocoding_context(
         self,
         session_id: str,
@@ -379,10 +379,10 @@ class RAGService:
     ) -> str:
         """Store co-coding session context."""
         collection = self._get_collection("cocoding_context")
-        
+
         content = f"Context: {context}\n\nCode:\n" + "\n---\n".join(code_snippets)
         content += "\n\nDecisions:\n" + "\n".join(f"- {d}" for d in decisions)
-        
+
         metadata = {
             "session_id": session_id,
             "user_id": user_id,
@@ -391,15 +391,15 @@ class RAGService:
             "decision_count": len(decisions),
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         collection.add(
             documents=[content],
             metadatas=[metadata],
             ids=[session_id]
         )
-        
+
         return session_id
-    
+
     def get_relevant_context(
         self,
         user_id: str,
@@ -409,17 +409,17 @@ class RAGService:
     ) -> List[Dict]:
         """Get relevant co-coding context for a query."""
         collection = self._get_collection("cocoding_context")
-        
+
         where_filter = {"user_id": user_id}
         if pipeline:
             where_filter["pipeline"] = pipeline
-        
+
         results = collection.query(
             query_texts=[query],
             n_results=limit,
             where=where_filter
         )
-        
+
         contexts = []
         if results["documents"]:
             for i, doc in enumerate(results["documents"][0]):
@@ -428,13 +428,13 @@ class RAGService:
                     "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
                     "relevance": 1 - (results["distances"][0][i] if results["distances"] else 0)
                 })
-        
+
         return contexts
-    
+
     # =========================================================================
     # Feedback
     # =========================================================================
-    
+
     def store_feedback(
         self,
         user_id: str,
@@ -445,11 +445,11 @@ class RAGService:
     ) -> str:
         """Store user feedback."""
         collection = self._get_collection("feedback")
-        
+
         feedback_id = hashlib.md5(
             f"{user_id}:{feedback_type}:{datetime.utcnow().isoformat()}".encode()
         ).hexdigest()[:16]
-        
+
         metadata = {
             "user_id": user_id,
             "feedback_type": feedback_type,
@@ -457,19 +457,19 @@ class RAGService:
             "timestamp": datetime.utcnow().isoformat(),
             **(context or {})
         }
-        
+
         collection.add(
             documents=[content],
             metadatas=[metadata],
             ids=[feedback_id]
         )
-        
+
         return feedback_id
-    
+
     # =========================================================================
     # Statistics
     # =========================================================================
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """Get RAG service statistics."""
         stats = {
@@ -477,13 +477,13 @@ class RAGService:
             "total_documents": 0,
             "status": "healthy"
         }
-        
+
         for name in self.COLLECTIONS:
             collection = self._get_collection(name)
             count = collection.count()
             stats["collections"][name] = count
             stats["total_documents"] += count
-        
+
         return stats
 
 

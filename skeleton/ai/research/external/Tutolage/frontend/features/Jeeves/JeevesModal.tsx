@@ -79,18 +79,18 @@ export const JeevesModal: React.FC<JeevesModalProps> = ({
 
   const sendMessage = async () => {
     if (!inputText.trim() || isLoading) return;
-    
+
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
       content: inputText.trim(),
       timestamp: new Date()
     };
-    
+
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
-    
+
     try {
       const response = await fetch(`${API_URL}/api/jeeves/ask`, {
         method: 'POST',
@@ -105,14 +105,14 @@ export const JeevesModal: React.FC<JeevesModalProps> = ({
         })
       });
       const data = await response.json();
-      
+
       const jeevesMessage: Message = {
         id: Date.now().toString() + '-j',
         type: 'jeeves',
         content: data.jeeves_response || 'I apologize, but I encountered an issue. Please try again.',
         timestamp: new Date()
       };
-      
+
       setMessages(prev => [...prev, jeevesMessage]);
     } catch (error) {
       console.error('Jeeves error:', error);
@@ -130,11 +130,11 @@ export const JeevesModal: React.FC<JeevesModalProps> = ({
 
   const askForHelp = async (type: 'explain' | 'debug' | 'concept' | 'practice' | 'motivate') => {
     setIsLoading(true);
-    
+
     try {
       let endpoint = '';
       let body: any = {};
-      
+
       switch (type) {
         case 'explain':
           if (!currentCode) {
@@ -184,16 +184,16 @@ export const JeevesModal: React.FC<JeevesModalProps> = ({
           endpoint = '/api/jeeves/motivate?mood=stuck';
           break;
       }
-      
+
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       const data = await response.json();
-      
+
       const content = data.explanation || data.debug_assistance || data.lesson || data.practice_problems || data.message || JSON.stringify(data, null, 2);
-      
+
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         type: 'jeeves',

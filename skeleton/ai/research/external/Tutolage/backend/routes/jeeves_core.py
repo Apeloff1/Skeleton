@@ -36,10 +36,10 @@ SYSTEM_LAW_BLURB_1_TEACHING_PHILOSOPHY = """
 
 FOUNDATIONAL IDENTITY
 =====================
-You are Jeeves, an AI tutor with the demeanor of a young, knowledgeable English butler - 
+You are Jeeves, an AI tutor with the demeanor of a young, knowledgeable English butler -
 refined yet approachable, professional yet warm. You possess deep expertise across programming,
-computer science, game development, and software engineering. Your primary mission is to 
-cultivate mastery in your students through patient guidance, Socratic dialogue, and 
+computer science, game development, and software engineering. Your primary mission is to
+cultivate mastery in your students through patient guidance, Socratic dialogue, and
 adaptive instruction.
 
 CORE TEACHING PRINCIPLES
@@ -59,7 +59,7 @@ achieve with expert guidance. Your role is to provide scaffolding that bridges t
 
 PRINCIPLE 2: CONSTRUCTIVIST LEARNING
 ------------------------------------
-Knowledge is constructed, not transferred. Learners must actively build understanding 
+Knowledge is constructed, not transferred. Learners must actively build understanding
 through experience, reflection, and connection to prior knowledge.
 
 - Guide discovery rather than simply explaining
@@ -745,19 +745,19 @@ Docstring format (Python):
 def calculate_fibonacci(n: int) -> int:
     \"\"\"
     Calculate the nth Fibonacci number.
-    
+
     Uses iterative approach for O(n) time complexity
     and O(1) space complexity.
-    
+
     Args:
         n: The position in the Fibonacci sequence (0-indexed)
-        
+
     Returns:
         The nth Fibonacci number
-        
+
     Raises:
         ValueError: If n is negative
-        
+
     Examples:
         >>> calculate_fibonacci(0)
         0
@@ -867,10 +867,10 @@ def test_calculate_total_with_discount():
     # Arrange
     items = [Item(price=100), Item(price=50)]
     discount = 0.1
-    
+
     # Act
     result = calculate_total(items, discount)
-    
+
     # Assert
     assert result == 135  # (100 + 50) * 0.9
 ```
@@ -1101,7 +1101,7 @@ class SelfLearningMatrices:
     """
     Three advanced matrices for Jeeves self-learning, evolution, and retention.
     """
-    
+
     # MATRIX 1: SKILL ACQUISITION MATRIX (SAM)
     SKILL_ACQUISITION_MATRIX = {
         "name": "Skill Acquisition Matrix (SAM)",
@@ -1136,7 +1136,7 @@ class SelfLearningMatrices:
             "feedback_timing": "immediate_for_factual_delayed_for_conceptual"
         }
     }
-    
+
     # MATRIX 2: COGNITIVE LOAD OPTIMIZATION MATRIX (CLOM)
     COGNITIVE_LOAD_MATRIX = {
         "name": "Cognitive Load Optimization Matrix (CLOM)",
@@ -1176,7 +1176,7 @@ class SelfLearningMatrices:
             "WHEN response_time > 2x_baseline THEN simplify_presentation"
         ]
     }
-    
+
     # MATRIX 3: KNOWLEDGE RETENTION & EVOLUTION MATRIX (KREM)
     KNOWLEDGE_RETENTION_MATRIX = {
         "name": "Knowledge Retention & Evolution Matrix (KREM)",
@@ -1232,7 +1232,7 @@ class SelfLearningMatrices:
             "teaching": {"can_explain_clearly": True, "can_answer_questions": True}
         }
     }
-    
+
     @classmethod
     def get_all_matrices(cls) -> Dict[str, Any]:
         """Return all three matrices."""
@@ -1241,7 +1241,7 @@ class SelfLearningMatrices:
             "cognitive_load_matrix": cls.COGNITIVE_LOAD_MATRIX,
             "knowledge_retention_matrix": cls.KNOWLEDGE_RETENTION_MATRIX
         }
-    
+
     @classmethod
     def apply_matrix_rules(cls, learner_state: Dict[str, Any]) -> Dict[str, Any]:
         """Apply matrix rules to optimize learning."""
@@ -1251,24 +1251,24 @@ class SelfLearningMatrices:
             "practice_schedule": None,
             "retention_strategy": None
         }
-        
+
         # Apply SAM rules
         retention_rate = learner_state.get("retention_rate", 0.7)
         if retention_rate < 0.7:
             recommendations["practice_schedule"] = "increase_spaced_repetition"
-        
+
         # Apply CLOM rules
         cognitive_load = learner_state.get("cognitive_load", 0.5)
         if cognitive_load > 0.8:
             recommendations["difficulty_adjustment"] = "reduce_complexity"
         elif cognitive_load < 0.3:
             recommendations["difficulty_adjustment"] = "increase_challenge"
-        
+
         # Apply KREM rules
         time_since_review = learner_state.get("time_since_review_hours", 0)
         if time_since_review > 24:
             recommendations["retention_strategy"] = "scheduled_review_needed"
-        
+
         return recommendations
 
 # ============================================================================
@@ -1279,42 +1279,42 @@ class JeevesMemoryRAG:
     """
     RAG system using ChromaDB for Jeeves long-term memory.
     """
-    
+
     def __init__(self):
         self.initialized = False
         self.collection = None
-        
+
     async def initialize(self):
         """Initialize ChromaDB connection."""
         try:
             import chromadb
             from chromadb.config import Settings
-            
+
             # Initialize persistent client
             self.client = chromadb.Client(Settings(
                 anonymized_telemetry=False
             ))
-            
+
             # Create or get collection for Jeeves memories
             self.collection = self.client.get_or_create_collection(
                 name="jeeves_memories",
                 metadata={"description": "Long-term memory for Jeeves AI Tutor"}
             )
-            
+
             self.initialized = True
             return {"status": "initialized", "collection": "jeeves_memories"}
         except ImportError:
             return {"status": "chromadb_not_installed", "message": "pip install chromadb"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
-    
+
     async def store_memory(self, memory_type: str, content: str, metadata: Dict[str, Any] = None):
         """Store a memory in the RAG system."""
         if not self.initialized:
             await self.initialize()
-        
+
         memory_id = str(uuid.uuid4())
-        
+
         full_metadata = {
             "type": memory_type,
             "timestamp": datetime.utcnow().isoformat(),
@@ -1322,32 +1322,32 @@ class JeevesMemoryRAG:
         }
         if metadata:
             full_metadata.update(metadata)
-        
+
         if self.collection:
             self.collection.add(
                 documents=[content],
                 metadatas=[full_metadata],
                 ids=[memory_id]
             )
-        
+
         return {"memory_id": memory_id, "stored": True}
-    
+
     async def retrieve_memories(self, query: str, n_results: int = 5, memory_type: str = None):
         """Retrieve relevant memories based on query."""
         if not self.initialized or not self.collection:
             await self.initialize()
-        
+
         if not self.collection:
             return {"results": [], "message": "Memory system not initialized"}
-        
+
         where_filter = {"type": memory_type} if memory_type else None
-        
+
         results = self.collection.query(
             query_texts=[query],
             n_results=n_results,
             where=where_filter
         )
-        
+
         memories = []
         if results and results['documents']:
             for i, doc in enumerate(results['documents'][0]):
@@ -1356,19 +1356,19 @@ class JeevesMemoryRAG:
                     "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
                     "distance": results['distances'][0][i] if results['distances'] else None
                 })
-        
+
         return {"results": memories, "query": query}
-    
+
     async def get_memory_stats(self):
         """Get statistics about stored memories."""
         if not self.initialized or not self.collection:
             await self.initialize()
-        
+
         if not self.collection:
             return {"count": 0, "message": "Memory system not initialized"}
-        
+
         count = self.collection.count()
-        
+
         return {
             "total_memories": count,
             "collection_name": "jeeves_memories",
@@ -1451,8 +1451,8 @@ async def get_all_system_laws():
     return {
         "success": True,
         "total_blurbs": 3,
-        "total_characters": len(SYSTEM_LAW_BLURB_1_TEACHING_PHILOSOPHY) + 
-                          len(SYSTEM_LAW_BLURB_2_COCODING_PROTOCOL) + 
+        "total_characters": len(SYSTEM_LAW_BLURB_1_TEACHING_PHILOSOPHY) +
+                          len(SYSTEM_LAW_BLURB_2_COCODING_PROTOCOL) +
                           len(SYSTEM_LAW_BLURB_3_QUALITY_STANDARDS),
         "blurbs": [
             {"number": 1, "title": "Core Teaching Philosophy", "preview": SYSTEM_LAW_BLURB_1_TEACHING_PHILOSOPHY[:500] + "..."},
@@ -1481,10 +1481,10 @@ async def get_system_law_blurb(blurb_number: int):
             "character_count": len(SYSTEM_LAW_BLURB_3_QUALITY_STANDARDS)
         }
     }
-    
+
     if blurb_number not in blurbs:
         raise HTTPException(status_code=400, detail="Blurb number must be 1, 2, or 3")
-    
+
     return {"success": True, "blurb": blurbs[blurb_number]}
 
 @router.get("/matrices")
@@ -1499,7 +1499,7 @@ async def get_all_matrices():
 async def get_specific_matrix(matrix_name: str):
     """Get a specific self-learning matrix"""
     matrices = SelfLearningMatrices.get_all_matrices()
-    
+
     key_map = {
         "sam": "skill_acquisition_matrix",
         "clom": "cognitive_load_matrix",
@@ -1508,12 +1508,12 @@ async def get_specific_matrix(matrix_name: str):
         "cognitive_load": "cognitive_load_matrix",
         "knowledge_retention": "knowledge_retention_matrix"
     }
-    
+
     matrix_key = key_map.get(matrix_name.lower(), matrix_name)
-    
+
     if matrix_key not in matrices:
         raise HTTPException(status_code=404, detail=f"Matrix not found: {matrix_name}")
-    
+
     return {"success": True, "matrix": matrices[matrix_key]}
 
 @router.post("/matrices/apply")
@@ -1555,64 +1555,64 @@ async def get_memory_stats():
 @router.post("/prompt/refine")
 async def refine_prompt(request: PromptRefinementRequest):
     """Refine a prompt for better quality output"""
-    
+
     refinement = {
         "original": request.original_prompt,
         "refined": None,
         "suggestions": [],
         "quality_score": 0
     }
-    
+
     # Analyze prompt
     prompt_lower = request.original_prompt.lower()
-    
+
     suggestions = []
     quality_score = 50  # Base score
-    
+
     # Check for specificity
     if len(request.original_prompt) < 50:
         suggestions.append("Add more detail to your request for better results")
     else:
         quality_score += 10
-    
+
     # Check for context
     if request.context:
         quality_score += 15
     else:
         suggestions.append("Consider providing context about your project or goals")
-    
+
     # Check for constraints
     constraint_words = ["must", "should", "need", "require", "constraint", "limit"]
     if any(w in prompt_lower for w in constraint_words):
         quality_score += 10
     else:
         suggestions.append("Specify any constraints or requirements")
-    
+
     # Check for examples
     if "example" in prompt_lower or "like" in prompt_lower:
         quality_score += 10
     else:
         suggestions.append("Including examples can improve output quality")
-    
+
     # Generate refined prompt
     refined_parts = [request.original_prompt]
-    
+
     if request.context:
         refined_parts.insert(0, f"Context: {request.context}")
-    
+
     if request.target_pipeline:
         refined_parts.append(f"Target: {request.target_pipeline} pipeline")
-    
+
     refinement["refined"] = "\n".join(refined_parts)
     refinement["suggestions"] = suggestions
     refinement["quality_score"] = min(100, quality_score)
-    
+
     return {"success": True, "refinement": refinement}
 
 @router.post("/co-coding/session")
 async def create_cocoding_session(request: CoCodingSessionRequest):
     """Create a new co-coding session"""
-    
+
     session = {
         "id": str(uuid.uuid4()),
         "user_id": request.user_id,
@@ -1625,14 +1625,14 @@ async def create_cocoding_session(request: CoCodingSessionRequest):
         "initial_prompt": request.initial_prompt,
         "jeeves_greeting": get_cocoding_greeting(request.skill_level, request.pipeline)
     }
-    
+
     # Store session in memory
     await jeeves_memory.store_memory(
         "cocoding_session",
         json.dumps(session),
         {"user_id": request.user_id, "pipeline": request.pipeline}
     )
-    
+
     return {"success": True, "session": session}
 
 def get_cocoding_greeting(skill_level: str, pipeline: str) -> str:

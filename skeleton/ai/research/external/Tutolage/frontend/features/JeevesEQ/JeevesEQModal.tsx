@@ -1,6 +1,6 @@
 /**
  * Jeeves EQ Modal v11.8 - Emotional Intelligence Dashboard
- * 
+ *
  * Features:
  * - Emotional state visualization
  * - Pomodoro timer UI
@@ -67,14 +67,14 @@ export const JeevesEQModal: React.FC<JeevesEQModalProps> = ({
   const [cognitiveLoad, setCognitiveLoad] = useState<any>(null);
   const [wellnessReminder, setWellnessReminder] = useState<any>(null);
   const [therapeuticResponse, setTherapeuticResponse] = useState<string | null>(null);
-  
+
   // Pomodoro state
   const [pomodoroActive, setPomodoroActive] = useState(false);
   const [pomodoroType, setPomodoroType] = useState<'work' | 'short_break' | 'long_break'>('work');
   const [pomodoroTime, setPomodoroTime] = useState(25 * 60); // 25 minutes in seconds
   const [sessionsCompleted, setSessionsCompleted] = useState(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Fetch EQ info and data
@@ -87,7 +87,7 @@ export const JeevesEQModal: React.FC<JeevesEQModalProps> = ({
         fetch(`${API_URL}/api/jeeves-eq/cognitive-load-check?user_id=${userId}&session_duration_minutes=30&new_concepts_introduced=2&error_count=3&last_break_minutes_ago=25`),
         fetch(`${API_URL}/api/jeeves-eq/wellness-reminder`)
       ]);
-      
+
       if (infoRes.ok) setEqInfo(await infoRes.json());
       if (profileRes.ok) setPsychologyProfile(await profileRes.json());
       if (loadRes.ok) setCognitiveLoad(await loadRes.json());
@@ -110,7 +110,7 @@ export const JeevesEQModal: React.FC<JeevesEQModalProps> = ({
       if (res.ok) {
         const data = await res.json();
         setEmotionalState(data.emotional_state);
-        
+
         // If intervention needed, get therapeutic response
         if (data.immediate_intervention_needed) {
           await getTherapeuticResponse(data.emotional_state.primary, data.emotional_state.intensity);
@@ -218,10 +218,10 @@ export const JeevesEQModal: React.FC<JeevesEQModalProps> = ({
           ]}
           onPress={() => setActiveTab(tab.id as TabType)}
         >
-          <Ionicons 
-            name={tab.icon as any} 
-            size={20} 
-            color={activeTab === tab.id ? colors.primary : colors.textMuted} 
+          <Ionicons
+            name={tab.icon as any}
+            size={20}
+            color={activeTab === tab.id ? colors.primary : colors.textMuted}
           />
           <Text style={[styles.tabText, { color: activeTab === tab.id ? colors.primary : colors.textMuted }]}>
             {tab.label}
@@ -240,7 +240,7 @@ export const JeevesEQModal: React.FC<JeevesEQModalProps> = ({
         {/* Emotional State Card */}
         <View style={[styles.emotionCard, { backgroundColor: EMOTION_COLORS[emotion] + '20' }]}>
           <Animated.View style={[
-            styles.emotionIconContainer, 
+            styles.emotionIconContainer,
             { backgroundColor: EMOTION_COLORS[emotion], transform: [{ scale: pulseAnim }] }
           ]}>
             <Ionicons name={(EMOTION_ICONS[emotion] || 'help') as any} size={40} color="#FFF" />
@@ -464,10 +464,10 @@ export const JeevesEQModal: React.FC<JeevesEQModalProps> = ({
           <Text style={[styles.cardTitle, { color: colors.text }]}>🧠 Cognitive Load Analysis</Text>
           <View style={styles.loadMeter}>
             <View style={[
-              styles.loadMeterFill, 
-              { 
+              styles.loadMeterFill,
+              {
                 width: `${(cognitiveLoad.load_score || 0) * 100}%`,
-                backgroundColor: cognitiveLoad.cognitive_load_level === 'high' ? '#EF4444' : 
+                backgroundColor: cognitiveLoad.cognitive_load_level === 'high' ? '#EF4444' :
                                cognitiveLoad.cognitive_load_level === 'medium' ? '#F59E0B' : '#10B981'
               }
             ]} />
