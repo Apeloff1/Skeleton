@@ -121,6 +121,36 @@ async def test_variation_and_edit_encode_binary_media() -> None:
 
 
 @pytest.mark.asyncio
+async def test_variation_and_edit_reject_malformed_image_payloads() -> None:
+    def bad(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "provider": "openai",
+                "model": "image-op",
+                "images": [{"data": "not***base64"}],
+            },
+        )
+
+    client = _client(bad)
+    with pytest.raises(EngineProtocolError, match="invalid base64"):
+        await client.create_image_variation(
+            b"source-image",
+            actor_id="image-route",
+            tenant_id="tenant-a",
+            operation_id="var-op",
+        )
+    with pytest.raises(EngineProtocolError, match="invalid base64"):
+        await client.edit_image(
+            b"source-image",
+            prompt="edit",
+            actor_id="image-route",
+            tenant_id="tenant-a",
+            operation_id="edit-op",
+        )
+
+
+@pytest.mark.asyncio
 async def test_speech_decodes_audio_and_rejects_bad_payload() -> None:
     def good(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
