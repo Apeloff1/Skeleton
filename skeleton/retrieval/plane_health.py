@@ -26,6 +26,12 @@ def _finite(name: str, value: Any) -> float:
     return number
 
 
+def _plane_name(plane: Any) -> str:
+    if not isinstance(plane, str) or not plane.strip():
+        raise ValueError("plane is required")
+    return plane
+
+
 class PlaneCircuitOpen(RuntimeError):
     """A retrieval plane is temporarily isolated after repeated failures."""
 
@@ -112,8 +118,11 @@ class PlaneHealthTracker:
         )
 
     def state(self, plane: str) -> PlaneHealth:
+        name = _plane_name(plane)
         with self._lock:
-            return self._states.get(plane, self._default(plane))
+            if name not in self._states:
+                raise KeyError(name)
+            return self._states[name]
 
     def reset(self, plane: str) -> None:
         """Forget operational health when a retriever implementation is replaced."""
@@ -123,6 +132,7 @@ class PlaneHealthTracker:
                 self._revision += 1
 
     def before_call(self, plane: str) -> None:
+        plane = _plane_name(plane)
         with self._lock:
             now = self._clock()
             current = self._states.get(plane, self._default(plane))
@@ -146,6 +156,7 @@ class PlaneHealthTracker:
                 self._revision += 1
 
     def record_success(self, plane: str, latency_ms: float) -> PlaneHealth:
+        plane = _plane_name(plane)
         latency = _finite("latency_ms", latency_ms)
         if latency < 0:
             raise ValueError("latency_ms must be non-negative")
@@ -180,6 +191,7 @@ class PlaneHealthTracker:
         latency_ms: float,
         error: BaseException,
     ) -> PlaneHealth:
+        plane = _plane_name(plane)
         latency = _finite("latency_ms", latency_ms)
         if latency < 0:
             raise ValueError("latency_ms must be non-negative")
