@@ -287,3 +287,115 @@ def test_transport_acknowledgement_is_tenant_bound(
 
     operations.close()
     events.close()
+
+
+def test_resync_snapshot_returns_compaction_floor_and_latest_cursor(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    transport.dispatch_pending(operation.operation_id, tenant_id="tenant-a")
+    events.compact_through(operation.operation_id, 2)
+
+    snapshot = transport.resync_snapshot(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-recover",
+    )
+
+    assert snapshot.compacted_through == 2
+    assert snapshot.resume_after_sequence == 2
+    assert snapshot.latest_sequence == 3
+    assert snapshot.operation.envelope.state is OperationState.AUTHORIZED
+    assert snapshot.active_consumer_count == 1
+
+    replay = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        after_sequence=snapshot.resume_after_sequence,
+        consumer_id="client-recover",
+    )
+    assert [event.sequence for event in replay.events] == [3]
+
+    operations.close()
+    events.close()
+
+
+def test_acknowledge_and_compact_waits_for_slowest_active_consumer(
+    tmp_path: Path,
+) -> None:
+    transport, operations, events = _transport(tmp_path)
+    operation = _operation()
+    current = operations.create(operation, now=BASE_TIME)
+    for index, state in enumerate(
+        (
+            OperationState.VALIDATED,
+            OperationState.AUTHORIZED,
+        ),
+        start=1,
+    ):
+        current = operations.transition(
+            operation.operation_id,
+            state,
+            expected_version=current.version,
+            now=BASE_TIME + timedelta(seconds=index),
+        )
+
+    first = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+        after_sequence=0,
+    )
+    second = transport.replay(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-b",
+        after_sequence=0,
+    )
+    assert first.latest_sequence == second.latest_sequence == 3
+
+    fast = transport.acknowledge_and_compact(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-a",
+        sequence=3,
+    )
+    assert fast.compacted_through == 0
+    assert fast.compacted_events == 0
+    assert fast.active_consumer_count == 2
+
+    slow = transport.acknowledge_and_compact(
+        operation.operation_id,
+        tenant_id="tenant-a",
+        consumer_id="client-b",
+        sequence=2,
+    )
+    assert slow.compacted_through == 2
+    assert slow.compacted_events == 2
+    assert slow.latest_sequence == 3
+
+    with pytest.raises(StreamReplayGapError):
+        transport.replay(
+            operation.operation_id,
+            tenant_id="tenant-a",
+            after_sequence=1,
+        )
+
+    operations.close()
+    events.close()
