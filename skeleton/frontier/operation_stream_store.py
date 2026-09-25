@@ -301,6 +301,226 @@ class SQLiteOperationEventStore:
             raise StreamStoreCorruptionError("operation stream head disappeared")
         return row
 
+    @classmethod
+    def _owner_from_row(cls, row: sqlite3.Row) -> StreamOwnerLease:
+        try:
+            epoch = int(row["epoch"])
+            if epoch < 1:
+                raise ValueError("owner epoch must be positive")
+            return StreamOwnerLease(
+                operation_id=row["operation_id"],
+                owner_id=_owner_id(row["owner_id"]),
+                epoch=epoch,
+                lease_expires_at=cls._decode_timestamp(
+                    row["lease_expires_at"]
+                ),
+                updated_at=cls._decode_timestamp(row["updated_at"]),
+            )
+        except (KeyError, TypeError, ValueError, StreamContractError) as exc:
+            if isinstance(exc, StreamStoreCorruptionError):
+                raise
+            raise StreamStoreCorruptionError(
+                "persisted stream owner lease is invalid"
+            ) from exc
+
+    def _validate_owner_locked(
+        self,
+        operation_id: str,
+        *,
+        owner_id: str | None,
+        owner_epoch: int | None,
+        now: datetime | None = None,
+    ) -> StreamOwnerLease | None:
+        if owner_id is None and owner_epoch is None:
+            return None
+        if owner_id is None or owner_epoch is None:
+            raise StreamOwnershipConflictError(
+                "owner_id and owner_epoch must be supplied together"
+            )
+        owner = _owner_id(owner_id)
+        if (
+            isinstance(owner_epoch, bool)
+            or not isinstance(owner_epoch, int)
+            or owner_epoch < 1
+        ):
+            raise StreamOwnershipConflictError(
+                "owner_epoch must be a positive integer"
+            )
+        instant = _aware_utc(now)
+        row = self._connection.execute(
+            """
+            SELECT operation_id, owner_id, epoch, lease_expires_at, updated_at
+            FROM operation_stream_owner
+            WHERE namespace = ? AND operation_id = ?
+            """,
+            (self.namespace, operation_id),
+        ).fetchone()
+        if row is None:
+            raise StreamOwnershipConflictError(
+                "operation stream has no active publish owner"
+            )
+        lease = self._owner_from_row(row)
+        if lease.owner_id != owner or lease.epoch != owner_epoch:
+            raise StreamOwnershipConflictError(
+                "operation stream publish owner is stale"
+            )
+        if lease.lease_expires_at <= instant:
+            raise StreamOwnershipConflictError(
+                "operation stream publish owner lease expired"
+            )
+        return lease
+
+    def acquire_owner(
+        self,
+        operation_id: str,
+        owner_id: str,
+        *,
+        lease_seconds: int = 30,
+        now: datetime | None = None,
+    ) -> StreamOwnerLease:
+        owner = _owner_id(owner_id)
+        if (
+            isinstance(lease_seconds, bool)
+            or not isinstance(lease_seconds, int)
+            or lease_seconds < 1
+            or lease_seconds > 3_600
+        ):
+            raise ValueError(
+                "lease_seconds must be an integer between 1 and 3600"
+            )
+        instant = _aware_utc(now)
+        expires = instant + timedelta(seconds=lease_seconds)
+
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._ensure_head(operation_id)
+                row = self._connection.execute(
+                    """
+                    SELECT operation_id, owner_id, epoch,
+                           lease_expires_at, updated_at
+                    FROM operation_stream_owner
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (self.namespace, operation_id),
+                ).fetchone()
+
+                if row is None:
+                    epoch = 1
+                else:
+                    current = self._owner_from_row(row)
+                    if current.lease_expires_at > instant:
+                        if current.owner_id != owner:
+                            raise StreamOwnershipConflictError(
+                                "operation stream publish lease is held"
+                            )
+                        epoch = current.epoch
+                    else:
+                        epoch = current.epoch + 1
+
+                self._connection.execute(
+                    """
+                    INSERT INTO operation_stream_owner(
+                        namespace, operation_id, owner_id, epoch,
+                        lease_expires_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(namespace, operation_id)
+                    DO UPDATE SET
+                        owner_id = excluded.owner_id,
+                        epoch = excluded.epoch,
+                        lease_expires_at = excluded.lease_expires_at,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        self.namespace,
+                        operation_id,
+                        owner,
+                        epoch,
+                        expires.isoformat(),
+                        instant.isoformat(),
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return StreamOwnerLease(
+                    operation_id=operation_id,
+                    owner_id=owner,
+                    epoch=epoch,
+                    lease_expires_at=expires,
+                    updated_at=instant,
+                )
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def release_owner(
+        self,
+        operation_id: str,
+        owner_id: str,
+        owner_epoch: int,
+        *,
+        now: datetime | None = None,
+    ) -> StreamOwnerLease:
+        owner = _owner_id(owner_id)
+        if (
+            isinstance(owner_epoch, bool)
+            or not isinstance(owner_epoch, int)
+            or owner_epoch < 1
+        ):
+            raise ValueError("owner_epoch must be a positive integer")
+        instant = _aware_utc(now)
+
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT operation_id, owner_id, epoch,
+                           lease_expires_at, updated_at
+                    FROM operation_stream_owner
+                    WHERE namespace = ? AND operation_id = ?
+                    """,
+                    (self.namespace, operation_id),
+                ).fetchone()
+                if row is None:
+                    raise StreamOwnershipConflictError(
+                        "operation stream publish owner is missing"
+                    )
+                current = self._owner_from_row(row)
+                if (
+                    current.owner_id != owner
+                    or current.epoch != owner_epoch
+                ):
+                    raise StreamOwnershipConflictError(
+                        "cannot release a stale stream publish lease"
+                    )
+                self._connection.execute(
+                    """
+                    UPDATE operation_stream_owner
+                    SET lease_expires_at = ?, updated_at = ?
+                    WHERE namespace = ? AND operation_id = ?
+                      AND owner_id = ? AND epoch = ?
+                    """,
+                    (
+                        instant.isoformat(),
+                        instant.isoformat(),
+                        self.namespace,
+                        operation_id,
+                        owner,
+                        owner_epoch,
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return StreamOwnerLease(
+                    operation_id=operation_id,
+                    owner_id=owner,
+                    epoch=owner_epoch,
+                    lease_expires_at=instant,
+                    updated_at=instant,
+                )
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
     def append_event(self, event: StreamEvent) -> StreamEvent:
         """Append exactly the next event or return an identical duplicate."""
 
