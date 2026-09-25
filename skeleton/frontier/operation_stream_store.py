@@ -36,6 +36,10 @@ class StreamStoreCorruptionError(StreamContractError):
     """Persisted stream state cannot be interpreted safely."""
 
 
+class StreamOwnershipConflictError(StreamContractError):
+    """Another live worker owns the operation stream publish lease."""
+
+
 _CONSUMER_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 
 
@@ -46,6 +50,17 @@ def _consumer_id(value: str) -> str:
     if not _CONSUMER_ID_RE.fullmatch(normalized):
         raise StreamContractError(
             "consumer_id must be 1-128 characters using A-Z a-z 0-9 . _ : -"
+        )
+    return normalized
+
+
+def _owner_id(value: str) -> str:
+    if not isinstance(value, str):
+        raise StreamContractError("owner_id must be a string")
+    normalized = value.strip()
+    if not _CONSUMER_ID_RE.fullmatch(normalized):
+        raise StreamContractError(
+            "owner_id must be 1-128 characters using A-Z a-z 0-9 . _ : -"
         )
     return normalized
 
@@ -76,6 +91,28 @@ class StreamConsumerCheckpoint:
             "operation_id": self.operation_id,
             "consumer_id": self.consumer_id,
             "acknowledged_through": self.acknowledged_through,
+            "lease_expires_at": self.lease_expires_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class StreamOwnerLease:
+    operation_id: str
+    owner_id: str
+    epoch: int
+    lease_expires_at: datetime
+    updated_at: datetime
+
+    @property
+    def active(self) -> bool:
+        return self.lease_expires_at > datetime.now(timezone.utc)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation_id": self.operation_id,
+            "owner_id": self.owner_id,
+            "epoch": self.epoch,
             "lease_expires_at": self.lease_expires_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
         }
@@ -162,6 +199,21 @@ class SQLiteOperationEventStore:
 
                 CREATE INDEX IF NOT EXISTS idx_operation_stream_consumer_lease
                 ON operation_stream_consumer(
+                    namespace, operation_id, lease_expires_at
+                );
+
+                CREATE TABLE IF NOT EXISTS operation_stream_owner (
+                    namespace TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    owner_id TEXT NOT NULL,
+                    epoch INTEGER NOT NULL,
+                    lease_expires_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, operation_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_operation_stream_owner_lease
+                ON operation_stream_owner(
                     namespace, operation_id, lease_expires_at
                 );
                 """
