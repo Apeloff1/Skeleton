@@ -7,7 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-from skeleton.skills.tool_contract import approval_ref_for_request
+from skeleton.skills.tool_contract import (
+    ToolContractError,
+    approval_ref_for_request,
+)
 from skeleton.skills.tool_runtime import ToolExecutionConflict
 
 
@@ -707,7 +710,7 @@ async def test_result_store_enforces_manifest_output_schema_and_size(
         result_size_limit=32,
     )
 
-    with pytest.raises(registry.ToolContractError):
+    with pytest.raises(ToolContractError):
         await store.put(
             request,
             {"wrong": "shape"},
