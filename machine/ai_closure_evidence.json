@@ -642,9 +642,7 @@
       "evidence_present": [
         "deadline/trace/budget propagation test",
         "query/result binding test",
-        "engine outage produces explicit backend degraded behavior",
-        "backend contains no runtime model credential after cutover",
-        "provider execution occurs only in Skeleton service in production topology"
+        "engine outage produces explicit backend degraded behavior"
       ],
       "closure_evidence_required": [
         "backend->engine authenticated submit test",
@@ -663,6 +661,8 @@
         "delegated tenant/user/scope validation test",
         "submit retry returns same operation/execution rather than duplicate work",
         "idempotent cancel and late-result fencing test",
+        "backend contains no runtime model credential after cutover",
+        "provider execution occurs only in Skeleton service in production topology",
         "cross-service golden journey preserves operation/turn/receipt lineage"
       ],
       "blockers": [
