@@ -21,7 +21,15 @@ from skeleton.provider_contract import (
     ProviderUsage,
 )
 from skeleton.provider_runtime import ProviderResponse
-from skeleton.skills.tool_contract import ToolEffect, ToolManifest
+from skeleton.skills.tool_contract import (
+    ToolApprovalPolicy,
+    ToolAuthorityClass,
+    ToolEffect,
+    ToolIdempotencyMode,
+    ToolManifest,
+    ToolRiskClass,
+    ToolSideEffectClass,
+)
 from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -200,6 +208,89 @@ async def test_direct_provider_completion_is_verified_and_atomically_finalized()
     assert result.result.stream_terminal_event.startswith("stream-terminal:exec-1:")
     assert len(repo.pending_outbox(execution_id="exec-1")) == 1
     assert len(provider.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_tool_projection_is_minimal_and_excludes_disabled_tools() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:read"
+
+    rich_manifest = ToolManifest(
+        tool_id="repo.read",
+        version="2.0.0",
+        description="Read repository data",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        output_schema={"type": "object"},
+        capabilities=("repository.read", "citation.source"),
+        authority_class=ToolAuthorityClass.READ,
+        risk_class=ToolRiskClass.MEDIUM,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.NEVER,
+        network_policy="none",
+        data_policy="internal:repository",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=65536,
+        max_concurrency=8,
+    )
+    disabled_manifest = ToolManifest(
+        tool_id="repo.disabled",
+        version="1.0.0",
+        description="Disabled internal tool",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+        },
+        capabilities=("repository.internal",),
+        authority_class=ToolAuthorityClass.PRIVILEGED,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.POLICY,
+        network_policy="none",
+        data_policy="internal:restricted",
+        cost_model={"kind": "disabled"},
+        enabled=False,
+    )
+    await tools.register(rich_manifest, handler)
+    await tools.register(disabled_manifest, handler)
+
+    runtime = _runtime(repo, FakeProvider([]), tools)
+    projected = await runtime._provider_tools(
+        {"allowed_tool_ids": ["repo.read", "repo.disabled"]}
+    )
+
+    assert [item.tool_id for item in projected] == ["repo.read"]
+    assert projected[0].as_dict() == {
+        "tool_id": "repo.read",
+        "description": "Read repository data",
+        "input_schema": dict(rich_manifest.input_schema),
+    }
+    provider_payload = projected[0].as_dict()
+    for internal_field in (
+        "output_schema",
+        "capabilities",
+        "authority_class",
+        "risk_class",
+        "side_effect_class",
+        "idempotency_mode",
+        "approval_policy",
+        "network_policy",
+        "data_policy",
+        "cost_model",
+        "result_size_limit",
+        "max_concurrency",
+        "enabled",
+    ):
+        assert internal_field not in provider_payload
 
 
 @pytest.mark.asyncio
