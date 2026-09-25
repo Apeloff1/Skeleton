@@ -65,6 +65,9 @@ def _receipt_id(request: ToolExecutionRequest, manifest: ToolManifest) -> str:
     material = "\x1f".join(
         (
             request.operation_id,
+            request.execution_id or "",
+            request.turn_id or "",
+            request.call_id or "",
             request.tenant_id,
             request.tool_id,
             manifest.version,
@@ -100,7 +103,10 @@ class ToolRuntime:
         self._lock = threading.RLock()
         self._registry: dict[str, RegisteredTool] = {}
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
-        self._request_fingerprints: dict[tuple[str, str, str], tuple[str, str]] = {}
+        self._request_fingerprints: dict[
+            tuple[str, str, str],
+            tuple[str, str, str | None, str | None, str | None],
+        ] = {}
 
     def register(self, manifest: ToolManifest, handler: ToolHandler) -> ToolManifest:
         if not isinstance(manifest, ToolManifest):
@@ -154,6 +160,9 @@ class ToolRuntime:
             self._request_fingerprints[key] = (
                 durable.receipt.tool_id,
                 durable.receipt.arguments_digest,
+                durable.receipt.execution_id,
+                durable.receipt.turn_id,
+                durable.receipt.call_id,
             )
             return durable.receipt
 
@@ -173,7 +182,13 @@ class ToolRuntime:
             if registered is None:
                 raise ToolNotFound("tool is not registered")
 
-            fingerprint = (request.tool_id, request.arguments_digest)
+            fingerprint = (
+                request.tool_id,
+                request.arguments_digest,
+                request.execution_id,
+                request.turn_id,
+                request.call_id,
+            )
             previous_fingerprint = self._request_fingerprints.get(key)
             if previous_fingerprint is not None and previous_fingerprint != fingerprint:
                 raise ToolExecutionConflict(
@@ -191,6 +206,9 @@ class ToolRuntime:
                     receipt_id=_receipt_id(request, manifest),
                     request_id=request.request_id,
                     operation_id=request.operation_id,
+                    execution_id=request.execution_id,
+                    turn_id=request.turn_id,
+                    call_id=request.call_id,
                     tenant_id=request.tenant_id,
                     tool_id=request.tool_id,
                     idempotency_key=request.idempotency_key,
@@ -216,6 +234,9 @@ class ToolRuntime:
                         receipt_id=_receipt_id(request, manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
                         tenant_id=request.tenant_id,
                         tool_id=request.tool_id,
                         idempotency_key=request.idempotency_key,
@@ -232,6 +253,9 @@ class ToolRuntime:
                         receipt_id=_receipt_id(request, manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
                         tenant_id=request.tenant_id,
                         tool_id=request.tool_id,
                         idempotency_key=request.idempotency_key,
@@ -262,6 +286,9 @@ class ToolRuntime:
                         receipt_id=_receipt_id(request, manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
                         tenant_id=request.tenant_id,
                         tool_id=request.tool_id,
                         idempotency_key=request.idempotency_key,
@@ -290,6 +317,9 @@ class ToolRuntime:
                         receipt_id=_receipt_id(request, manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
                         tenant_id=request.tenant_id,
                         tool_id=request.tool_id,
                         idempotency_key=request.idempotency_key,
@@ -321,6 +351,9 @@ class ToolRuntime:
                     receipt_id=_receipt_id(request, manifest),
                     request_id=request.request_id,
                     operation_id=request.operation_id,
+                    execution_id=request.execution_id,
+                    turn_id=request.turn_id,
+                    call_id=request.call_id,
                     tenant_id=request.tenant_id,
                     tool_id=request.tool_id,
                     idempotency_key=request.idempotency_key,
@@ -338,6 +371,9 @@ class ToolRuntime:
                     receipt_id=_receipt_id(request, manifest),
                     request_id=request.request_id,
                     operation_id=request.operation_id,
+                    execution_id=request.execution_id,
+                    turn_id=request.turn_id,
+                    call_id=request.call_id,
                     tenant_id=request.tenant_id,
                     tool_id=request.tool_id,
                     idempotency_key=request.idempotency_key,
@@ -403,7 +439,10 @@ class AsyncToolRuntime:
         self._lock = asyncio.Lock()
         self._registry: dict[str, RegisteredAsyncTool] = {}
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
-        self._request_fingerprints: dict[tuple[str, str, str], tuple[str, str]] = {}
+        self._request_fingerprints: dict[
+            tuple[str, str, str],
+            tuple[str, str, str | None, str | None, str | None],
+        ] = {}
         self._inflight: dict[
             tuple[str, str, str], asyncio.Future[ToolExecutionReceipt]
         ] = {}
@@ -480,6 +519,9 @@ class AsyncToolRuntime:
             self._request_fingerprints[key] = (
                 durable.receipt.tool_id,
                 durable.receipt.arguments_digest,
+                durable.receipt.execution_id,
+                durable.receipt.turn_id,
+                durable.receipt.call_id,
             )
             return durable.receipt
 
@@ -493,7 +535,13 @@ class AsyncToolRuntime:
             raise TypeError("request must be ToolExecutionRequest")
         started = _utc(now)
         key = (request.tenant_id, request.operation_id, request.idempotency_key)
-        fingerprint = (request.tool_id, request.arguments_digest)
+        fingerprint = (
+            request.tool_id,
+            request.arguments_digest,
+            request.execution_id,
+            request.turn_id,
+            request.call_id,
+        )
         owner = False
 
         async with self._lock:
@@ -524,6 +572,9 @@ class AsyncToolRuntime:
                         receipt_id=_receipt_id(request, registered.manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
                         tenant_id=request.tenant_id,
                         tool_id=request.tool_id,
                         idempotency_key=request.idempotency_key,
@@ -549,6 +600,9 @@ class AsyncToolRuntime:
                             receipt_id=_receipt_id(request, registered.manifest),
                             request_id=request.request_id,
                             operation_id=request.operation_id,
+                            execution_id=request.execution_id,
+                            turn_id=request.turn_id,
+                            call_id=request.call_id,
                             tenant_id=request.tenant_id,
                             tool_id=request.tool_id,
                             idempotency_key=request.idempotency_key,
@@ -565,6 +619,9 @@ class AsyncToolRuntime:
                             receipt_id=_receipt_id(request, registered.manifest),
                             request_id=request.request_id,
                             operation_id=request.operation_id,
+                            execution_id=request.execution_id,
+                            turn_id=request.turn_id,
+                            call_id=request.call_id,
                             tenant_id=request.tenant_id,
                             tool_id=request.tool_id,
                             idempotency_key=request.idempotency_key,
@@ -595,6 +652,9 @@ class AsyncToolRuntime:
                             receipt_id=_receipt_id(request, registered.manifest),
                             request_id=request.request_id,
                             operation_id=request.operation_id,
+                            execution_id=request.execution_id,
+                            turn_id=request.turn_id,
+                            call_id=request.call_id,
                             tenant_id=request.tenant_id,
                             tool_id=request.tool_id,
                             idempotency_key=request.idempotency_key,
@@ -629,6 +689,9 @@ class AsyncToolRuntime:
                         receipt_id=_receipt_id(request, registered.manifest),
                         request_id=request.request_id,
                         operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
                         tenant_id=request.tenant_id,
                         tool_id=request.tool_id,
                         idempotency_key=request.idempotency_key,
@@ -713,6 +776,9 @@ class AsyncToolRuntime:
                     receipt_id=_receipt_id(request, manifest),
                     request_id=request.request_id,
                     operation_id=request.operation_id,
+                    execution_id=request.execution_id,
+                    turn_id=request.turn_id,
+                    call_id=request.call_id,
                     tenant_id=request.tenant_id,
                     tool_id=request.tool_id,
                     idempotency_key=request.idempotency_key,
@@ -730,6 +796,9 @@ class AsyncToolRuntime:
                 receipt_id=_receipt_id(request, manifest),
                 request_id=request.request_id,
                 operation_id=request.operation_id,
+                execution_id=request.execution_id,
+                turn_id=request.turn_id,
+                call_id=request.call_id,
                 tenant_id=request.tenant_id,
                 tool_id=request.tool_id,
                 idempotency_key=request.idempotency_key,
@@ -746,6 +815,9 @@ class AsyncToolRuntime:
                 receipt_id=_receipt_id(request, manifest),
                 request_id=request.request_id,
                 operation_id=request.operation_id,
+                execution_id=request.execution_id,
+                turn_id=request.turn_id,
+                call_id=request.call_id,
                 tenant_id=request.tenant_id,
                 tool_id=request.tool_id,
                 idempotency_key=request.idempotency_key,
