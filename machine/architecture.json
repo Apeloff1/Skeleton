@@ -283,7 +283,8 @@
       "kind": "fastapi",
       "canonical": true,
       "depends_on": [
-        "mongo"
+        "mongo",
+        "skeleton"
       ]
     },
     {
@@ -1425,16 +1426,24 @@
         },
         {
           "order": 1,
-          "id": "core-services",
+          "id": "engine-service",
           "nodes": [
-            "skeleton",
-            "backend"
+            "skeleton"
           ],
-          "mode": "parallel",
-          "barrier": "ready-before-dependent-product-start"
+          "mode": "serial",
+          "barrier": "ready-before-application-start"
         },
         {
           "order": 2,
+          "id": "application-service",
+          "nodes": [
+            "backend"
+          ],
+          "mode": "serial",
+          "barrier": "ready-before-dependent-product-start"
+        },
+        {
+          "order": 3,
           "id": "product-shell",
           "nodes": [
             "frontend"
@@ -1462,16 +1471,24 @@
         },
         {
           "order": 1,
-          "id": "drain-core-services",
+          "id": "drain-application-service",
           "nodes": [
-            "backend",
-            "skeleton"
+            "backend"
           ],
-          "mode": "parallel",
-          "action": "stop admission, drain requests/streams, checkpoint or terminalize operations, flush evidence"
+          "mode": "serial",
+          "action": "stop application admission, drain requests and streams"
         },
         {
           "order": 2,
+          "id": "drain-engine-service",
+          "nodes": [
+            "skeleton"
+          ],
+          "mode": "serial",
+          "action": "stop engine admission, checkpoint or terminalize operations, flush evidence"
+        },
+        {
+          "order": 3,
           "id": "stop-data-foundation",
           "nodes": [
             "chroma",
