@@ -128,7 +128,11 @@ class CAGStore(MemoryStore):
         metadata_filter: Optional[Dict[str, Any]] = None,
         min_score: float = 0.0,
     ) -> List[MemoryQueryResult]:
-        if not self._active_persona_id:
+        if isinstance(top_k, bool) or not isinstance(top_k, int):
+            raise TypeError("top_k must be an integer")
+        if top_k < 0:
+            raise ValueError("top_k must be non-negative")
+        if top_k == 0 or not self._active_persona_id:
             return []
         persona = self._personas[self._active_persona_id]
         context = persona.get_context_window(query_text)
@@ -167,8 +171,12 @@ class CAGStore(MemoryStore):
         persona = self._personas[self._active_persona_id]
         for key in list(persona.knowledge_graph.keys()):
             if key == chunk_id or f"cag_{key}" == chunk_id:
-                del persona.knowledge_graph[key]
-                del persona.importance_scores[key]
+                facts = persona.knowledge_graph.pop(key)
+                persona.current_tokens -= sum(
+                    persona.estimate_tokens(fact) for fact in facts
+                )
+                persona.current_tokens = max(0, persona.current_tokens)
+                persona.importance_scores.pop(key, None)
                 return True
         return False
 
