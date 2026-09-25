@@ -13,6 +13,8 @@ idempotency, budget and credential-ownership guarantees.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 import os
@@ -127,6 +129,7 @@ class EngineClientConfig:
     poll_interval_s: float = 0.05
     execution_timeout_s: float = 120.0
     max_response_bytes: int = 4 * 1024 * 1024
+    max_media_response_bytes: int = 48 * 1024 * 1024
     max_poll_attempts: int = 2400
 
     def __post_init__(self) -> None:
@@ -189,6 +192,15 @@ class EngineClientConfig:
         )
         object.__setattr__(
             self,
+            "max_media_response_bytes",
+            _positive_int(
+                self.max_media_response_bytes,
+                "max_media_response_bytes",
+                maximum=128 * 1024 * 1024,
+            ),
+        )
+        object.__setattr__(
+            self,
             "max_poll_attempts",
             _positive_int(
                 self.max_poll_attempts,
@@ -231,6 +243,12 @@ class EngineClientConfig:
                     os.getenv(
                         "SKELETON_ENGINE_MAX_RESPONSE_BYTES",
                         str(4 * 1024 * 1024),
+                    )
+                ),
+                max_media_response_bytes=int(
+                    os.getenv(
+                        "SKELETON_ENGINE_MAX_MEDIA_RESPONSE_BYTES",
+                        str(48 * 1024 * 1024),
                     )
                 ),
                 max_poll_attempts=int(
@@ -652,6 +670,7 @@ class EngineClient:
         json_body: Mapping[str, Any] | None = None,
         params: Mapping[str, str] | None = None,
         trace_id: str | None = None,
+        max_response_bytes: int | None = None,
     ) -> dict[str, Any]:
         timeout = httpx.Timeout(self.config.request_timeout_s)
         try:
@@ -676,6 +695,15 @@ class EngineClient:
                 "engine transport failed"
             ) from exc
 
+        response_limit = (
+            self.config.max_response_bytes
+            if max_response_bytes is None
+            else _positive_int(
+                max_response_bytes,
+                "max_response_bytes",
+                maximum=128 * 1024 * 1024,
+            )
+        )
         content_length = response.headers.get("content-length")
         if content_length is not None:
             try:
@@ -684,11 +712,11 @@ class EngineClient:
                 raise EngineProtocolError(
                     "engine content-length is invalid"
                 ) from exc
-            if advertised > self.config.max_response_bytes:
+            if advertised > response_limit:
                 raise EngineProtocolError(
                     "engine response exceeds configured size bound"
                 )
-        if len(response.content) > self.config.max_response_bytes:
+        if len(response.content) > response_limit:
             raise EngineProtocolError(
                 "engine response exceeds configured size bound"
             )
@@ -718,6 +746,198 @@ class EngineClient:
                 "engine response must be an object"
             )
         return dict(payload)
+
+    async def generate_image(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        operation_id: str,
+        prompt: str,
+        size: str = "1024x1024",
+        quality: str = "standard",
+        count: int = 1,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload = await self._request(
+            "POST",
+            "/media/images/generate",
+            json_body={
+                "actor_id": _text(actor_id, "actor_id", maximum=512),
+                "tenant_id": _text(tenant_id, "tenant_id", maximum=512),
+                "operation_id": _text(
+                    operation_id,
+                    "operation_id",
+                    maximum=512,
+                ),
+                "prompt": _text(prompt, "prompt", maximum=16_384),
+                "size": _text(size, "size", maximum=64),
+                "quality": _text(quality, "quality", maximum=64),
+                "count": _positive_int(count, "count", maximum=4),
+            },
+            trace_id=trace_id,
+            max_response_bytes=self.config.max_media_response_bytes,
+        )
+        images = payload.get("images")
+        if not isinstance(images, list) or not images:
+            raise EngineProtocolError(
+                "engine image response is missing images"
+            )
+        for item in images:
+            if not isinstance(item, Mapping):
+                raise EngineProtocolError(
+                    "engine image item must be an object"
+                )
+            data = item.get("data")
+            if not isinstance(data, str) or not data:
+                raise EngineProtocolError(
+                    "engine image item is missing base64 data"
+                )
+            if len(data) > 32 * 1024 * 1024:
+                raise EngineProtocolError(
+                    "engine image payload exceeds size bound"
+                )
+            try:
+                base64.b64decode(data, validate=True)
+            except (ValueError, binascii.Error) as exc:
+                raise EngineProtocolError(
+                    "engine image payload is invalid base64"
+                ) from exc
+        return payload
+
+    async def create_image_variation(
+        self,
+        image: bytes,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        operation_id: str,
+        count: int = 1,
+        size: str = "1024x1024",
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(image, (bytes, bytearray)) or not image:
+            raise EngineProtocolError("image must be non-empty bytes")
+        if len(image) > 20 * 1024 * 1024:
+            raise EngineProtocolError("image exceeds media size bound")
+        return await self._request(
+            "POST",
+            "/media/images/variation",
+            json_body={
+                "actor_id": _text(actor_id, "actor_id", maximum=512),
+                "tenant_id": _text(tenant_id, "tenant_id", maximum=512),
+                "operation_id": _text(
+                    operation_id,
+                    "operation_id",
+                    maximum=512,
+                ),
+                "image_base64": base64.b64encode(bytes(image)).decode("ascii"),
+                "count": _positive_int(count, "count", maximum=4),
+                "size": _text(size, "size", maximum=64),
+            },
+            trace_id=trace_id,
+            max_response_bytes=self.config.max_media_response_bytes,
+        )
+
+    async def edit_image(
+        self,
+        image: bytes,
+        *,
+        prompt: str,
+        actor_id: str,
+        tenant_id: str,
+        operation_id: str,
+        mask: bytes | None = None,
+        size: str = "1024x1024",
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        if not isinstance(image, (bytes, bytearray)) or not image:
+            raise EngineProtocolError("image must be non-empty bytes")
+        if len(image) > 20 * 1024 * 1024:
+            raise EngineProtocolError("image exceeds media size bound")
+        if mask is not None and (
+            not isinstance(mask, (bytes, bytearray))
+            or not mask
+            or len(mask) > 20 * 1024 * 1024
+        ):
+            raise EngineProtocolError("mask exceeds media size bound")
+        return await self._request(
+            "POST",
+            "/media/images/edit",
+            json_body={
+                "actor_id": _text(actor_id, "actor_id", maximum=512),
+                "tenant_id": _text(tenant_id, "tenant_id", maximum=512),
+                "operation_id": _text(
+                    operation_id,
+                    "operation_id",
+                    maximum=512,
+                ),
+                "image_base64": base64.b64encode(bytes(image)).decode("ascii"),
+                "mask_base64": (
+                    None
+                    if mask is None
+                    else base64.b64encode(bytes(mask)).decode("ascii")
+                ),
+                "prompt": _text(prompt, "prompt", maximum=16_384),
+                "size": _text(size, "size", maximum=64),
+            },
+            trace_id=trace_id,
+            max_response_bytes=self.config.max_media_response_bytes,
+        )
+
+    async def synthesize_speech(
+        self,
+        *,
+        actor_id: str,
+        tenant_id: str,
+        operation_id: str,
+        text: str,
+        voice: str = "nova",
+        speed: float = 1.0,
+        response_format: str = "mp3",
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload = await self._request(
+            "POST",
+            "/media/speech",
+            json_body={
+                "actor_id": _text(actor_id, "actor_id", maximum=512),
+                "tenant_id": _text(tenant_id, "tenant_id", maximum=512),
+                "operation_id": _text(
+                    operation_id,
+                    "operation_id",
+                    maximum=512,
+                ),
+                "text": _text(text, "text", maximum=16_384),
+                "voice": _text(voice, "voice", maximum=128),
+                "speed": _positive_float(speed, "speed", maximum=4.0),
+                "response_format": _text(
+                    response_format,
+                    "response_format",
+                    maximum=16,
+                ),
+            },
+            trace_id=trace_id,
+            max_response_bytes=self.config.max_media_response_bytes,
+        )
+        raw = payload.get("audio_base64")
+        if not isinstance(raw, str) or not raw:
+            raise EngineProtocolError(
+                "engine speech response is missing audio"
+            )
+        try:
+            audio = base64.b64decode(raw, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise EngineProtocolError(
+                "engine speech payload is invalid base64"
+            ) from exc
+        if not audio or len(audio) > 24 * 1024 * 1024:
+            raise EngineProtocolError(
+                "engine speech payload exceeds size bound"
+            )
+        payload = dict(payload)
+        payload["audio"] = audio
+        return payload
 
     async def submit(
         self,
