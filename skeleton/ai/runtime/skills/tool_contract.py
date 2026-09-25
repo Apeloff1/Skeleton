@@ -32,6 +32,44 @@ class ToolEffect(str, Enum):
     IRREVERSIBLE = "irreversible"
 
 
+class ToolAuthorityClass(str, Enum):
+    READ = "read"
+    WRITE = "write"
+    DESTRUCTIVE = "destructive"
+    EXTERNAL_COMMIT = "external_commit"
+    PRIVILEGED = "privileged"
+
+
+class ToolRiskClass(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class ToolSideEffectClass(str, Enum):
+    NONE = "none"
+    LOCAL_REVERSIBLE = "local_reversible"
+    LOCAL_IRREVERSIBLE = "local_irreversible"
+    EXTERNAL_REVERSIBLE = "external_reversible"
+    EXTERNAL_IRREVERSIBLE = "external_irreversible"
+
+
+class ToolIdempotencyMode(str, Enum):
+    NOT_REQUIRED = "not_required"
+    INTRINSIC = "intrinsic"
+    IDEMPOTENCY_KEY = "idempotency_key"
+    RESERVATION_FENCE = "reservation_fence"
+    COMPENSATABLE = "compensatable"
+
+
+class ToolApprovalPolicy(str, Enum):
+    NEVER = "never"
+    POLICY = "policy"
+    ALWAYS = "always"
+    OPERATOR_ONLY = "operator_only"
+
+
 class ToolExecutionStatus(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
@@ -81,7 +119,7 @@ def _schema(value: object, field: str) -> dict[str, Any]:
         json.dumps(normalized, sort_keys=True, allow_nan=False)
     except (TypeError, ValueError) as exc:
         raise ToolContractError(f"{field} must be deterministic JSON") from exc
-    if field == "input_schema":
+    if field in {"input_schema", "output_schema"}:
         _validate_schema_shape(normalized)
     return normalized
 
@@ -258,6 +296,19 @@ class ToolManifest:
     version: str
     description: str
     input_schema: Mapping[str, Any]
+    output_schema: Mapping[str, Any] | None = None
+    capabilities: tuple[str, ...] = ()
+    authority_class: ToolAuthorityClass = ToolAuthorityClass.READ
+    risk_class: ToolRiskClass = ToolRiskClass.LOW
+    side_effect_class: ToolSideEffectClass = ToolSideEffectClass.NONE
+    idempotency_mode: ToolIdempotencyMode = ToolIdempotencyMode.NOT_REQUIRED
+    approval_policy: ToolApprovalPolicy = ToolApprovalPolicy.NEVER
+    network_policy: str = "none"
+    data_policy: str = "internal"
+    cost_model: Mapping[str, Any] | None = None
+    result_size_limit: int = 1024 * 1024
+    max_concurrency: int = 16
+    enabled: bool = True
     effect: ToolEffect = ToolEffect.READ_ONLY
     approval_required: bool = False
     compensation_tool_id: str | None = None
@@ -268,7 +319,84 @@ class ToolManifest:
         object.__setattr__(self, "tool_id", _tool_id(self.tool_id))
         _text(self.version, "version", max_length=64)
         _text(self.description, "description", max_length=2048)
-        object.__setattr__(self, "input_schema", _schema(self.input_schema, "input_schema"))
+        object.__setattr__(
+            self,
+            "input_schema",
+            _schema(self.input_schema, "input_schema"),
+        )
+        output_schema = (
+            {"type": "object"}
+            if self.output_schema is None
+            else self.output_schema
+        )
+        object.__setattr__(
+            self,
+            "output_schema",
+            _schema(output_schema, "output_schema"),
+        )
+
+        normalized_capabilities: list[str] = []
+        for raw in self.capabilities:
+            capability = _text(raw, "capability", max_length=128)
+            if capability not in normalized_capabilities:
+                normalized_capabilities.append(capability)
+        if len(normalized_capabilities) > 64:
+            raise ToolContractError("capabilities exceeds maximum count")
+        object.__setattr__(
+            self,
+            "capabilities",
+            tuple(normalized_capabilities),
+        )
+
+        for field_name, enum_type in (
+            ("authority_class", ToolAuthorityClass),
+            ("risk_class", ToolRiskClass),
+            ("side_effect_class", ToolSideEffectClass),
+            ("idempotency_mode", ToolIdempotencyMode),
+            ("approval_policy", ToolApprovalPolicy),
+        ):
+            try:
+                value = enum_type(getattr(self, field_name))
+            except ValueError as exc:
+                raise ToolContractError(
+                    f"{field_name} is invalid"
+                ) from exc
+            object.__setattr__(self, field_name, value)
+
+        _text(self.network_policy, "network_policy", max_length=256)
+        _text(self.data_policy, "data_policy", max_length=256)
+        cost_model = (
+            {"kind": "unmetered"}
+            if self.cost_model is None
+            else self.cost_model
+        )
+        object.__setattr__(
+            self,
+            "cost_model",
+            _schema(cost_model, "cost_model"),
+        )
+
+        if (
+            isinstance(self.result_size_limit, bool)
+            or not isinstance(self.result_size_limit, int)
+            or self.result_size_limit < 0
+            or self.result_size_limit > 1024 * 1024 * 1024
+        ):
+            raise ToolContractError(
+                "result_size_limit must be within [0, 1GiB]"
+            )
+        if (
+            isinstance(self.max_concurrency, bool)
+            or not isinstance(self.max_concurrency, int)
+            or self.max_concurrency < 1
+            or self.max_concurrency > 4096
+        ):
+            raise ToolContractError(
+                "max_concurrency must be within [1, 4096]"
+            )
+        if not isinstance(self.enabled, bool):
+            raise ToolContractError("enabled must be boolean")
+
         try:
             effect = ToolEffect(self.effect)
         except ValueError as exc:
@@ -276,18 +404,91 @@ class ToolManifest:
         object.__setattr__(self, "effect", effect)
         if not isinstance(self.approval_required, bool):
             raise ToolContractError("approval_required must be boolean")
+
+        approval_policy = self.approval_policy
+        if self.approval_required and approval_policy is ToolApprovalPolicy.NEVER:
+            approval_policy = ToolApprovalPolicy.ALWAYS
+            object.__setattr__(self, "approval_policy", approval_policy)
+        if approval_policy in {
+            ToolApprovalPolicy.ALWAYS,
+            ToolApprovalPolicy.OPERATOR_ONLY,
+        } and not self.approval_required:
+            object.__setattr__(self, "approval_required", True)
+
         if effect is ToolEffect.IRREVERSIBLE and not self.approval_required:
             raise ToolContractError("irreversible tools require approval")
+        if (
+            self.risk_class is ToolRiskClass.CRITICAL
+            and self.approval_policy is ToolApprovalPolicy.NEVER
+        ):
+            raise ToolContractError(
+                "critical tools require non-never approval policy"
+            )
+        if (
+            self.authority_class is not ToolAuthorityClass.READ
+            and self.idempotency_mode is ToolIdempotencyMode.NOT_REQUIRED
+        ):
+            raise ToolContractError(
+                "non-read authority requires an idempotency mode"
+            )
+        if (
+            self.side_effect_class
+            in {
+                ToolSideEffectClass.EXTERNAL_IRREVERSIBLE,
+                ToolSideEffectClass.LOCAL_IRREVERSIBLE,
+            }
+            and self.approval_policy is ToolApprovalPolicy.NEVER
+        ):
+            raise ToolContractError(
+                "irreversible side effects require approval policy"
+            )
+
         if self.compensation_tool_id is not None:
-            object.__setattr__(self, "compensation_tool_id", _tool_id(self.compensation_tool_id))
+            object.__setattr__(
+                self,
+                "compensation_tool_id",
+                _tool_id(self.compensation_tool_id),
+            )
             if effect is ToolEffect.READ_ONLY:
-                raise ToolContractError("read-only tools cannot declare compensation")
+                raise ToolContractError(
+                    "read-only tools cannot declare compensation"
+                )
         timeout = float(self.timeout_seconds)
         if not math.isfinite(timeout) or timeout <= 0 or timeout > 3600:
-            raise ToolContractError("timeout_seconds must be within (0, 3600]")
+            raise ToolContractError(
+                "timeout_seconds must be within (0, 3600]"
+            )
         object.__setattr__(self, "timeout_seconds", timeout)
         if self.schema_version != TOOL_CONTRACT_SCHEMA_VERSION:
-            raise ToolContractError("unsupported tool contract schema version")
+            raise ToolContractError(
+                "unsupported tool contract schema version"
+            )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "tool_id": self.tool_id,
+            "version": self.version,
+            "description": self.description,
+            "input_schema": dict(self.input_schema),
+            "output_schema": dict(self.output_schema or {}),
+            "capabilities": list(self.capabilities),
+            "authority_class": self.authority_class.value,
+            "risk_class": self.risk_class.value,
+            "side_effect_class": self.side_effect_class.value,
+            "idempotency_mode": self.idempotency_mode.value,
+            "approval_policy": self.approval_policy.value,
+            "network_policy": self.network_policy,
+            "data_policy": self.data_policy,
+            "cost_model": dict(self.cost_model or {}),
+            "result_size_limit": self.result_size_limit,
+            "max_concurrency": self.max_concurrency,
+            "enabled": self.enabled,
+            "effect": self.effect.value,
+            "approval_required": self.approval_required,
+            "compensation_tool_id": self.compensation_tool_id,
+            "timeout_seconds": self.timeout_seconds,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -455,8 +656,13 @@ class ToolExecutionReceipt:
 
 __all__ = [
     "TOOL_CONTRACT_SCHEMA_VERSION",
+    "ToolApprovalPolicy",
+    "ToolAuthorityClass",
     "ToolContractError",
     "ToolEffect",
+    "ToolIdempotencyMode",
+    "ToolRiskClass",
+    "ToolSideEffectClass",
     "ToolExecutionRequest",
     "ToolExecutionReceipt",
     "ToolExecutionStatus",
