@@ -386,7 +386,9 @@
         "skeleton/skills/tool_contract.py lineage-capable request/receipt and approval binding",
         "skeleton/skills/tool_receipt_store.py durable execution/turn/call lineage migration and replay fencing",
         "skeleton/testing/test_tool_receipt_store.py lineage replay/conflict/migration regressions",
-        "backend/tests/test_tool_registry_canonical_delegate.py lineage propagation/restart replay regression"
+        "backend/tests/test_tool_registry_canonical_delegate.py lineage propagation/restart replay regression",
+        "skeleton/intelligence/execution_runtime.py canonical execution/provider-turn/provider-call lineage binding",
+        "skeleton/testing/test_execution_runtime.py end-to-end model-tool-model lineage regression"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
@@ -404,7 +406,6 @@
         "tool manifest schema validation/fuzz coverage against malformed nested schemas",
         "model-visible inventory proof that only admitted/enabled tools are projected",
         "move remaining privileged backend I/O handlers behind canonical adapter owners",
-        "make execution/turn/call lineage mandatory at canonical cognitive callers and prove end-to-end receipt binding",
         "bind governance classification/retention to durable tool results",
         "bind cost/admission reconciliation across tool/artifact/storage usage",
         "exact-head App Assembly and provider-surface isolation evidence"
@@ -413,8 +414,7 @@
         "dependency must close: gap-governance-registry",
         "dependency must close: gap-cost-admission",
         "dependency must close: gap-provider-surface-convergence",
-        "remaining privileged backend I/O handlers need adapter-owner cutover",
-        "lineage storage/fencing exists; canonical cognitive callers still need mandatory execution/turn/call propagation"
+        "remaining privileged backend I/O handlers need adapter-owner cutover"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
