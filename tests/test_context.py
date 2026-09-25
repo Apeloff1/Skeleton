@@ -529,6 +529,9 @@ class TestBlend:
         assert jeeves._brain is not None
         assert jeeves._brain.era == pack["era"]
 
+        plan = jeeves.plan_build()
+        assert plan["era"] == pack["era"]
+
     def test_pipeline_blend_run(self):
         from skeleton.context.pipeline import GameForgeRun
         out = GameForgeRun().execute("", blend=("arcade_golden_age", "soulslike", 0.5))
