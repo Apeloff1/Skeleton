@@ -174,6 +174,39 @@ def test_command_from_context_rejects_assistant_profile_for_non_assistant_capabi
         )
 
 
+def test_rebuilt_command_keeps_submission_digest_across_fresh_authority() -> None:
+    context = _context()
+    started = _now()
+    first = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="retry-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+        created_at=started,
+        deadline=started + timedelta(minutes=2),
+    )
+    retry_started = started + timedelta(seconds=30)
+    retry = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="retry-idem",
+        instructions="Policy",
+        prompt="Prompt",
+        verification_profile="assistant_proposal",
+        created_at=retry_started,
+        deadline=retry_started + timedelta(minutes=2),
+    )
+
+    assert first.command_digest != retry.command_digest
+    assert first.submission_digest == retry.submission_digest
+    assert first.execution_request.identity_digest == retry.execution_request.identity_digest
+    assert first.operation.identity_digest == retry.operation.identity_digest
+
+
 def test_command_from_context_rejects_unbounded_or_invalid_history() -> None:
     context = _context()
     with pytest.raises(EngineProtocolError, match="role"):
