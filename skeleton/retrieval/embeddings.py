@@ -24,18 +24,24 @@ class LocalEmbedder:
     """Deterministic bag-of-words hashing embedder."""
 
     def __init__(self, *, dim: int = 128) -> None:
-        if dim <= 0:
-            raise ValueError("dim must be positive")
+        if isinstance(dim, bool) or not isinstance(dim, int) or dim < 1:
+            raise ValueError("dim must be a positive integer")
         self._dim = dim
 
     def vector(self, text: str) -> Tuple[float, ...]:
-        tokens = _TOKEN.findall((text or "").lower())
+        if not isinstance(text, str) or not text.strip():
+            raise ValueError("text is required")
+        tokens = _TOKEN.findall(text.lower())
+        if not tokens:
+            raise ValueError("text must contain a token")
         vec = [0.0] * self._dim
         for token in tokens:
             digest = hashlib.sha256(token.encode()).digest()
             idx = digest[0] % self._dim
             vec[idx] += 1.0
-        norm = math.sqrt(sum(v * v for v in vec)) or 1.0
+        norm = math.sqrt(sum(v * v for v in vec))
+        if norm == 0.0:
+            raise ValueError("embedding must be non-zero")
         return tuple(v / norm for v in vec)
 
     def similarity(self, a: Sequence[float], b: Sequence[float]) -> float:
@@ -52,7 +58,7 @@ def _embed_text(item: ScoredResult) -> str:
         return raw
     if isinstance(item.content, str) and item.content.strip():
         return item.content
-    return item.fragment_id
+    raise ValueError("result text is required")
 
 
 def rerank_by_embedding(
