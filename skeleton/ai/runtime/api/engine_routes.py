@@ -222,8 +222,21 @@ def _raise_engine_error(exc: Exception) -> None:
     if isinstance(exc, EngineAuthorityError):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(exc),
+            detail="engine authority denied",
         ) from exc
+    if isinstance(exc, EngineServiceError):
+        normalized = str(exc).lower()
+        authority_markers = (
+            "different service principal",
+            "different actor or tenant",
+            "outside engine service grant",
+            "service grant is missing required scope",
+        )
+        if any(marker in normalized for marker in authority_markers):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="engine authority denied",
+            ) from exc
     if isinstance(exc, EngineSubmissionConflict):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

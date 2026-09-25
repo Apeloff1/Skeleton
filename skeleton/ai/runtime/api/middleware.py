@@ -212,10 +212,23 @@ class GatePolicy:
         *,
         open_prefixes: Sequence[str] = DEFAULT_OPEN_PREFIXES,
         domains: Sequence[Tuple[str, str]] = DEFAULT_DOMAIN_MAP,
+        body_limits: Sequence[Tuple[str, int]] = (),
     ) -> None:
         self._open = tuple(open_prefixes)
-        # Longest prefix first for stable RequiredDomain.
+        # Longest prefix first for stable RequiredDomain/body-limit selection.
         self._domains = tuple(sorted(domains, key=lambda pd: len(pd[0]), reverse=True))
+        normalized_limits: list[tuple[str, int]] = []
+        for prefix, raw_limit in body_limits:
+            if (
+                isinstance(raw_limit, bool)
+                or not isinstance(raw_limit, int)
+                or raw_limit <= 0
+            ):
+                raise ValueError("body limit must be a positive integer")
+            normalized_limits.append((str(prefix), raw_limit))
+        self._body_limits = tuple(
+            sorted(normalized_limits, key=lambda item: len(item[0]), reverse=True)
+        )
 
     def is_open_route(self, path: str) -> bool:
         return any(pref and _matches_path_prefix(path, pref) for pref in self._open)
@@ -225,6 +238,14 @@ class GatePolicy:
             if prefix and _matches_path_prefix(path, prefix):
                 return domain
         return None
+
+    def body_limit(self, path: str, default: int) -> int:
+        """Return the narrowest declared request-body ceiling for one route."""
+
+        for prefix, limit in self._body_limits:
+            if prefix and _matches_path_prefix(path, prefix):
+                return limit
+        return default
 
 
 # ---------------------------------------------------------------------------
@@ -306,8 +327,15 @@ class _BodyLimitExceeded(Exception):
 class BodyBoundMiddleware:
     """Reject bodies that exceed the configured limit, including streamed bodies."""
 
-    def __init__(self, app, *, max_body_bytes: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        app,
+        *,
+        policy: Optional[GatePolicy] = None,
+        max_body_bytes: Optional[int] = None,
+    ) -> None:
         self.app = app
+        self.policy = policy or GatePolicy()
         from skeleton.api.request_bounds import _positive_limit
 
         self.max_body = _positive_limit(
@@ -324,6 +352,9 @@ class BodyBoundMiddleware:
         # ASGI already gives us byte headers. Scan only for the one value we
         # need instead of allocating and decoding a complete header mapping on
         # every request.
+        path = str(scope.get("path") or "/")
+        route_limit = self.policy.body_limit(path, self.max_body)
+
         cl = None
         for key, value in scope.get("headers") or ():
             if key == b"content-length" or key.lower() == b"content-length":
@@ -340,9 +371,9 @@ class BodyBoundMiddleware:
                 resp = _json_response(400, {"error": "invalid_content_length"})
                 await resp(scope, receive, send)
                 return
-            if declared > self.max_body:
+            if declared > route_limit:
                 resp = _json_response(
-                    413, {"error": "scroll_too_large", "limit": self.max_body}
+                    413, {"error": "scroll_too_large", "limit": route_limit}
                 )
                 await resp(scope, receive, send)
                 return
@@ -354,7 +385,7 @@ class BodyBoundMiddleware:
             message = await receive()
             if message.get("type") == "http.request":
                 seen += len(message.get("body") or b"")
-                if seen > self.max_body:
+                if seen > route_limit:
                     raise _BodyLimitExceeded
             return message
 
@@ -362,7 +393,7 @@ class BodyBoundMiddleware:
             await self.app(scope, bounded_receive, send)
         except _BodyLimitExceeded:
             resp = _json_response(
-                413, {"error": "scroll_too_large", "limit": self.max_body}
+                413, {"error": "scroll_too_large", "limit": route_limit}
             )
             await resp(scope, receive, send)
 
@@ -530,7 +561,11 @@ def install_gate(
     app.add_middleware(PolicyGateMiddleware, policy=policy, audit_log=audit_log)
     app.add_middleware(AuthMiddleware, policy=policy)
     app.add_middleware(WormAuditMiddleware, audit_log=audit_log)
-    app.add_middleware(BodyBoundMiddleware, max_body_bytes=max_body_bytes)
+    app.add_middleware(
+        BodyBoundMiddleware,
+        policy=policy,
+        max_body_bytes=max_body_bytes,
+    )
     app.add_middleware(
         WriteAdmitMiddleware,
         policy=policy,
