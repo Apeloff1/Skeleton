@@ -65,7 +65,7 @@ def cluster_answers(samples: Sequence[str], *, threshold: float = 0.5) -> List[L
 def semantic_entropy(samples: Sequence[str], *, threshold: float = 0.5) -> float:
     """Entropy over meaning-cluster sizes; 0 when every sample agrees."""
     if len(samples) < 2:
-        return 0.0
+        raise ValueError("entropy needs at least two samples")
     clusters = cluster_answers(samples, threshold=threshold)
     total = len(samples)
     h = 0.0
@@ -98,8 +98,14 @@ class UncertaintyGate:
 
     def __init__(self, *, abstain_above: float = 1.0, hedge_above: float = 0.35,
                  cluster_threshold: float = 0.5) -> None:
-        if not 0.0 <= hedge_above <= abstain_above:
+        if isinstance(hedge_above, bool) or isinstance(abstain_above, bool) or isinstance(cluster_threshold, bool):
+            raise ValueError("gate thresholds must be numbers")
+        if not isinstance(hedge_above, (int, float)) or not isinstance(abstain_above, (int, float)) or not isinstance(cluster_threshold, (int, float)):
+            raise ValueError("gate thresholds must be numbers")
+        if not 0.0 <= float(hedge_above) <= float(abstain_above):
             raise ValueError("bands must satisfy 0 <= hedge_above <= abstain_above")
+        if not 0.0 < float(cluster_threshold) <= 1.0:
+            raise ValueError("cluster threshold must be in (0, 1]")
         self.abstain_above = abstain_above
         self.hedge_above = hedge_above
         self.cluster_threshold = cluster_threshold
@@ -108,9 +114,10 @@ class UncertaintyGate:
 
     def evaluate(self, samples: Sequence[str]) -> GateVerdict:
         self.evaluations += 1
-        if not samples:
+        if len(samples) < 2:
             self.abstentions += 1
-            return GateVerdict(Decision.ABSTAIN, float("inf"), 0, 0.0, "")
+            only = samples[0] if samples else ""
+            return GateVerdict(Decision.ABSTAIN, float("inf"), len(list(samples)), 0.0, only)
         clusters = cluster_answers(samples, threshold=self.cluster_threshold)
         counts = Counter(len(m) for m in clusters)
         dominant = max(counts) / len(samples)
@@ -131,6 +138,5 @@ class UncertaintyGate:
         return {
             "evaluations": self.evaluations,
             "abstentions": self.abstentions,
-            "abstention_rate": round(
-                self.abstentions / self.evaluations, 4) if self.evaluations else 0.0,
+            "abstention_rate": None if self.evaluations == 0 else round(self.abstentions / self.evaluations, 4),
         }
