@@ -114,6 +114,17 @@ def test_remote_mcp_requires_https_and_explicit_tool_allowlist() -> None:
     assert tool[1]["allowed_tool_names"] == ["read", "search"]
     assert tool[1]["authorization"] == "ephemeral-token"
 
+    with pytest.raises(ValueError, match="single-line"):
+        builder.mcp(
+            McpSpec("https://mcp.example", ("read",)),
+            authorization="bad\\nheader",
+        )
+    with pytest.raises(ValueError, match="single-line"):
+        builder.mcp(
+            McpSpec("https://mcp.example", ("read",)),
+            extra_headers={"X-Test": "bad\\r\\nvalue"},
+        )
+
 
 def test_collection_and_image_specs_are_bounded() -> None:
     with pytest.raises(ValueError):
