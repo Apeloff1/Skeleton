@@ -154,8 +154,12 @@ class Fuser:
                 if fid not in fragments:
                     fragments[fid] = result
 
+        # Python's sort is stable: score ties retain the deterministic
+        # first-seen order supplied by QuadRetriever (plane registration order,
+        # then per-plane rank). Do not replace this with a fragment-id tie break;
+        # lexical IDs are unrelated to retrieval precedence.
         ranked = _take(
-            sorted(scores.items(), key=lambda item: (-item[1], item[0])),
+            sorted(scores.items(), key=lambda item: -item[1]),
             top_k,
         )
         return [
