@@ -46,7 +46,7 @@ def test_assist_executes_through_engine_and_preserves_policy_context(
             captured["command"] = command
             return SimpleNamespace(
                 execution_id=command.execution_request.execution_id,
-                final_output="Use a guard clause.\n\n\`\`\`python\nif value is None:\n    return\n\`\`\`",
+                final_output="Use a guard clause.\n\n```python\nif value is None:\n    return\n```",
                 verification="verification:assist",
                 evidence_refs=("evidence:assist",),
             )
