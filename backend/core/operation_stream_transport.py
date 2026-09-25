@@ -306,10 +306,13 @@ class OperationStreamTransport:
                 consumer_id,
                 lease_seconds=consumer_lease_seconds,
             )
+        # Projection depth is independent from the caller's replay page size.
+        # Otherwise a page of N events can make the durable head appear to be N
+        # even when additional committed outbox transitions already exist,
+        # incorrectly reporting has_more=False across reconnects/workers.
         self.dispatch_pending(
             operation_id,
             tenant_id=tenant_id,
-            limit=limit,
         )
         events = self.event_store.replay(
             ReplayCursor(
