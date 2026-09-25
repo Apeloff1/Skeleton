@@ -349,7 +349,7 @@ def test_outbox_failure_blocks_later_versions_until_retry() -> None:
     assert blocked.attempts[0].superseded is True
     assert blocked.attempts[1].memory_version == 2
     assert blocked.attempts[1].published is False
-    assert len(repo.pending_projection_events()) == 1
+    assert len(repo.pending_projection_event_headers()) == 1
     assert healthy.items[first.memory_id].text == "v2"
 
     failing.fail_add = False
@@ -432,7 +432,7 @@ def test_outbox_dispatch_limit_preserves_pending_tail() -> None:
 
     assert first.published_events == 1
     assert first.remaining_pending_sample == 1
-    assert len(repo.pending_projection_events()) == 1
+    assert len(repo.pending_projection_event_headers()) == 1
 
 
 def test_stale_pending_event_cannot_regress_rebuilt_projection() -> None:
