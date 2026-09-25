@@ -2,7 +2,9 @@
 
 import pytest
 
+from skeleton.foundation.journal import EventJournal, JournaledBus
 from skeleton.intelligence.dream import DreamEngine
+from skeleton.kernel.events import EventBus
 from skeleton.memory.consolidation import ConsolidationCycle
 from skeleton.memory.mag import MAGStore
 from skeleton.memory.rag import InMemoryTFIDFStore
@@ -38,6 +40,25 @@ def test_a_dissolved_cluster_is_removed_from_retrieval() -> None:
     assert mag.delete(first) is True
     assert engine.dream() == []
     assert rag._chunks == {}
+
+
+def test_dream_accepts_journaled_bus_used_by_genesis() -> None:
+    mag = MAGStore("user-a")
+    mag.add_episode("alpha voyage", tags={"voyage"})
+    mag.add_episode("beta voyage", tags={"voyage"})
+    rag = InMemoryTFIDFStore()
+    journal = EventJournal()
+    bus = JournaledBus(EventBus(), journal)
+    engine = DreamEngine(mag, rag, bus=bus)
+
+    themes = engine.dream()
+
+    assert [theme["tag"] for theme in themes] == ["voyage"]
+    assert len(journal) == 1
+    entry = journal.entry(0)
+    assert entry is not None
+    assert entry.topic == "memory.dream.cycle"
+    assert entry.payload["themes"] == 1
 
 
 def test_dream_bounds_are_rejected() -> None:
