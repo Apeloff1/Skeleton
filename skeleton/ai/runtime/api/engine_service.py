@@ -528,6 +528,46 @@ class EngineExecutionCommand:
             raise EngineServiceError(
                 "compiled context source snapshot mismatch"
             )
+        allowed_tool_ids = self.execution_request.tool_policy.get(
+            "allowed_tool_ids",
+            [],
+        )
+        if (
+            not isinstance(allowed_tool_ids, list)
+            or any(
+                not isinstance(item, str) or not item.strip()
+                for item in allowed_tool_ids
+            )
+        ):
+            raise EngineServiceError(
+                "execution tool policy allowed_tool_ids is malformed"
+            )
+        canonical_allowed = list(
+            dict.fromkeys(item.strip() for item in allowed_tool_ids)
+        )
+        handoff_tool_ids = [
+            tool.tool_id
+            for tool in handoff.tools
+        ]
+        if canonical_allowed != handoff_tool_ids:
+            raise EngineServiceError(
+                "compiled context tools do not match execution tool policy"
+            )
+        if (
+            "tool_choice" in context_policy
+            and context_policy.get("tool_choice") != handoff.tool_choice
+        ):
+            raise EngineServiceError(
+                "compiled context tool_choice does not match execution policy"
+            )
+        if (
+            "specific_tool_id" in context_policy
+            and context_policy.get("specific_tool_id")
+            != handoff.specific_tool_id
+        ):
+            raise EngineServiceError(
+                "compiled context specific_tool_id does not match execution policy"
+            )
         refs: list[str] = []
         for raw in self.context_seed_refs:
             if not isinstance(raw, str) or not raw.strip():
