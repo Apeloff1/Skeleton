@@ -93,8 +93,11 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
     )
 
 
-def test_lafs_no_longer_owns_local_provider_activation() -> None:
-    assert "backend/routes/lafs.py" not in _local_provider_consumers()
+def test_remaining_local_provider_consumers_are_media_only() -> None:
+    assert set(_local_provider_consumers()) == {
+        "backend/core/expressive_tts.py",
+        "backend/routes/image_generation.py",
+    }
 
 
 def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
