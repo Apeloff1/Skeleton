@@ -238,12 +238,16 @@
         "scripts/check_provider_bootstrap.py",
         "scripts/check_provider_runtime_boundary.py",
         "backend/core/ai_provider.py compatibility facade",
-        "skeleton/jeeves/providers.py canonical-runtime compatibility facade"
+        "skeleton/jeeves/providers.py canonical-runtime compatibility facade",
+        "backend/services/tool_registry.py declared provider-isolation surface with retired llm_chat alias",
+        "backend/tests/test_tool_registry_canonical_delegate.py provider credential/SDK source isolation regression",
+        "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation"
       ],
       "remaining": [
-        "confirm exact-head provider-surface inventory and SDK-isolation CI",
-        "finish application provider credential isolation before engine credential cutover",
-        "prove no undeclared credential-bearing or raw provider transport surfaces remain"
+        "collect exact-head provider-surface inventory and SDK/network isolation evidence",
+        "verify canonical async/sync text and media regressions",
+        "verify all application isolation surfaces remain credential-free",
+        "independent signoff and canonical gap closure"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
@@ -471,7 +475,7 @@
       ],
       "work_package": "WP-P0-TOOL-RUNTIME",
       "blueprint": "tool_runtime_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "Converge all model-callable actions onto one typed, authority-aware, idempotent, sandbox/network-governed tool runtime before the cognitive loop can execute side effects.",
       "target_files": {
         "contracts": [
@@ -523,8 +527,24 @@
         "receipt lineage"
       ],
       "closure_gate": "every model-callable tool is declared, minimally projected, policy-admitted, idempotency-aware and receipt-backed, with no executable shadow registry or nested provider credential path",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
+        "skeleton/skills/tool_runtime.py canonical sync/async governed runtime",
+        "skeleton/skills/tool_receipt_store.py durable idempotency reservation and replay fencing",
+        "skeleton/skills/tool_adapters/ scoped sandbox/database/network/artifact policy adapters",
+        "backend/services/tool_registry.py compatibility delegation with retired nested llm_chat provider path",
+        "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
+        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence"
+      ],
+      "remaining": [
+        "move compile/build/database/network execution bodies out of flat compatibility registry",
+        "finish canonical manifest richness for authority/risk/data/cost/result metadata",
+        "bind execution_id/turn_id/call_id into canonical request and receipt lineage",
+        "bind governance lifecycle policy to durable tool result references",
+        "bind monotonic cost/admission reconciliation for all expensive tool classes",
+        "prove minimal provider tool projection and current-head provider-surface isolation",
+        "collect exact-head CI and independent verification after dependencies close"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
