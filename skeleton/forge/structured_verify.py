@@ -1,7 +1,10 @@
-"""JSON/YAML materialise verification — CodeVerifier + optional bounded repair.
+"""JSON/YAML materialise verification with structured-data semantics.
 
-Sibling to ``verify_loop.py``: revise-until-green for structured text without
-forking Godot ``ForgeVerifier`` project checks onto json/yaml artefacts.
+JSON/YAML artefacts are data, not source code. Their hard acceptance gate is
+therefore deterministic structured decoding plus a bounded root-shape check.
+The generic CodeVerifier is retained only as advisory diagnostics; its
+code-shape requirements (for example requiring a function/class definition)
+must never veto a valid data artefact.
 """
 
 from __future__ import annotations
@@ -118,7 +121,7 @@ def verify_structured(
     root=None,
     accept_threshold: float | None = None,
 ) -> dict[str, Any]:
-    """Parse-check + policy-aware ``CodeVerifier.verdict`` on encoded text."""
+    """Verify encoded structured data without imposing source-code semantics."""
     threshold = _threshold(accept_threshold, root)
     if not files:
         return _verification_dict(
@@ -134,19 +137,28 @@ def verify_structured(
     path = sorted(files)[0]
     text = files[path]
     parsed, parse_err = _parse_ok(text, target)
+    # Keep the code verifier as observability only. JSON/YAML documents do
+    # not contain Python/JS function definitions, so applying its code-shape
+    # acceptance bit here makes every valid structured artefact fail closed for
+    # the wrong reason.
     code = CodeVerifier(accept_at=threshold, root=root, surface="forge")
-    verdict = code.verdict(text, request=request or path)
+    advisory = code.verify(text, request=request or path)
     code_report = {
         "path": path,
-        "confidence": round(verdict.confidence, 4),
-        "issues": list(verdict.issues),
+        "confidence": round(advisory.score, 4),
+        "accepted_as_code": advisory.accepted,
+        "issues": list(advisory.issues),
+        "advisory": True,
     }
     issues: list[str] = []
     if not parsed:
         issues.append(parse_err or "parse_error")
-    issues.extend(list(verdict.issues))
-    # Parse gate is hard; CodeVerifier confidence is the soft score.
-    score = 0.0 if not parsed else float(verdict.confidence)
+
+    # Structured materialisation is canonical data emitted from a typed mapping.
+    # Successful bounded decoding to an object/array is the authoritative gate.
+    # A valid document receives full structured confidence; malformed documents
+    # remain a hard zero regardless of advisory code-verifier output.
+    score = 1.0 if parsed else 0.0
     accepted = bool(parsed and score >= threshold)
     reason = "accepted" if accepted else ("parse_error" if not parsed else "low_score")
     payload = _verification_dict(
