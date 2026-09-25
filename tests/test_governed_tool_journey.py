@@ -25,7 +25,7 @@ def _request(tool_id: str, arguments: dict, *, operation_id: str | None = None) 
 
 def _surface() -> tuple[ToolRuntime, GovernedToolSurface]:
     def database(request):
-        return {"rows": [{"name": "ada", "role": "maintainer"}]}
+        return {"rows": [{"name": "ada", "role": "maintainer", "password": "secret-token"}]}
 
     def network(request):
         return {
@@ -72,16 +72,17 @@ def test_stored_row_grounds_the_answer_and_replay_does_not_call_again() -> None:
     operation_id = str(uuid4())
     request = _request(
         "repository.query",
-        {"collection": "notes", "filter": {"name": "ada"}},
+        {"collection": "notes", "filter": {"name": "ada"}, "project": {"name": 1, "role": 1}},
         operation_id=operation_id,
     )
     result = journey.run(request, "Ada is the maintainer.")
     assert result.disposition == "answer"
     assert result.citations
     assert "maintainer" in result.citations[0].excerpt
+    assert "secret-token" not in result.citations[0].excerpt
     replay = _request(
         "repository.query",
-        {"collection": "notes", "filter": {"name": "ada"}},
+        {"collection": "notes", "filter": {"name": "ada"}, "project": {"name": 1, "role": 1}},
         operation_id=operation_id,
     )
     # Same operation, same answer, new request id. The tool idempotency key
@@ -92,7 +93,7 @@ def test_stored_row_grounds_the_answer_and_replay_does_not_call_again() -> None:
         tenant_id="tenant-a",
         tool_id="repository.query",
         idempotency_key="idem-1",
-        arguments={"collection": "notes", "filter": {"name": "ada"}},
+        arguments={"collection": "notes", "filter": {"name": "ada"}, "project": {"name": 1, "role": 1}},
         requested_at=datetime.now(timezone.utc),
     )
     again = journey.run(replay, "Ada is the maintainer.")
@@ -107,7 +108,7 @@ def test_invented_sentence_qualifies_and_a_different_replay_conflicts() -> None:
     result = journey.run(
         _request(
             "repository.query",
-            {"collection": "notes"},
+            {"collection": "notes", "project": {"name": 1, "role": 1}},
             operation_id=operation_id,
         ),
         "Ada is the maintainer. The service runs on mars.",
@@ -122,7 +123,7 @@ def test_invented_sentence_qualifies_and_a_different_replay_conflicts() -> None:
                 tenant_id="tenant-a",
                 tool_id="repository.query",
                 idempotency_key="idem-2",
-                arguments={"collection": "notes"},
+                arguments={"collection": "notes", "project": {"name": 1, "role": 1}},
                 requested_at=datetime.now(timezone.utc),
             ),
             "Something else entirely.",
@@ -158,7 +159,7 @@ def test_negation_is_not_supported_by_a_positive_quote() -> None:
     runtime, surface = _surface()
     journey = GroundedJourney(runtime, surface)
     result = journey.run(
-        _request("repository.query", {"collection": "notes"}),
+        _request("repository.query", {"collection": "notes", "project": {"name": 1, "role": 1}}),
         "Ada is not the maintainer.",
     )
     assert result.disposition == "abstain"
@@ -182,9 +183,22 @@ def test_a_broken_port_is_not_reported_as_a_policy_denial() -> None:
     surface.database = lambda request: "not-an-object"
     journey = GroundedJourney(runtime, surface)
     result = journey.run(
-        _request("repository.query", {"collection": "notes"}),
+        _request("repository.query", {"collection": "notes", "project": {"name": 1, "role": 1}}),
         "Ada is the maintainer.",
     )
     assert surface.calls
     assert result.disposition == "block"
     assert result.error_code == "ToolRuntimeError"
+
+
+def test_unprojected_query_never_reads_the_row() -> None:
+    runtime, surface = _surface()
+    surface.database = lambda request: (_ for _ in ()).throw(AssertionError("port called"))
+    journey = GroundedJourney(runtime, surface)
+    result = journey.run(
+        _request("repository.query", {"collection": "notes"}),
+        "Ada is the maintainer.",
+    )
+    assert surface.calls == []
+    assert result.disposition == "block"
+    assert result.error_code == "ToolAdapterDenied"

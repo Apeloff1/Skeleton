@@ -180,15 +180,50 @@ class GovernedToolSurface:
             raise ToolRuntimeError("tool port must return an object")
         return payload
 
+    def _admitted_fields(self, project: Mapping[str, Any]) -> tuple[str, ...]:
+        """Only an explicit inclusion projection may leave the database."""
+
+        fields: list[str] = []
+        for key, flag in project.items():
+            name = str(key)
+            if name == "_id" or name.startswith("$"):
+                continue
+            included = flag is True or (isinstance(flag, int) and not isinstance(flag, bool) and flag == 1)
+            excluded = flag is False or (isinstance(flag, int) and not isinstance(flag, bool) and flag == 0)
+            if included:
+                fields.append(name)
+            elif excluded:
+                continue
+            else:
+                raise ToolAdapterDenied("projection values must be 0 or 1")
+        if not fields:
+            raise ToolAdapterDenied("an inclusion projection is required")
+        return tuple(fields)
+
+    def _projected_row(self, row: Mapping[str, Any], fields: tuple[str, ...]) -> dict[str, Any]:
+        kept: dict[str, Any] = {}
+        for name in fields:
+            if name not in row:
+                continue
+            value = row[name]
+            try:
+                json.dumps(value, sort_keys=True, allow_nan=False)
+            except (TypeError, ValueError) as exc:
+                raise ToolRuntimeError("database row value is not JSON") from exc
+            kept[name] = value
+        return kept
+
     def _query(self, request: ToolExecutionRequest) -> str:
         normalized = self.database_policy.query_request(request.arguments)
+        fields = self._admitted_fields(normalized["project"])
         payload = self._invoke("repository.query", normalized, self.database)
         rows = payload.get("rows")
         if not isinstance(rows, list) or any(not isinstance(row, Mapping) for row in rows):
             raise ToolRuntimeError("database port must return row objects")
         if len(rows) > int(normalized["limit"]):
             raise ToolRuntimeError("database port exceeded the admitted limit")
-        return self._store("repository.query", {"kind": "database", "rows": [dict(row) for row in rows]})
+        projected = [self._projected_row(row, fields) for row in rows]
+        return self._store("repository.query", {"kind": "database", "rows": projected})
 
     def _search(self, request: ToolExecutionRequest) -> str:
         normalized = self.network_policy.search_request(request.arguments)
