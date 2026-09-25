@@ -72,7 +72,10 @@ class WalkReport:
 
 
 def _speed(pack: Dict[str, Any]) -> float:
-    return max(float((pack.get("player") or {}).get("speed") or 180.0), 1.0)
+    player = pack.get("player") if isinstance(pack.get("player"), dict) else None
+    if player is None or "speed" not in player:
+        raise ValueError("player speed is required")
+    return _positive(player["speed"], "player speed")
 
 
 def _positive(value: Any, label: str) -> float:
@@ -108,12 +111,23 @@ def _enemy(pack: Dict[str, Any], tier: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _nonneg(value: Any, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{label} must be a non-negative number")
+    number = float(value)
+    if number < 0 or number != number or number == float("inf"):
+        raise ValueError(f"{label} must be a non-negative number")
+    return number
+
+
 def _heat_cfg(pack: Dict[str, Any]) -> Dict[str, float]:
-    h = pack.get("heat") or {}
+    heat = pack.get("heat") if isinstance(pack.get("heat"), dict) else None
+    if heat is None:
+        raise ValueError("heat is required")
     return {
-        "max": float(h.get("max_heat") or 100.0),
-        "cool": float(h.get("passive_cool") or 7.5),
-        "sprint": float(h.get("sprint_heat_per_sec") or 11.0),
+        "max": _positive(heat.get("max_heat"), "max_heat"),
+        "cool": _nonneg(heat.get("passive_cool"), "passive_cool"),
+        "sprint": _nonneg(heat.get("sprint_heat_per_sec"), "sprint_heat_per_sec"),
     }
 
 
@@ -131,7 +145,7 @@ def _adj(graph: Dict[str, Any], pack: Dict[str, Any]) -> Dict[str, List[Tuple[st
     for d in graph.get("doors") or []:
         a, b = d["from"], d["to"]
         if a not in by or b not in by:
-            continue
+            raise ValueError("door references an unknown room")
         dx = float(by[b]["x"]) - float(by[a]["x"])
         dy = float(by[b]["y"]) - float(by[a]["y"])
         travel = math.hypot(dx, dy) / speed
