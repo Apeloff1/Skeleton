@@ -539,10 +539,11 @@
         "skeleton/skills/tool_receipt_store.py migrates existing stores and fences lineage changes across restart",
         "backend/services/tool_registry.py propagates execution/turn/call lineage through compatibility delegation",
         "skeleton/intelligence/execution_runtime.py propagates canonical execution/provider-turn/provider-call identities into every cognitive tool request",
-        "skeleton/testing/test_execution_runtime.py verifies receipt lineage against persisted provider turn"
+        "skeleton/testing/test_execution_runtime.py verifies receipt lineage against persisted provider turn",
+        "skeleton/skills/tool_adapters/owners.py owns compatibility side-effect/read execution bodies outside the flat backend registry",
+        "backend/services/tool_registry.py delegates vault/Jeeves/compile/package/database/network handlers to canonical owners"
       ],
       "remaining": [
-        "move compile/build/database/network execution bodies out of flat compatibility registry",
         "finish canonical manifest richness for authority/risk/data/cost/result metadata",
         "bind governance lifecycle policy to durable tool result references",
         "bind monotonic cost/admission reconciliation for all expensive tool classes",
