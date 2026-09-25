@@ -127,6 +127,10 @@ class SQLiteOperationEventStore:
         with self._lock:
             self._connection.executescript(
                 """
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA busy_timeout = 5000;
+
                 CREATE TABLE IF NOT EXISTS operation_stream_head (
                     namespace TEXT NOT NULL,
                     operation_id TEXT NOT NULL,
