@@ -49,13 +49,15 @@ CREATE TABLE IF NOT EXISTS tenant_quota (
     max_cost_usd REAL NOT NULL,
     max_tool_calls INTEGER NOT NULL,
     max_artifact_bytes INTEGER NOT NULL,
+    max_storage_bytes INTEGER NOT NULL,
     max_concurrent_operations INTEGER NOT NULL,
     committed_operations INTEGER NOT NULL DEFAULT 0,
     committed_input_tokens INTEGER NOT NULL DEFAULT 0,
     committed_output_tokens INTEGER NOT NULL DEFAULT 0,
     committed_cost_usd REAL NOT NULL DEFAULT 0,
     committed_tool_calls INTEGER NOT NULL DEFAULT 0,
-    committed_artifact_bytes INTEGER NOT NULL DEFAULT 0
+    committed_artifact_bytes INTEGER NOT NULL DEFAULT 0,
+    committed_storage_bytes INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS quota_reservations (
@@ -69,6 +71,7 @@ CREATE TABLE IF NOT EXISTS quota_reservations (
     estimate_cost_usd REAL NOT NULL,
     estimate_tool_calls INTEGER NOT NULL,
     estimate_artifact_bytes INTEGER NOT NULL,
+    estimate_storage_bytes INTEGER NOT NULL,
     reserved_at REAL NOT NULL,
     UNIQUE (tenant_id, operation_id)
 );
@@ -87,12 +90,14 @@ CREATE TABLE IF NOT EXISTS quota_completions (
     estimate_cost_usd REAL NOT NULL,
     estimate_tool_calls INTEGER NOT NULL,
     estimate_artifact_bytes INTEGER NOT NULL,
+    estimate_storage_bytes INTEGER NOT NULL,
     actual_operations INTEGER NOT NULL,
     actual_input_tokens INTEGER NOT NULL,
     actual_output_tokens INTEGER NOT NULL,
     actual_cost_usd REAL NOT NULL,
     actual_tool_calls INTEGER NOT NULL,
     actual_artifact_bytes INTEGER NOT NULL,
+    actual_storage_bytes INTEGER NOT NULL,
     overrun_dimensions TEXT NOT NULL,
     completed_at REAL NOT NULL,
     UNIQUE (tenant_id, operation_id)
@@ -112,6 +117,7 @@ CREATE TABLE IF NOT EXISTS quota_usage_events (
     delta_cost_usd REAL NOT NULL DEFAULT 0,
     delta_tool_calls INTEGER NOT NULL DEFAULT 0,
     delta_artifact_bytes INTEGER NOT NULL DEFAULT 0,
+    delta_storage_bytes INTEGER NOT NULL DEFAULT 0,
     recorded_at REAL NOT NULL
 );
 
@@ -157,12 +163,72 @@ class SqliteTenantQuotaLedger:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    @staticmethod
+    def _ensure_column(
+        conn: sqlite3.Connection,
+        table: str,
+        column: str,
+        definition: str,
+    ) -> bool:
+        columns = {
+            str(row["name"])
+            for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        if column in columns:
+            return False
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
+        return True
+
     def _ensure_schema(self) -> None:
         conn = self._connect()
         try:
             conn.execute("PRAGMA journal_mode = WAL")
             conn.execute("PRAGMA synchronous = FULL")
             conn.executescript(_SCHEMA)
+
+            added_max_storage = self._ensure_column(
+                conn,
+                "tenant_quota",
+                "max_storage_bytes",
+                "max_storage_bytes INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                "tenant_quota",
+                "committed_storage_bytes",
+                "committed_storage_bytes INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                "quota_reservations",
+                "estimate_storage_bytes",
+                "estimate_storage_bytes INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                "quota_completions",
+                "estimate_storage_bytes",
+                "estimate_storage_bytes INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                "quota_completions",
+                "actual_storage_bytes",
+                "actual_storage_bytes INTEGER NOT NULL DEFAULT 0",
+            )
+            self._ensure_column(
+                conn,
+                "quota_usage_events",
+                "delta_storage_bytes",
+                "delta_storage_bytes INTEGER NOT NULL DEFAULT 0",
+            )
+            if added_max_storage:
+                conn.execute(
+                    """
+                    UPDATE tenant_quota
+                    SET max_storage_bytes = max_artifact_bytes
+                    """
+                )
         finally:
             conn.close()
 
@@ -208,6 +274,7 @@ class SqliteTenantQuotaLedger:
             max_cost_usd=float(row["max_cost_usd"]),
             max_tool_calls=int(row["max_tool_calls"]),
             max_artifact_bytes=int(row["max_artifact_bytes"]),
+            max_storage_bytes=int(row["max_storage_bytes"]),
             max_concurrent_operations=int(row["max_concurrent_operations"]),
         )
 
@@ -220,6 +287,7 @@ class SqliteTenantQuotaLedger:
             cost_usd=float(row[f"{prefix}_cost_usd"]),
             tool_calls=int(row[f"{prefix}_tool_calls"]),
             artifact_bytes=int(row[f"{prefix}_artifact_bytes"]),
+            storage_bytes=int(row[f"{prefix}_storage_bytes"]),
         )
 
     @staticmethod
@@ -255,6 +323,7 @@ class SqliteTenantQuotaLedger:
             cost_usd=float(row["committed_cost_usd"]),
             tool_calls=int(row["committed_tool_calls"]),
             artifact_bytes=int(row["committed_artifact_bytes"]),
+            storage_bytes=int(row["committed_storage_bytes"]),
         )
 
     @staticmethod
@@ -300,6 +369,7 @@ class SqliteTenantQuotaLedger:
             cost_usd=max(left.cost_usd, right.cost_usd),
             tool_calls=max(left.tool_calls, right.tool_calls),
             artifact_bytes=max(left.artifact_bytes, right.artifact_bytes),
+            storage_bytes=max(left.storage_bytes, right.storage_bytes),
         )
 
     @staticmethod
@@ -315,7 +385,8 @@ class SqliteTenantQuotaLedger:
                 COALESCE(SUM(delta_output_tokens), 0) AS output_tokens,
                 COALESCE(SUM(delta_cost_usd), 0) AS cost_usd,
                 COALESCE(SUM(delta_tool_calls), 0) AS tool_calls,
-                COALESCE(SUM(delta_artifact_bytes), 0) AS artifact_bytes
+                COALESCE(SUM(delta_artifact_bytes), 0) AS artifact_bytes,
+                COALESCE(SUM(delta_storage_bytes), 0) AS storage_bytes
             FROM quota_usage_events
             WHERE reservation_id = ?
             """,
@@ -329,6 +400,7 @@ class SqliteTenantQuotaLedger:
             cost_usd=float(row["cost_usd"]),
             tool_calls=int(row["tool_calls"]),
             artifact_bytes=int(row["artifact_bytes"]),
+            storage_bytes=int(row["storage_bytes"]),
         )
 
     @staticmethod
@@ -375,6 +447,7 @@ class SqliteTenantQuotaLedger:
                 cost_usd=float(row["delta_cost_usd"]),
                 tool_calls=int(row["delta_tool_calls"]),
                 artifact_bytes=int(row["delta_artifact_bytes"]),
+                storage_bytes=int(row["delta_storage_bytes"]),
             ),
             recorded_at=float(row["recorded_at"]),
         )
@@ -418,11 +491,12 @@ class SqliteTenantQuotaLedger:
                     tenant_id, window_id,
                     max_operations, max_input_tokens, max_output_tokens,
                     max_cost_usd, max_tool_calls, max_artifact_bytes,
-                    max_concurrent_operations,
+                    max_storage_bytes, max_concurrent_operations,
                     committed_operations, committed_input_tokens,
                     committed_output_tokens, committed_cost_usd,
-                    committed_tool_calls, committed_artifact_bytes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0)
+                    committed_tool_calls, committed_artifact_bytes,
+                    committed_storage_bytes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)
                 """,
                 (
                     tenant,
@@ -433,6 +507,7 @@ class SqliteTenantQuotaLedger:
                     quota.max_cost_usd,
                     quota.max_tool_calls,
                     quota.max_artifact_bytes,
+                    quota.max_storage_bytes,
                     quota.max_concurrent_operations,
                 ),
             )
@@ -523,8 +598,8 @@ class SqliteTenantQuotaLedger:
                     estimate_operations, estimate_input_tokens,
                     estimate_output_tokens, estimate_cost_usd,
                     estimate_tool_calls, estimate_artifact_bytes,
-                    reserved_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    estimate_storage_bytes, reserved_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     reservation.reservation_id,
@@ -537,6 +612,7 @@ class SqliteTenantQuotaLedger:
                     values["cost_usd"],
                     values["tool_calls"],
                     values["artifact_bytes"],
+                    values["storage_bytes"],
                     timestamp,
                 ),
             )
@@ -551,12 +627,13 @@ class SqliteTenantQuotaLedger:
         *,
         max_tool_calls: int | None = None,
         max_artifact_bytes: int | None = None,
+        max_storage_bytes: int | None = None,
         now: float | None = None,
     ) -> QuotaUsageEvent:
         """Atomically record one idempotent incremental actual-usage event.
 
-        Storage bytes consume the same byte budget as artifacts. Callers should
-        record the event before a side effect when its cost is known. Once an
+        Artifact and storage bytes have independent budget dimensions. Callers
+        should record the event before a side effect when its cost is known. Once an
         event exists, release() is forbidden; completion must reconcile it.
         """
 
@@ -570,6 +647,7 @@ class SqliteTenantQuotaLedger:
         for field, value in (
             ("max_tool_calls", max_tool_calls),
             ("max_artifact_bytes", max_artifact_bytes),
+            ("max_storage_bytes", max_storage_bytes),
         ):
             if value is not None and (
                 isinstance(value, bool)
@@ -585,6 +663,7 @@ class SqliteTenantQuotaLedger:
             cost_usd=delta.cost_usd,
             tool_calls=delta.tool_calls,
             artifact_bytes=delta.artifact_bytes,
+            storage_bytes=delta.storage_bytes,
         )
 
         with self._write() as conn:
@@ -630,6 +709,11 @@ class SqliteTenantQuotaLedger:
                 and prospective.artifact_bytes > max_artifact_bytes
             ):
                 raise QuotaExceeded("operation_budget_exceeded:artifact_bytes")
+            if (
+                max_storage_bytes is not None
+                and prospective.storage_bytes > max_storage_bytes
+            ):
+                raise QuotaExceeded("operation_budget_exceeded:storage_bytes")
 
             quota_row = self._quota_row(conn, reservation.tenant_id)
             quota = self._quota(quota_row)
@@ -658,8 +742,8 @@ class SqliteTenantQuotaLedger:
                     operation_id, category,
                     delta_operations, delta_input_tokens, delta_output_tokens,
                     delta_cost_usd, delta_tool_calls, delta_artifact_bytes,
-                    recorded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    delta_storage_bytes, recorded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     event,
@@ -674,6 +758,7 @@ class SqliteTenantQuotaLedger:
                     values["cost_usd"],
                     values["tool_calls"],
                     values["artifact_bytes"],
+                    values["storage_bytes"],
                     timestamp,
                 ),
             )
@@ -740,8 +825,8 @@ class SqliteTenantQuotaLedger:
                     operation_id, category,
                     delta_operations, delta_input_tokens, delta_output_tokens,
                     delta_cost_usd, delta_tool_calls, delta_artifact_bytes,
-                    recorded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?)
+                    delta_storage_bytes, recorded_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0, ?)
                 """,
                 (
                     event,
@@ -768,6 +853,7 @@ class SqliteTenantQuotaLedger:
         *,
         max_tool_calls: int | None = None,
         max_artifact_bytes: int | None = None,
+        max_storage_bytes: int | None = None,
         now: float | None = None,
     ) -> QuotaUsageEvent:
         """Replace one durable unknown marker with conservative actual usage."""
@@ -779,6 +865,7 @@ class SqliteTenantQuotaLedger:
         for field, value in (
             ("max_tool_calls", max_tool_calls),
             ("max_artifact_bytes", max_artifact_bytes),
+            ("max_storage_bytes", max_storage_bytes),
         ):
             if value is not None and (
                 isinstance(value, bool)
@@ -794,6 +881,7 @@ class SqliteTenantQuotaLedger:
             cost_usd=delta.cost_usd,
             tool_calls=delta.tool_calls,
             artifact_bytes=delta.artifact_bytes,
+            storage_bytes=delta.storage_bytes,
         )
 
         with self._write() as conn:
@@ -829,6 +917,11 @@ class SqliteTenantQuotaLedger:
                 and prospective.artifact_bytes > max_artifact_bytes
             ):
                 raise QuotaExceeded("operation_budget_exceeded:artifact_bytes")
+            if (
+                max_storage_bytes is not None
+                and prospective.storage_bytes > max_storage_bytes
+            ):
+                raise QuotaExceeded("operation_budget_exceeded:storage_bytes")
 
             quota_row = self._quota_row(conn, reservation.tenant_id)
             quota = self._quota(quota_row)
@@ -860,6 +953,7 @@ class SqliteTenantQuotaLedger:
                     delta_cost_usd = ?,
                     delta_tool_calls = ?,
                     delta_artifact_bytes = ?,
+                    delta_storage_bytes = ?,
                     recorded_at = ?
                 WHERE event_id = ?
                 """,
@@ -871,6 +965,7 @@ class SqliteTenantQuotaLedger:
                     values["cost_usd"],
                     values["tool_calls"],
                     values["artifact_bytes"],
+                    values["storage_bytes"],
                     timestamp,
                     event,
                 ),
@@ -1022,7 +1117,8 @@ class SqliteTenantQuotaLedger:
                     committed_output_tokens = ?,
                     committed_cost_usd = ?,
                     committed_tool_calls = ?,
-                    committed_artifact_bytes = ?
+                    committed_artifact_bytes = ?,
+                    committed_storage_bytes = ?
                 WHERE tenant_id = ?
                 """,
                 (
@@ -1032,6 +1128,7 @@ class SqliteTenantQuotaLedger:
                     values["cost_usd"],
                     values["tool_calls"],
                     values["artifact_bytes"],
+                    values["storage_bytes"],
                     reservation.tenant_id,
                 ),
             )
@@ -1048,11 +1145,13 @@ class SqliteTenantQuotaLedger:
                     estimate_operations, estimate_input_tokens,
                     estimate_output_tokens, estimate_cost_usd,
                     estimate_tool_calls, estimate_artifact_bytes,
+                    estimate_storage_bytes,
                     actual_operations, actual_input_tokens,
                     actual_output_tokens, actual_cost_usd,
                     actual_tool_calls, actual_artifact_bytes,
+                    actual_storage_bytes,
                     overrun_dimensions, completed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     completion.reservation_id,
@@ -1065,12 +1164,14 @@ class SqliteTenantQuotaLedger:
                     estimate_values["cost_usd"],
                     estimate_values["tool_calls"],
                     estimate_values["artifact_bytes"],
+                    estimate_values["storage_bytes"],
                     actual_values["operations"],
                     actual_values["input_tokens"],
                     actual_values["output_tokens"],
                     actual_values["cost_usd"],
                     actual_values["tool_calls"],
                     actual_values["artifact_bytes"],
+                    actual_values["storage_bytes"],
                     json.dumps(list(overruns), separators=(",", ":")),
                     timestamp,
                 ),
@@ -1116,7 +1217,8 @@ class SqliteTenantQuotaLedger:
                 """
                 SELECT category,
                        COALESCE(SUM(delta_tool_calls), 0) AS tool_calls,
-                       COALESCE(SUM(delta_artifact_bytes), 0) AS artifact_bytes
+                       COALESCE(SUM(delta_artifact_bytes), 0) AS artifact_bytes,
+                       COALESCE(SUM(delta_storage_bytes), 0) AS storage_bytes
                 FROM quota_usage_events
                 WHERE tenant_id = ?
                 GROUP BY category
@@ -1127,6 +1229,7 @@ class SqliteTenantQuotaLedger:
                 str(row["category"]): {
                     "tool_calls": int(row["tool_calls"]),
                     "artifact_bytes": int(row["artifact_bytes"]),
+                    "storage_bytes": int(row["storage_bytes"]),
                 }
                 for row in category_rows
             }
@@ -1140,6 +1243,7 @@ class SqliteTenantQuotaLedger:
                     "max_cost_usd": quota.max_cost_usd,
                     "max_tool_calls": quota.max_tool_calls,
                     "max_artifact_bytes": quota.max_artifact_bytes,
+                    "max_storage_bytes": quota.max_storage_bytes,
                     "max_concurrent_operations": quota.max_concurrent_operations,
                 },
                 "committed": committed.as_dict(),
@@ -1195,13 +1299,15 @@ class SqliteTenantQuotaLedger:
                     max_cost_usd = ?,
                     max_tool_calls = ?,
                     max_artifact_bytes = ?,
+                    max_storage_bytes = ?,
                     max_concurrent_operations = ?,
                     committed_operations = 0,
                     committed_input_tokens = 0,
                     committed_output_tokens = 0,
                     committed_cost_usd = 0,
                     committed_tool_calls = 0,
-                    committed_artifact_bytes = 0
+                    committed_artifact_bytes = 0,
+                    committed_storage_bytes = 0
                 WHERE tenant_id = ?
                 """,
                 (
@@ -1212,6 +1318,7 @@ class SqliteTenantQuotaLedger:
                     quota.max_cost_usd,
                     quota.max_tool_calls,
                     quota.max_artifact_bytes,
+                    quota.max_storage_bytes,
                     quota.max_concurrent_operations,
                     tenant,
                 ),
