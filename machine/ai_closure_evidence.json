@@ -142,9 +142,17 @@
       "plane": "model-provider",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/testing/test_provider_contract.py",
+        "tests/test_provider_runtime_boundary.py",
+        "backend/tests/test_ai_provider_media.py",
+        "scripts/check_provider_bootstrap.py",
+        "scripts/check_provider_runtime_boundary.py",
+        "backend/core/ai_provider.py compatibility facade",
+        "skeleton/jeeves/providers.py canonical-runtime compatibility facade"
+      ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
         "canonical synchronous provider transport regression suite",
