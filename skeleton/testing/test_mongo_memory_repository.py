@@ -687,10 +687,14 @@ async def test_mongo_outbox_failure_blocks_later_versions_and_recovers() -> None
     )
 
     assert blocked.degraded is True
-    assert blocked.attempted_events == 1
-    assert blocked.published_events == 0
-    assert len(await repo.pending_projection_events()) == 2
-    assert healthy.items[first.memory_id].text == "v1"
+    assert blocked.attempted_events == 2
+    assert blocked.published_events == 1
+    assert blocked.attempts[0].superseded is True
+    assert blocked.attempts[0].published is True
+    assert blocked.attempts[1].memory_version == 2
+    assert blocked.attempts[1].published is False
+    assert len(await repo.pending_projection_events()) == 1
+    assert healthy.items[first.memory_id].text == "v2"
 
     failing.add = original_add
     recovered = await coordinator.dispatch_pending(
@@ -700,7 +704,7 @@ async def test_mongo_outbox_failure_blocks_later_versions_and_recovers() -> None
     )
 
     assert recovered.degraded is False
-    assert recovered.published_events == 2
+    assert recovered.published_events == 1
     assert healthy.items[first.memory_id].text == "v2"
     assert failing.items[first.memory_id].text == "v2"
     assert await repo.pending_projection_events() == ()
@@ -734,4 +738,49 @@ async def test_mongo_expiry_revision_is_expire_not_generic_tombstone() -> None:
     assert [(row.memory_version, row.action) for row in await repo.pending_projection_events()] == [
         (1, "upsert"),
         (2, "delete"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_mongo_stale_pending_event_cannot_regress_rebuilt_projection() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    first = await repo.commit(
+        _proposal(key="mongo-stale-create", content="v1"),
+        now=_now(),
+    )
+    await repo.commit(
+        _proposal(
+            key="mongo-stale-update",
+            content="v2",
+            target=first.memory_id,
+            version=1,
+        ),
+        now=_now() + timedelta(seconds=1),
+    )
+    store = FakeProjectionStore()
+    projection = LegacyMemoryStoreProjection("rag", store)
+    coordinator = AsyncMemoryProjectionCoordinator(repo)
+
+    rebuilt = await coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert rebuilt.degraded is False
+    assert store.items[first.memory_id].text == "v2"
+
+    bounded = await coordinator.dispatch_pending(
+        projections=(projection,),
+        limit=1,
+        now=_now() + timedelta(seconds=2),
+    )
+
+    assert bounded.published_events == 1
+    assert bounded.attempts[0].memory_version == 1
+    assert bounded.attempts[0].superseded is True
+    assert store.items[first.memory_id].text == "v2"
+    assert [(event.memory_version, event.action) for event in await repo.pending_projection_events()] == [
+        (2, "upsert"),
     ]
