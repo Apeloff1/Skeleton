@@ -750,7 +750,13 @@
         "API reconnect recovery can hand an operation cursor between independent workers",
         "API slow-client backpressure and replay-gap recovery remain correct across worker handoff",
         "API cancel-complete race across workers emits exactly one terminal result",
-        "frontend reconnect page continuity, slow-client gap rejection and terminal race fencing regressions"
+        "frontend reconnect page continuity, slow-client gap rejection and terminal race fencing regressions",
+        "skeleton/testing/test_operation_stream_store.py worker lease fencing/takeover",
+        "backend/tests/test_operation_stream_transport.py distributed projection ownership",
+        "backend/tests/test_operation_stream_route.py cross-worker reconnect and slow-client API journeys",
+        "fenced expiring projection lease with generation-based stale-worker fencing",
+        "cross-worker API reconnect journey over shared durable cursor state",
+        "operation-local slow-client replay isolation"
       ],
       "closure_evidence_required": [
         "durable replay/compaction/terminal/backpressure persistence tests",
