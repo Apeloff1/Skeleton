@@ -50,6 +50,10 @@ class EngineConflictError(EngineClientError):
     """The engine rejected an idempotency or state conflict."""
 
 
+class EngineNotFoundError(EngineProtocolError):
+    """The requested engine resource does not exist."""
+
+
 class EngineAuthorizationError(EngineClientError):
     """The engine rejected delegated authority."""
 
@@ -721,6 +725,8 @@ class EngineClient:
                 "engine response exceeds configured size bound"
             )
 
+        if response.status_code == 404:
+            raise EngineNotFoundError("engine resource was not found")
         if response.status_code == 409:
             raise EngineConflictError("engine rejected conflicting request")
         if response.status_code in {401, 403}:
@@ -1176,11 +1182,47 @@ class EngineClient:
 
             await asyncio.sleep(self.config.poll_interval_s)
 
-    async def execute(
+    async def _recover_ambiguous_submit(
         self,
         command: EngineExecutionCommand,
-    ) -> EngineTerminalResult:
-        ack = await self.submit(command)
+    ) -> bool:
+        """Return True only when status proves the deterministic execution exists."""
+
+        try:
+            status = await self.status(
+                command.execution_request.execution_id,
+                actor_id=command.operation.actor_id,
+                tenant_id=command.operation.tenant_id,
+                trace_id=command.operation.trace_id,
+            )
+        except EngineNotFoundError:
+            return False
+
+        operation_id = _text(
+            status.get("operation_id"),
+            "status.operation_id",
+            maximum=192,
+        )
+        execution_id = _text(
+            status.get("execution_id"),
+            "status.execution_id",
+            maximum=192,
+        )
+        if operation_id != command.operation.operation_id:
+            raise EngineProtocolError(
+                "recovered engine status operation identity mismatch"
+            )
+        if execution_id != command.execution_request.execution_id:
+            raise EngineProtocolError(
+                "recovered engine status execution identity mismatch"
+            )
+        return True
+
+    @staticmethod
+    def _validate_ack_identity(
+        ack: Mapping[str, Any],
+        command: EngineExecutionCommand,
+    ) -> str:
         execution_id = _text(
             ack.get("execution_id"),
             "ack.execution_id",
@@ -1199,6 +1241,40 @@ class EngineClient:
             raise EngineProtocolError(
                 "engine acknowledgement operation identity mismatch"
             )
+        return execution_id
+
+    async def execute(
+        self,
+        command: EngineExecutionCommand,
+    ) -> EngineTerminalResult:
+        if not isinstance(command, EngineExecutionCommand):
+            raise TypeError("command must be EngineExecutionCommand")
+
+        execution_id = command.execution_request.execution_id
+        try:
+            ack = await self.submit(command)
+        except EngineUnavailableError as first_error:
+            try:
+                recovered = await self._recover_ambiguous_submit(command)
+            except EngineUnavailableError:
+                raise first_error
+            if not recovered:
+                try:
+                    ack = await self.submit(command)
+                except EngineUnavailableError as retry_error:
+                    try:
+                        recovered = await self._recover_ambiguous_submit(command)
+                    except (EngineNotFoundError, EngineUnavailableError):
+                        raise retry_error
+                    if not recovered:
+                        raise retry_error
+                else:
+                    execution_id = self._validate_ack_identity(ack, command)
+            else:
+                execution_id = command.execution_request.execution_id
+        else:
+            execution_id = self._validate_ack_identity(ack, command)
+
         return await self.wait_for_terminal(
             execution_id=execution_id,
             actor_id=command.operation.actor_id,
@@ -1214,6 +1290,7 @@ __all__ = [
     "EngineClientError",
     "EngineConflictError",
     "EngineExecutionFailed",
+    "EngineNotFoundError",
     "EngineProtocolError",
     "EngineTerminalResult",
     "EngineUnavailableError",
