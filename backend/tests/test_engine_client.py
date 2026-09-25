@@ -1198,3 +1198,56 @@ def test_command_from_context_allows_smaller_explicit_output_budget() -> None:
         "selected_input_tokens_estimate"
     ] == context.selected_tokens_estimate
 
+def test_command_from_context_requires_positive_compiled_output_reserve() -> None:
+    context = _context()
+    zero_budget = ContextBudget(
+        max_context_tokens=context.budget.max_context_tokens,
+        reserved_output_tokens=0,
+        reserved_tool_result_tokens=0,
+        reserved_policy_tokens=context.budget.reserved_policy_tokens,
+        safety_margin_tokens=context.budget.safety_margin_tokens,
+        max_segment_tokens=context.budget.max_segment_tokens,
+        max_artifact_tokens=context.budget.max_artifact_tokens,
+        max_tool_result_tokens=context.budget.max_tool_result_tokens,
+    )
+    rebound = ContextEnvelope(
+        context_id=context.context_id,
+        operation_id=context.operation_id,
+        execution_id=context.execution_id,
+        turn_id=context.turn_id,
+        tenant_id=context.tenant_id,
+        instruction_segments=context.instruction_segments,
+        evidence_segments=context.evidence_segments,
+        tool_schema_segments=context.tool_schema_segments,
+        budget=zero_budget,
+        selected_tokens_estimate=context.selected_tokens_estimate,
+        omitted_segment_ids=context.omitted_segment_ids,
+        omission_reasons=context.omission_reasons,
+        source_snapshot=context.source_snapshot,
+        context_digest=context_digest_payload(
+            operation_id=context.operation_id,
+            execution_id=context.execution_id,
+            turn_id=context.turn_id,
+            tenant_id=context.tenant_id,
+            budget=zero_budget,
+            selected=context.selected_segments,
+            omitted_segment_ids=context.omitted_segment_ids,
+            compiler_version=context.compiler_version,
+        ),
+        compiled_at=context.compiled_at,
+        compiler_version=context.compiler_version,
+    )
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="positive output reserve",
+    ):
+        command_from_context(
+            context=rebound,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="zero-output-reserve",
+            instructions="Policy",
+            prompt="Prompt",
+        )
+
