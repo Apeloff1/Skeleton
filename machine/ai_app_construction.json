@@ -1758,7 +1758,7 @@
       "plane": "tool-runtime",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, adapter-owned privileged/read execution surfaces, rich governance manifests, minimal enabled-only provider projection, manifest-aware cost metering, and per-tool concurrency governance now exist. Remaining closure is durable-result governance lifecycle binding, dependency closure, exact-head validation and independent verification.",
+      "gap": "Canonical typed tool contracts, governed sync/async runtimes, durable receipt fencing, scoped policies, backend compatibility delegation, execution/turn/provider-call lineage, adapter-owned privileged/read execution surfaces, rich governance manifests, minimal enabled-only provider projection, manifest-aware cost metering, per-tool concurrency governance, and lifecycle-governed durable tool results now exist. Remaining closure is dependency closure, exact-head validation and independent verification.",
       "construction": [
         "keep SkillManifest as declarative instruction/capability guidance and define a separate ToolManifest execution contract",
         "materialize the canonical tool contract/runtime under skeleton/skills without executable fields in declarative skill manifests",
@@ -1808,10 +1808,12 @@
         "skeleton/skills/tool_runtime.py meters manifest estimated_cost_usd with tool-call usage through AdmissionRuntime when available",
         "skeleton/skills/tool_runtime.py enforces ToolManifest.max_concurrency with per-tool async semaphores",
         "skeleton/testing/test_tool_runtime.py proves cost usage is metered before side effects and max_concurrency serializes distinct calls",
-        "skeleton/skills/tool_contract.py validates non-negative finite cost_model.estimated_cost_usd"
+        "skeleton/skills/tool_contract.py validates non-negative finite cost_model.estimated_cost_usd",
+        "backend/services/tool_registry.py governed durable tool-result store registers artifact-plane lifecycle metadata before payload commit",
+        "backend/services/tool_registry.py durable tool results enforce manifest output schema/result size, retention deadlines and lifecycle-aware capacity deletion",
+        "backend/tests/test_tool_registry_canonical_delegate.py proves restart-persistent lifecycle metadata, governance fail-closed persistence, capacity deletion acknowledgement, result schema/size enforcement and retention expiry deletion"
       ],
       "outstanding_evidence": [
-        "governance lifecycle binding for durable results",
         "dependency closure and exact-head validation"
       ]
     },
@@ -5254,7 +5256,10 @@
       "production backend tool manifests explicitly declare authority, risk, side-effect, idempotency, approval, network/data/cost, result and concurrency metadata",
       "provider projection skips disabled manifests and strips all internal governance metadata",
       "manifest estimated tool cost is reconciled into AdmissionRuntime usage events together with tool-call count",
-      "async runtime enforces manifest max_concurrency per tool before handler execution"
+      "async runtime enforces manifest max_concurrency per tool before handler execution",
+      "durable compatibility tool results register canonical artifact-plane lifecycle metadata before payload persistence",
+      "tool-result retention and capacity eviction execute through lifecycle deletion plans and acknowledgement receipts",
+      "result commit validates manifest output schema and result_size_limit before durable storage"
     ],
     "remaining": [
       "dependency closure and exact-head validation"
