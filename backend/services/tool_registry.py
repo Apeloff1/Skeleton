@@ -40,6 +40,9 @@ from skeleton.skills import (
     ToolExecutionStatus,
     ToolManifest,
 )
+from skeleton.skills.tool_contract import validate_tool_arguments
+from skeleton.vault.data_lifecycle import DataLifecycleRegistry, LifecycleState
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.skills.tool_adapters import (
     ArtifactAdapterPolicy,
     AsyncArtifactPackageAdapter,
@@ -388,13 +391,51 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
 
 
 class _CompatibilityResultStore:
-    """Durable projection of canonical tool outputs for legacy callers."""
+    """Durable governed projection of canonical tool outputs for legacy callers."""
 
-    def __init__(self, path: str = ":memory:", max_entries: int = 4096) -> None:
+    _SOURCE_PREFIX = "tool-result://"
+    _DELETION_TARGET = "tool-result"
+
+    def __init__(
+        self,
+        path: str = ":memory:",
+        max_entries: int = 4096,
+        *,
+        governance: GovernanceRegistry | None = None,
+        retention_seconds: int = 7 * 24 * 60 * 60,
+    ) -> None:
+        if (
+            isinstance(max_entries, bool)
+            or not isinstance(max_entries, int)
+            or max_entries < 1
+        ):
+            raise ValueError("max_entries must be a positive integer")
+        if (
+            isinstance(retention_seconds, bool)
+            or not isinstance(retention_seconds, int)
+            or retention_seconds < 60
+            or retention_seconds > 365 * 24 * 60 * 60
+        ):
+            raise ValueError(
+                "retention_seconds must be within [60, 31536000]"
+            )
         self.max_entries = max_entries
+        self.retention_seconds = retention_seconds
         self._lock = asyncio.Lock()
+        self._path = str(path)
+        self._owns_governance = governance is None
+        if governance is None:
+            lifecycle_path = (
+                None
+                if self._path == ":memory:"
+                else self._path + ".governance.sqlite3"
+            )
+            governance = GovernanceRegistry(
+                DataLifecycleRegistry(lifecycle_path)
+            )
+        self.governance = governance
         self._connection = sqlite3.connect(
-            str(path),
+            self._path,
             check_same_thread=False,
             isolation_level=None,
             timeout=5.0,
@@ -405,14 +446,130 @@ class _CompatibilityResultStore:
             CREATE TABLE IF NOT EXISTS legacy_tool_result (
                 result_ref TEXT PRIMARY KEY,
                 result_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                tenant_id TEXT,
+                operation_id TEXT,
+                tool_id TEXT,
+                created_at_epoch REAL,
+                retention_until REAL
             )
             """
         )
+        existing_columns = {
+            str(row["name"])
+            for row in self._connection.execute(
+                "PRAGMA table_info(legacy_tool_result)"
+            ).fetchall()
+        }
+        for column, ddl in (
+            ("tenant_id", "TEXT"),
+            ("operation_id", "TEXT"),
+            ("tool_id", "TEXT"),
+            ("created_at_epoch", "REAL"),
+            ("retention_until", "REAL"),
+        ):
+            if column not in existing_columns:
+                self._connection.execute(
+                    f"ALTER TABLE legacy_tool_result ADD COLUMN {column} {ddl}"
+                )
 
-    async def put(self, request: ToolExecutionRequest, result: dict) -> str:
+    @classmethod
+    def source_ref(cls, result_ref: str) -> str:
+        value = str(result_ref).strip()
+        if not value:
+            raise ValueError("result_ref is required")
+        return cls._SOURCE_PREFIX + value
+
+    @classmethod
+    def _parse_source_ref(cls, source_ref: object) -> str:
+        raw = str(source_ref).strip()
+        if not raw.startswith(cls._SOURCE_PREFIX):
+            raise ValueError("tool result source_ref is invalid")
+        result_ref = raw[len(cls._SOURCE_PREFIX):]
+        if not result_ref:
+            raise ValueError("tool result source_ref is invalid")
+        return result_ref
+
+    @staticmethod
+    def _data_class(manifest: ToolManifest | None) -> str:
+        if manifest is None:
+            return "internal"
+        prefix = str(manifest.data_policy).split(":", 1)[0].strip().lower()
+        if prefix in {"public", "internal", "confidential", "restricted"}:
+            return prefix
+        return "internal"
+
+    @staticmethod
+    def _created_epoch(row: sqlite3.Row) -> float:
+        raw = row["created_at_epoch"]
+        if raw is not None:
+            return float(raw)
+        parsed = datetime.fromisoformat(str(row["created_at"]))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).timestamp()
+
+    def _govern_result(
+        self,
+        *,
+        result_ref: str,
+        request: ToolExecutionRequest,
+        manifest: ToolManifest | None,
+        created_at: float,
+        retention_until: float,
+    ) -> None:
+        self.governance.register_canonical_write(
+            "artifact",
+            record_id=result_ref,
+            tenant_id=request.tenant_id,
+            source_ref=self.source_ref(result_ref),
+            data_class=self._data_class(manifest),
+            purposes=("model-inference",),
+            deletion_targets=(self._DELETION_TARGET,),
+            created_at=created_at,
+            retention_until=retention_until,
+            exportable=False,
+        )
+
+    def _capacity_plan(
+        self,
+        rows: list[sqlite3.Row],
+        *,
+        now: float,
+    ) -> list[tuple[str, str, str]]:
+        plans: list[tuple[str, str, str]] = []
+        for row in rows:
+            tenant_id = row["tenant_id"]
+            result_ref = row["result_ref"]
+            if tenant_id is None:
+                # Pre-governance legacy rows are retained until they are
+                # replayed/backfilled with tenant identity.
+                continue
+            plan = self.governance.request_deletion(
+                str(tenant_id),
+                record_ids=(str(result_ref),),
+                reason="tool-result-capacity",
+                now=now,
+            )
+            plans.append(
+                (plan.plan_id, str(result_ref), str(tenant_id))
+            )
+        return plans
+
+    async def put(
+        self,
+        request: ToolExecutionRequest,
+        result: dict,
+        *,
+        manifest: ToolManifest | None = None,
+    ) -> str:
         if not isinstance(result, dict):
             raise TypeError("legacy tool result must be an object")
+        if manifest is not None:
+            if manifest.tool_id != request.tool_id:
+                raise ValueError("tool result manifest does not match request")
+            validate_tool_arguments(manifest.output_schema or {}, result)
+
         encoded_text = json.dumps(
             result,
             sort_keys=True,
@@ -421,6 +578,9 @@ class _CompatibilityResultStore:
             default=str,
         )
         encoded = encoded_text.encode("utf-8")
+        if manifest is not None and len(encoded) > manifest.result_size_limit:
+            raise ValueError("tool result exceeds manifest result_size_limit")
+
         identity_parts = [request.operation_id]
         if request.execution_id is not None:
             identity_parts.extend(
@@ -433,56 +593,163 @@ class _CompatibilityResultStore:
         ref = "legacy-tool-result:" + hashlib.sha256(
             identity + b"\x1f" + encoded
         ).hexdigest()
+
         async with self._lock:
-            self._connection.execute("BEGIN IMMEDIATE")
-            try:
-                existing = self._connection.execute(
-                    "SELECT result_json FROM legacy_tool_result WHERE result_ref = ?",
-                    (ref,),
-                ).fetchone()
-                if existing is not None and existing["result_json"] != encoded_text:
-                    raise RuntimeError("legacy tool result digest collision")
-                self._connection.execute(
-                    """
-                    INSERT OR IGNORE INTO legacy_tool_result(
-                        result_ref, result_json, created_at
-                    ) VALUES (?, ?, ?)
-                    """,
-                    (ref, encoded_text, datetime.now(timezone.utc).isoformat()),
+            existing = self._connection.execute(
+                "SELECT * FROM legacy_tool_result WHERE result_ref = ?",
+                (ref,),
+            ).fetchone()
+            if existing is not None and existing["result_json"] != encoded_text:
+                raise RuntimeError("legacy tool result digest collision")
+            if existing is not None:
+                for column, expected in (
+                    ("tenant_id", request.tenant_id),
+                    ("operation_id", request.operation_id),
+                    ("tool_id", request.tool_id),
+                ):
+                    current = existing[column]
+                    if current is not None and str(current) != str(expected):
+                        raise RuntimeError(
+                            "legacy tool result governance identity conflict"
+                        )
+                created_epoch = self._created_epoch(existing)
+                retention_until = (
+                    float(existing["retention_until"])
+                    if existing["retention_until"] is not None
+                    else created_epoch + self.retention_seconds
                 )
+            else:
+                created_epoch = datetime.now(timezone.utc).timestamp()
+                retention_until = created_epoch + self.retention_seconds
+
+            # Governance is registered before payload mutation. A crash may
+            # therefore leave metadata for an absent payload, but never a
+            # durable payload without lifecycle authority.
+            self._govern_result(
+                result_ref=ref,
+                request=request,
+                manifest=manifest,
+                created_at=created_epoch,
+                retention_until=retention_until,
+            )
+
+            self._connection.execute("BEGIN IMMEDIATE")
+            plans: list[tuple[str, str, str]] = []
+            try:
                 self._connection.execute(
                     """
-                    DELETE FROM legacy_tool_result
-                    WHERE result_ref IN (
-                        SELECT result_ref
-                        FROM legacy_tool_result
-                        ORDER BY created_at DESC, result_ref DESC
-                        LIMIT -1 OFFSET ?
-                    )
+                    INSERT INTO legacy_tool_result(
+                        result_ref, result_json, created_at, tenant_id,
+                        operation_id, tool_id, created_at_epoch,
+                        retention_until
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(result_ref) DO UPDATE SET
+                        tenant_id = COALESCE(
+                            legacy_tool_result.tenant_id,
+                            excluded.tenant_id
+                        ),
+                        operation_id = COALESCE(
+                            legacy_tool_result.operation_id,
+                            excluded.operation_id
+                        ),
+                        tool_id = COALESCE(
+                            legacy_tool_result.tool_id,
+                            excluded.tool_id
+                        ),
+                        created_at_epoch = COALESCE(
+                            legacy_tool_result.created_at_epoch,
+                            excluded.created_at_epoch
+                        ),
+                        retention_until = COALESCE(
+                            legacy_tool_result.retention_until,
+                            excluded.retention_until
+                        )
+                    """,
+                    (
+                        ref,
+                        encoded_text,
+                        datetime.fromtimestamp(
+                            created_epoch,
+                            timezone.utc,
+                        ).isoformat(),
+                        request.tenant_id,
+                        request.operation_id,
+                        request.tool_id,
+                        created_epoch,
+                        retention_until,
+                    ),
+                )
+                overflow = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM legacy_tool_result
+                    ORDER BY created_at_epoch DESC, created_at DESC, result_ref DESC
+                    LIMIT -1 OFFSET ?
                     """,
                     (self.max_entries,),
+                ).fetchall()
+                governed_overflow = [
+                    row for row in overflow if row["tenant_id"] is not None
+                ]
+                plans = self._capacity_plan(
+                    governed_overflow,
+                    now=datetime.now(timezone.utc).timestamp(),
                 )
+                for _, result_ref, _ in plans:
+                    self._connection.execute(
+                        "DELETE FROM legacy_tool_result WHERE result_ref = ?",
+                        (result_ref,),
+                    )
                 self._connection.execute("COMMIT")
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
+
+            for plan_id, result_ref, _tenant_id in plans:
+                self.governance.acknowledge_deletion(
+                    plan_id,
+                    result_ref,
+                    self._DELETION_TARGET,
+                    now=datetime.now(timezone.utc).timestamp(),
+                )
         return ref
 
     async def get(self, ref: str) -> dict | None:
         async with self._lock:
             row = self._connection.execute(
-                "SELECT result_json FROM legacy_tool_result WHERE result_ref = ?",
+                "SELECT * FROM legacy_tool_result WHERE result_ref = ?",
                 (str(ref),),
             ).fetchone()
-        if row is None:
-            return None
-        value = json.loads(row["result_json"])
+            if row is None or row["tenant_id"] is None:
+                return None
+            lifecycle = self.governance.lifecycle.get(str(ref))
+            if lifecycle["state"] != LifecycleState.ACTIVE.value:
+                return None
+            if lifecycle["tenant_id"] != str(row["tenant_id"]):
+                raise RuntimeError("tool result governance tenant mismatch")
+            value = json.loads(row["result_json"])
         if not isinstance(value, dict):
             raise RuntimeError("durable legacy tool result is not an object")
         return value
 
+    async def delete(self, action) -> None:
+        result_ref = self._parse_source_ref(action.source_ref)
+        if result_ref != str(action.record_id):
+            raise RuntimeError("tool result lifecycle identity mismatch")
+        async with self._lock:
+            self._connection.execute(
+                """
+                DELETE FROM legacy_tool_result
+                WHERE result_ref = ? AND tenant_id = ?
+                """,
+                (result_ref, str(action.tenant_id)),
+            )
+
     def close(self) -> None:
         self._connection.close()
+        if self._owns_governance:
+            self.governance.lifecycle.close()
+
 
 
 def _canonical_receipt_path() -> str:
@@ -491,6 +758,21 @@ def _canonical_receipt_path() -> str:
 
 def _canonical_result_path() -> str:
     return os.environ.get("BACKEND_TOOL_RESULT_PATH", ":memory:")
+
+
+def _canonical_result_retention_seconds() -> int:
+    raw = os.environ.get("BACKEND_TOOL_RESULT_RETENTION_SECONDS", "604800")
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            "BACKEND_TOOL_RESULT_RETENTION_SECONDS must be an integer"
+        ) from exc
+    if value < 60 or value > 365 * 24 * 60 * 60:
+        raise RuntimeError(
+            "BACKEND_TOOL_RESULT_RETENTION_SECONDS is outside safe bounds"
+        )
+    return value
 
 
 _CANONICAL_RUNTIME: AsyncToolRuntime | None = None
@@ -556,7 +838,8 @@ async def _ensure_canonical_runtime() -> None:
             )
         if _CANONICAL_RESULT_STORE is None:
             _CANONICAL_RESULT_STORE = _CompatibilityResultStore(
-                _canonical_result_path()
+                _canonical_result_path(),
+                retention_seconds=_canonical_result_retention_seconds(),
             )
         runtime = _CANONICAL_RUNTIME
         store = _CANONICAL_RESULT_STORE
@@ -567,6 +850,7 @@ async def _ensure_canonical_runtime() -> None:
                 request: ToolExecutionRequest,
                 *,
                 _fn=fn,
+                _manifest=manifest,
             ) -> str:
                 try:
                     result = await _fn(dict(request.arguments))
@@ -574,7 +858,11 @@ async def _ensure_canonical_runtime() -> None:
                     result = {"ok": False, "error": "tool_denied"}
                 except Exception:
                     result = {"ok": False, "error": "tool_failed"}
-                return await store.put(request, result)
+                return await store.put(
+                    request,
+                    result,
+                    manifest=_manifest,
+                )
 
             await runtime.register(
                 manifest,
