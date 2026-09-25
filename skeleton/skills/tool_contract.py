@@ -299,6 +299,9 @@ class ToolExecutionRequest:
     idempotency_key: str
     arguments: Mapping[str, Any]
     requested_at: datetime
+    execution_id: str | None = None
+    turn_id: str | None = None
+    call_id: str | None = None
     approval_ref: str | None = None
     delegated_authority_ref: str | None = None
     schema_version: int = TOOL_CONTRACT_SCHEMA_VERSION
@@ -306,6 +309,10 @@ class ToolExecutionRequest:
     def __post_init__(self) -> None:
         _uuid(self.request_id, "request_id")
         _uuid(self.operation_id, "operation_id")
+        for field in ("execution_id", "turn_id", "call_id"):
+            value = getattr(self, field)
+            if value is not None:
+                _uuid(value, field)
         _text(self.tenant_id, "tenant_id")
         object.__setattr__(self, "tool_id", _tool_id(self.tool_id))
         _text(self.idempotency_key, "idempotency_key", max_length=1024)
@@ -335,6 +342,9 @@ def approval_ref_for_request(request: ToolExecutionRequest) -> str:
     material = "\x1f".join(
         (
             request.operation_id,
+            request.execution_id or "",
+            request.turn_id or "",
+            request.call_id or "",
             request.tenant_id,
             request.tool_id,
             request.arguments_digest,
@@ -355,6 +365,9 @@ class ToolExecutionReceipt:
     status: ToolExecutionStatus
     started_at: datetime
     finished_at: datetime
+    execution_id: str | None = None
+    turn_id: str | None = None
+    call_id: str | None = None
     result_ref: str | None = None
     error_code: str | None = None
     approval_ref: str | None = None
@@ -366,6 +379,10 @@ class ToolExecutionReceipt:
         _uuid(self.receipt_id, "receipt_id")
         _uuid(self.request_id, "request_id")
         _uuid(self.operation_id, "operation_id")
+        for field in ("execution_id", "turn_id", "call_id"):
+            value = getattr(self, field)
+            if value is not None:
+                _uuid(value, field)
         _text(self.tenant_id, "tenant_id")
         object.__setattr__(self, "tool_id", _tool_id(self.tool_id))
         _text(self.idempotency_key, "idempotency_key", max_length=1024)
@@ -408,6 +425,9 @@ class ToolExecutionReceipt:
             "receipt_id": self.receipt_id,
             "request_id": self.request_id,
             "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "turn_id": self.turn_id,
+            "call_id": self.call_id,
             "tenant_id": self.tenant_id,
             "tool_id": self.tool_id,
             "idempotency_key": self.idempotency_key,
