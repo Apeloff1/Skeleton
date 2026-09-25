@@ -21,12 +21,31 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 
+class ProcessRewardError(ValueError):
+    """A step score is not a usable promise or progress value."""
+
+
+def _unit(value: object, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProcessRewardError(f"{label} must be a real number in [0, 1]")
+    number = float(value)
+    if number != number or number < 0.0 or number > 1.0:
+        raise ProcessRewardError(f"{label} must be a real number in [0, 1]")
+    return number
+
+
 @dataclass(frozen=True)
 class StepScore:
     step_index: int
     promise: float
     progress: float
     note: str = ""
+
+    def __post_init__(self) -> None:
+        if isinstance(self.step_index, bool) or not isinstance(self.step_index, int) or self.step_index < 0:
+            raise ProcessRewardError("step_index must be a non-negative integer")
+        object.__setattr__(self, "promise", _unit(self.promise, "promise"))
+        object.__setattr__(self, "progress", _unit(self.progress, "progress"))
 
     @property
     def value(self) -> float:
@@ -84,6 +103,8 @@ class ProcessRewarder:
         traj = Trajectory(steps=list(steps))
         prev: Optional[str] = None
         for i, step in enumerate(steps):
+            if not isinstance(step, str) or not step.strip():
+                raise ProcessRewardError("each step must be a non-empty string")
             promise, progress = self._scorer(step, prev, ctx)
             traj.scores.append(StepScore(i, promise, progress))
             prev = step

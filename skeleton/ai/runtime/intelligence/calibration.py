@@ -24,18 +24,36 @@ class CalibrationRecord:
     channel: str = "default"
 
 
+class CalibrationError(ValueError):
+    """A stated confidence or an outcome is not a usable calibration sample."""
+
+
+def _confidence(stated: object) -> float:
+    if isinstance(stated, bool) or not isinstance(stated, (int, float)):
+        raise CalibrationError("stated confidence must be a real number in [0, 1]")
+    value = float(stated)
+    if value != value or value < 0.0 or value > 1.0:
+        raise CalibrationError("stated confidence must be a real number in [0, 1]")
+    return value
+
+
 class CalibrationLedger:
     """Outcome ledger + isotonic-lite correction for stated confidence."""
 
     BANDS = 10
 
     def __init__(self, *, min_samples: int = 20) -> None:
+        if isinstance(min_samples, bool) or not isinstance(min_samples, int) or min_samples < 1:
+            raise CalibrationError("min_samples must be a positive integer")
         self.min_samples = min_samples
         self._records: List[CalibrationRecord] = []
 
     def record(self, stated: float, correct: bool, *, channel: str = "default") -> None:
-        stated = min(1.0, max(0.0, float(stated)))
-        self._records.append(CalibrationRecord(stated, bool(correct), channel))
+        if not isinstance(correct, bool):
+            raise CalibrationError("correct must be a bool")
+        if not isinstance(channel, str) or not channel.strip():
+            raise CalibrationError("channel is required")
+        self._records.append(CalibrationRecord(_confidence(stated), correct, channel))
 
     # ------------------------------------------------------------------
     # Measurement
@@ -72,7 +90,7 @@ class CalibrationLedger:
         Below ``min_samples`` the mapping is identity — never correct on
         vibes. Above it, the band's empirical accuracy replaces the claim.
         """
-        stated = min(1.0, max(0.0, float(stated)))
+        stated = _confidence(stated)
         recs = [r for r in self._records if channel is None or r.channel == channel]
         if len(recs) < self.min_samples:
             return stated

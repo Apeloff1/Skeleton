@@ -62,18 +62,24 @@ class ImproveLoop:
         self.target = target
         self.min_gain = min_gain
         self.runs = 0
+        if self.target is not None and (
+            isinstance(self.target, bool)
+            or not isinstance(self.target, (int, float))
+            or self.target != self.target
+        ):
+            raise ValueError("target must be a finite number")
 
     def run(self, seed: Any, generate: GeneratorFn,
             evaluate: EvaluatorFn) -> ImproveResult:
         """Improve on ``seed`` until budget, patience, or target stops us."""
         self.runs += 1
         best = seed
-        best_score = evaluate(seed)
+        best_score = self._score(evaluate(seed))
         result = ImproveResult(best=best, best_score=best_score)
         dry = 0
         for i in range(1, self.max_iterations + 1):
             candidate = generate(best, i)
-            score = evaluate(candidate)
+            score = self._score(evaluate(candidate))
             improved = score > best_score + self.min_gain
             result.iterations.append(Iteration(i, score, improved))
             if improved:
@@ -92,3 +98,9 @@ class ImproveLoop:
         else:
             result.stopped_reason = "budget"
         return result
+
+    @staticmethod
+    def _score(value: Any) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+            raise ValueError("evaluator score must be a finite number")
+        return float(value)
