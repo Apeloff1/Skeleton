@@ -45,6 +45,17 @@ export interface FollowOperationOptions {
   pollMs?: number;
   initialState?: OperationClientState;
   onState?: (state: OperationClientState) => void;
+  maxResyncAttempts?: number;
+}
+
+export interface OperationResyncSnapshotPayload {
+  ok: boolean;
+  operation: OperationSnapshot;
+  compacted_through: number;
+  resume_after_sequence: number;
+  latest_sequence: number;
+  terminal: boolean;
+  active_consumer_count: number;
 }
 
 function cursorKey(operationId: string): string {
@@ -189,15 +200,52 @@ export async function replayOperation(
   return next;
 }
 
+async function fetchOperationResyncSnapshot(
+  operationId: string,
+  signal?: AbortSignal,
+): Promise<OperationResyncSnapshotPayload | null> {
+  const path =
+    `/api/operations/${encodeURIComponent(operationId)}/events/resync`
+    + `?consumer_id=${encodeURIComponent(OPERATION_CONSUMER_ID)}`;
+  const result = await api.get<OperationResyncSnapshotPayload>(path, {
+    signal,
+    headers: authHeaders(),
+    retries: 2,
+    timeoutMs: 15_000,
+  });
+  if (!result.ok || !result.data) return null;
+
+  const snapshot = result.data;
+  if (
+    snapshot.ok !== true
+    || !snapshot.operation
+    || snapshot.operation.operation_id !== operationId
+    || !Number.isSafeInteger(snapshot.compacted_through)
+    || snapshot.compacted_through < 0
+    || !Number.isSafeInteger(snapshot.resume_after_sequence)
+    || snapshot.resume_after_sequence !== snapshot.compacted_through
+    || !Number.isSafeInteger(snapshot.latest_sequence)
+    || snapshot.latest_sequence < snapshot.compacted_through
+    || !Number.isSafeInteger(snapshot.active_consumer_count)
+    || snapshot.active_consumer_count < 0
+  ) {
+    return null;
+  }
+  return snapshot;
+}
+
+
 export async function resumeOperation(
   operationId: string,
   signal?: AbortSignal,
 ): Promise<OperationClientState> {
   const cursor = await loadOperationCursor(operationId);
-  return replayOperation(
+  const replayed = await replayOperation(
     createOperationClientState(operationId, cursor),
     signal,
   );
+  if (!replayed.resyncRequired) return replayed;
+  return resyncOperation(operationId, signal);
 }
 
 export async function followOperation(
@@ -205,6 +253,11 @@ export async function followOperation(
   options: FollowOperationOptions = {},
 ): Promise<OperationClientState> {
   const pollMs = Math.max(100, Math.floor(options.pollMs ?? 750));
+  const maxResyncAttempts = Math.max(
+    0,
+    Math.min(5, Math.floor(options.maxResyncAttempts ?? 2)),
+  );
+  let resyncAttempts = 0;
   let state = options.initialState
     ?? createOperationClientState(
       operationId,
@@ -213,14 +266,29 @@ export async function followOperation(
 
   options.onState?.(state);
 
-  while (!state.terminal && !state.resyncRequired && !options.signal?.aborted) {
+  while (!state.terminal && !options.signal?.aborted) {
     const before = state.lastSequence;
     state = await replayOperation(state, options.signal);
     options.onState?.(state);
 
+    if (state.resyncRequired) {
+      if (resyncAttempts >= maxResyncAttempts) break;
+      resyncAttempts += 1;
+      state = await resyncOperation(operationId, options.signal, 1);
+      options.onState?.(state);
+      if (
+        state.resyncRequired
+        || state.connection === 'error'
+        || state.terminal
+        || options.signal?.aborted
+      ) {
+        break;
+      }
+      continue;
+    }
+
     if (
       state.terminal
-      || state.resyncRequired
       || state.connection === 'error'
       || options.signal?.aborted
     ) {
@@ -275,10 +343,57 @@ export async function cancelOperation(
 export async function resyncOperation(
   operationId: string,
   signal?: AbortSignal,
+  maxAttempts = 2,
 ): Promise<OperationClientState> {
-  await clearOperationCursor(operationId);
-  return replayOperation(
-    createOperationClientState(operationId, 0),
-    signal,
+  const attempts = Math.max(1, Math.min(5, Math.floor(maxAttempts)));
+  let last = failOperationResync(
+    createOperationClientState(operationId),
+    'replay_gap',
   );
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (signal?.aborted) {
+      return { ...last, connection: 'idle', error: 'aborted' };
+    }
+
+    const snapshot = await fetchOperationResyncSnapshot(operationId, signal);
+    if (!snapshot) {
+      return {
+        ...last,
+        connection: 'error',
+        error: 'authoritative_resync_unavailable',
+      };
+    }
+
+    const floor = snapshot.resume_after_sequence;
+    try {
+      await saveOperationCursor(operationId, floor);
+    } catch {
+      return {
+        ...last,
+        connection: 'error',
+        error: 'cursor_persistence_failed',
+      };
+    }
+
+    let state = createOperationClientState(operationId, floor);
+    state = {
+      ...state,
+      operationState: snapshot.operation.state,
+      terminal: Boolean(snapshot.terminal),
+      connection: snapshot.terminal ? 'terminal' : 'replaying',
+      resyncRequired: false,
+      error: null,
+    };
+
+    if (snapshot.terminal && snapshot.latest_sequence === floor) {
+      return state;
+    }
+
+    const replayed = await replayOperation(state, signal);
+    if (!replayed.resyncRequired) return replayed;
+    last = replayed;
+  }
+
+  return last;
 }
