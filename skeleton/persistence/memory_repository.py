@@ -820,11 +820,13 @@ class SQLiteMemoryRepository:
                 if row is None:
                     raise MemoryNotFound("memory not found in authority scope")
                 current = self._record(row)
-                if current.version != expected_version:
-                    raise MemoryConflict("memory version conflict")
                 if current.state is MemoryState.TOMBSTONED:
+                    if expected_version not in {current.version, current.version - 1}:
+                        raise MemoryConflict("memory version conflict")
                     self._connection.execute("COMMIT")
                     return current
+                if current.version != expected_version:
+                    raise MemoryConflict("memory version conflict")
                 self._connection.execute(
                     """
                     UPDATE canonical_memory
@@ -1617,9 +1619,9 @@ class MongoMemoryRepository:
             namespace=namespace,
             include_tombstoned=True,
         )
-        if current.version != expected_version:
-            raise MemoryConflict("memory version conflict")
         if current.state is MemoryState.TOMBSTONED:
+            if expected_version not in {current.version, current.version - 1}:
+                raise MemoryConflict("memory version conflict")
             await self._ensure_revision_and_projection(
                 current,
                 mutation="tombstone",
@@ -1628,6 +1630,8 @@ class MongoMemoryRepository:
                 committed_at=current.updated_at,
             )
             return current
+        if current.version != expected_version:
+            raise MemoryConflict("memory version conflict")
         updated = await self.records.find_one_and_update(
             {
                 **self._scope(tenant_id=tenant_id, namespace=namespace),
