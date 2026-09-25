@@ -39,6 +39,10 @@ class DialogueVerificationReport:
 
 class DialogueVerifier:
     def __init__(self, *, accept_at: float | None = None, root=None) -> None:
+        if accept_at is not None and (
+            isinstance(accept_at, bool) or not isinstance(accept_at, (int, float)) or not 0 < float(accept_at) <= 1
+        ):
+            raise ValueError("accept_at must be in (0, 1]")
         self.accept_at = accept_at if accept_at is not None else threshold_for("dialogue", root=root, fallback=0.7)
         self.runs = 0
         self.accepted = 0
@@ -92,15 +96,32 @@ class DialogueVerifier:
     def _reachability(self, tree: Mapping[str, Any], issues: list[str]) -> float:
         nodes = tree.get("nodes") or {}
         entry = tree.get("entry")
-        if not entry or entry not in nodes:
+        if not isinstance(nodes, Mapping) or not isinstance(entry, str) or entry not in nodes or not isinstance(nodes.get(entry), Mapping):
+            issues.append("hard: dialogue entry is not a node")
             return 0.0
         seen, stack = set(), [entry]
         while stack:
             current = stack.pop()
             if current in seen or current not in nodes:
                 continue
+            node = nodes[current]
+            if not isinstance(node, Mapping):
+                issues.append("hard: dialogue node is not an object")
+                return 0.0
             seen.add(current)
-            stack.extend(edge.get("target") for edge in nodes[current].get("edges") or [] if edge.get("target"))
+            edges = node.get("edges") or []
+            if not isinstance(edges, list):
+                issues.append("hard: dialogue edges are not a list")
+                return 0.0
+            for edge in edges:
+                if not isinstance(edge, Mapping):
+                    issues.append("hard: dialogue edge is not an object")
+                    return 0.0
+                target = edge.get("target")
+                if not isinstance(target, str) or target not in nodes:
+                    issues.append("hard: dialogue edge points nowhere")
+                    return 0.0
+                stack.append(target)
         score = len(seen) / max(1, len(nodes))
         if score < 1.0:
             issues.append("soft: dialogue tree has unreachable nodes")
@@ -112,19 +133,25 @@ class DialogueVerifier:
             return 0.0
         live = 0
         for node in nodes.values():
-            if node.get("terminal") or (node.get("edges") or []):
+            if not isinstance(node, Mapping):
+                issues.append("hard: dialogue node is not an object")
+                return 0.0
+            edges = node.get("edges") or []
+            if node.get("terminal") or (isinstance(edges, list) and edges):
                 live += 1
+            elif edges and not isinstance(edges, list):
+                issues.append("hard: dialogue edges are not a list")
+                return 0.0
         score = live / len(nodes)
         if score < 1.0:
             issues.append("soft: dialogue tree has dead-air nodes")
         return score
 
     def _grounding(self, tree: Mapping[str, Any], description: str, issues: list[str]) -> float:
-        if not description.strip():
-            return 1.0
         tokens = [t for t in description.lower().replace("_", " ").split() if len(t) >= 4]
         if not tokens:
-            return 1.0
+            issues.append("hard: dialogue has no description to ground against")
+            return 0.0
         nodes = tree.get("nodes") or {}
         hay = " ".join(str((node or {}).get("line") or "") for node in nodes.values()).lower()
         hits = sum(1 for t in tokens if t in hay)

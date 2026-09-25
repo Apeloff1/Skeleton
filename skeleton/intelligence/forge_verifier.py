@@ -71,13 +71,13 @@ class ForgeVerifier:
             for issue in report.hard_issues:
                 blocking.append(f"{path}: {issue}")
         reports = tuple(sorted(reports, key=lambda r: (r.score, r.path)))
-        avg = (sum(r.score for r in reports) / len(reports)) if reports else 1.0
+        avg = (sum(r.score for r in reports) / len(reports)) if reports else 0.0
         weakest = reports[0].path if reports else ""
         summary = {"files_checked": len(reports), "failed_files": sum(1 for r in reports if r.score < self.gd_accept_at), "warned_files": sum(1 for r in reports if r.soft_issues and r.score >= self.gd_accept_at), "passed_files": sum(1 for r in reports if r.score >= self.gd_accept_at and not r.soft_issues), "project_issues": len(project_issues), "blocking_issues": len(blocking)}
-        accepted = (not project_issues) and all(r.score >= self.gd_accept_at for r in reports) and avg >= self.accept_at
+        accepted = bool(reports) and (not project_issues) and all(r.score >= self.gd_accept_at and not r.hard_issues for r in reports) and avg >= self.accept_at
         if accepted:
             self.accepted += 1
-        reason = self._reason(project_issues, reports, avg)
+        reason = "no_scripts" if not reports else self._reason(project_issues, reports, avg)
         quality = self._quality_report(accepted=accepted, reason=reason, score=avg, weakest_path=weakest, project_issues=project_issues, reports=reports, summary=summary)
         from skeleton.organism.policy_enforcement import gate_check
         policy_gate = gate_check("forge", avg, root=self._root)
