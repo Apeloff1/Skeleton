@@ -16,7 +16,7 @@ from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from threading import Event, RLock
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
 from skeleton.kernel.events import EventBus
 from skeleton.retrieval.cache import ResultCache
@@ -29,6 +29,7 @@ from skeleton.retrieval.receipts import (
     query_digest,
     receipt_id,
 )
+from skeleton.retrieval.scope import RetrievalScope, ScopedRetrievalError
 
 
 @dataclass
@@ -224,9 +225,21 @@ class QuadRetriever:
         retriever: Any,
         query: str,
         k: int,
+        scope: Optional[RetrievalScope] = None,
     ) -> List[ScoredResult]:
         """Execute one plane and normalize its native result objects."""
-        if hasattr(retriever, "query"):
+        if scope is not None:
+            scoped = getattr(retriever, "query_scoped", None)
+            if not callable(scoped):
+                raise ScopedRetrievalError(
+                    f"retrieval plane {plane_name!r} cannot enforce pre-ranking scope"
+                )
+            plane_results = scoped(
+                query,
+                top_k=k,
+                scope=scope.to_dict(),
+            )
+        elif hasattr(retriever, "query"):
             if plane_name == "cag":
                 plane_results = retriever.query(query)
             else:
@@ -274,6 +287,7 @@ class QuadRetriever:
         failed_planes: Tuple[str, ...],
         results: List[ScoredResult],
         source: str,
+        scope_digest_value: str,
     ) -> RetrievalReceipt:
         fragment_planes = tuple(
             (result.fragment_id, self._result_planes(result))
@@ -297,6 +311,7 @@ class QuadRetriever:
                 receipt_id=receipt_id(sequence, digest, generation),
                 query_digest=digest,
                 generation=generation,
+                scope_digest=scope_digest_value,
                 considered_planes=tuple(dict.fromkeys(considered_planes)),
                 candidate_planes=candidate_planes,
                 failed_planes=tuple(dict.fromkeys(failed_planes)),
@@ -418,6 +433,72 @@ class QuadRetriever:
     def recent_receipts(self, limit: int = 20) -> Tuple[RetrievalReceipt, ...]:
         return self._receipts.recent(limit)
 
+    def retrieve_scoped(
+        self,
+        query: str,
+        scope: Mapping[str, str] | RetrievalScope,
+        k: int = 8,
+        use_cache: bool = True,
+    ) -> List[ScoredResult]:
+        """Retrieve only through planes that enforce authorization before ranking."""
+        resolved = (
+            scope
+            if isinstance(scope, RetrievalScope)
+            else RetrievalScope.from_mapping(scope)
+        )
+        with self._state_lock:
+            unsupported = [
+                name
+                for name, retriever in self._planes.items()
+                if not callable(getattr(retriever, "query_scoped", None))
+            ]
+        if unsupported:
+            raise ScopedRetrievalError(
+                "scoped retrieval refused because plane(s) lack query_scoped: "
+                + ", ".join(sorted(unsupported))
+            )
+        return self.retrieve(
+            query,
+            k=k,
+            use_cache=use_cache,
+            _scope=resolved,
+        )
+
+    def retrieve_scoped_with_receipt(
+        self,
+        query: str,
+        scope: Mapping[str, str] | RetrievalScope,
+        k: int = 8,
+        use_cache: bool = True,
+    ) -> Tuple[List[ScoredResult], RetrievalReceipt]:
+        resolved = (
+            scope
+            if isinstance(scope, RetrievalScope)
+            else RetrievalScope.from_mapping(scope)
+        )
+        with self._state_lock:
+            unsupported = [
+                name
+                for name, retriever in self._planes.items()
+                if not callable(getattr(retriever, "query_scoped", None))
+            ]
+        if unsupported:
+            raise ScopedRetrievalError(
+                "scoped retrieval refused because plane(s) lack query_scoped: "
+                + ", ".join(sorted(unsupported))
+            )
+        sink: List[RetrievalReceipt] = []
+        results = self.retrieve(
+            query,
+            k=k,
+            use_cache=use_cache,
+            _receipt_sink=sink,
+            _scope=resolved,
+        )
+        if not sink:
+            raise RuntimeError("scoped retrieval completed without a receipt")
+        return results, sink[-1]
+
     def retrieve_with_receipt(
         self,
         query: str,
@@ -442,6 +523,7 @@ class QuadRetriever:
         use_cache: bool = True,
         *,
         _receipt_sink: Optional[List[RetrievalReceipt]] = None,
+        _scope: Optional[RetrievalScope] = None,
     ) -> List[ScoredResult]:
         """Query registered planes concurrently and fuse deterministic results."""
         t0 = time.perf_counter()
@@ -455,7 +537,10 @@ class QuadRetriever:
 
         considered_planes = tuple(name for name, _ in plane_items)
         freshness_token = self._freshness.cache_token()
-        cache_key = f"{generation}:{freshness_token}:{k}:{query_digest(query)}"
+        scope_token = _scope.digest if _scope is not None else "unscoped"
+        cache_key = (
+            f"{generation}:{freshness_token}:{scope_token}:{k}:{query_digest(query)}"
+        )
         if use_cache:
             cached = self._cache.get(cache_key)
             if cached is not None:
@@ -469,6 +554,7 @@ class QuadRetriever:
                     failed_planes=(),
                     results=cached_list,
                     source="cache",
+                    scope_digest_value="" if _scope is None else _scope.digest,
                 )
                 if _receipt_sink is not None:
                     _receipt_sink.append(receipt)
@@ -500,6 +586,7 @@ class QuadRetriever:
                     failed_planes=(),
                     results=cached_list,
                     source="cache",
+                    scope_digest_value="" if _scope is None else _scope.digest,
                 )
                 if _receipt_sink is not None:
                     _receipt_sink.append(receipt)
@@ -514,6 +601,7 @@ class QuadRetriever:
                 k=k,
                 use_cache=True,
                 _receipt_sink=_receipt_sink,
+                _scope=_scope,
             )
 
         try:
@@ -544,7 +632,13 @@ class QuadRetriever:
             if len(plane_items) == 1:
                 plane_name, retriever = plane_items[0]
                 try:
-                    normalized = self._query_plane(plane_name, retriever, query, k)
+                    normalized = self._query_plane(
+                        plane_name,
+                        retriever,
+                        query,
+                        k,
+                        _scope,
+                    )
                 except Exception:
                     failures.append(plane_name)
                 else:
@@ -564,6 +658,7 @@ class QuadRetriever:
                                 retriever,
                                 query,
                                 k,
+                                _scope,
                             ),
                         )
                         for plane_name, retriever in plane_items
@@ -593,6 +688,7 @@ class QuadRetriever:
                 failed_planes=tuple(failures),
                 results=fused,
                 source="live",
+                scope_digest_value="" if _scope is None else _scope.digest,
             )
             if _receipt_sink is not None:
                 _receipt_sink.append(receipt)
@@ -615,6 +711,7 @@ class QuadRetriever:
                         "elapsed_ms": round(elapsed_ms, 3),
                         "planes": {plane: len(hits) for plane, hits in results_by_plane.items()},
                         "receipt_id": receipt.receipt_id,
+                        "scope_digest": receipt.scope_digest,
                         "partial": receipt.partial,
                     },
                 )
@@ -626,6 +723,7 @@ class QuadRetriever:
                         "failed_planes": list(failures),
                         "results": len(fused),
                         "receipt_id": receipt.receipt_id,
+                        "scope_digest": receipt.scope_digest,
                         "partial": receipt.partial,
                     },
                 )
