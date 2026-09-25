@@ -6,65 +6,33 @@ import pytest
 from zipfile import ZipFile
 
 from core.gameforge_artifact_builder import build_source_artifact, build_web_artifact
-from skeleton.artifact_plane.usage import ArtifactUsageMeter
-from skeleton.intelligence.admission import (
-    AdmissionError,
-    AdmissionRequest,
-    ResourceBudget,
-    UsageEstimate,
-)
-from skeleton.intelligence.admission_runtime import AdmissionRuntime
-from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 
 
-def _artifact_runtime(
-    *,
-    max_artifact_bytes: int,
-) -> tuple[AdmissionRuntime, ArtifactUsageMeter]:
-    ledger = TenantQuotaLedger()
-    ledger.configure(
-        "tenant-artifact",
-        TenantQuota(
-            window_id="artifact-window",
-            max_operations=10,
-            max_input_tokens=10_000,
-            max_output_tokens=10_000,
-            max_cost_usd=10.0,
-            max_tool_calls=100,
-            max_artifact_bytes=max_artifact_bytes,
-            max_concurrent_operations=4,
-        ),
-    )
-    runtime = AdmissionRuntime(quota_ledger=ledger)
-    return runtime, ArtifactUsageMeter(runtime)
+class ArtifactBudgetExceeded(RuntimeError):
+    pass
 
 
-def _admit_artifact_operation(
-    runtime: AdmissionRuntime,
-    operation_id: str,
-    *,
-    max_artifact_bytes: int,
-) -> None:
-    runtime.admit(
-        AdmissionRequest(
-            operation_id=operation_id,
-            tenant_id="tenant-artifact",
-            capability="artifact-build",
-            budget=ResourceBudget(
-                max_input_tokens=10_000,
-                max_output_tokens=10_000,
-                max_cost_usd=10.0,
-                max_wall_seconds=30.0,
-                max_provider_attempts=1,
-                max_tool_calls=10,
-                max_artifact_bytes=max_artifact_bytes,
-                max_concurrency=4,
-                max_queue_depth=10,
-            ),
-            estimate=UsageEstimate(),
-        ),
-        now_wall=10.0,
-    )
+class FakeArtifactUsageMeter:
+    def __init__(self, *, max_bytes: int | None = None) -> None:
+        self.max_bytes = max_bytes
+        self.calls: list[tuple[str, str, str, int]] = []
+
+    def meter_artifact(
+        self,
+        operation_id: str,
+        artifact_id: str,
+        write_id: str,
+        byte_count: int,
+        *,
+        now_wall: float | None = None,
+    ) -> object:
+        del now_wall
+        if self.max_bytes is not None and byte_count > self.max_bytes:
+            raise ArtifactBudgetExceeded("artifact byte budget exceeded")
+        self.calls.append(
+            (operation_id, artifact_id, write_id, byte_count)
+        )
+        return object()
 
 
 def test_web_artifact_escapes_html_and_contains_runtime_payload(tmp_path):
@@ -141,12 +109,7 @@ def test_deterministic_build_token_reuses_same_artifact_identity(tmp_path):
     assert second["sha256"] == first["sha256"]
 
 def test_source_artifact_meters_exact_committed_archive_bytes(tmp_path):
-    runtime, meter = _artifact_runtime(max_artifact_bytes=1_000_000)
-    _admit_artifact_operation(
-        runtime,
-        "artifact-op",
-        max_artifact_bytes=1_000_000,
-    )
+    meter = FakeArtifactUsageMeter()
 
     result = build_source_artifact(
         "metered",
@@ -160,19 +123,17 @@ def test_source_artifact_meters_exact_committed_archive_bytes(tmp_path):
     )
 
     final_path = tmp_path / result["filename"]
-    completion = runtime.complete(
-        "artifact-op",
-        UsageEstimate(),
-        now_wall=11.0,
-    )
 
     assert final_path.is_file()
     assert result["size_bytes"] == final_path.stat().st_size
-    assert completion.quota_completion is not None
-    assert (
-        completion.quota_completion.actual.artifact_bytes
-        == final_path.stat().st_size
-    )
+    assert meter.calls == [
+        (
+            "artifact-op",
+            result["build_id"],
+            "archive-v1",
+            final_path.stat().st_size,
+        )
+    ]
 
 
 def test_quota_rejection_does_not_replace_existing_artifact(tmp_path):
@@ -186,14 +147,9 @@ def test_quota_rejection_does_not_replace_existing_artifact(tmp_path):
     final_path = tmp_path / original["filename"]
     before = final_path.read_bytes()
 
-    runtime, meter = _artifact_runtime(max_artifact_bytes=1)
-    _admit_artifact_operation(
-        runtime,
-        "artifact-reject",
-        max_artifact_bytes=1_000_000,
-    )
+    meter = FakeArtifactUsageMeter(max_bytes=1)
 
-    with pytest.raises(AdmissionError, match="artifact_bytes"):
+    with pytest.raises(ArtifactBudgetExceeded, match="artifact byte budget"):
         build_source_artifact(
             "metered",
             files=[{"filename": "main.py", "content": "print('replacement')"}],
