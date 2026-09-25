@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hmac
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -68,7 +69,34 @@ def _engine_coordinator():
     return getattr(get_state(), "engine_execution_coordinator", None)
 
 
-def _verified_service_principal(request: Request) -> str:
+def _engine_service_token() -> str:
+    from skeleton.config.settings import get_settings
+
+    token = get_settings().engine.service_token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="engine service authentication is not configured",
+        )
+    return token
+
+
+def _verified_service_principal(
+    request: Request,
+    expected_token: str,
+) -> str:
+    authorization = request.headers.get("authorization", "")
+    scheme, separator, presented = authorization.partition(" ")
+    if (
+        not separator
+        or scheme.lower() != "bearer"
+        or not presented
+        or not hmac.compare_digest(presented, expected_token)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="engine service authentication failed",
+        )
     principal = request.headers.get("x-zaibatsu-attester")
     if not principal:
         raise HTTPException(
@@ -115,9 +143,10 @@ async def submit_execution(
     body: EngineSubmitBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
     coordinator=Depends(_engine_coordinator),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         command = EngineExecutionCommand.from_dict(body.command)
         ack = service.submit(
@@ -141,8 +170,9 @@ def execution_status(
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         return service.status(
             execution_id,
@@ -161,8 +191,9 @@ def cancel_execution(
     body: EngineCancelBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         return service.cancel(
             execution_id,
@@ -182,8 +213,9 @@ def pending_tool_approvals(
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         pending = service.pending_tool_approvals(
             execution_id,
@@ -209,9 +241,10 @@ async def approve_tool_call(
     body: EngineToolApprovalBody,
     request: Request,
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
     coordinator=Depends(_engine_coordinator),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         approval = service.approve_tool_call(
             execution_id,
@@ -239,8 +272,9 @@ def execution_events(
     actor_id: str = Query(..., min_length=1, max_length=512),
     tenant_id: str = Query(..., min_length=1, max_length=512),
     service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
 ) -> dict[str, Any]:
-    principal = _verified_service_principal(request)
+    principal = _verified_service_principal(request, service_token)
     try:
         return service.events(
             execution_id,
@@ -253,4 +287,9 @@ def execution_events(
         raise
 
 
-__all__ = ["router", "_engine_coordinator", "_engine_service"]
+__all__ = [
+    "router",
+    "_engine_coordinator",
+    "_engine_service",
+    "_engine_service_token",
+]
