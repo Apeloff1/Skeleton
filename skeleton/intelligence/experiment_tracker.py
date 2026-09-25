@@ -48,8 +48,21 @@ class ExperimentTracker:
 
     def create(self, name: str, variants: Optional[List[str]] = None,
                weights: Optional[List[int]] = None) -> Experiment:
-        names = variants or ["control", "treatment"]
-        ws = weights or [100 // len(names)] * len(names)
+        names = list(variants or ["control", "treatment"])
+        if not names or any(not isinstance(item, str) or not item.strip() for item in names):
+            raise ValueError("variants must be non-empty strings")
+        if len(set(names)) != len(names):
+            raise ValueError("variant names must be unique")
+        if weights is None:
+            ws = [1] * len(names)
+        else:
+            if len(weights) != len(names):
+                raise ValueError("weights must match the variant list")
+            if any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in weights):
+                raise ValueError("weights must be non-negative integers")
+            if sum(weights) <= 0:
+                raise ValueError("weights must sum to a positive total")
+            ws = list(weights)
         exp = Experiment(
             name=name,
             variants={n: Variant(name=n, weight=w) for n, w in zip(names, ws)},
