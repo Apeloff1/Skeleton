@@ -205,9 +205,12 @@ class NetworkEgressPolicy:
             or address.is_unspecified
         ):
             return None
-        snippet = str(result.get("body") or result.get("description") or "")[
-            : self.max_snippet_chars
-        ]
+        snippet = str(
+            result.get("body")
+            or result.get("snippet")
+            or result.get("description")
+            or ""
+        )[: self.max_snippet_chars]
         return {"title": title, "url": raw_url, "snippet": snippet}
 
 
