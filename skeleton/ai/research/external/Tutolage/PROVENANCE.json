@@ -122,6 +122,51 @@
       "destination": "skeleton/ai/research/external/Tutolage/frontend/features/JeevesEQ/JeevesEQModal.tsx",
       "classification": "research-quarantine",
       "promotion_authority": false
+    },
+    {
+      "source_repository": "Apeloff1/Tutolage",
+      "source_ref": "main",
+      "source_path": "backend/routes/ai_debugger.py",
+      "source_blob_sha": "9f0b2e56de2de111c2d6cda09d45459651b9b64f",
+      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/ai_debugger.py",
+      "classification": "research-quarantine",
+      "promotion_authority": false
+    },
+    {
+      "source_repository": "Apeloff1/Tutolage",
+      "source_ref": "main",
+      "source_path": "backend/routes/jeeves_hyperion.py",
+      "source_blob_sha": "1d0064cb4ad3d2b30eb211c7df95d3d16803e38c",
+      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_hyperion.py",
+      "classification": "research-quarantine",
+      "promotion_authority": false
+    },
+    {
+      "source_repository": "Apeloff1/Tutolage",
+      "source_ref": "main",
+      "source_path": "backend/routes/jeeves_synergy.py",
+      "source_blob_sha": "ec6c8b4b506ebdd567fb4181992955132d865ca2",
+      "destination": "skeleton/ai/research/external/Tutolage/backend/routes/jeeves_synergy.py",
+      "classification": "research-quarantine",
+      "promotion_authority": false
+    },
+    {
+      "source_repository": "Apeloff1/Tutolage",
+      "source_ref": "main",
+      "source_path": "backend/tests/test_jeeves_core.py",
+      "source_blob_sha": "6fe40d9e421366d6404d48635879c24fa7877892",
+      "destination": "skeleton/ai/research/external/Tutolage/backend/tests/test_jeeves_core.py",
+      "classification": "research-quarantine",
+      "promotion_authority": false
+    },
+    {
+      "source_repository": "Apeloff1/Tutolage",
+      "source_ref": "main",
+      "source_path": "frontend/features/AI/index.ts",
+      "source_blob_sha": "0b2139c06cba1e3614e1f4852c4e5adb25d4581d",
+      "destination": "skeleton/ai/research/external/Tutolage/frontend/features/AI/index.ts",
+      "classification": "research-quarantine",
+      "promotion_authority": false
     }
   ]
 }
