@@ -56,6 +56,7 @@ _USAGE_FIELDS = (
     "provider_attempts",
     "tool_calls",
     "artifact_bytes",
+    "storage_bytes",
 )
 
 
@@ -328,6 +329,10 @@ class AdmissionRuntime:
                 decision.estimated.artifact_bytes
                 + int(decision.remaining["artifact_bytes"])
             )
+            max_storage_bytes = int(
+                decision.estimated.storage_bytes
+                + int(decision.remaining["storage_bytes"])
+            )
             try:
                 return recorder(
                     reservation.reservation_id,
@@ -336,6 +341,7 @@ class AdmissionRuntime:
                     delta,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
+                    max_storage_bytes=max_storage_bytes,
                     now=wall,
                 )
             except QuotaExceeded as exc:
@@ -405,7 +411,7 @@ class AdmissionRuntime:
             operation_id,
             event_id,
             "storage",
-            UsageEstimate(artifact_bytes=byte_count),
+            UsageEstimate(storage_bytes=byte_count),
             now_wall=now_wall,
         )
 
@@ -534,6 +540,10 @@ class AdmissionRuntime:
                 decision.estimated.artifact_bytes
                 + int(decision.remaining["artifact_bytes"])
             )
+            max_storage_bytes = int(
+                decision.estimated.storage_bytes
+                + int(decision.remaining["storage_bytes"])
+            )
             try:
                 recorded = resolver(
                     reservation.reservation_id,
@@ -541,6 +551,7 @@ class AdmissionRuntime:
                     delta,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
+                    max_storage_bytes=max_storage_bytes,
                     now=_wall_time(now_wall, field="now_wall"),
                 )
             except QuotaExceeded as exc:
