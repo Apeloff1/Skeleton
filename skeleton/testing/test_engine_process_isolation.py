@@ -93,6 +93,10 @@ def test_provider_registry_activation_detection_covers_alias_and_qualified_calls
     )
 
 
+def test_lafs_remains_tracked_as_transitional_local_provider_consumer() -> None:
+    assert "backend/routes/lafs.py" in _local_provider_consumers()
+
+
 def test_runtime_provider_credentials_follow_parity_cutover_state() -> None:
     compose = _compose()
     skeleton = _service_block(compose, "skeleton", "backend")
