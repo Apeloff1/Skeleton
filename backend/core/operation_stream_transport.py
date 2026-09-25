@@ -68,6 +68,47 @@ class CancellationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class OperationResyncSnapshot:
+    operation: StoredOperation
+    compacted_through: int
+    latest_sequence: int
+    stream_terminal: bool
+    active_consumer_count: int
+
+    @property
+    def resume_after_sequence(self) -> int:
+        return self.compacted_through
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "operation": self.operation.as_dict(),
+            "compacted_through": self.compacted_through,
+            "resume_after_sequence": self.resume_after_sequence,
+            "latest_sequence": self.latest_sequence,
+            "terminal": self.operation.terminal or self.stream_terminal,
+            "active_consumer_count": self.active_consumer_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OperationAcknowledgement:
+    consumer: StreamConsumerCheckpoint
+    compacted_events: int
+    compacted_through: int
+    latest_sequence: int
+    active_consumer_count: int
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "consumer": self.consumer.as_dict(),
+            "compacted_events": self.compacted_events,
+            "compacted_through": self.compacted_through,
+            "latest_sequence": self.latest_sequence,
+            "active_consumer_count": self.active_consumer_count,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class OperationStreamBatch:
     operation: StoredOperation
     events: tuple[StreamEvent, ...]
@@ -273,6 +314,77 @@ class OperationStreamTransport:
             after_sequence=after_sequence,
         )
 
+    def resync_snapshot(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        consumer_id: str | None = None,
+        consumer_lease_seconds: int = 300,
+    ) -> OperationResyncSnapshot:
+        """Return authoritative operation state plus the safe retained replay floor."""
+
+        operation = self._authorized_operation(
+            operation_id,
+            tenant_id=tenant_id,
+        )
+        # Project any committed outbox rows before publishing the head so the
+        # snapshot cannot report an older durable stream position than state.
+        self.dispatch_pending(
+            operation_id,
+            tenant_id=tenant_id,
+        )
+        if consumer_id is not None:
+            self.event_store.register_consumer(
+                operation_id,
+                consumer_id,
+                lease_seconds=consumer_lease_seconds,
+            )
+        head = self.event_store.head(operation_id)
+        consumers = self.event_store.active_consumers(operation_id)
+        return OperationResyncSnapshot(
+            operation=self._authorized_operation(
+                operation_id,
+                tenant_id=tenant_id,
+            ),
+            compacted_through=int(head["compacted_through"]),
+            latest_sequence=int(head["latest_sequence"]),
+            stream_terminal=bool(head["terminal"]),
+            active_consumer_count=len(consumers),
+        )
+
+    def acknowledge_and_compact(
+        self,
+        operation_id: str,
+        *,
+        tenant_id: str,
+        consumer_id: str,
+        sequence: int,
+        consumer_lease_seconds: int = 300,
+    ) -> OperationAcknowledgement:
+        """ACK one applied cursor and compact only through all active clients."""
+
+        checkpoint = self.acknowledge(
+            operation_id,
+            tenant_id=tenant_id,
+            consumer_id=consumer_id,
+            sequence=sequence,
+            consumer_lease_seconds=consumer_lease_seconds,
+        )
+        compacted = self.compact_acknowledged(
+            operation_id,
+            tenant_id=tenant_id,
+        )
+        head = self.event_store.head(operation_id)
+        consumers = self.event_store.active_consumers(operation_id)
+        return OperationAcknowledgement(
+            consumer=checkpoint,
+            compacted_events=compacted,
+            compacted_through=int(head["compacted_through"]),
+            latest_sequence=int(head["latest_sequence"]),
+            active_consumer_count=len(consumers),
+        )
+
     def acknowledge(
         self,
         operation_id: str,
@@ -343,7 +455,9 @@ class OperationStreamTransport:
 
 __all__ = [
     "CancellationResult",
+    "OperationAcknowledgement",
     "OperationAccessDenied",
+    "OperationResyncSnapshot",
     "OperationStreamBatch",
     "OperationStreamTransport",
     "OperationTransportConflict",
