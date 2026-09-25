@@ -35,6 +35,12 @@ def _flag(value, label: str) -> bool:
     return value
 
 
+def _optional_flag(value, label: str, *, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return _flag(value, label)
+
+
 def _rng(seed: str) -> random.Random:
     digest = hashlib.sha256(seed.encode()).digest()
     return random.Random(int.from_bytes(digest[:8], "big"))
@@ -62,7 +68,11 @@ def generate_rooms(
         raise ValueError("seed is required")
     rng = _rng(seed)
     n = rng.randint(lo, min(hi, lo + 8, 24))
-    bias = plan.get("room_bias", pack.get("room_bias"))
+    bias = plan.get("room_bias")
+    if bias is None:
+        bias = pack.get("room_bias")
+    if bias is None:
+        bias = "balanced"
     if not isinstance(bias, str) or bias not in _BIAS:
         raise ValueError(f"unknown room_bias {bias!r}")
     bag = _BIAS[bias]
@@ -107,8 +117,8 @@ def generate_rooms(
         "edges": [{"from": a, "to": b} for a, b in edges],
         "doors": doors,
         "reachable": True,
-        "spawn_weapon": _flag(plan.get("spawn_weapon"), "spawn_weapon"),
-        "extract_late": _flag(plan.get("extract_late"), "extract_late"),
+        "spawn_weapon": _optional_flag(plan.get("spawn_weapon"), "spawn_weapon"),
+        "extract_late": _optional_flag(plan.get("extract_late"), "extract_late"),
         "occupancy": occupant_counts({"rooms": rooms}),
     }
 
