@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import sqlite3
 import threading
 
 import pytest
@@ -25,6 +26,7 @@ def _quota(
     *,
     max_operations: int = 10,
     max_input_tokens: int = 10_000,
+    max_storage_bytes: int = 10_000_000,
     max_concurrent: int = 10,
 ) -> TenantQuota:
     return TenantQuota(
@@ -35,6 +37,7 @@ def _quota(
         max_cost_usd=100.0,
         max_tool_calls=1_000,
         max_artifact_bytes=10_000_000,
+        max_storage_bytes=max_storage_bytes,
         max_concurrent_operations=max_concurrent,
     )
 
@@ -52,6 +55,7 @@ def _request(operation_id: str) -> AdmissionRequest:
             max_provider_attempts=3,
             max_tool_calls=10,
             max_artifact_bytes=1024,
+            max_storage_bytes=1024,
             max_concurrency=4,
             max_queue_depth=20,
         ),
@@ -268,3 +272,178 @@ def test_window_reset_is_durable_and_fenced_by_active_reservations(
     snapshot = restarted.snapshot("tenant-a")
     assert snapshot["window_id"] == "window-2"
     assert snapshot["committed"]["operations"] == 0
+
+def test_storage_usage_is_independent_and_survives_restart(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "quota.sqlite3"
+    ledger = SqliteTenantQuotaLedger(path)
+    ledger.configure(
+        "tenant-a",
+        _quota(max_storage_bytes=64),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    runtime.admit(_request("op-storage"), now_wall=10.0)
+
+    event = runtime.meter_storage_bytes(
+        "op-storage",
+        "storage-write-1",
+        48,
+        now_wall=10.1,
+    )
+    assert event.delta.storage_bytes == 48
+    assert event.delta.artifact_bytes == 0
+
+    runtime.complete(
+        "op-storage",
+        UsageEstimate(
+            input_tokens=80,
+            output_tokens=20,
+            cost_usd=0.4,
+            wall_seconds=0.8,
+            provider_attempts=1,
+        ),
+        now_wall=11.0,
+    )
+
+    restarted = SqliteTenantQuotaLedger(path)
+    snapshot = restarted.snapshot("tenant-a")
+    assert snapshot["committed"]["storage_bytes"] == 48
+    assert snapshot["committed"]["artifact_bytes"] == 0
+    assert snapshot["metered_by_category"]["storage"]["storage_bytes"] == 48
+    assert snapshot["metered_by_category"]["storage"]["artifact_bytes"] == 0
+
+
+def test_legacy_quota_schema_migrates_storage_columns_in_place(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "legacy-quota.sqlite3"
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE tenant_quota (
+                tenant_id TEXT PRIMARY KEY,
+                window_id TEXT NOT NULL,
+                max_operations INTEGER NOT NULL,
+                max_input_tokens INTEGER NOT NULL,
+                max_output_tokens INTEGER NOT NULL,
+                max_cost_usd REAL NOT NULL,
+                max_tool_calls INTEGER NOT NULL,
+                max_artifact_bytes INTEGER NOT NULL,
+                max_concurrent_operations INTEGER NOT NULL,
+                committed_operations INTEGER NOT NULL DEFAULT 0,
+                committed_input_tokens INTEGER NOT NULL DEFAULT 0,
+                committed_output_tokens INTEGER NOT NULL DEFAULT 0,
+                committed_cost_usd REAL NOT NULL DEFAULT 0,
+                committed_tool_calls INTEGER NOT NULL DEFAULT 0,
+                committed_artifact_bytes INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE TABLE quota_reservations (
+                reservation_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                window_id TEXT NOT NULL,
+                operation_id TEXT NOT NULL,
+                estimate_operations INTEGER NOT NULL,
+                estimate_input_tokens INTEGER NOT NULL,
+                estimate_output_tokens INTEGER NOT NULL,
+                estimate_cost_usd REAL NOT NULL,
+                estimate_tool_calls INTEGER NOT NULL,
+                estimate_artifact_bytes INTEGER NOT NULL,
+                reserved_at REAL NOT NULL,
+                UNIQUE (tenant_id, operation_id)
+            );
+            CREATE TABLE quota_completions (
+                reservation_id TEXT PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                window_id TEXT NOT NULL,
+                operation_id TEXT NOT NULL,
+                estimate_operations INTEGER NOT NULL,
+                estimate_input_tokens INTEGER NOT NULL,
+                estimate_output_tokens INTEGER NOT NULL,
+                estimate_cost_usd REAL NOT NULL,
+                estimate_tool_calls INTEGER NOT NULL,
+                estimate_artifact_bytes INTEGER NOT NULL,
+                actual_operations INTEGER NOT NULL,
+                actual_input_tokens INTEGER NOT NULL,
+                actual_output_tokens INTEGER NOT NULL,
+                actual_cost_usd REAL NOT NULL,
+                actual_tool_calls INTEGER NOT NULL,
+                actual_artifact_bytes INTEGER NOT NULL,
+                overrun_dimensions TEXT NOT NULL,
+                completed_at REAL NOT NULL,
+                UNIQUE (tenant_id, operation_id)
+            );
+            CREATE TABLE quota_usage_events (
+                event_id TEXT PRIMARY KEY,
+                reservation_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL,
+                window_id TEXT NOT NULL,
+                operation_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                delta_operations INTEGER NOT NULL DEFAULT 0,
+                delta_input_tokens INTEGER NOT NULL DEFAULT 0,
+                delta_output_tokens INTEGER NOT NULL DEFAULT 0,
+                delta_cost_usd REAL NOT NULL DEFAULT 0,
+                delta_tool_calls INTEGER NOT NULL DEFAULT 0,
+                delta_artifact_bytes INTEGER NOT NULL DEFAULT 0,
+                recorded_at REAL NOT NULL
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO tenant_quota (
+                tenant_id, window_id,
+                max_operations, max_input_tokens, max_output_tokens,
+                max_cost_usd, max_tool_calls, max_artifact_bytes,
+                max_concurrent_operations
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "tenant-a",
+                "legacy-window",
+                10,
+                1000,
+                1000,
+                50.0,
+                100,
+                4096,
+                4,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    migrated = SqliteTenantQuotaLedger(path)
+    snapshot = migrated.snapshot("tenant-a")
+
+    assert snapshot["quota"]["max_artifact_bytes"] == 4096
+    assert snapshot["quota"]["max_storage_bytes"] == 4096
+    assert snapshot["committed"]["storage_bytes"] == 0
+
+    conn = sqlite3.connect(path)
+    try:
+        columns = {
+            table: {
+                row[1]
+                for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            for table in (
+                "tenant_quota",
+                "quota_reservations",
+                "quota_completions",
+                "quota_usage_events",
+            )
+        }
+    finally:
+        conn.close()
+
+    assert "max_storage_bytes" in columns["tenant_quota"]
+    assert "committed_storage_bytes" in columns["tenant_quota"]
+    assert "estimate_storage_bytes" in columns["quota_reservations"]
+    assert "estimate_storage_bytes" in columns["quota_completions"]
+    assert "actual_storage_bytes" in columns["quota_completions"]
+    assert "delta_storage_bytes" in columns["quota_usage_events"]
+
