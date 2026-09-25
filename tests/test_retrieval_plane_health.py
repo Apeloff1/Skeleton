@@ -113,3 +113,31 @@ def test_ewma_latency_is_stable_and_bounded() -> None:
     health.record_success("rag", 10.0)
     health.record_success("rag", 30.0)
     assert health.snapshot()["rag"]["ewma_latency_ms"] == 20.0
+
+
+def test_replacing_plane_clears_old_circuit_state() -> None:
+    clock = _Clock()
+    health = PlaneHealthTracker(
+        failure_threshold=1,
+        cooldown_s=60.0,
+        clock=clock,
+    )
+
+    class Broken:
+        def query(self, query: str, top_k: int):
+            raise RuntimeError("old backend down")
+
+    class Healthy:
+        def query(self, query: str, top_k: int):
+            return [ScoredResult("fresh", query, 1.0, plane="rag")]
+
+    quad = QuadRetriever(health=health)
+    quad.register_plane("rag", Broken())
+    assert quad.retrieve("first", use_cache=False) == []
+    assert health.snapshot()["rag"]["circuit_open"] is True
+
+    quad.register_plane("rag", Healthy())
+    results = quad.retrieve("second", use_cache=False)
+
+    assert [row.fragment_id for row in results] == ["fresh"]
+    assert health.snapshot()["rag"]["circuit_open"] is False
