@@ -70,7 +70,7 @@ NON_LEXICAL_WORDS = frozenset({
 })
 
 _FILLER_PATTERN = re.compile(
-    r"^(?:" + "|".join(re.escape(w) for w in sorted(NON_LEXICAL_WORDS, key=len, reverse=True)) + r")[.!…]*$",
+    r"^(?:" + "|".join(re.escape(w) for w in sorted(NON_LEXICAL_WORDS, key=len, reverse=True)) + r")[.!?…]*$",
     re.I,
 )
 
