@@ -134,7 +134,12 @@ class Fuser:
         contributions: Dict[str, Dict[str, float]] = {}
 
         for plane, results in results_by_plane.items():
-            weight = 1.0 if weights is None else _finite_score(weights.get(plane, 1.0))
+            if weights is None:
+                weight = 1.0
+            elif plane not in weights:
+                raise ValueError(f"fusion weight for {plane!r} is required")
+            else:
+                weight = _finite_score(weights[plane])
             if weight < 0:
                 raise ValueError("fusion weights must be non-negative")
             for rank, result in enumerate(results, 1):
@@ -185,7 +190,9 @@ class Fuser:
         contributions: Dict[str, Dict[str, float]] = {}
 
         for plane, results in results_by_plane.items():
-            weight = weights.get(plane, 0.5)
+            if plane not in weights:
+                raise ValueError(f"unknown fusion plane {plane!r}")
+            weight = weights[plane]
             for result in results:
                 if not isinstance(result, ScoredResult):
                     raise TypeError("fusion inputs must be ScoredResult")
