@@ -11,6 +11,8 @@
     "fresh or private evidence dependencies are routed before synthesis",
     "retrieved, tool and model content cannot self-promote into trusted control",
     "external writes require explicit user action plus request-bound grants",
+    "assistant capability policy never owns a shadow tool executor or receipt store",
+    "write-class capabilities require the injected canonical runtime to have durable receipt storage",
     "tool execution is bounded and idempotent",
     "memory retrieval and durable persistence are separate decisions",
     "automation cadence is bounded and represented explicitly",
@@ -43,7 +45,12 @@
     "existing_context_contract": "skeleton/ai/runtime/contracts/context.py",
     "existing_provider_boundary": "skeleton/ai/providers/runtime.py",
     "existing_tool_adapters": "skeleton/ai/runtime/skills/tool_adapters",
-    "handoff_contract": "skeleton/ai/assistant/handoff.py"
+    "handoff_contract": "skeleton/ai/assistant/handoff.py",
+    "canonical_tool_runtime": "skeleton/skills/tool_runtime.py",
+    "canonical_tool_contract": "skeleton/skills/tool_contract.py",
+    "canonical_tool_receipts": "skeleton/skills/tool_receipt_store.py",
+    "assistant_tool_role": "authorize and translate ToolProposal into canonical ToolExecutionRequest only",
+    "write_durability_rule": "reversible/external/security-sensitive writes fail closed without a durable canonical receipt store"
   },
   "explicit_exclusions": [
     "vendor model weights",
@@ -53,5 +60,10 @@
     "hidden chain-of-thought or private reasoning traces",
     "provider SDK objects in canonical assistant contracts"
   ],
-  "promotion_rule": "implementation candidate only; no completion or verification signoff is implied until exact-head CI and independent verification pass"
+  "promotion_rule": "implementation candidate only; no completion or verification signoff is implied until exact-head CI and independent verification pass",
+  "validation": {
+    "focused_test": "skeleton/testing/test_ai_assistant_tooling.py",
+    "structural_validator": "scripts/check_ai_assistant_control_plane.py",
+    "authority_invariant": "ToolCoordinator requires injected AsyncToolRuntime and delegates admitted execution to self.tool_runtime.execute"
+  }
 }

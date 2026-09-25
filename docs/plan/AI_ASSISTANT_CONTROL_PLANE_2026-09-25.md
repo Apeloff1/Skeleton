@@ -52,13 +52,21 @@ scopes, and I/O bounds. Scoped reads and all writes require request-bound
 grants. External/security-sensitive writes additionally require explicit user
 action. Requested scopes cannot exceed the descriptor's declared authority.
 
-### Bounded idempotent tool loop
+### Bounded canonical tool delegation
 
-`tooling.py` binds proposals to the request digest, verifies side-effect
-classification, enforces per-capability input/output bounds and request call
-budgets, and preserves idempotency across retries. Reusing an idempotency key
-for different arguments fails closed. Authorization denials do not consume the
-key, allowing a later correctly-authorized retry.
+`tooling.py` is policy and translation, not a second executor. It binds
+proposals to the request digest, verifies side-effect classification, enforces
+per-capability input/output bounds and request call budgets, then translates an
+admitted proposal into the canonical `ToolExecutionRequest` contract and
+delegates execution to an injected `AsyncToolRuntime`.
+
+The coordinator has no private tool-receipt cache and cannot silently create its
+own runtime. Reusing an idempotency key for different arguments fails closed in
+both the assistant binding and canonical durable receipt identity. Write-class
+capabilities are blocked unless the injected canonical runtime has durable
+receipt storage, preserving restart ambiguity and exactly-once protections.
+Authorization denials do not consume the key, allowing a later correctly
+authorized retry.
 
 ### Memory policy
 
@@ -95,7 +103,10 @@ The packet deliberately composes rather than replaces:
   model/tool execution;
 - `skeleton/ai/runtime/contracts/context.py` for canonical context semantics;
 - `skeleton/ai/providers/runtime.py` for provider isolation;
-- `skeleton/ai/runtime/skills/tool_adapters/` for tool-facing adapter policy;
+- `skeleton/skills/tool_runtime.py` and
+  `skeleton/skills/tool_receipt_store.py` for the only privileged tool
+  execution/idempotency boundary;
+- `skeleton/skills/tool_adapters/` for tool-facing adapter policy;
 - the existing Stage-6 durable operation streaming/reconciliation plane for
   product delivery.
 
@@ -117,7 +128,10 @@ The focused tests cover:
 - external write confirmation + request-bound scopes;
 - scoped read permission enforcement;
 - per-capability input bounds;
-- tool idempotent replay and conflicting-key rejection;
+- canonical durable tool replay and conflicting-key rejection, including
+  process restart;
+- write-capability fail-closed behavior when durable receipt storage is absent;
+- canonical receipt provenance on assistant-visible tool receipts;
 - sensitive memory persistence;
 - sub-hour condition-watch rejection;
 - runtime handoff and provenance binding.
