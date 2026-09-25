@@ -42,6 +42,8 @@ class MaterialiseIntent:
     journaled_at: float = field(default_factory=time.time)
     confirmed: bool = False
     attempts: int = 0
+    dead: bool = False
+    last_error: str = ""
 
     @property
     def blueprint_id(self) -> str:
@@ -70,8 +72,8 @@ class MaterialiseOutbox:
     """
 
     def __init__(self, sink: Sink | None = None, *, cap: int = 4096) -> None:
-        if cap < 1:
-            raise ValueError("outbox cap must be >= 1")
+        if isinstance(cap, bool) or not isinstance(cap, int) or cap < 1:
+            raise ValueError("outbox cap must be a positive integer")
         self._sink: Sink = sink if sink is not None else MemorySink()
         self._cap = cap
         self._pending: deque[MaterialiseIntent] = deque()
@@ -108,12 +110,20 @@ class MaterialiseOutbox:
         extra: dict[str, Any] | None = None,
     ) -> int:
         """Journal a forge.blueprint.materialised-shaped record."""
+        if not isinstance(blueprint_id, str) or not blueprint_id.strip():
+            raise ValueError("blueprint_id is required")
+        if not isinstance(era, str) or not era.strip() or not isinstance(target, str) or not target.strip():
+            raise ValueError("era and target are required")
+        if isinstance(components, bool) or not isinstance(components, int) or components < 0:
+            raise ValueError("components must be a non-negative integer")
+        if isinstance(wires, bool) or not isinstance(wires, int) or wires < 0:
+            raise ValueError("wires must be a non-negative integer")
         document: dict[str, Any] = {
             "kind": "forge.blueprint.materialised",
             "blueprint_id": blueprint_id,
             "name": name,
-            "components": int(components),
-            "wires": int(wires),
+            "components": components,
+            "wires": wires,
             "era": era,
             "target": target,
             "ts": time.time(),
@@ -129,13 +139,19 @@ class MaterialiseOutbox:
             for intent in self._pending:
                 if intent.confirmed:
                     continue
+                if intent.dead:
+                    continue
                 try:
                     self._sink(dict(intent.document))
                     intent.confirmed = True
+                    intent.last_error = ""
                     done += 1
                     self.confirmed_total += 1
-                except Exception:
+                except Exception as exc:
                     intent.attempts += 1
+                    intent.last_error = type(exc).__name__
+                    if intent.attempts >= 8:
+                        intent.dead = True
             while self._pending and self._pending[0].confirmed:
                 self._pending.popleft()
         return done
@@ -171,12 +187,12 @@ def bind_materialise_outbox(bus: EventBus, outbox: MaterialiseOutbox) -> Callabl
     def _handler(event: DomainEvent) -> None:
         payload = event.payload or {}
         outbox.append_materialisation(
-            blueprint_id=str(payload.get("blueprint_id") or ""),
-            components=int(payload.get("components") or 0),
-            wires=int(payload.get("wires") or 0),
-            era=str(payload.get("era") or ""),
-            target=str(payload.get("target") or ""),
-            name=str(payload.get("name") or ""),
+            blueprint_id=payload.get("blueprint_id"),
+            components=payload.get("components"),
+            wires=payload.get("wires"),
+            era=payload.get("era"),
+            target=payload.get("target"),
+            name=payload.get("name") or "",
             extra={"source": "bus", "correlation_id": event.correlation_id},
         )
 
