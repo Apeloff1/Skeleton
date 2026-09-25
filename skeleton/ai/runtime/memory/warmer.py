@@ -130,6 +130,20 @@ class FillerStore:
         self._fillers[filler.key] = filler
         self._save()
 
+    def discard(self, key: str, *, persist: bool = True) -> bool:
+        """Remove one filler. Persistence is one save, not a private dict edit."""
+
+        if not isinstance(key, str) or not key:
+            raise ValueError("filler key is required")
+        if self._fillers.pop(key, None) is None:
+            return False
+        if persist:
+            self._save()
+        return True
+
+    def persist(self) -> None:
+        self._save()
+
     def get(self, key: str) -> Optional[Filler]:
         return self._fillers.get(key)
 

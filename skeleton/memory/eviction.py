@@ -1,26 +1,22 @@
-"""Workflow-aware filler eviction — KVFlow-flavored cache pressure policy.
+"""Workflow-aware filler eviction.
 
-Ported insight from KVFlow (workflow-aware prefix-cache eviction for
-multi-agent LLM workflows): when the filler store is full, don't evict the
-global LRU — evict the filler whose loss costs the least *workflow* damage.
-Cost proxy per filler:
-
-    keep_score = (hits-weighted recency) + freshness + rebuild cost
-
-where rebuild cost is token count (rebuilding a 40k-token prefix hurts more
-than a 200-token one), recency is time since last refresh, and hits come
-from the caller's PrefixRegistry when supplied.
-
-Pure domain. ``FillerStore.evict_for_capacity`` is additive; nothing else
-changes.
+When the filler store is over capacity, evict the prefix whose loss costs
+the least: low recency, stale, cheap to rebuild, and rarely hit. Ties break
+on the key. The store is changed through ``discard``, not by editing its
+private table.
 """
 
 from __future__ import annotations
 
+import math
 import time
 from typing import Dict, Optional
 
 from .warmer import Filler, FillerStore
+
+
+class EvictionError(ValueError):
+    """The eviction request cannot be applied safely."""
 
 
 def keep_score(
@@ -29,13 +25,21 @@ def keep_score(
     now: Optional[float] = None,
     hits: int = 0,
 ) -> float:
-    """Higher = more painful to evict."""
-    now = now if now is not None else time.time()
-    age_s = max(0.0, now - filler.refreshed_at)
-    recency = 1.0 / (1.0 + age_s / 3600.0)          # decays hourly
+    """Higher means the filler is more expensive to lose."""
+
+    if now is None:
+        now = time.time()
+    if isinstance(now, bool) or not isinstance(now, (int, float)) or not math.isfinite(float(now)):
+        raise EvictionError("now must be a finite number")
+    if isinstance(hits, bool) or not isinstance(hits, int) or hits < 0:
+        raise EvictionError("hits must be a non-negative integer")
+    if isinstance(filler.tokens, bool) or not isinstance(filler.tokens, int) or filler.tokens < 0:
+        raise EvictionError("filler tokens must be a non-negative integer")
+    age_s = max(0.0, float(now) - filler.refreshed_at)
+    recency = 1.0 / (1.0 + age_s / 3600.0)
     freshness = 1.0 if filler.is_fresh(now) else 0.2
-    rebuild_cost = min(4.0, filler.tokens / 10_000)  # 40k tokens → 4.0 cap
-    hit_bonus = min(2.0, hits / 10.0)                # hot prefixes stick
+    rebuild_cost = min(4.0, filler.tokens / 10_000)
+    hit_bonus = min(2.0, hits / 10.0)
     return recency + freshness + rebuild_cost + hit_bonus
 
 
@@ -46,19 +50,31 @@ def evict_for_capacity(
     now: Optional[float] = None,
     hit_counts: Optional[Dict[str, int]] = None,
 ) -> list:
-    """Evict lowest-keep-score fillers until ``len(store) <= capacity``.
+    """Evict the lowest keep-score fillers until the store is within capacity."""
 
-    Returns the evicted filler keys. Deterministic: ties break on key name.
-    """
-    hits = hit_counts or {}
-    evicted = []
+    if not isinstance(store, FillerStore):
+        raise TypeError("store must be a FillerStore")
+    if isinstance(capacity, bool) or not isinstance(capacity, int) or capacity < 0:
+        raise EvictionError("capacity must be a non-negative integer")
+    if hit_counts is None:
+        hit_counts = {}
+    if not isinstance(hit_counts, dict):
+        raise TypeError("hit_counts must be a mapping")
+    for key, hits in hit_counts.items():
+        if not isinstance(key, str) or isinstance(hits, bool) or not isinstance(hits, int) or hits < 0:
+            raise EvictionError("hit counts must be non-negative integers")
+    evicted: list[str] = []
     while len(store.all()) > capacity:
         victim = min(
             store.all(),
-            key=lambda f: (keep_score(f, now=now, hits=hits.get(f.key, 0)), f.key),
+            key=lambda filler: (keep_score(filler, now=now, hits=hit_counts.get(filler.key, 0)), filler.key),
         )
-        store._fillers.pop(victim.key, None)
+        if not store.discard(victim.key, persist=False):
+            raise EvictionError(f"filler {victim.key} disappeared during eviction")
         evicted.append(victim.key)
     if evicted:
-        store._save()
+        store.persist()
     return evicted
+
+
+__all__ = ["EvictionError", "evict_for_capacity", "keep_score"]
