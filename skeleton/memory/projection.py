@@ -18,6 +18,7 @@ from skeleton.memory.types import MemoryChunk
 from skeleton.memory.vector import VectorStore
 from skeleton.persistence.memory_repository import (
     MemoryProjectionEvent,
+    MemoryProjectionEventCorruption,
     MongoMemoryRepository,
     SQLiteMemoryRepository,
 )
@@ -466,7 +467,30 @@ class MemoryProjectionCoordinator:
             projections,
             require_nonempty=True,
         )
-        events = self.repository.pending_projection_events(limit=limit)
+        try:
+            events = self.repository.pending_projection_events(limit=limit)
+        except MemoryProjectionEventCorruption as exc:
+            attempt = ProjectionEventDispatch(
+                event_id=exc.event_id,
+                memory_id=exc.memory_id,
+                memory_version=exc.memory_version,
+                action=exc.action,
+                published=False,
+                results=(
+                    ProjectionResult(
+                        projection="canonical-fence",
+                        state=ProjectionState.DEGRADED,
+                        error_code=type(exc.__cause__ or exc).__name__,
+                    ),
+                ),
+            )
+            return ProjectionDispatchReport(
+                attempted_events=1,
+                published_events=0,
+                blocked_event_id=exc.event_id,
+                remaining_pending_sample=1,
+                attempts=(attempt,),
+            )
         attempts: list[ProjectionEventDispatch] = []
         published = 0
         blocked_event_id: str | None = None
