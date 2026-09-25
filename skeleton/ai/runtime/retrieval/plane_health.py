@@ -115,6 +115,13 @@ class PlaneHealthTracker:
         with self._lock:
             return self._states.get(plane, self._default(plane))
 
+    def reset(self, plane: str) -> None:
+        """Forget operational health when a retriever implementation is replaced."""
+        with self._lock:
+            if plane in self._states:
+                del self._states[plane]
+                self._revision += 1
+
     def before_call(self, plane: str) -> None:
         with self._lock:
             now = self._clock()
