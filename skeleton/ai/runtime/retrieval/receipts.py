@@ -173,7 +173,8 @@ class ReceiptLedger:
         if not isinstance(receipt, RetrievalReceipt):
             raise TypeError("receipt must be RetrievalReceipt")
         with self._lock:
-            self._entries.pop(receipt.receipt_id, None)
+            if receipt.receipt_id in self._entries:
+                raise ValueError("duplicate retrieval receipt id")
             self._entries[receipt.receipt_id] = receipt
             while len(self._entries) > self.max_entries:
                 evicted, _ = self._entries.popitem(last=False)
