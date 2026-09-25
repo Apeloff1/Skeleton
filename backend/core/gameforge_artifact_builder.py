@@ -13,9 +13,12 @@ import json
 import math
 import os
 from pathlib import Path
+import tempfile
 import time
 import zipfile
 from typing import Any, Iterable
+
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 
 
 DEFAULT_ARTIFACTS_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "builds"
@@ -154,6 +157,40 @@ def _archive_member_name(value: Any, *, fallback: str) -> str:
     return raw[:240]
 
 
+def _commit_metered_archive(
+    pending_path: Path,
+    final_path: Path,
+    *,
+    usage_meter: ArtifactUsageMeter | None,
+    operation_id: str | None,
+    artifact_id: str,
+    write_id: str,
+) -> None:
+    if usage_meter is not None:
+        operation = str(operation_id or "").strip()
+        if not operation:
+            raise ValueError(
+                "operation_id is required when artifact usage metering is enabled"
+            )
+        usage_meter.meter_artifact(
+            operation,
+            artifact_id,
+            write_id,
+            pending_path.stat().st_size,
+        )
+    os.replace(pending_path, final_path)
+
+
+def _pending_archive_path(final_path: Path) -> Path:
+    fd, raw = tempfile.mkstemp(
+        prefix=final_path.name + ".",
+        suffix=".pending",
+        dir=final_path.parent,
+    )
+    os.close(fd)
+    return Path(raw)
+
+
 def _materialize_files(
     supplied: Iterable[dict[str, Any]] | None,
     game_name: str,
@@ -175,6 +212,9 @@ def build_web_artifact(
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
     build_token: str | None = None,
     built_at: float | int | None = None,
+    usage_meter: ArtifactUsageMeter | None = None,
+    operation_id: str | None = None,
+    write_id: str | None = None,
 ) -> dict[str, Any]:
     source_files = _materialize_files(files, game_name)
     safe_name, build_id, workdir = artifact_build(
@@ -227,9 +267,21 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
     index_path.write_text(html, encoding="utf-8")
 
     zip_path = resolve_under_dir(artifacts_root, f"{build_id}.zip")
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
-        _zip_write(archive, "index.html", index_path.read_bytes())
-        _zip_write(archive, "game_data.json", data_path.read_bytes())
+    pending_path = _pending_archive_path(zip_path)
+    try:
+        with zipfile.ZipFile(pending_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            _zip_write(archive, "index.html", index_path.read_bytes())
+            _zip_write(archive, "game_data.json", data_path.read_bytes())
+        _commit_metered_archive(
+            pending_path,
+            zip_path,
+            usage_meter=usage_meter,
+            operation_id=operation_id,
+            artifact_id=build_id,
+            write_id=write_id or build_id,
+        )
+    finally:
+        pending_path.unlink(missing_ok=True)
 
     record = register_artifact(
         build_id,
@@ -251,6 +303,9 @@ def build_source_artifact(
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
     build_token: str | None = None,
     built_at: float | int | None = None,
+    usage_meter: ArtifactUsageMeter | None = None,
+    operation_id: str | None = None,
+    write_id: str | None = None,
 ) -> dict[str, Any]:
     source_files = _materialize_files(files, game_name)
     safe_name, build_id, _workdir = artifact_build(
@@ -271,22 +326,42 @@ def build_source_artifact(
         ],
     }
 
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
-        _zip_write(archive, "manifest.json", json.dumps(manifest, indent=2))
-        used: set[str] = set()
-        for index, item in enumerate(source_files):
-            name = _archive_member_name(
-                item.get("filename"),
-                fallback=f"file-{index}.txt",
-            )
-            candidate = name
-            suffix = 1
-            while candidate in used:
-                stem, dot, extension = name.partition(".")
-                candidate = f"{stem}-{suffix}{dot}{extension}" if dot else f"{name}-{suffix}"
-                suffix += 1
-            used.add(candidate)
-            _zip_write(archive, f"gamefiles/{candidate}", str(item.get("content", "")))
+    pending_path = _pending_archive_path(zip_path)
+    try:
+        with zipfile.ZipFile(pending_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            _zip_write(archive, "manifest.json", json.dumps(manifest, indent=2))
+            used: set[str] = set()
+            for index, item in enumerate(source_files):
+                name = _archive_member_name(
+                    item.get("filename"),
+                    fallback=f"file-{index}.txt",
+                )
+                candidate = name
+                suffix = 1
+                while candidate in used:
+                    stem, dot, extension = name.partition(".")
+                    candidate = (
+                        f"{stem}-{suffix}{dot}{extension}"
+                        if dot
+                        else f"{name}-{suffix}"
+                    )
+                    suffix += 1
+                used.add(candidate)
+                _zip_write(
+                    archive,
+                    f"gamefiles/{candidate}",
+                    str(item.get("content", "")),
+                )
+        _commit_metered_archive(
+            pending_path,
+            zip_path,
+            usage_meter=usage_meter,
+            operation_id=operation_id,
+            artifact_id=build_id,
+            write_id=write_id or build_id,
+        )
+    finally:
+        pending_path.unlink(missing_ok=True)
 
     record = register_artifact(
         build_id,
