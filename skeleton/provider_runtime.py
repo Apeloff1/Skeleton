@@ -1898,6 +1898,8 @@ class OpenAIProviderAdapter(ProviderAdapter):
             raise ProviderInvocationError("image variation source exceeded size limit")
         if count < 1 or count > 4:
             raise ProviderInvocationError("image variation count must be between one and four")
+        if size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
+            raise ProviderInvocationError("image variation size is unsupported")
 
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
@@ -1973,10 +1975,17 @@ class OpenAIProviderAdapter(ProviderAdapter):
             raise ProviderInvocationError("image edit source must be non-empty bytes")
         if len(image) > _MAX_PROVIDER_MEDIA_BYTES:
             raise ProviderInvocationError("image edit source exceeded size limit")
-        if mask is not None and len(mask) > _MAX_PROVIDER_MEDIA_BYTES:
-            raise ProviderInvocationError("image edit mask exceeded size limit")
+        if mask is not None:
+            if not isinstance(mask, bytes) or not mask:
+                raise ProviderInvocationError(
+                    "image edit mask must be non-empty bytes"
+                )
+            if len(mask) > _MAX_PROVIDER_MEDIA_BYTES:
+                raise ProviderInvocationError("image edit mask exceeded size limit")
         if not isinstance(prompt, str) or not prompt.strip():
             raise ProviderInvocationError("image edit prompt must be non-empty")
+        if size not in {"256x256", "512x512", "1024x1024", "1792x1024", "1024x1792"}:
+            raise ProviderInvocationError("image edit size is unsupported")
 
         governance, lease, estimate = _require_media_policy(
             provider_id=self.provider_id,
@@ -2049,7 +2058,15 @@ class OpenAIProviderAdapter(ProviderAdapter):
             raise ProviderInvocationError("speech provider text must be non-empty")
         if len(request.text) > 16_384:
             raise ProviderInvocationError("speech provider text exceeded size limit")
-        if not 0.25 <= float(request.speed) <= 4.0:
+        if isinstance(request.speed, bool):
+            raise ProviderInvocationError("speech provider speed is unsupported")
+        try:
+            speed = float(request.speed)
+        except (TypeError, ValueError) as exc:
+            raise ProviderInvocationError(
+                "speech provider speed is unsupported"
+            ) from exc
+        if not math.isfinite(speed) or not 0.25 <= speed <= 4.0:
             raise ProviderInvocationError("speech provider speed is unsupported")
         if request.response_format not in {"mp3", "wav", "opus", "aac", "flac", "pcm"}:
             raise ProviderInvocationError("speech provider format is unsupported")
@@ -2076,7 +2093,7 @@ class OpenAIProviderAdapter(ProviderAdapter):
                     model=request.model,
                     voice=request.voice,
                     input=request.text,
-                    speed=request.speed,
+                    speed=speed,
                     response_format=request.response_format,
                 )
                 raw = getattr(response, "content", None)
