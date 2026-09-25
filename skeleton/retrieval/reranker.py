@@ -8,7 +8,7 @@ Provides:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Optional
 
 from skeleton.kernel.events import EventBus
@@ -144,16 +144,31 @@ class FeatureReranker:
                         "content": content,
                     },
                 )()
+            elif hasattr(original, "fragment_id") and hasattr(original, "metadata"):
+                metadata = dict(getattr(original, "metadata", {}) or {})
+                metadata["rerank_features"] = dict(features)
+                metadata["pre_rerank_score"] = original_score
+                try:
+                    outgoing = replace(
+                        original,
+                        score=float(reranked_score),
+                        metadata=metadata,
+                    )
+                except TypeError:
+                    outgoing = original
             else:
                 outgoing = original
-                if getattr(outgoing, "features", None) is None:
-                    try:
-                        outgoing.features = features
-                    except (AttributeError, TypeError):
-                        pass
             scored.append((reranked_score, outgoing, features))
 
-        scored.sort(key=lambda item: item[0], reverse=True)
+        scored.sort(
+            key=lambda item: (
+                -item[0],
+                str(
+                    getattr(item[1], "fragment_id", None)
+                    or getattr(item[1], "item_id", "")
+                ),
+            )
+        )
         self._stats["reranked"] += len(scored)
         return [result for _, result, _ in scored[:top_k]]
 
