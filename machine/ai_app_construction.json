@@ -2175,7 +2175,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, restart-safe durable tenant quota reservation, shared live process pressure, provider/media lease enforcement, manifest-aware tool metering, independent artifact/storage byte accounting, and aggregate estimate-vs-actual telemetry now share one contract. Remaining work is broader non-provider admission coverage, distributed pressure coordination, exact-head validation and independent verification.",
+      "gap": "Request admission, restart-safe durable tenant quota reservation, shared live process pressure, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage write metering, and aggregate estimate-vs-actual telemetry now share one contract. Remaining work is broader non-provider admission coverage, distributed pressure coordination, exact-head validation and independent verification.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2189,7 +2189,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "shared AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, independent artifact/storage byte ceilings, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; distributed pressure and broader expensive-plane admission remain"
+      "status_detail": "shared AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, independently budgeted artifact/storage writes, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; broader expensive-plane admission, distributed pressure and final exact-head verification remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -7373,7 +7373,10 @@
       "ToolRuntime charges manifest tool-call and estimated-cost usage through AdmissionRuntime before side effects",
       "skeleton/testing/test_tenant_quota_sqlite.py restart-safe durable quota recovery and multi-worker fencing",
       "skeleton/testing/test_admission_runtime.py estimate-versus-actual telemetry with identity-free snapshots",
-      "skeleton/testing/test_artifact_usage.py deterministic artifact/storage write metering and unknown-usage resolution"
+      "skeleton/testing/test_artifact_usage.py deterministic artifact/storage write metering and unknown-usage resolution",
+      "independent artifact_bytes and storage_bytes budgets across admission, quota, durable SQLite and usage adapters",
+      "legacy SQLite quota stores migrate storage columns additively and inherit prior artifact ceiling once as initial storage ceiling",
+      "restart-safe storage write usage and unknown-resolution regressions"
     ]
   },
   "provider_surface_convergence_blueprint": {
