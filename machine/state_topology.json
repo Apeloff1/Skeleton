@@ -144,7 +144,9 @@
         "skeleton/testing/test_operation_runtime.py",
         "scripts/state_recovery_drill.py",
         "skeleton/testing/test_state_recovery_drill.py",
-        ".github/workflows/state-recovery-drill.yml"
+        ".github/workflows/state-recovery-drill.yml",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
       ]
     },
     {
@@ -169,7 +171,9 @@
         "skeleton/api/server.py",
         "docker-compose.yml",
         "skeleton/testing/test_data_lifecycle.py",
-        "skeleton/testing/test_governance_runtime_binding.py"
+        "skeleton/testing/test_governance_runtime_binding.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
       ]
     },
     {
@@ -238,7 +242,9 @@
         "skeleton/testing/test_engine_execution_coordinator.py",
         "skeleton/testing/test_tool_receipt_store.py",
         "skeleton/testing/test_tenant_quota_sqlite.py",
-        "skeleton/testing/test_shared_pressure.py"
+        "skeleton/testing/test_shared_pressure.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
       ]
     },
     {
@@ -1086,5 +1092,11 @@
     "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage",
     "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes",
     "governance lifecycle metadata, deletion plans, acknowledgements and receipts are restart-safe authoritative state and cannot rely solely on process memory"
-  ]
+  ],
+  "backup_policy": {
+    "contract": "machine/state_backup_policy.json",
+    "tool": "scripts/state_backup_bundle.py",
+    "recovery_drill": "scripts/state_recovery_drill.py",
+    "workflow": ".github/workflows/state-recovery-drill.yml"
+  }
 }
