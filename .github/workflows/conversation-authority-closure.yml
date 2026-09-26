@@ -178,7 +178,7 @@ jobs:
               raise SystemExit("Jeeves conversation cutover verification failed")
           if receipt.get("legacy_read_accesses") != 1:
               raise SystemExit("legacy Jeeves store is not migration-read-only")
-          if len(receipt.get("digests") or {}) != 10:
+          if len(receipt.get("digests") or {}) != 12:
               raise SystemExit("Jeeves cutover digest coverage is incomplete")
           print("jeeves conversation cutover receipt:", expected)
           PY
