@@ -277,3 +277,57 @@ async def test_regenerate_route_rejects_user_message_source(
 
     assert exc.value.status_code == 409
     assert "only assistant messages" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_regenerate_route_rejects_stale_version_before_engine_resolution(
+    monkeypatch,
+) -> None:
+    import core.engine_client as engine_client
+    import routes.conversations as route
+
+    thread, _user_message, assistant = _conversation()
+    engine_resolutions = []
+
+    async def get_thread(*_args, **_kwargs):
+        return thread
+
+    async def forbidden_list(*_args, **_kwargs):
+        raise AssertionError(
+            "message loading must not run after stale version rejection"
+        )
+
+    def forbidden_engine_resolution():
+        engine_resolutions.append(True)
+        raise AssertionError(
+            "engine must not resolve after stale version rejection"
+        )
+
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            get_thread=get_thread,
+            list_messages=forbidden_list,
+        ),
+    )
+    monkeypatch.setattr(
+        engine_client.EngineClient,
+        "from_env",
+        forbidden_engine_resolution,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await route.regenerate_assistant_message(
+            thread.thread_id,
+            assistant.message_id,
+            route.RegenerateMessageRequest(
+                idempotency_key="regen-stale",
+                expected_thread_version=thread.version - 1,
+            ),
+            user={"tenant_id": "tenant-a", "email": "owner-a"},
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "thread version conflict"
+    assert engine_resolutions == []
