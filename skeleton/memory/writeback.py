@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+import json
 import threading
 
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.contracts.memory_record import MemoryRecord, MemoryWriteProposal
+from skeleton.intelligence.admission import AdmissionError
+from skeleton.intelligence.admission_runtime import (
+    AdmissionRuntime,
+    AdmissionRuntimeError,
+)
 from skeleton.memory.policy import (
     MemoryPolicyEngine,
     MemoryPolicyResult,
@@ -53,6 +60,7 @@ class GovernedMemoryWriter:
         *,
         governance: GovernanceRegistry,
         policy: MemoryPolicyEngine | None = None,
+        admission_runtime: AdmissionRuntime | None = None,
         purposes: tuple[str, ...] = (
             "model-inference",
             "retrieval-synthesis",
@@ -62,6 +70,11 @@ class GovernedMemoryWriter:
             raise TypeError("repository must be SQLiteMemoryRepository")
         if not isinstance(governance, GovernanceRegistry):
             raise TypeError("governance must be GovernanceRegistry")
+        if (
+            admission_runtime is not None
+            and not isinstance(admission_runtime, AdmissionRuntime)
+        ):
+            raise TypeError("admission_runtime must be AdmissionRuntime")
         normalized_purposes = tuple(
             dict.fromkeys(str(value).strip().lower() for value in purposes)
         )
@@ -71,6 +84,12 @@ class GovernedMemoryWriter:
         self.governance = governance
         self.purposes = normalized_purposes
         self.policy = policy or MemoryPolicyEngine()
+        self.admission_runtime = admission_runtime
+        self._usage_meter = (
+            None
+            if admission_runtime is None
+            else ArtifactUsageMeter(admission_runtime)
+        )
         self._lock = threading.RLock()
         self._staged: dict[str, StagedMemoryWrite] = {}
 
@@ -95,6 +114,82 @@ class GovernedMemoryWriter:
             self._staged[proposal.proposal_id] = staged
             return staged
 
+    @staticmethod
+    def _proposal_storage_payload(
+        proposal: MemoryWriteProposal,
+    ) -> dict[str, object]:
+        return {
+            "schema_version": proposal.schema_version,
+            "proposal_id": proposal.proposal_id,
+            "tenant_id": proposal.tenant_id,
+            "namespace": proposal.namespace,
+            "subject_id": proposal.subject_id,
+            "kind": proposal.kind.value,
+            "idempotency_key": proposal.idempotency_key,
+            "proposed_at": proposal.proposed_at.astimezone(
+                timezone.utc
+            ).isoformat(),
+            "content": proposal.content,
+            "content_ref": proposal.content_ref,
+            "provenance_refs": list(proposal.provenance_refs),
+            "source_operation_id": proposal.source_operation_id,
+            "target_memory_id": proposal.target_memory_id,
+            "expected_version": proposal.expected_version,
+            "expires_at": (
+                None
+                if proposal.expires_at is None
+                else proposal.expires_at.astimezone(
+                    timezone.utc
+                ).isoformat()
+            ),
+            "data_class": proposal.data_class,
+        }
+
+    def _meter_storage(
+        self,
+        proposal: MemoryWriteProposal,
+        *,
+        now: datetime | None,
+    ) -> None:
+        meter = self._usage_meter
+        if meter is None:
+            return
+        operation_id = proposal.source_operation_id
+        if operation_id is None:
+            raise MemoryWritebackError(
+                "admitted memory write requires source_operation_id"
+            )
+        payload = self._proposal_storage_payload(proposal)
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else now.astimezone(timezone.utc)
+        )
+        try:
+            meter.meter_storage(
+                operation_id,
+                (
+                    "memory:"
+                    + proposal.tenant_id
+                    + ":"
+                    + proposal.namespace
+                ),
+                proposal.proposal_id,
+                len(encoded),
+                now_wall=instant.timestamp(),
+            )
+        except (AdmissionError, AdmissionRuntimeError) as exc:
+            raise MemoryWritebackError(
+                "memory write denied by resource admission"
+            ) from exc
+
     def commit(
         self,
         proposal_id: str,
@@ -116,6 +211,7 @@ class GovernedMemoryWriter:
                 and not review_approved
             ):
                 raise MemoryWriteDenied(staged.policy.reason)
+            self._meter_storage(staged.proposal, now=now)
             record = self.repository.commit(staged.proposal, now=now)
             try:
                 self.governance.reconcile_canonical_write(
