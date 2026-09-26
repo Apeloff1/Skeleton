@@ -127,6 +127,10 @@ class EngineGovernanceDeletionPlanBody(BaseModel):
     )
 
 
+class EngineGovernancePlanExecutionBody(BaseModel):
+    tenant_id: str = Field(min_length=1, max_length=512)
+
+
 class EngineGovernanceDeletionAckBody(BaseModel):
     tenant_id: str = Field(min_length=1, max_length=512)
     plan_id: str = Field(min_length=1, max_length=512)
@@ -409,6 +413,28 @@ def request_governance_deletion(
                 else tuple(body.record_ids)
             ),
             reason=body.reason,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
+@router.post(
+    "/governance/deletions/{plan_id}/execute-engine-targets"
+)
+async def execute_governance_engine_targets(
+    plan_id: str,
+    body: EngineGovernancePlanExecutionBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return await service.execute_external_governance_engine_targets(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+            plan_id=plan_id,
         )
     except Exception as exc:
         _raise_engine_error(exc)
