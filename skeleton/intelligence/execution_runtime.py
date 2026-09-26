@@ -793,7 +793,7 @@ class CognitiveExecutionRuntime:
             raise CognitiveExecutionError("allowed_tool_ids checkpoint is corrupt")
         tool_data_class = payload.get("tool_data_class", "internal")
         tool_purpose = payload.get("tool_purpose", "tool-execution")
-        tenant_id = payload.get("tenant_id")
+        tenant_id = payload.get("tenant_id", "default")
         if (
             not isinstance(tool_data_class, str)
             or not tool_data_class.strip()
