@@ -10,11 +10,14 @@ from skeleton.contracts.memory_record import (
     memory_payload_digest,
 )
 from skeleton.memory.core import CAGStore, InMemoryTFIDFStore, MAGStore
+from skeleton.intelligence.admission import ResourceBudget
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.memory.projection import (
     CAGStoreProjection,
     LegacyMemoryStoreProjection,
     MAGStoreProjection,
     MemoryProjectionCoordinator,
+    ProjectionAdmissionError,
     ProjectionState,
     TFIDFStoreProjection,
     VectorStoreProjection,
@@ -534,3 +537,108 @@ def test_current_projection_event_must_match_canonical_record() -> None:
     assert report.blocked_event_id is not None
     assert report.attempts[0].results[0].projection == "canonical-fence"
     assert len(repo.pending_projection_events()) == 1
+
+def test_material_projection_rebuild_is_admitted_and_reconciled() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(
+            key="admitted-rebuild",
+            content="material canonical memory " * 16,
+        ),
+        now=_now(),
+    )
+    store = FakeStore()
+    runtime = AdmissionRuntime()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        admission_runtime=runtime,
+        rebuild_budget=ResourceBudget(max_storage_bytes=1024 * 1024),
+    )
+
+    report = coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        admission_operation_id="retrieval-rebuild-1",
+    )
+
+    assert report.degraded is False
+    assert record.memory_id in store.items
+    assert runtime.snapshot()["active_operations"] == ()
+    telemetry = runtime.telemetry_snapshot()["metrics"]
+    assert telemetry["counters"]["admission.admitted_total"] == 1
+    assert telemetry["counters"]["admission.completed_total"] == 1
+    actual = telemetry["samples"]["admission.actual.storage_bytes"]
+    assert len(actual) == 1
+    assert actual[0] > 0
+
+
+def test_projection_rebuild_denial_happens_before_derived_mutation() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(
+            key="denied-rebuild",
+            content="large canonical memory " * 32,
+        ),
+        now=_now(),
+    )
+    store = FakeStore()
+    store.add(
+        MemoryChunk(
+            id="stale-id",
+            text="stale projection",
+            metadata={},
+            source_tier="derived:rag",
+        )
+    )
+    runtime = AdmissionRuntime()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        admission_runtime=runtime,
+        rebuild_budget=ResourceBudget(max_storage_bytes=1),
+    )
+
+    with pytest.raises(
+        ProjectionAdmissionError,
+        match="denied by resource admission",
+    ):
+        coordinator.rebuild_subject(
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+            projections=(LegacyMemoryStoreProjection("rag", store),),
+            known_projection_ids=("stale-id",),
+            admission_operation_id="retrieval-rebuild-denied",
+        )
+
+    assert "stale-id" in store.items
+    assert record.memory_id not in store.items
+    assert runtime.snapshot()["active_operations"] == ()
+
+
+def test_admitted_projection_rebuild_requires_operation_identity() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(
+        _proposal(key="missing-rebuild-id", content="canonical"),
+        now=_now(),
+    )
+    store = FakeStore()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        admission_runtime=AdmissionRuntime(),
+    )
+
+    with pytest.raises(
+        ProjectionAdmissionError,
+        match="requires operation_id",
+    ):
+        coordinator.rebuild_subject(
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+            projections=(LegacyMemoryStoreProjection("rag", store),),
+        )
+
+    assert store.items == {}
+
