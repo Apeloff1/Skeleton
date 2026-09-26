@@ -423,7 +423,7 @@
       ],
       "work_package": "WP-P0-CONVERSATION-STATE",
       "blueprint": "conversation_runtime_contract",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Make multi-turn conversation continuity, message ordering and branch lineage durable server-owned product state that feeds the cognitive runtime without trusting browser-supplied history.",
       "target_files": {
         "contracts": [
@@ -488,14 +488,21 @@
         "backend/routes/jeeves_compose.py routes generative escalation through EngineTextRequest/execute_engine_text rather than provider SDKs or credentials",
         "backend/routes/jeeves_compose.py ignores caller-supplied history for retrieval, prompting and persistence even when server storage is empty or unavailable",
         "tests/test_jeeves_chat_workspace.py proves server transcript wins over conflicting client history, legacy history is model-invisible, and canonical-engine delegation keeps conversation context out of trusted instructions",
-        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface"
+        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface",
+        "backend/routes/jeeves_compose.py imports legacy jeeves_chat rows once into canonical ConversationThread/ConversationMessage authority and serves canonical history thereafter",
+        "backend/routes/conversations.py regenerate endpoint executes through EngineClient then commits conversation_authority.regenerate_assistant_message with operation/result/context lineage",
+        "backend/tests/test_conversation_regeneration_route.py proves engine-before-commit, stale-version fencing and canonical regeneration lineage",
+        "backend/core/conversations.py governed deletion physically removes conversation payloads before acknowledgement and governed export reads registry-scoped conversation records",
+        "backend/tests/test_conversation_governance.py and backend/tests/test_conversation_storage_admission.py prove tenant-scoped governed delete/export behavior",
+        "frontend/features/Jeeves/WorkspaceController.ts rehydrates and refreshes device state from canonical server history",
+        "frontend/features/Jeeves/workspace.ts projectCanonicalHistory replaces stale completed cache while preserving unresolved local work and never serializes local transcript into model input",
+        "frontend/scripts/test-jeeves-workspace.cjs proves remount reconstruction, durable session identity and device-transcript non-authority",
+        "scripts/verify_jeeves_conversation_cutover.py independently verifies legacy migration-read-only authority, canonical regeneration and workspace reconstruction boundaries"
       ],
       "remaining": [
-        "cut Jeeves compatibility storage over to canonical ConversationThread/ConversationMessage authority",
-        "wire regenerate through canonical engine execution and branch commit",
-        "finish conversation governance delete/export/retention propagation",
-        "prove frontend refresh/reconnect reconstruction from server authority",
-        "close declared Stage-0 dependencies and collect independent exact-head closure evidence"
+        "complete conversation retention/reference propagation across referenced artifacts, memory projections and summaries",
+        "close gap-state-authority-convergence and gap-governance-registry",
+        "collect fresh exact-head Conversation Authority Closure Gate evidence and independent verifier receipt"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
