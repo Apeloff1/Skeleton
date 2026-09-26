@@ -1717,6 +1717,46 @@ class EngineExecutionService:
         if mode_key not in {"register", "reconcile"}:
             raise EngineServiceError("governance write mode is invalid")
 
+        plane_key = _bounded_storage_text(
+            plane,
+            "plane",
+            maximum=64,
+        ).lower()
+        if (
+            isinstance(purposes, (str, bytes))
+            or not isinstance(purposes, tuple)
+            or not 1 <= len(purposes) <= 32
+        ):
+            raise EngineServiceError(
+                "purposes must contain between 1 and 32 values"
+            )
+        normalized_purposes = tuple(
+            _bounded_storage_text(
+                value,
+                "purpose",
+                maximum=256,
+            ).lower()
+            for value in purposes
+        )
+        normalized_targets: tuple[str, ...] | None = None
+        if deletion_targets is not None:
+            if (
+                isinstance(deletion_targets, (str, bytes))
+                or not isinstance(deletion_targets, tuple)
+                or not 1 <= len(deletion_targets) <= 32
+            ):
+                raise EngineServiceError(
+                    "deletion_targets must contain between 1 and 32 values"
+                )
+            normalized_targets = tuple(
+                _bounded_storage_text(
+                    value,
+                    "deletion_target",
+                    maximum=256,
+                ).lower()
+                for value in deletion_targets
+            )
+
         grant = self.authorities.grant_for(principal)
         if "engine:governance" not in grant.scopes:
             raise EngineAuthorityError(
@@ -1744,24 +1784,20 @@ class EngineExecutionService:
                 "data_class",
                 maximum=64,
             ),
-            "purposes": tuple(purposes),
-            "deletion_targets": (
-                None
-                if deletion_targets is None
-                else tuple(deletion_targets)
-            ),
+            "purposes": normalized_purposes,
+            "deletion_targets": normalized_targets,
             "created_at": created_at,
             "retention_until": retention_until,
             "exportable": bool(exportable),
         }
         if mode_key == "register":
             record = registry.register_canonical_write(
-                plane,
+                plane_key,
                 **kwargs,
             )
         else:
             record = registry.reconcile_canonical_write(
-                plane,
+                plane_key,
                 **kwargs,
             )
         inventory = registry.lifecycle.get(record.record_id)
