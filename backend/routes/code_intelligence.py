@@ -9,7 +9,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/intelligence", tags=["Code Intelligence"])
 
@@ -18,8 +17,6 @@ try:
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
-
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # REQUEST MODELS
@@ -104,10 +101,10 @@ class PerformanceRequest(BaseModel):
 # ============================================================================
 
 async def call_llm(system: str, prompt: str) -> str:
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return "LLM not available"
     try:
-        chat = LlmChat(api_key=EMERGENT_KEY, system_message=system).with_model("openai", "gpt-4o")
+        chat = LlmChat(system_message=system).with_model("openai", "gpt-4o")
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except Exception:
