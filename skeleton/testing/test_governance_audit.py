@@ -290,8 +290,8 @@ def test_canonical_registration_and_reconciliation_are_audited_without_payload()
             tenant_id=registered.tenant_id,
             source_ref=registered.source_ref,
             data_class="restricted",
-            purposes=("model-inference", "retrieval-synthesis"),
-            deletion_targets=("artifact", "retrieval"),
+            purposes=registered.purposes,
+            deletion_targets=registered.deletion_targets,
             created_at=registered.created_at,
             retention_until=30.0,
         )
@@ -315,10 +315,7 @@ def test_canonical_registration_and_reconciliation_are_audited_without_payload()
     assert register_entry.metadata["correlation_id"] == "gov-register"
     assert reconcile_entry.metadata["correlation_id"] == "gov-reconcile"
     assert reconcile_entry.metadata["data_class"] == "restricted"
-    assert reconcile_entry.metadata["deletion_targets"] == [
-        "artifact",
-        "retrieval",
-    ]
+    assert reconcile_entry.metadata["deletion_targets"] == ["artifact"]
 
     rendered = repr(
         [
