@@ -40,6 +40,8 @@ from skeleton.intelligence.admission_runtime import (
 )
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
+from skeleton.vault.data_governance import DataGovernanceDenied
+from skeleton.vault.data_lifecycle import LifecycleError
 from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
@@ -1790,17 +1792,22 @@ class EngineExecutionService:
             "retention_until": retention_until,
             "exportable": bool(exportable),
         }
-        if mode_key == "register":
-            record = registry.register_canonical_write(
-                plane_key,
-                **kwargs,
-            )
-        else:
-            record = registry.reconcile_canonical_write(
-                plane_key,
-                **kwargs,
-            )
-        inventory = registry.lifecycle.get(record.record_id)
+        try:
+            if mode_key == "register":
+                record = registry.register_canonical_write(
+                    plane_key,
+                    **kwargs,
+                )
+            else:
+                record = registry.reconcile_canonical_write(
+                    plane_key,
+                    **kwargs,
+                )
+            inventory = registry.lifecycle.get(record.record_id)
+        except (DataGovernanceDenied, LifecycleError) as exc:
+            raise EngineServiceError(
+                "external governance write rejected"
+            ) from exc
         if inventory["tenant_id"] != tenant:
             raise EngineServiceError(
                 "governance write tenant reconciliation failed"
