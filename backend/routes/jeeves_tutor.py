@@ -36,7 +36,6 @@ from core.http_errors import internal_http_error
 
 router = APIRouter(prefix="/jeeves", tags=["Jeeves AI Tutor"])
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # MongoDB for knowledge vault
 _mongo = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
@@ -210,7 +209,6 @@ Always be helpful, accurate, and adapt to the user's level."""
     for attempt in range(1, attempts + 1):
         try:
             chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
                 session_id=session_id or f"jeeves-{uuid.uuid4().hex[:8]}",
                 system_message=system,
             ).with_model("openai", "gpt-4o")
