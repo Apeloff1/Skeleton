@@ -408,7 +408,11 @@
         "backend/routes/conversations.py admin retention sweep drives tenant-scoped governed expiry",
         "skeleton/testing/test_data_lifecycle.py proves retention replay plan identity and outstanding-action filtering",
         "skeleton/testing/test_engine_execution_service.py proves split-owner retention keeps conversation actions pending after engine-owned acknowledgement",
-        "backend/tests/test_conversation_governance.py proves same-plan engine-first then conversation retention execution"
+        "backend/tests/test_conversation_governance.py proves same-plan engine-first then conversation retention execution",
+        "backend/tests/test_ai_chat_conversation_finalization.py proves post-engine assistant-commit failure retries with identical operation/execution/context/submission identity and different pending turns are blocked",
+        "tests/test_jeeves_chat_workspace.py proves pending canonical Jeeves turns resume after crash, current user input is not duplicated into retry history, idless pending turns reuse server-assigned identity, different pending turns serialize, and optimistic races return retryable conflicts",
+        "frontend/src/product/conversationProjection.ts plus frontend/scripts/test-conversation-projection.mjs prove deterministic refresh/reconnect ordering, foreign-thread rejection and projection/version fencing",
+        "backend/routes/conversations.py plus backend/tests/test_conversation_regeneration_route.py prove engine-before-commit regeneration with immutable supersedes/causal lineage"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -426,12 +430,12 @@
       "outstanding_evidence": [
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
-        "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
+        "fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
       ],
       "blockers": [
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
-        "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
+        "fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -472,7 +476,9 @@
         "scripts/state_recovery_drill.py destructive Mongo recovery now includes canonical memory records, idempotency receipts, revision history and projection outbox; derived rebuild includes active canonical memory and excludes tombstones",
         "backend/routes/ai.py exposes AIChatMemoryPolicy as an explicit opt-in product/user long-term-memory policy and emits no memory_write_intent by default",
         "backend/routes/ai.py translates opt-in only into content_from=verified_final_output with stable conversation/user-policy provenance and fails closed when the canonical engine is unavailable",
-        "backend/tests/test_ai_chat_engine_cutover.py proves default chat has no engine:memory scope, explicit preference persistence delegates engine:memory and commits returned memory_refs, and opt-in without the canonical engine never falls back to local/provider execution"
+        "backend/tests/test_ai_chat_engine_cutover.py proves default chat has no engine:memory scope, explicit preference persistence delegates engine:memory and commits returned memory_refs, and opt-in without the canonical engine never falls back to local/provider execution",
+        "backend/routes/ai.py exposes AIChatMemoryPolicy as explicit authenticated opt-in and translates it only into verified_final_output memory intent",
+        "backend/tests/test_ai_chat_memory_policy.py proves memory policy defaults off, rejects subject spoofing/unnormalized namespace/naive expiry, reaches delegated engine:memory on opt-in, persists returned memory refs, and fails closed without canonical engine or legacy-provider fallback"
       ],
       "closure_evidence_required": [
         "durable memory write/read/restart test",
@@ -489,18 +495,14 @@
       "outstanding_evidence": [
         "dependency must close: gap-state-authority-convergence",
         "dependency must close: gap-governance-registry",
-        "fresh exact-head State Recovery Drill including canonical memory authority",
-        "fresh exact-head memory client/runtime/governance regression evidence",
-        "fresh exact-head App Assembly and Backend Quality evidence",
-        "independent closure verification"
+        "fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
+        "independent verification before canonical closure"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
         "dependency must close: gap-governance-registry",
-        "fresh exact-head State Recovery Drill including canonical memory authority",
-        "fresh exact-head memory client/runtime/governance regression evidence",
-        "fresh exact-head App Assembly and Backend Quality evidence",
-        "independent closure verification"
+        "fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
+        "independent verification before canonical closure"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
