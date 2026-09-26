@@ -224,3 +224,117 @@ async def test_engine_chat_send_async_single_message_keeps_compatibility(
     assert response == "single-ok"
     assert len(seen) == 1
     assert seen[0].prompt == "only"
+
+
+def test_engine_chat_idempotency_binds_execution_semantics():
+    base_policy = InstructionPolicy(
+        policy_id="backend.test.engine-chat",
+        version="1",
+        instructions="Canonical policy.",
+    )
+    same_policy = InstructionPolicy(
+        policy_id="backend.test.engine-chat",
+        version="1",
+        instructions="Canonical policy.",
+    )
+    upgraded_policy = InstructionPolicy(
+        policy_id="backend.test.engine-chat",
+        version="2",
+        instructions="Canonical policy.",
+    )
+    changed_instructions = InstructionPolicy(
+        policy_id="backend.test.engine-chat",
+        version="1",
+        instructions="Updated canonical policy.",
+    )
+
+    base = EngineChat(
+        session_id="session-idempotency",
+        instruction_policy=base_policy,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        capability="assistant.compat",
+        verification_profile="assistant_proposal",
+        data_class="internal",
+        purpose="model-inference",
+    ).with_max_tokens(1024)
+    same = EngineChat(
+        session_id="session-idempotency",
+        instruction_policy=same_policy,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        capability="assistant.compat",
+        verification_profile="assistant_proposal",
+        data_class="internal",
+        purpose="model-inference",
+    ).with_max_tokens(1024)
+
+    prompt = "same prompt"
+    base_key = base._idempotency_key(prompt)
+
+    assert same._idempotency_key(prompt) == base_key
+
+    assert EngineChat(
+        session_id="session-idempotency",
+        instruction_policy=upgraded_policy,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        capability="assistant.compat",
+        verification_profile="assistant_proposal",
+        data_class="internal",
+        purpose="model-inference",
+    ).with_max_tokens(1024)._idempotency_key(prompt) != base_key
+
+    assert EngineChat(
+        session_id="session-idempotency",
+        instruction_policy=changed_instructions,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        capability="assistant.compat",
+        verification_profile="assistant_proposal",
+        data_class="internal",
+        purpose="model-inference",
+    ).with_max_tokens(1024)._idempotency_key(prompt) != base_key
+
+    assert EngineChat(
+        session_id="session-idempotency",
+        instruction_policy=base_policy,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        capability="assistant.compat",
+        verification_profile="evidence_required",
+        data_class="internal",
+        purpose="model-inference",
+    ).with_max_tokens(1024)._idempotency_key(prompt) != base_key
+
+    assert EngineChat(
+        session_id="session-idempotency",
+        instruction_policy=base_policy,
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        capability="assistant.compat",
+        verification_profile="assistant_proposal",
+        data_class="internal",
+        purpose="model-inference",
+    ).with_max_tokens(2048)._idempotency_key(prompt) != base_key
+
+
+def test_engine_chat_idempotency_binds_history_but_not_unused_routing_hints():
+    base = EngineChat(
+        session_id="session-history",
+        system_message="System instructions.",
+    ).with_model("provider-a", "model-a")
+    same_semantics = EngineChat(
+        session_id="session-history",
+        system_message="System instructions.",
+    ).with_model("provider-b", "model-b")
+
+    prompt = "hello"
+    assert same_semantics._idempotency_key(prompt) == base._idempotency_key(
+        prompt
+    )
+
+    base.add_message("assistant", "prior answer")
+    assert same_semantics._idempotency_key(prompt) != base._idempotency_key(
+        prompt
+    )
