@@ -178,7 +178,16 @@
         "skeleton/vault/lifecycle_adapters.py governed artifact physical delete/export adapter",
         "skeleton/api/server.py startup composition of canonical governed artifact store",
         "skeleton/testing/test_lifecycle_adapters.py artifact registration/export/delete/retention/fail-closed regressions",
-        "skeleton/testing/test_governance_runtime_binding.py production artifact lifecycle composition regression"
+        "skeleton/testing/test_governance_runtime_binding.py production artifact lifecycle composition regression",
+        "backend/core/route_privacy.py complete route-domain privacy ceiling registry",
+        "backend/api_middleware.py request-scoped route privacy binding",
+        "backend/core/engine_text.py pre-provider route privacy enforcement",
+        "backend/services/tool_registry.py pre-tool route privacy enforcement",
+        "backend/tests/test_route_privacy.py provider/tool privacy and context isolation regressions",
+        "backend/core/gameforge_artifact_builder.py canonical governed production artifact write path",
+        "backend/routes/gameforge_build.py tenant-scoped governed artifact download/list/build and bounded retention",
+        "backend/tests/test_gameforge_artifact_builder.py governed artifact production regressions",
+        "skeleton/testing/test_governance_runtime_binding.py physical artifact retention expiry through production lifecycle adapters"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -187,14 +196,14 @@
         "retention expiry test"
       ],
       "outstanding_evidence": [
-        "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
         "fresh exact-head governance audit/conversation lifecycle validation",
         "fresh exact-head validation of production governed artifact lifecycle composition",
-        "fresh exact-head governed artifact lifecycle validation"
+        "fresh exact-head governed artifact lifecycle validation",
+        "fresh exact-head route privacy middleware/provider/tool regression validation",
+        "fresh exact-head GameForge governed artifact retention validation"
       ],
       "blockers": [
-        "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff"
       ],
       "close_when": [
