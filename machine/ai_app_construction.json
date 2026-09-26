@@ -1822,7 +1822,7 @@
       "plane": "prompt-context",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical ContextBudget/ContextSegment/ContextEnvelope contracts, deterministic trust-aware packing, explicit omission reasons, provider-neutral projection, and conversation/retrieval source adapters now exist. Remaining closure work is to add memory/artifact/tool/skill adapters, bind the cognitive runtime and ProviderRequest to context_id/context_digest, add provenance-preserving compaction, and migrate direct feature prompt/history construction onto the compiler.",
+      "gap": "Canonical context contracts, deterministic trust-aware packing, explicit omission reasons, provider-neutral projection, and conversation/retrieval/memory/artifact/skill/tool-schema/tool-result source adapters now exist. Remaining closure work is provenance-preserving compaction, making the cognitive runtime consume ContextEnvelope/provider projection directly, migrating legacy feature prompt/history assembly, and proving no canonical model turn bypasses the compiler.",
       "construction": [
         "define ContextEnvelope and ContextSegment immutable contracts with source/trust/data-class/provenance/budget metadata",
         "materialize one ContextCompiler under skeleton/context for all cognitive runtime model turns",
@@ -1866,17 +1866,19 @@
           "conversation source adapter with prior assistant output marked derived_untrusted",
           "retrieval source adapter requiring tenant/data-class/purpose/provenance",
           "determinism, injection, tenant isolation, clearance and budget regressions",
-          "App Assembly gating for context compiler contracts"
-        ],
-        "remaining": [
+          "App Assembly gating for context compiler contracts",
           "memory source adapter for governed canonical memory records",
           "artifact source adapter with authorization/content externalization",
-          "tool result and admitted tool schema source adapters",
+          "admitted tool schema source adapter",
           "declarative skill instruction adapter",
+          "durable successful tool result adapter with receipt lineage"
+        ],
+        "remaining": [
           "provenance-preserving summary/compaction implementation",
-          "bind context_id and context_digest into AgentTurn and ProviderRequest",
+          "bind ContextEnvelope/provider projection directly into cognitive AgentTurn and ProviderRequest construction",
           "migrate backend/routes/ai.py direct prompt/history assembly",
           "migrate backend/services/ai_assistant_svc.py direct ProviderRequest assembly",
+          "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
           "prove all canonical cognitive model turns originate from ContextCompiler"
         ]
       }
@@ -5541,15 +5543,18 @@
       "omission ledger",
       "provider-neutral projection",
       "conversation adapter",
-      "retrieval adapter"
-    ],
-    "remaining_surfaces": [
+      "retrieval adapter",
       "memory adapter",
       "artifact adapter",
-      "tool and skill adapters",
-      "compaction",
-      "AgentTurn/ProviderRequest binding",
-      "legacy route/service convergence"
+      "skill adapter",
+      "admitted tool-schema adapter",
+      "durable tool-result adapter"
+    ],
+    "remaining_surfaces": [
+      "provenance-preserving compaction",
+      "direct ContextEnvelope -> cognitive ProviderRequest binding",
+      "legacy route/service prompt convergence",
+      "versioned instruction-policy convergence"
     ]
   },
   "verification_runtime_blueprint": {
