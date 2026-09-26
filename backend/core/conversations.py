@@ -396,12 +396,35 @@ class MongoConversationAuthority:
                 "conversation governance deletion plan is malformed"
             )
 
-        external_actions = [
-            raw
-            for raw in plan["actions"]
-            if isinstance(raw, Mapping)
-            and str(raw.get("target") or "").lower() != "conversation"
-        ]
+        external_actions: list[Mapping[str, Any]] = []
+        for raw in plan["actions"]:
+            if not isinstance(raw, Mapping):
+                raise ConversationStorageUnavailable(
+                    "conversation governance deletion action is malformed"
+                )
+            if raw.get("tenant_id") != str(tenant_id):
+                raise ConversationStorageUnavailable(
+                    "conversation governance deletion tenant mismatch"
+                )
+            record_id = str(raw.get("record_id") or "").strip()
+            target = str(raw.get("target") or "").strip().lower()
+            source_ref = str(raw.get("source_ref") or "").strip()
+            if not record_id or not target or not source_ref:
+                raise ConversationStorageUnavailable(
+                    "conversation governance deletion action is malformed"
+                )
+            if record_id not in record_ids:
+                raise ConversationStorageUnavailable(
+                    "conversation governance plan contains unselected record"
+                )
+            if target == "conversation":
+                self._governed_conversation_location(
+                    record_id,
+                    source_ref,
+                )
+            else:
+                external_actions.append(raw)
+
         engine_result: Mapping[str, Any] | None = None
         if external_actions:
             executor = self.governance_engine_target_executor
