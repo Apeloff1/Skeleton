@@ -166,7 +166,10 @@
         "skeleton/vault/lifecycle_adapters.py tenant-bound governed retrieval physical delete/export adapter",
         "skeleton/api/server.py production retrieval owner plus lifecycle executor composition",
         "skeleton/testing/test_lifecycle_adapters.py retrieval isolation/export/delete/retention regressions",
-        "skeleton/testing/test_governance_runtime_binding.py production retrieval lifecycle binding regression"
+        "skeleton/testing/test_governance_runtime_binding.py production retrieval lifecycle binding regression",
+        "skeleton/memory/projection.py governance-bound derived vector/TF-IDF retrieval lifecycle",
+        "skeleton/api/server.py production AsyncMemoryProjectionCoordinator shares canonical GovernanceRegistry",
+        "skeleton/testing/test_memory_projection.py derived retrieval registration/delete acknowledgement regressions"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -175,7 +178,6 @@
         "retention expiry test"
       ],
       "outstanding_evidence": [
-        "memory derived projection/index deletion completion acknowledgement",
         "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
         "fresh exact-head governance audit/conversation lifecycle validation",
@@ -183,7 +185,6 @@
         "artifact production physical delete/export/retention adapter composition"
       ],
       "blockers": [
-        "memory derived projection/index deletion completion acknowledgement",
         "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
         "artifact canonical write registration",
