@@ -203,7 +203,7 @@ async def generate_sprite(request: Sprite2DRequest):
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.asset-pipeline.sprite-spec",
                     version="1",
-                    instructions="""You are an expert pixel artist and game asset designer. 
+                    instructions="""You are an expert pixel artist and game asset designer.
             Generate detailed, professional asset creation specifications and prompts for AI image generators.
             Include specific details about colors, shapes, shading, and style consistency.""",
                 ),
