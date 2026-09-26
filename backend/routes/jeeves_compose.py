@@ -567,7 +567,18 @@ async def _canonical_history_turn_rows(
                 "role_user": causal.content,
                 "role_jeeves": message.content,
                 "status": "complete",
+                "user_ts": causal.created_at.timestamp(),
+                "assistant_ts": message.created_at.timestamp(),
                 "ts": message.created_at.timestamp(),
+                "tier": "canonical",
+                "model": (
+                    "skeleton-engine"
+                    if execution_id
+                    else "canonical-jeeves"
+                ),
+                "forms": ["text"],
+                "artifact_count": len(message.artifact_refs),
+                "grounded_in": len(message.citation_refs),
                 "operation_id": message.operation_id,
                 "ai_result_id": message.ai_result_id,
                 "engine_execution_id": execution_id,
