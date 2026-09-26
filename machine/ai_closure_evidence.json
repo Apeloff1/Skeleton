@@ -582,9 +582,23 @@
       "plane": "model-provider",
       "stage": 2,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
+        "skeleton/provider_contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
+        "skeleton/provider_runtime.py accepts neutral tool definitions, structured_output_schema, tool_choice, specific_tool_id and deadline on ProviderRequest",
+        "skeleton/provider_runtime.py normalizes provider-native tool calls, structured output, usage and finish reasons before returning ProviderResponse",
+        "skeleton/provider_runtime.py rejects provider tool calls that were not offered by the admitted request",
+        "skeleton/provider_runtime.py converts normalized responses into ordered provider-neutral deltas via provider_response_deltas",
+        "ProviderAdapter.stream exposes the neutral delta contract even when the provider transport is non-streaming",
+        "skeleton/testing/test_provider_contract.py covers canonical tool-call digest validation and unknown usage semantics",
+        "skeleton/testing/test_provider_contract.py covers sync tool-only normalization, unoffered-tool denial and structured output projection",
+        "skeleton/testing/test_provider_contract.py covers sync and async deadline rejection/clamping before provider I/O",
+        "skeleton/testing/test_provider_contract.py covers neutral delta ordering and default stream finalization",
+        "skeleton/testing/test_provider_contract.py covers async provider transport normalization and admission reconciliation",
+        "skeleton/intelligence/execution_runtime.py projects only admitted minimal ProviderToolDefinition values and consumes neutral provider tool/structured outputs"
+      ],
       "closure_evidence_required": [
         "text-only compatibility tests",
         "structured output success/invalid schema tests",
@@ -598,16 +612,10 @@
         "no provider SDK/native response object escapes provider_runtime"
       ],
       "outstanding_evidence": [
-        "text-only compatibility tests",
-        "structured output success/invalid schema tests",
-        "single/multiple normalized tool-call tests",
-        "unknown/unoffered tool-call rejection",
-        "tool argument size/count bound tests",
-        "finish reason normalization tests",
-        "usage normalization/unknown-field tests",
-        "deadline/cancellation provider tests",
-        "stream delta ordering/finalization tests when streaming enabled",
-        "no provider SDK/native response object escapes provider_runtime"
+        "fresh exact-head execution of provider protocol and provider-boundary regression suites",
+        "fresh exact-head proof that provider-native SDK/response types remain isolated inside provider_runtime",
+        "declared dependency-gap closure",
+        "independent verification before gap closure"
       ],
       "blockers": [
         "dependency must close: gap-provider-surface-convergence",
