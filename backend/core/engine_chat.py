@@ -346,7 +346,12 @@ class EngineChat:
             raise ValueError(
                 "engine chat messages must not be empty"
             )
-        return await self.send_message(material[-1])
+        if len(material) != 1:
+            raise ValueError(
+                "engine chat send_async accepts exactly one message; "
+                "use add_message for canonical history"
+            )
+        return await self.send_message(material[0])
 
     async def send_message_multimodal_response(
         self,
