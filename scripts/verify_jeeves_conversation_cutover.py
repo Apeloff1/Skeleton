@@ -29,6 +29,8 @@ CHAT_WORKSPACE = Path("frontend/features/Jeeves/ChatWorkspace.tsx")
 WORKSPACE_CONTROLLER_TEST = Path("frontend/scripts/test-jeeves-workspace.cjs")
 CONVERSATION_ROUTE = Path("backend/routes/conversations.py")
 REGENERATION_ROUTE_TEST = Path("backend/tests/test_conversation_regeneration_route.py")
+CONVERSATION_GOVERNANCE_TEST = Path("backend/tests/test_conversation_governance.py")
+CONVERSATIONS_API_TEST = Path("backend/tests/test_conversations_api.py")
 
 REQUIRED_ROUTE_TOKENS = (
     "_canonical_authority",
@@ -46,6 +48,10 @@ REQUIRED_AUTHORITY_TOKENS = (
     "commit_assistant_message",
     "active_transcript",
     "idempotency_key",
+    "memory_refs",
+    "governed_record_ids_for_thread",
+    "delete_thread_with_governance",
+    "governance_engine_target_executor",
 )
 FORBIDDEN_ROUTE_TOKENS = (
     "SKL_JEEVES_CANONICAL_CONVERSATIONS",
@@ -140,6 +146,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     controller_test_path = root / WORKSPACE_CONTROLLER_TEST
     conversation_route_path = root / CONVERSATION_ROUTE
     regeneration_test_path = root / REGENERATION_ROUTE_TEST
+    governance_test_path = root / CONVERSATION_GOVERNANCE_TEST
+    conversations_api_test_path = root / CONVERSATIONS_API_TEST
     required = (
         route_path,
         authority_path,
@@ -151,6 +159,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         controller_test_path,
         conversation_route_path,
         regeneration_test_path,
+        governance_test_path,
+        conversations_api_test_path,
     )
     for path in required:
         if not path.is_file():
@@ -182,6 +192,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     controller_tests = _read(controller_test_path)
     conversation_route = _read(conversation_route_path)
     regeneration_tests = _read(regeneration_test_path)
+    governance_tests = _read(governance_test_path)
+    conversations_api_tests = _read(conversations_api_test_path)
 
     for token in REQUIRED_ROUTE_TOKENS:
         if token not in route:
@@ -201,6 +213,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         "causal_user_message_id",
         "operation_id",
         "ai_result_id",
+        "memory_refs",
     ):
         if token not in contract:
             errors.append(f"conversation contract lost token: {token}")
@@ -296,6 +309,38 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         if token not in regeneration_tests:
             errors.append(
                 f"conversation regenerate regression is missing: {token}"
+            )
+
+    for token in (
+        '@router.delete("/{thread_id}")',
+        "delete_thread_with_governance",
+        '"deletion_state": "deleted"',
+        '"complete": True',
+    ):
+        if token not in conversation_route:
+            errors.append(
+                f"conversation delete route lost governed propagation token: {token}"
+            )
+    if "Conversation deletion propagation is queued" in conversation_route:
+        errors.append(
+            "conversation delete route regained non-executing queued deletion path"
+        )
+
+    for token in (
+        "test_thread_governance_selection_includes_only_explicit_linked_records",
+        "test_governed_deletion_removes_message_before_thread_and_acks",
+    ):
+        if token not in governance_tests:
+            errors.append(
+                f"conversation governance regression is missing: {token}"
+            )
+    for token in (
+        "test_delete_executes_governed_propagation_before_claiming_completion",
+        "test_delete_never_claims_completion_when_governance_propagation_fails",
+    ):
+        if token not in conversations_api_tests:
+            errors.append(
+                f"conversation deletion API regression is missing: {token}"
             )
 
     legacy_reads = _verify_legacy_reads(route, errors)
