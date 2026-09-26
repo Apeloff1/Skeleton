@@ -684,9 +684,26 @@
         "skeleton/context/compiler.py",
         "skeleton/context/sources/conversation.py",
         "skeleton/context/sources/retrieval.py",
-        "skeleton/testing/test_context_compiler.py"
+        "skeleton/testing/test_context_compiler.py",
+        "skeleton/context/sources/conversation.py canonical conversation message adapter",
+        "skeleton/context/sources/retrieval.py ACL/provenance-bound retrieval adapter",
+        "skeleton/context/sources/memory.py active tenant-bound canonical memory adapter",
+        "skeleton/context/sources/artifact.py authorized materialized artifact adapter",
+        "skeleton/context/sources/skill.py trusted declarative skill instruction adapter",
+        "skeleton/context/sources/tool.py trusted minimal tool-schema adapter",
+        "skeleton/context/sources/tool.py successful durable tool-receipt result adapter with operation/execution/turn/call/governance provenance",
+        "skeleton/context/compiler.py deterministic trust-aware packing, omission ledger and provider-neutral projection",
+        "skeleton/testing/test_context_compiler.py deterministic digest/packing, mandatory policy, tenant/data-class, injection and budget regressions",
+        "skeleton/testing/test_context_compiler.py tool-result lineage/fail-closed/result-limit regressions"
       ],
-      "remaining": [],
+      "remaining": [
+        "implement provenance-preserving compaction with source/digest retention",
+        "make cognitive runtime consume ContextEnvelope/provider projection rather than preassembled instructions/prompt/history",
+        "bind compiler-produced context_id/context_digest/source snapshot to provider turn construction",
+        "migrate backend/routes/ai.py and backend/services/ai_assistant_svc.py prompt assembly to compatibility delegation",
+        "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
+        "collect exact-head validation and independent closure evidence"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
