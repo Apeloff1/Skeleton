@@ -105,8 +105,8 @@ async def pitch(pid: str):
     brief = (g.get("brief") or "").strip()
     genre = g.get("genre", "")
     text = None
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if key and brief:
+    llm_used = False
+    if brief:
         try:
             import uuid
             from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -116,11 +116,12 @@ async def pitch(pid: str):
             resp = await asyncio.wait_for(chat.send_message(UserMessage(
                 text=f"Write ONE vivid 2-sentence store pitch for '{title}' ({genre}). Premise: {brief}")), timeout=30)
             text = (resp.content if hasattr(resp, "content") else str(resp)).strip()
+            llm_used = bool(text)
         except Exception:
             text = None
     if not text:
         text = f"{title} is a {genre or 'bold new'} experience. {brief[:160] or 'Step into a world built just for you.'}"
-    return {"pid": pid, "title": title, "pitch": text, "llm": bool(text and key)}
+    return {"pid": pid, "title": title, "pitch": text, "llm": llm_used}
 
 
 # ── WIN 6 · Auto changelog from stage approvals ─────────────────────────────
