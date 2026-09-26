@@ -131,7 +131,7 @@ def test_invalid_budgets_fail_closed(budget) -> None:
         lambda: UsageEstimate(input_tokens=-1),
         lambda: UsageEstimate(cost_usd=math.inf),
         lambda: UsageEstimate(storage_bytes=-1),
-        lambda: UsageEstimate(provider_attempts=0),
+        lambda: UsageEstimate(provider_attempts=-1),
     ],
 )
 def test_invalid_estimates_fail_closed(estimate) -> None:
@@ -168,3 +168,20 @@ def test_receipt_exposes_budget_state_but_not_payload() -> None:
     assert payload["tenant_id"] == "tenant-1"
     assert "prompt" not in str(payload)
     assert "secret" not in str(payload)
+
+def test_non_provider_usage_defaults_to_zero_provider_attempts() -> None:
+    estimate = UsageEstimate(storage_bytes=128, tool_calls=1)
+
+    assert estimate.provider_attempts == 0
+    decision = require_admission(
+        AdmissionRequest(
+            operation_id="storage-op",
+            tenant_id="tenant-1",
+            capability="storage-write",
+            budget=ResourceBudget(),
+            estimate=estimate,
+        )
+    )
+    assert decision.estimated.provider_attempts == 0
+    assert decision.remaining["provider_attempts"] == 3
+
