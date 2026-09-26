@@ -436,6 +436,7 @@ async def _append_canonical_user_turn(
     authority, thread, tenant_id, owner_id = (
         await _ensure_canonical_thread(session_id)
     )
+    prior_sequence = thread.message_sequence
     thread, message = await authority.append_user_message(
         thread.thread_id,
         tenant_id=tenant_id,
@@ -447,7 +448,15 @@ async def _append_canonical_user_turn(
         expected_thread_version=thread.version,
         data_class="internal",
     )
-    return authority, thread, message, tenant_id, owner_id
+    created = message.sequence > prior_sequence
+    return (
+        authority,
+        thread,
+        message,
+        tenant_id,
+        owner_id,
+        created,
+    )
 
 
 async def _commit_canonical_assistant_turn(
@@ -819,6 +828,8 @@ async def chat(req: ChatReq):
             req,
             sid,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=503,
@@ -827,6 +838,24 @@ async def chat(req: ChatReq):
                 "retry later"
             ),
         ) from exc
+
+    if not canonical_turn[-1]:
+        if req.client_message_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail="canonical conversation retry identity is unavailable",
+            )
+        replay = await _canonical_existing_turn(
+            sid,
+            req.client_message_id,
+            req.message,
+        )
+        if replay is None:
+            raise HTTPException(
+                status_code=409,
+                detail="canonical conversation replay state is incomplete",
+            )
+        return replay
 
     context_req = req.model_copy(update={"history": effective_history})
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
@@ -874,6 +903,7 @@ async def chat(req: ChatReq):
         canonical_user,
         canonical_tenant,
         canonical_owner,
+        _canonical_user_created,
     ) = canonical_turn
     try:
         canonical_thread, canonical_assistant = (
