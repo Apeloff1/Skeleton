@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from core.engine_chat import EngineChat, UserMessage
 from core.engine_text import EngineTextError
 from skeleton.context.instruction_policy import InstructionPolicy
+from skeleton.persistence.conversation_repository import ConversationConflict
 from gameforge.jeeves.free_tier import free_tier
 from gameforge.jeeves import artifacts as ART
 from gameforge.jeeves.chat_contract import (
