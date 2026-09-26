@@ -386,10 +386,9 @@ def project_provider_context(
 
     instruction_blocks: list[str] = []
     for segment in envelope.instruction_segments:
-        content = _require_content(segment)
-        instruction_blocks.append(
-            f"[{segment.kind.value.upper()}:{segment.source_id}]\n{content}"
-        )
+        # Provenance is already digest-bound in the envelope source snapshot.
+        # Do not leak internal segment labels into model policy text.
+        instruction_blocks.append(_require_content(segment))
 
     conversation = [
         segment
@@ -404,24 +403,40 @@ def project_provider_context(
 
     prompt = ""
     history: list[dict[str, str]] = []
-    if conversation:
-        last = conversation[-1]
-        prompt_index = len(conversation) - 1 if last.kind is ContextKind.USER_MESSAGE else -1
-        for index, segment in enumerate(conversation):
-            content = _require_content(segment)
-            if index == prompt_index:
-                prompt = content
-                continue
-            history.append(
-                {
-                    "role": (
-                        "user"
-                        if segment.kind is ContextKind.USER_MESSAGE
-                        else "assistant"
-                    ),
-                    "content": content,
-                }
-            )
+    prompt_segment: ContextSegment | None = None
+    user_segments = [
+        segment
+        for segment in conversation
+        if segment.kind is ContextKind.USER_MESSAGE
+    ]
+    if user_segments:
+        # Current turns are newest; priority is the deterministic tie-break for
+        # callers that compile history and the current prompt at one timestamp.
+        prompt_segment = max(
+            user_segments,
+            key=lambda segment: (
+                segment.created_at.timestamp(),
+                segment.priority,
+                segment.relevance,
+                segment.segment_id,
+            ),
+        )
+        prompt = _require_content(prompt_segment)
+
+    for segment in conversation:
+        if segment is prompt_segment:
+            continue
+        content = _require_content(segment)
+        history.append(
+            {
+                "role": (
+                    "user"
+                    if segment.kind is ContextKind.USER_MESSAGE
+                    else "assistant"
+                ),
+                "content": content,
+            }
+        )
 
     evidence_blocks: list[str] = []
     for segment in non_conversation:
