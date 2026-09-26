@@ -1952,7 +1952,10 @@
         "skeleton/intelligence/execution_runtime.py materializes canonical VerificationReceipt and stores it before committing terminal AIExecutionResult",
         "skeleton/testing/test_verification_runtime.py covers scope integrity, model-evidence non-authority, independent-origin policy, contradiction, tool postconditions, observable receipt privacy, semantic-provider routing, fail-closed outage, repair lineage, citation rebinding and bounded repair budgets",
         "skeleton/testing/test_execution_runtime.py proves canonical verification receipt persistence, fail-closed missing evidence and verification-before-finalization ordering",
-        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head"
+        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
+        "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
+        "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
       ],
       "verification_state": "core-contract-runtime-and-receipt-persistence-implemented-production-semantic-evidence-binding-open"
     },
@@ -5982,7 +5985,14 @@
       "aggregate production tool/action postconditions into final verification",
       "map qualified/abstain/repair/block dispositions into execution publication/finalization semantics",
       "collect exact-head cognitive verification closure evidence and independent signoff"
-    ]
+    ],
+    "independent_verification": {
+      "verifier": "scripts/verify_verification_evidence_closure.py",
+      "regressions": "tests/test_verification_evidence_independent_verifier.py",
+      "workflow": ".github/workflows/verification-evidence-closure.yml",
+      "exact_head_receipt": "independent-verification-evidence-v1",
+      "status": "implemented-pending-exact-head-evidence"
+    }
   },
   "provider_interaction_protocol": {
     "schema_version": 1,
