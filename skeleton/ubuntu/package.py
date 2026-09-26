@@ -63,7 +63,7 @@ def validate_package_apt(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-apt:"+identifier, ("ubuntu","package","apt",identifier,desired), "validated package-apt")
+    return UbuntuAction("package-apt:"+identifier, ("ubuntu","package","apt",identifier,desired), "reconcile package-apt")
 
 def plan_package_apt(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-apt plan."""
@@ -123,7 +123,7 @@ def validate_package_snap(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-snap:"+identifier, ("ubuntu","package","snap",identifier,desired), "validated package-snap")
+    return UbuntuAction("package-snap:"+identifier, ("ubuntu","package","snap",identifier,desired), "reconcile package-snap")
 
 def plan_package_snap(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-snap plan."""
@@ -183,7 +183,7 @@ def validate_package_deb(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-deb:"+identifier, ("ubuntu","package","deb",identifier,desired), "validated package-deb")
+    return UbuntuAction("package-deb:"+identifier, ("ubuntu","package","deb",identifier,desired), "reconcile package-deb")
 
 def plan_package_deb(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-deb plan."""
@@ -243,7 +243,7 @@ def validate_package_repo(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-repo:"+identifier, ("ubuntu","package","repo",identifier,desired), "validated package-repo")
+    return UbuntuAction("package-repo:"+identifier, ("ubuntu","package","repo",identifier,desired), "reconcile package-repo")
 
 def plan_package_repo(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-repo plan."""
@@ -303,7 +303,7 @@ def validate_package_pin(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-pin:"+identifier, ("ubuntu","package","pin",identifier,desired), "validated package-pin")
+    return UbuntuAction("package-pin:"+identifier, ("ubuntu","package","pin",identifier,desired), "reconcile package-pin")
 
 def plan_package_pin(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-pin plan."""
@@ -363,7 +363,7 @@ def validate_package_hold(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-hold:"+identifier, ("ubuntu","package","hold",identifier,desired), "validated package-hold")
+    return UbuntuAction("package-hold:"+identifier, ("ubuntu","package","hold",identifier,desired), "reconcile package-hold")
 
 def plan_package_hold(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-hold plan."""
@@ -423,7 +423,7 @@ def validate_package_cache(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-cache:"+identifier, ("ubuntu","package","cache",identifier,desired), "validated package-cache")
+    return UbuntuAction("package-cache:"+identifier, ("ubuntu","package","cache",identifier,desired), "reconcile package-cache")
 
 def plan_package_cache(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-cache plan."""
@@ -483,7 +483,7 @@ def validate_package_mirror(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-mirror:"+identifier, ("ubuntu","package","mirror",identifier,desired), "validated package-mirror")
+    return UbuntuAction("package-mirror:"+identifier, ("ubuntu","package","mirror",identifier,desired), "reconcile package-mirror")
 
 def plan_package_mirror(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-mirror plan."""
@@ -543,7 +543,7 @@ def validate_package_keyring(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-keyring:"+identifier, ("ubuntu","package","keyring",identifier,desired), "validated package-keyring")
+    return UbuntuAction("package-keyring:"+identifier, ("ubuntu","package","keyring",identifier,desired), "reconcile package-keyring")
 
 def plan_package_keyring(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-keyring plan."""
@@ -603,7 +603,7 @@ def validate_package_policy(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("package-policy:"+identifier, ("ubuntu","package","policy",identifier,desired), "validated package-policy")
+    return UbuntuAction("package-policy:"+identifier, ("ubuntu","package","policy",identifier,desired), "reconcile package-policy")
 
 def plan_package_policy(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic package-policy plan."""

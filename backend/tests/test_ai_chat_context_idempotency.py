@@ -14,6 +14,9 @@ def test_chat_binds_ephemeral_context_digest_into_user_idempotency(monkeypatch):
     monkeypatch.setattr(auth, "_enforced", lambda: False)
     captured = {}
 
+    async def active_transcript(*_args, **_kwargs):
+        return ()
+
     async def append_user_message(thread_id, **kwargs):
         captured.update(kwargs)
         raise RuntimeError("stop after append identity capture")
@@ -21,7 +24,10 @@ def test_chat_binds_ephemeral_context_digest_into_user_idempotency(monkeypatch):
     monkeypatch.setattr(
         ai,
         "conversation_authority",
-        SimpleNamespace(append_user_message=append_user_message),
+        SimpleNamespace(
+            active_transcript=active_transcript,
+            append_user_message=append_user_message,
+        ),
     )
     app = FastAPI()
     app.include_router(ai.router)

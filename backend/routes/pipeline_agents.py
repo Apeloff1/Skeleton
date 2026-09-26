@@ -5,6 +5,7 @@ More game pipelines • More specialized agents • AAA Studio Team
 3 System Blurbs enforced as immutable laws across all chats.
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -620,12 +621,8 @@ async def send_chat_message(msg: ChatMessage):
 
 async def generate_agent_responses(user_message: str, chat_id: str, user_id: str) -> list:
     """Generate LLM-powered responses from relevant agents based on chat room and user message."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     import uuid
-    
-    EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
-    if not EMERGENT_KEY:
-        return []
     
     # Determine which agents should respond based on chat room
     room_agents = {
@@ -651,10 +648,13 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
         system_prompt += "\n\nYou are in a group chat with the user and other agents. Keep responses concise, actionable, and focused on your specialty. Include code when relevant. Use markdown formatting."
         
         try:
-            chat = LlmChat(
-                api_key=EMERGENT_KEY,
+            chat = EngineChat(
                 session_id=f"groupchat_{chat_id}_{agent_id}_{str(uuid.uuid4())[:8]}",
-                system_message=system_prompt
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.pipeline-agents.groupchat",
+                    version="1",
+                    instructions=system_prompt.strip(),
+                ),
             ).with_model("openai", "gpt-4o")
             
             response_text = await chat.send_message(UserMessage(text=user_message))

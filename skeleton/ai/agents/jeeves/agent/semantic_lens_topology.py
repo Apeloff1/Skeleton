@@ -31,6 +31,24 @@ from .semantic_plane_interactions import plane_interaction_rules
 from .types import AgentContractError, positive_int, probability, stable_fingerprint, stable_id
 
 
+def _sectioned_fingerprint(payload: Mapping[str, object]) -> str:
+    """Fingerprint a topology payload without exceeding the JSON node budget.
+
+    The full lens registry now yields well over ``json_safe``'s node budget
+    when serialised as one document.  Each list item is digested through the
+    same bounded canonical encoder, then the ordered per-section digests are
+    fingerprinted, so any change to any item still changes the result.
+    """
+
+    sections: dict[str, object] = {}
+    for key, value in payload.items():
+        if isinstance(value, (list, tuple)):
+            sections[key] = [stable_fingerprint(item) for item in value]
+        else:
+            sections[key] = stable_fingerprint(value)
+    return stable_fingerprint(sections)
+
+
 @dataclass(frozen=True, slots=True)
 class LensTopologyEdge:
     edge_id: str
@@ -345,7 +363,7 @@ class SemanticLensTopology:
             reinforcement_edge_ids=reinforces,
             family_pair_counts=pairs,
             candidate_bridge_count=len(effective_candidates),
-            fingerprint=stable_fingerprint(payload),
+            fingerprint=_sectioned_fingerprint(payload),
         )
 
     @property

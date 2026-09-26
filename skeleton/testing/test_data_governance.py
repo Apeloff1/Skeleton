@@ -6,8 +6,11 @@ from skeleton.vault.data_governance import (
     DataClass,
     DataGovernanceDenied,
     ProviderTransferRequest,
+    ToolTransferRequest,
     evaluate_provider_transfer,
+    evaluate_tool_transfer,
     require_provider_transfer,
+    require_tool_transfer,
 )
 
 
@@ -157,3 +160,65 @@ def test_normalization_bounds_identifiers() -> None:
                 tenant_id="x" * 257,
             )
         )
+
+def test_tool_transfer_enforces_manifest_data_ceiling() -> None:
+    denied = evaluate_tool_transfer(
+        ToolTransferRequest(
+            tool_id="web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+            data_class="internal",
+            purpose="tool-execution",
+            tenant_id="tenant-a",
+            source="test",
+        )
+    )
+    permitted = require_tool_transfer(
+        ToolTransferRequest(
+            tool_id="web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+            data_class="public",
+            purpose="tool-execution",
+            tenant_id="tenant-a",
+            source="test",
+        )
+    )
+
+    assert denied.permitted is False
+    assert denied.reason_code == "tool_data_ceiling_exceeded"
+    assert permitted.permitted is True
+    assert permitted.decision_id.startswith("gov-tool-")
+
+
+def test_restricted_data_is_denied_for_networked_tool() -> None:
+    decision = evaluate_tool_transfer(
+        ToolTransferRequest(
+            tool_id="repo.remote",
+            data_policy="restricted:tenant-only",
+            network_policy="public-search:bounded-egress",
+            data_class="restricted",
+            purpose="tool-execution",
+            tenant_id="tenant-secret",
+            source="test",
+        )
+    )
+
+    assert decision.permitted is False
+    assert decision.reason_code == "restricted_network_tool_denied"
+
+
+def test_sensitive_tool_transfer_requires_tenant_binding() -> None:
+    decision = evaluate_tool_transfer(
+        ToolTransferRequest(
+            tool_id="vault.read",
+            data_policy="confidential:vault",
+            network_policy="none",
+            data_class="confidential",
+            purpose="retrieval-synthesis",
+            source="test",
+        )
+    )
+
+    assert decision.permitted is False
+    assert decision.reason_code == "tool_sensitive_data_requires_tenant"

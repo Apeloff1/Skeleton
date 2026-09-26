@@ -1012,7 +1012,10 @@ async def ship(b: ShipBody, user=Depends(_editor)):
 
     # ── saga step actions ────────────────────────────────────────────
     async def _s_web(ctx):
-        web = await GB.build_web(GB.BuildBody(game_name=b.game_name))
+        web = await GB._build_web_for_user(
+            GB.BuildBody(game_name=b.game_name),
+            user,
+        )
         out["web_build"] = {"ok": web.get("ok"), "download_url": web.get("download_url"),
                             "size_bytes": web.get("size_bytes")}
         out["steps"].append("web_build")
@@ -1023,7 +1026,10 @@ async def ship(b: ShipBody, user=Depends(_editor)):
         return {"web_build_id": web.get("build_id")}
 
     async def _s_source(ctx):
-        src = await GB.build_source(GB.BuildBody(game_name=b.game_name))
+        src = await GB._build_source_for_user(
+            GB.BuildBody(game_name=b.game_name),
+            user,
+        )
         out["source_build"] = {"ok": src.get("ok"), "download_url": src.get("download_url"),
                                "size_bytes": src.get("size_bytes")}
         out["steps"].append("source_build")

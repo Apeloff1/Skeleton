@@ -19,6 +19,7 @@ import threading
 import time
 from typing import Any
 
+from skeleton.cognition.telemetry import MetricRegistry
 from skeleton.intelligence.admission import (
     AdmissionDecision,
     AdmissionError,
@@ -34,7 +35,15 @@ from skeleton.intelligence.quota import (
     QuotaExceeded,
     QuotaReservation,
     QuotaUsageEvent,
+    TenantQuota,
     TenantQuotaLedger,
+)
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
+    SharedPressureError,
+    SharedPressureExceeded,
+    SharedPressureLease,
+    SqliteSharedPressureLedger,
 )
 
 
@@ -47,6 +56,41 @@ class AdmissionRuntimeConflict(AdmissionRuntimeError):
 
 
 _USAGE_CATEGORIES = {"tool", "artifact", "storage", "provider", "other"}
+_USAGE_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cost_usd",
+    "wall_seconds",
+    "provider_attempts",
+    "tool_calls",
+    "artifact_bytes",
+    "storage_bytes",
+)
+
+
+def _observe_usage(
+    metrics: MetricRegistry,
+    prefix: str,
+    usage: UsageEstimate,
+) -> None:
+    for field_name in _USAGE_FIELDS:
+        metrics.observe(
+            f"admission.{prefix}.{field_name}",
+            float(getattr(usage, field_name)),
+        )
+
+
+def _observe_usage_delta(
+    metrics: MetricRegistry,
+    estimated: UsageEstimate,
+    actual: UsageEstimate,
+) -> None:
+    for field_name in _USAGE_FIELDS:
+        metrics.observe(
+            f"admission.delta.{field_name}",
+            float(getattr(actual, field_name))
+            - float(getattr(estimated, field_name)),
+        )
 
 
 def _wall_time(value: float | None, *, field: str) -> float:
@@ -146,6 +190,7 @@ class _ActiveLease:
     lease: AdmissionLease
     request_fingerprint: str
     unknown_usage: dict[str, UnknownUsageMarker]
+    shared_pressure_lease: SharedPressureLease | None = None
 
 
 class AdmissionRuntime:
@@ -155,8 +200,53 @@ class AdmissionRuntime:
         self,
         *,
         quota_ledger: TenantQuotaLedger | None = None,
+        default_tenant_quota: TenantQuota | None = None,
+        metrics_registry: MetricRegistry | None = None,
+        shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
+        shared_pressure_scope: str | None = None,
+        shared_pressure_owner_id: str | None = None,
     ) -> None:
+        pressure_values = (
+            shared_pressure_ledger,
+            shared_pressure_scope,
+            shared_pressure_owner_id,
+        )
+        if any(value is not None for value in pressure_values) and not all(
+            value is not None for value in pressure_values
+        ):
+            raise ValueError(
+                "shared pressure ledger, scope, and owner_id must be configured together"
+            )
+        if default_tenant_quota is not None and quota_ledger is None:
+            raise ValueError(
+                "default_tenant_quota requires quota_ledger"
+            )
+        if (
+            default_tenant_quota is not None
+            and not isinstance(default_tenant_quota, TenantQuota)
+        ):
+            raise TypeError("default_tenant_quota must be TenantQuota")
         self.quota_ledger = quota_ledger
+        self.default_tenant_quota = default_tenant_quota
+        self.metrics_registry = metrics_registry or MetricRegistry()
+        self.shared_pressure_ledger = shared_pressure_ledger
+        self.shared_pressure_scope = (
+            None
+            if shared_pressure_scope is None
+            else str(shared_pressure_scope).strip()
+        )
+        self.shared_pressure_owner_id = (
+            None
+            if shared_pressure_owner_id is None
+            else str(shared_pressure_owner_id).strip()
+        )
+        if shared_pressure_ledger is not None and (
+            not self.shared_pressure_scope
+            or not self.shared_pressure_owner_id
+        ):
+            raise ValueError(
+                "shared pressure scope and owner_id must be non-empty"
+            )
         self._lock = threading.RLock()
         self._active: dict[str, _ActiveLease] = {}
         self._queue_depth = 0
@@ -183,6 +273,32 @@ class AdmissionRuntime:
                 queue_depth=self._queue_depth,
             )
 
+    def _ensure_tenant_quota(self, tenant_id: str) -> None:
+        if self.quota_ledger is None or self.default_tenant_quota is None:
+            return
+        try:
+            self.quota_ledger.snapshot(tenant_id)
+            return
+        except QuotaError:
+            pass
+        try:
+            self.quota_ledger.configure(
+                tenant_id,
+                self.default_tenant_quota,
+            )
+        except QuotaConflict:
+            # Another worker may have won first-use provisioning.
+            try:
+                self.quota_ledger.snapshot(tenant_id)
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "tenant_quota_unavailable"
+                ) from exc
+        except QuotaError as exc:
+            raise AdmissionRuntimeError(
+                "tenant_quota_unavailable"
+            ) from exc
+
     def admit(
         self,
         request: AdmissionRequest,
@@ -204,9 +320,28 @@ class AdmissionRuntime:
                     )
                 return current.lease
 
+            shared_snapshot = None
+            if self.shared_pressure_ledger is not None:
+                try:
+                    shared_snapshot = self.shared_pressure_ledger.snapshot(
+                        self.shared_pressure_scope,
+                        tenant_id=request.tenant_id,
+                        now=wall,
+                    )
+                except SharedPressureError as exc:
+                    raise AdmissionRuntimeError(
+                        "shared_pressure_unavailable"
+                    ) from exc
+
             pressure = RuntimePressure(
-                active_operations=len(self._active),
-                queue_depth=self._queue_depth,
+                active_operations=max(
+                    len(self._active),
+                    0 if shared_snapshot is None else shared_snapshot.active,
+                ),
+                queue_depth=max(
+                    self._queue_depth,
+                    0 if shared_snapshot is None else shared_snapshot.queued,
+                ),
             )
             evaluated = replace(request, pressure=pressure)
             decision = require_admission(
@@ -214,8 +349,30 @@ class AdmissionRuntime:
                 now_monotonic=now_monotonic,
             )
 
+            shared_lease: SharedPressureLease | None = None
+            if self.shared_pressure_ledger is not None:
+                try:
+                    shared_lease = self.shared_pressure_ledger.acquire(
+                        self.shared_pressure_scope,
+                        request.tenant_id,
+                        request.operation_id,
+                        self.shared_pressure_owner_id,
+                        priority=request.priority,
+                        lease_seconds=request.budget.max_wall_seconds,
+                        now=wall,
+                    )
+                except SharedPressureExceeded as exc:
+                    raise AdmissionError(str(exc)) from exc
+                except SharedPressureConflict as exc:
+                    raise AdmissionRuntimeConflict(str(exc)) from exc
+                except SharedPressureError as exc:
+                    raise AdmissionRuntimeError(
+                        "shared_pressure_unavailable"
+                    ) from exc
+
             reservation: QuotaReservation | None = None
             if self.quota_ledger is not None:
+                self._ensure_tenant_quota(request.tenant_id)
                 try:
                     reservation = self.quota_ledger.reserve(
                         request.tenant_id,
@@ -224,8 +381,12 @@ class AdmissionRuntime:
                         now=wall,
                     )
                 except QuotaExceeded as exc:
+                    if shared_lease is not None:
+                        self._release_shared_pressure(shared_lease)
                     raise AdmissionError(str(exc)) from exc
                 except (QuotaConflict, QuotaError) as exc:
+                    if shared_lease is not None:
+                        self._release_shared_pressure(shared_lease)
                     raise AdmissionError("tenant_quota_unavailable") from exc
 
             lease = AdmissionLease(
@@ -234,12 +395,37 @@ class AdmissionRuntime:
                 quota_reservation=reservation,
                 admitted_at=wall,
             )
+            self.metrics_registry.inc("admission.admitted_total")
+            _observe_usage(
+                self.metrics_registry,
+                "estimated",
+                decision.estimated,
+            )
             self._active[request.operation_id] = _ActiveLease(
                 lease=lease,
                 request_fingerprint=fingerprint,
                 unknown_usage={},
+                shared_pressure_lease=shared_lease,
             )
             return lease
+
+    def _release_shared_pressure(
+        self,
+        lease: SharedPressureLease,
+    ) -> None:
+        ledger = self.shared_pressure_ledger
+        owner = self.shared_pressure_owner_id
+        if ledger is None or owner is None:
+            return
+        try:
+            ledger.release(lease.lease_id, owner)
+        except SharedPressureError:
+            # Shared pressure leases are time-bounded. Terminal accounting must
+            # not become unrecoverable because an already-expired pressure lease
+            # was reaped by another worker.
+            self.metrics_registry.inc(
+                "admission.shared_pressure_release_error_total"
+            )
 
     def record_usage_event(
         self,
@@ -285,6 +471,10 @@ class AdmissionRuntime:
                 decision.estimated.artifact_bytes
                 + int(decision.remaining["artifact_bytes"])
             )
+            max_storage_bytes = int(
+                decision.estimated.storage_bytes
+                + int(decision.remaining["storage_bytes"])
+            )
             try:
                 return recorder(
                     reservation.reservation_id,
@@ -293,6 +483,7 @@ class AdmissionRuntime:
                     delta,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
+                    max_storage_bytes=max_storage_bytes,
                     now=wall,
                 )
             except QuotaExceeded as exc:
@@ -362,7 +553,7 @@ class AdmissionRuntime:
             operation_id,
             event_id,
             "storage",
-            UsageEstimate(artifact_bytes=byte_count),
+            UsageEstimate(storage_bytes=byte_count),
             now_wall=now_wall,
         )
 
@@ -491,6 +682,10 @@ class AdmissionRuntime:
                 decision.estimated.artifact_bytes
                 + int(decision.remaining["artifact_bytes"])
             )
+            max_storage_bytes = int(
+                decision.estimated.storage_bytes
+                + int(decision.remaining["storage_bytes"])
+            )
             try:
                 recorded = resolver(
                     reservation.reservation_id,
@@ -498,6 +693,7 @@ class AdmissionRuntime:
                     delta,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
+                    max_storage_bytes=max_storage_bytes,
                     now=_wall_time(now_wall, field="now_wall"),
                 )
             except QuotaExceeded as exc:
@@ -562,6 +758,21 @@ class AdmissionRuntime:
                         "quota_completion_unavailable"
                     ) from exc
 
+            if active.shared_pressure_lease is not None:
+                self._release_shared_pressure(
+                    active.shared_pressure_lease
+                )
+            self.metrics_registry.inc("admission.completed_total")
+            _observe_usage(
+                self.metrics_registry,
+                "actual",
+                actual,
+            )
+            _observe_usage_delta(
+                self.metrics_registry,
+                active.lease.decision.estimated,
+                actual,
+            )
             self._active.pop(operation)
             return AdmissionCompletion(
                 lease=active.lease,
@@ -591,8 +802,19 @@ class AdmissionRuntime:
                         "quota reservation exists without a quota ledger"
                     )
                 self.quota_ledger.release(reservation.reservation_id)
+            if active.shared_pressure_lease is not None:
+                self._release_shared_pressure(active.shared_pressure_lease)
             self._active.pop(operation)
             return active.lease
+
+    def telemetry_snapshot(self) -> dict[str, Any]:
+        """Return aggregate resource telemetry without operation or tenant IDs."""
+
+        with self._lock:
+            return {
+                "schema_version": 1,
+                "metrics": self.metrics_registry.snapshot(),
+            }
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:

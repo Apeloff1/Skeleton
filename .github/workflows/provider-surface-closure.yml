@@ -1,0 +1,246 @@
+name: Provider Surface Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/provider_runtime.py"
+      - "skeleton/provider_contract.py"
+      - "skeleton/provider_governance.py"
+      - "skeleton/intelligence/**"
+      - "skeleton/api/**"
+      - "skeleton/ai/runtime/**"
+      - "backend/core/ai_provider_compat.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/engine_chat.py"
+      - "backend/emergentintegrations/llm/chat.py"
+      - "backend/routes/lafs.py"
+      - "backend/routes/jeeves_compose.py"
+      - "backend/routes/code_intelligence.py"
+      - "backend/routes/sota_2026.py"
+      - "backend/tests/test_engine_chat.py"
+      - "backend/tests/test_code_intelligence_engine_boundary.py"
+      - "backend/tests/test_sota_2026_engine_boundary.py"
+      - "tests/test_provider_runtime_boundary.py"
+      - "backend/services/tool_registry.py"
+      - "scripts/check_provider_bootstrap.py"
+      - "scripts/check_provider_capability_matrix.py"
+      - "scripts/check_provider_runtime_boundary.py"
+      - "scripts/verify_provider_surface_closure.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "skeleton/testing/test_provider_context_binding.py"
+      - "skeleton/testing/test_provider_context_budget.py"
+      - "skeleton/testing/test_provider_runtime_schema_parity.py"
+      - "skeleton/testing/test_provider_stream_reliability_profiles.py"
+      - "skeleton/testing/test_provider_surface_inventory.py"
+      - "skeleton/testing/test_engine_cross_service_boundary.py"
+      - "tests/test_provider_capability_matrix.py"
+      - "tests/test_provider_surface_independent_verifier.py"
+      - "machine/provider_capability_matrix.json"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/provider-surface-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-surface-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  provider-surface-contracts:
+    name: Provider surface contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused provider runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+
+      - name: Audit canonical provider SDK boundary
+        run: python scripts/check_provider_runtime_boundary.py
+
+      - name: Validate provider bootstrap and emit exact-head inventory receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/check_provider_bootstrap.py
+          --evidence-out .provider-surface-evidence.json
+          --print-evidence
+
+      - name: Validate canonical provider capability matrix
+        run: >-
+          python scripts/check_provider_capability_matrix.py
+          machine/provider_capability_matrix.json
+
+      - name: Validate provider capability matrix contract
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_provider_capability_matrix.py
+
+      - name: Run provider inventory and schema boundary contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_provider_surface_inventory.py
+          skeleton/testing/test_provider_runtime_schema_parity.py
+          skeleton/testing/test_provider_context_binding.py
+          skeleton/testing/test_provider_context_budget.py
+
+      - name: Run async sync and media provider contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_provider_contract.py
+
+      - name: Run provider streaming reliability contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_provider_stream_reliability_profiles.py
+
+      - name: Run engine provider isolation golden journey
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_cross_service_boundary.py
+
+      - name: Run product provider-isolation facade contracts
+        run: |
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin \
+            backend/tests/test_engine_chat.py \
+            backend/tests/test_code_intelligence_engine_boundary.py \
+            backend/tests/test_sota_2026_engine_boundary.py
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin \
+            tests/test_provider_runtime_boundary.py
+
+      - name: Assert exact-head provider evidence receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".provider-surface-evidence.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          actual = str(receipt.get("head_sha") or "").strip()
+          if actual != expected:
+              raise SystemExit(
+                  f"provider evidence head mismatch: {actual!r} != {expected!r}"
+              )
+          if receipt.get("valid") is not True:
+              raise SystemExit("provider evidence receipt is not valid")
+          if receipt.get("validation_errors"):
+              raise SystemExit("provider evidence receipt contains validation errors")
+          if not receipt.get("declared_surfaces"):
+              raise SystemExit("provider evidence has no declared surfaces")
+          if not receipt.get("discovered_surfaces"):
+              raise SystemExit("provider evidence has no discovered surfaces")
+          print(
+              "provider-surface exact-head receipt:",
+              expected,
+              "declared=",
+              len(receipt["declared_surfaces"]),
+              "discovered=",
+              len(receipt["discovered_surfaces"]),
+          )
+          PY
+
+  provider-surface-independent:
+    name: Independent provider verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent provider verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_provider_surface_independent_verifier.py
+
+      - name: Run independent exact-head provider ownership scan
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_provider_surface_closure.py
+          --evidence-out .provider-surface-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".provider-surface-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit(
+                  "independent provider receipt does not match exact PR head"
+              )
+          if receipt.get("verifier") != "independent-provider-surface-v1":
+              raise SystemExit("unexpected independent provider verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent provider verification failed")
+          if int(receipt.get("scanned_python_files", 0)) < 1:
+              raise SystemExit("independent provider scan covered no Python files")
+          if not receipt.get("declared_surface_digest"):
+              raise SystemExit("independent provider declaration digest is missing")
+          print(
+              "independent provider exact-head receipt:",
+              expected,
+              "scanned=",
+              receipt["scanned_python_files"],
+              "edges=",
+              len(receipt["discovered_provider_edges"]),
+          )
+          PY

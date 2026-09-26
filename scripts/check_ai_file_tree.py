@@ -572,7 +572,7 @@ def validate() -> list[str]:
                 continue
             serialized = json.dumps(contract, ensure_ascii=False)
             planned_roots.update(
-                re.findall(r"\bskeleton/[A-Za-z0-9_.-]+", serialized)
+                re.findall(r"\bskeleton/[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?", serialized)
             )
 
         unclassified = sorted(planned_roots - classified_roots)

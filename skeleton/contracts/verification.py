@@ -502,6 +502,185 @@ class VerificationCheck:
             raise VerificationContractError("unsupported verification schema version")
 
 
+@dataclass(frozen=True, slots=True)
+class VerificationReceipt:
+    """Immutable observable verification receipt bound to finalization lineage."""
+
+    receipt_id: str
+    claim_id: str
+    claim_digest: str
+    tenant_id: str
+    outcome: VerificationOutcome
+    policy_level: VerificationLevel
+    required_modes: tuple[str, ...]
+    policy_satisfied: bool
+    verifier_id: str
+    verified_at: datetime
+    operation_id: str | None = None
+    execution_id: str | None = None
+    turn_id: str | None = None
+    result_ref: str | None = None
+    check_id: str | None = None
+    supporting_evidence_ids: tuple[str, ...] = ()
+    contradicting_evidence_ids: tuple[str, ...] = ()
+    rejected_evidence_ids: tuple[str, ...] = ()
+    postcondition_observation_ids: tuple[str, ...] = ()
+    independent: bool = False
+    issues: tuple[str, ...] = ()
+    schema_version: int = VERIFICATION_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "receipt_id", _uuid(self.receipt_id, "receipt_id"))
+        object.__setattr__(self, "claim_id", _uuid(self.claim_id, "claim_id"))
+        object.__setattr__(
+            self,
+            "claim_digest",
+            _sha256(self.claim_digest, "claim_digest"),
+        )
+        object.__setattr__(
+            self,
+            "tenant_id",
+            _text(self.tenant_id, "tenant_id", max_length=512),
+        )
+        try:
+            object.__setattr__(self, "outcome", VerificationOutcome(self.outcome))
+            object.__setattr__(
+                self,
+                "policy_level",
+                VerificationLevel(self.policy_level),
+            )
+        except ValueError as exc:
+            raise VerificationContractError(
+                "verification receipt enum value is invalid"
+            ) from exc
+        if isinstance(self.required_modes, (str, bytes)):
+            raise VerificationContractError("required_modes must be an iterable")
+        modes = tuple(
+            _text(item, "required_modes", max_length=128)
+            for item in self.required_modes
+        )
+        if not modes:
+            raise VerificationContractError("required_modes must not be empty")
+        object.__setattr__(self, "required_modes", tuple(dict.fromkeys(modes)))
+        if not isinstance(self.policy_satisfied, bool):
+            raise VerificationContractError("policy_satisfied must be boolean")
+        object.__setattr__(
+            self,
+            "verifier_id",
+            _text(self.verifier_id, "verifier_id", max_length=512),
+        )
+        object.__setattr__(
+            self,
+            "verified_at",
+            _utc(self.verified_at, "verified_at"),
+        )
+        object.__setattr__(
+            self,
+            "operation_id",
+            _optional_uuid(self.operation_id, "operation_id"),
+        )
+        object.__setattr__(
+            self,
+            "execution_id",
+            _optional_text(self.execution_id, "execution_id", max_length=256),
+        )
+        object.__setattr__(
+            self,
+            "turn_id",
+            _optional_uuid(self.turn_id, "turn_id"),
+        )
+        object.__setattr__(
+            self,
+            "result_ref",
+            _optional_text(self.result_ref, "result_ref", max_length=2048),
+        )
+        object.__setattr__(
+            self,
+            "check_id",
+            _optional_uuid(self.check_id, "check_id"),
+        )
+        for field_name in (
+            "supporting_evidence_ids",
+            "contradicting_evidence_ids",
+            "rejected_evidence_ids",
+            "postcondition_observation_ids",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _uuid_refs(getattr(self, field_name), field_name),
+            )
+        if not isinstance(self.independent, bool):
+            raise VerificationContractError("independent must be boolean")
+        object.__setattr__(self, "issues", _refs(self.issues, "issues"))
+        if self.policy_satisfied:
+            if self.outcome is not VerificationOutcome.PASSED:
+                raise VerificationContractError(
+                    "satisfied verification receipt requires passed outcome"
+                )
+            if self.check_id is None:
+                raise VerificationContractError(
+                    "satisfied verification receipt requires check_id"
+                )
+            if (
+                self.policy_level >= VerificationLevel.EVIDENCE
+                and not self.supporting_evidence_ids
+            ):
+                raise VerificationContractError(
+                    "evidence-level satisfied receipt requires supporting evidence"
+                )
+            if (
+                self.policy_level >= VerificationLevel.INDEPENDENT
+                and not self.independent
+            ):
+                raise VerificationContractError(
+                    "independent-level satisfied receipt requires independent=true"
+                )
+            if (
+                self.policy_level >= VerificationLevel.POSTCONDITION
+                and not self.postcondition_observation_ids
+            ):
+                raise VerificationContractError(
+                    "postcondition-level satisfied receipt requires observations"
+                )
+        if self.schema_version != VERIFICATION_SCHEMA_VERSION:
+            raise VerificationContractError(
+                "unsupported verification receipt schema version"
+            )
+
+    @property
+    def digest(self) -> str:
+        return _canonical_digest(self.as_dict())
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "receipt_id": self.receipt_id,
+            "claim_id": self.claim_id,
+            "claim_digest": self.claim_digest,
+            "tenant_id": self.tenant_id,
+            "operation_id": self.operation_id,
+            "execution_id": self.execution_id,
+            "turn_id": self.turn_id,
+            "result_ref": self.result_ref,
+            "outcome": self.outcome.value,
+            "policy_level": int(self.policy_level),
+            "required_modes": list(self.required_modes),
+            "policy_satisfied": self.policy_satisfied,
+            "check_id": self.check_id,
+            "verifier_id": self.verifier_id,
+            "verified_at": self.verified_at.isoformat(),
+            "supporting_evidence_ids": list(self.supporting_evidence_ids),
+            "contradicting_evidence_ids": list(self.contradicting_evidence_ids),
+            "rejected_evidence_ids": list(self.rejected_evidence_ids),
+            "postcondition_observation_ids": list(
+                self.postcondition_observation_ids
+            ),
+            "independent": self.independent,
+            "issues": list(self.issues),
+        }
+
+
 __all__ = [
     "VERIFICATION_SCHEMA_VERSION",
     "ClaimKind",
@@ -517,4 +696,5 @@ __all__ = [
     "VerificationOutcome",
     "VerificationRisk",
     "VerificationClaim",
+    "VerificationReceipt",
 ]

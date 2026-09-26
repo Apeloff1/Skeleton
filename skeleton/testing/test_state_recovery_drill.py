@@ -185,3 +185,137 @@ def test_failed_phase_stops_recovery_journal() -> None:
 
     assert len(journal.events) == 1
     assert journal.events[0].status == "failed"
+
+
+def test_operation_sqlite_restore_preserves_authority_and_outbox_order(
+    tmp_path,
+) -> None:
+    result = drill.run_operation_sqlite_drill(
+        tmp_path / "sqlite-recovery",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["backup_digest"] == result["restore_digest"]
+    journal = result["journal"]
+    assert journal["complete"] is True
+    phases = [event["phase"] for event in journal["events"]]
+    assert phases == [
+        "seed_operation_authority",
+        "backup_operation_authority",
+        "destroy_operation_authority",
+        "restore_operation_authority",
+        "verify_operation_authority",
+        "reconcile_operation_outbox",
+        "ready",
+    ]
+    verification = journal["events"][4]["evidence"]
+    assert verification["state"] == "admitted"
+    assert verification["version"] == 4
+    assert verification["pending_outbox"] == 4
+    reconciliation = journal["events"][5]["evidence"]
+    assert reconciliation["remaining"] == 0
+    assert reconciliation["published"] == 4
+    assert reconciliation["event_types"] == [
+        "operation.created",
+        "operation.validated",
+        "operation.authorized",
+        "operation.admitted",
+    ]
+    assert len(set(reconciliation["event_ids"])) == 4
+
+
+def test_sqlite_snapshot_verification_rejects_restore_drift(tmp_path) -> None:
+    source = tmp_path / "source.sqlite"
+    conn = drill.sqlite3.connect(str(source))
+    try:
+        conn.execute("CREATE TABLE authority (id TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO authority VALUES ('a', 'one')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    expected = drill.capture_sqlite_database(source)
+    conn = drill.sqlite3.connect(str(source))
+    try:
+        conn.execute("UPDATE authority SET value = 'two' WHERE id = 'a'")
+        conn.commit()
+    finally:
+        conn.close()
+    actual = drill.capture_sqlite_database(source)
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="differs from backup",
+    ):
+        drill.verify_sqlite_snapshot(expected, actual)
+
+
+def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
+    tmp_path,
+) -> None:
+    result = drill.run_engine_sqlite_bundle_drill(
+        tmp_path / "engine-bundle",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["bundle_digest"] == result["restored_bundle_digest"]
+    assert set(result["stores"]) == {
+        "execution",
+        "pressure",
+        "quota",
+        "submissions",
+        "tool_receipts",
+    }
+    for store in result["stores"].values():
+        assert store["backup_digest"] == store["restore_digest"]
+
+    verified = result["verified"]
+    assert verified["execution_state"] == "routing"
+    assert verified["checkpoint_version"] == 1
+    assert verified["approval_ref"].startswith("approval:")
+    assert len(verified["approval_ref"]) == len("approval:") + 64
+    assert verified["tool_reservation_status"] == "in_doubt"
+    assert verified["quota_committed_input_tokens"] == 90
+    assert verified["pressure_active"] == 1
+    assert verified["pressure_queued"] == 1
+
+
+def test_derived_rebuild_includes_only_active_canonical_memory() -> None:
+    snapshot = {
+        "collections": {
+            "canonical_memory_records": {
+                "documents": [
+                    {
+                        "memory_id": "memory-active",
+                        "tenant_id": "tenant-a",
+                        "subject_id": "user-a",
+                        "state": "active",
+                        "content": "remember this",
+                    },
+                    {
+                        "memory_id": "memory-deleted",
+                        "tenant_id": "tenant-a",
+                        "subject_id": "user-a",
+                        "state": "tombstoned",
+                        "content": "do not project this",
+                    },
+                ]
+            }
+        }
+    }
+
+    projection = drill.rebuild_derived_projection(snapshot)
+
+    assert projection["count"] == 1
+    assert projection["records"] == [
+        {
+            "source": "canonical_memory_records",
+            "record_id": "memory-active",
+            "tenant_or_user": "tenant-a",
+            "digest": drill.digest_payload(
+                snapshot["collections"]["canonical_memory_records"]["documents"][0]
+            ),
+        }
+    ]

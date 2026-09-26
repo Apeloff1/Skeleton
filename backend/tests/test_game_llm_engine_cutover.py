@@ -163,4 +163,5 @@ def test_game_llm_source_has_no_local_provider_activation() -> None:
     assert "ProviderRegistry.from_env(" not in source
     assert "ProviderRequest(" not in source
     assert "from core.ai_provider import" not in source
-    assert "execute_engine_text" in source
+    assert "EngineChat" in source
+    assert "UserMessage" in source

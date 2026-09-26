@@ -64,6 +64,7 @@ _AI_SURFACE_PATH_TERMS = (
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
 _NON_RUNTIME_PROVIDER_MIRROR_PREFIXES = (
     "skeleton/ai/research/external/",
+    "skeleton/ai/runtime/provider_runtime.py",
 )
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
@@ -923,7 +924,9 @@ def build_provider_surface_evidence(
         "head_sha": (
             head_sha
             if head_sha is not None
-            else os.environ.get("GITHUB_SHA", "").strip() or "unknown"
+            else os.environ.get("EVIDENCE_HEAD_SHA", "").strip()
+            or os.environ.get("GITHUB_SHA", "").strip()
+            or "unknown"
         ),
         "declared_surfaces": sorted(
             declared,
@@ -958,7 +961,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence_out is not None:
         args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
         args.evidence_out.write_text(
-            json.dumps(evidence, indent=2, sort_keys=True) + "\\n",
+            json.dumps(evidence, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
     if args.print_evidence:

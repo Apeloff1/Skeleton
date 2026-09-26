@@ -325,13 +325,19 @@ def test_chat_retry_replays_existing_assistant_without_provider_call(
 
 
 def test_chat_version_conflict_maps_to_409(route, client, monkeypatch):
+    async def active_transcript(*args, **kwargs):
+        return ()
+
     async def append_user_message(*args, **kwargs):
         raise ConversationConflict("thread version conflict")
 
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        SimpleNamespace(append_user_message=append_user_message),
+        SimpleNamespace(
+            active_transcript=active_transcript,
+            append_user_message=append_user_message,
+        ),
     )
 
     response = client.post(

@@ -17,6 +17,7 @@ from core.engine_client import (
     command_from_context,
 )
 from skeleton.provider_contract import ProviderToolDefinition
+from skeleton.context.compiler import ContextCompiler
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -95,6 +96,101 @@ def _context() -> ContextEnvelope:
     )
 
 
+def _projected_context() -> ContextEnvelope:
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    created_at = _now()
+    budget = ContextBudget(
+        max_context_tokens=4096,
+        reserved_output_tokens=512,
+        reserved_tool_result_tokens=0,
+        reserved_policy_tokens=512,
+        safety_margin_tokens=128,
+        max_segment_tokens=2048,
+        max_artifact_tokens=1024,
+        max_tool_result_tokens=1024,
+    )
+    segments = (
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.PRODUCT_INSTRUCTION,
+            source_type="product-policy",
+            source_id="policy:projected",
+            content="Canonical projected instruction.",
+            trust_level=ContextTrust.TRUSTED_CONTROL,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=1000,
+            relevance=1.0,
+            created_at=created_at,
+            provenance=("test",),
+            retention_class="policy",
+            mandatory=True,
+        ),
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.USER_MESSAGE,
+            source_type="conversation",
+            source_id="message:earlier-user",
+            content="Canonical earlier question.",
+            trust_level=ContextTrust.AUTHORIZED_USER_DATA,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=700,
+            relevance=1.0,
+            created_at=created_at,
+            provenance=("test",),
+            retention_class="conversation",
+        ),
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.ASSISTANT_MESSAGE,
+            source_type="conversation",
+            source_id="message:earlier-assistant",
+            content="Canonical earlier answer.",
+            trust_level=ContextTrust.DERIVED_UNTRUSTED,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=700,
+            relevance=1.0,
+            created_at=created_at + timedelta(milliseconds=1),
+            provenance=("test",),
+            retention_class="conversation",
+        ),
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.USER_MESSAGE,
+            source_type="conversation",
+            source_id="message:current-user",
+            content="Canonical current question.",
+            trust_level=ContextTrust.AUTHORIZED_USER_DATA,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=900,
+            relevance=1.0,
+            created_at=created_at + timedelta(milliseconds=2),
+            provenance=("test",),
+            retention_class="conversation",
+        ),
+    )
+    return ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=budget,
+        segments=segments,
+        tools_enabled=False,
+        compiled_at=created_at,
+    )
+
+
 def _command():
     context = _context()
     return command_from_context(
@@ -136,6 +232,13 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert "engine:approve" not in command.delegated_authority.scopes
     assert command.execution_request.resource_budget["max_model_turns"] == 4
     assert command.execution_request.resource_budget["max_tool_calls"] == 1
+    resource_budget = command.execution_request.resource_budget
+    assert resource_budget["max_input_tokens"] == 4096 - 512 - 128
+    assert 0 < resource_budget["selected_input_tokens_estimate"] <= (
+        resource_budget["max_input_tokens"]
+    )
+    assert resource_budget["max_output_tokens"] == 512
+    assert resource_budget["max_tool_result_tokens"] == 0
     assert command.execution_request.tool_policy["allowed_tool_ids"] == []
     assert command.execution_request.context_policy["verification_profile"] == "evidence_required"
     assert command.compiled_context.tool_choice == "none"
@@ -146,6 +249,37 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.context_seed_refs == ("conversation:thread-a",)
     assert command.execution_request.context_policy["handoff_digest"] == (
         command.compiled_context.handoff_digest
+    )
+
+
+def test_command_from_context_uses_context_projection_over_legacy_text() -> None:
+    context = _projected_context()
+
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="projection-authority",
+        instructions="ATTACKER OVERRIDE",
+        prompt="ATTACKER PROMPT",
+        history=(
+            {"role": "user", "content": "ATTACKER HISTORY"},
+        ),
+    )
+
+    assert command.compiled_context.instructions == (
+        "Canonical projected instruction."
+    )
+    assert command.compiled_context.prompt == "Canonical current question."
+    assert command.compiled_context.history == (
+        ("user", "Canonical earlier question."),
+        ("assistant", "Canonical earlier answer."),
+    )
+    assert "ATTACKER" not in command.compiled_context.instructions
+    assert "ATTACKER" not in command.compiled_context.prompt
+    assert all(
+        "ATTACKER" not in content
+        for _role, content in command.compiled_context.history
     )
 
 
@@ -1152,3 +1286,355 @@ async def test_client_rejects_missing_service_token_before_transport() -> None:
         )
 
     assert called is False
+
+def test_command_from_context_rejects_output_above_compiled_reserve() -> None:
+    context = _context()
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="max_output_tokens exceeds compiled context reserve",
+    ):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="output-over-reserve",
+            instructions="Policy",
+            prompt="Prompt",
+            max_output_tokens=context.budget.reserved_output_tokens + 1,
+        )
+
+
+def test_command_from_context_allows_smaller_explicit_output_budget() -> None:
+    context = _context()
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="output-under-reserve",
+        instructions="Policy",
+        prompt="Prompt",
+        max_output_tokens=128,
+    )
+
+    assert command.execution_request.resource_budget["max_output_tokens"] == 128
+    assert command.execution_request.resource_budget["max_input_tokens"] == (
+        context.budget.input_capacity(tools_enabled=False)
+    )
+    assert command.execution_request.resource_budget[
+        "selected_input_tokens_estimate"
+    ] == context.selected_tokens_estimate
+
+def test_command_from_context_requires_positive_compiled_output_reserve() -> None:
+    context = _context()
+    zero_budget = ContextBudget(
+        max_context_tokens=context.budget.max_context_tokens,
+        reserved_output_tokens=0,
+        reserved_tool_result_tokens=0,
+        reserved_policy_tokens=context.budget.reserved_policy_tokens,
+        safety_margin_tokens=context.budget.safety_margin_tokens,
+        max_segment_tokens=context.budget.max_segment_tokens,
+        max_artifact_tokens=context.budget.max_artifact_tokens,
+        max_tool_result_tokens=context.budget.max_tool_result_tokens,
+    )
+    rebound = ContextEnvelope(
+        context_id=context.context_id,
+        operation_id=context.operation_id,
+        execution_id=context.execution_id,
+        turn_id=context.turn_id,
+        tenant_id=context.tenant_id,
+        instruction_segments=context.instruction_segments,
+        evidence_segments=context.evidence_segments,
+        tool_schema_segments=context.tool_schema_segments,
+        budget=zero_budget,
+        selected_tokens_estimate=context.selected_tokens_estimate,
+        omitted_segment_ids=context.omitted_segment_ids,
+        omission_reasons=context.omission_reasons,
+        source_snapshot=context.source_snapshot,
+        context_digest=context_digest_payload(
+            operation_id=context.operation_id,
+            execution_id=context.execution_id,
+            turn_id=context.turn_id,
+            tenant_id=context.tenant_id,
+            budget=zero_budget,
+            selected=context.selected_segments,
+            omitted_segment_ids=context.omitted_segment_ids,
+            compiler_version=context.compiler_version,
+        ),
+        compiled_at=context.compiled_at,
+        compiler_version=context.compiler_version,
+    )
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="positive output reserve",
+    ):
+        command_from_context(
+            context=rebound,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="zero-output-reserve",
+            instructions="Policy",
+            prompt="Prompt",
+        )
+
+@pytest.mark.asyncio
+async def test_storage_admission_client_uses_engine_boundary_and_bounded_body() -> None:
+    seen = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["principal"] = request.headers.get("x-zaibatsu-attester")
+        seen["authorization"] = request.headers.get("authorization")
+        seen["trace"] = request.headers.get("x-trace-id")
+        seen["body"] = __import__("json").loads(request.content)
+        return _json(
+            200,
+            {
+                "schema_version": 1,
+                "receipt_id": "storage-admission:test",
+                "operation_id": str(uuid4()),
+                "tenant_id": "tenant-a",
+                "capability": "conversation-persistence",
+                "resource_id": "conversation-message",
+                "write_id": "thread-a:idem-1",
+                "storage_bytes": 321,
+                "admitted_at": _now().isoformat(),
+                "quota_reservation_id": "qrs-test",
+                "admission_decision_id": "adm-test",
+                "replayed": False,
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    receipt = await client.admit_storage_write(
+        tenant_id="tenant-a",
+        capability="conversation-persistence",
+        resource_id="conversation-message",
+        write_id="thread-a:idem-1",
+        storage_bytes=321,
+        trace_id="trace-storage",
+    )
+
+    assert receipt["storage_bytes"] == 321
+    assert seen["path"] == "/api/v1/engine/admission/storage"
+    assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
+    assert seen["trace"] == "trace-storage"
+    assert seen["body"] == {
+        "tenant_id": "tenant-a",
+        "capability": "conversation-persistence",
+        "resource_id": "conversation-message",
+        "write_id": "thread-a:idem-1",
+        "storage_bytes": 321,
+    }
+
+
+@pytest.mark.asyncio
+async def test_storage_admission_client_rejects_invalid_size_before_io() -> None:
+    called = False
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return _json(500, {"detail": "must not be reached"})
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EngineProtocolError, match="storage_bytes"):
+        await client.admit_storage_write(
+            tenant_id="tenant-a",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-a:idem-1",
+            storage_bytes=0,
+        )
+
+    assert called is False
+
+@pytest.mark.asyncio
+async def test_governance_write_client_posts_bounded_metadata() -> None:
+    seen = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["principal"] = request.headers.get("x-zaibatsu-attester")
+        seen["authorization"] = request.headers.get("authorization")
+        seen["body"] = __import__("json").loads(request.content)
+        return _json(
+            200,
+            {
+                "schema_version": 1,
+                "mode": "register",
+                "record": {
+                    "record_id": "message-1",
+                    "tenant_id": "tenant-a",
+                    "owner_plane": "conversation",
+                    "source_ref": "conversation-message://thread-1/message-1",
+                    "data_class": "internal",
+                    "purposes": ["model-inference"],
+                    "deletion_targets": ["conversation"],
+                    "created_at": 100.0,
+                    "retention_until": None,
+                    "exportable": True,
+                    "state": "active",
+                },
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    receipt = await client.reconcile_governed_write(
+        mode="register",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="internal",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+    )
+
+    assert receipt["record"]["owner_plane"] == "conversation"
+    assert seen["path"] == "/api/v1/engine/governance/writes"
+    assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
+    assert seen["body"] == {
+        "mode": "register",
+        "plane": "conversation",
+        "record_id": "message-1",
+        "tenant_id": "tenant-a",
+        "source_ref": "conversation-message://thread-1/message-1",
+        "data_class": "internal",
+        "purposes": ["model-inference"],
+        "deletion_targets": ["conversation"],
+        "created_at": 100.0,
+        "retention_until": None,
+        "exportable": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_governance_write_client_rejects_malformed_lists_before_io() -> None:
+    called = False
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return _json(500, {"detail": "must not be reached"})
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EngineProtocolError, match="purposes"):
+        await client.reconcile_governed_write(
+            mode="register",
+            plane="conversation",
+            record_id="message-1",
+            tenant_id="tenant-a",
+            source_ref="conversation-message://thread-1/message-1",
+            data_class="internal",
+            purposes=(),
+        )
+
+    assert called is False
+
+
+def test_command_from_context_binds_explicit_verified_memory_intent() -> None:
+    context = _context()
+
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="memory-intent",
+        instructions="ignored legacy instruction",
+        prompt="remember this verified outcome",
+        verification_profile="assistant_proposal",
+        memory_write_intent={
+            "subject_id": "user-a",
+            "namespace": "assistant",
+            "kind": "semantic",
+            "content_from": "verified_final_output",
+            "data_class": "confidential",
+            "provenance_refs": ["conversation:thread-a"],
+        },
+    )
+
+    intent = command.execution_request.context_policy[
+        "memory_write_intent"
+    ]
+    assert intent == {
+        "subject_id": "user-a",
+        "namespace": "assistant",
+        "kind": "semantic",
+        "data_class": "confidential",
+        "content_from": "verified_final_output",
+        "provenance_refs": ["conversation:thread-a"],
+    }
+    assert "engine:memory" in command.delegated_authority.scopes
+
+
+def test_command_from_context_rejects_unverified_memory_content_source() -> None:
+    context = _context()
+
+    with pytest.raises(
+        EngineProtocolError,
+        match="only persist verified_final_output",
+    ):
+        command_from_context(
+            context=context,
+            actor_id="actor-a",
+            capability="assistant.chat",
+            idempotency_key="memory-intent-invalid",
+            instructions="canonical",
+            prompt="hello",
+            verification_profile="assistant_proposal",
+            memory_write_intent={
+                "subject_id": "user-a",
+                "kind": "semantic",
+                "content_from": "raw_model_output",
+            },
+        )
+
+
+def test_command_without_memory_intent_does_not_delegate_memory_scope() -> None:
+    context = _context()
+
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="no-memory-intent",
+        instructions="canonical",
+        prompt="hello",
+        verification_profile="assistant_proposal",
+    )
+
+    assert "memory_write_intent" not in (
+        command.execution_request.context_policy
+    )
+    assert "engine:memory" not in command.delegated_authority.scopes

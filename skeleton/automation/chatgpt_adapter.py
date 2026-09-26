@@ -66,6 +66,17 @@ _SECRET_PATTERNS = (
 )
 
 
+
+def require_repository_provider_credentials_absent() -> None:
+    """Fail closed before credential-free publication phases.
+
+    Credential inspection lives in the declared repository-automation provider
+    owner so publication modules never become shadow credential surfaces.
+    """
+    if os.getenv("OPENAI_API_KEY", "").strip():
+        raise ValueError("OPENAI_API_KEY must be absent during publish")
+
+
 @dataclass(frozen=True, slots=True)
 class ReasoningRequest:
     task: str
@@ -89,6 +100,7 @@ class ChatGPTReasoner:
         api_key: str | None = None,
         model: str | None = None,
         timeout: float = 20.0,
+        scrub_environment: bool = False,
     ) -> None:
         enforce_bot_activation_security()
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)):
@@ -96,7 +108,14 @@ class ChatGPTReasoner:
         if not math.isfinite(float(timeout)):
             raise ValueError("timeout must be finite")
 
-        resolved_key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY", "")
+        if not isinstance(scrub_environment, bool):
+            raise TypeError("scrub_environment must be bool")
+        if api_key is not None:
+            resolved_key = api_key
+        elif scrub_environment:
+            resolved_key = os.environ.pop("OPENAI_API_KEY", "")
+        else:
+            resolved_key = os.getenv("OPENAI_API_KEY", "")
         if not isinstance(resolved_key, str):
             raise TypeError("api_key must be a string")
         resolved_key = resolved_key.strip()

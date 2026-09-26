@@ -77,8 +77,22 @@ class ServerState:
         self.engine_execution_service: Optional[Any] = None
         self.engine_execution_coordinator: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
+        self.engine_admission_runtime: Optional[Any] = None
+        self.engine_execution_admission_runtime: Optional[Any] = None
+        self.engine_quota_ledger: Optional[Any] = None
+        self.engine_pressure_ledger: Optional[Any] = None
         self.governance_lifecycle: Optional[Any] = None
         self.governance_registry: Optional[Any] = None
+        self.governance_audit_log: Optional[Any] = None
+        self.governance_audit_timeline: Optional[Any] = None
+        self.governance_lifecycle_adapters: Optional[Any] = None
+        self.governance_lifecycle_executor: Optional[Any] = None
+        self.canonical_artifact_store: Optional[Any] = None
+        self.canonical_retrieval_index: Optional[Any] = None
+        self.canonical_memory_mongo_client: Optional[Any] = None
+        self.canonical_memory_repository: Optional[Any] = None
+        self.canonical_memory_writer: Optional[Any] = None
+        self.canonical_memory_projection_coordinator: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
@@ -93,8 +107,14 @@ class ServerState:
 
         from pathlib import Path
 
+        from skeleton.vault.audit import AuditLog
         from skeleton.vault.data_lifecycle import DataLifecycleRegistry
+        from skeleton.vault.governance_audit import GovernanceAuditTimeline
         from skeleton.vault.governance_registry import GovernanceRegistry
+        from skeleton.vault.lifecycle_adapters import (
+            LifecycleAdapterRegistry,
+            LifecycleExecutor,
+        )
 
         path = os.environ.get(
             "SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -106,8 +126,38 @@ class ServerState:
                 exist_ok=True,
             )
         lifecycle = DataLifecycleRegistry(path)
+        audit_override = os.environ.get(
+            "SKL_GOVERNANCE_AUDIT_PATH",
+            "",
+        ).strip()
+        if audit_override:
+            audit_log = AuditLog.open(audit_override)
+        elif path == ":memory:":
+            audit_log = AuditLog()
+        else:
+            lifecycle_path = Path(path).expanduser()
+            audit_log = AuditLog.open(
+                lifecycle_path.with_name(
+                    lifecycle_path.name + ".audit.jsonl"
+                )
+            )
+        timeline = GovernanceAuditTimeline(
+            audit_log,
+            actor="governance-runtime",
+        )
         self.governance_lifecycle = lifecycle
-        self.governance_registry = GovernanceRegistry(lifecycle)
+        self.governance_audit_log = audit_log
+        self.governance_audit_timeline = timeline
+        self.governance_lifecycle_adapters = LifecycleAdapterRegistry()
+        self.governance_lifecycle_executor = LifecycleExecutor(
+            lifecycle,
+            self.governance_lifecycle_adapters,
+            timeline=timeline,
+        )
+        self.governance_registry = GovernanceRegistry(
+            lifecycle,
+            timeline=timeline,
+        )
         return self.governance_registry
 
     def close_governance_registry(self) -> None:
@@ -116,6 +166,318 @@ class ServerState:
             lifecycle.close()
         self.governance_registry = None
         self.governance_lifecycle = None
+        self.governance_audit_log = None
+        self.governance_audit_timeline = None
+        self.governance_lifecycle_adapters = None
+        self.governance_lifecycle_executor = None
+        self.canonical_artifact_store = None
+        self.canonical_retrieval_index = None
+
+    def bind_canonical_artifact_store(
+        self,
+        root: str | Path | None = None,
+    ) -> Any:
+        """Bind one governed filesystem artifact authority to lifecycle execution."""
+
+        if self.canonical_artifact_store is not None:
+            return self.canonical_artifact_store
+
+        from pathlib import Path
+
+        from skeleton.artifact_plane.governance import GovernedArtifactStore
+        from skeleton.vault.lifecycle_adapters import (
+            GovernedArtifactLifecycleAdapter,
+        )
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+
+        if root is None:
+            override = os.environ.get(
+                "SKL_GOVERNANCE_ARTIFACT_ROOT",
+                "",
+            ).strip()
+            if override:
+                artifact_root = Path(override).expanduser()
+            else:
+                lifecycle_path = os.environ.get(
+                    "SKL_GOVERNANCE_LIFECYCLE_PATH",
+                    ":memory:",
+                ).strip() or ":memory:"
+                if lifecycle_path == ":memory:":
+                    artifact_root = Path.cwd() / ".skeleton-governed-artifacts"
+                else:
+                    lifecycle_file = Path(lifecycle_path).expanduser()
+                    artifact_root = lifecycle_file.parent / "governed_artifacts"
+        else:
+            artifact_root = Path(root).expanduser()
+
+        store = GovernedArtifactStore(artifact_root, governance)
+        adapter = GovernedArtifactLifecycleAdapter(store)
+        adapters.register_deletion("artifact", adapter)
+        adapters.register_export("artifact", adapter)
+        self.canonical_artifact_store = store
+        return store
+
+    def bind_canonical_retrieval_index(self) -> Any:
+        """Bind one tenant-scoped governed retrieval owner to lifecycle execution."""
+
+        if self.canonical_retrieval_index is not None:
+            return self.canonical_retrieval_index
+
+        from skeleton.retrieval.governance import GovernedRetrievalIndex
+        from skeleton.vault.lifecycle_adapters import (
+            GovernedRetrievalLifecycleAdapter,
+        )
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+
+        retrieval = GovernedRetrievalIndex(governance)
+        adapter = GovernedRetrievalLifecycleAdapter(retrieval)
+        adapters.register_deletion("retrieval", adapter)
+        adapters.register_export("retrieval", adapter)
+        self.canonical_retrieval_index = retrieval
+        return retrieval
+
+    async def bind_canonical_memory_writer(
+        self,
+        database: Any | None = None,
+    ) -> Any:
+        """Bind the production Mongo memory authority to governance/admission."""
+
+        if self.canonical_memory_writer is not None:
+            return self.canonical_memory_writer
+        if self.engine_execution_admission_runtime is None:
+            self.bind_engine_execution_service()
+        admission_runtime = self.engine_execution_admission_runtime
+        if admission_runtime is None:
+            raise RuntimeError(
+                "engine execution admission must be bound before memory"
+            )
+
+        from skeleton.config.settings import get_settings
+        from skeleton.memory.projection import AsyncMemoryProjectionCoordinator
+        from skeleton.memory.writeback import AsyncGovernedMemoryWriter
+        from skeleton.persistence.memory_repository import (
+            MongoMemoryRepository,
+        )
+        from skeleton.vault.lifecycle_adapters import (
+            MongoMemoryLifecycleAdapter,
+        )
+
+        if database is None:
+            from motor.motor_asyncio import AsyncIOMotorClient
+
+            mongo = get_settings().mongo
+            client = AsyncIOMotorClient(
+                mongo.uri,
+                serverSelectionTimeoutMS=mongo.timeout_ms,
+            )
+            database = client[mongo.database]
+            self.canonical_memory_mongo_client = client
+
+        repository = MongoMemoryRepository(database)
+        await repository.ensure_indexes()
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+        memory_lifecycle = MongoMemoryLifecycleAdapter(repository)
+        adapters.register_deletion("memory", memory_lifecycle)
+        adapters.register_export("memory", memory_lifecycle)
+
+        writer = AsyncGovernedMemoryWriter(
+            repository,
+            governance=governance,
+            admission_runtime=admission_runtime,
+        )
+        self.canonical_memory_repository = repository
+        self.canonical_memory_writer = writer
+        self.canonical_memory_projection_coordinator = (
+            AsyncMemoryProjectionCoordinator(
+                repository,
+                admission_runtime=admission_runtime,
+                governance=governance,
+                lifecycle_adapters=adapters,
+            )
+        )
+        return writer
+
+    async def bind_verified_memory_finalization(
+        self,
+        request: Any,
+        candidate: str,
+        payload: Any,
+    ) -> Any:
+        """Commit only explicit verified-final-output memory intents."""
+
+        from datetime import datetime, timezone
+        from uuid import NAMESPACE_URL, UUID, uuid5
+
+        from skeleton.contracts.memory_record import (
+            MemoryKind,
+            MemoryWriteProposal,
+        )
+        from skeleton.intelligence.execution_runtime import (
+            ExecutionFinalizationBindings,
+        )
+
+        context_policy = dict(request.context_policy)
+        raw_intent = context_policy.get("memory_write_intent")
+        if raw_intent is None:
+            return ExecutionFinalizationBindings()
+        if not isinstance(raw_intent, dict):
+            raise RuntimeError(
+                "memory_write_intent must be a normalized object"
+            )
+        writer = self.canonical_memory_writer
+        if writer is None:
+            raise RuntimeError(
+                "canonical memory authority is required by execution intent"
+            )
+
+        tenant_id = str(context_policy.get("tenant_id") or "").strip()
+        subject_id = str(raw_intent.get("subject_id") or "").strip()
+        namespace = str(
+            raw_intent.get("namespace") or "assistant"
+        ).strip()
+        if not tenant_id or not subject_id or not namespace:
+            raise RuntimeError(
+                "memory finalization authority scope is invalid"
+            )
+        try:
+            kind = MemoryKind(str(raw_intent.get("kind") or ""))
+        except ValueError as exc:
+            raise RuntimeError(
+                "memory finalization kind is invalid"
+            ) from exc
+        if raw_intent.get("content_from") != "verified_final_output":
+            raise RuntimeError(
+                "memory finalization may only persist verified final output"
+            )
+
+        proposed_at = datetime.now(timezone.utc)
+        expires_at = None
+        raw_expiry = raw_intent.get("expires_at")
+        if raw_expiry is not None:
+            try:
+                expires_at = datetime.fromisoformat(str(raw_expiry))
+            except ValueError as exc:
+                raise RuntimeError(
+                    "memory finalization expiry is invalid"
+                ) from exc
+            if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+                raise RuntimeError(
+                    "memory finalization expiry must be timezone-aware"
+                )
+            expires_at = expires_at.astimezone(timezone.utc)
+            if expires_at <= proposed_at:
+                raise RuntimeError(
+                    "memory finalization expiry has elapsed"
+                )
+
+        try:
+            source_operation_id = str(UUID(str(request.operation_id)))
+        except (ValueError, AttributeError):
+            source_operation_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "skeleton-operation:" + str(request.operation_id),
+                )
+            )
+
+        provenance_refs = [
+            "execution:" + str(request.execution_id),
+            "context:" + str(
+                context_policy.get("context_digest") or "unknown"
+            ),
+            "verified-final-output",
+        ]
+        if isinstance(payload, dict):
+            for field, prefix in (
+                ("provider_receipts", "provider:"),
+                ("tool_receipts", "tool:"),
+            ):
+                values = payload.get(field, [])
+                if not isinstance(values, list):
+                    continue
+                for raw in values:
+                    value = str(raw).strip()
+                    if value:
+                        ref = prefix + value
+                        if ref not in provenance_refs:
+                            provenance_refs.append(ref)
+        raw_refs = raw_intent.get("provenance_refs", [])
+        if isinstance(raw_refs, list):
+            for raw in raw_refs:
+                value = str(raw).strip()
+                if value and value not in provenance_refs:
+                    provenance_refs.append(value)
+
+        idempotency_key = str(
+            raw_intent.get("idempotency_key")
+            or (
+                "execution-memory:"
+                + str(request.execution_id)
+                + ":verified-final-output"
+            )
+        ).strip()
+        proposal_id = str(
+            uuid5(
+                NAMESPACE_URL,
+                "skeleton-memory-finalization:"
+                + str(request.execution_id)
+                + ":"
+                + idempotency_key,
+            )
+        )
+        proposal = MemoryWriteProposal(
+            proposal_id=proposal_id,
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            kind=kind,
+            idempotency_key=idempotency_key,
+            proposed_at=proposed_at,
+            content=str(candidate).strip(),
+            provenance_refs=tuple(provenance_refs),
+            source_operation_id=source_operation_id,
+            expires_at=expires_at,
+            data_class=str(
+                raw_intent.get("data_class")
+                or context_policy.get("data_class")
+                or "confidential"
+            ),
+        )
+        writer.stage(proposal)
+        record = await writer.commit(
+            proposal.proposal_id,
+            now=proposed_at,
+        )
+        return ExecutionFinalizationBindings(
+            memory_refs=("memory:" + record.memory_id,),
+        )
+
+    async def close_canonical_memory_writer(self) -> None:
+        client = self.canonical_memory_mongo_client
+        self.canonical_memory_writer = None
+        self.canonical_memory_repository = None
+        self.canonical_memory_projection_coordinator = None
+        self.canonical_memory_mongo_client = None
+        if client is not None:
+            client.close()
 
     def bind_swarm_runtime(self, runtime: Any) -> Any:
         """Replace the live swarm runtime and atomically rebind dependent control planes."""
@@ -170,6 +532,26 @@ class ServerState:
 
     def is_healthy(self) -> Dict[str, Any]:
         checks = {}
+        memory_configured = _canonical_memory_mongo_configured()
+        memory_bound = (
+            self.canonical_memory_repository is not None
+            and self.canonical_memory_writer is not None
+            and self.canonical_memory_projection_coordinator is not None
+        )
+        checks["canonical_memory"] = {
+            "configured": memory_configured,
+            "bound": memory_bound,
+            "status": (
+                "ready"
+                if memory_bound
+                else ("unavailable" if memory_configured else "disabled")
+            ),
+            "error": (
+                "canonical memory authority configured but not bound"
+                if memory_configured and not memory_bound
+                else None
+            ),
+        }
         for attr in dir(self):
             if not attr.startswith("_") and not callable(getattr(self, attr)):
                 val = getattr(self, attr)
@@ -278,23 +660,40 @@ class ServerState:
             EngineAuthorityRegistry,
             EngineServiceGrant,
         )
-        from skeleton.api.engine_runtime import EngineExecutionCoordinator
+        from skeleton.api.engine_runtime import (
+            EngineExecutionCoordinator,
+            build_engine_tool_runtime,
+        )
         from skeleton.api.engine_service import (
             EngineExecutionService,
             SQLiteEngineSubmissionStore,
         )
         from skeleton.config.settings import get_settings
+        from skeleton.intelligence.admission_runtime import AdmissionRuntime
+        from skeleton.intelligence.quota import (
+            TenantQuota,
+            TenantQuotaLedger,
+        )
+        from skeleton.intelligence.quota_sqlite import (
+            SqliteTenantQuotaLedger,
+        )
+        from skeleton.intelligence.shared_pressure import (
+            SharedPressurePolicy,
+            SqliteSharedPressureLedger,
+        )
         from skeleton.persistence.execution_repository import (
             SQLiteExecutionRepository,
         )
+        from skeleton.provider_runtime import ProviderRegistry
         from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
-        from skeleton.skills.tool_runtime import AsyncToolRuntime
 
         settings = get_settings().engine
         for raw_path in (
             settings.execution_state_path,
             settings.submission_state_path,
             settings.tool_receipt_path,
+            settings.quota_state_path,
+            settings.pressure_state_path,
         ):
             if raw_path != ":memory:":
                 Path(raw_path).expanduser().parent.mkdir(
@@ -320,6 +719,9 @@ class ServerState:
                             "engine:events",
                             "engine:approve",
                             "engine:media",
+                            "engine:admission",
+                            "engine:governance",
+                            "engine:memory",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,
@@ -327,23 +729,108 @@ class ServerState:
                 )
             ]
         )
+        receipt_store = SQLiteToolReceiptStore(
+            settings.tool_receipt_path
+        )
+
+        quota_ledger = (
+            TenantQuotaLedger()
+            if settings.quota_state_path == ":memory:"
+            else SqliteTenantQuotaLedger(settings.quota_state_path)
+        )
+        default_tenant_quota = TenantQuota(
+            window_id=settings.quota_window_id,
+            max_operations=settings.quota_max_operations,
+            max_input_tokens=settings.quota_max_input_tokens,
+            max_output_tokens=settings.quota_max_output_tokens,
+            max_cost_usd=settings.quota_max_cost_usd,
+            max_tool_calls=settings.quota_max_tool_calls,
+            max_artifact_bytes=settings.quota_max_artifact_bytes,
+            max_storage_bytes=settings.quota_max_storage_bytes,
+            max_concurrent_operations=(
+                settings.quota_max_concurrent_operations
+            ),
+        )
+
+        pressure_ledger = None
+        if settings.pressure_state_path != ":memory:":
+            pressure_ledger = SqliteSharedPressureLedger(
+                settings.pressure_state_path
+            )
+            pressure_ledger.configure(
+                SharedPressurePolicy(
+                    scope=settings.pressure_scope,
+                    max_concurrency=settings.pressure_max_concurrency,
+                    max_queue_depth=settings.pressure_max_queue_depth,
+                    max_tenant_concurrency=(
+                        settings.pressure_max_tenant_concurrency
+                    ),
+                    max_tenant_queue_depth=(
+                        settings.pressure_max_tenant_queue_depth
+                    ),
+                    soft_shed_fraction=(
+                        settings.pressure_soft_shed_fraction
+                    ),
+                    protect_priority_at_or_below=(
+                        settings.pressure_protect_priority_at_or_below
+                    ),
+                    default_lease_seconds=settings.pressure_lease_seconds,
+                ),
+                replace=True,
+            )
+
+        execution_admission_runtime = AdmissionRuntime(
+            quota_ledger=quota_ledger,
+            default_tenant_quota=default_tenant_quota,
+        )
+        provider_admission_runtime = AdmissionRuntime(
+            quota_ledger=quota_ledger,
+            default_tenant_quota=default_tenant_quota,
+            shared_pressure_ledger=pressure_ledger,
+            shared_pressure_scope=(
+                settings.pressure_scope
+                if pressure_ledger is not None
+                else None
+            ),
+            shared_pressure_owner_id=(
+                settings.pressure_owner_id
+                if pressure_ledger is not None
+                else None
+            ),
+        )
         service = EngineExecutionService(
             repository,
             submissions,
             authorities,
+            admission_runtime=execution_admission_runtime,
+            governance_registry=self.bind_governance_registry(),
+            governance_lifecycle_executor=(
+                self.governance_lifecycle_executor
+            ),
         )
-        receipt_store = SQLiteToolReceiptStore(
-            settings.tool_receipt_path
+        provider_registry = ProviderRegistry.from_env(
+            admission_runtime=provider_admission_runtime,
         )
         coordinator = EngineExecutionCoordinator(
             service,
-            tool_runtime=AsyncToolRuntime(
+            provider_registry=provider_registry,
+            finalization_binding_hook=(
+                self.bind_verified_memory_finalization
+            ),
+            tool_runtime=build_engine_tool_runtime(
+                admission_runtime=execution_admission_runtime,
                 receipt_store=receipt_store,
             ),
         )
         self.engine_execution_service = service
         self.engine_execution_coordinator = coordinator
         self.engine_tool_receipt_store = receipt_store
+        self.engine_admission_runtime = provider_admission_runtime
+        self.engine_execution_admission_runtime = (
+            execution_admission_runtime
+        )
+        self.engine_quota_ledger = quota_ledger
+        self.engine_pressure_ledger = pressure_ledger
         return service
 
     async def recover_engine_executions(self) -> tuple[str, ...]:
@@ -366,6 +853,10 @@ class ServerState:
         self.engine_execution_coordinator = None
         self.engine_execution_service = None
         self.engine_tool_receipt_store = None
+        self.engine_admission_runtime = None
+        self.engine_execution_admission_runtime = None
+        self.engine_quota_ledger = None
+        self.engine_pressure_ledger = None
 
     def wire_from_genesis(self, genesis: Any) -> None:
         self.genesis = genesis
@@ -438,6 +929,12 @@ def _public_dev_surfaces_enabled() -> bool:
     return os.environ.get("SKELETON_PUBLIC_DEV_SURFACES", "").strip().lower() in {
         "1", "true", "yes", "on",
     }
+
+
+def _canonical_memory_mongo_configured() -> bool:
+    """Return whether the production canonical Mongo memory binding is configured."""
+
+    return bool(os.environ.get("SKL_MONGO_URI", "").strip())
 
 
 def _gate_open_prefixes() -> tuple[str, ...]:
@@ -520,12 +1017,17 @@ def create_app() -> Any:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
         state.bind_governance_registry()
+        state.bind_canonical_artifact_store()
+        state.bind_canonical_retrieval_index()
         state.bind_engine_execution_service()
+        if _canonical_memory_mongo_configured():
+            await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
 
     @app.on_event("shutdown")
     async def shutdown():
         state = get_state()
+        await state.close_canonical_memory_writer()
         await state.close_engine_execution_service()
         state.close_governance_registry()
         state.close_operation_runtime()

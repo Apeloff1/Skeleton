@@ -103,6 +103,7 @@ _ALLOWED_EXECUTION_TRANSITIONS: dict[ExecutionState, frozenset[ExecutionState]] 
             ExecutionState.WAITING_FOR_TOOL_AUTHORITY,
             ExecutionState.TOOL_PENDING,
             ExecutionState.CHECKPOINTING,
+            ExecutionState.REPAIRING,
             ExecutionState.VERIFYING,
             ExecutionState.FINALIZING,
             ExecutionState.CANCELLED,

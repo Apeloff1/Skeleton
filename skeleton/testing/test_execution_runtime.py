@@ -21,7 +21,15 @@ from skeleton.provider_contract import (
     ProviderUsage,
 )
 from skeleton.provider_runtime import ProviderResponse
-from skeleton.skills.tool_contract import ToolEffect, ToolManifest
+from skeleton.skills.tool_contract import (
+    ToolApprovalPolicy,
+    ToolAuthorityClass,
+    ToolEffect,
+    ToolIdempotencyMode,
+    ToolManifest,
+    ToolRiskClass,
+    ToolSideEffectClass,
+)
 from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 
@@ -130,6 +138,8 @@ def _manifest(
     tool_id: str = "repo.read",
     *,
     approval_required: bool = False,
+    data_policy: str = "internal:test",
+    network_policy: str = "none",
 ) -> ToolManifest:
     return ToolManifest(
         tool_id=tool_id,
@@ -147,6 +157,8 @@ def _manifest(
             else ToolEffect.READ_ONLY
         ),
         approval_required=approval_required,
+        data_policy=data_policy,
+        network_policy=network_policy,
     )
 
 
@@ -203,13 +215,183 @@ async def test_direct_provider_completion_is_verified_and_atomically_finalized()
 
 
 @pytest.mark.asyncio
+async def test_provider_tool_projection_is_minimal_and_excludes_disabled_tools() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:read"
+
+    rich_manifest = ToolManifest(
+        tool_id="repo.read",
+        version="2.0.0",
+        description="Read repository data",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        output_schema={"type": "object"},
+        capabilities=("repository.read", "citation.source"),
+        authority_class=ToolAuthorityClass.READ,
+        risk_class=ToolRiskClass.MEDIUM,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.NEVER,
+        network_policy="none",
+        data_policy="internal:repository",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=65536,
+        max_concurrency=8,
+    )
+    disabled_manifest = ToolManifest(
+        tool_id="repo.disabled",
+        version="1.0.0",
+        description="Disabled internal tool",
+        input_schema={
+            "type": "object",
+            "additionalProperties": False,
+        },
+        capabilities=("repository.internal",),
+        authority_class=ToolAuthorityClass.PRIVILEGED,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.POLICY,
+        network_policy="none",
+        data_policy="internal:restricted",
+        cost_model={"kind": "disabled"},
+        enabled=False,
+    )
+    await tools.register(rich_manifest, handler)
+    await tools.register(disabled_manifest, handler)
+
+    runtime = _runtime(repo, FakeProvider([]), tools)
+    projected = await runtime._provider_tools(
+        {"allowed_tool_ids": ["repo.read", "repo.disabled"]}
+    )
+
+    assert [item.tool_id for item in projected] == ["repo.read"]
+    assert projected[0].as_dict() == {
+        "tool_id": "repo.read",
+        "description": "Read repository data",
+        "input_schema": dict(rich_manifest.input_schema),
+    }
+    provider_payload = projected[0].as_dict()
+    for internal_field in (
+        "output_schema",
+        "capabilities",
+        "authority_class",
+        "risk_class",
+        "side_effect_class",
+        "idempotency_mode",
+        "approval_policy",
+        "network_policy",
+        "data_policy",
+        "cost_model",
+        "result_size_limit",
+        "max_concurrency",
+        "enabled",
+    ):
+        assert internal_field not in provider_payload
+
+
+
+
+@pytest.mark.asyncio
+async def test_provider_projection_filters_tools_by_privacy_ceiling() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "search:1"
+
+    await tools.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        handler,
+    )
+    runtime = _runtime(repo, FakeProvider([]), tools)
+
+    internal = await runtime._provider_tools(
+        {
+            "allowed_tool_ids": ["web.search"],
+            "tenant_id": "tenant-a",
+            "tool_data_class": "internal",
+            "tool_purpose": "tool-execution",
+        }
+    )
+    public = await runtime._provider_tools(
+        {
+            "allowed_tool_ids": ["web.search"],
+            "tenant_id": "tenant-a",
+            "tool_data_class": "public",
+            "tool_purpose": "tool-execution",
+        }
+    )
+
+    assert internal == ()
+    assert [item.tool_id for item in public] == ["web.search"]
+
+
+@pytest.mark.asyncio
+async def test_cognitive_tool_request_preserves_privacy_context() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    tool_requests = []
+
+    async def handler(request):
+        tool_requests.append(request)
+        return "search:privacy"
+
+    await tools.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        handler,
+    )
+    provider = FakeProvider(
+        [
+            _tool_response("call-search", tool_id="web.search"),
+            _text_response("public answer", response_id="resp-public"),
+        ]
+    )
+    runtime = _runtime(repo, provider, tools)
+    request = _request(
+        allowed_tools=("web.search",),
+        context_policy={
+            "data_class": "public",
+            "tool_purpose": "verification",
+        },
+    )
+
+    result = await runtime.start(
+        request,
+        instructions="Use the public search tool.",
+        prompt="Verify the public fact.",
+        context_digest="9" * 64,
+        now=_now(),
+    )
+
+    assert result.result.final_output == "public answer"
+    assert len(tool_requests) == 1
+    assert tool_requests[0].data_class == "public"
+    assert tool_requests[0].transfer_purpose == "verification"
+
+@pytest.mark.asyncio
 async def test_model_tool_model_round_trip_uses_canonical_receipt_lineage() -> None:
     repo = SQLiteExecutionRepository()
     tools = AsyncToolRuntime()
-    tool_calls = []
+    tool_requests = []
 
     async def handler(request):
-        tool_calls.append(dict(request.arguments))
+        tool_requests.append(request)
         return "artifact:readme"
 
     await tools.register(_manifest(), handler)
@@ -231,7 +413,14 @@ async def test_model_tool_model_round_trip_uses_canonical_receipt_lineage() -> N
     )
 
     assert result.result.final_output == "final answer"
-    assert tool_calls == [{"path": "README.md"}]
+    assert [dict(item.arguments) for item in tool_requests] == [
+        {"path": "README.md"}
+    ]
+    assert len(tool_requests) == 1
+    provider_turn = repo.turns(request.execution_id)[0]
+    assert tool_requests[0].execution_id == request.execution_id
+    assert tool_requests[0].turn_id == provider_turn.turn_id
+    assert tool_requests[0].call_id == "call-1"
     assert result.result.usage["model_turns"] == 2
     assert result.result.usage["tool_calls"] == 1
     assert len(result.result.tool_receipts) == 1
@@ -895,3 +1084,138 @@ async def test_resume_commits_staged_terminal_intent_without_replaying_verificat
     assert result.result.artifact_refs == ("artifact:recover",)
     assert repo.finalization_intent("exec-1") is None
     assert len(repo.pending_outbox(execution_id="exec-1")) == 1
+
+@pytest.mark.asyncio
+async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("metered answer", response_id="resp-meter-storage")]
+    )
+    events = []
+
+    def meter(resource_id, write_id, payload, meter_now):
+        events.append((resource_id, write_id, payload, meter_now))
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        storage_meter=meter,
+    )
+    result = await runtime.start(
+        _request(
+            context_policy={
+                "capability": "assistant.chat",
+                "verification_profile": "assistant_proposal",
+            }
+        ),
+        instructions="Answer.",
+        prompt="Return a bounded answer.",
+        context_digest="d" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    resources = [item[0] for item in events]
+    assert "execution-checkpoint" in resources
+    assert "execution-turn" in resources
+    assert "execution-finalization-intent" in resources
+    assert "execution-result" in resources
+
+    write_ids = [item[1] for item in events]
+    assert len(write_ids) == len(set(write_ids))
+    assert any(item.startswith("checkpoint:exec-1:") for item in write_ids)
+    assert any(item.startswith("turn:exec-1:") for item in write_ids)
+    assert "intent:exec-1" in write_ids
+    assert "result:exec-1" in write_ids
+
+    for _resource_id, _write_id, payload, meter_now in events:
+        assert payload is not None
+        assert meter_now == _now()
+
+
+@pytest.mark.asyncio
+async def test_failed_verification_never_invokes_finalization_binding() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("unverified claim", response_id="resp-no-memory")]
+    )
+    binding_calls = []
+
+    def verify(_request, _candidate, _context_digest):
+        return ExecutionVerificationDecision(
+            passed=False,
+            receipt={
+                "outcome": "failed",
+                "policy_satisfied": False,
+                "verifier_id": "test:no-memory-on-failure",
+            },
+            evidence_refs=("evidence:verification-failure",),
+        )
+
+    def forbidden_binding(*args):
+        binding_calls.append(args)
+        raise AssertionError(
+            "finalization binding must not run after failed verification"
+        )
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        verification_hook=verify,
+        finalization_binding_hook=forbidden_binding,
+    )
+    result = await runtime.start(
+        _request(),
+        instructions="Answer only when verified.",
+        prompt="Produce a candidate.",
+        context_digest="e" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.memory_refs == ()
+    assert binding_calls == []
+
+@pytest.mark.asyncio
+async def test_canonical_verification_receipt_is_persisted_before_terminal_result() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("proposal", response_id="resp-canonical-receipt")]
+    )
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    result = await runtime.start(
+        _request(
+            context_policy={
+                "capability": "assistant.chat",
+                "verification_profile": "assistant_proposal",
+            }
+        ),
+        instructions="Answer.",
+        prompt="Return a bounded proposal.",
+        context_digest="f" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    payload = result.result.verification_receipt
+    assert payload["receipt_id"]
+    assert payload["execution_id"] == "exec-1"
+    assert payload["result_ref"] == "execution-result:exec-1"
+    assert payload["policy_satisfied"] is True
+
+    stored = repo.verification_receipt(payload["receipt_id"])
+    assert stored is not None
+    assert stored.receipt_id == payload["receipt_id"]
+    assert stored.execution_id == "exec-1"
+    assert stored.result_ref == "execution-result:exec-1"
+    assert stored.claim_digest == payload["claim_digest"]
+    assert repo.verification_receipts_for_execution("exec-1") == (stored,)

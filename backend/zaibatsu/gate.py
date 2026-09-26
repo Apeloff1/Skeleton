@@ -15,6 +15,7 @@ from api_middleware import (
     AccessLogMiddleware,
     RateLimiterMiddleware,
     RequestIdMiddleware,
+    RoutePrivacyMiddleware,
     get_stats as _get_stats,
     install_middleware as _install_api_middleware,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "AccessLogMiddleware",
     "RateLimiterMiddleware",
     "RequestIdMiddleware",
+    "RoutePrivacyMiddleware",
     "get_stats",
     "install_middleware",
 ]

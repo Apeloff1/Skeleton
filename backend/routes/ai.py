@@ -13,11 +13,11 @@ import hashlib
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from core.conversations import ConversationStorageUnavailable, conversation_authority
 from core.engine_client import (
@@ -28,7 +28,13 @@ from core.engine_client import (
     command_from_context,
 )
 from routes.gameforge_auth import require_role
-from skeleton.contracts.context import ContextBudget, ContextEnvelope
+from skeleton.contracts.context import (
+    ContextBudget,
+    ContextEnvelope,
+    ContextKind,
+    ContextSegment,
+    ContextTrust,
+)
 from skeleton.contracts.conversation import ConversationAuthorType
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
@@ -200,6 +206,26 @@ class AIAssistResponse(BaseModel):
     timestamp: str
 
 
+class AIChatMemoryPolicy(BaseModel):
+    """Explicit user/product policy for verified long-term memory writeback."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    persist_verified_response: bool = False
+    kind: Literal[
+        "episodic",
+        "semantic",
+        "procedural",
+        "preference",
+    ] = "semantic"
+    namespace: str = Field(
+        default="assistant",
+        min_length=1,
+        max_length=256,
+    )
+    expires_at: datetime | None = None
+
+
 class AIChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=100_000, description="User message")
     thread_id: str = Field(..., min_length=1, max_length=64, description="Canonical conversation thread")
@@ -211,6 +237,67 @@ class AIChatRequest(BaseModel):
         max_length=100,
         description="Deprecated and rejected: server transcript is authoritative",
     )
+    memory_policy: AIChatMemoryPolicy | None = Field(
+        default=None,
+        description=(
+            "Explicit opt-in policy for persisting only the verified assistant "
+            "result into canonical long-term memory."
+        ),
+    )
+
+
+def _chat_memory_write_intent(
+    *,
+    request: AIChatRequest,
+    owner_id: str,
+    thread,
+    user_message,
+) -> dict[str, Any] | None:
+    """Translate explicit chat policy into one engine-owned memory intent."""
+
+    policy = request.memory_policy
+    if policy is None or not policy.persist_verified_response:
+        return None
+
+    namespace = policy.namespace.strip()
+    if not namespace or namespace != policy.namespace:
+        raise HTTPException(
+            status_code=422,
+            detail="memory_policy.namespace must be normalized",
+        )
+    expires_at = policy.expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+            raise HTTPException(
+                status_code=422,
+                detail="memory_policy.expires_at must be timezone-aware",
+            )
+        expires_at = expires_at.astimezone(timezone.utc)
+
+    return {
+        "subject_id": owner_id,
+        "namespace": namespace,
+        "kind": policy.kind,
+        "content_from": "verified_final_output",
+        "idempotency_key": (
+            "chat-memory:"
+            + thread.thread_id
+            + ":"
+            + user_message.message_id
+            + ":"
+            + policy.kind
+        ),
+        "provenance_refs": [
+            "conversation:" + thread.thread_id,
+            "conversation-message:" + user_message.message_id,
+            "user-policy:verified-response-memory",
+        ],
+        **(
+            {}
+            if expires_at is None
+            else {"expires_at": expires_at}
+        ),
+    }
 
 
 def _chat_identity(user: dict) -> tuple[str, str]:
@@ -411,16 +498,26 @@ async def call_llm(
                 created_at=now,
                 mandatory=True,
             ),
-            artifact_segment(
-                artifact_id="ai-compat-prompt:" + turn_id,
+            ContextSegment.from_content(
+                segment_id=str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_URL,
+                        "backend-ai-compat-prompt:" + turn_id,
+                    )
+                ),
+                kind=ContextKind.USER_MESSAGE,
+                source_type="legacy-engine-request",
+                source_id="ai-compat-prompt:" + turn_id,
                 content=prompt_text,
+                trust_level=ContextTrust.AUTHORIZED_USER_DATA,
+                data_class="internal",
                 tenant_id="default",
                 purpose="model-inference",
-                created_at=now,
-                data_class="internal",
-                retention_class="ephemeral-ai-request",
                 priority=800,
                 relevance=1.0,
+                created_at=now,
+                provenance=("backend-ai-compat",),
+                retention_class="ephemeral-ai-request",
             ),
         ]
         context_envelope = ContextCompiler().compile(
@@ -510,7 +607,18 @@ async def call_llm(
         ],
         "context_compiler_version": context_envelope.compiler_version,
         "engine_verification": result.verification,
-        "engine_evidence_refs": list(result.evidence_refs),
+        "engine_evidence_refs": list(
+            getattr(result, "evidence_refs", ())
+        ),
+        "engine_tool_receipts": list(
+            getattr(result, "tool_receipts", ())
+        ),
+        "engine_memory_refs": list(
+            getattr(result, "memory_refs", ())
+        ),
+        "engine_artifact_refs": list(
+            getattr(result, "artifact_refs", ())
+        ),
     }
 
 
@@ -591,6 +699,22 @@ async def ai_chat(
 
     tenant_id, owner_id = _chat_identity(user)
     try:
+        existing_transcript = await conversation_authority.active_transcript(
+            request.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if (
+            existing_transcript
+            and existing_transcript[-1].author_type
+            is ConversationAuthorType.USER
+            and existing_transcript[-1].idempotency_key
+            != request.idempotency_key
+        ):
+            raise ConversationConflict(
+                "previous canonical turn is incomplete; retry after it completes"
+            )
+
         context_attachment_refs: tuple[str, ...] = ()
         if request.context:
             context_attachment_refs = (
@@ -677,6 +801,13 @@ async def ai_chat(
         request_context=request.context,
     )
 
+    memory_write_intent = _chat_memory_write_intent(
+        request=request,
+        owner_id=owner_id,
+        thread=thread,
+        user_message=user_message,
+    )
+
     # Stage-5 application -> engine cutover.  The assembled app configures
     # SKELETON_INTERNAL_URL, so canonical chat execution crosses the authenticated
     # engine boundary.  Pre-ENG-03 compatibility environments that do not
@@ -710,7 +841,8 @@ async def ai_chat(
 
     if engine_client is not None:
         engine_started = time.monotonic()
-        engine_deadline = datetime.now(timezone.utc) + timedelta(
+        engine_started_at = datetime.now(timezone.utc)
+        engine_deadline = engine_started_at + timedelta(
             seconds=engine_client.config.execution_timeout_s
         )
         try:
@@ -728,7 +860,7 @@ async def ai_chat(
                 verification_profile="assistant_proposal",
                 history=history,
                 service_principal=engine_client.config.service_principal,
-                created_at=datetime.now(timezone.utc),
+                created_at=engine_started_at,
                 deadline=engine_deadline,
                 trace_id="chat:" + operation_id,
                 max_model_turns=4,
@@ -739,6 +871,7 @@ async def ai_chat(
                     "conversation-message:" + user_message.message_id,
                     *context_attachment_refs,
                 ),
+                memory_write_intent=memory_write_intent,
             )
             engine_result = await engine_client.execute(command)
         except EngineExecutionFailed as exc:
@@ -814,7 +947,35 @@ async def ai_chat(
             "latency_ms": (time.monotonic() - engine_started) * 1000.0,
             "engine_execution_id": engine_result.execution_id,
             "engine_verification": engine_result.verification,
-            "engine_evidence_refs": list(engine_result.evidence_refs),
+            "engine_evidence_refs": list(
+                getattr(engine_result, "evidence_refs", ())
+            ),
+            "engine_tool_receipts": list(
+                getattr(engine_result, "tool_receipts", ())
+            ),
+            "engine_memory_refs": list(
+                getattr(engine_result, "memory_refs", ())
+            ),
+            "engine_artifact_refs": list(
+                getattr(engine_result, "artifact_refs", ())
+            ),
+        }
+    elif memory_write_intent is not None:
+        return {
+            "success": False,
+            "response": (
+                "Long-term memory persistence requires the canonical AI "
+                "engine. Retry when it is available."
+            ),
+            "ai_generated": False,
+            "provider": None,
+            "model": _active_model(),
+            "error": "Canonical memory persistence unavailable",
+            "error_code": "memory_persistence_unavailable",
+            "thread": thread.as_dict(),
+            "user_message": user_message.as_dict(),
+            "context": context_envelope.binding_dict(),
+            "timestamp": _utcnow(),
         }
     else:
         result = await call_llm(
@@ -868,6 +1029,18 @@ async def ai_chat(
                 context_digest=context_envelope.context_digest,
                 context_source_snapshot=context_envelope.source_snapshot,
                 context_compiler_version=context_envelope.compiler_version,
+                tool_receipt_refs=tuple(
+                    result.get("engine_tool_receipts") or ()
+                ),
+                memory_refs=tuple(
+                    result.get("engine_memory_refs") or ()
+                ),
+                citation_refs=tuple(
+                    result.get("engine_evidence_refs") or ()
+                ),
+                artifact_refs=tuple(
+                    result.get("engine_artifact_refs") or ()
+                ),
             )
         )
     except Exception as exc:
@@ -883,6 +1056,9 @@ async def ai_chat(
         "engine_execution_id": result.get("engine_execution_id"),
         "engine_verification": result.get("engine_verification"),
         "engine_evidence_refs": result.get("engine_evidence_refs", []),
+        "engine_tool_receipts": result.get("engine_tool_receipts", []),
+        "engine_memory_refs": result.get("engine_memory_refs", []),
+        "engine_artifact_refs": result.get("engine_artifact_refs", []),
         "latency_ms": result.get("latency_ms"),
         "replayed": False,
         "operation_id": operation_id,

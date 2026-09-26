@@ -3,6 +3,7 @@ GAME SHARED — Common utilities, DB connections, models, and helpers
 shared across all game factory sub-routers.
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Optional
@@ -19,7 +20,7 @@ load_dotenv()
 
 # LLM Integration
 try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
@@ -32,7 +33,6 @@ projects_collection = db.game_projects
 build_steps_collection = db.game_build_steps
 vault_collection = db.code_vault
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 
 # =============================================================================
@@ -41,14 +41,17 @@ EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None) -> dict:
     """Call LLM with fallback to mock data."""
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"success": False, "response": None, "error": "LLM not available"}
 
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_KEY,
+        chat = EngineChat(
             session_id=session_id or str(uuid.uuid4()),
-            system_message=system_prompt
+            instruction_policy=InstructionPolicy(
+                policy_id="backend.game-shared.generation",
+                version="1",
+                instructions=system_prompt.strip(),
+            ),
         ).with_model("openai", "gpt-4o")
 
         response = await chat.send_message(UserMessage(text=user_prompt))

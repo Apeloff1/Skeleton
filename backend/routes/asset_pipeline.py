@@ -5,22 +5,20 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/assets", tags=["Asset Pipeline"])
 
 # Try to import LLM for AI-powered generation
 try:
-    from emergentintegrations.llm.chat import LlmChat
+    from core.engine_chat import EngineChat
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
-
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # ASSET TYPES & CONFIGURATIONS
@@ -198,12 +196,18 @@ async def generate_sprite(request: Sprite2DRequest):
     
     # AI-enhanced generation prompt
     generation_prompt = ""
-    if LLM_AVAILABLE and EMERGENT_KEY:
+    if LLM_AVAILABLE:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
-            llm.add_message("system", """You are an expert pixel artist and game asset designer. 
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.asset-pipeline.sprite-spec",
+                    version="1",
+                    instructions="""You are an expert pixel artist and game asset designer.
             Generate detailed, professional asset creation specifications and prompts for AI image generators.
-            Include specific details about colors, shapes, shading, and style consistency.""")
+            Include specific details about colors, shapes, shading, and style consistency.""",
+                ),
+            )
             llm.add_message("user", f"""Create a detailed asset generation specification for:
             
             Description: {request.description}
@@ -221,7 +225,7 @@ async def generate_sprite(request: Sprite2DRequest):
             4. Stable Diffusion prompt
             5. Technical specifications
             6. Animation keyframe descriptions (if animated)""")
-            generation_prompt = llm.chat()
+            generation_prompt = await llm.chat()
         except Exception:
             generation_prompt = prompt
     else:
@@ -273,11 +277,17 @@ async def generate_3d_model(request: Model3DRequest):
     
     # AI-enhanced generation
     generation_prompt = ""
-    if LLM_AVAILABLE and EMERGENT_KEY:
+    if LLM_AVAILABLE:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
-            llm.add_message("system", """You are an expert 3D artist and game asset designer.
-            Generate detailed, professional 3D model specifications and prompts for AI 3D generators like Meshy, Tripo, and manual modeling.""")
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.asset-pipeline.model-spec",
+                    version="1",
+                    instructions="""You are an expert 3D artist and game asset designer.
+            Generate detailed, professional 3D model specifications and prompts for AI 3D generators like Meshy, Tripo, and manual modeling.""",
+                ),
+            )
             llm.add_message("user", f"""Create a detailed 3D asset generation specification for:
             
             Description: {request.description}
@@ -300,7 +310,7 @@ async def generate_3d_model(request: Model3DRequest):
             6. Rigging requirements (if applicable)
             7. Animation specifications (if applicable)
             8. LOD recommendations""")
-            generation_prompt = llm.chat()
+            generation_prompt = await llm.chat()
         except Exception:
             generation_prompt = prompt
     else:
@@ -413,10 +423,19 @@ async def generate_asset_batch(request: AssetBatchRequest):
     }
     
     # Generate style guide if AI available
-    if LLM_AVAILABLE and EMERGENT_KEY and request.consistent_style:
+    if LLM_AVAILABLE and request.consistent_style:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
-            llm.add_message("system", "You are a game art director. Create consistent style guides for game assets.")
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.asset-pipeline.style-guide",
+                    version="1",
+                    instructions=(
+                        "You are a game art director. Create consistent "
+                        "style guides for game assets."
+                    ),
+                ),
+            )
             llm.add_message("user", f"""Create a style guide for a {request.game_type} game with {request.art_style} art style.
             Project: {request.project_name}
             Assets needed: {len(request.assets)}
@@ -425,7 +444,7 @@ async def generate_asset_batch(request: AssetBatchRequest):
             1. Color palette (5-8 hex colors)
             2. Style rules for consistency
             3. Technical specifications""")
-            style_response = llm.chat()
+            style_response = await llm.chat()
             style_guide["ai_generated"] = style_response
         except Exception:
             pass

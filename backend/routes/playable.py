@@ -17,6 +17,7 @@
 ║  exact missing structural checks (so the UI can prompt a regenerate).      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
+from skeleton.context.instruction_policy import InstructionPolicy
 import os
 import threading
 import base64
@@ -31,7 +32,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 from core.databases import client as _SHARED_MONGO_CLIENT
-from routes.llm_router import MODEL_CATALOG, ROUTING_POLICY, EMERGENT_LLM_KEY
+from routes.llm_router import MODEL_CATALOG, ROUTING_POLICY
 
 router = APIRouter(prefix="/api/playable", tags=["playable"])
 _db = _SHARED_MONGO_CLIENT[os.environ.get("DB_NAME", "test_database")]
@@ -183,16 +184,20 @@ class GenerateBody(BaseModel):
 async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
     """Run a provider-diverse LLM ensemble (fallback) WITHOUT touching the
     main-loop Mongo client — safe to drive from a fresh loop inside a thread."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    if not EMERGENT_LLM_KEY:
-        return {"content": "", "error": "EMERGENT_LLM_KEY not configured", "model": None, "provider": None}
+    from core.engine_chat import EngineChat, UserMessage
     sid = f"playable-{uuid.uuid4().hex[:8]}"
     for i, model in enumerate(ensemble):
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
         try:
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
-                           system_message=system).with_model(provider, model)
+            chat = EngineChat(
+                session_id=sid,
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.playable.generation",
+                    version="1",
+                    instructions=system.strip(),
+                ),
+            ).with_model(provider, model)
             resp = await chat.send_message(UserMessage(text=prompt))
             content = resp.content if hasattr(resp, "content") else str(resp)
             return {"content": content, "model": model, "provider": provider,

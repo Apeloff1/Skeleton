@@ -26,8 +26,22 @@ from skeleton.contracts.ai_execution import (
     ExecutionState,
 )
 from skeleton.contracts.operation import OperationEnvelope
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+from skeleton.vault.data_lifecycle import DataLifecycleRegistry
+from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+)
 from skeleton.provider_contract import ProviderToolCall
+from skeleton.skills.tool_contract import (
+    ToolExecutionRequest,
+    ToolExecutionStatus,
+    ToolManifest,
+)
+from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
@@ -126,6 +140,7 @@ def _authority(
         "engine:cancel",
         "engine:events",
         "engine:approve",
+        "engine:admission",
     ),
     issued_at: datetime | None = None,
     expires_at: datetime | None = None,
@@ -173,6 +188,7 @@ def _registry(
         "engine:cancel",
         "engine:events",
         "engine:approve",
+        "engine:admission",
     ),
 ) -> EngineAuthorityRegistry:
     return EngineAuthorityRegistry(
@@ -193,6 +209,32 @@ def _service(tmp_path, *, registry=None):
         SQLiteEngineSubmissionStore(tmp_path / "submissions.sqlite3"),
         registry or _registry(),
     )
+
+
+
+def _admitted_service(tmp_path):
+    ledger = TenantQuotaLedger()
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="engine-test-window",
+            max_operations=100,
+            max_input_tokens=1_000_000,
+            max_output_tokens=1_000_000,
+            max_cost_usd=100.0,
+            max_tool_calls=1_000,
+            max_artifact_bytes=10_000_000,
+            max_storage_bytes=10_000_000,
+            max_concurrent_operations=16,
+        ),
+    )
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-admitted.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "submissions-admitted.sqlite3"),
+        _registry(),
+        admission_runtime=runtime,
+    )
+    return service, runtime, ledger
 
 
 def test_command_rejects_tool_policy_handoff_mismatch() -> None:
@@ -565,6 +607,7 @@ def _service_with_approval_scope(tmp_path):
                 "engine:cancel",
                 "engine:events",
                 "engine:approve",
+                "engine:admission",
             )
         ),
     )
@@ -980,4 +1023,630 @@ def test_engine_approval_uses_request_bound_runtime_capability(tmp_path) -> None
             idempotency_key="tampered-idempotency",
             expires_at=_now() + timedelta(minutes=5),
             now=_now(),
+        )
+
+def test_submit_acquires_execution_quota_before_durable_allocation(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    command = _command()
+
+    ack = service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+
+    assert ack.execution_id == command.execution_request.execution_id
+    assert service.repository.get(ack.execution_id).execution_id == ack.execution_id
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["reserved"]["operations"] == 1
+    assert len(runtime.snapshot()["active_operations"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_execution_quota_lease_is_shared_with_tool_usage(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    command = _command()
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    lease = service.ensure_execution_admission(
+        command,
+        now=_now(),
+    )
+    assert lease is not None
+
+    tools = AsyncToolRuntime(admission_runtime=runtime)
+
+    async def handler(_request):
+        return "artifact:engine-admission-test"
+
+    await tools.register(
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Read bounded repository state.",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        ),
+        handler,
+    )
+    receipt = await tools.execute(
+        ToolExecutionRequest(
+            request_id=str(uuid4()),
+            operation_id=lease.operation_id,
+            tenant_id="tenant-a",
+            tool_id="repo.read",
+            idempotency_key="engine-tool-meter",
+            arguments={"path": "README.md"},
+            requested_at=_now(),
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    active = ledger.snapshot("tenant-a")
+    assert active["active_reservations"] == 1
+    assert active["metered_by_category"]["tool"]["tool_calls"] == 1
+
+    completion = service.complete_execution_admission(
+        command.execution_request.execution_id,
+        now=_now() + timedelta(seconds=1),
+    )
+    assert completion is not None
+    closed = ledger.snapshot("tenant-a")
+    assert closed["active_reservations"] == 0
+    assert closed["committed"]["tool_calls"] == 1
+    assert closed["committed"]["operations"] == 1
+
+def test_submit_meters_execution_and_submission_storage_without_replay_double_count(
+    tmp_path,
+) -> None:
+    service, _runtime, ledger = _admitted_service(tmp_path)
+    command = _command()
+
+    first = service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    first_snapshot = ledger.snapshot("tenant-a")
+    storage = first_snapshot["metered_by_category"]["storage"]
+
+    assert first.execution_id == command.execution_request.execution_id
+    assert storage["storage_bytes"] > 0
+    assert storage["artifact_bytes"] == 0
+    assert first_snapshot["usage_events"] == 2
+
+    replay = service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now() + timedelta(seconds=1),
+    )
+    replay_snapshot = ledger.snapshot("tenant-a")
+
+    assert replay == first
+    assert replay_snapshot["usage_events"] == 2
+    assert (
+        replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+        == storage["storage_bytes"]
+    )
+
+def test_external_storage_admission_is_replay_safe_and_tenant_scoped(
+    tmp_path,
+) -> None:
+    service, _runtime, ledger = _admitted_service(tmp_path)
+
+    first = service.consume_external_storage_write(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        capability="conversation-persistence",
+        resource_id="conversation-message",
+        write_id="thread-a:idem-1",
+        storage_bytes=128,
+        now=_now(),
+    )
+    replay = service.consume_external_storage_write(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        capability="conversation-persistence",
+        resource_id="conversation-message",
+        write_id="thread-a:idem-1",
+        storage_bytes=128,
+        now=_now() + timedelta(seconds=1),
+    )
+
+    assert first.replayed is False
+    assert replay.replayed is True
+    assert replay.operation_id == first.operation_id
+    assert replay.receipt_id == first.receipt_id
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["committed"]["storage_bytes"] == 128
+    assert snapshot["usage_events"] == 1
+
+    with pytest.raises(
+        EngineServiceError,
+        match="external storage admission identity conflict",
+    ):
+        service.consume_external_storage_write(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-a:idem-1",
+            storage_bytes=129,
+            now=_now() + timedelta(seconds=2),
+        )
+
+    with pytest.raises(EngineAuthorityError, match="tenant denied"):
+        service.consume_external_storage_write(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-b",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-b:idem-1",
+            storage_bytes=64,
+            now=_now(),
+        )
+
+
+def test_external_storage_admission_requires_dedicated_scope(tmp_path) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+        )
+    )
+
+    with pytest.raises(EngineAuthorityError, match="admission scope denied"):
+        service.consume_external_storage_write(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-a:idem-scope",
+            storage_bytes=64,
+            now=_now(),
+        )
+
+def test_external_governance_write_registers_replays_and_reconciles(
+    tmp_path,
+) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    lifecycle = DataLifecycleRegistry(tmp_path / "governance.sqlite3")
+    service.governance_registry = GovernanceRegistry(lifecycle)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+            "engine:admission",
+            "engine:governance",
+        )
+    )
+
+    first = service.reconcile_external_governed_write(
+        verified_service_principal="backend-service",
+        mode="register",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="internal",
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+        retention_until=200.0,
+        exportable=True,
+    )
+    replay = service.reconcile_external_governed_write(
+        verified_service_principal="backend-service",
+        mode="register",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="internal",
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+        retention_until=200.0,
+        exportable=True,
+    )
+    reconciled = service.reconcile_external_governed_write(
+        verified_service_principal="backend-service",
+        mode="reconcile",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="confidential",
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+        retention_until=300.0,
+        exportable=True,
+    )
+
+    assert first.as_dict() == replay.as_dict()
+    assert first.record["owner_plane"] == "conversation"
+    assert first.record["state"] == "active"
+    assert reconciled.record["data_class"] == "confidential"
+    assert reconciled.record["retention_until"] == 300.0
+    assert lifecycle.get("message-1") == reconciled.record
+    lifecycle.close()
+
+
+def test_external_governance_write_requires_dedicated_scope(tmp_path) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    lifecycle = DataLifecycleRegistry(tmp_path / "governance-scope.sqlite3")
+    service.governance_registry = GovernanceRegistry(lifecycle)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+            "engine:admission",
+        )
+    )
+
+    with pytest.raises(
+        EngineAuthorityError,
+        match="governance scope denied",
+    ):
+        service.reconcile_external_governed_write(
+            verified_service_principal="backend-service",
+            mode="register",
+            plane="conversation",
+            record_id="message-scope",
+            tenant_id="tenant-a",
+            source_ref="conversation-message://thread/message-scope",
+            data_class="internal",
+            purposes=("model-inference",),
+        )
+    lifecycle.close()
+
+
+def test_external_governance_write_rejects_cross_tenant_and_bad_lists(
+    tmp_path,
+) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    lifecycle = DataLifecycleRegistry(tmp_path / "governance-bounds.sqlite3")
+    service.governance_registry = GovernanceRegistry(lifecycle)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+            "engine:admission",
+            "engine:governance",
+        )
+    )
+
+    with pytest.raises(EngineAuthorityError, match="tenant denied"):
+        service.reconcile_external_governed_write(
+            verified_service_principal="backend-service",
+            mode="register",
+            plane="memory",
+            record_id="memory-1",
+            tenant_id="tenant-b",
+            source_ref="memory://assistant/memory-1",
+            data_class="internal",
+            purposes=("model-inference",),
+        )
+
+    with pytest.raises(EngineServiceError, match="purposes"):
+        service.reconcile_external_governed_write(
+            verified_service_principal="backend-service",
+            mode="register",
+            plane="memory",
+            record_id="memory-2",
+            tenant_id="tenant-a",
+            source_ref="memory://assistant/memory-2",
+            data_class="internal",
+            purposes=(),
+        )
+    lifecycle.close()
+
+def _governed_service(tmp_path):
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(
+            tmp_path / "execution-governed.sqlite3"
+        ),
+        SQLiteEngineSubmissionStore(
+            tmp_path / "submissions-governed.sqlite3"
+        ),
+        _registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:governance",
+            )
+        ),
+        governance_registry=governance,
+    )
+    return service, governance
+
+
+class _RecordingDeletionAdapter:
+    def __init__(self) -> None:
+        self.deleted = []
+
+    async def delete(self, action) -> None:
+        self.deleted.append((action.record_id, action.target))
+
+
+@pytest.mark.asyncio
+async def test_external_governance_engine_execution_skips_conversation_owner(
+    tmp_path,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    adapters = LifecycleAdapterRegistry()
+    memory_adapter = _RecordingDeletionAdapter()
+    adapters.register_deletion("memory", memory_adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-linked.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "submissions-linked.sqlite3"),
+        _registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:governance",
+            )
+        ),
+        governance_registry=governance,
+        governance_lifecycle_executor=executor,
+    )
+    governance.register_canonical_write(
+        "conversation",
+        record_id="thread-linked",
+        tenant_id="tenant-a",
+        source_ref="conversation-thread://thread-linked",
+        data_class="confidential",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=10.0,
+    )
+    governance.register_canonical_write(
+        "memory",
+        record_id="memory-linked",
+        tenant_id="tenant-a",
+        source_ref="memory://assistant/memory-linked",
+        data_class="confidential",
+        purposes=("assistant-memory",),
+        deletion_targets=("memory",),
+        created_at=10.0,
+    )
+    plan = service.request_external_governance_deletion(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        record_ids=("thread-linked", "memory-linked"),
+    )
+
+    result = await service.execute_external_governance_engine_targets(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        plan_id=plan["plan_id"],
+    )
+
+    assert result["executed_targets"] == ["memory"]
+    assert memory_adapter.deleted == [("memory-linked", "memory")]
+    pending = lifecycle.pending_deletion_plan(
+        plan["plan_id"],
+        tenant_id="tenant-a",
+    )
+    assert [
+        (action.record_id, action.target)
+        for action in pending.actions
+    ] == [("thread-linked", "conversation")]
+
+
+@pytest.mark.asyncio
+async def test_external_retention_plan_replays_pending_conversation_owner(
+    tmp_path,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    adapters = LifecycleAdapterRegistry()
+    memory_adapter = _RecordingDeletionAdapter()
+    adapters.register_deletion("memory", memory_adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-retention.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "submissions-retention.sqlite3"),
+        _registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:governance",
+            )
+        ),
+        governance_registry=governance,
+        governance_lifecycle_executor=executor,
+    )
+    governance.register_canonical_write(
+        "conversation",
+        record_id="thread-retention",
+        tenant_id="tenant-a",
+        source_ref="conversation-thread://thread-retention",
+        data_class="confidential",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=10.0,
+        retention_until=15.0,
+    )
+    governance.register_canonical_write(
+        "memory",
+        record_id="memory-retention",
+        tenant_id="tenant-a",
+        source_ref="memory://assistant/memory-retention",
+        data_class="confidential",
+        purposes=("assistant-memory",),
+        deletion_targets=("memory",),
+        created_at=10.0,
+        retention_until=15.0,
+    )
+
+    plan = service.plan_external_governance_retention(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert plan["plan_id"]
+    assert {
+        (row["record_id"], row["target"])
+        for row in plan["actions"]
+    } == {
+        ("thread-retention", "conversation"),
+        ("memory-retention", "memory"),
+    }
+
+    engine_result = await service.execute_external_governance_engine_targets(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        plan_id=plan["plan_id"],
+        now=_now(),
+    )
+    assert engine_result["executed_targets"] == ["memory"]
+    assert memory_adapter.deleted == [("memory-retention", "memory")]
+
+    replay = service.plan_external_governance_retention(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert replay["plan_id"] == plan["plan_id"]
+    assert [
+        (row["record_id"], row["target"])
+        for row in replay["actions"]
+    ] == [("thread-retention", "conversation")]
+
+
+def test_external_governance_deletion_plan_ack_and_inventory_are_tenant_fenced(
+    tmp_path,
+) -> None:
+    service, governance = _governed_service(tmp_path)
+    for record_id in ("thread-1", "message-1"):
+        governance.register_canonical_write(
+            "conversation",
+            record_id=record_id,
+            tenant_id="tenant-a",
+            source_ref=(
+                "conversation-thread://thread-1"
+                if record_id == "thread-1"
+                else "conversation-message://thread-1/message-1"
+            ),
+            data_class="confidential",
+            purposes=("model-inference",),
+            deletion_targets=("conversation",),
+            created_at=10.0,
+            exportable=True,
+        )
+
+    inventory = service.external_governance_inventory(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+    )
+    assert inventory["tenant_id"] == "tenant-a"
+    assert inventory["count"] == 2
+    assert {row["record_id"] for row in inventory["records"]} == {
+        "thread-1",
+        "message-1",
+    }
+
+    plan = service.request_external_governance_deletion(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        record_ids=("thread-1", "message-1"),
+        reason="tenant-request",
+        now=_now(),
+    )
+    assert plan["tenant_id"] == "tenant-a"
+    assert {row["record_id"] for row in plan["actions"]} == {
+        "thread-1",
+        "message-1",
+    }
+    assert {row["target"] for row in plan["actions"]} == {
+        "conversation",
+    }
+
+    for row in plan["actions"]:
+        receipt = service.acknowledge_external_governance_deletion(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            plan_id=plan["plan_id"],
+            record_id=row["record_id"],
+            target=row["target"],
+            now=_now() + timedelta(seconds=1),
+        )
+        assert receipt["record_id"] == row["record_id"]
+        assert receipt["target"] == "conversation"
+        assert receipt["state"] == "deleted"
+
+    assert governance.lifecycle.get("thread-1")["state"] == "deleted"
+    assert governance.lifecycle.get("message-1")["state"] == "deleted"
+
+
+def test_external_governance_lifecycle_requires_governance_scope(tmp_path) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    governance.register_canonical_write(
+        "conversation",
+        record_id="thread-denied",
+        tenant_id="tenant-a",
+        source_ref="conversation-thread://thread-denied",
+        data_class="confidential",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=10.0,
+    )
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-denied.sqlite3"),
+        SQLiteEngineSubmissionStore(
+            tmp_path / "submissions-denied.sqlite3"
+        ),
+        _registry(scopes=("engine:read",)),
+        governance_registry=governance,
+    )
+
+    with pytest.raises(
+        EngineAuthorityError,
+        match="governance scope denied",
+    ):
+        service.request_external_governance_deletion(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            record_ids=("thread-denied",),
         )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import pytest
 
@@ -9,6 +10,11 @@ from skeleton.contracts.ai_execution import (
     AIExecutionResult,
     AgentTurn,
     ExecutionState,
+)
+from skeleton.contracts.verification import (
+    VerificationLevel,
+    VerificationOutcome,
+    VerificationReceipt,
 )
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
@@ -422,3 +428,71 @@ def test_staged_finalization_is_idempotent_and_rejects_changed_terminal_payload(
             expected_execution_version=current.version,
             now=_now(),
         )
+
+def _verification_receipt(*, receipt_id: str | None = None, verifier_id: str = "verify:test") -> VerificationReceipt:
+    return VerificationReceipt(
+        receipt_id=receipt_id or str(uuid4()),
+        claim_id=str(uuid4()),
+        claim_digest="c" * 64,
+        tenant_id="tenant-a",
+        execution_id="exec-1",
+        result_ref="execution-result:exec-1",
+        outcome=VerificationOutcome.PASSED,
+        policy_level=VerificationLevel.STRUCTURAL,
+        required_modes=("structural",),
+        policy_satisfied=True,
+        check_id=str(uuid4()),
+        verifier_id=verifier_id,
+        verified_at=_now(),
+    )
+
+
+def test_verification_receipt_survives_restart_and_replays_idempotently(
+    tmp_path,
+) -> None:
+    path = tmp_path / "execution.sqlite3"
+    first = SQLiteExecutionRepository(path)
+    first.create(_request(), now=_now())
+    receipt = _verification_receipt()
+
+    stored = first.remember_verification_receipt(receipt)
+    replay = first.remember_verification_receipt(receipt)
+
+    assert stored == receipt
+    assert replay == receipt
+    assert first.verification_receipt(receipt.receipt_id) == receipt
+    assert first.verification_receipts_for_execution("exec-1") == (receipt,)
+    assert first.verification_receipts_for_claim(receipt.claim_id) == (receipt,)
+    first.close()
+
+    reopened = SQLiteExecutionRepository(path)
+    assert reopened.verification_receipt(receipt.receipt_id) == receipt
+    assert reopened.verification_receipts_for_execution("exec-1") == (receipt,)
+
+
+def test_verification_receipt_identity_conflict_fails_closed() -> None:
+    repo = SQLiteExecutionRepository()
+    repo.create(_request(), now=_now())
+    receipt = _verification_receipt()
+    repo.remember_verification_receipt(receipt)
+
+    changed = VerificationReceipt(
+        receipt_id=receipt.receipt_id,
+        claim_id=receipt.claim_id,
+        claim_digest=receipt.claim_digest,
+        tenant_id=receipt.tenant_id,
+        execution_id=receipt.execution_id,
+        result_ref=receipt.result_ref,
+        outcome=receipt.outcome,
+        policy_level=receipt.policy_level,
+        required_modes=receipt.required_modes,
+        policy_satisfied=receipt.policy_satisfied,
+        check_id=receipt.check_id,
+        verifier_id="verify:changed",
+        verified_at=receipt.verified_at,
+    )
+    with pytest.raises(
+        ExecutionRepositoryConflict,
+        match="verification receipt identity already differs",
+    ):
+        repo.remember_verification_receipt(changed)

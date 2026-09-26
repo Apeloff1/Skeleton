@@ -149,8 +149,8 @@ def test_legacy_assistant_source_delegates_to_engine_without_local_provider() ->
     assert "skeleton.frontier.model_runtime" not in source
     assert "ProviderRegistry" not in source
     assert "ProviderRequest" not in source
-    assert "EngineTextRequest" in source
-    assert "execute_engine_text" in source
+    assert "EngineChat" in source
+    assert "UserMessage" in source
 
 
 def test_hub_source_has_no_local_provider_or_legacy_chat_shim() -> None:
@@ -162,8 +162,8 @@ def test_hub_source_has_no_local_provider_or_legacy_chat_shim() -> None:
     assert "emergentintegrations" not in source
     assert "ProviderRegistry" not in source
     assert "ProviderRequest" not in source
-    assert "EngineTextRequest" in source
-    assert "execute_engine_text" in source
+    assert "EngineChat" in source
+    assert "UserMessage" in source
 
 
 def test_lafs_and_llm_router_delegate_to_engine() -> None:
@@ -173,8 +173,8 @@ def test_lafs_and_llm_router_delegate_to_engine() -> None:
     for source in (lafs_source, router_source):
         assert "ProviderRegistry.from_env()" not in source
         assert "ProviderRequest(" not in source
-        assert "EngineTextRequest" in source
-        assert "execute_engine_text" in source
+        assert "EngineChat" in source
+        assert "UserMessage" in source
 
     assert 'verification_profile="evidence_required"' in lafs_source
     assert 'verification_profile="assistant_proposal"' in router_source

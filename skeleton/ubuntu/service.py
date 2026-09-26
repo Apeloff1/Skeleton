@@ -63,7 +63,7 @@ def validate_service_systemd(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-systemd:"+identifier, ("ubuntu","service","systemd",identifier,desired), "validated service-systemd")
+    return UbuntuAction("service-systemd:"+identifier, ("ubuntu","service","systemd",identifier,desired), "reconcile service-systemd")
 
 def plan_service_systemd(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-systemd plan."""
@@ -123,7 +123,7 @@ def validate_service_socket(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-socket:"+identifier, ("ubuntu","service","socket",identifier,desired), "validated service-socket")
+    return UbuntuAction("service-socket:"+identifier, ("ubuntu","service","socket",identifier,desired), "reconcile service-socket")
 
 def plan_service_socket(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-socket plan."""
@@ -183,7 +183,7 @@ def validate_service_timer(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-timer:"+identifier, ("ubuntu","service","timer",identifier,desired), "validated service-timer")
+    return UbuntuAction("service-timer:"+identifier, ("ubuntu","service","timer",identifier,desired), "reconcile service-timer")
 
 def plan_service_timer(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-timer plan."""
@@ -243,7 +243,7 @@ def validate_service_target(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-target:"+identifier, ("ubuntu","service","target",identifier,desired), "validated service-target")
+    return UbuntuAction("service-target:"+identifier, ("ubuntu","service","target",identifier,desired), "reconcile service-target")
 
 def plan_service_target(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-target plan."""
@@ -303,7 +303,7 @@ def validate_service_unit(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-unit:"+identifier, ("ubuntu","service","unit",identifier,desired), "validated service-unit")
+    return UbuntuAction("service-unit:"+identifier, ("ubuntu","service","unit",identifier,desired), "reconcile service-unit")
 
 def plan_service_unit(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-unit plan."""
@@ -363,7 +363,7 @@ def validate_service_journal(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-journal:"+identifier, ("ubuntu","service","journal",identifier,desired), "validated service-journal")
+    return UbuntuAction("service-journal:"+identifier, ("ubuntu","service","journal",identifier,desired), "reconcile service-journal")
 
 def plan_service_journal(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-journal plan."""
@@ -423,7 +423,7 @@ def validate_service_restart(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-restart:"+identifier, ("ubuntu","service","restart",identifier,desired), "validated service-restart")
+    return UbuntuAction("service-restart:"+identifier, ("ubuntu","service","restart",identifier,desired), "reconcile service-restart")
 
 def plan_service_restart(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-restart plan."""
@@ -483,7 +483,7 @@ def validate_service_enable(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-enable:"+identifier, ("ubuntu","service","enable",identifier,desired), "validated service-enable")
+    return UbuntuAction("service-enable:"+identifier, ("ubuntu","service","enable",identifier,desired), "reconcile service-enable")
 
 def plan_service_enable(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-enable plan."""
@@ -543,7 +543,7 @@ def validate_service_mask(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-mask:"+identifier, ("ubuntu","service","mask",identifier,desired), "validated service-mask")
+    return UbuntuAction("service-mask:"+identifier, ("ubuntu","service","mask",identifier,desired), "reconcile service-mask")
 
 def plan_service_mask(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-mask plan."""
@@ -603,7 +603,7 @@ def validate_service_health(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("service-health:"+identifier, ("ubuntu","service","health",identifier,desired), "validated service-health")
+    return UbuntuAction("service-health:"+identifier, ("ubuntu","service","health",identifier,desired), "reconcile service-health")
 
 def plan_service_health(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic service-health plan."""
