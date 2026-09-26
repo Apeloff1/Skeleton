@@ -1700,7 +1700,7 @@
       "plane": "application-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical ConversationThread/ConversationMessage envelopes, a durable conformance repository, authoritative Mongo collections, first-class /api/v1/conversations routes, server-first Jeeves history, stable retry identities and a rebuildable frontend client now exist. Remaining closure work is to migrate all legacy caller-history chat paths and the Jeeves workspace onto the canonical API, commit assistant messages only from terminal/qualified AIExecutionResult through the cognitive loop, complete regenerate orchestration, and prove governance delete/export/retention plus browser refresh reconstruction.",
+      "gap": "Canonical ConversationThread/ConversationMessage authority, Mongo persistence, first-class APIs, server-owned /ai/chat context compilation, stable retry identity, assistant result binding primitives and branch/regenerate repository primitives are implemented. Jeeves no longer owns provider credentials and no caller-supplied history can enter model context, including degraded-storage paths. Remaining convergence is migrating Jeeves compatibility storage/workspace reconstruction onto canonical ConversationThread/Message authority, wiring regenerate through engine execution, and completing governance/browser reconstruction closure evidence.",
       "construction": [
         "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
         "persist thread/message authority in backend core Mongo rather than client memory or provider history",
@@ -1725,7 +1725,7 @@
         "context projection preserves selected message/citation/tool provenance",
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
-      "verification_state": "canonical-authority-and-mongo-binding-added",
+      "verification_state": "canonical-chat-authority-and-client-history-isolation-implemented-jeeves-store-cutover-open",
       "progress": {
         "state": "in_progress",
         "completed": [
@@ -1740,16 +1740,19 @@
           "server-first Jeeves transcript reconstruction with one-time legacy bootstrap",
           "stable client conversation/message IDs for retry idempotency",
           "frontend canonical conversation API client",
-          "App Assembly gates for conversation contracts, persistence and API regressions"
+          "App Assembly gates for conversation contracts, persistence and API regressions",
+          "backend /ai/chat rejects caller conversation_history as canonical input",
+          "backend /ai/chat compiles server-owned transcript through ContextCompiler",
+          "Jeeves generative escalation delegates through canonical engine boundary",
+          "Jeeves caller history is ignored in normal, empty-thread and degraded-storage paths",
+          "Jeeves compatibility tests prove server transcript authority and retry idempotency"
         ],
         "remaining": [
-          "migrate backend /ai/chat away from canonical use of caller conversation_history",
-          "migrate Jeeves WorkspaceController from device-local transcript authority to canonical conversation API projection",
-          "bind assistant commits exclusively to terminal or qualified AIExecutionResult from the cognitive execution loop",
-          "implement regenerate command through operation/orchestration rather than direct message fabrication",
-          "propagate deletion/export/retention through artifact, memory, summary and derived-index governance",
-          "prove ordered concurrent append and interrupted prepared-intent recovery against Mongo",
-          "prove browser refresh/reconnect reconstructs identical active transcript from server authority"
+          "migrate Jeeves jeeves_chat compatibility rows onto canonical ConversationThread/ConversationMessage authority",
+          "migrate Jeeves WorkspaceController/device reconstruction to canonical conversation API projection",
+          "wire regenerate through engine execution and canonical regenerate_assistant_message",
+          "complete conversation governance delete/export/retention propagation across referenced artifacts/memory/summaries",
+          "prove browser refresh/reconnect reconstructs identical active transcript from canonical server authority"
         ]
       }
     },
@@ -5088,12 +5091,14 @@
       "Mongo authority adapter",
       "conversation create/list/read/append/edit/state/delete-intent API",
       "Jeeves server-first history compatibility migration",
-      "frontend conversation client"
+      "frontend conversation client",
+      "server-authoritative /ai/chat context compilation",
+      "caller-history rejection/ignore boundaries",
+      "Jeeves canonical engine delegation"
     ],
     "remaining_surfaces": [
-      "all legacy chat ingress convergence",
-      "cognitive-loop assistant finalization",
-      "regenerate orchestration",
+      "Jeeves compatibility-store cutover to canonical conversation authority",
+      "cognitive-loop regenerate orchestration",
       "governance lifecycle completion",
       "frontend workspace server reconstruction"
     ]
