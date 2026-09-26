@@ -32,6 +32,7 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.context import ContextEnvelope
+from skeleton.contracts.memory_record import MemoryKind
 from skeleton.context.compiler import project_provider_context
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.provider_contract import ProviderToolDefinition
@@ -397,6 +398,7 @@ def command_from_context(
     tool_choice: str | None = None,
     specific_tool_id: str | None = None,
     context_seed_refs: Sequence[str] = (),
+    memory_write_intent: Mapping[str, Any] | None = None,
 ) -> EngineExecutionCommand:
     """Build a digest-bound engine command from one immutable context snapshot."""
 
@@ -538,6 +540,123 @@ def command_from_context(
             "assistant_proposal verification requires tool-free execution"
         )
 
+    normalized_memory_intent: dict[str, Any] | None = None
+    if memory_write_intent is not None:
+        intent = _json_object(
+            memory_write_intent,
+            "memory_write_intent",
+        )
+        allowed_memory_fields = {
+            "subject_id",
+            "namespace",
+            "kind",
+            "data_class",
+            "expires_at",
+            "idempotency_key",
+            "provenance_refs",
+            "content_from",
+        }
+        unknown_memory_fields = sorted(
+            set(intent) - allowed_memory_fields
+        )
+        if unknown_memory_fields:
+            raise EngineProtocolError(
+                "memory_write_intent contains unsupported fields: "
+                + ",".join(unknown_memory_fields)
+            )
+        subject_id = _text(
+            intent.get("subject_id"),
+            "memory_write_intent.subject_id",
+            maximum=512,
+        )
+        namespace = _text(
+            intent.get("namespace", "assistant"),
+            "memory_write_intent.namespace",
+            maximum=256,
+        )
+        kind = _text(
+            intent.get("kind"),
+            "memory_write_intent.kind",
+            maximum=64,
+        ).lower()
+        try:
+            MemoryKind(kind)
+        except ValueError as exc:
+            raise EngineProtocolError(
+                "memory_write_intent.kind is unsupported"
+            ) from exc
+        content_from = _text(
+            intent.get("content_from", "verified_final_output"),
+            "memory_write_intent.content_from",
+            maximum=64,
+        )
+        if content_from != "verified_final_output":
+            raise EngineProtocolError(
+                "memory_write_intent may only persist verified_final_output"
+            )
+        data_class = _text(
+            intent.get("data_class", handoff.data_class),
+            "memory_write_intent.data_class",
+            maximum=32,
+        ).lower()
+        if data_class not in {
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
+        }:
+            raise EngineProtocolError(
+                "memory_write_intent.data_class is unsupported"
+            )
+        expires_at = intent.get("expires_at")
+        normalized_expiry = None
+        if expires_at is not None:
+            normalized_expiry = _aware(
+                expires_at,
+                "memory_write_intent.expires_at",
+            ).isoformat()
+            if _aware(
+                expires_at,
+                "memory_write_intent.expires_at",
+            ) <= started:
+                raise EngineProtocolError(
+                    "memory_write_intent.expires_at must follow execution creation"
+                )
+        raw_refs = intent.get("provenance_refs", [])
+        if not isinstance(raw_refs, list):
+            raise EngineProtocolError(
+                "memory_write_intent.provenance_refs must be a list"
+            )
+        provenance_refs: list[str] = []
+        for index, raw_ref in enumerate(raw_refs):
+            ref = _text(
+                raw_ref,
+                f"memory_write_intent.provenance_refs[{index}]",
+                maximum=1024,
+            )
+            if ref not in provenance_refs:
+                provenance_refs.append(ref)
+            if len(provenance_refs) > 128:
+                raise EngineProtocolError(
+                    "memory_write_intent.provenance_refs exceeds maximum count"
+                )
+        normalized_memory_intent = {
+            "subject_id": subject_id,
+            "namespace": namespace,
+            "kind": kind,
+            "data_class": data_class,
+            "content_from": content_from,
+            "provenance_refs": provenance_refs,
+        }
+        if normalized_expiry is not None:
+            normalized_memory_intent["expires_at"] = normalized_expiry
+        if intent.get("idempotency_key") is not None:
+            normalized_memory_intent["idempotency_key"] = _text(
+                intent.get("idempotency_key"),
+                "memory_write_intent.idempotency_key",
+                maximum=1024,
+            )
+
     normalized_history: list[tuple[str, str]] = []
     projected_history = (
         projection.history
@@ -662,26 +781,30 @@ def command_from_context(
         tool_choice=resolved_tool_choice,
         specific_tool_id=normalized_specific_tool_id,
     )
+    context_policy = {
+        "tenant_id": context.tenant_id,
+        "capability": cap,
+        "verification_profile": profile,
+        "data_class": handoff.data_class,
+        "context_id": context.context_id,
+        "context_digest": context.context_digest,
+        "compiler_version": context.compiler_version,
+        "handoff_digest": handoff.handoff_digest,
+        "tool_choice": resolved_tool_choice,
+        "specific_tool_id": normalized_specific_tool_id,
+        "source_snapshot": [
+            [segment_id, digest]
+            for segment_id, digest in context.source_snapshot
+        ],
+    }
+    if normalized_memory_intent is not None:
+        context_policy["memory_write_intent"] = normalized_memory_intent
+
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
         execution_id=context.execution_id,
         objective=objective_text,
-        context_policy={
-            "tenant_id": context.tenant_id,
-            "capability": cap,
-            "verification_profile": profile,
-            "data_class": handoff.data_class,
-            "context_id": context.context_id,
-            "context_digest": context.context_digest,
-            "compiler_version": context.compiler_version,
-            "handoff_digest": handoff.handoff_digest,
-            "tool_choice": resolved_tool_choice,
-            "specific_tool_id": normalized_specific_tool_id,
-            "source_snapshot": [
-                [segment_id, digest]
-                for segment_id, digest in context.source_snapshot
-            ],
-        },
+        context_policy=context_policy,
         tool_policy={
             "tenant_id": context.tenant_id,
             "allowed_tool_ids": [
@@ -707,6 +830,8 @@ def command_from_context(
     ]
     if normalized_tools:
         authority_scopes.append("engine:approve")
+    if normalized_memory_intent is not None:
+        authority_scopes.append("engine:memory")
 
     authority = DelegatedAuthority(
         service_principal=principal,
