@@ -17,6 +17,11 @@ from skeleton.context.compiler import (
     project_provider_context,
 )
 from skeleton.context.policy import ContextCompilePolicy
+from skeleton.context.sources.tool import tool_result_segment
+from skeleton.skills.tool_contract import (
+    ToolExecutionReceipt,
+    ToolExecutionStatus,
+)
 
 
 BASE = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
@@ -373,3 +378,93 @@ def test_policy_can_raise_clearance_for_explicit_authorized_flow() -> None:
     assert [s.segment_id for s in envelope.evidence_segments] == [
         restricted.segment_id
     ]
+
+
+def _tool_receipt(
+    *,
+    status: ToolExecutionStatus = ToolExecutionStatus.SUCCEEDED,
+) -> ToolExecutionReceipt:
+    return ToolExecutionReceipt(
+        receipt_id=str(uuid4()),
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        execution_id="exec-tool-context",
+        turn_id="turn-tool-context",
+        call_id="call-tool-context",
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="context-tool-result",
+        arguments_digest="a" * 64,
+        status=status,
+        started_at=BASE,
+        finished_at=BASE + timedelta(seconds=1),
+        result_ref=(
+            "artifact:tool-result"
+            if status is ToolExecutionStatus.SUCCEEDED
+            else None
+        ),
+        error_code=(
+            None
+            if status is ToolExecutionStatus.SUCCEEDED
+            else "tool_failed"
+        ),
+        data_class="internal",
+        transfer_purpose="verification",
+        governance_decision_ref="gov-tool-context",
+    )
+
+
+def test_successful_tool_result_adapter_preserves_receipt_lineage() -> None:
+    receipt = _tool_receipt()
+
+    segment = tool_result_segment(
+        receipt,
+        content="untrusted tool output",
+        purpose="chat",
+    )
+
+    assert segment.kind is ContextKind.TOOL_RESULT
+    assert segment.trust_level is ContextTrust.UNTRUSTED_EVIDENCE
+    assert segment.source_type == "tool-runtime"
+    assert segment.source_id == receipt.receipt_id
+    assert segment.tenant_id == receipt.tenant_id
+    assert segment.data_class == receipt.data_class
+    assert segment.content_ref == receipt.result_ref
+    assert "tool-receipt:" + receipt.receipt_id in segment.provenance
+    assert "execution:" + str(receipt.execution_id) in segment.provenance
+    assert "turn:" + str(receipt.turn_id) in segment.provenance
+    assert "call:" + str(receipt.call_id) in segment.provenance
+    assert (
+        "governance-decision:" + str(receipt.governance_decision_ref)
+        in segment.provenance
+    )
+
+
+def test_non_success_tool_receipt_cannot_enter_context() -> None:
+    receipt = _tool_receipt(status=ToolExecutionStatus.FAILED)
+
+    with pytest.raises(ValueError, match="only successful tool receipts"):
+        tool_result_segment(
+            receipt,
+            content="should not be projected",
+            purpose="chat",
+        )
+
+
+def test_tool_result_adapter_obeys_compiler_tool_result_limit() -> None:
+    segment = tool_result_segment(
+        _tool_receipt(),
+        content="x" * 600,
+        purpose="chat",
+    )
+
+    envelope = _compile(
+        [segment],
+        budget=_budget(tool_result=20),
+        tools_enabled=True,
+    )
+
+    assert envelope.evidence_segments == ()
+    assert dict(envelope.omission_reasons)[segment.segment_id] == (
+        "segment_limit_exceeded"
+    )
