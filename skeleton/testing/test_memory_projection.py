@@ -641,4 +641,3 @@ def test_admitted_projection_rebuild_requires_operation_identity() -> None:
         )
 
     assert store.items == {}
-
