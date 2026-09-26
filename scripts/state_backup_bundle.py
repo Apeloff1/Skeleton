@@ -13,7 +13,6 @@ from typing import Any, Mapping
 from scripts.state_recovery_drill import (
     RecoveryDrillError,
     capture_sqlite_database,
-    canonical_json,
     digest_payload,
     online_backup_sqlite,
 )
