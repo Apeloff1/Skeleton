@@ -8,6 +8,7 @@ import pytest
 
 from core.operation_stream_transport import (
     OperationAccessDenied,
+    OperationEventStore,
     OperationStreamTransport,
     encode_sse_event,
     encode_sse_heartbeat,
@@ -584,3 +585,24 @@ def test_projection_lease_serializes_workers_and_allows_clean_takeover(tmp_path:
         assert [event.sequence for event in events_b.replay(ReplayCursor(operation.operation_id))] == [1]
     finally:
         operations_a.close(); operations_b.close(); events_a.close(); events_b.close()
+
+
+def test_event_store_contract_accepts_reference_backend_and_rejects_partial(
+    tmp_path: Path,
+) -> None:
+    operations = SQLiteOperationStore(tmp_path / "operations-contract.sqlite")
+    events = SQLiteOperationEventStore(tmp_path / "events-contract.sqlite")
+    try:
+        assert isinstance(events, OperationEventStore)
+        transport = OperationStreamTransport(operations, events)
+        assert transport.event_store is events
+
+        class PartialStore:
+            def replay(self, *_args, **_kwargs):
+                return ()
+
+        with pytest.raises(TypeError, match="OperationEventStore contract"):
+            OperationStreamTransport(operations, PartialStore())
+    finally:
+        operations.close()
+        events.close()
