@@ -600,7 +600,7 @@
       "plane": "prompt-context",
       "stage": 2,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/context.py",
@@ -630,7 +630,13 @@
         "compiler omission_reasons record compacted_to:<derived-segment-id> for replay/audit",
         "skeleton/testing/test_context_compiler.py covers compaction lineage, trust downgrade, hard token bounds, control refusal and compiler admission",
         "backend/services/ai_assistant_svc.py delegates model execution through EngineTextRequest/execute_engine_text and owns no provider transport or credentials",
-        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary"
+        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary",
+        "scripts/check_context_execution_boundary.py statically rejects direct ProviderRequest/ProviderRegistry/legacy provider ownership in product routes/services/GameForge",
+        "tests/test_context_execution_boundary.py proves product AI surfaces may use only the canonical engine/context compatibility boundary",
+        "scripts/check_instruction_policy_boundary.py requires every product EngineChat construction to bind an explicit instruction_policy",
+        "tests/test_instruction_policy_boundary.py covers missing policy, anonymous system-message override, aliased EngineChat imports and canonical policy acceptance",
+        ".github/workflows/backend-quality.yml runs context execution and instruction-policy boundary gates",
+        ".github/workflows/app-assembly.yml runs both boundaries and their regressions on the assembled application"
       ],
       "closure_evidence_required": [
         "deterministic context snapshot/digest tests",
@@ -646,17 +652,18 @@
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "outstanding_evidence": [
-        "semantic/multi-segment summary provenance tests where extractive compaction is insufficient",
-        "repository-wide source scan proving remaining model turns cannot bypass ContextCompiler/digest-bound handoff",
-        "legacy control-prompt ownership/parity tests",
-        "fresh exact-head context compiler/App Assembly/runtime validation",
-        "declared dependency-gap closure and independent verification"
+        "fresh exact-head Backend Quality context/instruction-policy boundary evidence",
+        "fresh exact-head App Assembly context/instruction-policy boundary evidence",
+        "declared dependency-gap closure",
+        "independent context-compiler closure verification"
       ],
       "blockers": [
         "dependency must close: gap-conversation-state-authority",
         "dependency must close: gap-memory-durable-authority",
         "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-governance-registry"
+        "dependency must close: gap-governance-registry",
+        "fresh exact-head Backend Quality context/instruction-policy boundary evidence",
+        "fresh exact-head App Assembly context/instruction-policy boundary evidence"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
