@@ -653,6 +653,25 @@ class AsyncToolRuntime:
                 self._registry[key].manifest for key in sorted(self._registry)
             )
 
+    async def verification_metadata(
+        self,
+        tool_id: str,
+    ) -> tuple[ToolManifest, bool]:
+        """Return immutable manifest policy plus postcondition availability.
+
+        Verification consumes this snapshot after a durable tool receipt has
+        committed. Exposing only manifest metadata and whether an explicit
+        postcondition exists keeps verification out of handler internals while
+        allowing action claims to fail closed when no postcondition was
+        actually observed.
+        """
+
+        async with self._lock:
+            item = self._registry.get(str(tool_id))
+            if item is None:
+                raise ToolNotFound("tool is not registered")
+            return item.manifest, item.postcondition is not None
+
     async def receipt(
         self,
         *,
