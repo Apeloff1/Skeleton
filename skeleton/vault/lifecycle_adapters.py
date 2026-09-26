@@ -17,13 +17,11 @@ from dataclasses import dataclass
 import inspect
 from typing import Any, Mapping, Protocol, runtime_checkable
 
-from skeleton.artifact_plane.governance import GovernedArtifactStore
 from skeleton.observability.correlation import correlation_scope, get_correlation_id
 from skeleton.persistence.memory_repository import (
     MemoryNotFound,
     SQLiteMemoryRepository,
 )
-from skeleton.retrieval.governance import GovernedRetrievalIndex
 from skeleton.vault.governance_audit import GovernanceAuditTimeline
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
@@ -247,7 +245,9 @@ class SQLiteMemoryLifecycleAdapter:
 class GovernedArtifactLifecycleAdapter:
     """Physical delete/export adapter for canonical governed artifacts."""
 
-    def __init__(self, artifacts: GovernedArtifactStore) -> None:
+    def __init__(self, artifacts: Any) -> None:
+        from skeleton.artifact_plane.governance import GovernedArtifactStore
+
         if not isinstance(artifacts, GovernedArtifactStore):
             raise TypeError("artifacts must be GovernedArtifactStore")
         self.artifacts = artifacts
@@ -303,7 +303,9 @@ class GovernedArtifactLifecycleAdapter:
 class GovernedRetrievalLifecycleAdapter:
     """Physical delete/export adapter for canonical governed retrieval."""
 
-    def __init__(self, retrieval: GovernedRetrievalIndex) -> None:
+    def __init__(self, retrieval: Any) -> None:
+        from skeleton.retrieval.governance import GovernedRetrievalIndex
+
         if not isinstance(retrieval, GovernedRetrievalIndex):
             raise TypeError(
                 "retrieval must be GovernedRetrievalIndex"
