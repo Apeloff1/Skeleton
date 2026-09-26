@@ -593,6 +593,7 @@ __all__ = [
     "DeletionAdapter",
     "DeletionExecutionResult",
     "ExportAdapter",
+    "GovernedArtifactLifecycleAdapter",
     "GovernedExport",
     "GovernedRetrievalLifecycleAdapter",
     "LifecycleAdapterError",
