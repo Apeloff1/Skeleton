@@ -208,7 +208,7 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
     loop and would hang here) so the main server loop is never blocked."""
     import time
     import asyncio
-    from routes.llm_router import EMERGENT_LLM_KEY, ROUTING_POLICY, MODEL_CATALOG
+    from routes.llm_router import ROUTING_POLICY, MODEL_CATALOG
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     t0 = time.time()
     try:
@@ -221,7 +221,7 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
             for m in ensemble:
                 prov = MODEL_CATALOG.get(m, {}).get("provider", "openai")
                 try:
-                    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"mono-{job_id[:8]}",
+                    chat = LlmChat(session_id=f"mono-{job_id[:8]}",
                                    system_message=MONOGRAPH_SYSTEM).with_model(prov, m)
                     resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=300)
                     return (resp.content if hasattr(resp, "content") else str(resp)), m
@@ -352,7 +352,7 @@ def _poster_worker(job_id: str, cfg: WorldConfig, style: str):
         key = os.environ.get("EMERGENT_LLM_KEY")
 
         async def _gen():
-            chat = LlmChat(api_key=key, session_id=f"poster-{job_id[:8]}",
+            chat = LlmChat(session_id=f"poster-{job_id[:8]}",
                            system_message="You generate photorealistic scientific Earth-observation map imagery.")
             chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))
