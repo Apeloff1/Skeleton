@@ -14,7 +14,7 @@ router = APIRouter(prefix="/assets", tags=["Asset Pipeline"])
 
 # Try to import LLM for AI-powered generation
 try:
-    from emergentintegrations.llm.chat import LlmChat
+    from core.engine_chat import EngineChat
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
@@ -197,7 +197,7 @@ async def generate_sprite(request: Sprite2DRequest):
     generation_prompt = ""
     if LLM_AVAILABLE:
         try:
-            llm = LlmChat(model="gpt-4o")
+            llm = EngineChat(model="gpt-4o")
             llm.add_message("system", """You are an expert pixel artist and game asset designer. 
             Generate detailed, professional asset creation specifications and prompts for AI image generators.
             Include specific details about colors, shapes, shading, and style consistency.""")
@@ -272,7 +272,7 @@ async def generate_3d_model(request: Model3DRequest):
     generation_prompt = ""
     if LLM_AVAILABLE:
         try:
-            llm = LlmChat(model="gpt-4o")
+            llm = EngineChat(model="gpt-4o")
             llm.add_message("system", """You are an expert 3D artist and game asset designer.
             Generate detailed, professional 3D model specifications and prompts for AI 3D generators like Meshy, Tripo, and manual modeling.""")
             llm.add_message("user", f"""Create a detailed 3D asset generation specification for:
@@ -412,7 +412,7 @@ async def generate_asset_batch(request: AssetBatchRequest):
     # Generate style guide if AI available
     if LLM_AVAILABLE and request.consistent_style:
         try:
-            llm = LlmChat(model="gpt-4o")
+            llm = EngineChat(model="gpt-4o")
             llm.add_message("system", "You are a game art director. Create consistent style guides for game assets.")
             llm.add_message("user", f"""Create a style guide for a {request.game_type} game with {request.art_style} art style.
             Project: {request.project_name}
