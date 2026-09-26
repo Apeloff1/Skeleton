@@ -24,6 +24,7 @@ on:
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
       - "tests/test_context_execution_boundary.py"
+      - "backend/tests/test_conversation_governance.py"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
   pull_request:
@@ -46,6 +47,7 @@ on:
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
       - "tests/test_context_execution_boundary.py"
+      - "backend/tests/test_conversation_governance.py"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
 
