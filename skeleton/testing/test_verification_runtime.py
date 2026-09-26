@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 from uuid import uuid4
 
 import pytest
@@ -19,8 +20,15 @@ from skeleton.contracts.verification import (
     VerificationRisk,
 )
 from skeleton.intelligence.verification_runtime import (
+    FinalizationDisposition,
+    SemanticVerificationRuntime,
     VerificationRuntime,
     materialize_verification_receipt,
+)
+from skeleton.provider_runtime import (
+    ProviderAdapter,
+    ProviderResponse,
+    ProviderUnavailableError,
 )
 from skeleton.retrieval.verification import ground_claim, validate_citation
 from skeleton.skills.tool_contract import (
@@ -289,3 +297,370 @@ def test_materialized_verification_receipt_is_deterministic_and_observable() -> 
     assert "chain_of_thought" not in serialized_keys
     assert "reasoning_text" not in serialized_keys
     assert "hidden_reasoning" not in serialized_keys
+
+
+
+class _SemanticAdapter(ProviderAdapter):
+    provider_id = "semantic-test"
+    model = "verifier-v1"
+
+    def __init__(self, responses=(), *, error=None):
+        self.responses = list(responses)
+        self.error = error
+        self.requests = []
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    async def generate(self, request):
+        self.requests.append(request)
+        if self.error is not None:
+            raise self.error
+        if not self.responses:
+            raise AssertionError("unexpected semantic verifier request")
+        return self.responses.pop(0)
+
+
+def _semantic_response(
+    verdict: str,
+    *,
+    issues=(),
+    revised_claim=None,
+    confidence=None,
+    request_id="semantic-request-1",
+):
+    payload = {
+        "verdict": verdict,
+        "issues": list(issues),
+    }
+    if revised_claim is not None:
+        payload["revised_claim"] = revised_claim
+    if confidence is not None:
+        payload["confidence"] = confidence
+    return ProviderResponse(
+        text=None,
+        provider="semantic-test",
+        model="verifier-v1",
+        request_id=request_id,
+        structured_output=payload,
+    )
+
+
+def _semantic_evidence(
+    claim,
+    *,
+    origin: str,
+    source: str,
+    text: str,
+):
+    return EvidenceReference(
+        evidence_id=str(uuid4()),
+        claim_id=claim.claim_id,
+        tenant_id=claim.tenant_id,
+        source_id=source,
+        origin_id=origin,
+        content_digest=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        locator="line:1",
+        relation=EvidenceRelation.SUPPORTS,
+        producer=EvidenceProducer.SOURCE,
+        observed_at=NOW,
+        scope=claim.scope,
+        provenance_refs=("source-ledger:" + origin,),
+    )
+
+
+@pytest.mark.asyncio
+async def test_semantic_verifier_uses_provider_neutral_structured_request_and_publishes_high_risk_pass():
+    claim = _claim(risk=VerificationRisk.HIGH)
+    first_text = "Deployment health check passed in staging."
+    second_text = "Independent staging monitor reports healthy."
+    first = _semantic_evidence(
+        claim,
+        origin="origin-1",
+        source="health-api",
+        text=first_text,
+    )
+    second = _semantic_evidence(
+        claim,
+        origin="origin-2",
+        source="independent-monitor",
+        text=second_text,
+    )
+    adapter = _SemanticAdapter(
+        [
+            _semantic_response(
+                "pass",
+                confidence=0.97,
+                request_id="semantic-pass-1",
+            )
+        ]
+    )
+
+    result = await SemanticVerificationRuntime(adapter).finalize(
+        claim,
+        evidence=(first, second),
+        evidence_text={
+            first.evidence_id: first_text,
+            second.evidence_id: second_text,
+        },
+        verified_at=NOW,
+    )
+
+    assert result.disposition is FinalizationDisposition.PUBLISH
+    assert result.final_assessment.policy_satisfied is True
+    assert result.independent_check is not None
+    assert result.independent_check.independent is True
+    assert result.independent_check.level is VerificationLevel.INDEPENDENT
+    assert result.independent_check.evidence_ids == (
+        first.evidence_id,
+        second.evidence_id,
+    )
+    assert len(adapter.requests) == 1
+    request = adapter.requests[0]
+    assert request.purpose == "semantic-verification"
+    assert request.tenant_id == claim.tenant_id
+    assert request.tool_choice == "none"
+    assert request.tools == ()
+    assert request.max_output_tokens == 800
+    assert request.structured_output_schema["additionalProperties"] is False
+    assert request.structured_output_schema["properties"]["verdict"]["enum"] == [
+        "pass",
+        "repair",
+        "qualify",
+        "abstain",
+        "block",
+    ]
+    assert first_text in request.prompt
+    assert second_text in request.prompt
+    assert "chain_of_thought" not in request.prompt
+    assert "hidden_reasoning" not in request.prompt
+
+
+@pytest.mark.asyncio
+async def test_semantic_verifier_outage_abstains_low_risk_but_blocks_high_risk():
+    outage = ProviderUnavailableError("semantic verifier unavailable")
+    low_adapter = _SemanticAdapter(error=outage)
+    low = _claim(
+        risk=VerificationRisk.LOW,
+        kind=ClaimKind.HYPOTHESIS,
+    )
+
+    low_result = await SemanticVerificationRuntime(low_adapter).finalize(
+        low,
+        verified_at=NOW,
+        force_semantic=True,
+    )
+
+    assert low_result.disposition is FinalizationDisposition.ABSTAIN
+    assert "semantic_verifier_unavailable_or_invalid" in low_result.issues
+    assert len(low_adapter.requests) == 1
+
+    high = _claim(risk=VerificationRisk.HIGH)
+    first_text = "Primary authority reports healthy."
+    second_text = "Independent authority reports healthy."
+    first = _semantic_evidence(
+        high,
+        origin="origin-a",
+        source="primary-authority",
+        text=first_text,
+    )
+    second = _semantic_evidence(
+        high,
+        origin="origin-b",
+        source="secondary-authority",
+        text=second_text,
+    )
+    high_adapter = _SemanticAdapter(
+        error=ProviderUnavailableError("semantic verifier unavailable")
+    )
+
+    high_result = await SemanticVerificationRuntime(high_adapter).finalize(
+        high,
+        evidence=(first, second),
+        evidence_text={
+            first.evidence_id: first_text,
+            second.evidence_id: second_text,
+        },
+        verified_at=NOW,
+    )
+
+    assert high_result.disposition is FinalizationDisposition.BLOCK
+    assert "semantic_verifier_unavailable_or_invalid" in high_result.issues
+    assert len(high_adapter.requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_semantic_repair_preserves_lineage_and_requires_citation_rebinding_before_publish():
+    claim = _claim()
+    evidence_text = "The staging deployment is healthy with one degraded replica."
+    evidence = _semantic_evidence(
+        claim,
+        origin="origin-1",
+        source="deployment-status",
+        text=evidence_text,
+    )
+    adapter = _SemanticAdapter(
+        [
+            _semantic_response(
+                "repair",
+                issues=("claim is too absolute",),
+                revised_claim=(
+                    "Deployment is healthy in staging with one degraded replica."
+                ),
+                request_id="semantic-repair-1",
+            ),
+            _semantic_response(
+                "pass",
+                confidence=0.91,
+                request_id="semantic-repair-2",
+            ),
+        ]
+    )
+
+    result = await SemanticVerificationRuntime(
+        adapter,
+        max_rounds=2,
+        max_repairs=1,
+    ).finalize(
+        claim,
+        evidence=(evidence,),
+        evidence_text={evidence.evidence_id: evidence_text},
+        verified_at=NOW,
+        force_semantic=True,
+    )
+
+    assert result.disposition is FinalizationDisposition.QUALIFIED
+    assert result.final_claim.claim_id != claim.claim_id
+    assert result.final_claim.text.endswith("one degraded replica.")
+    assert result.final_claim.generated_by_model is True
+    assert len(result.repair_lineage) == 1
+    lineage = result.repair_lineage[0]
+    assert lineage.original_claim_id == claim.claim_id
+    assert lineage.repaired_claim_id == result.final_claim.claim_id
+    assert lineage.original_claim_digest == claim.digest
+    assert lineage.repaired_claim_digest == result.final_claim.digest
+    assert "repaired_claim_requires_citation_rebinding" in result.issues
+    assert len(adapter.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_high_impact_repaired_claim_is_blocked_until_evidence_is_rebound():
+    claim = _claim(risk=VerificationRisk.HIGH)
+    first_text = "Primary deployment authority reports healthy."
+    second_text = "Independent deployment authority reports healthy."
+    first = _semantic_evidence(
+        claim,
+        origin="origin-1",
+        source="primary",
+        text=first_text,
+    )
+    second = _semantic_evidence(
+        claim,
+        origin="origin-2",
+        source="secondary",
+        text=second_text,
+    )
+    adapter = _SemanticAdapter(
+        [
+            _semantic_response(
+                "repair",
+                issues=("scope needs qualification",),
+                revised_claim="Deployment is healthy in staging.",
+                request_id="repair-high-1",
+            ),
+            _semantic_response(
+                "pass",
+                request_id="repair-high-2",
+            ),
+        ]
+    )
+
+    result = await SemanticVerificationRuntime(
+        adapter,
+        max_rounds=2,
+        max_repairs=1,
+    ).finalize(
+        claim,
+        evidence=(first, second),
+        evidence_text={
+            first.evidence_id: first_text,
+            second.evidence_id: second_text,
+        },
+        verified_at=NOW,
+    )
+
+    assert result.disposition is FinalizationDisposition.BLOCK
+    assert len(result.repair_lineage) == 1
+    assert "repaired_claim_requires_citation_rebinding" in result.issues
+
+
+@pytest.mark.asyncio
+async def test_semantic_repair_budget_is_bounded_and_fails_safe():
+    claim = _claim()
+    evidence_text = "Deployment is healthy in staging."
+    evidence = _semantic_evidence(
+        claim,
+        origin="origin-1",
+        source="primary",
+        text=evidence_text,
+    )
+    adapter = _SemanticAdapter(
+        [
+            _semantic_response(
+                "repair",
+                issues=("first repair",),
+                revised_claim="Deployment appears healthy in staging.",
+                request_id="repair-budget-1",
+            ),
+            _semantic_response(
+                "repair",
+                issues=("second repair",),
+                revised_claim="Deployment is partially healthy in staging.",
+                request_id="repair-budget-2",
+            ),
+        ]
+    )
+
+    result = await SemanticVerificationRuntime(
+        adapter,
+        max_rounds=2,
+        max_repairs=1,
+    ).finalize(
+        claim,
+        evidence=(evidence,),
+        evidence_text={evidence.evidence_id: evidence_text},
+        verified_at=NOW,
+        force_semantic=True,
+    )
+
+    assert result.disposition is FinalizationDisposition.ABSTAIN
+    assert result.issues == ("semantic_repair_budget_exhausted",)
+    assert len(result.repair_lineage) == 1
+    assert len(adapter.requests) == 2
+
+
+@pytest.mark.asyncio
+async def test_missing_authoritative_evidence_never_invokes_semantic_verifier_even_with_high_confidence():
+    claim = _claim(risk=VerificationRisk.HIGH)
+    adapter = _SemanticAdapter(
+        [
+            _semantic_response(
+                "pass",
+                confidence=1.0,
+                request_id="confidence-only",
+            )
+        ]
+    )
+
+    result = await SemanticVerificationRuntime(adapter).finalize(
+        claim,
+        verified_at=NOW,
+        force_semantic=True,
+    )
+
+    assert result.disposition is FinalizationDisposition.BLOCK
+    assert result.semantic_rounds == ()
+    assert adapter.requests == []
+    assert "authoritative_support_missing" in result.issues
+    assert "semantic_verifier_not_admitted" in result.issues
