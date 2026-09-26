@@ -436,7 +436,7 @@ async def create_game_project(request: GameProjectRequest):
     }
     
     # AI-enhanced project generation
-    if LLM_AVAILABLE and EMERGENT_KEY:
+    if LLM_AVAILABLE:
         try:
             llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
             llm.add_message("system", """You are an expert game designer and technical director.
