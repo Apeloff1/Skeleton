@@ -962,7 +962,10 @@ def run_engine_sqlite_bundle_drill(
     from skeleton.persistence.execution_repository import (
         SQLiteExecutionRepository,
     )
-    from skeleton.skills.tool_contract import ToolExecutionRequest
+    from skeleton.skills.tool_contract import (
+        ToolExecutionRequest,
+        approval_ref_for_request,
+    )
     from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 
     root = Path(workdir)
@@ -1041,24 +1044,8 @@ def run_engine_sqlite_bundle_drill(
         command=command,
         ack=ack,
     )
-    approval = EngineToolApproval(
-        approval_id="approval-engine-recovery",
-        execution_id=command.execution_request.execution_id,
-        call_id="call-engine-recovery",
-        tool_id="repo.write",
-        arguments_digest="c" * 64,
-        actor_id=command.operation.actor_id,
-        tenant_id=command.operation.tenant_id,
-        idempotency_key="approval-engine-recovery",
-        bound_approval_ref="approval:engine-recovery",
-        issued_at=created_at,
-        expires_at=created_at + timedelta(hours=1),
-    )
-    submissions.remember_approval(approval)
-
-    tool_store = SQLiteToolReceiptStore(source_paths["tool_receipts"])
     tool_request = ToolExecutionRequest(
-        request_id="tool-request-engine-recovery",
+        request_id="00000000-0000-4000-8000-000000000912",
         operation_id=command.operation.operation_id,
         execution_id=command.execution_request.execution_id,
         turn_id=command.compiled_context.turn_id,
@@ -1071,6 +1058,22 @@ def run_engine_sqlite_bundle_drill(
         data_class="internal",
         transfer_purpose="verification",
     )
+    approval = EngineToolApproval(
+        approval_id="approval-engine-recovery",
+        execution_id=tool_request.execution_id or "",
+        call_id=tool_request.call_id or "",
+        tool_id=tool_request.tool_id,
+        arguments_digest=tool_request.arguments_digest,
+        actor_id=command.operation.actor_id,
+        tenant_id=tool_request.tenant_id,
+        idempotency_key="approval-engine-recovery",
+        bound_approval_ref=approval_ref_for_request(tool_request),
+        issued_at=created_at,
+        expires_at=created_at + timedelta(hours=1),
+    )
+    submissions.remember_approval(approval)
+
+    tool_store = SQLiteToolReceiptStore(source_paths["tool_receipts"])
     reservation = tool_store.reserve(tool_request, now=created_at)
     if reservation.status != "owner":
         raise RecoveryDrillError("tool recovery seed did not acquire reservation")
