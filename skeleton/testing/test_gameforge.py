@@ -17,7 +17,11 @@ class TestGameForgeIntake(unittest.TestCase):
             "combat": "turn-based",
             "progression": "skill-tree",
         })
-        self.assertEqual(result["era"], "medieval_fantasy")
+        # The brief votes a canonical, compilable era; the narrative setting
+        # label ("medieval_fantasy") travels separately and is never an era id.
+        self.assertEqual(result["era"], "crpg")
+        self.assertEqual(result["setting"], "medieval_fantasy")
+        self.assertEqual(result["genre"], "rpg")
         self.assertIn("isometric", result["vision"])
 
 

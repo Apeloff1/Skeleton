@@ -13,16 +13,17 @@ from typing import Any, Dict, Optional
 
 from skeleton.context.cockpit import Cockpit
 from skeleton.context.dodeca import Dodecahedron
-from skeleton.context.helix import DNAHelix
-from skeleton.context.ledger import ContextLedger
 from skeleton.context.oracle import Magic8Ball
-from skeleton.context.snowball import Snowball
 from skeleton.context.tensor import ContextTensor, detect_era
 from skeleton.forge.archetypes import default_library
 from skeleton.forge.universal import Forge
 from skeleton.jeeves.core import Jeeves, SessionMode
 from skeleton.kernel.events import EventBus
 from skeleton.pipelines.composer import PipelineComposer, Stage
+
+# Archetype names that ask the forge stage to compose the blueprint from the
+# vision (skeleton.forge.vision_compose) instead of stamping a preset.
+COMPOSE_ARCHETYPES = frozenset({"auto", "vision"})
 
 
 class GameForgeRun:
@@ -45,13 +46,28 @@ class GameForgeRun:
         return cls(cockpit=cockpit, live=True)
 
     def execute(self, vision: str, *, era: Optional[str] = None,
-                archetype: str = "extraction",
+                archetype: Optional[str] = None,
                 target: str = "godot",
                 project_root: Optional[str] = None,
                 answers: Optional[Dict[str, str]] = None,
                 overwrite: bool = False,
                 blend: Optional[tuple] = None,
-                generation: Optional[str] = None) -> Dict[str, Any]:
+                generation: Optional[str] = None,
+                playtest: Optional[str] = None,
+                repair_mode: str = "apply") -> Dict[str, Any]:
+        """Run the ten-stage pipeline.
+
+        ``playtest``: ``None``/"off" (default, static checks only), "auto"
+        (boot the emitted build headless in Godot when a binary is available)
+        or "require" (the emit stage fails unless the headless boot passes).
+        ``repair_mode``: "apply" (default, revise until green) or "suggest"
+        (verify loop proposes repairs without changing files).
+        """
+        from skeleton.forge.playtest import normalise_mode
+        from skeleton.forge.repair import REPAIR_MODES
+        playtest_mode = normalise_mode(playtest)
+        if repair_mode not in REPAIR_MODES:
+            raise ValueError(f"repair_mode must be one of {REPAIR_MODES}, got {repair_mode!r}")
         cockpit = self.cockpit
         if answers:
             from skeleton.context.questionnaire import intake
@@ -61,6 +77,8 @@ class GameForgeRun:
             cockpit.tensor = taken.tensor
         if generation is None:
             generation = getattr(cockpit, "generation", None)
+        # Explicit argument > cockpit pin (BIND ARCHETYPE) > canonical preset.
+        archetype = archetype or getattr(cockpit, "archetype", None) or "extraction"
         try:
             from skeleton.cortex.era_bind import resolve
             bound = resolve(vision or era or "")
@@ -92,6 +110,8 @@ class GameForgeRun:
             "reference": hit,
             "repair": True,
             "max_rounds": 3,
+            "playtest_mode": playtest_mode,
+            "repair_mode": repair_mode,
         }
         stages = [
             Stage("ingest", _stage_ingest),
@@ -133,6 +153,7 @@ class GameForgeRun:
                 "verification": run.context.get("verification"),
                 "verify_loop": run.context.get("verify_loop"),
                 "repair": run.context.get("repair"),
+                "composition": run.context.get("composition"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -141,6 +162,7 @@ class GameForgeRun:
             "files": run.context.get("files") or {},
             "sim": run.context.get("sim"),
             "project": run.context.get("project"),
+            "playtest": run.context.get("playtest"),
             "cortex_observe": run.context.get("cortex_observe"),
             "build_plan": (run.context.get("build_plan").to_dict()
                            if hasattr(run.context.get("build_plan"), "to_dict")
@@ -187,7 +209,7 @@ def _stage_detect(ctx: Dict[str, Any]) -> Dict[str, Any]:
     if not blend and getattr(cockpit, "blend", None):
         blend = cockpit.blend
         ctx["blend"] = blend
-    from skeleton.forge.hardware import detect_generation, attach
+    from skeleton.forge.hardware import detect_generation
     if not ctx.get("generation"):
         cockpit_generation = getattr(cockpit, "generation", None)
         if cockpit_generation:
@@ -256,10 +278,18 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
     forge: Forge = ctx["forge"]
     cockpit: Cockpit = ctx["cockpit"]
     name = ctx.get("archetype") or "extraction"
-    try:
-        bp = default_library().build(forge, name)
-    except Exception:
-        bp = default_library().build(forge, "extraction")
+    composition = None
+    if name in COMPOSE_ARCHETYPES:
+        # Vision-derived component graph (opt-in via archetype="auto").
+        from skeleton.forge.vision_compose import compose_from_vision
+        bp, composed = compose_from_vision(forge, str(ctx.get("vision") or ""))
+        composition = composed.to_dict()
+        ctx["composition"] = composition
+    else:
+        try:
+            bp = default_library().build(forge, name)
+        except Exception:
+            bp = default_library().build(forge, "extraction")
     pack = ctx.get("pack")
     if not pack:
         from skeleton.forge.eras import compile_era
@@ -285,6 +315,7 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         bp, era=ctx["era"], target=ctx.get("target") or "godot",
         pack=pack, build_plan=build_plan.to_dict(),
         repair=repair, max_rounds=max_rounds,
+        repair_mode=str(ctx.get("repair_mode") or "apply"),
     )
     _commit(ctx, "forge", name, art.get("blueprint_id", ""), {
         "blueprint_id": art.get("blueprint_id"),
@@ -295,6 +326,8 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "room_bias": build_plan.room_bias,
         "verification_accepted": (art.get("verification") or {}).get("accepted"),
         "verify_loop_rounds": ((art.get("verify_loop") or {}).get("trace") or {}).get("rounds"),
+        "composition_features": (composition or {}).get("features"),
+        "composition_fallback": (composition or {}).get("fallback"),
     })
     return {
         "blueprint_id": art.get("blueprint_id"),
@@ -306,6 +339,7 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "verification": art.get("verification"),
         "verify_loop": art.get("verify_loop"),
         "repair": art.get("repair"),
+        "composition": composition,
     }
 
 
@@ -370,12 +404,21 @@ def _stage_emit(ctx: Dict[str, Any]) -> Dict[str, Any]:
         Path(root, "CONTEXT_TENSOR.json").write_text(
             json.dumps(cockpit.tensor.to_dict(), indent=2), encoding="utf-8"
         )
+    played = None
+    mode = ctx.get("playtest_mode") or "off"
+    if mode != "off":
+        from skeleton.forge.playtest import playtest
+        played = playtest(files)
+        if mode == "require" and not played.get("passed"):
+            detail = "; ".join(played.get("errors") or []) or played.get("reason") or played.get("status")
+            raise RuntimeError(f"playtest {played.get('status')}: {detail}"[:600])
     _commit(ctx, "emit", ctx["era"], f"{len(files)} files", {
         "file_count": len(files),
         "root": None if not project else project["root"],
         "check": "ok",
+        "playtest": None if played is None else played.get("status"),
     })
-    return {"emitted": True, "project": project, "check_ok": True}
+    return {"emitted": True, "project": project, "check_ok": True, "playtest": played}
 
 
 def _stage_seal(ctx: Dict[str, Any]) -> Dict[str, Any]:

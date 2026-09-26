@@ -295,6 +295,7 @@ jobs:
       - run: yarn typecheck
       - run: yarn test:operation-stream
       - run: yarn test:conversation
+      - run: yarn test:skeleton-forge
       - run: yarn export:web
   docker:
     name: "Docker Build"

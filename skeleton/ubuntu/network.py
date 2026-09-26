@@ -63,7 +63,7 @@ def validate_network_netplan(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-netplan:"+identifier, ("ubuntu","network","netplan",identifier,desired), "validated network-netplan")
+    return UbuntuAction("network-netplan:"+identifier, ("ubuntu","network","netplan",identifier,desired), "reconcile network-netplan")
 
 def plan_network_netplan(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-netplan plan."""
@@ -123,7 +123,7 @@ def validate_network_dns(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-dns:"+identifier, ("ubuntu","network","dns",identifier,desired), "validated network-dns")
+    return UbuntuAction("network-dns:"+identifier, ("ubuntu","network","dns",identifier,desired), "reconcile network-dns")
 
 def plan_network_dns(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-dns plan."""
@@ -183,7 +183,7 @@ def validate_network_route(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-route:"+identifier, ("ubuntu","network","route",identifier,desired), "validated network-route")
+    return UbuntuAction("network-route:"+identifier, ("ubuntu","network","route",identifier,desired), "reconcile network-route")
 
 def plan_network_route(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-route plan."""
@@ -243,7 +243,7 @@ def validate_network_bridge(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-bridge:"+identifier, ("ubuntu","network","bridge",identifier,desired), "validated network-bridge")
+    return UbuntuAction("network-bridge:"+identifier, ("ubuntu","network","bridge",identifier,desired), "reconcile network-bridge")
 
 def plan_network_bridge(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-bridge plan."""
@@ -303,7 +303,7 @@ def validate_network_bond(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-bond:"+identifier, ("ubuntu","network","bond",identifier,desired), "validated network-bond")
+    return UbuntuAction("network-bond:"+identifier, ("ubuntu","network","bond",identifier,desired), "reconcile network-bond")
 
 def plan_network_bond(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-bond plan."""
@@ -363,7 +363,7 @@ def validate_network_vlan(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-vlan:"+identifier, ("ubuntu","network","vlan",identifier,desired), "validated network-vlan")
+    return UbuntuAction("network-vlan:"+identifier, ("ubuntu","network","vlan",identifier,desired), "reconcile network-vlan")
 
 def plan_network_vlan(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-vlan plan."""
@@ -423,7 +423,7 @@ def validate_network_mtu(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-mtu:"+identifier, ("ubuntu","network","mtu",identifier,desired), "validated network-mtu")
+    return UbuntuAction("network-mtu:"+identifier, ("ubuntu","network","mtu",identifier,desired), "reconcile network-mtu")
 
 def plan_network_mtu(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-mtu plan."""
@@ -483,7 +483,7 @@ def validate_network_firewall(identifier: str, desired: str = "present", *, enab
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-firewall:"+identifier, ("ubuntu","network","firewall",identifier,desired), "validated network-firewall")
+    return UbuntuAction("network-firewall:"+identifier, ("ubuntu","network","firewall",identifier,desired), "reconcile network-firewall")
 
 def plan_network_firewall(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-firewall plan."""
@@ -543,7 +543,7 @@ def validate_network_proxy(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-proxy:"+identifier, ("ubuntu","network","proxy",identifier,desired), "validated network-proxy")
+    return UbuntuAction("network-proxy:"+identifier, ("ubuntu","network","proxy",identifier,desired), "reconcile network-proxy")
 
 def plan_network_proxy(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-proxy plan."""
@@ -603,7 +603,7 @@ def validate_network_tls(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("network-tls:"+identifier, ("ubuntu","network","tls",identifier,desired), "validated network-tls")
+    return UbuntuAction("network-tls:"+identifier, ("ubuntu","network","tls",identifier,desired), "reconcile network-tls")
 
 def plan_network_tls(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic network-tls plan."""

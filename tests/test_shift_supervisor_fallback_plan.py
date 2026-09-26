@@ -63,3 +63,16 @@ def test_cli_does_not_reclassify_internal_supervisor_failure(monkeypatch):
     monkeypatch.setattr(supervisor_cli, "build_supervisor", lambda **_kwargs: BrokenSupervisor())
     with pytest.raises(ValueError, match="custody invariant failed"):
         supervisor_cli.main(["--once"])
+
+
+def test_failover_accepts_plain_string_labels():
+    """gh issue snapshots may flatten labels to strings; failover must not crash."""
+    result = compile_fallback_state({
+        "issues": [
+            {"number": 7, "title": "String-labelled", "body": "Work", "labels": ["build-approved", "security"]},
+            {"number": 8, "title": "Mixed", "body": "Work", "labels": [{"name": "supervisor-ready"}, "bug", None, 3]},
+        ]
+    })
+    assert [item["source_issue"] for item in result["plan_items"]] == [7, 8]
+    assert result["plan_items"][0]["priority"] == 100
+    assert result["plan_items"][1]["priority"] == 90

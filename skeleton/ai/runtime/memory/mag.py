@@ -268,7 +268,12 @@ class MAGStore(MemoryStore):
             return False
         episode = self._episodes.pop(chunk_id)
         for tag in episode.tags:
-            self._tag_index[tag].discard(chunk_id)
+            bucket = self._tag_index.get(tag)
+            if bucket is None:
+                continue
+            bucket.discard(chunk_id)
+            if not bucket:
+                del self._tag_index[tag]
         return True
 
     def get_preference_vector(self) -> List[float]:

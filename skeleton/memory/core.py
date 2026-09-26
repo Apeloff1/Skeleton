@@ -47,6 +47,7 @@ class InMemoryTFIDFStore:
         self._total_docs = 0
 
     def add(self, chunk: Chunk) -> None:
+        chunk = self._coerce_chunk(chunk)
         if chunk.chunk_id in self._docs:
             self.delete(chunk.chunk_id)
         self._docs[chunk.chunk_id] = chunk
@@ -85,6 +86,28 @@ class InMemoryTFIDFStore:
             ScoredChunk(chunk=self._docs[doc_id], score=score, plane="rag")
             for doc_id, score in ranked
         ]
+
+    @staticmethod
+    def _coerce_chunk(chunk: Any) -> Chunk:
+        """Accept canonical ``MemoryChunk`` (``id``) as well as legacy ``Chunk``.
+
+        Canonical producers such as ``DreamEngine`` emit
+        ``skeleton.memory.types.MemoryChunk``; Genesis still wires this legacy
+        store, so normalize rather than fail on the missing ``chunk_id``.
+        """
+        if isinstance(chunk, Chunk):
+            return chunk
+        chunk_id = getattr(chunk, "chunk_id", None) or getattr(chunk, "id", None)
+        text = getattr(chunk, "text", None)
+        if not isinstance(chunk_id, str) or not chunk_id or not isinstance(text, str):
+            raise TypeError("RAG chunk must expose a non-empty id/chunk_id and text")
+        metadata = getattr(chunk, "metadata", None)
+        return Chunk(
+            text=text,
+            chunk_id=chunk_id,
+            metadata=dict(metadata) if isinstance(metadata, dict) else {},
+            embedding=getattr(chunk, "embedding", None),
+        )
 
     def delete(self, chunk_id: str) -> bool:
         chunk = self._docs.pop(chunk_id, None)

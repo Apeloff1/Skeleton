@@ -56,6 +56,30 @@ class GameSpec:
         }
 
 
+_TITLE_ACRONYMS = frozenset({"rpg", "crpg", "jrpg", "arpg", "fps", "rts", "mmo", "mmorpg", "2d", "3d", "aaa"})
+
+
+def _title_word(token: str) -> str:
+    parts = [p for p in str(token).replace("_", " ").split(" ") if p]
+    out = []
+    for part in parts:
+        pieces = part.split("-")
+        out.append("-".join(x.upper() if x.lower() in _TITLE_ACRONYMS else x.capitalize() for x in pieces))
+    return " ".join(out)
+
+
+def derive_title(intake_result: Any) -> str:
+    """Readable working title: ``"<Genre> of <Setting|Era>"``.
+
+    Uses the narrative setting when the creative brief supplied one (e.g.
+    ``RPG of Medieval Fantasy``) and falls back to the voted era.
+    """
+    genre = str(getattr(intake_result, "genre", "") or "") or "Game"
+    place = str(getattr(intake_result, "setting", "") or "") or str(getattr(intake_result, "era", "") or "")
+    genre_word = _title_word(genre)
+    return f"{genre_word} of {_title_word(place)}" if place else genre_word
+
+
 class GameForge:
     """Orchestrate full game generation from intake answers.
 
@@ -92,7 +116,7 @@ class GameForge:
 
         try:
             intake_result = process_intake(answers)
-            game_title = title or f"{intake_result.genre.title()} of {intake_result.era.replace('_', ' ').title()}"
+            game_title = title or derive_title(intake_result)
 
             forge = self._get_forge()
             bp = forge.new_blueprint(game_title)
@@ -100,9 +124,12 @@ class GameForge:
             forge.instantiate(bp, "enemy_spawner", "spawner")
             forge.instantiate(bp, "weapon_forge", "weapons")
             forge.instantiate(bp, "extract", "goal")
+            # Only type-compatible wires: player intent (event) drives the
+            # spawner tick (event). ``weapons.parts`` and ``goal.cores`` are
+            # resource in-ports fed by the era pack's loot economy at
+            # materialise time, exactly as in the ``extraction`` archetype;
+            # wiring event outputs into them fails Blueprint.validate().
             bp.connect(("hero", "intent"), ("spawner", "tick"))
-            bp.connect(("hero", "intent"), ("weapons", "parts"))
-            bp.connect(("spawner", "spawn"), ("goal", "cores"))
 
             artefact = forge.materialise(
                 bp, era=intake_result.era, target=target, repair=repair,

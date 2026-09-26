@@ -704,6 +704,11 @@ class LensCompositionEngine:
         for rule in merged:
             destination = index if rule.symmetric else directed
             if rule.key in destination:
+                if destination[rule.key] == rule:
+                    # Re-supplying an identical rule (e.g. callers that pass the
+                    # default catalogue explicitly) is idempotent; only a
+                    # conflicting redefinition is a contract violation.
+                    continue
                 raise AgentContractError(f"duplicate lens interaction rule: {rule.key}")
             destination[rule.key] = rule
         self._symmetric = index

@@ -77,6 +77,25 @@ def run(req: RunRequest) -> Dict[str, Any]:
     return payload
 
 
+class ComposeRequest(BaseModel):
+    vision: str = Field(default="", max_length=4000)
+
+
+@router.post("/compose")
+def compose(req: ComposeRequest) -> Dict[str, Any]:
+    """Preview the vision-derived blueprint that ``archetype="auto"`` would forge."""
+    from skeleton.forge.universal import Forge
+    from skeleton.forge.vision_compose import compose_from_vision, describe
+    try:
+        bp, composition = compose_from_vision(Forge(), req.vision)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    payload = composition.to_dict()
+    payload["summary"] = describe(payload)
+    payload["topology"] = bp.to_dict()
+    return payload
+
+
 @router.get("/beats")
 def beats() -> Dict[str, Any]:
     from skeleton.context.questionnaire import BEATS

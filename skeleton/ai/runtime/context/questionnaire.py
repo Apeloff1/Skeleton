@@ -7,7 +7,7 @@ label.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Tuple
 
 from skeleton.context.tensor import AXES, ContextTensor
@@ -107,20 +107,64 @@ class Intake:
     ballots: Dict[str, int]
     vision: str
     answers: Dict[str, str]
+    # Creative-brief facets (genre/theme/perspective/combat/progression).
+    # Defaulted so positional and keyword construction stay compatible.
+    genre: str = ""
+    theme: str = ""
+    perspective: str = ""
+    setting: str = ""
+    brief: Dict[str, str] = field(default_factory=dict)
+    brief_ballots: Dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        out: Dict[str, Any] = {
             "era": self.era,
             "tensor": self.tensor.to_dict(),
             "ballots": self.ballots,
             "vision": self.vision,
             "answers": dict(self.answers),
         }
+        if self.brief:
+            out.update({
+                "genre": self.genre,
+                "theme": self.theme,
+                "perspective": self.perspective,
+                "setting": self.setting,
+                "brief": dict(self.brief),
+                "brief_ballots": dict(self.brief_ballots),
+            })
+        return out
 
 
 def intake(answers: Mapping[str, str]) -> Intake:
+    """Vote an era from the twelve beats; fall back to the creative brief.
+
+    Beat answers (``pace``, ``death``, ...) are authoritative. When none are
+    present but creative-brief facets are (``genre``, ``theme``,
+    ``perspective``, ``combat``, ``progression``), the brief votes a
+    canonical era instead of silently collapsing to ``extraction_now``.
+    Brief facets are always carried on the result for downstream titling,
+    NPC seeding and animation.
+    """
+    if not isinstance(answers, Mapping):
+        raise TypeError("intake answers must be a mapping")
+    brief = normalise_brief(answers)
+    has_beats = any(answers.get(b["id"]) in b["options"] for b in BEATS)
+    if brief and not has_beats:
+        return _brief_intake(brief)
+    result = _beat_intake(answers)
+    if brief:
+        result.genre = brief.get("genre", "")
+        result.theme = brief.get("theme", "")
+        result.perspective = brief.get("perspective", "")
+        result.setting = BRIEF_SETTINGS.get(result.theme, "")
+        result.brief = dict(brief)
+    return result
+
+
+def _beat_intake(answers: Mapping[str, str]) -> Intake:
     ballots: Dict[str, int] = {}
-    axis_acc = {a: [] for a in AXES}  # type: Dict[str, List[float]]
+    axis_acc: Dict[str, List[float]] = {a: [] for a in AXES}
     used = {}
     phrases = []
     for beat in BEATS:
@@ -149,6 +193,169 @@ def intake(answers: Mapping[str, str]) -> Intake:
     tensor = ContextTensor(tuple(values), era=era)
     vision = "intake " + "; ".join(phrases) + f" => {era}"
     return Intake(era=era, tensor=tensor, ballots=ballots, vision=vision, answers=used)
+
+
+# ---------------------------------------------------------------------------
+# Creative brief — the five-facet questionnaire used by ``GameForge.run``.
+# ---------------------------------------------------------------------------
+
+BRIEF_FACETS: Tuple[str, ...] = ("genre", "theme", "perspective", "combat", "progression")
+BRIEF_MAX_CHARS = 48
+
+# Facet weight: genre is the strongest dialect signal, perspective the weakest.
+BRIEF_WEIGHTS: Dict[str, float] = {
+    "genre": 2.0,
+    "theme": 1.0,
+    "combat": 1.0,
+    "progression": 1.0,
+    "perspective": 0.5,
+}
+
+# Every target below must be a canonical era id (see forge.eras.list_eras);
+# ``test_questionnaire_brief`` pins that invariant.
+BRIEF_ERA_VOTES: Dict[str, Dict[str, str]] = {
+    "genre": {
+        "action-adventure": "modern_aaa", "action": "modern_aaa", "adventure": "modern_aaa",
+        "rpg": "crpg", "crpg": "crpg", "jrpg": "jrpg", "arpg": "soulslike",
+        "soulslike": "soulslike", "strategy": "grand_strategy", "rts": "grand_strategy",
+        "tactics": "tactics_grid", "platformer": "metroidvania", "metroidvania": "metroidvania",
+        "simulation": "city_builder", "city-builder": "city_builder", "shooter": "boomer_shooter",
+        "fps": "boomer_shooter", "horror": "horror_survival", "survival": "extraction_now",
+        "extraction": "extraction_now", "roguelike": "roguelike", "roguelite": "roguelike",
+        "stealth": "stealth", "immersive-sim": "immersive_sim", "fighting": "fighting_game",
+        "puzzle": "indie_experimental", "deckbuilder": "deckbuilder", "card": "deckbuilder",
+        "battle-royale": "battle_royale", "mmo": "mmorpg", "mmorpg": "mmorpg",
+        "visual-novel": "visual_novel", "narrative": "walking_sim", "cozy": "cozy_wholesome",
+        "arcade": "arcade_golden_age", "bullet-heaven": "bullet_heaven",
+    },
+    "theme": {
+        "sci-fi": "extraction_now", "fantasy": "crpg", "dark-fantasy": "soulslike",
+        "modern": "modern_aaa", "post-apocalyptic": "extraction_now", "cyberpunk": "immersive_sim",
+        "horror": "horror_survival", "cozy": "cozy_wholesome", "retro": "arcade_golden_age",
+        "historical": "grand_strategy", "anime": "jrpg", "noir": "stealth",
+    },
+    "combat": {
+        "tactical": "extraction_now", "real-time": "modern_aaa", "turn-based": "tactics_grid",
+        "none": "walking_sim", "puzzle-based": "indie_experimental", "melee": "soulslike",
+        "fast": "boomer_shooter", "stealth": "stealth", "card-based": "deckbuilder",
+    },
+    "progression": {
+        "skill-tree": "crpg", "level-based": "jrpg", "equipment": "extraction_now",
+        "narrative": "visual_novel", "open-ended": "immersive_sim", "permadeath": "roguelike",
+        "metroidvania": "metroidvania", "score": "arcade_golden_age",
+    },
+    "perspective": {
+        "first-person": "immersive_sim", "third-person": "modern_aaa", "top-down": "roguelike",
+        "isometric": "crpg", "side-scrolling": "metroidvania", "2d": "metroidvania",
+    },
+}
+
+# Narrative setting label per theme (descriptive, never used as an era id).
+BRIEF_SETTINGS: Dict[str, str] = {
+    "sci-fi": "far_future", "fantasy": "medieval_fantasy", "dark-fantasy": "gothic_fantasy",
+    "modern": "contemporary", "post-apocalyptic": "wasteland", "cyberpunk": "neon_dystopia",
+    "horror": "dread", "cozy": "hearth", "retro": "arcade_cabinet", "historical": "period",
+    "anime": "stylised", "noir": "rain_city",
+}
+
+BRIEF_DEFAULTS: Dict[str, str] = {
+    "genre": "action-adventure",
+    "theme": "sci-fi",
+    "perspective": "third-person",
+    "combat": "tactical",
+    "progression": "skill-tree",
+}
+
+
+def _norm_token(value: Any) -> str:
+    text = str(value).strip().lower()
+    text = "".join(ch if ch.isalnum() else "-" for ch in text)
+    while "--" in text:
+        text = text.replace("--", "-")
+    return text.strip("-")[:BRIEF_MAX_CHARS]
+
+
+def normalise_brief(answers: Mapping[str, Any]) -> Dict[str, str]:
+    """Return the non-empty, normalised creative-brief facets in ``answers``.
+
+    Values are lower-cased, non-alphanumerics collapse to ``-`` and length is
+    bounded, so free text cannot inject structure into the vision string.
+    """
+    out: Dict[str, str] = {}
+    beat_options = {b["id"]: b["options"] for b in BEATS}
+    for facet in BRIEF_FACETS:
+        raw = answers.get(facet)
+        if raw is None or isinstance(raw, (dict, list, tuple, set)):
+            continue
+        if raw in beat_options.get(facet, ()):
+            # ``combat`` is also a beat id: a closed-vocabulary beat answer
+            # ("earned", "instantly", ...) belongs to the beat vote, not the brief.
+            continue
+        token = _norm_token(raw)
+        if token:
+            out[facet] = token
+    return out
+
+
+def brief_ballots(brief: Mapping[str, str]) -> Dict[str, float]:
+    """Weighted era ballots cast by the known facet values in ``brief``."""
+    ballots: Dict[str, float] = {}
+    for facet in BRIEF_FACETS:
+        value = brief.get(facet)
+        era = BRIEF_ERA_VOTES[facet].get(value or "")
+        if era:
+            ballots[era] = ballots.get(era, 0.0) + BRIEF_WEIGHTS[facet]
+    return ballots
+
+
+def _brief_vision(brief: Mapping[str, str]) -> str:
+    def human(facet: str) -> str:
+        value = brief.get(facet, BRIEF_DEFAULTS[facet])
+        # Genre/theme keep their hyphenated dialect ("action-adventure",
+        # "sci-fi"); mechanical facets read as prose ("turn based").
+        return value if facet in {"genre", "theme"} else value.replace("-", " ")
+
+    def article(word: str) -> str:
+        return "An" if word[:1] in "aeiou" else "A"
+
+    lead = human("perspective")
+    return (
+        f"{article(lead)} {lead} {human('genre')} game set in a {human('theme')} universe "
+        f"with {human('combat')} combat and {human('progression')} progression."
+    )
+
+
+def _brief_intake(brief: Mapping[str, str]) -> Intake:
+    ballots = brief_ballots(brief)
+    if ballots:
+        # Highest weight wins; ties break on the genre's own vote, then name.
+        genre_era = BRIEF_ERA_VOTES["genre"].get(brief.get("genre", ""), "")
+        era = max(ballots, key=lambda e: (ballots[e], e == genre_era, e))
+    else:
+        era = "extraction_now"
+    base = ContextTensor.from_era(era)
+    runners = sorted((e for e in ballots if e != era), key=lambda e: (-ballots[e], e))
+    tensor = base
+    if runners:
+        # Blend toward the runner-up in proportion to its share of the vote,
+        # so an rpg-with-tactics-combat is a real blend rather than a label.
+        share = ballots[runners[0]] / (ballots[era] + ballots[runners[0]])
+        blended = base.lerp(ContextTensor.from_era(runners[0]), min(0.45, share * 0.6))
+        tensor = ContextTensor(tuple(blended.values), era=era)
+    theme = brief.get("theme", "")
+    return Intake(
+        era=era,
+        tensor=tensor,
+        ballots={e: int(round(v * 2)) for e, v in ballots.items()},
+        vision=_brief_vision(brief),
+        answers=dict(brief),
+        genre=brief.get("genre", BRIEF_DEFAULTS["genre"]),
+        theme=theme,
+        perspective=brief.get("perspective", ""),
+        setting=BRIEF_SETTINGS.get(theme, ""),
+        brief=dict(brief),
+        brief_ballots=dict(ballots),
+    )
 
 
 # Aliases kept for callers that imported the Sep-6 stub names.
