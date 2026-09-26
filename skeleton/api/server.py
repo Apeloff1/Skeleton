@@ -83,6 +83,9 @@ class ServerState:
         self.engine_pressure_ledger: Optional[Any] = None
         self.governance_lifecycle: Optional[Any] = None
         self.governance_registry: Optional[Any] = None
+        self.governance_audit_log: Optional[Any] = None
+        self.governance_audit_timeline: Optional[Any] = None
+        self.governance_lifecycle_adapters: Optional[Any] = None
         self.canonical_memory_mongo_client: Optional[Any] = None
         self.canonical_memory_repository: Optional[Any] = None
         self.canonical_memory_writer: Optional[Any] = None
@@ -101,8 +104,11 @@ class ServerState:
 
         from pathlib import Path
 
+        from skeleton.vault.audit import AuditLog
         from skeleton.vault.data_lifecycle import DataLifecycleRegistry
+        from skeleton.vault.governance_audit import GovernanceAuditTimeline
         from skeleton.vault.governance_registry import GovernanceRegistry
+        from skeleton.vault.lifecycle_adapters import LifecycleAdapterRegistry
 
         path = os.environ.get(
             "SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -114,8 +120,33 @@ class ServerState:
                 exist_ok=True,
             )
         lifecycle = DataLifecycleRegistry(path)
+        audit_override = os.environ.get(
+            "SKL_GOVERNANCE_AUDIT_PATH",
+            "",
+        ).strip()
+        if audit_override:
+            audit_log = AuditLog.open(audit_override)
+        elif path == ":memory:":
+            audit_log = AuditLog()
+        else:
+            lifecycle_path = Path(path).expanduser()
+            audit_log = AuditLog.open(
+                lifecycle_path.with_name(
+                    lifecycle_path.name + ".audit.jsonl"
+                )
+            )
+        timeline = GovernanceAuditTimeline(
+            audit_log,
+            actor="governance-runtime",
+        )
         self.governance_lifecycle = lifecycle
-        self.governance_registry = GovernanceRegistry(lifecycle)
+        self.governance_audit_log = audit_log
+        self.governance_audit_timeline = timeline
+        self.governance_lifecycle_adapters = LifecycleAdapterRegistry()
+        self.governance_registry = GovernanceRegistry(
+            lifecycle,
+            timeline=timeline,
+        )
         return self.governance_registry
 
     def close_governance_registry(self) -> None:
@@ -124,6 +155,9 @@ class ServerState:
             lifecycle.close()
         self.governance_registry = None
         self.governance_lifecycle = None
+        self.governance_audit_log = None
+        self.governance_audit_timeline = None
+        self.governance_lifecycle_adapters = None
 
     async def bind_canonical_memory_writer(
         self,
