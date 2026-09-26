@@ -78,6 +78,8 @@ class ServerState:
         self.engine_execution_coordinator: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
         self.engine_admission_runtime: Optional[Any] = None
+        self.engine_execution_admission_runtime: Optional[Any] = None
+        self.engine_quota_ledger: Optional[Any] = None
         self.engine_pressure_ledger: Optional[Any] = None
         self.governance_lifecycle: Optional[Any] = None
         self.governance_registry: Optional[Any] = None
@@ -287,6 +289,13 @@ class ServerState:
         )
         from skeleton.config.settings import get_settings
         from skeleton.intelligence.admission_runtime import AdmissionRuntime
+        from skeleton.intelligence.quota import (
+            TenantQuota,
+            TenantQuotaLedger,
+        )
+        from skeleton.intelligence.quota_sqlite import (
+            SqliteTenantQuotaLedger,
+        )
         from skeleton.intelligence.shared_pressure import (
             SharedPressurePolicy,
             SqliteSharedPressureLedger,
@@ -303,6 +312,7 @@ class ServerState:
             settings.execution_state_path,
             settings.submission_state_path,
             settings.tool_receipt_path,
+            settings.quota_state_path,
             settings.pressure_state_path,
         ):
             if raw_path != ":memory:":
@@ -336,13 +346,27 @@ class ServerState:
                 )
             ]
         )
-        service = EngineExecutionService(
-            repository,
-            submissions,
-            authorities,
-        )
         receipt_store = SQLiteToolReceiptStore(
             settings.tool_receipt_path
+        )
+
+        quota_ledger = (
+            TenantQuotaLedger()
+            if settings.quota_state_path == ":memory:"
+            else SqliteTenantQuotaLedger(settings.quota_state_path)
+        )
+        default_tenant_quota = TenantQuota(
+            window_id=settings.quota_window_id,
+            max_operations=settings.quota_max_operations,
+            max_input_tokens=settings.quota_max_input_tokens,
+            max_output_tokens=settings.quota_max_output_tokens,
+            max_cost_usd=settings.quota_max_cost_usd,
+            max_tool_calls=settings.quota_max_tool_calls,
+            max_artifact_bytes=settings.quota_max_artifact_bytes,
+            max_storage_bytes=settings.quota_max_storage_bytes,
+            max_concurrent_operations=(
+                settings.quota_max_concurrent_operations
+            ),
         )
 
         pressure_ledger = None
@@ -372,7 +396,13 @@ class ServerState:
                 replace=True,
             )
 
-        admission_runtime = AdmissionRuntime(
+        execution_admission_runtime = AdmissionRuntime(
+            quota_ledger=quota_ledger,
+            default_tenant_quota=default_tenant_quota,
+        )
+        provider_admission_runtime = AdmissionRuntime(
+            quota_ledger=quota_ledger,
+            default_tenant_quota=default_tenant_quota,
             shared_pressure_ledger=pressure_ledger,
             shared_pressure_scope=(
                 settings.pressure_scope
@@ -385,20 +415,31 @@ class ServerState:
                 else None
             ),
         )
+        service = EngineExecutionService(
+            repository,
+            submissions,
+            authorities,
+            admission_runtime=execution_admission_runtime,
+        )
         provider_registry = ProviderRegistry.from_env(
-            admission_runtime=admission_runtime,
+            admission_runtime=provider_admission_runtime,
         )
         coordinator = EngineExecutionCoordinator(
             service,
             provider_registry=provider_registry,
             tool_runtime=AsyncToolRuntime(
+                admission_runtime=execution_admission_runtime,
                 receipt_store=receipt_store,
             ),
         )
         self.engine_execution_service = service
         self.engine_execution_coordinator = coordinator
         self.engine_tool_receipt_store = receipt_store
-        self.engine_admission_runtime = admission_runtime
+        self.engine_admission_runtime = provider_admission_runtime
+        self.engine_execution_admission_runtime = (
+            execution_admission_runtime
+        )
+        self.engine_quota_ledger = quota_ledger
         self.engine_pressure_ledger = pressure_ledger
         return service
 
@@ -423,6 +464,8 @@ class ServerState:
         self.engine_execution_service = None
         self.engine_tool_receipt_store = None
         self.engine_admission_runtime = None
+        self.engine_execution_admission_runtime = None
+        self.engine_quota_ledger = None
         self.engine_pressure_ledger = None
 
     def wire_from_genesis(self, genesis: Any) -> None:
