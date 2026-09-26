@@ -281,4 +281,3 @@ def test_independent_verifier_rejects_declared_edge_loss(
         and "sdk_client" in error
         for error in receipt["errors"]
     )
-
