@@ -243,6 +243,7 @@ class ServerState:
             AsyncMemoryProjectionCoordinator(
                 repository,
                 admission_runtime=admission_runtime,
+                governance=self.bind_governance_registry(),
             )
         )
         return writer
