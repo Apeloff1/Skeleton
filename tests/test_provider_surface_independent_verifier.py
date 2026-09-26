@@ -119,6 +119,24 @@ def test_independent_verifier_accepts_declared_provider_ownership(
     }
 
 
+def test_independent_verifier_ignores_inert_provider_url_catalog(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    (root / "backend" / "catalog.py").write_text(
+        'OPENAI_ENDPOINT = "https://api.openai.com/v1/responses"\n',
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is True
+    assert not any(
+        row["path"] == "backend/catalog.py"
+        for row in receipt["discovered_provider_edges"]
+    )
+
+
 def test_independent_verifier_rejects_undeclared_vendor_sdk_edge(
     tmp_path: Path,
 ) -> None:
