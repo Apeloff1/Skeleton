@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from skeleton.artifact_plane.governance import GovernedArtifactStore
 from skeleton.api.server import (
     ServerState,
     _canonical_memory_mongo_configured,
@@ -191,6 +192,73 @@ def test_server_state_restores_durable_governance_audit_chain(
     assert entries[0].outcome == "success"
     assert restarted.governance_audit_log.tamper_check() == (True, -1)
     restarted.close_governance_registry()
+
+
+
+@pytest.mark.asyncio
+async def test_server_state_composes_governed_artifact_lifecycle(
+    tmp_path,
+) -> None:
+    state = ServerState()
+    artifacts = state.bind_canonical_artifact_store(tmp_path / "artifacts")
+    replay = state.bind_canonical_artifact_store(tmp_path / "other")
+
+    assert replay is artifacts
+    assert isinstance(artifacts, GovernedArtifactStore)
+    assert state.governance_lifecycle_executor is not None
+    assert state.governance_lifecycle_adapters is not None
+
+    record = artifacts.write_bytes(
+        tenant_id="tenant-a",
+        artifact_id="runtime-artifact.bin",
+        payload=b"runtime-governed-artifact",
+        data_class="confidential",
+        purposes=("artifact-delivery",),
+        created_at=10.0,
+        retention_until=100.0,
+    )
+    inventory = state.governance_registry.export_inventory("tenant-a")
+    row = next(
+        item
+        for item in inventory["records"]
+        if item["record_id"] == record.record_id
+    )
+    assert row["owner_plane"] == "artifact"
+    assert row["data_class"] == "confidential"
+
+    exported = await state.governance_lifecycle_executor.export_tenant(
+        "tenant-a"
+    )
+    artifact_exports = [
+        item
+        for item in exported.records
+        if item["governance"]["record_id"] == record.record_id
+    ]
+    assert len(artifact_exports) == 1
+    assert (
+        artifact_exports[0]["payload"]["artifact_id"]
+        == "runtime-artifact.bin"
+    )
+
+    plan = state.governance_lifecycle.request_deletion(
+        "tenant-a",
+        record_ids=(record.record_id,),
+        now=20.0,
+    )
+    await state.governance_lifecycle_executor.execute_deletion_plan(
+        plan,
+        now=21.0,
+    )
+
+    assert artifacts.read_bytes(
+        "tenant-a",
+        "runtime-artifact.bin",
+    ) is None
+    assert (
+        state.governance_lifecycle.get(record.record_id)["state"]
+        == "deleted"
+    )
+    state.close_governance_registry()
 
 @pytest.mark.asyncio
 async def test_server_state_composes_governed_retrieval_lifecycle() -> None:
