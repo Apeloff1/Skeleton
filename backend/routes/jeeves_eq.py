@@ -16,6 +16,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
@@ -518,7 +519,13 @@ async def get_therapeutic_response(
     # For intense negative emotions, use AI for more personalized response
     if intensity > 0.7 and emotional_state in ["frustrated", "overwhelmed", "discouraged"]:
         try:
-            chat = EngineChat()
+            chat = EngineChat(
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.jeeves-eq.support",
+                    version="1",
+                    instructions="Respond helpfully to the user request.",
+                )
+            )
             ai_prompt = f"""You are Jeeves, an emotionally intelligent AI tutor. The user is feeling {emotional_state} (intensity: {intensity}).
             
 Context: {context or 'Learning programming'}
