@@ -32,7 +32,7 @@
       "plane": "cost-capacity",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_verification",
       "closure_decision": "open",
       "evidence_present": [
         "ResourceBudget and UsageEstimate contracts",
@@ -97,7 +97,10 @@
         "skeleton/memory/projection.py admitted sync/async material rebuild boundary",
         "skeleton/testing/test_memory_projection.py pre-mutation denial and successful reconciliation regressions",
         "skeleton/api/server.py live admitted AsyncMemoryProjectionCoordinator composition",
-        "skeleton/ai/runtime/memory/projection.py canonical mirror"
+        "skeleton/ai/runtime/memory/projection.py canonical mirror",
+        ".github/workflows/cost-admission-closure.yml dedicated exact-head cost/admission closure workflow",
+        "scripts/verify_cost_admission_closure.py independent production-boundary and mirror verifier",
+        "tests/test_cost_admission_independent_verifier.py independent verifier regression suite"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -106,12 +109,11 @@
         "cost telemetry test"
       ],
       "outstanding_evidence": [
-        "fresh exact-head validation of metered durable engine/cognitive storage writes",
-        "fresh exact-head validation of live canonical Mongo memory composition",
-        "fresh exact-head validation of canonical cost/admission implementation",
-        "independent verification before gap closure"
+        "fresh exact-head Cost Admission Closure Gate"
       ],
-      "blockers": [],
+      "blockers": [
+        "fresh exact-head Cost Admission Closure Gate"
+      ],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
