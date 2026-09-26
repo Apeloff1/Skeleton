@@ -8,6 +8,7 @@ use deeper paths (/{pid}/cover…, /{pid}/cover.png, /{pid}/card.png) so they ne
 shadow the GET /{pid} catch-all in routes.playable.
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
 import os
 import uuid
@@ -36,8 +37,16 @@ async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
         "rich depth. No text, no words, no logos, no watermark, no UI." + PHOTOREAL_SUFFIX
     )
     try:
-        chat = (EngineChat(session_id=f"cover-{uuid.uuid4().hex[:8]}",
-                        system_message="You are a AAA game concept artist creating cover key art.")
+        chat = (EngineChat(
+                    session_id=f"cover-{uuid.uuid4().hex[:8]}",
+                    instruction_policy=InstructionPolicy(
+                        policy_id="backend.playable-cover.image-generation",
+                        version="1",
+                        instructions=(
+                            "You are a AAA game concept artist creating cover key art."
+                        ),
+                    ),
+                )
                 .with_model("gemini", "gemini-3.1-flash-image-preview")
                 .with_params(modalities=["image", "text"]))
         _text, images = await asyncio.wait_for(
