@@ -43,7 +43,6 @@ async def list_therapeutic_interactions(limit: int = 30):
     return {"interactions": rows, "count": len(rows)}
 
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 mongo_client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 eq_db = mongo_client.codedock_jeeves_eq
 
