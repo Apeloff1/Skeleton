@@ -119,7 +119,7 @@ jobs:
 
       - name: Run independent exact-head tool runtime scan
         env:
-          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/verify_tool_runtime_closure.py
           --evidence-out .tool-runtime-independent.json
