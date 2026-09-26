@@ -467,21 +467,27 @@ async def _append_canonical_user_turn(
         tenant_id=tenant_id,
         owner_id=owner_id,
     )
+    user_idempotency_key = _canonical_user_idempotency(
+        req.client_message_id
+    )
     if (
         transcript
         and transcript[-1].author_type is ConversationAuthorType.USER
     ):
         pending = transcript[-1]
-        expected_key = (
-            _canonical_user_idempotency(req.client_message_id)
-            if req.client_message_id is not None
-            else None
-        )
-        same_pending_turn = (
-            expected_key is not None
-            and pending.idempotency_key == expected_key
-            and pending.content == req.message
-        )
+        if req.client_message_id is not None:
+            same_pending_turn = (
+                pending.idempotency_key == user_idempotency_key
+                and pending.content == req.message
+            )
+        else:
+            # Without a caller turn ID, the only safe resumable case is the
+            # exact pending user content already committed for this session.
+            # Reuse its server-assigned idempotency key; do not manufacture a
+            # new key that would strand the prior turn.
+            same_pending_turn = pending.content == req.message
+            if same_pending_turn:
+                user_idempotency_key = pending.idempotency_key
         if not same_pending_turn:
             raise HTTPException(
                 status_code=409,
@@ -497,9 +503,7 @@ async def _append_canonical_user_turn(
         tenant_id=tenant_id,
         owner_id=owner_id,
         content=req.message,
-        idempotency_key=_canonical_user_idempotency(
-            req.client_message_id
-        ),
+        idempotency_key=user_idempotency_key,
         expected_thread_version=thread.version,
         data_class="internal",
     )
@@ -811,18 +815,14 @@ async def chat(req: ChatReq):
         ) from exc
 
     if not canonical_turn[-1]:
-        if req.client_message_id is None:
-            raise HTTPException(
-                status_code=409,
-                detail="canonical conversation retry identity is unavailable",
+        if req.client_message_id is not None:
+            replay = await _canonical_existing_turn(
+                sid,
+                req.client_message_id,
+                req.message,
             )
-        replay = await _canonical_existing_turn(
-            sid,
-            req.client_message_id,
-            req.message,
-        )
-        if replay is not None:
-            return replay
+            if replay is not None:
+                return replay
 
         # Resume an incomplete canonical turn. Server history was loaded
         # before append_user_message(), so on retry it already contains the
