@@ -213,6 +213,109 @@ async def test_governed_deletion_removes_message_before_thread_and_acks():
 
 
 @pytest.mark.asyncio
+async def test_retention_sweep_executes_engine_then_conversation_same_plan():
+    tenant_id = "tenant-a"
+    thread_id, message_id, governance, thread, message = _records(tenant_id)
+    database = _Database(threads=(thread,), messages=(message,))
+    plan_id = "plan-retention-split"
+    memory_id = "memory-retention-linked"
+    acknowledgements: list[tuple[str, str]] = []
+
+    actions = [
+        {
+            "record_id": governance[0]["record_id"],
+            "tenant_id": tenant_id,
+            "target": "conversation",
+            "source_ref": governance[0]["source_ref"],
+        },
+        {
+            "record_id": governance[1]["record_id"],
+            "tenant_id": tenant_id,
+            "target": "conversation",
+            "source_ref": governance[1]["source_ref"],
+        },
+        {
+            "record_id": memory_id,
+            "tenant_id": tenant_id,
+            "target": "memory",
+            "source_ref": "memory://assistant/" + memory_id,
+        },
+    ]
+
+    async def retention_planner(*, tenant_id: str):
+        return {
+            "plan_id": plan_id,
+            "tenant_id": tenant_id,
+            "reason": "retention-expired",
+            "actions": actions,
+        }
+
+    async def deletion_planner(*, tenant_id: str, record_ids, reason: str):
+        assert reason == "retention-expired"
+        assert set(record_ids) == {thread_id, message_id}
+        return {
+            "plan_id": plan_id,
+            "tenant_id": tenant_id,
+            "reason": reason,
+            "actions": actions,
+        }
+
+    async def engine_executor(*, tenant_id: str, plan_id: str):
+        database.log.append(("engine", plan_id))
+        return {
+            "plan_id": plan_id,
+            "tenant_id": tenant_id,
+            "executed_targets": ["memory"],
+            "receipts": [],
+        }
+
+    async def acker(
+        *,
+        tenant_id: str,
+        plan_id: str,
+        record_id: str,
+        target: str,
+    ):
+        acknowledgements.append((record_id, target))
+        return {
+            "plan_id": plan_id,
+            "record_id": record_id,
+            "target": target,
+            "state": "deleted",
+            "tenant_id": tenant_id,
+        }
+
+    authority = MongoConversationAuthority(
+        database,
+        governance_deletion_planner=deletion_planner,
+        governance_deletion_acker=acker,
+        governance_engine_target_executor=engine_executor,
+        governance_retention_planner=retention_planner,
+    )
+
+    result = await authority.execute_due_retention(
+        tenant_id=tenant_id,
+    )
+
+    assert result["complete"] is True
+    assert result["plan_id"] == plan_id
+    assert set(result["record_ids"]) == {
+        thread_id,
+        message_id,
+        memory_id,
+    }
+    assert database.log == [
+        ("engine", plan_id),
+        ("conversation_messages", message_id),
+        ("conversation_threads", thread_id),
+    ]
+    assert acknowledgements == [
+        (message_id, "conversation"),
+        (thread_id, "conversation"),
+    ]
+
+
+@pytest.mark.asyncio
 async def test_governed_deletion_fails_closed_on_cross_tenant_action():
     tenant_id = "tenant-a"
     thread_id, _message_id, _governance, thread, _message = _records(
