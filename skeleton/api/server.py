@@ -244,6 +244,7 @@ class ServerState:
                 repository,
                 admission_runtime=admission_runtime,
                 governance=self.bind_governance_registry(),
+                lifecycle_adapters=self.governance_lifecycle_adapters,
             )
         )
         return writer
