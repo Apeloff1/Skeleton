@@ -1,4 +1,5 @@
 import api, { type ApiResult } from '../utils/apiClient';
+import { validateConversationProjection } from './conversationProjection';
 
 export type ConversationThreadState = 'active' | 'archived' | 'deleting' | 'deleted';
 export type ConversationAuthorType = 'user' | 'assistant' | 'tool' | 'system-derived';
@@ -130,21 +131,15 @@ export async function reconstructConversation(
       limit: 500,
     }),
   ]);
-  const messages = [...page.messages].sort(
-    (left, right) => left.sequence - right.sequence,
+  const projection = validateConversationProjection(
+    thread,
+    page.messages,
   );
-  const lastSequence = messages.length
-    ? messages[messages.length - 1].sequence
-    : 0;
-  if (lastSequence > thread.message_sequence) {
-    throw new Error('Conversation projection is ahead of canonical thread state.');
-  }
-  for (let index = 1; index < messages.length; index += 1) {
-    if (messages[index].sequence <= messages[index - 1].sequence) {
-      throw new Error('Conversation projection is not strictly ordered.');
-    }
-  }
-  return { thread, messages, lastSequence };
+  return {
+    thread,
+    messages: projection.messages,
+    lastSequence: projection.lastSequence,
+  };
 }
 
 export async function appendConversationMessage(
