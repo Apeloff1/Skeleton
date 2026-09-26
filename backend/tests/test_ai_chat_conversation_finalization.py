@@ -15,7 +15,6 @@ from skeleton.contracts.conversation import (
     ConversationThreadState,
 )
 from skeleton.persistence.conversation_repository import (
-    ConversationConflict,
     ConversationStorageUnavailable,
 )
 
