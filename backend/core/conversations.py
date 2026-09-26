@@ -797,6 +797,19 @@ class MongoConversationAuthority:
                     raise ConversationConflict(
                         "parent message is missing or invalid"
                     )
+                if message.author_type is ConversationAuthorType.ASSISTANT:
+                    parent_message = _message_from_doc(parent)
+                    if (
+                        message.causal_user_message_id
+                        != message.parent_message_id
+                        or parent_message.author_type
+                        is not ConversationAuthorType.USER
+                        or parent_message.message_id
+                        != message.causal_user_message_id
+                    ):
+                        raise ConversationConflict(
+                            "assistant result must bind its causal user message"
+                        )
 
             if message.supersedes_message_id is not None:
                 prior_doc = await self.messages.find_one(
