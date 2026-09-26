@@ -599,6 +599,12 @@ def _public_dev_surfaces_enabled() -> bool:
     }
 
 
+def _canonical_memory_mongo_configured() -> bool:
+    """Return whether the production canonical Mongo memory binding is configured."""
+
+    return bool(os.environ.get("SKL_MONGO_URI", "").strip())
+
+
 def _gate_open_prefixes() -> tuple[str, ...]:
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES
 
@@ -680,7 +686,8 @@ def create_app() -> Any:
             state.wire_from_genesis(Genesis(seed=42).boot())
         state.bind_governance_registry()
         state.bind_engine_execution_service()
-        await state.bind_canonical_memory_writer()
+        if _canonical_memory_mongo_configured():
+            await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
 
     @app.on_event("shutdown")
