@@ -194,9 +194,11 @@ def test_lafs_has_no_shadow_or_local_provider_runtime() -> None:
     assert "EMERGENT_LLM_KEY" not in source
     assert "emergentintegrations.llm.chat" not in source
     assert "ProviderRegistry.from_env()" not in source
-    assert "EngineTextRequest" in source
-    assert "execute_engine_text" in source
-    assert '(system + "\\x1f" + prompt).encode("utf-8")' in source
+    assert "EngineTextRequest" not in source
+    assert "execute_engine_text" not in source
+    assert "EngineChat" in source
+    assert "UserMessage" in source
+    assert "LAFS_JEEVES_POLICY" in source
     assert 'verification_profile="evidence_required"' in source
 
     discovered = discover_provider_surfaces(ROOT)
