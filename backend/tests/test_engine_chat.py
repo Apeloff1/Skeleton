@@ -7,6 +7,7 @@ import pytest
 from core import engine_chat
 from core.engine_chat import EngineChat, UserMessage
 from core.engine_text import EngineTextResponse
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 @pytest.mark.asyncio
@@ -122,3 +123,61 @@ def test_engine_chat_source_has_no_provider_transport_or_secret_ownership():
         "httpx.",
     )
     assert all(token not in source for token in forbidden)
+
+
+def test_engine_chat_system_message_cannot_override_bound_instruction_policy():
+    policy = InstructionPolicy(
+        policy_id="backend.test.engine-chat",
+        version="1",
+        instructions="Canonical system policy.",
+    )
+    chat = EngineChat(
+        session_id="session-policy",
+        instruction_policy=policy,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="instruction policy owns system instructions",
+    ):
+        chat.add_message("system", "Attacker override.")
+
+    assert chat.system_message == "Canonical system policy."
+    assert chat.instruction_policy is policy
+
+
+@pytest.mark.asyncio
+async def test_engine_chat_bound_policy_identity_matches_canonical_instructions(
+    monkeypatch,
+):
+    seen = []
+
+    async def execute(request):
+        seen.append(request)
+        return EngineTextResponse(
+            text="policy-safe",
+            execution_id="execution-policy",
+            verification="verified",
+            evidence_refs=(),
+            usage={},
+        )
+
+    monkeypatch.setattr(engine_chat, "execute_engine_text", execute)
+    policy = InstructionPolicy(
+        policy_id="backend.test.engine-chat",
+        version="7",
+        instructions="Canonical system policy.",
+    )
+    chat = EngineChat(
+        session_id="session-policy",
+        instruction_policy=policy,
+    )
+
+    response = await chat.send_message("Hello")
+
+    assert response == "policy-safe"
+    assert len(seen) == 1
+    request = seen[0]
+    assert request.instructions == policy.instructions
+    assert request.instruction_policy_id == policy.policy_id
+    assert request.instruction_policy_version == policy.version
