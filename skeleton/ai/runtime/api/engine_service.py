@@ -40,6 +40,7 @@ from skeleton.intelligence.admission_runtime import (
 )
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
@@ -881,6 +882,29 @@ class EngineStorageAdmissionReceipt:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineGovernanceWriteReceipt:
+    mode: str
+    record: Mapping[str, Any]
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        normalized_mode = str(self.mode).strip().lower()
+        if normalized_mode not in {"register", "reconcile"}:
+            raise EngineServiceError("governance write mode is invalid")
+        if not isinstance(self.record, Mapping):
+            raise TypeError("record must be a mapping")
+        object.__setattr__(self, "mode", normalized_mode)
+        object.__setattr__(self, "record", dict(self.record))
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "mode": self.mode,
+            "record": dict(self.record),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class EngineExecutionStatus:
     operation_id: str
     execution_id: str
@@ -1436,6 +1460,7 @@ class EngineExecutionService:
         authorities: EngineAuthorityRegistry,
         *,
         admission_runtime: AdmissionRuntime | None = None,
+        governance_registry: GovernanceRegistry | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -1448,10 +1473,16 @@ class EngineExecutionService:
             and not isinstance(admission_runtime, AdmissionRuntime)
         ):
             raise TypeError("admission_runtime must be AdmissionRuntime")
+        if (
+            governance_registry is not None
+            and not isinstance(governance_registry, GovernanceRegistry)
+        ):
+            raise TypeError("governance_registry must be GovernanceRegistry")
         self.repository = repository
         self.submissions = submissions
         self.authorities = authorities
         self.admission_runtime = admission_runtime
+        self.governance_registry = governance_registry
         self._usage_meter = (
             None
             if admission_runtime is None
@@ -1649,6 +1680,134 @@ class EngineExecutionService:
             quota_reservation_id=reservation_id,
             admission_decision_id=lease.decision.decision_id,
             replayed=False,
+        )
+
+    def reconcile_external_governed_write(
+        self,
+        *,
+        verified_service_principal: str,
+        mode: str,
+        plane: str,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: str,
+        purposes: tuple[str, ...],
+        deletion_targets: tuple[str, ...] | None = None,
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+    ) -> EngineGovernanceWriteReceipt:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+
+        principal = _bounded_storage_text(
+            verified_service_principal,
+            "service_principal",
+        )
+        tenant = _bounded_storage_text(tenant_id, "tenant_id")
+        mode_key = _bounded_storage_text(
+            mode,
+            "mode",
+            maximum=32,
+        ).lower()
+        if mode_key not in {"register", "reconcile"}:
+            raise EngineServiceError("governance write mode is invalid")
+
+        plane_key = _bounded_storage_text(
+            plane,
+            "plane",
+            maximum=64,
+        ).lower()
+        if (
+            isinstance(purposes, (str, bytes))
+            or not isinstance(purposes, tuple)
+            or not 1 <= len(purposes) <= 32
+        ):
+            raise EngineServiceError(
+                "purposes must contain between 1 and 32 values"
+            )
+        normalized_purposes = tuple(
+            _bounded_storage_text(
+                value,
+                "purpose",
+                maximum=256,
+            ).lower()
+            for value in purposes
+        )
+        normalized_targets: tuple[str, ...] | None = None
+        if deletion_targets is not None:
+            if (
+                isinstance(deletion_targets, (str, bytes))
+                or not isinstance(deletion_targets, tuple)
+                or not 1 <= len(deletion_targets) <= 32
+            ):
+                raise EngineServiceError(
+                    "deletion_targets must contain between 1 and 32 values"
+                )
+            normalized_targets = tuple(
+                _bounded_storage_text(
+                    value,
+                    "deletion_target",
+                    maximum=256,
+                ).lower()
+                for value in deletion_targets
+            )
+
+        grant = self.authorities.grant_for(principal)
+        if "engine:governance" not in grant.scopes:
+            raise EngineAuthorityError(
+                "engine governance scope denied"
+            )
+        if not grant.allows_tenant(tenant):
+            raise EngineAuthorityError(
+                "engine governance tenant denied"
+            )
+
+        kwargs = {
+            "record_id": _bounded_storage_text(
+                record_id,
+                "record_id",
+                maximum=512,
+            ),
+            "tenant_id": tenant,
+            "source_ref": _bounded_storage_text(
+                source_ref,
+                "source_ref",
+                maximum=512,
+            ),
+            "data_class": _bounded_storage_text(
+                data_class,
+                "data_class",
+                maximum=64,
+            ),
+            "purposes": normalized_purposes,
+            "deletion_targets": normalized_targets,
+            "created_at": created_at,
+            "retention_until": retention_until,
+            "exportable": bool(exportable),
+        }
+        if mode_key == "register":
+            record = registry.register_canonical_write(
+                plane_key,
+                **kwargs,
+            )
+        else:
+            record = registry.reconcile_canonical_write(
+                plane_key,
+                **kwargs,
+            )
+        inventory = registry.lifecycle.get(record.record_id)
+        if inventory["tenant_id"] != tenant:
+            raise EngineServiceError(
+                "governance write tenant reconciliation failed"
+            )
+        return EngineGovernanceWriteReceipt(
+            mode=mode_key,
+            record=inventory,
         )
 
     def _execution_admission_request(
@@ -2362,6 +2521,7 @@ __all__ = [
     "EngineExecutionCommand",
     "EngineExecutionService",
     "EngineExecutionStatus",
+    "EngineGovernanceWriteReceipt",
     "EngineServiceError",
     "EngineStorageAdmissionReceipt",
     "EngineSubmissionConflict",
