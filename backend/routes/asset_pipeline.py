@@ -218,7 +218,7 @@ async def generate_sprite(request: Sprite2DRequest):
             4. Stable Diffusion prompt
             5. Technical specifications
             6. Animation keyframe descriptions (if animated)""")
-            generation_prompt = llm.chat()
+            generation_prompt = await llm.chat()
         except Exception:
             generation_prompt = prompt
     else:
@@ -297,7 +297,7 @@ async def generate_3d_model(request: Model3DRequest):
             6. Rigging requirements (if applicable)
             7. Animation specifications (if applicable)
             8. LOD recommendations""")
-            generation_prompt = llm.chat()
+            generation_prompt = await llm.chat()
         except Exception:
             generation_prompt = prompt
     else:
@@ -422,7 +422,7 @@ async def generate_asset_batch(request: AssetBatchRequest):
             1. Color palette (5-8 hex colors)
             2. Style rules for consistency
             3. Technical specifications""")
-            style_response = llm.chat()
+            style_response = await llm.chat()
             style_guide["ai_generated"] = style_response
         except Exception:
             pass
