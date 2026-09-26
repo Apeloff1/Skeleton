@@ -76,6 +76,35 @@ def test_client_message_id_conflict_is_rejected():
 def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns():
     pass
 """,
+        "frontend/features/Jeeves/WorkspaceController.ts": """
+export type HistoryTransport = unknown;
+class WorkspaceController {
+  canonicalMessages() {}
+  rehydrateServerTranscripts() {
+    throw new Error('canonical conversation history unavailable');
+  }
+  save() {
+    return { sessionUpdatedAt: Date.now() };
+  }
+}
+""",
+        "frontend/features/Jeeves/workspace.ts": """
+function sessionIdentity(value: unknown) { return value; }
+const sessionId = sessionIdentity('session');
+const restored = {
+  sessionId,
+  sessionUpdatedAt: sessionId ? sessionUpdatedAt : 0,
+};
+""",
+        "frontend/features/Jeeves/ChatWorkspace.tsx": """
+type ChatHistoryResponse = unknown;
+const path = '/api/jeeves/chat/' + sessionId + '?limit=50';
+""",
+        "frontend/scripts/test-jeeves-workspace.cjs": """
+test('remount replaces stale device transcript with canonical server history', () => {});
+test('remount keeps device cache with notice when canonical history is unavailable', () => {});
+test('durable backend session identity survives timestamp age and skew', () => {});
+""",
     }
     for rel, source in files.items():
         path = root / rel
@@ -97,7 +126,7 @@ def test_cutover_verifier_accepts_migration_read_only_legacy_store(
     assert receipt["errors"] == []
     assert receipt["head_sha"] == "conversation-head"
     assert receipt["legacy_read_accesses"] == 1
-    assert len(receipt["digests"]) == 4
+    assert len(receipt["digests"]) == 8
 
 
 def test_cutover_verifier_rejects_legacy_write(tmp_path: Path) -> None:
@@ -149,3 +178,19 @@ def test_cutover_verifier_rejects_extra_legacy_reader(tmp_path: Path) -> None:
         "escaped migration reader: rogue_read" in error
         for error in receipt["errors"]
     )
+
+
+def test_cutover_verifier_rejects_ttl_session_expiry_regression(
+    tmp_path: Path,
+) -> None:
+    root = _write_valid_repo(tmp_path)
+    path = root / "frontend" / "features" / "Jeeves" / "workspace.ts"
+    source = path.read_text(encoding="utf-8")
+    source += "\nconst sessionFresh = false;\n"
+    path.write_text(source, encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "workspace model regained TTL-based canonical session expiry" in receipt["errors"]
+
