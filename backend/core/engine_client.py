@@ -1081,6 +1081,54 @@ class EngineClient:
         payload["audio"] = audio
         return payload
 
+    async def admit_storage_write(
+        self,
+        *,
+        tenant_id: str,
+        capability: str,
+        resource_id: str,
+        write_id: str,
+        storage_bytes: int,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        if (
+            isinstance(storage_bytes, bool)
+            or not isinstance(storage_bytes, int)
+            or storage_bytes < 1
+            or storage_bytes > 1024 * 1024 * 1024
+        ):
+            raise EngineProtocolError(
+                "storage_bytes must be within [1, 1GiB]"
+            )
+        return await self._request(
+            "POST",
+            "/admission/storage",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "capability": _text(
+                    capability,
+                    "capability",
+                    maximum=256,
+                ),
+                "resource_id": _text(
+                    resource_id,
+                    "resource_id",
+                    maximum=512,
+                ),
+                "write_id": _text(
+                    write_id,
+                    "write_id",
+                    maximum=1024,
+                ),
+                "storage_bytes": storage_bytes,
+            },
+            trace_id=trace_id,
+        )
+
     async def submit(
         self,
         command: EngineExecutionCommand,
