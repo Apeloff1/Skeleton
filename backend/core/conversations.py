@@ -147,6 +147,7 @@ class MongoConversationAuthority:
         governance_deletion_acker: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_inventory_reader: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_engine_target_executor: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
+        governance_retention_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
     ) -> None:
         self.database = database
         self.threads = database["conversation_threads"]
@@ -159,6 +160,7 @@ class MongoConversationAuthority:
         self.governance_engine_target_executor = (
             governance_engine_target_executor
         )
+        self.governance_retention_planner = governance_retention_planner
 
     @staticmethod
     def _governed_conversation_location(
@@ -463,6 +465,130 @@ class MongoConversationAuthority:
                 None if engine_result is None else dict(engine_result)
             ),
             "conversation": dict(conversation_result),
+            "complete": True,
+        }
+
+    async def execute_due_retention(
+        self,
+        *,
+        tenant_id: str,
+    ) -> Mapping[str, Any]:
+        """Execute one tenant retention plan across engine and conversation owners."""
+
+        planner = self.governance_retention_planner
+        if planner is None:
+            raise ConversationStorageUnavailable(
+                "conversation retention planning is unavailable"
+            )
+        try:
+            plan = await planner(tenant_id=str(tenant_id))
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "conversation retention plan is unavailable"
+            ) from exc
+        if (
+            not isinstance(plan, Mapping)
+            or plan.get("tenant_id") != str(tenant_id)
+            or not isinstance(plan.get("actions"), list)
+        ):
+            raise ConversationStorageUnavailable(
+                "conversation retention plan is malformed"
+            )
+
+        plan_id = str(plan.get("plan_id") or "").strip()
+        if not plan_id:
+            if plan["actions"]:
+                raise ConversationStorageUnavailable(
+                    "conversation retention plan is malformed"
+                )
+            return {
+                "tenant_id": str(tenant_id),
+                "plan_id": None,
+                "record_ids": [],
+                "linked_execution": None,
+                "conversation": None,
+                "complete": True,
+            }
+
+        external_actions: list[Mapping[str, Any]] = []
+        conversation_ids: list[str] = []
+        seen_records: set[str] = set()
+        for raw in plan["actions"]:
+            if not isinstance(raw, Mapping):
+                raise ConversationStorageUnavailable(
+                    "conversation retention action is malformed"
+                )
+            if raw.get("tenant_id") != str(tenant_id):
+                raise ConversationStorageUnavailable(
+                    "conversation retention tenant mismatch"
+                )
+            record_id = str(raw.get("record_id") or "").strip()
+            target = str(raw.get("target") or "").strip().lower()
+            source_ref = str(raw.get("source_ref") or "").strip()
+            if not record_id or not target or not source_ref:
+                raise ConversationStorageUnavailable(
+                    "conversation retention action is malformed"
+                )
+            seen_records.add(record_id)
+            if target == "conversation":
+                self._governed_conversation_location(
+                    record_id,
+                    source_ref,
+                )
+                if record_id not in conversation_ids:
+                    conversation_ids.append(record_id)
+            else:
+                external_actions.append(raw)
+
+        engine_result: Mapping[str, Any] | None = None
+        if external_actions:
+            executor = self.governance_engine_target_executor
+            if executor is None:
+                raise ConversationStorageUnavailable(
+                    "conversation retention engine executor is unavailable"
+                )
+            try:
+                engine_result = await executor(
+                    tenant_id=str(tenant_id),
+                    plan_id=plan_id,
+                )
+            except Exception as exc:
+                raise ConversationStorageUnavailable(
+                    "conversation retention linked propagation failed"
+                ) from exc
+            if (
+                not isinstance(engine_result, Mapping)
+                or engine_result.get("plan_id") != plan_id
+                or engine_result.get("tenant_id") != str(tenant_id)
+            ):
+                raise ConversationStorageUnavailable(
+                    "conversation retention linked receipt is malformed"
+                )
+
+        conversation_result: Mapping[str, Any] | None = None
+        if conversation_ids:
+            conversation_result = await self.execute_governed_deletion(
+                tenant_id=str(tenant_id),
+                record_ids=tuple(conversation_ids),
+                reason="retention-expired",
+            )
+            if conversation_result.get("plan_id") != plan_id:
+                raise ConversationStorageUnavailable(
+                    "conversation retention plan identity changed"
+                )
+
+        return {
+            "tenant_id": str(tenant_id),
+            "plan_id": plan_id,
+            "record_ids": sorted(seen_records),
+            "linked_execution": (
+                None if engine_result is None else dict(engine_result)
+            ),
+            "conversation": (
+                None
+                if conversation_result is None
+                else dict(conversation_result)
+            ),
             "complete": True,
         }
 
@@ -1662,6 +1788,11 @@ conversation_authority = MongoConversationAuthority(
         None
         if _conversation_engine_client is None
         else _conversation_engine_client.execute_governance_deletion_engine_targets
+    ),
+    governance_retention_planner=(
+        None
+        if _conversation_engine_client is None
+        else _conversation_engine_client.plan_governance_retention
     ),
 )
 
