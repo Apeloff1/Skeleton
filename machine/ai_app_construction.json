@@ -1848,7 +1848,7 @@
       "plane": "prompt-context",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical context contracts, deterministic trust-aware packing, explicit omission reasons, provider-neutral projection, all declared source adapters, and authoritative ContextEnvelope-to-engine handoff projection now exist. Product compatibility prompts are digest-bound user-message segments and legacy command text cannot override projected context. Remaining closure work is provenance-preserving compaction, full legacy route/service convergence, versioned instruction-policy convergence, exact-head evidence, and dependency closure.",
+      "gap": "Canonical context contracts, governed source adapters, deterministic packing/omission, provider-neutral projection, digest-bound engine handoff, provenance-preserving compaction, compatibility-service delegation and versioned product instruction ownership are implemented. Product routes/services/GameForge cannot own ProviderRequest/ProviderRegistry/legacy provider execution and every product EngineChat construction must bind an explicit instruction policy. Deterministic compaction is fail-closed; semantic multi-source summarization remains an optional future optimization and is not required for canonical execution. Remaining closure is lower-stage dependency closure plus fresh exact-head/independent evidence.",
       "construction": [
         "define ContextEnvelope and ContextSegment immutable contracts with source/trust/data-class/provenance/budget metadata",
         "materialize one ContextCompiler under skeleton/context for all cognitive runtime model turns",
@@ -1875,9 +1875,9 @@
         "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
-      "verification_state": "universal-context-contract-and-compiler-added",
+      "verification_state": "implementation-complete-pending-dependencies-exact-head-and-independent-closure",
       "progress": {
-        "state": "in_progress",
+        "state": "implemented_pending_closure",
         "completed": [
           "ContextBudget, ContextSegment and ContextEnvelope immutable contracts",
           "stable source snapshot and context digest contract",
@@ -1903,14 +1903,14 @@
           "legacy command instructions/prompt/history cannot override canonical projected context",
           "deterministic provenance-preserving evidence compaction primitive",
           "compiler opt-in compaction of oversized artifact/tool/conversation evidence with auditable source mapping",
-          "legacy ai_assistant_svc and ai_hub_svc provider calls migrated through canonical engine-text/context compiler boundary"
+          "legacy ai_assistant_svc and ai_hub_svc provider calls migrated through canonical engine-text/context compiler boundary",
+          "repository-wide product context execution boundary rejects direct provider/prompt ownership",
+          "versioned instruction policy ownership is statically enforced for product EngineChat surfaces"
         ],
         "remaining": [
-          "multi-segment/semantic summary compaction where deterministic excerpts are insufficient",
-          "migrate any remaining direct feature prompt/provider assembly discovered by repository source scan",
-          "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
-          "prove all canonical cognitive model turns originate from ContextCompiler or a digest-bound ContextEnvelope handoff",
-          "fresh exact-head and independent validation"
+          "close declared conversation/memory/tool/governance dependencies",
+          "collect fresh exact-head Context Compiler/Backend Quality/App Assembly evidence including instruction-policy boundary",
+          "obtain independent closure verification"
         ]
       }
     },
@@ -5450,7 +5450,7 @@
   "context_compiler_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "implementation-in-progress",
+    "status": "implemented-pending-closure",
     "gap": "gap-context-compiler-convergence",
     "target_modules": {
       "contracts": "skeleton/contracts/context.py",
@@ -5690,13 +5690,14 @@
       "deterministic provenance-preserving evidence compaction",
       "compiler-integrated oversized evidence compaction",
       "ai_assistant_svc engine-text compatibility delegation",
-      "ai_hub_svc engine-text compatibility delegation"
+      "ai_hub_svc engine-text compatibility delegation",
+      "repository-wide product provider/context execution boundary",
+      "versioned product EngineChat instruction-policy ownership gate"
     ],
     "remaining_surfaces": [
-      "semantic/multi-segment summary compaction",
-      "remaining legacy direct prompt/provider source scan and convergence",
-      "versioned instruction-policy convergence",
-      "exact-head/independent closure evidence"
+      "optional semantic/multi-segment summarization only if a future workload cannot safely use deterministic excerpts/omission",
+      "declared dependency closure",
+      "fresh exact-head and independent closure evidence"
     ]
   },
   "verification_runtime_blueprint": {
