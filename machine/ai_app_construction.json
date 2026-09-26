@@ -2259,7 +2259,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media leases, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, governed production Mongo memory writes, admitted authoritative Mongo conversation persistence, admitted canonical-memory projection rebuilds, and aggregate estimate-vs-actual telemetry now share one contract. Implementation closure is complete; final promotion awaits exact-head and independent verification.",
+      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media leases, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, governed production Mongo memory writes, authoritative conversation persistence, canonical-memory projection admission, and aggregate estimate-vs-actual telemetry are implementation-complete under one contract. A dedicated Cost Admission Closure Gate now binds exact-head runtime regressions and an independent source/mirror verifier. Remaining closure is a fresh green exact-head gate.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2273,7 +2273,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "known expensive provider and non-provider boundaries are admitted: provider/media, tools, engine persistence, canonical memory, authoritative conversations, artifact/storage writes and material canonical-memory projection rebuilds; exact-head/independent closure evidence remains",
+      "status_detail": "implementation-complete pending fresh exact-head Cost Admission Closure Gate",
       "evidence_present": [
         "backend/core/conversations.py admits thread/message/state writes through EngineClient.admit_storage_write before Mongo mutation",
         "backend/core/engine_client.py authenticated bounded /admission/storage client boundary",
@@ -7494,7 +7494,7 @@
   "cost_admission_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "in-progress-p0",
+    "status": "implemented-pending-closure",
     "gap": "gap-cost-admission",
     "canonical_owner": "skeleton/intelligence",
     "objective": "Every expensive AI boundary is admitted against one monotonic request/tenant budget before allocation, with actual usage reconciled durably across processes.",
@@ -7602,7 +7602,10 @@
       "Skeleton production package declares Motor/PyMongo required by the canonical Mongo memory owner",
       "material canonical-memory projection rebuilds reserve admission before derived-store mutation and reconcile actual bytes/wall time",
       "production ServerState binds admitted AsyncMemoryProjectionCoordinator beside the governed Mongo memory writer",
-      "projection rebuild denial leaves stale/derived stores untouched"
+      "projection rebuild denial leaves stale/derived stores untouched",
+      ".github/workflows/cost-admission-closure.yml exact-head cost/admission closure gate",
+      "scripts/verify_cost_admission_closure.py independently verifies production admission boundaries, durable schema tokens and AI-tree mirror parity",
+      "Cost Admission Closure Gate runs quota, pressure, telemetry, tool/provider, engine persistence, memory/projection and conversation admission regressions"
     ]
   },
   "provider_surface_convergence_blueprint": {
