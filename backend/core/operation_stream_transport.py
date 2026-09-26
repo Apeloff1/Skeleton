@@ -23,7 +23,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
 from skeleton.contracts.operation import OperationState
@@ -35,6 +35,7 @@ from skeleton.frontier.operation_stream import (
 from skeleton.frontier.operation_stream_store import (
     SQLiteOperationEventStore,
     StreamConsumerCheckpoint,
+    StreamWorkerLease,
 )
 from skeleton.persistence.operation_store import (
     OperationStoreConflict,
@@ -45,6 +46,83 @@ from skeleton.persistence.operation_store import (
 
 
 _PROCESS_STREAM_WORKER_ID = f"worker-{os.getpid()}-{uuid4().hex}"
+
+
+@runtime_checkable
+class OperationEventStore(Protocol):
+    """Durable stream authority contract.
+
+    SQLite is the local reference implementation. Network/shared backends must
+    preserve the same append, replay, lease, consumer, and compaction semantics
+    before they can be injected into the transport.
+    """
+
+    def acquire_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        *,
+        lease_seconds: int,
+    ) -> StreamWorkerLease | None: ...
+
+    def renew_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        generation: int,
+        *,
+        lease_seconds: int,
+    ) -> StreamWorkerLease | None: ...
+
+    def release_worker_lease(
+        self,
+        operation_id: str,
+        worker_id: str,
+        generation: int,
+    ) -> bool: ...
+
+    def append(
+        self,
+        operation_id: str,
+        event_type: str,
+        payload: Mapping[str, Any],
+        *,
+        event_id: str,
+        timestamp: Any,
+    ) -> StreamEvent: ...
+
+    def replay(
+        self,
+        cursor: ReplayCursor,
+        *,
+        limit: int,
+    ) -> tuple[StreamEvent, ...]: ...
+
+    def head(self, operation_id: str) -> Mapping[str, Any]: ...
+
+    def register_consumer(
+        self,
+        operation_id: str,
+        consumer_id: str,
+        *,
+        lease_seconds: int,
+    ) -> StreamConsumerCheckpoint: ...
+
+    def active_consumers(
+        self,
+        operation_id: str,
+    ) -> tuple[StreamConsumerCheckpoint, ...]: ...
+
+    def acknowledge_consumer(
+        self,
+        operation_id: str,
+        consumer_id: str,
+        sequence: int,
+        *,
+        lease_seconds: int,
+    ) -> StreamConsumerCheckpoint: ...
+
+    def compact_acknowledged(self, operation_id: str) -> int: ...
 
 
 class OperationTransportError(RuntimeError):
@@ -246,15 +324,17 @@ class OperationStreamTransport:
     def __init__(
         self,
         operation_store: SQLiteOperationStore,
-        event_store: SQLiteOperationEventStore,
+        event_store: OperationEventStore,
         *,
         worker_id: str | None = None,
         projection_lease_seconds: int = 10,
     ) -> None:
         if not isinstance(operation_store, SQLiteOperationStore):
             raise TypeError("operation_store must be SQLiteOperationStore")
-        if not isinstance(event_store, SQLiteOperationEventStore):
-            raise TypeError("event_store must be SQLiteOperationEventStore")
+        if not isinstance(event_store, OperationEventStore):
+            raise TypeError(
+                "event_store must implement the durable OperationEventStore contract"
+            )
         if (
             isinstance(projection_lease_seconds, bool)
             or not isinstance(projection_lease_seconds, int)
@@ -551,6 +631,7 @@ __all__ = [
     "OperationAcknowledgement",
     "OperationAccessDenied",
     "OperationResyncSnapshot",
+    "OperationEventStore",
     "OperationStreamBatch",
     "OperationStreamTransport",
     "OperationTransportConflict",
