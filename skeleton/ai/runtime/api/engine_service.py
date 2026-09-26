@@ -24,6 +24,18 @@ from skeleton.contracts.operation import (
     OperationEnvelope,
     OperationState,
 )
+from skeleton.intelligence.admission import (
+    AdmissionError,
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import (
+    AdmissionCompletion,
+    AdmissionLease,
+    AdmissionRuntime,
+    AdmissionRuntimeError,
+)
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
 from skeleton.persistence.execution_repository import (
@@ -82,6 +94,53 @@ def _digest(value: Mapping[str, Any]) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _execution_admission_operation_id(operation_id: str) -> str:
+    """Canonical execution/tool quota identity derived from parent operation."""
+
+    raw = str(operation_id).strip()
+    if not raw:
+        raise EngineServiceError("operation_id is required")
+    try:
+        return str(UUID(raw))
+    except (ValueError, AttributeError):
+        return str(
+            uuid5(
+                NAMESPACE_URL,
+                "skeleton-operation:" + raw,
+            )
+        )
+
+
+def _resource_budget_from_mapping(
+    values: Mapping[str, Any],
+) -> ResourceBudget:
+    if not isinstance(values, Mapping):
+        raise EngineServiceError("resource budget must be an object")
+    supported = {
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_cost_usd",
+        "max_wall_seconds",
+        "max_provider_attempts",
+        "max_tool_calls",
+        "max_artifact_bytes",
+        "max_storage_bytes",
+        "max_concurrency",
+        "max_queue_depth",
+    }
+    kwargs = {
+        key: values[key]
+        for key in supported
+        if key in values
+    }
+    try:
+        return ResourceBudget(**kwargs)
+    except (TypeError, ValueError, AdmissionError) as exc:
+        raise EngineServiceError(
+            "execution resource budget is invalid"
+        ) from exc
 
 
 def _operation_from_dict(payload: Mapping[str, Any]) -> OperationEnvelope:
@@ -1293,6 +1352,8 @@ class EngineExecutionService:
         repository: SQLiteExecutionRepository,
         submissions: SQLiteEngineSubmissionStore,
         authorities: EngineAuthorityRegistry,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -1300,9 +1361,107 @@ class EngineExecutionService:
             raise TypeError("submissions must be SQLiteEngineSubmissionStore")
         if not isinstance(authorities, EngineAuthorityRegistry):
             raise TypeError("authorities must be EngineAuthorityRegistry")
+        if (
+            admission_runtime is not None
+            and not isinstance(admission_runtime, AdmissionRuntime)
+        ):
+            raise TypeError("admission_runtime must be AdmissionRuntime")
         self.repository = repository
         self.submissions = submissions
         self.authorities = authorities
+        self.admission_runtime = admission_runtime
+
+    def _execution_admission_request(
+        self,
+        command: EngineExecutionCommand,
+    ) -> AdmissionRequest:
+        return AdmissionRequest(
+            operation_id=_execution_admission_operation_id(
+                command.operation.operation_id
+            ),
+            tenant_id=command.operation.tenant_id,
+            capability="engine-execution",
+            budget=_resource_budget_from_mapping(
+                command.resource_budget
+            ),
+            estimate=UsageEstimate(),
+        )
+
+    def ensure_execution_admission(
+        self,
+        command: EngineExecutionCommand,
+        *,
+        now: datetime | None = None,
+    ) -> AdmissionLease | None:
+        runtime = self.admission_runtime
+        if runtime is None:
+            return None
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "admission.now")
+        )
+        try:
+            return runtime.admit(
+                self._execution_admission_request(command),
+                now_wall=instant.timestamp(),
+            )
+        except (AdmissionError, AdmissionRuntimeError) as exc:
+            raise EngineServiceError(
+                "engine execution denied by resource admission"
+            ) from exc
+
+    def complete_execution_admission(
+        self,
+        execution_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> AdmissionCompletion | None:
+        runtime = self.admission_runtime
+        if runtime is None:
+            return None
+        stored = self.submissions.get_by_execution_id(
+            str(execution_id)
+        )
+        if stored is None:
+            raise EngineServiceError(
+                "engine execution submission is unavailable"
+            )
+        lease = self.ensure_execution_admission(
+            stored.command,
+            now=now,
+        )
+        assert lease is not None
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "admission.now")
+        )
+        try:
+            return runtime.complete(
+                lease.operation_id,
+                UsageEstimate(),
+                now_wall=instant.timestamp(),
+            )
+        except AdmissionRuntimeError as exc:
+            raise EngineServiceError(
+                "engine execution admission completion failed"
+            ) from exc
+
+    def release_execution_admission(
+        self,
+        command: EngineExecutionCommand,
+    ) -> None:
+        runtime = self.admission_runtime
+        if runtime is None:
+            return
+        operation_id = _execution_admission_operation_id(
+            command.operation.operation_id
+        )
+        try:
+            runtime.release(operation_id)
+        except AdmissionRuntimeError:
+            pass
 
     def _validate(
         self,
@@ -1365,13 +1524,21 @@ class EngineExecutionService:
                 )
             return existing.ack
 
+        self.ensure_execution_admission(
+            command,
+            now=instant,
+        )
         try:
             execution = self.repository.create(
                 command.execution_request,
                 now=instant,
             )
         except ExecutionRepositoryConflict as exc:
+            self.release_execution_admission(command)
             raise EngineSubmissionConflict(str(exc)) from exc
+        except Exception:
+            self.release_execution_admission(command)
+            raise
 
         idempotency_digest = _digest(
             {
@@ -1399,11 +1566,15 @@ class EngineExecutionService:
             ),
             trace_id=command.operation.trace_id,
         )
-        return self.submissions.remember(
-            service_principal=verified_service_principal,
-            command=command,
-            ack=ack,
-        )
+        try:
+            return self.submissions.remember(
+                service_principal=verified_service_principal,
+                command=command,
+                ack=ack,
+            )
+        except Exception:
+            self.release_execution_admission(command)
+            raise
 
     def _stored_for_access(
         self,
