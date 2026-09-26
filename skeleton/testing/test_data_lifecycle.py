@@ -337,6 +337,41 @@ def test_durable_registry_preserves_retention_plans_across_restart(tmp_path) -> 
     restarted.close()
 
 
+def test_tenant_retention_plan_replays_only_outstanding_actions() -> None:
+    registry = DataLifecycleRegistry()
+    registry.register(
+        _record(
+            "retention-linked",
+            targets=("memory", "conversation"),
+            retention_until=15.0,
+        )
+    )
+
+    first = registry.plan_retention_expiry_for_tenant(
+        "tenant-a",
+        now=20.0,
+    )
+    assert first is not None
+    registry.acknowledge_deletion(
+        first.plan_id,
+        "retention-linked",
+        "memory",
+        now=21.0,
+    )
+
+    replay = registry.plan_retention_expiry_for_tenant(
+        "tenant-a",
+        now=30.0,
+    )
+
+    assert replay is not None
+    assert replay.plan_id == first.plan_id
+    assert [
+        (action.record_id, action.target)
+        for action in replay.actions
+    ] == [("retention-linked", "conversation")]
+
+
 def test_durable_registry_rejects_corrupt_snapshot(tmp_path) -> None:
     path = tmp_path / "corrupt-lifecycle.sqlite3"
     registry = DataLifecycleRegistry(path)
