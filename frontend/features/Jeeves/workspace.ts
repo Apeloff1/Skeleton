@@ -5,6 +5,7 @@ export const MAX_CONVERSATIONS = 30;
 export const MAX_MESSAGES = 100;
 export const MAX_TEXT = 16_000;
 export const MAX_CONTEXT = 4_000;
+/** @deprecated Canonical server sessions are durable; retained for API compatibility. */
 export const SESSION_TTL = 6 * 60 * 60 * 1000;
 
 export type Artifact = {
@@ -95,6 +96,11 @@ function timestamp(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function sessionIdentity(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value)
+    ? value : null;
+}
+
 function restoreMessage(value: unknown, now: number): Message | null {
   const item = record(value);
   if (!item || (item.role !== 'user' && item.role !== 'jeeves') || typeof item.text !== 'string') return null;
@@ -123,15 +129,15 @@ function restoreConversation(value: unknown, now: number): Conversation | null {
       return message;
     });
   const sessionUpdatedAt = timestamp(item.sessionUpdatedAt, 0);
-  const sessionFresh = now >= sessionUpdatedAt && now - sessionUpdatedAt <= SESSION_TTL;
+  const sessionId = sessionIdentity(item.sessionId);
   return {
     id: text(item.id, 100), title: text(item.title, 100).trim() || 'Untitled conversation',
     handoffId: typeof item.handoffId === 'string' && /^[a-zA-Z0-9_-]{1,120}$/.test(item.handoffId) ? item.handoffId : undefined,
     createdAt: timestamp(item.createdAt, now), updatedAt: timestamp(item.updatedAt, now),
     pinned: item.pinned === true, archived: item.archived === true,
     draft: text(item.draft), context: text(item.context, MAX_CONTEXT), allForms: item.allForms === true,
-    sessionId: sessionFresh ? text(item.sessionId, 128) || null : null,
-    sessionUpdatedAt: sessionFresh ? sessionUpdatedAt : 0, messages,
+    sessionId,
+    sessionUpdatedAt: sessionId ? sessionUpdatedAt : 0, messages,
   };
 }
 
