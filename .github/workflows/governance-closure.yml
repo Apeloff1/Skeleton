@@ -80,7 +80,7 @@ jobs:
 
       - name: Run canonical governance lifecycle contracts
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_data_governance.py
           skeleton/testing/test_data_lifecycle.py
           skeleton/testing/test_governance_audit.py
@@ -89,13 +89,13 @@ jobs:
 
       - name: Run governed memory and projection contracts
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_memory_writeback.py
           skeleton/testing/test_memory_projection.py
 
       - name: Run backend route and durable-write governance contracts
         run: >-
-          python -m pytest -q --noconftest
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_route_privacy.py
           backend/tests/test_conversation_storage_admission.py
           backend/tests/test_conversation_governance.py
