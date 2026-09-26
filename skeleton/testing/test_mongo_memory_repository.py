@@ -7,7 +7,22 @@ from uuid import uuid4
 
 import pytest
 
-from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
+from skeleton.contracts.memory_record import (
+    MemoryKind,
+    MemoryState,
+    MemoryWriteProposal,
+)
+from skeleton.intelligence.admission import (
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
+from skeleton.memory.writeback import (
+    AsyncGovernedMemoryWriter,
+    MemoryWritebackError,
+)
 from skeleton.memory.projection import (
     AsyncMemoryProjectionCoordinator,
     LegacyMemoryStoreProjection,
@@ -19,6 +34,7 @@ from skeleton.persistence.memory_repository import (
     MemoryNotFound,
     MongoMemoryRepository,
 )
+from skeleton.vault.governance_registry import GovernanceRegistry
 
 
 def _matches(doc: dict, query: dict) -> bool:
@@ -784,3 +800,158 @@ async def test_mongo_stale_pending_event_cannot_regress_rebuilt_projection() -> 
     assert [(event.memory_version, event.action) for event in await repo.pending_projection_events()] == [
         (2, "upsert"),
     ]
+
+def _memory_admission_for(proposal: MemoryWriteProposal):
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        proposal.tenant_id,
+        TenantQuota(
+            window_id="mongo-memory-window",
+            max_operations=10,
+            max_input_tokens=10_000,
+            max_output_tokens=10_000,
+            max_cost_usd=100.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1_000_000,
+            max_storage_bytes=1_000_000,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    runtime.admit(
+        AdmissionRequest(
+            operation_id=proposal.source_operation_id,
+            tenant_id=proposal.tenant_id,
+            capability="memory-write",
+            budget=ResourceBudget(max_storage_bytes=1_000_000),
+            estimate=UsageEstimate(),
+        ),
+        now_wall=_now().timestamp(),
+    )
+    return runtime, ledger
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_meters_mongo_memory_before_commit() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="governed-create")
+    runtime, ledger = _memory_admission_for(proposal)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    record = await writer.commit(proposal.proposal_id, now=_now())
+    storage = ledger.snapshot("tenant-a")["metered_by_category"]["storage"]
+    governed = governance.lifecycle.get(record.memory_id)
+
+    assert record.state is MemoryState.ACTIVE
+    assert storage["storage_bytes"] > 0
+    assert storage["artifact_bytes"] == 0
+    assert governed["owner_plane"] == "memory"
+    assert governed["tenant_id"] == "tenant-a"
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_requires_active_memory_admission() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="missing-admission")
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        proposal.tenant_id,
+        TenantQuota(
+            window_id="mongo-memory-window",
+            max_storage_bytes=1_000_000,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="memory write denied by resource admission",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    assert db["canonical_memory_records"].docs == []
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_replay_does_not_double_charge() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="governed-replay")
+    runtime, ledger = _memory_admission_for(proposal)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    first = await writer.commit(proposal.proposal_id, now=_now())
+    first_snapshot = ledger.snapshot("tenant-a")
+    writer.stage(proposal)
+    replay = await writer.commit(
+        proposal.proposal_id,
+        now=_now() + timedelta(seconds=2),
+    )
+    replay_snapshot = ledger.snapshot("tenant-a")
+
+    assert replay == first
+    assert first_snapshot["usage_events"] == 1
+    assert replay_snapshot["usage_events"] == 1
+    assert (
+        replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+        == first_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_tombstones_on_governance_failure(
+    monkeypatch,
+) -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    governance = GovernanceRegistry()
+    proposal = _proposal(key="governance-failure")
+    runtime, _ledger = _memory_admission_for(proposal)
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("governance unavailable")
+
+    monkeypatch.setattr(governance, "reconcile_canonical_write", fail)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="governance registration failed; memory was tombstoned",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    rows = await repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+    assert len(rows) == 1
+    assert rows[0].state is MemoryState.TOMBSTONED
+
