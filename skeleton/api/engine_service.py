@@ -1935,6 +1935,69 @@ class EngineExecutionService:
             ],
         }
 
+    def plan_external_governance_retention(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Create or recover one tenant-scoped retention expiry plan."""
+
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        timestamp = (
+            None
+            if now is None
+            else _aware(
+                now,
+                "governance_retention.now",
+            ).timestamp()
+        )
+        try:
+            plan = registry.lifecycle.plan_retention_expiry_for_tenant(
+                tenant,
+                now=timestamp,
+            )
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "external governance retention plan rejected"
+            ) from exc
+
+        if plan is None:
+            return {
+                "schema_version": 1,
+                "tenant_id": tenant,
+                "plan_id": None,
+                "reason": "retention-expired",
+                "created_at": None,
+                "actions": [],
+            }
+        return {
+            "schema_version": 1,
+            "tenant_id": plan.tenant_id,
+            "plan_id": plan.plan_id,
+            "reason": plan.reason,
+            "created_at": plan.created_at,
+            "actions": [
+                {
+                    "record_id": action.record_id,
+                    "tenant_id": action.tenant_id,
+                    "target": action.target,
+                    "source_ref": action.source_ref,
+                    "reason": action.reason,
+                }
+                for action in plan.actions
+            ],
+        }
+
     async def execute_external_governance_engine_targets(
         self,
         *,
