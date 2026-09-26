@@ -2175,7 +2175,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage writes, and aggregate estimate-vs-actual telemetry now share one contract. Remaining work is broader non-provider admission coverage plus exact-head and independent verification.",
+      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, and aggregate estimate-vs-actual telemetry now share one contract. Remaining implementation work is admission at expensive conversation/retrieval/memory persistence boundaries plus exact-head and independent verification.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2189,7 +2189,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "shared AdmissionRuntime composes request budgets, restart-safe SQLite tenant quota reservations, durable shared concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, independently budgeted artifact/storage writes, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; broader expensive-plane admission and final exact-head verification remain"
+      "status_detail": "shared AdmissionRuntime composes request budgets, durable SQLite tenant quota reservations, durable shared concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, independent artifact/storage usage, engine execution/submission/checkpoint/turn/result persistence metering, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; conversation/retrieval/memory persistence admission and final exact-head verification remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -7379,7 +7379,9 @@
       "restart-safe storage write usage and unknown-resolution regressions",
       "restart-safe SqliteSharedPressureLedger prevents multi-worker overbooking and coordinates shared queue depth",
       "shared pressure includes tenant fairness, lease expiry reaping, owner fencing, soft shedding and atomic queue promotion",
-      "AdmissionRuntime consumes shared pressure snapshots and durable leases while preserving local counters as cache"
+      "AdmissionRuntime consumes shared pressure snapshots and durable leases while preserving local counters as cache",
+      "engine execution/submission/checkpoint/turn/finalization/result persistence is metered through operation-level storage admission",
+      "storage write identities are deterministic so restart replay does not double-charge durable usage"
     ]
   },
   "provider_surface_convergence_blueprint": {
