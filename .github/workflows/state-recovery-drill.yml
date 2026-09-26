@@ -76,6 +76,12 @@ jobs:
           --workdir "${RUNNER_TEMP}/operation-sqlite-recovery"
           --output "${RUNNER_TEMP}/operation-sqlite-recovery.json"
 
+      - name: Run full engine SQLite bundle backup restore drill
+        run: >-
+          python scripts/state_recovery_drill.py live-engine-sqlite
+          --workdir "${RUNNER_TEMP}/engine-sqlite-recovery"
+          --output "${RUNNER_TEMP}/engine-sqlite-recovery.json"
+
       - name: Verify recovery evidence and ordering
         run: |
           python - <<'PY'
@@ -140,4 +146,36 @@ jobs:
           print("operation-sqlite-recovery: OK")
           print("phases:", " -> ".join(actual))
           print("backup/restore digest:", report["backup_digest"])
+          PY
+
+      - name: Verify engine SQLite bundle recovery evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "engine-sqlite-recovery.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          assert report["status"] == "passed"
+          assert report["bundle_digest"] == report["restored_bundle_digest"]
+          assert set(report["stores"]) == {
+              "execution",
+              "pressure",
+              "quota",
+              "submissions",
+              "tool_receipts",
+          }
+          for store in report["stores"].values():
+              assert store["backup_digest"] == store["restore_digest"]
+          verified = report["verified"]
+          assert verified["execution_state"] == "routing"
+          assert verified["checkpoint_version"] == 1
+          assert verified["approval_ref"] == "approval:engine-recovery"
+          assert verified["tool_reservation_status"] == "in_doubt"
+          assert verified["quota_committed_input_tokens"] == 90
+          assert verified["pressure_active"] == 1
+          assert verified["pressure_queued"] == 1
+          print("engine-sqlite-bundle-recovery: OK")
+          print("bundle digest:", report["bundle_digest"])
           PY
