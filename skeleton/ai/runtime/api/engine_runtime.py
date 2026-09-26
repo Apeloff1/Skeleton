@@ -12,6 +12,7 @@ from skeleton.api.engine_service import (
     EngineServiceError,
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
     VerificationHook,
@@ -21,7 +22,25 @@ from skeleton.provider_runtime import (
     ProviderRegistry,
     ProviderUnavailableError,
 )
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
+
+
+def build_engine_tool_runtime(
+    *,
+    admission_runtime: AdmissionRuntime,
+    receipt_store: SQLiteToolReceiptStore,
+) -> AsyncToolRuntime:
+    """Construct the engine-owned canonical tool runtime at its owner boundary."""
+
+    if not isinstance(admission_runtime, AdmissionRuntime):
+        raise TypeError("admission_runtime must be AdmissionRuntime")
+    if not isinstance(receipt_store, SQLiteToolReceiptStore):
+        raise TypeError("receipt_store must be SQLiteToolReceiptStore")
+    return AsyncToolRuntime(
+        admission_runtime=admission_runtime,
+        receipt_store=receipt_store,
+    )
 
 
 class EngineExecutionCoordinatorError(RuntimeError):
