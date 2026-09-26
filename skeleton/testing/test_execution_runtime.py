@@ -20,7 +20,7 @@ from skeleton.provider_contract import (
     ProviderToolCall,
     ProviderUsage,
 )
-from skeleton.provider_runtime import ProviderResponse
+from skeleton.provider_runtime import ProviderAdapter, ProviderResponse
 from skeleton.skills.tool_contract import (
     ToolApprovalPolicy,
     ToolAuthorityClass,
@@ -69,9 +69,13 @@ def _request(
     )
 
 
-class FakeProvider:
+class FakeProvider(ProviderAdapter):
     provider_id = "fake"
     model = "fake-model"
+
+    @property
+    def available(self) -> bool:
+        return True
 
     def __init__(self, responses):
         self.responses = list(responses)
