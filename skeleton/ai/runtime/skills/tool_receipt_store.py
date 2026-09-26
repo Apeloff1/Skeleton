@@ -236,7 +236,7 @@ class SQLiteToolReceiptStore:
                     or row["transfer_purpose"] != request.transfer_purpose
                 ):
                     raise ToolReceiptConflict(
-                        "idempotency key replayed with different tool, arguments, lineage, or privacy context"
+                        "idempotency key replayed with different tool or arguments, lineage, or privacy context"
                     )
                 if row["state"] == "committed":
                     receipt = _receipt_from_json(row["receipt_json"])
