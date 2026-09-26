@@ -190,4 +190,3 @@ def test_server_state_restores_durable_governance_audit_chain(
     assert entries[0].outcome == "success"
     assert restarted.governance_audit_log.tamper_check() == (True, -1)
     restarted.close_governance_registry()
-
