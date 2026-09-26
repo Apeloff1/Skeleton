@@ -9,7 +9,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/sota", tags=["SOTA 2026"])
 
@@ -20,7 +19,6 @@ try:
 except Exception:
     LLM_AVAILABLE = False
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # REQUEST MODELS
@@ -98,12 +96,11 @@ async def get_sota_info():
 async def predictive_assistance(request: PredictiveRequest):
     """Predict what the user needs next based on context"""
     
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"predictions": [], "error": "LLM not available"}
     
     try:
         chat = LlmChat(
-            api_key=EMERGENT_KEY,
             system_message="""You are a predictive coding assistant. Based on the code and context:
 1. Predict what the user will likely code next (next 1-3 lines)
 2. Identify what they might be trying to achieve
@@ -144,7 +141,7 @@ Predict:
 async def auto_refactor(request: RefactorRequest):
     """Automatically refactor code for improvement"""
     
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"refactored_code": request.code, "error": "LLM not available"}
     
     focus_prompts = {
@@ -157,7 +154,6 @@ async def auto_refactor(request: RefactorRequest):
     
     try:
         chat = LlmChat(
-            api_key=EMERGENT_KEY,
             system_message=f"""You are an expert code refactoring agent. {focus_prompts.get(request.focus, focus_prompts['all'])}
 
 Rules:
@@ -193,7 +189,7 @@ Preserve behavior: {request.preserve_behavior}"""
 async def multi_model_orchestration(request: MultiModelRequest):
     """Use multiple AI models for better results"""
     
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"result": None, "error": "LLM not available"}
     
     # For now, we use GPT-4o with different prompting strategies
@@ -210,7 +206,6 @@ async def multi_model_orchestration(request: MultiModelRequest):
     try:
         for strategy in strategies:
             chat = LlmChat(
-                api_key=EMERGENT_KEY,
                 system_message=f"You are an expert programmer. {strategy['focus']}"
             ).with_model("openai", "gpt-4o")
             
@@ -230,7 +225,6 @@ async def multi_model_orchestration(request: MultiModelRequest):
         if request.consensus_mode == "best":
             # Use another call to pick the best
             synth_chat = LlmChat(
-                api_key=EMERGENT_KEY,
                 system_message="You are an expert at evaluating code solutions. Pick the best one and explain why."
             ).with_model("openai", "gpt-4o")
             
@@ -259,12 +253,11 @@ async def multi_model_orchestration(request: MultiModelRequest):
 async def advanced_code_intelligence(request: CodeIntelRequest):
     """Deep code analysis and intelligence"""
     
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"analysis": {}, "error": "LLM not available"}
     
     try:
         chat = LlmChat(
-            api_key=EMERGENT_KEY,
             system_message="""You are a code analysis expert. Provide deep insights about code:
 - Complexity analysis (cyclomatic, cognitive)
 - Design pattern detection
@@ -302,12 +295,11 @@ Provide detailed analysis for each type."""
 async def smart_autocomplete(request: AutoCompleteRequest):
     """Context-aware intelligent autocomplete"""
     
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"completions": [], "error": "LLM not available"}
     
     try:
         chat = LlmChat(
-            api_key=EMERGENT_KEY,
             system_message="""You are an intelligent code autocomplete system. Given code and cursor position:
 1. Provide 3-5 relevant completions
 2. Include multi-line completions when appropriate
@@ -351,7 +343,7 @@ Provide smart completions."""
 async def explain_like_expert(code: str, language: str = "python", expertise_level: str = "senior"):
     """Get expert-level code explanation"""
     
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"explanation": "", "error": "LLM not available"}
     
     level_prompts = {
@@ -363,7 +355,6 @@ async def explain_like_expert(code: str, language: str = "python", expertise_lev
     
     try:
         chat = LlmChat(
-            api_key=EMERGENT_KEY,
             system_message=f"You are a principal engineer. {level_prompts.get(expertise_level, level_prompts['senior'])}"
         ).with_model("openai", "gpt-4o")
         
