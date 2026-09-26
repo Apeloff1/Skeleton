@@ -2066,7 +2066,7 @@
       "plane": "governance",
       "priority": "P0",
       "status": "open",
-      "gap": "The governance registry is implementation-complete pending exact-head closure: restart-safe lifecycle authority, canonical write registration, provider/tool privacy ceilings, memory/conversation/retrieval/artifact lifecycle adapters, WORM audit linkage, deletion/export/retention execution and governed GameForge artifacts are production-bound. A dedicated Governance Closure Gate now executes the closure contracts on every relevant change. Remaining closure is fresh exact-head green evidence and independent verification.",
+      "gap": "The governance registry is implementation-complete pending exact-head closure: restart-safe lifecycle authority, canonical write registration, provider/tool privacy ceilings, memory/conversation/retrieval/artifact lifecycle adapters, WORM audit linkage, deletion/export/retention execution, governed GameForge artifacts, and an independent source-only governance verifier are production-bound. Remaining closure is fresh exact-head Governance Closure Gate plus Stage-0/App Assembly evidence.",
       "construction": [
         "define data classes and transfer purposes",
         "bind data class to memory, artifact, retrieval and provider payloads",
@@ -2080,7 +2080,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "implementation-complete pending exact-head Governance Closure Gate/App Assembly validation and independent verification",
+      "status_detail": "implementation-complete pending fresh exact-head Governance Closure Gate (including independent verifier) and Stage-0/App Assembly validation",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -2123,14 +2123,17 @@
         "backend/routes/gameforge_studio.py preserves authenticated tenant identity through Ship-It build calls",
         "backend/tests/test_gameforge_artifact_builder.py governed canonical ZIP/fail-closed tenant regressions",
         "skeleton/testing/test_governance_runtime_binding.py physical governed artifact retention-expiry regression",
-        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes"
+        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes",
+        "scripts/verify_governance_closure.py independent source-only governance blueprint/state-topology/boundary/mirror verifier",
+        "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
+        ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
       ],
       "outstanding_evidence": [
         "fresh exact-head Governance Closure Gate",
         "fresh exact-head Stage-0/App Assembly validation",
-        "independent governance closure verification"
+        "fresh exact-head Governance Closure Gate independent verifier receipt"
       ],
-      "verification_state": "implemented-pending-exact-head-and-independent-verification"
+      "verification_state": "implemented-pending-exact-head-verification"
     },
     {
       "id": "gap-feedback-promotion",
@@ -7488,12 +7491,15 @@
       "backend/routes/gameforge_studio.py preserves authenticated tenant identity through Ship-It build calls",
       "backend/tests/test_gameforge_artifact_builder.py governed canonical ZIP/fail-closed tenant regressions",
       "skeleton/testing/test_governance_runtime_binding.py physical governed artifact retention-expiry regression",
-      ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes"
+      ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes",
+      "scripts/verify_governance_closure.py independent source-only governance blueprint/state-topology/boundary/mirror verifier",
+      "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
+      ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
     ],
     "remaining": [
       "fresh exact-head Governance Closure Gate",
       "fresh exact-head Stage-0/App Assembly validation",
-      "independent closure verification"
+      "fresh exact-head Governance Closure Gate independent verifier receipt"
     ]
   },
   "cost_admission_blueprint": {
