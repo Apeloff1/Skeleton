@@ -125,6 +125,31 @@ class OperationEventStore(Protocol):
     def compact_acknowledged(self, operation_id: str) -> int: ...
 
 
+@runtime_checkable
+class OperationStateStore(Protocol):
+    """Authoritative operation/outbox store contract required by transport."""
+
+    def get(self, operation_id: str) -> StoredOperation: ...
+
+    def pending_outbox(
+        self,
+        *,
+        operation_id: str,
+        limit: int = 1000,
+    ) -> tuple[Any, ...]: ...
+
+    def acknowledge_outbox(self, outbox_id: str) -> None: ...
+
+    def transition(
+        self,
+        operation_id: str,
+        target: OperationState,
+        *,
+        expected_version: int,
+        now: Any | None = None,
+    ) -> StoredOperation: ...
+
+
 class OperationTransportError(RuntimeError):
     """Base transport-composition error."""
 
@@ -323,14 +348,16 @@ class OperationStreamTransport:
 
     def __init__(
         self,
-        operation_store: SQLiteOperationStore,
+        operation_store: OperationStateStore,
         event_store: OperationEventStore,
         *,
         worker_id: str | None = None,
         projection_lease_seconds: int = 10,
     ) -> None:
-        if not isinstance(operation_store, SQLiteOperationStore):
-            raise TypeError("operation_store must be SQLiteOperationStore")
+        if not isinstance(operation_store, OperationStateStore):
+            raise TypeError(
+                "operation_store must implement the durable OperationStateStore contract"
+            )
         if not isinstance(event_store, OperationEventStore):
             raise TypeError(
                 "event_store must implement the durable OperationEventStore contract"
