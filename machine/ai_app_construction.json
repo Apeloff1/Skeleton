@@ -2151,7 +2151,7 @@
       "plane": "memory",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical MemoryContract/RetrieverContract normalization exists, but production memory authority is not durably bound: MAG/CAG/vector/reference stores are largely process-local and legacy memory assembly treats memory as optional optimization. Fully functional AI requires restart-safe tenant-scoped memory records with explicit provenance, retention/deletion/export, while vector indexes and in-process stores remain derived projections.",
+      "gap": "Canonical long-term memory is production-bound to Mongo through MongoMemoryRepository, governed staged writeback and admission, with tenant/namespace isolation, idempotency/version fencing, immutable revision lineage, expiry/tombstones, durable projection outbox, canonical lifecycle export/delete and rebuildable vector/MAG/CAG/search projections. Remaining closure work is dependency closure plus fresh exact-head and independent verification.",
       "construction": [
         "reuse skeleton/frontier MemoryContract and RetrieverContract as canonical storage-neutral boundaries",
         "define durable MemoryRecord and MemoryWriteProposal contracts with tenant/user/namespace/data-class/purpose/provenance/retention/version metadata",
@@ -2175,14 +2175,32 @@
         "process-memory loss does not lose canonical memory test",
         "retrieval provenance points back to canonical memory records",
         "memory outage produces explicit degraded continuity behavior"
-      ]
+      ],
+      "verification_state": "mongo-authority-lifecycle-and-derived-rebuild-implemented-pending-closure",
+      "progress": {
+        "state": "implemented_pending_closure",
+        "completed": [
+          "production Mongo canonical memory repository",
+          "tenant/namespace scoped idempotency and optimistic version fencing",
+          "immutable memory revision lineage and durable projection outbox",
+          "governed staged writeback with provenance/review/admission policy",
+          "Mongo canonical memory lifecycle export and tombstone deletion",
+          "derived vector/MAG/CAG/TFIDF projection rebuild and failure isolation",
+          "server startup binding for canonical Mongo memory authority"
+        ],
+        "remaining": [
+          "close Stage-0 state-authority and governance dependencies",
+          "collect fresh exact-head Mongo memory/App Assembly validation",
+          "obtain independent closure verification"
+        ]
+      }
     },
     {
       "id": "gap-state-authority-convergence",
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State authority convergence is substantially implemented: Jeeves RAG product state is Mongo-authoritative with rebuildable Chroma projections; production Skeleton reasoning uses durable OperationEnvelope state with transactional outbox and continuous reconciliation; authoritative Mongo recovery is verified before derived rebuild; operation SQLite backup/restore and restored outbox reconciliation are rehearsed; and cognitive execution/result/approval/tool/quota/pressure state is production-bound to durable engine SQLite stores. Remaining closure work is full engine-bundle backup/restore rehearsal, retention/operator policy finalization, exact-head evidence, and independent verification.",
+      "gap": "State authority convergence is implementation-complete pending closure evidence: RAG/product state and canonical AI memory are Mongo-authoritative; production reasoning, cognitive execution/result/submission/approval/tool/quota/pressure and governance state have durable authorities; operation and full engine SQLite recovery drills exist; and a machine-readable verified backup/retention policy covers the durable SQLite bundle. Remaining work is fresh exact-head recovery/topology/assembly evidence and independent closure verification.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2203,7 +2221,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "rag-operation-mongo-and-operation-sqlite-recovery-proven-engine-bundle-rehearsal-and-exact-head-open",
+      "verification_state": "implementation-complete-pending-exact-head-and-independent-closure",
       "progress": {
         "completed": [
           "canonical RAG user/session/progress/feedback state migrated to Mongo authority",
@@ -2214,13 +2232,14 @@
           "operation SQLite online-backup destructive restore rehearsal",
           "restored operation outbox identity and reconciliation verification",
           "cognitive execution/result/approval/tool/quota state bound to persistent engine SQLite stores",
-          "engine quota and shared-pressure state persisted in Compose"
+          "engine quota and shared-pressure state persisted in Compose",
+          "full engine SQLite bundle destructive backup/restore rehearsal",
+          "machine-readable durable state backup and retention policy",
+          "verified backup bundle tool with required-store and tamper detection"
         ],
         "remaining": [
-          "extend destructive backup/restore rehearsal across the complete engine SQLite bundle",
-          "finalize operator retention/backup policy for the durable engine SQLite bundle and governance state",
-          "collect fresh exact-head State Recovery Drill, App Assembly, Backend Quality and state-topology validation evidence",
-          "independent closure verification"
+          "collect fresh exact-head State Recovery Drill, state topology, App Assembly and Backend Quality evidence",
+          "obtain independent closure verification"
         ]
       }
     },
@@ -6718,7 +6737,7 @@
   "memory_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "implemented-pending-closure",
     "gap": "gap-memory-durable-authority",
     "canonical_contracts": {
       "storage": "skeleton/frontier/contracts.py:MemoryContract",
@@ -6913,6 +6932,21 @@
         "current": "process-local vector store",
         "target": "derived retrieval projection/reference implementation"
       }
+    ],
+    "implemented_surfaces": [
+      "MemoryRecord/MemoryWriteProposal contracts",
+      "SQLite conformance repository",
+      "Mongo production authority repository",
+      "governed staged memory writer",
+      "canonical memory governance lifecycle adapter",
+      "durable projection outbox",
+      "vector/TFIDF/MAG/CAG derived projection adapters",
+      "server production memory binding"
+    ],
+    "remaining_surfaces": [
+      "fresh exact-head validation",
+      "declared dependency closure",
+      "independent closure verification"
     ]
   },
   "functional_ai_dependency_graph": {
@@ -7253,7 +7287,13 @@
       "runtime outbox dispatcher lifecycle",
       "Mongo authoritative-first recovery drill",
       "operation SQLite backup/restore and restored outbox reconciliation drill",
-      "durable cognitive execution/result/approval/tool/quota/pressure bindings"
+      "durable cognitive execution/result/approval/tool/quota/pressure bindings",
+      "scripts/state_recovery_drill.py destructively backs up/restores canonical operation SQLite and reconciles restored outbox identities",
+      "scripts/state_recovery_drill.py backs up/restores the five-store engine SQLite bundle and reopens execution, submission/approval, tool-idempotency, quota and shared-pressure state",
+      "machine/state_backup_policy.json defines required authoritative SQLite stores, restore order and retention floors",
+      "scripts/state_backup_bundle.py creates online SQLite backups with integrity, binary SHA256, logical snapshot and bundle-digest verification",
+      "skeleton/testing/test_state_backup_bundle.py proves required-store fail-closed behavior and backup tamper detection",
+      "docker-compose.yml persists engine execution, submission, tool receipt, quota and shared-pressure state under skeleton_data"
     ],
     "sqlite_domains": [
       "canonical operation state and transactional outbox",
