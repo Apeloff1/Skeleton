@@ -410,10 +410,18 @@ def project_provider_context(
         if segment.kind is ContextKind.USER_MESSAGE
     ]
     if user_segments:
-        # Current turns are newest; priority is the deterministic tie-break for
-        # callers that compile history and the current prompt at one timestamp.
+        # Canonical conversation sources bind the current turn directly to the
+        # envelope turn_id. This avoids UUID-order prompt selection when a
+        # replay/import fixture gives several turns the same timestamp.
+        current_turn = [
+            segment
+            for segment in user_segments
+            if segment.source_type == "conversation"
+            and segment.source_id == envelope.turn_id
+        ]
+        candidates = current_turn or user_segments
         prompt_segment = max(
-            user_segments,
+            candidates,
             key=lambda segment: (
                 segment.created_at.timestamp(),
                 segment.priority,
