@@ -1220,6 +1220,101 @@ class EngineClient:
             trace_id=trace_id,
         )
 
+    async def request_governance_deletion(
+        self,
+        *,
+        tenant_id: str,
+        record_ids: Sequence[str] | None = None,
+        reason: str = "tenant-request",
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_ids: list[str] | None = None
+        if record_ids is not None:
+            if isinstance(record_ids, (str, bytes)):
+                raise EngineProtocolError("record_ids must be a sequence")
+            normalized_ids = [
+                _text(value, "record_id", maximum=512)
+                for value in record_ids
+            ]
+            if not 1 <= len(normalized_ids) <= 10_000:
+                raise EngineProtocolError(
+                    "record_ids must contain between 1 and 10000 values"
+                )
+        return await self._request(
+            "POST",
+            "/governance/deletions",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "record_ids": normalized_ids,
+                "reason": _text(
+                    reason,
+                    "reason",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
+    async def acknowledge_governance_deletion(
+        self,
+        *,
+        tenant_id: str,
+        plan_id: str,
+        record_id: str,
+        target: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/governance/deletions/acknowledgements",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "plan_id": _text(
+                    plan_id,
+                    "plan_id",
+                    maximum=512,
+                ),
+                "record_id": _text(
+                    record_id,
+                    "record_id",
+                    maximum=512,
+                ),
+                "target": _text(
+                    target,
+                    "target",
+                    maximum=256,
+                ).lower(),
+            },
+            trace_id=trace_id,
+        )
+
+    async def governance_inventory(
+        self,
+        *,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            "/governance/inventory",
+            params={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
     async def submit(
         self,
         command: EngineExecutionCommand,
