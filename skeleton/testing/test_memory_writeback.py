@@ -367,4 +367,3 @@ def test_governed_memory_replay_does_not_double_charge_storage() -> None:
         replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
         == first_snapshot["metered_by_category"]["storage"]["storage_bytes"]
     )
-
