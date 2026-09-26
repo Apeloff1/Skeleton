@@ -113,17 +113,15 @@
         "skeleton/testing/test_artifact_usage.py and test_tenant_quota_sqlite.py prove independent and restart-safe storage accounting",
         "skeleton/intelligence/shared_pressure.py coordinates durable multi-worker concurrency and queue pressure",
         "skeleton/testing/test_shared_pressure.py proves restart/multi-worker/fairness/shedding invariants",
-        "AdmissionRuntime consumes shared snapshots and durable pressure leases"
+        "AdmissionRuntime consumes shared snapshots and durable pressure leases",
+        "skeleton/api/engine_service.py charges engine state/submission storage before durable writes",
+        "skeleton/intelligence/execution_runtime.py charges checkpoints/turns/finalization/result storage via replay-stable write IDs",
+        "skeleton/api/engine_runtime.py binds storage callbacks to the active operation admission lease",
+        "skeleton/testing/test_engine_execution_service.py and test_execution_runtime.py prove durable write metering"
       ],
       "remaining": [
-        "admission at every expensive non-provider action",
-        "bind actual storage usage to artifact/storage admission receipts",
-        "admit every expensive non-provider action before allocation",
-        "add shared multi-worker pressure coordination",
-        "collect fresh exact-head cost/admission telemetry and quota verification",
-        "bind admission to every remaining expensive non-provider action",
         "collect exact-head and independent closure evidence",
-        "validate independent storage byte migration on exact head"
+        "admit every remaining expensive conversation/retrieval/memory persistence boundary before allocation"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
