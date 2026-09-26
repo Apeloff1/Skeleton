@@ -310,8 +310,6 @@ async def jeeves_ask(req: JeevesAskReq):
             model = "skeleton-engine"
         except EngineTextError:
             reply = None
-        except Exception:  # noqa: BLE001
-            reply = None
     if not reply:
         if recalled or pdf_text:
             head = pdf_text.strip() if pdf_text else ""
