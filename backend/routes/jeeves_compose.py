@@ -83,7 +83,14 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
                 else "I couldn't find relevant material in the available knowledge base. "
                      "This response is using local extraction rather than generative reasoning. "
                      "Try a more specific question or add relevant project details.")
-        return {"text": text, "tier": tier, "model": f"{tier}-extractive"}
+        return {
+            "text": text,
+            "tier": tier,
+            "model": f"{tier}-extractive",
+            "engine_execution_id": None,
+            "engine_verification": None,
+            "engine_evidence_refs": [],
+        }
     # Generative escalation is engine-owned. Product routes never activate
     # provider SDKs or credentials directly.
     prompt = f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"
@@ -111,6 +118,9 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
             "text": response.text,
             "tier": "paid",
             "model": "skeleton-engine",
+            "engine_execution_id": response.execution_id,
+            "engine_verification": response.verification,
+            "engine_evidence_refs": list(response.evidence_refs),
         }
     except EngineTextError:
         return {
@@ -121,6 +131,9 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
             ),
             "tier": "local",
             "model": "unavailable-fallback",
+            "engine_execution_id": None,
+            "engine_verification": None,
+            "engine_evidence_refs": [],
         }
 
 
@@ -434,6 +447,9 @@ async def chat(req: ChatReq):
         "artifact_count": len(art),
         "tier": gen["tier"],
         "model": gen["model"],
+        "engine_execution_id": gen.get("engine_execution_id"),
+        "engine_verification": gen.get("engine_verification"),
+        "engine_evidence_refs": list(gen.get("engine_evidence_refs") or []),
         "modalities": modalities,
         "grounded_in": len(recalled),
         "history_messages_used": len(effective_history),
@@ -457,6 +473,9 @@ async def chat(req: ChatReq):
         "forms": forms,
         "tier": gen["tier"],
         "model": gen["model"],
+        "engine_execution_id": gen.get("engine_execution_id"),
+        "engine_verification": gen.get("engine_verification"),
+        "engine_evidence_refs": list(gen.get("engine_evidence_refs") or []),
         "modalities": modalities,
         "artifacts": art,
         "artifact_count": len(art),
