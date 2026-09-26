@@ -317,11 +317,13 @@
         "skeleton/testing/test_provider_contract.py proves provider media failure releases active admission",
         ".github/workflows/provider-surface-closure.yml exact-head closure gate",
         "scripts/check_provider_bootstrap.py exact-head provider inventory receipt",
-        "closure gate covers SDK/network isolation, canonical async/media regressions, stream reliability and engine cross-service isolation"
+        "closure gate covers SDK/network isolation, canonical async/media regressions, stream reliability and engine cross-service isolation",
+        "scripts/verify_provider_surface_closure.py independently reconstructs declared provider ownership from source",
+        "tests/test_provider_surface_independent_verifier.py rejects undeclared SDK/credential edges, missing canonical source/mirror and declared-edge loss",
+        "Provider Surface Closure Gate emits SHA-bound independent-provider-surface-v1 receipt"
       ],
       "remaining": [
-        "collect fresh exact-head Provider Surface Closure Gate evidence",
-        "obtain independent provider-surface closure verification"
+        "collect fresh exact-head Provider Surface Closure Gate evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
