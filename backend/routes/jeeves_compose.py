@@ -694,6 +694,7 @@ async def _canonical_existing_turn(
     session_id: str,
     client_message_id: str,
     user_message: str,
+    request_refs: tuple[str, ...] = (),
 ) -> Dict[str, Any] | None:
     """Resolve a retry entirely from canonical conversation authority."""
 
@@ -720,6 +721,14 @@ async def _canonical_existing_turn(
         raise HTTPException(
             status_code=409,
             detail="client_message_id was already used for different content",
+        )
+    if canonical_user.attachment_refs != request_refs:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "client_message_id was already used for different "
+                "turn semantics"
+            ),
         )
 
     assistant_key = "jeeves-assistant:" + client_message_id
@@ -778,6 +787,7 @@ async def _claim_idempotent_turn(
             session_id,
             req.client_message_id,
             req.message,
+            _canonical_request_refs(req),
         )
     except HTTPException:
         raise
@@ -859,6 +869,7 @@ async def chat(req: ChatReq):
                 sid,
                 req.client_message_id,
                 req.message,
+                _canonical_request_refs(req),
             )
             if replay is not None:
                 return replay
