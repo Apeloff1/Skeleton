@@ -27,6 +27,8 @@ WORKSPACE_CONTROLLER = Path("frontend/features/Jeeves/WorkspaceController.ts")
 WORKSPACE_MODEL = Path("frontend/features/Jeeves/workspace.ts")
 CHAT_WORKSPACE = Path("frontend/features/Jeeves/ChatWorkspace.tsx")
 WORKSPACE_CONTROLLER_TEST = Path("frontend/scripts/test-jeeves-workspace.cjs")
+CONVERSATION_ROUTE = Path("backend/routes/conversations.py")
+REGENERATION_ROUTE_TEST = Path("backend/tests/test_conversation_regeneration_route.py")
 
 REQUIRED_ROUTE_TOKENS = (
     "_canonical_authority",
@@ -136,6 +138,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     workspace_model_path = root / WORKSPACE_MODEL
     chat_workspace_path = root / CHAT_WORKSPACE
     controller_test_path = root / WORKSPACE_CONTROLLER_TEST
+    conversation_route_path = root / CONVERSATION_ROUTE
+    regeneration_test_path = root / REGENERATION_ROUTE_TEST
     required = (
         route_path,
         authority_path,
@@ -145,6 +149,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         workspace_model_path,
         chat_workspace_path,
         controller_test_path,
+        conversation_route_path,
+        regeneration_test_path,
     )
     for path in required:
         if not path.is_file():
@@ -172,6 +178,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     workspace_model = _read(workspace_model_path)
     chat_workspace = _read(chat_workspace_path)
     controller_tests = _read(controller_test_path)
+    conversation_route = _read(conversation_route_path)
+    regeneration_tests = _read(regeneration_test_path)
 
     for token in REQUIRED_ROUTE_TOKENS:
         if token not in route:
@@ -243,6 +251,31 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         if token not in controller_tests:
             errors.append(
                 f"Jeeves remount regression is missing: {token}"
+            )
+
+    for token in (
+        '@router.post("/{thread_id}/messages/{message_id}/regenerate")',
+        "command_from_context",
+        "_compile_chat_context",
+        "_provider_history",
+        "EngineClient.from_env",
+        "conversation_authority.regenerate_assistant_message",
+        '"engine-result:" + result.execution_id',
+        '"regenerated_from": target.message_id',
+        '"causal_user_message_id": causal.message_id',
+    ):
+        if token not in conversation_route:
+            errors.append(
+                f"conversation regenerate route lost canonical token: {token}"
+            )
+    for token in (
+        "test_regenerate_route_runs_engine_then_commits_new_branch",
+        "test_regenerate_route_never_commits_when_engine_unavailable",
+        "test_regenerate_route_rejects_stale_version_before_engine_resolution",
+    ):
+        if token not in regeneration_tests:
+            errors.append(
+                f"conversation regenerate regression is missing: {token}"
             )
 
     legacy_reads = _verify_legacy_reads(route, errors)
