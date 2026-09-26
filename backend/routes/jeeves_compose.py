@@ -55,12 +55,19 @@ _ENGINE_EXECUTION_SCOPE: ContextVar[str | None] = ContextVar(
 
 
 # ── shared helpers ─────────────────────────────────────────────
-def _canon_context(query: str, top_k: int = 5):
+def _canon_context(
+    query: str,
+    top_k: int = 5,
+) -> List[Dict] | None:
     try:
         from gameforge.lafs import lafs
-        return lafs.probability_search(query, acquisition="hybrid-deep", top_k=top_k)
+        return lafs.probability_search(
+            query,
+            acquisition="hybrid-deep",
+            top_k=top_k,
+        )
     except Exception:  # noqa: BLE001
-        return []
+        return None
 
 
 def _derive_dataset(recalled: List[Dict]) -> Dict:
@@ -210,7 +217,7 @@ async def compose(req: ComposeReq):
     """Jeeves replies in ALL requested forms in a SINGLE parse."""
     forms = [f for f in req.forms if f in _ALL_FORMS] or ["text"]
     title = req.title or req.query[:60]
-    recalled = _canon_context(req.query)
+    recalled = _canon_context(req.query) or []
     gen = await _generate_text(req.query, recalled, req.needs_reasoning)
     ds = _derive_dataset(recalled)
     art = _build_artifacts(forms, title, gen["text"], ds, recalled)
@@ -846,6 +853,11 @@ async def chat(req: ChatReq):
     context_req = req.model_copy(update={"history": effective_history})
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
     recalled = _canon_context(retrieval_query(context_req))
+    if recalled is None:
+        raise HTTPException(
+            status_code=503,
+            detail="canonical retrieval is unavailable; retry later",
+        )
 
     modalities = ["text"]
     try:
