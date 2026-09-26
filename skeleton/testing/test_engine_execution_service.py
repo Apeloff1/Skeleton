@@ -1369,3 +1369,123 @@ def test_external_governance_write_rejects_cross_tenant_and_bad_lists(
             purposes=(),
         )
     lifecycle.close()
+
+def _governed_service(tmp_path):
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(
+            tmp_path / "execution-governed.sqlite3"
+        ),
+        SQLiteEngineSubmissionStore(
+            tmp_path / "submissions-governed.sqlite3"
+        ),
+        _registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:governance",
+            )
+        ),
+        governance_registry=governance,
+    )
+    return service, governance
+
+
+def test_external_governance_deletion_plan_ack_and_inventory_are_tenant_fenced(
+    tmp_path,
+) -> None:
+    service, governance = _governed_service(tmp_path)
+    for record_id in ("thread-1", "message-1"):
+        governance.register_canonical_write(
+            "conversation",
+            record_id=record_id,
+            tenant_id="tenant-a",
+            source_ref=(
+                "conversation-thread://thread-1"
+                if record_id == "thread-1"
+                else "conversation-message://thread-1/message-1"
+            ),
+            data_class="confidential",
+            purposes=("model-inference",),
+            deletion_targets=("conversation",),
+            created_at=10.0,
+            exportable=True,
+        )
+
+    inventory = service.external_governance_inventory(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+    )
+    assert inventory["tenant_id"] == "tenant-a"
+    assert inventory["count"] == 2
+    assert {row["record_id"] for row in inventory["records"]} == {
+        "thread-1",
+        "message-1",
+    }
+
+    plan = service.request_external_governance_deletion(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        record_ids=("thread-1", "message-1"),
+        reason="tenant-request",
+        now=_now(),
+    )
+    assert plan["tenant_id"] == "tenant-a"
+    assert {row["record_id"] for row in plan["actions"]} == {
+        "thread-1",
+        "message-1",
+    }
+    assert {row["target"] for row in plan["actions"]} == {
+        "conversation",
+    }
+
+    for row in plan["actions"]:
+        receipt = service.acknowledge_external_governance_deletion(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            plan_id=plan["plan_id"],
+            record_id=row["record_id"],
+            target=row["target"],
+            now=_now() + timedelta(seconds=1),
+        )
+        assert receipt["record_id"] == row["record_id"]
+        assert receipt["target"] == "conversation"
+        assert receipt["state"] == "deleted"
+
+    assert governance.lifecycle.get("thread-1")["state"] == "deleted"
+    assert governance.lifecycle.get("message-1")["state"] == "deleted"
+
+
+def test_external_governance_lifecycle_requires_governance_scope(tmp_path) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    governance.register_canonical_write(
+        "conversation",
+        record_id="thread-denied",
+        tenant_id="tenant-a",
+        source_ref="conversation-thread://thread-denied",
+        data_class="confidential",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=10.0,
+    )
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-denied.sqlite3"),
+        SQLiteEngineSubmissionStore(
+            tmp_path / "submissions-denied.sqlite3"
+        ),
+        _registry(scopes=("engine:read",)),
+        governance_registry=governance,
+    )
+
+    with pytest.raises(
+        EngineAuthorityError,
+        match="governance scope denied",
+    ):
+        service.request_external_governance_deletion(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            record_ids=("thread-denied",),
+        )
+
