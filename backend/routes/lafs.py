@@ -293,11 +293,7 @@ async def jeeves_ask(req: JeevesAskReq):
                     "\n\nIMAGE ATTACHMENT: present but not inspected by this "
                     "text-only engine path."
                 )
-            identity = hashlib.sha256(
-                prompt.encode("utf-8")
-            ).hexdigest()
             chat = EngineChat(
-                session_id="lafs-jeeves:" + identity,
                 instruction_policy=LAFS_JEEVES_POLICY,
                 actor_id="lafs-jeeves",
                 capability="assistant.compat",
