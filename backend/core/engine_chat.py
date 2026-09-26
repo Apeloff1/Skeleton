@@ -257,12 +257,31 @@ class EngineChat:
         return str(text)
 
     def _idempotency_key(self, prompt: str) -> str:
+        policy = self.instruction_policy
+        instructions = (
+            self.system_message.strip()
+            or "Respond helpfully to the user request."
+        )
         material = json.dumps(
             {
                 "session_id": self.session_id,
                 "turn_index": len(self._history),
                 "prompt": prompt,
                 "history": self._history,
+                "instruction_policy_id": (
+                    None if policy is None else policy.policy_id
+                ),
+                "instruction_policy_version": (
+                    None if policy is None else policy.version
+                ),
+                "instructions": instructions,
+                "tenant_id": self.tenant_id,
+                "actor_id": self.actor_id,
+                "capability": self.capability,
+                "verification_profile": self.verification_profile,
+                "max_output_tokens": self._max_output_tokens,
+                "data_class": self.data_class,
+                "purpose": self.purpose,
             },
             sort_keys=True,
             separators=(",", ":"),
