@@ -17,6 +17,7 @@ from dataclasses import dataclass
 import inspect
 from typing import Any, Mapping, Protocol, runtime_checkable
 
+from skeleton.artifact_plane.governance import GovernedArtifactStore
 from skeleton.observability.correlation import correlation_scope, get_correlation_id
 from skeleton.persistence.memory_repository import (
     MemoryNotFound,
@@ -241,6 +242,62 @@ class SQLiteMemoryLifecycleAdapter:
         except MemoryNotFound:
             return None
         return current.as_dict()
+
+
+class GovernedArtifactLifecycleAdapter:
+    """Physical delete/export adapter for canonical governed artifacts."""
+
+    def __init__(self, artifacts: GovernedArtifactStore) -> None:
+        if not isinstance(artifacts, GovernedArtifactStore):
+            raise TypeError("artifacts must be GovernedArtifactStore")
+        self.artifacts = artifacts
+
+    def _identity(
+        self,
+        record_id: object,
+        tenant_id: object,
+        source_ref: object,
+    ) -> tuple[str, str]:
+        tenant, artifact_id = self.artifacts.parse_source_ref(
+            source_ref
+        )
+        if tenant != str(tenant_id):
+            raise LifecycleAdapterError(
+                "artifact lifecycle tenant mismatch"
+            )
+        expected = self.artifacts.lifecycle_record_id(
+            tenant,
+            artifact_id,
+        )
+        if expected != str(record_id):
+            raise LifecycleAdapterError(
+                "artifact lifecycle identity mismatch"
+            )
+        return tenant, artifact_id
+
+    async def delete(self, action: DeletionAction) -> None:
+        tenant, artifact_id = self._identity(
+            action.record_id,
+            action.tenant_id,
+            action.source_ref,
+        )
+        await _await_if_needed(
+            self.artifacts.remove(tenant, artifact_id)
+        )
+
+    async def export(
+        self,
+        record: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        tenant, artifact_id = self._identity(
+            record.get("record_id"),
+            record.get("tenant_id"),
+            record.get("source_ref"),
+        )
+        return self.artifacts.export_record(
+            tenant,
+            artifact_id,
+        )
 
 
 class GovernedRetrievalLifecycleAdapter:
