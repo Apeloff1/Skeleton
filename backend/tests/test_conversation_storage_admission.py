@@ -25,10 +25,27 @@ def _now():
 class _InsertCollection:
     def __init__(self) -> None:
         self.inserts = []
+        self.rows = {}
 
     async def insert_one(self, payload):
-        self.inserts.append(dict(payload))
+        row = dict(payload)
+        self.inserts.append(row)
+        if row.get("_id") is not None:
+            self.rows[str(row["_id"])] = row
         return SimpleNamespace(inserted_id=payload.get("_id"))
+
+    async def find_one(self, query):
+        for row in self.rows.values():
+            if all(row.get(key) == value for key, value in query.items()):
+                return dict(row)
+        return None
+
+    async def delete_one(self, query):
+        for key, row in list(self.rows.items()):
+            if all(row.get(field) == value for field, value in query.items()):
+                del self.rows[key]
+                return SimpleNamespace(deleted_count=1)
+        return SimpleNamespace(deleted_count=0)
 
 
 class _Database:
@@ -343,3 +360,210 @@ async def test_authority_rejects_mismatched_governance_receipt() -> None:
         )
 
     assert db["conversation_threads"].inserts == []
+
+@pytest.mark.asyncio
+async def test_governed_conversation_deletion_is_physical_then_acknowledged() -> None:
+    db = _Database()
+    thread = _thread()
+    message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="delete-me",
+        content="delete me",
+    )
+    await db["conversation_threads"].insert_one(
+        {
+            **thread.as_dict(),
+            "_id": thread.thread_id,
+        }
+    )
+    await db["conversation_messages"].insert_one(
+        {
+            **message.as_dict(),
+            "_id": message.message_id,
+        }
+    )
+
+    acknowledgements = []
+
+    async def plan(**kwargs):
+        assert kwargs["tenant_id"] == "tenant-a"
+        return {
+            "plan_id": "plan-1",
+            "tenant_id": "tenant-a",
+            "actions": [
+                {
+                    "record_id": thread.thread_id,
+                    "tenant_id": "tenant-a",
+                    "target": "conversation",
+                    "source_ref": (
+                        "conversation-thread://" + thread.thread_id
+                    ),
+                    "reason": "tenant-request",
+                },
+                {
+                    "record_id": message.message_id,
+                    "tenant_id": "tenant-a",
+                    "target": "conversation",
+                    "source_ref": (
+                        "conversation-message://"
+                        + thread.thread_id
+                        + "/"
+                        + message.message_id
+                    ),
+                    "reason": "tenant-request",
+                },
+            ],
+        }
+
+    async def ack(**kwargs):
+        acknowledgements.append(dict(kwargs))
+        return {
+            "plan_id": kwargs["plan_id"],
+            "record_id": kwargs["record_id"],
+            "target": kwargs["target"],
+            "state": "deleted",
+        }
+
+    authority = MongoConversationAuthority(
+        db,
+        governance_deletion_planner=plan,
+        governance_deletion_acker=ack,
+    )
+    result = await authority.execute_governed_deletion(
+        tenant_id="tenant-a",
+        record_ids=(thread.thread_id, message.message_id),
+    )
+
+    assert result["plan_id"] == "plan-1"
+    assert result["deleted_record_ids"] == [
+        message.message_id,
+        thread.thread_id,
+    ]
+    assert [row["record_id"] for row in acknowledgements] == [
+        message.message_id,
+        thread.thread_id,
+    ]
+    assert db["conversation_messages"].rows == {}
+    assert db["conversation_threads"].rows == {}
+
+
+@pytest.mark.asyncio
+async def test_governed_conversation_export_uses_registry_inventory() -> None:
+    db = _Database()
+    thread = _thread()
+    message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="export-me",
+        content="exported answer",
+    )
+    await db["conversation_threads"].insert_one(
+        {**thread.as_dict(), "_id": thread.thread_id}
+    )
+    await db["conversation_messages"].insert_one(
+        {**message.as_dict(), "_id": message.message_id}
+    )
+
+    async def inventory(**kwargs):
+        assert kwargs["tenant_id"] == "tenant-a"
+        return {
+            "tenant_id": "tenant-a",
+            "records": [
+                {
+                    "record_id": thread.thread_id,
+                    "tenant_id": "tenant-a",
+                    "owner_plane": "conversation",
+                    "source_ref": (
+                        "conversation-thread://" + thread.thread_id
+                    ),
+                },
+                {
+                    "record_id": message.message_id,
+                    "tenant_id": "tenant-a",
+                    "owner_plane": "conversation",
+                    "source_ref": (
+                        "conversation-message://"
+                        + thread.thread_id
+                        + "/"
+                        + message.message_id
+                    ),
+                },
+                {
+                    "record_id": "other-plane",
+                    "tenant_id": "tenant-a",
+                    "owner_plane": "memory",
+                    "source_ref": "memory://assistant/other-plane",
+                },
+            ],
+        }
+
+    authority = MongoConversationAuthority(
+        db,
+        governance_inventory_reader=inventory,
+    )
+    exported = await authority.export_governed_records(
+        tenant_id="tenant-a",
+    )
+
+    assert exported["count"] == 2
+    payloads = {
+        item["governance"]["record_id"]: item["payload"]
+        for item in exported["records"]
+    }
+    assert payloads[thread.thread_id]["thread_id"] == thread.thread_id
+    assert payloads[message.message_id]["message_id"] == message.message_id
+    assert "_id" not in payloads[thread.thread_id]
+    assert "_id" not in payloads[message.message_id]
+
+
+@pytest.mark.asyncio
+async def test_malformed_governance_delete_plan_cannot_mutate_mongo() -> None:
+    db = _Database()
+    thread = _thread()
+    await db["conversation_threads"].insert_one(
+        {**thread.as_dict(), "_id": thread.thread_id}
+    )
+
+    async def malformed_plan(**_kwargs):
+        return {
+            "plan_id": "plan-bad",
+            "tenant_id": "tenant-a",
+            "actions": [
+                {
+                    "record_id": thread.thread_id,
+                    "tenant_id": "tenant-a",
+                    "target": "conversation",
+                    "source_ref": "conversation-message://wrong/mismatch",
+                }
+            ],
+        }
+
+    async def ack(**_kwargs):
+        raise AssertionError("ack must not run for malformed plan")
+
+    authority = MongoConversationAuthority(
+        db,
+        governance_deletion_planner=malformed_plan,
+        governance_deletion_acker=ack,
+    )
+
+    with pytest.raises(
+        ConversationStorageUnavailable,
+        match="source_ref is invalid",
+    ):
+        await authority.execute_governed_deletion(
+            tenant_id="tenant-a",
+            record_ids=(thread.thread_id,),
+        )
+
+    assert thread.thread_id in db["conversation_threads"].rows
+
