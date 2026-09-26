@@ -430,7 +430,9 @@
           "skeleton/contracts/conversation.py"
         ],
         "runtime": [
-          "backend/core/conversations.py"
+          "backend/core/conversations.py",
+          "skeleton/api/engine_service.py",
+          "skeleton/vault/data_lifecycle.py"
         ],
         "persistence": [
           "skeleton/persistence/conversation_repository.py"
@@ -442,7 +444,11 @@
         ],
         "tests": [
           "skeleton/testing/test_conversation_repository.py",
-          "backend/tests/test_conversations_api.py"
+          "backend/tests/test_conversations_api.py",
+          "backend/tests/test_conversation_governance.py",
+          "skeleton/testing/test_data_lifecycle.py",
+          "skeleton/testing/test_engine_execution_service.py",
+          "skeleton/testing/test_context_compiler.py"
         ]
       },
       "ordered_steps": [
@@ -470,7 +476,8 @@
         "operation/result binding",
         "context projection",
         "delete/export",
-        "refresh/reconnect reconstruction"
+        "refresh/reconnect reconstruction",
+        "retention expiry propagation"
       ],
       "closure_gate": "the server can reconstruct and authorize every model-visible prior message from canonical state without trusting client-supplied transcript history",
       "current_evidence": [
@@ -516,7 +523,16 @@
         "skeleton/api/engine_service.py and skeleton/vault/lifecycle_adapters.py execute non-conversation deletion targets through registered engine lifecycle adapters",
         "backend/tests/test_conversation_governance.py proves unrelated tenant records and unreferenced memory are excluded from conversation deletion selection",
         "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation targets pending while engine-owned memory deletion is acknowledged",
-        "backend/tests/test_conversations_api.py proves the API claims completion only after governed propagation succeeds"
+        "backend/tests/test_conversations_api.py proves the API claims completion only after governed propagation succeeds",
+        "skeleton/context/compiler.py binds canonical conversation prompt selection to ContextEnvelope.turn_id before timestamp/priority fallback, preventing same-timestamp prior turns from becoming the current prompt",
+        "skeleton/testing/test_context_compiler.py proves same-timestamp prompt selection remains bound to the current canonical conversation turn",
+        "skeleton/api/engine_service.py exposes tenant-scoped durable retention planning and executes only non-conversation targets through engine lifecycle adapters",
+        "skeleton/vault/data_lifecycle.py replays an outstanding tenant retention plan before creating new expiry work, preserving plan identity across partial distributed execution",
+        "backend/core/conversations.py execute_due_retention executes engine-owned targets first and conversation-owned Mongo targets second from the same durable retention plan",
+        "backend/routes/conversations.py exposes an admin-only tenant retention sweep over the canonical split-owner lifecycle protocol",
+        "skeleton/testing/test_data_lifecycle.py proves retention retries return only outstanding actions from the same plan",
+        "skeleton/testing/test_engine_execution_service.py proves engine retention acknowledges engine-owned memory while leaving conversation targets pending for backend authority",
+        "backend/tests/test_conversation_governance.py proves split-owner retention executes engine then conversation targets under one plan identity"
       ],
       "remaining": [
         "close gap-state-authority-convergence and gap-governance-registry",
