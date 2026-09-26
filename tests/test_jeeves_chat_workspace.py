@@ -220,11 +220,18 @@ def test_unavailable_paid_engine_is_not_labeled_as_paid_generation(
     route,
     monkeypatch,
 ):
-    async def unavailable(_request):
-        raise route.EngineTextError("engine unavailable")
+    class UnavailableChat:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def with_max_tokens(self, _value):
+            return self
+
+        async def send_message(self, _message):
+            raise route.EngineTextError("engine unavailable")
 
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
-    monkeypatch.setattr(route, "execute_engine_text", unavailable)
+    monkeypatch.setattr(route, "EngineChat", UnavailableChat)
 
     result = asyncio.run(route._generate_text("question", [], True))
 
@@ -238,17 +245,25 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
 ):
     seen = {}
 
-    async def execute(request):
-        seen["request"] = request
-        return SimpleNamespace(
-            text="engine answer",
-            execution_id="engine-exec-jeeves-1",
-            verification="verification:jeeves",
-            evidence_refs=("evidence:jeeves",),
-        )
+    class RecordingChat:
+        def __init__(self, *args, **kwargs):
+            seen["init"] = {"args": args, **kwargs}
+
+        def with_max_tokens(self, value):
+            seen["max_tokens"] = value
+            return self
+
+        async def send_message(self, message):
+            seen["message"] = message
+            return SimpleNamespace(
+                text="engine answer",
+                execution_id="engine-exec-jeeves-1",
+                verification="verification:jeeves",
+                evidence_refs=("evidence:jeeves",),
+            )
 
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
-    monkeypatch.setattr(route, "execute_engine_text", execute)
+    monkeypatch.setattr(route, "EngineChat", RecordingChat)
 
     result = asyncio.run(
         route._generate_text(
@@ -259,12 +274,14 @@ def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
         )
     )
 
-    request = seen["request"]
-    assert "PROJECT_CONTEXT_SENTINEL" in request.prompt
-    assert "PROJECT_CONTEXT_SENTINEL" not in request.instructions
-    assert request.instruction_policy_id == "backend.jeeves.chat"
-    assert request.instruction_policy_version == "1"
-    assert request.actor_id == "jeeves-compose"
+    assert "PROJECT_CONTEXT_SENTINEL" in seen["message"].text
+    policy = seen["init"]["instruction_policy"]
+    assert "PROJECT_CONTEXT_SENTINEL" not in policy.instructions
+    assert policy.policy_id == "backend.jeeves.chat"
+    assert policy.version == "1"
+    assert seen["init"]["actor_id"] == "jeeves-compose"
+    assert seen["init"]["capability"] == "assistant.compat"
+    assert seen["max_tokens"] == 8_192
     assert result["text"] == "engine answer"
     assert result["tier"] == "paid"
     assert result["model"] == "skeleton-engine"
