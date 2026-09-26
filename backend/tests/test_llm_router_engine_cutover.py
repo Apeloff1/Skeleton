@@ -14,8 +14,8 @@ def test_llm_router_has_no_local_provider_activation_or_transport() -> None:
     assert "AI_REGISTRY" not in SOURCE
 
     assert "EngineClient" in SOURCE
-    assert "EngineTextRequest" in SOURCE
-    assert "execute_engine_text" in SOURCE
+    assert "EngineChat" in SOURCE
+    assert "UserMessage" in SOURCE
 
 
 def test_llm_router_delegates_provider_and_model_ownership_to_engine() -> None:

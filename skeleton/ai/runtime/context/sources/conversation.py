@@ -50,6 +50,7 @@ def conversation_message_segment(
         "conversation-thread:" + thread.thread_id,
         "conversation-message:" + message.message_id,
         "conversation-branch:" + message.branch_id,
+        "conversation-sequence:" + str(message.sequence),
     ]
     if message.operation_id:
         provenance.append("operation:" + message.operation_id)

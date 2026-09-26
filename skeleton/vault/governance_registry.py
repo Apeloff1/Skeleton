@@ -186,8 +186,11 @@ class GovernanceRegistry:
     def __init__(
         self,
         lifecycle: DataLifecycleRegistry | None = None,
+        *,
+        timeline: GovernanceAuditTimeline | None = None,
     ) -> None:
         self.lifecycle = lifecycle or DataLifecycleRegistry()
+        self.timeline = timeline
 
     def register(self, record: GovernedDataRecord) -> GovernedDataRecord:
         return self.lifecycle.register(record)
@@ -243,7 +246,10 @@ class GovernanceRegistry:
         }
         if created_at is not None:
             kwargs["created_at"] = created_at
-        return self.lifecycle.ensure_registered(GovernedDataRecord(**kwargs))
+        record = self.lifecycle.ensure_registered(GovernedDataRecord(**kwargs))
+        if self.timeline is not None:
+            self.timeline.record_registration(record, mode="register")
+        return record
 
     def reconcile_canonical_write(
         self,
@@ -288,9 +294,12 @@ class GovernanceRegistry:
         }
         if created_at is not None:
             kwargs["created_at"] = created_at
-        return self.lifecycle.reconcile_registered(
+        record = self.lifecycle.reconcile_registered(
             GovernedDataRecord(**kwargs)
         )
+        if self.timeline is not None:
+            self.timeline.record_registration(record, mode="reconcile")
+        return record
 
     def context_for(
         self,

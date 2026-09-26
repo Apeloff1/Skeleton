@@ -202,10 +202,12 @@ class _GatedProvider:
 
     def __init__(self, gate: asyncio.Event) -> None:
         self.gate = gate
+        self.started = asyncio.Event()
         self.requests = []
 
     async def generate(self, request):
         self.requests.append(request)
+        self.started.set()
         await self.gate.wait()
         return ProviderResponse(
             text="late provider answer",
@@ -406,7 +408,7 @@ async def test_backend_client_crosses_authenticated_engine_boundary_idempotently
     )
     assert status["operation_id"] == context.operation_id
     assert status["execution_id"] == context.execution_id
-    assert status["execution_state"] == "admitted"
+    assert status["execution_state"] == "created"
     assert status["cancellation_requested"] is False
 
     with pytest.raises(EngineAuthorizationError):
@@ -536,13 +538,21 @@ async def test_http_cancel_fences_late_provider_result(tmp_path) -> None:
     command = _command(context, started=_now())
 
     execute_task = asyncio.create_task(client.execute(command))
-    for _ in range(100):
-        if provider.requests:
-            break
-        await asyncio.sleep(0)
-    else:
+    try:
+        await asyncio.wait_for(provider.started.wait(), timeout=2.0)
+    except TimeoutError:
         execute_task.cancel()
-        raise AssertionError("provider request did not start")
+        await asyncio.gather(execute_task, return_exceptions=True)
+        status = await client.status(
+            context.execution_id,
+            actor_id="actor-a",
+            tenant_id="tenant-a",
+        )
+        raise AssertionError(
+            "provider request did not start; "
+            f"execution_state={status['execution_state']} "
+            f"failure_code={status.get('failure_code')}"
+        )
 
     cancelled = await client.cancel(
         context.execution_id,

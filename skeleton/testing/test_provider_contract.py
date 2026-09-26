@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import base64
 import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.error import URLError
 
 import pytest
 
 from skeleton.automation.free_model import FreeModelClient, ModelError, redact_secrets
 from skeleton.jeeves.providers import AnthropicProvider, OpenAIProvider
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.provider_contract import (
     FinishReason,
     ProviderProtocolError,
@@ -18,11 +22,14 @@ from skeleton.provider_contract import (
     load_provider_architecture,
 )
 from skeleton.provider_runtime import (
+    OpenAIProviderAdapter,
     OpenAISyncProviderAdapter,
     ProviderAdapter,
+    ProviderImageRequest,
     ProviderInvocationError,
     ProviderRequest,
     ProviderResponse,
+    ProviderSpeechRequest,
     provider_response_deltas,
 )
 
@@ -578,3 +585,469 @@ async def test_default_provider_stream_uses_neutral_delta_contract() -> None:
     assert [delta.kind.value for delta in deltas] == ["text", "usage", "final"]
     assert deltas[-1].finish_reason is FinishReason.COMPLETED
     assert deltas[-1].response_id == "resp-stream"
+
+class _AsyncResponses:
+    def __init__(self, response) -> None:
+        self.response = response
+        self.calls = []
+
+    async def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.response
+
+
+class _AsyncImages:
+    def __init__(self) -> None:
+        self.generate_calls = []
+        self.variation_calls = []
+        self.edit_calls = []
+
+    async def generate(self, **kwargs):
+        self.generate_calls.append(kwargs)
+        encoded = base64.b64encode(b"generated-image").decode("ascii")
+        return SimpleNamespace(
+            id="img-generate",
+            data=[
+                SimpleNamespace(
+                    b64_json=encoded,
+                    revised_prompt="bounded generated image",
+                )
+            ],
+        )
+
+    async def create_variation(self, **kwargs):
+        self.variation_calls.append(kwargs)
+        encoded = base64.b64encode(b"variation-image").decode("ascii")
+        return SimpleNamespace(
+            id="img-variation",
+            data=[SimpleNamespace(b64_json=encoded, revised_prompt=None)],
+        )
+
+    async def edit(self, **kwargs):
+        self.edit_calls.append(kwargs)
+        encoded = base64.b64encode(b"edited-image").decode("ascii")
+        return SimpleNamespace(
+            id="img-edit",
+            data=[SimpleNamespace(b64_json=encoded, revised_prompt=None)],
+        )
+
+
+class _AsyncSpeech:
+    def __init__(self) -> None:
+        self.calls = []
+
+    async def create(self, **kwargs):
+        self.calls.append(kwargs)
+
+        class _SpeechResponse:
+            request_id = "speech-request"
+
+            async def read(self):
+                return b"speech-bytes"
+
+        return _SpeechResponse()
+
+
+class _AsyncClient:
+    def __init__(self, *, response=None) -> None:
+        self.responses = _AsyncResponses(
+            response
+            or SimpleNamespace(
+                id="resp-async",
+                output_text="async answer",
+                output=[],
+                status="completed",
+                usage=SimpleNamespace(
+                    input_tokens=7,
+                    output_tokens=3,
+                    total_tokens=10,
+                ),
+            )
+        )
+        self.images = _AsyncImages()
+        self.audio = SimpleNamespace(speech=_AsyncSpeech())
+
+
+@pytest.mark.asyncio
+async def test_async_openai_transport_normalizes_response_and_releases_admission() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        timeout_seconds=5,
+        max_retries=0,
+        client=client,
+    )
+
+    response = await adapter.generate(
+        ProviderRequest(
+            instructions="answer safely",
+            prompt="hello async",
+            operation_id="async-provider-test",
+            execution_id="exec-async",
+            turn_id="turn-async",
+            max_output_tokens=64,
+        )
+    )
+
+    assert response.text == "async answer"
+    assert response.provider == "openai"
+    assert response.model == "test-model"
+    assert response.request_id == "resp-async"
+    assert response.response_id == "resp-async"
+    assert response.finish_reason is FinishReason.COMPLETED
+    assert response.usage.input_tokens == 7
+    assert response.usage.output_tokens == 3
+    assert response.governance_decision_id.startswith("gov-")
+    assert response.admission_decision_id.startswith("adm-")
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+    assert client.responses.calls == [
+        {
+            "model": "test-model",
+            "instructions": "answer safely",
+            "input": [{"role": "user", "content": "hello async"}],
+            "max_output_tokens": 64,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_async_openai_rejects_expired_deadline_before_client_call() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(ProviderInvocationError, match="deadline exceeded"):
+        await adapter.generate(
+            ProviderRequest(
+                instructions="answer safely",
+                prompt="expired",
+                operation_id="async-expired-provider-test",
+                deadline=datetime.now(timezone.utc) - timedelta(seconds=1),
+            )
+        )
+
+    assert client.responses.calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_openai_image_generation_is_governed_and_bounded() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    response = await adapter.generate_image(
+        ProviderImageRequest(
+            prompt="draw a bounded architecture diagram",
+            count=1,
+            size="512x512",
+            quality="medium",
+            model="gpt-image-test",
+            operation_id="image-generate-test",
+            tenant_id="tenant-a",
+            estimated_cost_usd=0.02,
+        )
+    )
+
+    assert response.provider == "openai"
+    assert response.model == "gpt-image-test"
+    assert response.request_id == "img-generate"
+    assert response.governance_decision_id.startswith("gov-")
+    assert response.admission_decision_id.startswith("adm-")
+    assert response.images[0]["format"] == "base64_png"
+    assert (
+        base64.b64decode(response.images[0]["data"])
+        == b"generated-image"
+    )
+    assert client.images.generate_calls == [
+        {
+            "model": "gpt-image-test",
+            "prompt": "draw a bounded architecture diagram",
+            "size": "512x512",
+            "quality": "medium",
+            "n": 1,
+            "response_format": "b64_json",
+        }
+    ]
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_openai_image_variation_and_edit_preserve_binary_boundaries() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    variation = await adapter.create_image_variation(
+        b"source-image",
+        count=2,
+        size="1024x1024",
+        tenant_id="tenant-a",
+        operation_id="image-variation-test",
+    )
+    edited = await adapter.edit_image(
+        b"source-image",
+        prompt="remove the background",
+        mask=b"mask-image",
+        size="512x512",
+        tenant_id="tenant-a",
+        operation_id="image-edit-test",
+    )
+
+    assert variation.model == "image-variation"
+    assert variation.request_id == "img-variation"
+    assert base64.b64decode(variation.images[0]["data"]) == b"variation-image"
+    variation_call = client.images.variation_calls[0]
+    assert variation_call["image"].name == "image.png"
+    assert variation_call["image"].getvalue() == b"source-image"
+    assert variation_call["n"] == 2
+    assert variation_call["size"] == "1024x1024"
+    assert variation_call["response_format"] == "b64_json"
+
+    assert edited.model == "image-edit"
+    assert edited.request_id == "img-edit"
+    assert base64.b64decode(edited.images[0]["data"]) == b"edited-image"
+    edit_call = client.images.edit_calls[0]
+    assert edit_call["image"].name == "image.png"
+    assert edit_call["image"].getvalue() == b"source-image"
+    assert edit_call["mask"].name == "mask.png"
+    assert edit_call["mask"].getvalue() == b"mask-image"
+    assert edit_call["prompt"] == "remove the background"
+    assert edit_call["size"] == "512x512"
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_openai_speech_normalizes_async_reader_and_usage() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    response = await adapter.synthesize_speech(
+        ProviderSpeechRequest(
+            text="bounded speech",
+            voice="nova",
+            speed=1.25,
+            model="tts-test",
+            response_format="wav",
+            operation_id="speech-test",
+            tenant_id="tenant-a",
+            estimated_cost_usd=0.01,
+        )
+    )
+
+    assert response.audio == b"speech-bytes"
+    assert response.provider == "openai"
+    assert response.model == "tts-test"
+    assert response.response_format == "wav"
+    assert response.request_id == "speech-request"
+    assert response.governance_decision_id.startswith("gov-")
+    assert response.admission_decision_id.startswith("adm-")
+    assert client.audio.speech.calls == [
+        {
+            "model": "tts-test",
+            "voice": "nova",
+            "input": "bounded speech",
+            "speed": 1.25,
+            "response_format": "wav",
+        }
+    ]
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_media_failure_releases_admission_lease() -> None:
+    class BadImages:
+        async def generate(self, **_kwargs):
+            return SimpleNamespace(
+                id="bad-image",
+                data=[SimpleNamespace(b64_json="not-base64", revised_prompt=None)],
+            )
+
+    client = _AsyncClient()
+    client.images = BadImages()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="invalid base64 payload",
+    ):
+        await adapter.generate_image(
+            ProviderImageRequest(
+                prompt="invalid image response",
+                operation_id="image-failure-test",
+            )
+        )
+
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+@pytest.mark.asyncio
+async def test_async_image_variation_rejects_unsupported_size_before_io() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="image variation size is unsupported",
+    ):
+        await adapter.create_image_variation(
+            b"source-image",
+            size="999x999",
+            operation_id="bad-variation-size",
+        )
+
+    assert client.images.variation_calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_image_edit_rejects_bad_mask_and_size_before_io() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="image edit mask must be non-empty bytes",
+    ):
+        await adapter.edit_image(
+            b"source-image",
+            prompt="edit",
+            mask="not-bytes",  # type: ignore[arg-type]
+            operation_id="bad-edit-mask",
+        )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="image edit size is unsupported",
+    ):
+        await adapter.edit_image(
+            b"source-image",
+            prompt="edit",
+            size="999x999",
+            operation_id="bad-edit-size",
+        )
+
+    assert client.images.edit_calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+
+@pytest.mark.asyncio
+async def test_async_speech_rejects_non_numeric_speed_before_io() -> None:
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+    )
+
+    with pytest.raises(
+        ProviderInvocationError,
+        match="speech provider speed is unsupported",
+    ):
+        await adapter.synthesize_speech(
+            ProviderSpeechRequest(
+                text="hello",
+                speed="fast",  # type: ignore[arg-type]
+                operation_id="bad-speech-speed",
+            )
+        )
+
+    assert client.audio.speech.calls == []
+    assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+@pytest.mark.asyncio
+async def test_provider_turn_admission_identity_allows_durable_multi_turn_quota() -> None:
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="window-provider-turns",
+            max_operations=4,
+            max_input_tokens=100_000,
+            max_output_tokens=100_000,
+            max_cost_usd=100.0,
+            max_tool_calls=100,
+            max_artifact_bytes=100 * 1024 * 1024,
+            max_storage_bytes=100 * 1024 * 1024,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+        admission_runtime=runtime,
+    )
+
+    parent_operation = "operation-parent"
+    first = await adapter.generate(
+        ProviderRequest(
+            instructions="answer",
+            prompt="turn one",
+            tenant_id="tenant-a",
+            operation_id=parent_operation,
+            admission_operation_id="provider-turn-one",
+        )
+    )
+    second = await adapter.generate(
+        ProviderRequest(
+            instructions="answer",
+            prompt="turn two",
+            tenant_id="tenant-a",
+            operation_id=parent_operation,
+            admission_operation_id="provider-turn-two",
+        )
+    )
+
+    assert first.text == "async answer"
+    assert second.text == "async answer"
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["completions"] == 2
+    assert snapshot["committed"]["operations"] == 2
+    assert runtime.snapshot()["active_operations"] == ()
+
+
+def test_provider_admission_identity_falls_back_to_parent_operation() -> None:
+    request = ProviderRequest(
+        instructions="answer",
+        prompt="legacy",
+        operation_id="legacy-operation",
+    )
+    assert request.admission_operation_id is None

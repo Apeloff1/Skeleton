@@ -16,6 +16,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
@@ -28,7 +29,7 @@ import random
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -43,7 +44,6 @@ async def list_therapeutic_interactions(limit: int = 30):
     return {"interactions": rows, "count": len(rows)}
 
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 mongo_client = _SHARED_MONGO_CLIENT  # consolidated → core.databases.client
 eq_db = mongo_client.codedock_jeeves_eq
 
@@ -519,7 +519,13 @@ async def get_therapeutic_response(
     # For intense negative emotions, use AI for more personalized response
     if intensity > 0.7 and emotional_state in ["frustrated", "overwhelmed", "discouraged"]:
         try:
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY)
+            chat = EngineChat(
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.jeeves-eq.support",
+                    version="1",
+                    instructions="Respond helpfully to the user request.",
+                )
+            )
             ai_prompt = f"""You are Jeeves, an emotionally intelligent AI tutor. The user is feeling {emotional_state} (intensity: {intensity}).
             
 Context: {context or 'Learning programming'}

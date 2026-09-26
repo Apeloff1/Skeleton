@@ -77,6 +77,7 @@ class TenantQuota:
     max_cost_usd: float = 100.0
     max_tool_calls: int = 10_000
     max_artifact_bytes: int = 10 * 1024 * 1024 * 1024
+    max_storage_bytes: int = 10 * 1024 * 1024 * 1024
     max_concurrent_operations: int = 32
 
     def __post_init__(self) -> None:
@@ -91,6 +92,7 @@ class TenantQuota:
             "max_output_tokens",
             "max_tool_calls",
             "max_artifact_bytes",
+            "max_storage_bytes",
         ):
             _nonnegative_int(getattr(self, field), field)
         _positive_int(
@@ -108,6 +110,7 @@ class QuotaUsage:
     cost_usd: float = 0.0
     tool_calls: int = 0
     artifact_bytes: int = 0
+    storage_bytes: int = 0
 
     def __post_init__(self) -> None:
         for field in (
@@ -116,6 +119,7 @@ class QuotaUsage:
             "output_tokens",
             "tool_calls",
             "artifact_bytes",
+            "storage_bytes",
         ):
             _nonnegative_int(getattr(self, field), field)
         _finite_nonnegative(self.cost_usd, "cost_usd")
@@ -136,6 +140,7 @@ class QuotaUsage:
             cost_usd=estimate.cost_usd,
             tool_calls=estimate.tool_calls,
             artifact_bytes=estimate.artifact_bytes,
+            storage_bytes=estimate.storage_bytes,
         )
 
     def plus(self, other: "QuotaUsage") -> "QuotaUsage":
@@ -146,6 +151,7 @@ class QuotaUsage:
             cost_usd=self.cost_usd + other.cost_usd,
             tool_calls=self.tool_calls + other.tool_calls,
             artifact_bytes=self.artifact_bytes + other.artifact_bytes,
+            storage_bytes=self.storage_bytes + other.storage_bytes,
         )
 
     def as_dict(self) -> dict[str, int | float]:
@@ -156,6 +162,7 @@ class QuotaUsage:
             "cost_usd": self.cost_usd,
             "tool_calls": self.tool_calls,
             "artifact_bytes": self.artifact_bytes,
+            "storage_bytes": self.storage_bytes,
         }
 
 
@@ -278,6 +285,8 @@ def _quota_excess(
         excess.append("tool_calls")
     if usage.artifact_bytes > quota.max_artifact_bytes:
         excess.append("artifact_bytes")
+    if usage.storage_bytes > quota.max_storage_bytes:
+        excess.append("storage_bytes")
     return tuple(excess)
 
 
@@ -333,6 +342,7 @@ class TenantQuotaLedger:
             cost_usd=max(left.cost_usd, right.cost_usd),
             tool_calls=max(left.tool_calls, right.tool_calls),
             artifact_bytes=max(left.artifact_bytes, right.artifact_bytes),
+            storage_bytes=max(left.storage_bytes, right.storage_bytes),
         )
 
     @staticmethod
@@ -421,6 +431,7 @@ class TenantQuotaLedger:
         *,
         max_tool_calls: int | None = None,
         max_artifact_bytes: int | None = None,
+        max_storage_bytes: int | None = None,
         now: float | None = None,
     ) -> QuotaUsageEvent:
         """Record one idempotent incremental actual-usage observation.
@@ -441,6 +452,7 @@ class TenantQuotaLedger:
         for field, value in (
             ("max_tool_calls", max_tool_calls),
             ("max_artifact_bytes", max_artifact_bytes),
+            ("max_storage_bytes", max_storage_bytes),
         ):
             if value is not None and (
                 isinstance(value, bool)
@@ -456,6 +468,7 @@ class TenantQuotaLedger:
             cost_usd=delta.cost_usd,
             tool_calls=delta.tool_calls,
             artifact_bytes=delta.artifact_bytes,
+            storage_bytes=delta.storage_bytes,
         )
 
         with self._lock:
@@ -494,6 +507,11 @@ class TenantQuotaLedger:
                 and prospective.artifact_bytes > max_artifact_bytes
             ):
                 raise QuotaExceeded("operation_budget_exceeded:artifact_bytes")
+            if (
+                max_storage_bytes is not None
+                and prospective.storage_bytes > max_storage_bytes
+            ):
+                raise QuotaExceeded("operation_budget_exceeded:storage_bytes")
 
             other_reserved = QuotaUsage()
             for other in matched_state.reservations.values():
@@ -600,6 +618,7 @@ class TenantQuotaLedger:
         *,
         max_tool_calls: int | None = None,
         max_artifact_bytes: int | None = None,
+        max_storage_bytes: int | None = None,
         now: float | None = None,
     ) -> QuotaUsageEvent:
         """Replace a durable unknown marker with a conservative measured charge."""
@@ -634,6 +653,7 @@ class TenantQuotaLedger:
                     delta,
                     max_tool_calls=max_tool_calls,
                     max_artifact_bytes=max_artifact_bytes,
+                    max_storage_bytes=max_storage_bytes,
                     now=now,
                 )
             except Exception:
@@ -747,6 +767,20 @@ class TenantQuotaLedger:
             matched_state.completions.append(completion)
             return completion
 
+    def completion_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaCompletion | None:
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            for completion in reversed(state.completions):
+                if completion.operation_id == operation:
+                    return completion
+            return None
+
     def snapshot(self, tenant_id: str) -> dict[str, Any]:
         tenant = _required_id(tenant_id, "tenant_id")
         with self._lock:
@@ -763,6 +797,7 @@ class TenantQuotaLedger:
                     "max_cost_usd": state.quota.max_cost_usd,
                     "max_tool_calls": state.quota.max_tool_calls,
                     "max_artifact_bytes": state.quota.max_artifact_bytes,
+                    "max_storage_bytes": state.quota.max_storage_bytes,
                     "max_concurrent_operations": state.quota.max_concurrent_operations,
                 },
                 "committed": state.committed.as_dict(),
@@ -785,6 +820,11 @@ class TenantQuotaLedger:
                         ),
                         "artifact_bytes": sum(
                             event.delta.artifact_bytes
+                            for event in state.usage_events.values()
+                            if event.category == category
+                        ),
+                        "storage_bytes": sum(
+                            event.delta.storage_bytes
                             for event in state.usage_events.values()
                             if event.category == category
                         ),

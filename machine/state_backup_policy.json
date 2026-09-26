@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "policy_version": "1.0.0",
+  "status": "active",
+  "title": "Skeleton Durable State Backup and Retention Policy",
+  "owner_plane": "data-persistence",
+  "topology_contract": "machine/state_topology.json",
+  "source_root": "/app/data",
+  "objective": "Create verifiable, retention-governed backups of authoritative SQLite state before destructive change and on the operator backup cadence, without treating derived projections as canonical authority.",
+  "invariants": [
+    "authoritative SQLite files are backed up with SQLite online backup semantics rather than filesystem copy while live",
+    "a backup is not valid until every required store passes SQLite integrity_check and its manifest digest is recorded",
+    "restore verification precedes operation outbox reconciliation, engine execution recovery, governance actions and derived projection rebuild",
+    "a newer verified backup must exist before retention pruning can remove an older verified backup",
+    "backup manifests contain no provider credentials or application secrets"
+  ],
+  "stores": [
+    {
+      "id": "operation-state",
+      "file": "operation_state.sqlite",
+      "required": true,
+      "authority": "authoritative",
+      "restore_order": 10,
+      "retention_class": "operational-authority",
+      "post_restore": "verify operation identity/state/version and pending outbox identity, then reconcile outbox"
+    },
+    {
+      "id": "engine-execution",
+      "file": "engine_execution.sqlite",
+      "required": true,
+      "authority": "authoritative",
+      "restore_order": 20,
+      "retention_class": "cognitive-authority",
+      "post_restore": "verify execution/turn/checkpoint/result identity and recover resumable executions"
+    },
+    {
+      "id": "engine-submissions",
+      "file": "engine_submissions.sqlite",
+      "required": true,
+      "authority": "authoritative",
+      "restore_order": 30,
+      "retention_class": "cognitive-authority",
+      "post_restore": "verify idempotent submission acknowledgements and approval bindings"
+    },
+    {
+      "id": "engine-tool-receipts",
+      "file": "engine_tool_receipts.sqlite",
+      "required": true,
+      "authority": "authoritative",
+      "restore_order": 40,
+      "retention_class": "cognitive-authority",
+      "post_restore": "preserve committed and in-doubt tool idempotency fences before replay"
+    },
+    {
+      "id": "engine-quota",
+      "file": "engine_quota.sqlite",
+      "required": true,
+      "authority": "authoritative",
+      "restore_order": 50,
+      "retention_class": "capacity-authority",
+      "post_restore": "verify reservations/completions/usage before admitting new engine work"
+    },
+    {
+      "id": "engine-pressure",
+      "file": "engine_pressure.sqlite",
+      "required": true,
+      "authority": "coordination-authority",
+      "restore_order": 60,
+      "retention_class": "capacity-authority",
+      "post_restore": "reconfigure policy and reap expired leases before admission"
+    },
+    {
+      "id": "governance-lifecycle",
+      "file": "governance_lifecycle.sqlite",
+      "required": true,
+      "authority": "authoritative",
+      "restore_order": 70,
+      "retention_class": "governance-authority",
+      "post_restore": "validate lifecycle schema and outstanding deletion/export state before governance actions"
+    },
+    {
+      "id": "operation-stream",
+      "file": "operation_stream.sqlite",
+      "required": false,
+      "authority": "durable-projection",
+      "restore_order": 80,
+      "retention_class": "replay-projection",
+      "post_restore": "reopen replay state and reconcile unpublished authoritative operation outbox rows"
+    }
+  ],
+  "backup_triggers": [
+    "operator-scheduled production backup",
+    "before destructive schema migration",
+    "before state-store replacement or volume migration",
+    "before rollback-sensitive engine release"
+  ],
+  "retention": {
+    "minimum_verified_snapshots": 7,
+    "minimum_age_days_before_prune": 14,
+    "preserve_latest_pre_migration_snapshot": true,
+    "prune_requires_newer_verified_snapshot": true
+  },
+  "manifest": {
+    "format": "state-backup-manifest.v1",
+    "required_fields": [
+      "schema_version",
+      "created_at",
+      "policy_version",
+      "source_root",
+      "stores",
+      "bundle_digest"
+    ],
+    "per_store_evidence": [
+      "file",
+      "required",
+      "sqlite_integrity",
+      "size_bytes",
+      "sha256",
+      "snapshot_digest"
+    ]
+  },
+  "restore_gate": {
+    "required_sequence": [
+      "restore required authoritative stores",
+      "verify SQLite integrity and manifest digests",
+      "verify canonical identity/version/fence invariants",
+      "reconcile authoritative outboxes and recover resumable executions",
+      "restore or rebuild durable projections",
+      "rebuild disposable retrieval/vector/cache projections",
+      "admit normal traffic"
+    ],
+    "fail_closed_on": [
+      "missing required backup",
+      "digest mismatch",
+      "SQLite integrity failure",
+      "unsupported manifest schema",
+      "canonical identity/version/fence mismatch"
+    ]
+  },
+  "evidence": [
+    "scripts/state_backup_bundle.py",
+    "scripts/state_recovery_drill.py",
+    "skeleton/testing/test_state_backup_bundle.py",
+    "skeleton/testing/test_state_recovery_drill.py",
+    ".github/workflows/state-recovery-drill.yml",
+    "machine/state_topology.json"
+  ]
+}

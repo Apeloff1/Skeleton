@@ -14,11 +14,8 @@ import re
 from typing import Any, List
 
 from core.engine_client import EngineClient, EngineClientError
-from core.engine_text import (
-    EngineTextError,
-    EngineTextRequest,
-    execute_engine_text,
-)
+from core.engine_chat import EngineChat, EngineTextError, UserMessage
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 def _llm_provider_enum():
@@ -42,7 +39,7 @@ class AIHubService:
             raise ValueError(
                 "local provider registry injection is disabled; use the canonical engine"
             )
-        self._engine_executor = engine_executor or execute_engine_text
+        self._engine_executor = engine_executor
         self.providers = self._provider_snapshot()
 
     @property
@@ -98,6 +95,8 @@ class AIHubService:
         *,
         instructions: str,
         prompt: str,
+        policy_id: str,
+        policy_version: str = "1",
         max_output_tokens: int | None = None,
         verification_profile: str = "assistant_proposal",
     ) -> str:
@@ -105,6 +104,8 @@ class AIHubService:
             {
                 "instructions": instructions,
                 "prompt": prompt,
+                "policy_id": policy_id,
+                "policy_version": policy_version,
                 "max_output_tokens": max_output_tokens,
                 "verification_profile": verification_profile,
             },
@@ -112,18 +113,25 @@ class AIHubService:
             separators=(",", ":"),
             ensure_ascii=False,
         ).encode("utf-8")
-        response = await self._engine_executor(
-            EngineTextRequest(
-                instructions=instructions,
-                prompt=prompt,
-                idempotency_key=(
-                    "ai-hub:" + hashlib.sha256(material).hexdigest()
-                ),
-                actor_id="ai-hub",
-                capability="assistant.compat",
-                verification_profile=verification_profile,
-                max_output_tokens=max_output_tokens,
-            )
+        policy = InstructionPolicy(
+            policy_id=policy_id,
+            version=policy_version,
+            instructions=instructions,
+        )
+        chat = EngineChat(
+            session_id=(
+                "ai-hub:" + hashlib.sha256(material).hexdigest()
+            ),
+            instruction_policy=policy,
+            actor_id="ai-hub",
+            capability="assistant.compat",
+            verification_profile=verification_profile,
+            engine_executor=self._engine_executor,
+        )
+        if max_output_tokens is not None:
+            chat.with_max_tokens(max_output_tokens)
+        response = await chat.send_message(
+            UserMessage(text=prompt)
         )
         return response.text
 
@@ -161,6 +169,7 @@ class AIHubService:
             response = await self._generate(
                 instructions=instructions,
                 prompt=prompt,
+                policy_id="backend.ai-hub.feature-suggestions",
                 max_output_tokens=1800,
             )
         except EngineTextError:
@@ -231,6 +240,7 @@ class AIHubService:
             response = await self._generate(
                 instructions=instructions,
                 prompt=prompt,
+                policy_id="backend.ai-hub.sota-analysis",
                 max_output_tokens=2200,
                 verification_profile="evidence_required",
             )
@@ -269,6 +279,7 @@ class AIHubService:
             response = await self._generate(
                 instructions=instructions,
                 prompt=prompt,
+                policy_id="backend.ai-hub.implementation-plan",
                 max_output_tokens=2600,
             )
         except EngineTextError:

@@ -740,6 +740,135 @@ class DataLifecycleRegistry:
                 persist=True,
             )
 
+    def pending_deletion_plan(
+        self,
+        plan_id: str,
+        *,
+        tenant_id: str | None = None,
+    ) -> DeletionPlan:
+        """Return only unacknowledged actions for a durable deletion plan.
+
+        This is the retry/reconciliation read boundary for distributed physical
+        owners. It never creates, merges, or mutates a plan.
+        """
+
+        plan_key = _required_id(plan_id, "plan_id")
+        tenant = (
+            None
+            if tenant_id is None
+            else _required_id(tenant_id, "tenant_id")
+        )
+        with self._lock:
+            try:
+                plan = self._plans[plan_key]
+            except KeyError as exc:
+                raise LifecycleError("unknown deletion plan") from exc
+            if tenant is not None and plan.tenant_id != tenant:
+                raise DataGovernanceDenied(
+                    "cross-tenant deletion plan access denied"
+                )
+
+            outstanding: list[DeletionAction] = []
+            for action in plan.actions:
+                try:
+                    entry = self._entries[action.record_id]
+                except KeyError as exc:
+                    raise LifecycleError(
+                        "deletion plan references unknown lifecycle record"
+                    ) from exc
+                if entry.record.tenant_id != plan.tenant_id:
+                    raise LifecycleError(
+                        "deletion plan lifecycle tenant mismatch"
+                    )
+                if entry.active_plan_id != plan.plan_id:
+                    if entry.state is LifecycleState.DELETED:
+                        continue
+                    raise LifecycleConflict(
+                        "deletion plan is not active for lifecycle record"
+                    )
+                if action.target in entry.acknowledged_targets:
+                    continue
+                outstanding.append(action)
+
+            return DeletionPlan(
+                plan_id=plan.plan_id,
+                tenant_id=plan.tenant_id,
+                reason=plan.reason,
+                actions=tuple(outstanding),
+                created_at=plan.created_at,
+            )
+
+    def plan_retention_expiry_for_tenant(
+        self,
+        tenant_id: str,
+        *,
+        now: float | None = None,
+    ) -> DeletionPlan | None:
+        """Create one durable retention plan for an authorized tenant only."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        timestamp = (
+            time.time()
+            if now is None
+            else _finite_timestamp(now, "now")
+        )
+        with self._lock:
+            active_retention_plan_ids = {
+                entry.active_plan_id
+                for entry in self._entries.values()
+                if entry.record.tenant_id == tenant
+                and entry.state is LifecycleState.DELETE_PENDING
+                and entry.active_plan_id is not None
+                and self._plans.get(entry.active_plan_id) is not None
+                and self._plans[entry.active_plan_id].reason
+                == "retention-expired"
+            }
+            if active_retention_plan_ids:
+                if len(active_retention_plan_ids) != 1:
+                    raise LifecycleConflict(
+                        "tenant has multiple active retention plans"
+                    )
+                active_plan_id = next(iter(active_retention_plan_ids))
+                existing = self._plans[active_plan_id]
+                outstanding: list[DeletionAction] = []
+                for action in existing.actions:
+                    entry = self._entries.get(action.record_id)
+                    if (
+                        entry is None
+                        or entry.record.tenant_id != tenant
+                        or entry.active_plan_id != active_plan_id
+                    ):
+                        continue
+                    if action.target in entry.acknowledged_targets:
+                        continue
+                    outstanding.append(action)
+                return DeletionPlan(
+                    plan_id=existing.plan_id,
+                    tenant_id=existing.tenant_id,
+                    reason=existing.reason,
+                    actions=tuple(outstanding),
+                    created_at=existing.created_at,
+                )
+
+            entries = [
+                entry
+                for entry in self._entries.values()
+                if entry.record.tenant_id == tenant
+                and entry.state is LifecycleState.ACTIVE
+                and entry.record.retention_until is not None
+                and entry.record.retention_until <= timestamp
+            ]
+            if not entries:
+                return None
+            plan = self._plan(
+                entries,
+                tenant_id=tenant,
+                reason="retention-expired",
+                now=timestamp,
+                persist=True,
+            )
+            return plan
+
     def plan_retention_expiry(
         self,
         *,

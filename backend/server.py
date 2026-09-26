@@ -2432,7 +2432,15 @@ async def lifespan(app: FastAPI):
             await asyncio.wait_for(db.content_appeals.create_index("appeal_id", unique=True), timeout=10)
             await asyncio.wait_for(db.content_appeals.create_index([("status", 1), ("created_at", -1)]), timeout=10)
             from core.conversations import conversation_authority
-            await asyncio.wait_for(conversation_authority.ensure_indexes(), timeout=10)
+            from core.canonical_memory import ensure_canonical_memory_indexes
+            await asyncio.wait_for(
+                conversation_authority.ensure_indexes(),
+                timeout=10,
+            )
+            await asyncio.wait_for(
+                ensure_canonical_memory_indexes(),
+                timeout=10,
+            )
             logger.info("MongoDB indexes created successfully")
         except asyncio.TimeoutError:
             logger.warning("MongoDB index creation timed out - indexes will be created on first use")

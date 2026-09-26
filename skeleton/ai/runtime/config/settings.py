@@ -79,6 +79,26 @@ class EngineSettings(BaseSettings):
     execution_state_path: str = ":memory:"
     submission_state_path: str = ":memory:"
     tool_receipt_path: str = ":memory:"
+    quota_state_path: str = ":memory:"
+    quota_window_id: str = "engine-default"
+    quota_max_operations: int = Field(default=100_000, ge=1)
+    quota_max_input_tokens: int = Field(default=100_000_000, ge=1)
+    quota_max_output_tokens: int = Field(default=50_000_000, ge=1)
+    quota_max_cost_usd: float = Field(default=10_000.0, gt=0.0)
+    quota_max_tool_calls: int = Field(default=1_000_000, ge=1)
+    quota_max_artifact_bytes: int = Field(default=10 * 1024**3, ge=1)
+    quota_max_storage_bytes: int = Field(default=10 * 1024**3, ge=1)
+    quota_max_concurrent_operations: int = Field(default=256, ge=1)
+    pressure_state_path: str = ":memory:"
+    pressure_scope: str = "engine-ai"
+    pressure_owner_id: str = "skeleton-engine"
+    pressure_max_concurrency: int = Field(default=32, ge=1)
+    pressure_max_queue_depth: int = Field(default=1_000, ge=1)
+    pressure_max_tenant_concurrency: int = Field(default=32, ge=1)
+    pressure_max_tenant_queue_depth: int = Field(default=1_000, ge=1)
+    pressure_soft_shed_fraction: float = Field(default=0.8, gt=0.0, le=1.0)
+    pressure_protect_priority_at_or_below: int = Field(default=10, ge=0, le=100)
+    pressure_lease_seconds: float = Field(default=120.0, gt=0.0, le=86_400.0)
     service_token: SecretStr = Field(default=SecretStr(""), repr=False)
     service_principal: str = "codedock-backend"
     allowed_tenants_csv: str = "*"
@@ -182,6 +202,10 @@ class Settings(BaseSettings):
             "engine_execution_state_path": self.engine.execution_state_path,
             "engine_submission_state_path": self.engine.submission_state_path,
             "engine_tool_receipt_path": self.engine.tool_receipt_path,
+            "engine_quota_state_path": self.engine.quota_state_path,
+            "engine_quota_window_id": self.engine.quota_window_id,
+            "engine_pressure_state_path": self.engine.pressure_state_path,
+            "engine_pressure_scope": self.engine.pressure_scope,
         }
 
 

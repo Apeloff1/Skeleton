@@ -116,12 +116,18 @@ class LlmChat:
         return str(text)
 
     def _idempotency_key(self, prompt: str) -> str:
+        instructions = (
+            self.system_message.strip()
+            or "Respond helpfully to the user request."
+        )
         material = json.dumps(
             {
                 "session_id": self.session_id,
                 "turn_index": len(self._history),
                 "prompt": prompt,
                 "history": self._history,
+                "instructions": instructions,
+                "max_output_tokens": self._max_output_tokens,
             },
             sort_keys=True,
             separators=(",", ":"),

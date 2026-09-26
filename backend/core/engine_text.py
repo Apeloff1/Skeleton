@@ -13,6 +13,7 @@ import hashlib
 from typing import Mapping, Sequence
 from uuid import NAMESPACE_URL, uuid5
 
+from core.route_privacy import require_route_provider_transfer
 from core.engine_client import (
     EngineClient,
     EngineClientError,
@@ -27,6 +28,7 @@ from skeleton.contracts.context import (
 )
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
+from skeleton.vault.data_governance import DataGovernanceDenied
 
 
 class EngineTextError(RuntimeError):
@@ -51,6 +53,8 @@ class EngineTextRequest:
     instructions: str
     prompt: str
     idempotency_key: str
+    instruction_policy_id: str | None = None
+    instruction_policy_version: str | None = None
     history: tuple[Mapping[str, str], ...] = ()
     tenant_id: str = "default"
     actor_id: str = "backend-ai"
@@ -76,6 +80,35 @@ class EngineTextRequest:
             "idempotency_key",
             _text(self.idempotency_key, "idempotency_key", maximum=1024),
         )
+        policy_identity = (
+            self.instruction_policy_id,
+            self.instruction_policy_version,
+        )
+        if any(value is not None for value in policy_identity) and not all(
+            value is not None for value in policy_identity
+        ):
+            raise EngineTextError(
+                "instruction policy id and version must be supplied together"
+            )
+        if self.instruction_policy_id is not None:
+            object.__setattr__(
+                self,
+                "instruction_policy_id",
+                _text(
+                    self.instruction_policy_id,
+                    "instruction_policy_id",
+                    maximum=256,
+                ),
+            )
+            object.__setattr__(
+                self,
+                "instruction_policy_version",
+                _text(
+                    self.instruction_policy_version,
+                    "instruction_policy_version",
+                    maximum=64,
+                ),
+            )
         object.__setattr__(
             self,
             "tenant_id",
@@ -163,8 +196,11 @@ def _policy(request: EngineTextRequest) -> InstructionPolicy:
         request.instructions.encode("utf-8")
     ).hexdigest()
     return InstructionPolicy(
-        policy_id="backend.engine.compat." + digest[:24],
-        version="1",
+        policy_id=(
+            request.instruction_policy_id
+            or ("backend.engine.compat." + digest[:24])
+        ),
+        version=request.instruction_policy_version or "1",
         instructions=request.instructions,
     )
 
@@ -255,6 +291,18 @@ async def execute_engine_text(
 
     if not isinstance(request, EngineTextRequest):
         raise TypeError("request must be EngineTextRequest")
+    try:
+        require_route_provider_transfer(
+            provider_id="skeleton-engine",
+            data_class=request.data_class,
+            purpose=request.purpose,
+            tenant_id=request.tenant_id,
+            source="backend.engine_text",
+        )
+    except DataGovernanceDenied as exc:
+        raise EngineTextError(
+            "route privacy denied engine text request"
+        ) from exc
     active_client = client
     if active_client is None:
         try:
