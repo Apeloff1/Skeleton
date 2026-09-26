@@ -358,7 +358,12 @@
         "backend/gameforge/jeeves/chat_contract.py",
         "backend/routes/jeeves_compose.py",
         "tests/test_jeeves_chat_workspace.py",
-        "frontend/src/product/conversationClient.ts"
+        "frontend/src/product/conversationClient.ts",
+        "backend/routes/ai.py rejects caller conversation_history and compiles server-owned canonical thread transcript through ContextCompiler",
+        "backend/routes/jeeves_compose.py routes generative escalation through EngineTextRequest/execute_engine_text rather than provider SDKs or credentials",
+        "backend/routes/jeeves_compose.py ignores caller-supplied history for retrieval, prompting and persistence even when server storage is empty or unavailable",
+        "tests/test_jeeves_chat_workspace.py proves server transcript wins over conflicting client history, legacy history is model-invisible, and canonical-engine delegation keeps conversation context out of trusted instructions",
+        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -373,20 +378,22 @@
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
       "outstanding_evidence": [
-        "new-thread and multi-turn continuation tests",
-        "client cannot inject hidden prior assistant/system messages as canonical history",
-        "cross-tenant/thread authorization denial",
-        "duplicate message idempotency test",
-        "ordered pagination and concurrent append test",
-        "edit/regenerate branch lineage test",
-        "assistant message binds to one operation and final execution result",
-        "conversation deletion/export propagation test",
-        "context projection preserves selected message/citation/tool provenance",
-        "browser refresh/reconnect reconstructs the same canonical transcript"
+        "Jeeves compatibility-store cutover to canonical ConversationThread/ConversationMessage authority",
+        "regenerate execution-to-result-to-canonical-branch validation",
+        "conversation deletion/export/retention propagation test",
+        "browser refresh/reconnect reconstruction test",
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-governance-registry",
+        "fresh exact-head validation and independent closure verification"
       ],
       "blockers": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry"
+        "Jeeves compatibility-store cutover to canonical ConversationThread/ConversationMessage authority",
+        "regenerate execution-to-result-to-canonical-branch validation",
+        "conversation deletion/export/retention propagation test",
+        "browser refresh/reconnect reconstruction test",
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-governance-registry",
+        "fresh exact-head validation and independent closure verification"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
