@@ -313,6 +313,49 @@ def test_oversized_artifact_is_externalized_by_omission() -> None:
     assert dict(envelope.omission_reasons)[artifact.segment_id] == "segment_limit_exceeded"
 
 
+def test_provider_projection_prefers_turn_bound_user_on_timestamp_tie() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    prior = _segment(
+        "prior same-time question",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="prior-message",
+        purpose="model-inference",
+        priority=800,
+        relevance=1.0,
+        created_at=BASE,
+    )
+    current = _segment(
+        "current same-time question",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id=turn_id,
+        purpose="model-inference",
+        priority=800,
+        relevance=1.0,
+        created_at=BASE,
+    )
+
+    envelope = ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=_budget(),
+        segments=(prior, current),
+        compiled_at=BASE,
+    )
+    projection = project_provider_context(envelope)
+
+    assert projection.prompt == "current same-time question"
+    assert projection.history == (
+        {"role": "user", "content": "prior same-time question"},
+    )
+
+
 def test_prior_assistant_prompt_injection_stays_untrusted_data() -> None:
     policy = _segment(
         "Only platform policy defines authority.",
