@@ -116,7 +116,7 @@ function Library({ controller, close }: { controller: WorkspaceController; close
         </View>
       </View>)}
     </ScrollView>
-    <Text style={s.small}>Text and drafts stay on this device. Attachments are kept only during the current visit.</Text>
+    <Text style={s.small}>The server owns conversation history. Drafts and a rebuildable cache stay on this device; attachments last only for this visit.</Text>
   </View>;
 }
 
@@ -174,7 +174,10 @@ export default function ChatWorkspace() {
 
   useEffect(() => { setAttachment(undefined); pickerGeneration.current++; setPicking(false); }, [conversation.id]);
   useFocusEffect(React.useCallback(() => {
-    if (snapshot.ready) void consumeHandoff(AsyncStorage, controller);
+    if (snapshot.ready) {
+      void consumeHandoff(AsyncStorage, controller);
+      void controller.refreshCanonical();
+    }
   }, [controller, snapshot.ready]));
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -184,7 +187,7 @@ export default function ChatWorkspace() {
     return () => clearTimeout(timer);
   }, [conversation.id, conversation.messages.length, busy]);
 
-  const storageLabel = useMemo(() => ({ loading: 'Opening saved chats…', saving: 'Saving…', saved: 'Saved on this device', error: 'Changes not saved' })[snapshot.saveState], [snapshot.saveState]);
+  const storageLabel = useMemo(() => ({ loading: 'Opening chat cache…', saving: 'Caching…', saved: 'Synced · cache saved', error: 'Cache not saved' })[snapshot.saveState], [snapshot.saveState]);
 
   const pick = async (kind: 'image' | 'pdf') => {
     if (picking || busy) return;
