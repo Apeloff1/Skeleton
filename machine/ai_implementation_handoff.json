@@ -245,7 +245,7 @@
       "depends_on": [],
       "work_package": "WP-P0-PROVIDER-SURFACES",
       "blueprint": "provider_surface_convergence_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_verification",
       "objective": "One mandatory receipt semantics across every credential-bearing AI edge.",
       "target_files": {
         "contracts": [
@@ -306,13 +306,14 @@
         "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation",
         "skeleton/testing/test_provider_contract.py exercises async text, image generation/variation/editing and speech through canonical OpenAIProviderAdapter",
         "skeleton/provider_runtime.py rejects malformed media size/mask/speed before client I/O",
-        "skeleton/testing/test_provider_contract.py proves provider media failure releases active admission"
+        "skeleton/testing/test_provider_contract.py proves provider media failure releases active admission",
+        ".github/workflows/provider-surface-closure.yml exact-head closure gate",
+        "scripts/check_provider_bootstrap.py exact-head provider inventory receipt",
+        "closure gate covers SDK/network isolation, canonical async/media regressions, stream reliability and engine cross-service isolation"
       ],
       "remaining": [
-        "collect exact-head provider-surface inventory and SDK/network isolation evidence",
-        "verify all application isolation surfaces remain credential-free",
-        "independent signoff and canonical gap closure",
-        "collect fresh exact-head async/sync/media regression evidence"
+        "collect fresh exact-head Provider Surface Closure Gate evidence",
+        "obtain independent provider-surface closure verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
