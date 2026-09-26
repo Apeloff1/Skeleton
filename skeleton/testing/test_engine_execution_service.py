@@ -31,6 +31,10 @@ from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.vault.data_lifecycle import DataLifecycleRegistry
 from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+)
 from skeleton.provider_contract import ProviderToolCall
 from skeleton.skills.tool_contract import (
     ToolExecutionRequest,
@@ -1392,6 +1396,81 @@ def _governed_service(tmp_path):
         governance_registry=governance,
     )
     return service, governance
+
+
+class _RecordingDeletionAdapter:
+    def __init__(self) -> None:
+        self.deleted = []
+
+    async def delete(self, action) -> None:
+        self.deleted.append((action.record_id, action.target))
+
+
+@pytest.mark.asyncio
+async def test_external_governance_engine_execution_skips_conversation_owner(
+    tmp_path,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    adapters = LifecycleAdapterRegistry()
+    memory_adapter = _RecordingDeletionAdapter()
+    adapters.register_deletion("memory", memory_adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-linked.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "submissions-linked.sqlite3"),
+        _registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:governance",
+            )
+        ),
+        governance_registry=governance,
+        governance_lifecycle_executor=executor,
+    )
+    governance.register_canonical_write(
+        "conversation",
+        record_id="thread-linked",
+        tenant_id="tenant-a",
+        source_ref="conversation-thread://thread-linked",
+        data_class="confidential",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=10.0,
+    )
+    governance.register_canonical_write(
+        "memory",
+        record_id="memory-linked",
+        tenant_id="tenant-a",
+        source_ref="memory://assistant/memory-linked",
+        data_class="confidential",
+        purposes=("assistant-memory",),
+        deletion_targets=("memory",),
+        created_at=10.0,
+    )
+    plan = service.request_external_governance_deletion(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        record_ids=("thread-linked", "memory-linked"),
+    )
+
+    result = await service.execute_external_governance_engine_targets(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        plan_id=plan["plan_id"],
+    )
+
+    assert result["executed_targets"] == ["memory"]
+    assert memory_adapter.deleted == [("memory-linked", "memory")]
+    pending = lifecycle.pending_deletion_plan(
+        plan["plan_id"],
+        tenant_id="tenant-a",
+    )
+    assert [
+        (action.record_id, action.target)
+        for action in pending.actions
+    ] == [("thread-linked", "conversation")]
 
 
 def test_external_governance_deletion_plan_ack_and_inventory_are_tenant_fenced(
