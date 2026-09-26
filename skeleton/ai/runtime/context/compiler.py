@@ -485,6 +485,11 @@ def project_provider_context(
             candidates,
             key=lambda segment: (
                 segment.created_at.timestamp(),
+                (
+                    _conversation_sequence(segment)
+                    if _conversation_sequence(segment) is not None
+                    else -1
+                ),
                 segment.priority,
                 segment.relevance,
                 segment.segment_id,
