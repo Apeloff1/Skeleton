@@ -1700,7 +1700,7 @@
       "plane": "application-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical ConversationThread/ConversationMessage authority, Mongo persistence, first-class APIs, server-owned chat context compilation, stable retry identity, Jeeves one-time legacy import, canonical engine-backed regeneration, governed delete/export, and browser refresh/reconnect reconstruction are implemented. Remaining functional convergence is retention/reference propagation across conversation-linked artifacts, memory projections and summaries, followed by declared dependency and exact-head closure evidence.",
+      "gap": "Canonical ConversationThread/ConversationMessage authority, Mongo persistence, first-class APIs, server-owned chat context compilation, stable retry identity, Jeeves one-time legacy import, canonical engine-backed regeneration, first-class tool/memory/evidence/artifact lineage, split-owner governed delete/export, and browser refresh/reconnect reconstruction are implemented. Remaining functional convergence is automatic retention-expiry propagation, followed by declared dependency and exact-head closure evidence.",
       "construction": [
         "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
         "persist thread/message authority in backend core Mongo rather than client memory or provider history",
@@ -1725,7 +1725,7 @@
         "context projection preserves selected message/citation/tool provenance",
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
-      "verification_state": "canonical-cutover-regenerate-refresh-delete-export-implemented-retention-closure-open",
+      "verification_state": "canonical-cutover-regenerate-refresh-lineage-delete-export-implemented-retention-expiry-open",
       "progress": {
         "state": "in_progress",
         "completed": [
@@ -1752,10 +1752,15 @@
           "governed conversation delete physically removes payload before lifecycle acknowledgement",
           "governed conversation export is tenant-scoped and registry-driven",
           "WorkspaceController remount and refresh reconstruct completed transcript from canonical server history",
-          "device-local transcript never becomes provider/model context authority"
+          "device-local transcript never becomes provider/model context authority",
+          "assistant messages persist first-class tool, memory, evidence and artifact references from engine terminal results",
+          "SQLite and Mongo canonical conversation paths preserve memory lineage",
+          "thread-scoped governance selection includes only canonical conversation rows and explicitly referenced lifecycle records",
+          "engine-owned linked lifecycle targets execute before backend-owned physical conversation deletion",
+          "conversation deletion claims completion only after cross-plane propagation succeeds"
         ],
         "remaining": [
-          "complete retention/reference propagation across conversation-linked artifacts, memory projections and summaries",
+          "execute automatic retention-expiry propagation for canonical conversation rows and explicitly linked governed records",
           "close gap-state-authority-convergence and gap-governance-registry",
           "collect fresh exact-head Conversation Authority Closure Gate and independent verifier evidence"
         ]
