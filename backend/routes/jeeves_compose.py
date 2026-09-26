@@ -18,11 +18,9 @@ from typing import Annotated, Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from core.engine_text import (
-    EngineTextError,
-    EngineTextRequest,
-    execute_engine_text,
-)
+from core.engine_chat import EngineChat, UserMessage
+from core.engine_text import EngineTextError
+from skeleton.context.instruction_policy import InstructionPolicy
 from gameforge.jeeves.free_tier import free_tier
 from gameforge.jeeves import artifacts as ART
 from gameforge.jeeves.chat_contract import (
@@ -35,6 +33,16 @@ from gameforge.jeeves.chat_contract import (
 router = APIRouter(prefix="/api/jeeves", tags=["jeeves"])
 
 _ALL_FORMS = ["text", "pdf", "spreadsheet", "charts", "graph", "visual"]
+
+JEEVES_CHAT_POLICY = InstructionPolicy(
+    policy_id="backend.jeeves.chat",
+    version="1",
+    instructions=(
+        "You are Jeeves, the GameForge master orchestrator. "
+        "Answer grounded in the supplied canon; cite [n] when grounding "
+        "is available. Be precise."
+    ),
+)
 
 
 # ── shared helpers ─────────────────────────────────────────────
@@ -97,21 +105,14 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
         (query + "\x1f" + prompt).encode("utf-8")
     ).hexdigest()
     try:
-        response = await execute_engine_text(
-            EngineTextRequest(
-                instructions=(
-                    "You are Jeeves, the GameForge master orchestrator. "
-                    "Answer grounded in the supplied canon; cite [n] when "
-                    "grounding is available. Be precise."
-                ),
-                prompt=prompt,
-                idempotency_key="jeeves-chat:" + identity,
-                instruction_policy_id="backend.jeeves.chat",
-                instruction_policy_version="1",
-                actor_id="jeeves-compose",
-                capability="assistant.compat",
-                max_output_tokens=8_192,
-            )
+        chat = EngineChat(
+            session_id="jeeves-" + identity[:24],
+            instruction_policy=JEEVES_CHAT_POLICY,
+            actor_id="jeeves-compose",
+            capability="assistant.compat",
+        ).with_max_tokens(8_192)
+        response = await chat.send_message(
+            UserMessage(text=prompt)
         )
         return {
             "text": response.text,
