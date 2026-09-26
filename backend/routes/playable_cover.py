@@ -28,7 +28,7 @@ router = APIRouter(prefix="/api/playable", tags=["playable"])
 async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
     """Generate ONE square concept-art cover for a game via Gemini Nano Banana.
     Returns a base64 PNG string (no data: prefix) or None on failure."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     from core.render_quality import PHOTOREAL_SUFFIX, upscale_b64
     if not EMERGENT_LLM_KEY:
         return None
@@ -39,7 +39,7 @@ async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
         "rich depth. No text, no words, no logos, no watermark, no UI." + PHOTOREAL_SUFFIX
     )
     try:
-        chat = (LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"cover-{uuid.uuid4().hex[:8]}",
+        chat = (EngineChat(api_key=EMERGENT_LLM_KEY, session_id=f"cover-{uuid.uuid4().hex[:8]}",
                         system_message="You are a AAA game concept artist creating cover key art.")
                 .with_model("gemini", "gemini-3.1-flash-image-preview")
                 .with_params(modalities=["image", "text"]))
