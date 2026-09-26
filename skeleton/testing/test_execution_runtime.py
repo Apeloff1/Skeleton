@@ -1043,4 +1043,3 @@ async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -
     for _resource_id, _write_id, payload, meter_now in events:
         assert payload is not None
         assert meter_now == _now()
-
