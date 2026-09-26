@@ -12,6 +12,7 @@ Workflow:
 Also exposes per-user class-progress tracking for "continue reading" UX.
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 import logging
 from fastapi import APIRouter, HTTPException, Body
 from typing import Optional
@@ -330,14 +331,20 @@ async def auto_quiz_from_chapter(payload: dict = Body(...)):
         dna_block = translate_dna(mastery_dna, ACADEMY_DOMAIN)
         dna_injection = f"\n\n{dna_block}" if dna_block else ""
         chat = (
-            EngineChat(session_id=f"quiz-{uuid.uuid4().hex[:8]}",
-                    system_message=(
+            EngineChat(
+                session_id=f"quiz-{uuid.uuid4().hex[:8]}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.reading-content.quiz-generation",
+                    version="1",
+                    instructions=(
                         "You are an expert technical examiner. Given a chapter of educational text, "
                         "produce a JSON array of 5 multiple-choice questions that test comprehension "
                         "and applied understanding. Each question must have exactly 4 options, an "
                         "answer_idx (0-3), and a one-sentence explanation. Output ONLY the JSON array."
                         f"{dna_injection}"
-                    ))
+                    ),
+                ),
+            )
             .with_model("openai", "gpt-4o-mini")
         )
         msg = UserMessage(text=(
