@@ -9,6 +9,7 @@ import pytest
 from core.operation_stream_transport import (
     OperationAccessDenied,
     OperationEventStore,
+    OperationStateStore,
     OperationStreamTransport,
     encode_sse_event,
     encode_sse_heartbeat,
@@ -593,8 +594,10 @@ def test_event_store_contract_accepts_reference_backend_and_rejects_partial(
     operations = SQLiteOperationStore(tmp_path / "operations-contract.sqlite")
     events = SQLiteOperationEventStore(tmp_path / "events-contract.sqlite")
     try:
+        assert isinstance(operations, OperationStateStore)
         assert isinstance(events, OperationEventStore)
         transport = OperationStreamTransport(operations, events)
+        assert transport.operation_store is operations
         assert transport.event_store is events
 
         class PartialStore:
@@ -603,6 +606,13 @@ def test_event_store_contract_accepts_reference_backend_and_rejects_partial(
 
         with pytest.raises(TypeError, match="OperationEventStore contract"):
             OperationStreamTransport(operations, PartialStore())
+
+        class PartialOperationStore:
+            def get(self, *_args, **_kwargs):
+                raise AssertionError
+
+        with pytest.raises(TypeError, match="OperationStateStore contract"):
+            OperationStreamTransport(PartialOperationStore(), events)
     finally:
         operations.close()
         events.close()
