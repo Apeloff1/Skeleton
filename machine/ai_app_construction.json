@@ -2055,7 +2055,7 @@
       "plane": "governance",
       "priority": "P0",
       "status": "open",
-      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, payload-free WORM governance audit linkage, and canonical lifecycle adapters now exist. Remaining closure is artifact canonical write/adapter composition, complete derived deletion acknowledgement, route-wide provider/tool privacy enforcement, exact-head validation and independent verification.",
+      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, governed derived vector/TF-IDF projection registration and tombstone acknowledgement, payload-free WORM governance audit linkage, and canonical lifecycle adapters now exist. Remaining closure is artifact canonical write/adapter composition, route-wide provider/tool privacy enforcement, exact-head validation and independent verification.",
       "construction": [
         "define data classes and transfer purposes",
         "bind data class to memory, artifact, retrieval and provider payloads",
@@ -2069,7 +2069,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "canonical lifecycle and registry contracts enforce tenant, purpose, retention/deletion/export metadata; memory and authoritative conversations are registered and executable, lifecycle registration/delete/export decisions are audit-linked, while retrieval/artifact production composition and derived deletion acknowledgement remain",
+      "status_detail": "canonical lifecycle and registry contracts enforce tenant, purpose, retention/deletion/export metadata; memory, authoritative conversations, governed retrieval and derived vector/TF-IDF projection lifecycle are executable and audit-linked, while artifact production composition and route-wide privacy enforcement remain",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -2092,10 +2092,12 @@
         "skeleton/vault/lifecycle_adapters.py GovernedRetrievalLifecycleAdapter executes tenant-bound retrieval delete/export",
         "skeleton/api/server.py composes one governed retrieval owner and LifecycleExecutor at runtime startup",
         "skeleton/testing/test_lifecycle_adapters.py proves retrieval tenant isolation, export, deletion and retention execution",
-        "skeleton/testing/test_governance_runtime_binding.py proves ServerState retrieval lifecycle composition"
+        "skeleton/testing/test_governance_runtime_binding.py proves ServerState retrieval lifecycle composition",
+        "skeleton/memory/projection.py registers derived vector/TF-IDF retrieval projections before mutation and acknowledges lifecycle deletion only after physical projection removal",
+        "skeleton/api/server.py passes the canonical GovernanceRegistry into the production AsyncMemoryProjectionCoordinator",
+        "skeleton/testing/test_memory_projection.py proves registration-before-mutation and physical-delete-before-ack retrieval lifecycle behavior"
       ],
       "outstanding_evidence": [
-        "complete memory projection/index deletion acknowledgement after canonical tombstone",
         "bridge provider and tool privacy ceilings into every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
         "register artifact records at remaining canonical write boundaries",
