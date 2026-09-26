@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import json
 from uuid import uuid4
 
+import pytest
+
 from skeleton.contracts.memory_record import (
     MemoryKind,
     MemoryWriteProposal,
