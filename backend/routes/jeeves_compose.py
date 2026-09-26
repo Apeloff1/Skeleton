@@ -306,6 +306,105 @@ def _canonical_history_from_messages(messages) -> List[HistoryMessage]:
     return history[-_MAX_SERVER_HISTORY_MESSAGES:]
 
 
+async def _legacy_complete_rows(
+    session_id: str,
+    *,
+    limit: int = 500,
+) -> List[Dict[str, Any]]:
+    cursor = _chat_col().find(
+        {
+            "session_id": session_id,
+            "$or": [
+                {"status": "complete"},
+                {"status": {"$exists": False}},
+            ],
+        },
+        {"_id": 0},
+    ).sort("ts", 1)
+    return [
+        dict(row)
+        for row in await cursor.to_list(max(1, min(int(limit), 500)))
+    ]
+
+
+def _legacy_client_message_id(
+    session_id: str,
+    row: Dict[str, Any],
+    index: int,
+) -> str:
+    existing = row.get("client_message_id")
+    if isinstance(existing, str) and existing.strip():
+        return existing.strip()
+    material = (
+        session_id
+        + "\x1f"
+        + str(index)
+        + "\x1f"
+        + str(row.get("ts") or "")
+        + "\x1f"
+        + str(row.get("role_user") or "")
+    )
+    return "legacy-" + hashlib.sha256(
+        material.encode("utf-8")
+    ).hexdigest()[:32]
+
+
+async def _import_legacy_rows_to_canonical(
+    session_id: str,
+    rows: List[Dict[str, Any]],
+) -> int:
+    authority, thread, tenant_id, owner_id = (
+        await _ensure_canonical_thread(session_id)
+    )
+    imported = 0
+    for index, row in enumerate(rows):
+        user_text = row.get("role_user")
+        assistant_text = row.get("role_jeeves")
+        if (
+            not isinstance(user_text, str)
+            or not user_text.strip()
+            or not isinstance(assistant_text, str)
+            or not assistant_text.strip()
+        ):
+            continue
+        client_message_id = _legacy_client_message_id(
+            session_id,
+            row,
+            index,
+        )
+        thread, user_message = await authority.append_user_message(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content=user_text,
+            idempotency_key=_canonical_user_idempotency(
+                client_message_id
+            ),
+            expected_thread_version=thread.version,
+            data_class="internal",
+        )
+        generated = {
+            "text": assistant_text,
+            "model": row.get("model") or "legacy-jeeves",
+            "engine_execution_id": row.get("engine_execution_id"),
+            "engine_evidence_refs": list(
+                row.get("engine_evidence_refs") or []
+            ),
+        }
+        thread, _assistant = await _commit_canonical_assistant_turn(
+            authority=authority,
+            thread=thread,
+            user_message=user_message,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            session_id=session_id,
+            client_message_id=client_message_id,
+            generated=generated,
+        )
+        imported += 1
+    return imported
+
+
 async def _load_canonical_history(
     session_id: str,
 ) -> tuple[List[HistoryMessage], bool]:
@@ -318,6 +417,21 @@ async def _load_canonical_history(
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
+        if not messages:
+            legacy_rows = await _legacy_complete_rows(session_id)
+            if legacy_rows:
+                await _import_legacy_rows_to_canonical(
+                    session_id,
+                    legacy_rows,
+                )
+                authority, thread, tenant_id, owner_id = (
+                    await _ensure_canonical_thread(session_id)
+                )
+                messages = await authority.active_transcript(
+                    thread.thread_id,
+                    tenant_id=tenant_id,
+                    owner_id=owner_id,
+                )
         return _canonical_history_from_messages(messages), True
     except Exception:
         return [], False
