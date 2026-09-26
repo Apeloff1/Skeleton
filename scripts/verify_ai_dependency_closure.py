@@ -291,7 +291,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "verifier": "ai-dependency-closure-v1",
-        "head_sha": os.environ.get("GITHUB_SHA", "").strip() or "unknown",
+        "head_sha": os.environ.get("EVIDENCE_HEAD_SHA", "").strip()\n            or os.environ.get("GITHUB_SHA", "").strip()\n            or "unknown",
         "prerequisites": list(PREREQUISITES),
         "prerequisite_status": prerequisite_status,
         "prerequisites_closed": prerequisites_closed,
