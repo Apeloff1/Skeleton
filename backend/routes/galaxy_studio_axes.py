@@ -76,14 +76,14 @@ def flavor(req: FlavorReq):
             "tier": opt["tier"], "effect": opt["effect"]}
     try:
         import asyncio
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from core.engine_chat import EngineChat, UserMessage
         g = (req.spec or {}).get("genre", "game")
         prompt = (f"In 2 punchy sentences, describe how the '{opt['label']}' choice "
                   f"({opt['tier']} tier; directives {opt['effect']}) concretely shapes a "
                   f"{g}. Be specific and production-grounded; no fluff.")
 
         async def _run():
-            chat = LlmChat(session_id=f"axis-{opt['id']}",
+            chat = EngineChat(session_id=f"axis-{opt['id']}",
                            system_message="You are a senior technical art director.")
             chat.with_model("anthropic", "claude-sonnet-4-5-20250929")
             return await chat.send_message(UserMessage(text=prompt))
