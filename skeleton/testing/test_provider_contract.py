@@ -1051,4 +1051,3 @@ def test_provider_admission_identity_falls_back_to_parent_operation() -> None:
         operation_id="legacy-operation",
     )
     assert request.admission_operation_id is None
-
