@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any, Mapping, Protocol, Sequence
 
+from .chatgpt_adapter import require_repository_provider_credentials_absent
 from .idle_studio import (
     ChangeProposal,
     GitHubClient,
@@ -180,8 +181,7 @@ def publish_entries(
 
 
 def publish(package_path: Path, config: StudioConfig) -> int:
-    if os.getenv("OPENAI_API_KEY", "").strip():
-        raise ValueError("OPENAI_API_KEY must be absent during publish")
+    require_repository_provider_credentials_absent()
     repo = os.getenv("GITHUB_REPOSITORY", "").strip()
     token = os.environ.pop("GITHUB_TOKEN", "").strip() or os.environ.pop("GH_TOKEN", "").strip()
     if not repo or not token:
