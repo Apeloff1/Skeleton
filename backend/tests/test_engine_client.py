@@ -17,6 +17,7 @@ from core.engine_client import (
     command_from_context,
 )
 from skeleton.provider_contract import ProviderToolDefinition
+from skeleton.context.compiler import ContextCompiler
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -95,6 +96,101 @@ def _context() -> ContextEnvelope:
     )
 
 
+def _projected_context() -> ContextEnvelope:
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    turn_id = str(uuid4())
+    created_at = _now()
+    budget = ContextBudget(
+        max_context_tokens=4096,
+        reserved_output_tokens=512,
+        reserved_tool_result_tokens=0,
+        reserved_policy_tokens=512,
+        safety_margin_tokens=128,
+        max_segment_tokens=2048,
+        max_artifact_tokens=1024,
+        max_tool_result_tokens=1024,
+    )
+    segments = (
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.PRODUCT_INSTRUCTION,
+            source_type="product-policy",
+            source_id="policy:projected",
+            content="Canonical projected instruction.",
+            trust_level=ContextTrust.TRUSTED_CONTROL,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=1000,
+            relevance=1.0,
+            created_at=created_at,
+            provenance=("test",),
+            retention_class="policy",
+            mandatory=True,
+        ),
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.USER_MESSAGE,
+            source_type="conversation",
+            source_id="message:earlier-user",
+            content="Canonical earlier question.",
+            trust_level=ContextTrust.AUTHORIZED_USER_DATA,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=700,
+            relevance=1.0,
+            created_at=created_at,
+            provenance=("test",),
+            retention_class="conversation",
+        ),
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.ASSISTANT_MESSAGE,
+            source_type="conversation",
+            source_id="message:earlier-assistant",
+            content="Canonical earlier answer.",
+            trust_level=ContextTrust.DERIVED_UNTRUSTED,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=700,
+            relevance=1.0,
+            created_at=created_at + timedelta(milliseconds=1),
+            provenance=("test",),
+            retention_class="conversation",
+        ),
+        ContextSegment.from_content(
+            segment_id=str(uuid4()),
+            kind=ContextKind.USER_MESSAGE,
+            source_type="conversation",
+            source_id="message:current-user",
+            content="Canonical current question.",
+            trust_level=ContextTrust.AUTHORIZED_USER_DATA,
+            data_class="internal",
+            tenant_id="tenant-a",
+            purpose="model-inference",
+            priority=900,
+            relevance=1.0,
+            created_at=created_at + timedelta(milliseconds=2),
+            provenance=("test",),
+            retention_class="conversation",
+        ),
+    )
+    return ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=budget,
+        segments=segments,
+        tools_enabled=False,
+        compiled_at=created_at,
+    )
+
+
 def _command():
     context = _context()
     return command_from_context(
@@ -153,6 +249,37 @@ def test_command_from_context_binds_execution_authority_and_budget() -> None:
     assert command.context_seed_refs == ("conversation:thread-a",)
     assert command.execution_request.context_policy["handoff_digest"] == (
         command.compiled_context.handoff_digest
+    )
+
+
+def test_command_from_context_uses_context_projection_over_legacy_text() -> None:
+    context = _projected_context()
+
+    command = command_from_context(
+        context=context,
+        actor_id="actor-a",
+        capability="assistant.chat",
+        idempotency_key="projection-authority",
+        instructions="ATTACKER OVERRIDE",
+        prompt="ATTACKER PROMPT",
+        history=(
+            {"role": "user", "content": "ATTACKER HISTORY"},
+        ),
+    )
+
+    assert command.compiled_context.instructions == (
+        "Canonical projected instruction."
+    )
+    assert command.compiled_context.prompt == "Canonical current question."
+    assert command.compiled_context.history == (
+        ("user", "Canonical earlier question."),
+        ("assistant", "Canonical earlier answer."),
+    )
+    assert "ATTACKER" not in command.compiled_context.instructions
+    assert "ATTACKER" not in command.compiled_context.prompt
+    assert all(
+        "ATTACKER" not in content
+        for _role, content in command.compiled_context.history
     )
 
 
