@@ -1,9 +1,12 @@
 import {
   WORKSPACE_KEY, LEGACY_KEY, MAX_TEXT, MAX_CONTEXT, MAX_MESSAGES,
   addConversation, buildChatBody, createWorkspace, decodeWorkspace, deleteConversation,
-  encodeWorkspace, migrateLegacy, newId, updateConversation,
+  encodeWorkspace, migrateLegacy, newId, projectCanonicalHistory, updateConversation,
 } from './workspace';
-import type { Artifact, Attachment, ChatBody, Conversation, Message, Workspace } from './workspace';
+import type {
+  Artifact, Attachment, CanonicalChatTurn, ChatBody, ChatHistoryProjection,
+  Conversation, Message, Workspace,
+} from './workspace';
 import type { ChatHandoff } from './workbench/types';
 
 export interface WorkspaceStorage {
@@ -20,34 +23,15 @@ export type ChatResponse = {
   forms?: string[];
   artifacts?: Artifact[];
   persisted?: boolean;
+  canonical_thread_id?: string | null;
+  canonical_message_id?: string | null;
+  operation_id?: string | null;
+  ai_result_id?: string | null;
 };
 
 export type Transport = (body: ChatBody, signal: AbortSignal) => Promise<ChatResponse>;
-
-export type ChatHistoryTurn = {
-  client_message_id?: string;
-  role_user?: string;
-  role_jeeves?: string;
-  user_ts?: number;
-  assistant_ts?: number;
-  ts?: number;
-  model?: string;
-  tier?: string;
-  forms?: string[];
-  artifact_count?: number;
-  canonical_user_message_id?: string;
-  canonical_assistant_message_id?: string;
-};
-
-export type ChatHistoryResponse = {
-  ok?: boolean;
-  available?: boolean;
-  session_id?: string;
-  turns?: ChatHistoryTurn[];
-  history_source?: string;
-  canonical_thread_id?: string | null;
-};
-
+export type ChatHistoryTurn = CanonicalChatTurn;
+export type ChatHistoryResponse = ChatHistoryProjection;
 export type HistoryTransport = (
   sessionId: string,
 ) => Promise<ChatHistoryResponse>;
@@ -105,54 +89,23 @@ export class WorkspaceController {
     return this.loading;
   }
 
-  private canonicalMessages(turns: ChatHistoryTurn[]): Message[] {
-    const messages: Message[] = [];
-    turns.slice(-Math.floor(MAX_MESSAGES / 2)).forEach((turn, index) => {
-      const userText = typeof turn.role_user === 'string'
-        ? turn.role_user.slice(0, MAX_TEXT) : '';
-      const assistantText = typeof turn.role_jeeves === 'string'
-        ? turn.role_jeeves.slice(0, MAX_TEXT) : '';
-      if (!userText || !assistantText) return;
-
-      const assistantSeconds = typeof turn.assistant_ts === 'number'
-        && Number.isFinite(turn.assistant_ts)
-        ? turn.assistant_ts
-        : typeof turn.ts === 'number' && Number.isFinite(turn.ts)
-          ? turn.ts : Date.now() / 1000;
-      const userSeconds = typeof turn.user_ts === 'number'
-        && Number.isFinite(turn.user_ts)
-        ? turn.user_ts : Math.max(0, assistantSeconds - 0.001);
-      const clientId = typeof turn.client_message_id === 'string'
-        && /^[A-Za-z0-9_-]{1,128}$/.test(turn.client_message_id)
-        ? turn.client_message_id : null;
-      const canonicalUserId = typeof turn.canonical_user_message_id === 'string'
-        ? turn.canonical_user_message_id.slice(0, 128) : '';
-      const canonicalAssistantId = typeof turn.canonical_assistant_message_id === 'string'
-        ? turn.canonical_assistant_message_id.slice(0, 128) : '';
-
-      messages.push({
-        id: clientId || canonicalUserId || `canonical-user-${index}`,
-        role: 'user',
-        text: userText,
-        createdAt: Math.round(userSeconds * 1000),
-        status: 'complete',
-      });
-      messages.push({
-        id: canonicalAssistantId || `canonical-assistant-${index}`,
-        role: 'jeeves',
-        text: assistantText,
-        createdAt: Math.round(assistantSeconds * 1000),
-        status: 'complete',
-        tier: typeof turn.tier === 'string' ? turn.tier.slice(0, 80) : undefined,
-        model: typeof turn.model === 'string' ? turn.model.slice(0, 120) : undefined,
-        forms: Array.isArray(turn.forms)
-          ? turn.forms.filter((item): item is string => typeof item === 'string').slice(0, 10)
-          : undefined,
-        artifactCount: typeof turn.artifact_count === 'number'
-          ? Math.max(0, Math.min(100, Math.floor(turn.artifact_count))) : 0,
-      });
-    });
-    return messages;
+  private async hydrateConversation(
+    conversation: Conversation,
+  ): Promise<Conversation> {
+    if (!this.historyTransport || !conversation.sessionId) return conversation;
+    const result = await this.historyTransport(conversation.sessionId);
+    if (
+      result.ok === false
+      || result.available === false
+      || result.session_id !== conversation.sessionId
+      || !Array.isArray(result.turns)
+    ) {
+      throw new Error('canonical conversation history unavailable');
+    }
+    return projectCanonicalHistory(
+      conversation,
+      result,
+    );
   }
 
   private async rehydrateServerTranscripts(
@@ -165,23 +118,7 @@ export class WorkspaceController {
       workspace.conversations.map(async conversation => {
         if (!conversation.sessionId) return conversation;
         try {
-          const result = await this.historyTransport!(conversation.sessionId);
-          if (
-            result.ok === false
-            || result.available === false
-            || result.session_id !== conversation.sessionId
-            || !Array.isArray(result.turns)
-          ) {
-            throw new Error('canonical conversation history unavailable');
-          }
-          const messages = this.canonicalMessages(result.turns);
-          const newest = messages.at(-1)?.createdAt || conversation.updatedAt;
-          return {
-            ...conversation,
-            messages,
-            updatedAt: Math.max(conversation.updatedAt, newest),
-            sessionUpdatedAt: Date.now(),
-          };
+          return await this.hydrateConversation(conversation);
         } catch {
           failed += 1;
           return conversation;
@@ -258,6 +195,33 @@ export class WorkspaceController {
   dismissNotice = (): void => { this.emit({ notice: null }); };
   notify = (notice: string): void => { this.emit({ notice }); };
 
+  async refreshCanonical(
+    conversationId = this.snapshot.workspace.activeId,
+  ): Promise<boolean> {
+    if (!this.snapshot.ready || !this.historyTransport) return false;
+    if (this.running?.conversationId === conversationId) return false;
+    const current = this.snapshot.workspace.conversations.find(
+      item => item.id === conversationId,
+    );
+    if (!current?.sessionId) return false;
+    try {
+      const hydrated = await this.hydrateConversation(current);
+      const latest = this.snapshot.workspace.conversations.find(
+        item => item.id === conversationId,
+      );
+      if (!latest || this.running?.conversationId === conversationId) return false;
+      const projection = await this.hydrateConversation(latest);
+      this.change(updateConversation(
+        this.snapshot.workspace,
+        conversationId,
+        () => projection,
+      ));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   get active(): Conversation {
     return this.snapshot.workspace.conversations.find(c => c.id === this.snapshot.workspace.activeId)!;
   }
@@ -327,6 +291,7 @@ export class WorkspaceController {
     if (!this.snapshot.workspace.conversations.some(c => c.id === id)) return;
     if (id !== this.active.id) this.cancel();
     this.change({ ...updateConversation(this.snapshot.workspace, id, c => ({ ...c, archived: false })), activeId: id });
+    void this.refreshCanonical(id);
   }
 
   remove(id: string): void {
@@ -436,13 +401,31 @@ export class WorkspaceController {
         throw new Error('Jeeves returned an empty response. Try again.');
       }
       const reply: Message = {
-        id: newId(), role: 'jeeves', text: response.reply.slice(0, MAX_TEXT), status: 'complete',
-        createdAt: Date.now(), tier: response.tier, model: response.model,
-        forms: response.forms, artifacts: response.artifacts || [], artifactCount: response.artifacts?.length || 0,
+        id: response.canonical_message_id || newId(),
+        role: 'jeeves',
+        text: response.reply.slice(0, MAX_TEXT),
+        status: 'complete',
+        createdAt: Date.now(),
+        tier: response.tier,
+        model: response.model,
+        forms: response.forms,
+        artifacts: response.artifacts || [],
+        artifactCount: response.artifacts?.length || 0,
       };
       this.change(updateConversation(this.snapshot.workspace, conversationId, c => ({
-        ...c, sessionId: response.session_id || c.sessionId, sessionUpdatedAt: Date.now(), updatedAt: Date.now(),
-        messages: [...c.messages.map(m => m.id === messageId ? { ...m, status: 'complete' as const, error: undefined } : m), reply],
+        ...c,
+        canonicalThreadId: response.canonical_thread_id || c.canonicalThreadId,
+        sessionId: response.session_id || c.sessionId,
+        sessionUpdatedAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [
+          ...c.messages.map(m => m.id === messageId ? {
+            ...m,
+            status: 'complete' as const,
+            error: undefined,
+          } : m),
+          reply,
+        ],
       })));
       this.attachments.delete(messageId);
       if (response.persisted === false) this.notify('The server could not save this exchange. Your device-local transcript is still available.');
