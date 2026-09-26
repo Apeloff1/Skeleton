@@ -798,6 +798,40 @@ class DataLifecycleRegistry:
                 created_at=plan.created_at,
             )
 
+    def plan_retention_expiry_for_tenant(
+        self,
+        tenant_id: str,
+        *,
+        now: float | None = None,
+    ) -> DeletionPlan | None:
+        """Create one durable retention plan for an authorized tenant only."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        timestamp = (
+            time.time()
+            if now is None
+            else _finite_timestamp(now, "now")
+        )
+        with self._lock:
+            entries = [
+                entry
+                for entry in self._entries.values()
+                if entry.record.tenant_id == tenant
+                and entry.state is LifecycleState.ACTIVE
+                and entry.record.retention_until is not None
+                and entry.record.retention_until <= timestamp
+            ]
+            if not entries:
+                return None
+            plan = self._plan(
+                entries,
+                tenant_id=tenant,
+                reason="retention-expired",
+                now=timestamp,
+                persist=True,
+            )
+            return plan
+
     def plan_retention_expiry(
         self,
         *,
