@@ -181,3 +181,46 @@ async def test_engine_chat_bound_policy_identity_matches_canonical_instructions(
     assert request.instructions == policy.instructions
     assert request.instruction_policy_id == policy.policy_id
     assert request.instruction_policy_version == policy.version
+
+
+@pytest.mark.asyncio
+async def test_engine_chat_send_async_rejects_lossy_multi_message_batch():
+    chat = EngineChat(session_id="session-multi")
+
+    with pytest.raises(
+        ValueError,
+        match="accepts exactly one message",
+    ):
+        await chat.send_async(
+            [
+                UserMessage(text="first"),
+                UserMessage(text="second"),
+            ]
+        )
+
+
+@pytest.mark.asyncio
+async def test_engine_chat_send_async_single_message_keeps_compatibility(
+    monkeypatch,
+):
+    seen = []
+
+    async def execute(request):
+        seen.append(request)
+        return EngineTextResponse(
+            text="single-ok",
+            execution_id="execution-single",
+            verification=None,
+            evidence_refs=(),
+            usage={},
+        )
+
+    monkeypatch.setattr(engine_chat, "execute_engine_text", execute)
+
+    response = await EngineChat(
+        session_id="session-single",
+    ).send_async([UserMessage(text="only")])
+
+    assert response == "single-ok"
+    assert len(seen) == 1
+    assert seen[0].prompt == "only"
