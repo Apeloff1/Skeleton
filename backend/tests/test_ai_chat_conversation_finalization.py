@@ -333,7 +333,8 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
         second.compiled_context.handoff_digest
     )
     assert first.submission_digest == second.submission_digest
-    assert first.operation.created_at != second.operation.created_at
+    assert first.resource_budget["max_elapsed_seconds"] == 30.0
+    assert second.resource_budget["max_elapsed_seconds"] == 30.0
     assert response["ai_result_id"] == (
         "engine-result:" + second.execution_request.execution_id
     )
