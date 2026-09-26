@@ -8,7 +8,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/game-genres", tags=["Game Genres"])
 
@@ -19,7 +18,6 @@ try:
 except Exception:
     LLM_AVAILABLE = False
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # COMPLETE GAME GENRES DATABASE
@@ -438,7 +436,7 @@ async def create_game_project(request: GameProjectRequest):
     # AI-enhanced project generation
     if LLM_AVAILABLE:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
+            llm = LlmChat(model="gpt-4o")
             llm.add_message("system", """You are an expert game designer and technical director.
             Create comprehensive game project specifications with detailed technical requirements.""")
             llm.add_message("user", f"""Create a detailed game project specification for:
