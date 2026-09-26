@@ -95,6 +95,24 @@ class EngineStorageAdmissionBody(BaseModel):
     storage_bytes: int = Field(ge=1, le=1024 * 1024 * 1024)
 
 
+class EngineGovernanceWriteBody(BaseModel):
+    mode: str = Field(min_length=1, max_length=32)
+    plane: str = Field(min_length=1, max_length=64)
+    record_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    source_ref: str = Field(min_length=1, max_length=512)
+    data_class: str = Field(min_length=1, max_length=64)
+    purposes: list[str] = Field(min_length=1, max_length=32)
+    deletion_targets: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=32,
+    )
+    created_at: float | None = Field(default=None, ge=0)
+    retention_until: float | None = Field(default=None, ge=0)
+    exportable: bool = True
+
+
 class EngineToolApprovalBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
@@ -312,6 +330,39 @@ def admit_storage_write(
             resource_id=body.resource_id,
             write_id=body.write_id,
             storage_bytes=body.storage_bytes,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return receipt.as_dict()
+
+
+@router.post("/governance/writes")
+def reconcile_governed_write(
+    body: EngineGovernanceWriteBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        receipt = service.reconcile_external_governed_write(
+            verified_service_principal=principal,
+            mode=body.mode,
+            plane=body.plane,
+            record_id=body.record_id,
+            tenant_id=body.tenant_id,
+            source_ref=body.source_ref,
+            data_class=body.data_class,
+            purposes=tuple(body.purposes),
+            deletion_targets=(
+                None
+                if body.deletion_targets is None
+                else tuple(body.deletion_targets)
+            ),
+            created_at=body.created_at,
+            retention_until=body.retention_until,
+            exportable=body.exportable,
         )
     except Exception as exc:
         _raise_engine_error(exc)
