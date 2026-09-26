@@ -1089,3 +1089,41 @@ def test_pending_canonical_turn_blocks_different_concurrent_turn(
     assert len(messages) == 1
     assert messages[0].message_id == pending.message_id
     assert messages[0].content == "first pending question"
+
+
+def test_jeeves_turn_version_race_is_retryable_conflict(
+    route,
+    monkeypatch,
+):
+    canonical = _CanonicalConversationAuthority()
+    calls = {"generate": 0}
+
+    async def race(*_args, **_kwargs):
+        raise ConversationConflict("thread version conflict")
+
+    async def generate(*_args, **_kwargs):
+        calls["generate"] += 1
+        return {"text": "must not run", "tier": "free", "model": "test"}
+
+    monkeypatch.setattr(route, "_append_canonical_user_turn", race)
+
+    with _chat_client(
+        route,
+        monkeypatch,
+        _MemoryChatCollection(),
+        generate,
+        canonical=canonical,
+    ) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-race",
+                "client_message_id": "race-1",
+                "message": "hello",
+            },
+        )
+
+    assert response.status_code == 409
+    assert "canonical conversation turn conflicted" in response.text
+    assert "same client_message_id" in response.text
+    assert calls["generate"] == 0
