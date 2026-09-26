@@ -962,7 +962,7 @@
       ],
       "work_package": "WP-P0-COGNITIVE-LOOP",
       "blueprint": "cognitive_runtime_blueprint",
-      "implementation_status": "architecture-detailed",
+      "implementation_status": "implementation-complete",
       "objective": "One canonical durable AI execution transaction from admitted user intent through model/tool turns to a verified, persisted and streamable result.",
       "target_files": {
         "contracts": [
@@ -1025,16 +1025,28 @@
         "memory writeback policy defined",
         "verification and finalization protocol defined",
         "usage and observability contract defined",
-        "implementation slices ordered"
+        "implementation slices ordered",
+        "skeleton/contracts/ai_execution.py canonical orchestration envelopes",
+        "skeleton/persistence/execution_repository.py durable execution/turn/checkpoint/finalization authority",
+        "skeleton/intelligence/execution_runtime.py canonical bounded provider-tool-provider loop",
+        "engine execution admission and approval bind through skeleton/api/engine_service.py",
+        "engine coordination binds CognitiveExecutionRuntime through skeleton/api/engine_runtime.py",
+        "durable execution writes are metered against the operation admission lease",
+        "canonical AI-tree mirrors are byte-identical for contracts/runtime/repository/engine service/coordinator",
+        "scripts/verify_cognitive_execution_closure.py independent closure verifier",
+        ".github/workflows/cognitive-execution-closure.yml exact-head closure gate"
       ],
       "remaining": [
-        "materialize contract modules",
-        "bind durable repositories",
-        "extend provider structured/tool output boundary",
-        "implement governed tool runtime integration",
-        "implement execution loop",
-        "implement frontend/backend transport integration",
-        "prove fault and golden-journey evidence"
+        "close gap-state-authority-convergence",
+        "close gap-governance-registry",
+        "close gap-cost-admission",
+        "close gap-conversation-state-authority",
+        "close gap-memory-durable-authority",
+        "close gap-tool-runtime-convergence",
+        "close gap-context-compiler-convergence",
+        "close gap-provider-interaction-protocol",
+        "close gap-verification-evidence-contract",
+        "collect fresh exact-head Cognitive Execution Closure Gate evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
