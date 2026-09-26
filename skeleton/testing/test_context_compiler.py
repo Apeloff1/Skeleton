@@ -11,6 +11,10 @@ from skeleton.contracts.context import (
     ContextSegment,
     ContextTrust,
 )
+from skeleton.context.compaction import (
+    ContextCompactionError,
+    compact_context_segment,
+)
 from skeleton.context.compiler import (
     ContextCompilationError,
     ContextCompiler,
@@ -468,3 +472,110 @@ def test_tool_result_adapter_obeys_compiler_tool_result_limit() -> None:
     assert dict(envelope.omission_reasons)[segment.segment_id] == (
         "segment_limit_exceeded"
     )
+
+
+def test_compaction_preserves_evidence_lineage_and_hard_token_bound() -> None:
+    original = _segment(
+        "artifact evidence " * 200,
+        kind=ContextKind.ARTIFACT,
+        trust=ContextTrust.UNTRUSTED_EVIDENCE,
+        source_type="artifact",
+        source_id="artifact-large",
+        priority=450,
+        relevance=0.9,
+        provenance=("artifact:large", "citation:source-1"),
+    )
+
+    compacted = compact_context_segment(
+        original,
+        max_tokens=24,
+    )
+
+    assert compacted is not original
+    assert compacted.kind is ContextKind.ARTIFACT
+    assert compacted.trust_level is ContextTrust.DERIVED_UNTRUSTED
+    assert compacted.tenant_id == original.tenant_id
+    assert compacted.purpose == original.purpose
+    assert compacted.data_class == original.data_class
+    assert compacted.token_estimate <= 24
+    assert compacted.derived_from == (original.segment_id,)
+    assert "compacted-segment:" + original.segment_id in compacted.provenance
+    assert (
+        "compacted-content-sha256:" + original.content_digest
+        in compacted.provenance
+    )
+    assert "citation:source-1" in compacted.provenance
+
+
+def test_compacted_conversation_becomes_derived_summary() -> None:
+    original = _segment(
+        "conversation turn " * 120,
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="message-large",
+        priority=700,
+        relevance=1.0,
+    )
+
+    compacted = compact_context_segment(
+        original,
+        max_tokens=20,
+    )
+
+    assert compacted.kind is ContextKind.CONVERSATION_SUMMARY
+    assert compacted.trust_level is ContextTrust.DERIVED_UNTRUSTED
+    assert compacted.token_estimate <= 20
+    envelope = _compile([compacted])
+    assert envelope.evidence_segments == (compacted,)
+
+
+def test_compaction_refuses_trusted_control() -> None:
+    policy = _segment(
+        "Never summarize authority.",
+        kind=ContextKind.PRODUCT_INSTRUCTION,
+        trust=ContextTrust.TRUSTED_CONTROL,
+        source_type="product-policy",
+        source_id="policy-no-compact",
+        priority=1000,
+        relevance=1.0,
+        mandatory=True,
+    )
+
+    with pytest.raises(
+        ContextCompactionError,
+        match="not eligible|trusted or mandatory",
+    ):
+        compact_context_segment(policy, max_tokens=8)
+
+
+def test_compaction_can_admit_previously_oversized_artifact() -> None:
+    original = _segment(
+        "large artifact " * 300,
+        kind=ContextKind.ARTIFACT,
+        trust=ContextTrust.UNTRUSTED_EVIDENCE,
+        source_type="artifact",
+        source_id="artifact-oversized",
+        priority=500,
+        relevance=0.8,
+    )
+    budget = _budget(
+        max_context=120,
+        output=20,
+        tools=0,
+        policy=0,
+        safety=10,
+        segment=30,
+        artifact=30,
+        tool_result=30,
+    )
+
+    rejected = _compile([original], budget=budget)
+    assert rejected.evidence_segments == ()
+    assert dict(rejected.omission_reasons)[original.segment_id] == (
+        "segment_limit_exceeded"
+    )
+
+    compacted = compact_context_segment(original, max_tokens=24)
+    admitted = _compile([compacted], budget=budget)
+    assert admitted.evidence_segments == (compacted,)
