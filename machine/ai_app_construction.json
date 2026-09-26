@@ -2055,7 +2055,7 @@
       "plane": "governance",
       "priority": "P0",
       "status": "open",
-      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, and canonical SQLite memory lifecycle adapter now exist. GovernedMemoryWriter registers/reconciles memory classification and retention and tombstones memory fail-closed if governance persistence fails. Remaining closure is canonical conversation/retrieval/artifact registration, complete derived deletion propagation and export adapters, route-wide provider/tool privacy enforcement, audit receipt linkage, exact-head validation and independent verification.",
+      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, payload-free WORM governance audit linkage, and canonical lifecycle adapters now exist. Remaining closure is retrieval/artifact canonical write registration and production adapter composition, complete derived deletion acknowledgement, route-wide provider/tool privacy enforcement, exact-head validation and independent verification.",
       "construction": [
         "define data classes and transfer purposes",
         "bind data class to memory, artifact, retrieval and provider payloads",
@@ -2069,7 +2069,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "canonical lifecycle and registry contracts now enforce tenant, purpose, retention/deletion/export metadata and registry-derived provider classification; broader memory/retrieval/artifact registration plus durable adapter propagation remain",
+      "status_detail": "canonical lifecycle and registry contracts enforce tenant, purpose, retention/deletion/export metadata; memory and authoritative conversations are registered and executable, lifecycle registration/delete/export decisions are audit-linked, while retrieval/artifact production composition and derived deletion acknowledgement remain",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -2080,15 +2080,21 @@
         "skeleton/testing/test_data_lifecycle.py restart/deletion-plan/receipt durability evidence",
         "skeleton/testing/test_lifecycle_adapters.py canonical SQLite memory lifecycle evidence",
         "skeleton/testing/test_governance_runtime_binding.py production runtime persistence evidence",
-        "skeleton/testing/test_memory_writeback.py canonical write registration/reconciliation evidence"
+        "skeleton/testing/test_memory_writeback.py canonical write registration/reconciliation evidence",
+        "backend/core/conversations.py registers authoritative thread/message writes before Mongo mutation and executes governed tenant deletion/export",
+        "backend/tests/test_conversation_storage_admission.py conversation governance registration/delete/export fail-closed regression coverage",
+        "skeleton/vault/governance_audit.py WORM audit linkage for canonical register/reconcile/delete/export lifecycle actions",
+        "skeleton/vault/governance_registry.py emits registration/reconciliation audit receipts through GovernanceAuditTimeline",
+        "skeleton/api/server.py binds one durable GovernanceAuditTimeline and lifecycle adapter registry beside the canonical GovernanceRegistry",
+        "skeleton/testing/test_governance_audit.py proves payload-free registration/reconciliation audit linkage",
+        "skeleton/testing/test_governance_runtime_binding.py proves durable governance audit chain restore across restart"
       ],
       "outstanding_evidence": [
-        "register conversation, retrieval and artifact records at canonical write boundaries",
         "complete memory projection/index deletion acknowledgement after canonical tombstone",
-        "propagate deletion/export/retention through conversation/retrieval/artifact durable adapters",
         "bridge provider and tool privacy ceilings into every application route",
-        "bind lifecycle registration/deletion/export decisions to canonical audit receipts",
-        "exact-head Stage-0/App Assembly verification and independent signoff"
+        "exact-head Stage-0/App Assembly verification and independent signoff",
+        "register retrieval and artifact records at canonical write boundaries",
+        "compose retrieval/artifact physical delete/export/retention adapters in the production runtime"
       ]
     },
     {
