@@ -18,7 +18,10 @@ from skeleton.contracts.verification import (
     VerificationOutcome,
     VerificationRisk,
 )
-from skeleton.intelligence.verification_runtime import VerificationRuntime
+from skeleton.intelligence.verification_runtime import (
+    VerificationRuntime,
+    materialize_verification_receipt,
+)
 from skeleton.retrieval.verification import ground_claim, validate_citation
 from skeleton.skills.tool_contract import (
     ToolExecutionReceipt,
@@ -246,3 +249,43 @@ def test_tool_postcondition_adapter_never_turns_failed_receipt_into_pass():
     )
     assert failed_observation.passed is False
     assert failed_observation.result_ref == "tool-receipt:" + receipt.receipt_id
+
+def test_materialized_verification_receipt_is_deterministic_and_observable() -> None:
+    claim = _claim()
+    evidence = _evidence(claim, origin="primary-1", source="primary")
+    assessment = VerificationRuntime().verify(
+        claim,
+        evidence=(evidence,),
+        verified_at=NOW,
+        verifier_id="verification-runtime:test",
+    )
+
+    first = materialize_verification_receipt(
+        claim,
+        assessment,
+        execution_id="exec-1",
+        result_ref="execution-result:exec-1",
+    )
+    replay = materialize_verification_receipt(
+        claim,
+        assessment,
+        execution_id="exec-1",
+        result_ref="execution-result:exec-1",
+    )
+
+    assert replay == first
+    assert first.policy_satisfied is True
+    assert first.outcome is VerificationOutcome.PASSED
+    assert first.supporting_evidence_ids == (evidence.evidence_id,)
+    assert first.execution_id == "exec-1"
+    assert first.result_ref == "execution-result:exec-1"
+    assert first.check_id == assessment.check.check_id
+
+    payload = first.as_dict()
+    assert payload["receipt_id"] == first.receipt_id
+    assert payload["claim_digest"] == claim.digest
+    assert payload["verified_at"] == NOW.isoformat()
+    serialized_keys = " ".join(sorted(payload))
+    assert "chain_of_thought" not in serialized_keys
+    assert "reasoning_text" not in serialized_keys
+    assert "hidden_reasoning" not in serialized_keys
