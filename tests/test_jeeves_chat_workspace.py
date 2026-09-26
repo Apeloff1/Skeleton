@@ -3,6 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from dataclasses import replace
+from datetime import datetime, timezone
+from uuid import uuid4
 import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,6 +14,17 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
+
+from skeleton.contracts.conversation import (
+    ConversationAuthorType,
+    ConversationMessage,
+    ConversationThread,
+    ConversationThreadState,
+)
+from skeleton.persistence.conversation_repository import (
+    ConversationConflict,
+    ConversationNotFound,
+)
 
 
 @pytest.fixture
@@ -507,3 +521,322 @@ def test_history_is_ignored_when_server_storage_is_unavailable(
     )
     assert captured["context"] == ""
     assert "ATTACKER HISTORY" not in response.text
+
+
+
+class _CanonicalConversationAuthority:
+    def __init__(self):
+        self.threads = {}
+        self.messages = {}
+
+    async def get_thread(self, thread_id, *, tenant_id, owner_id):
+        thread = self.threads.get(thread_id)
+        if (
+            thread is None
+            or thread.tenant_id != tenant_id
+            or thread.owner_id != owner_id
+        ):
+            raise ConversationNotFound(thread_id)
+        return thread
+
+    async def create_thread(
+        self,
+        *,
+        tenant_id,
+        owner_id,
+        title,
+        data_class,
+        thread_id,
+        branch_id,
+    ):
+        if thread_id in self.threads:
+            raise ConversationConflict("thread identity already exists")
+        now = datetime(2026, 9, 26, 6, 0, tzinfo=timezone.utc)
+        thread = ConversationThread(
+            thread_id=thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            created_at=now,
+            updated_at=now,
+            version=1,
+            message_sequence=0,
+            active_branch_id=branch_id,
+            state=ConversationThreadState.ACTIVE,
+            title=title,
+            data_class=data_class,
+        )
+        self.threads[thread_id] = thread
+        self.messages[thread_id] = []
+        return thread
+
+    async def active_transcript(self, thread_id, *, tenant_id, owner_id):
+        await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        return tuple(
+            sorted(
+                self.messages.get(thread_id, []),
+                key=lambda item: item.sequence,
+            )
+        )
+
+    def _existing(self, thread_id, idempotency_key):
+        return next(
+            (
+                message
+                for message in self.messages.get(thread_id, [])
+                if message.idempotency_key == idempotency_key
+            ),
+            None,
+        )
+
+    async def append_user_message(
+        self,
+        thread_id,
+        *,
+        tenant_id,
+        owner_id,
+        content,
+        idempotency_key,
+        expected_thread_version,
+        data_class,
+        **_kwargs,
+    ):
+        thread = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        existing = self._existing(thread_id, idempotency_key)
+        if existing is not None:
+            if (
+                existing.author_type is not ConversationAuthorType.USER
+                or existing.content != content
+            ):
+                raise ConversationConflict(
+                    "idempotency_key was reused with different content"
+                )
+            return thread, existing
+        if thread.version != expected_thread_version:
+            raise ConversationConflict("thread version conflict")
+        message = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=thread.message_sequence + 1,
+            author_type=ConversationAuthorType.USER,
+            created_at=datetime.now(timezone.utc),
+            idempotency_key=idempotency_key,
+            content=content,
+            data_class=data_class,
+        )
+        updated = replace(
+            thread,
+            version=thread.version + 1,
+            message_sequence=message.sequence,
+            updated_at=message.created_at,
+        )
+        self.threads[thread_id] = updated
+        self.messages[thread_id].append(message)
+        return updated, message
+
+    async def commit_assistant_message(
+        self,
+        thread_id,
+        *,
+        tenant_id,
+        owner_id,
+        content,
+        idempotency_key,
+        expected_thread_version,
+        causal_user_message_id,
+        operation_id,
+        ai_result_id,
+        data_class,
+        citation_refs=(),
+        **_kwargs,
+    ):
+        thread = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        existing = self._existing(thread_id, idempotency_key)
+        if existing is not None:
+            if (
+                existing.author_type
+                is not ConversationAuthorType.ASSISTANT
+                or existing.content != content
+                or existing.causal_user_message_id
+                != causal_user_message_id
+            ):
+                raise ConversationConflict(
+                    "idempotency_key was reused with different content"
+                )
+            return thread, existing
+        if thread.version != expected_thread_version:
+            raise ConversationConflict("thread version conflict")
+        causal = next(
+            (
+                message
+                for message in self.messages.get(thread_id, [])
+                if message.message_id == causal_user_message_id
+            ),
+            None,
+        )
+        if (
+            causal is None
+            or causal.author_type is not ConversationAuthorType.USER
+        ):
+            raise ConversationConflict("causal user message is unavailable")
+        message = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=thread.message_sequence + 1,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=datetime.now(timezone.utc),
+            idempotency_key=idempotency_key,
+            content=content,
+            parent_message_id=causal_user_message_id,
+            causal_user_message_id=causal_user_message_id,
+            operation_id=operation_id,
+            ai_result_id=ai_result_id,
+            citation_refs=tuple(citation_refs),
+            data_class=data_class,
+        )
+        updated = replace(
+            thread,
+            version=thread.version + 1,
+            message_sequence=message.sequence,
+            updated_at=message.created_at,
+        )
+        self.threads[thread_id] = updated
+        self.messages[thread_id].append(message)
+        return updated, message
+
+
+def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns(
+    route,
+    monkeypatch,
+):
+    monkeypatch.setenv("SKL_JEEVES_CANONICAL_CONVERSATIONS", "1")
+    legacy = _MemoryChatCollection(
+        [
+            {
+                "_id": "legacy-turn",
+                "session_id": "conversation-canonical",
+                "client_message_id": "legacy-1",
+                "role_user": "legacy question",
+                "role_jeeves": "legacy answer",
+                "status": "complete",
+                "model": "legacy-model",
+                "ts": 1.0,
+            }
+        ]
+    )
+    canonical = _CanonicalConversationAuthority()
+    calls = {"count": 0}
+
+    async def generate(
+        query,
+        recalled,
+        needs_reasoning,
+        conversation_context="",
+    ):
+        calls["count"] += 1
+        assert "legacy question" in conversation_context
+        assert "legacy answer" in conversation_context
+        return {
+            "text": "canonical next answer",
+            "tier": "free",
+            "model": "test",
+            "engine_execution_id": None,
+            "engine_verification": None,
+            "engine_evidence_refs": [],
+        }
+
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
+    with _chat_client(route, monkeypatch, legacy, generate) as transport:
+        payload = {
+            "session_id": "conversation-canonical",
+            "client_message_id": "message-2",
+            "message": "follow up",
+        }
+        first = transport.post("/api/jeeves/chat", json=payload)
+        replay = transport.post("/api/jeeves/chat", json=payload)
+        history = transport.get(
+            "/api/jeeves/chat/conversation-canonical?limit=10"
+        )
+
+    assert first.status_code == 200
+    assert first.json()["history_source"] == "canonical"
+    assert first.json()["canonical_thread_id"]
+    assert first.json()["canonical_message_id"]
+    assert first.json()["reply"] == "canonical next answer"
+    assert calls["count"] == 1
+
+    assert replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    assert replay.json()["history_source"] == "canonical"
+    assert replay.json()["reply"] == "canonical next answer"
+    assert calls["count"] == 1
+
+    body = history.json()
+    assert body["available"] is True
+    assert body["history_source"] == "canonical"
+    assert body["canonical_thread_id"]
+    assert [row["role_user"] for row in body["turns"]] == [
+        "legacy question",
+        "follow up",
+    ]
+    assert [row["role_jeeves"] for row in body["turns"]] == [
+        "legacy answer",
+        "canonical next answer",
+    ]
+
+    thread_id = first.json()["canonical_thread_id"]
+    messages = canonical.messages[thread_id]
+    assert [message.author_type.value for message in messages] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
+    assert all(
+        message.idempotency_key.startswith(
+            ("jeeves-user:", "jeeves-assistant:")
+        )
+        for message in messages
+    )
+
+
+def test_canonical_jeeves_mode_fails_closed_if_authority_is_unavailable(
+    route,
+    monkeypatch,
+):
+    monkeypatch.setenv("SKL_JEEVES_CANONICAL_CONVERSATIONS", "1")
+    legacy = _MemoryChatCollection()
+
+    class BrokenAuthority:
+        async def get_thread(self, *args, **kwargs):
+            raise RuntimeError("canonical authority unavailable")
+
+    async def generate(*_args, **_kwargs):
+        raise AssertionError("generation must not run without authority")
+
+    monkeypatch.setattr(route, "_canonical_authority", BrokenAuthority)
+    with _chat_client(route, monkeypatch, legacy, generate) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-broken",
+                "client_message_id": "message-1",
+                "message": "hello",
+            },
+        )
+
+    assert response.status_code == 503
+    assert "canonical conversation authority is unavailable" in response.text
