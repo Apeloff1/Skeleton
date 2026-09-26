@@ -209,7 +209,12 @@
         "skeleton/testing/test_memory_projection.py proves fail-closed derived retrieval lifecycle ordering",
         "skeleton/artifact_plane/governance.py owns tenant-scoped governed artifact bytes",
         "skeleton/api/server.py binds artifact lifecycle adapters during startup",
-        "skeleton/testing/test_server_governance_binding.py proves physical export/delete/retention"
+        "skeleton/testing/test_server_governance_binding.py proves physical export/delete/retention",
+        "skeleton/artifact_plane/governance.py canonical governed artifact owner",
+        "skeleton/vault/lifecycle_adapters.py governed artifact delete/export adapter",
+        "skeleton/api/server.py composes artifact owner into production startup",
+        "skeleton/testing/test_lifecycle_adapters.py proves artifact registration/delete/export/retention",
+        "skeleton/testing/test_governance_runtime_binding.py proves production artifact composition"
       ],
       "remaining": [
         "bridge provider privacy ceilings into every application route",
