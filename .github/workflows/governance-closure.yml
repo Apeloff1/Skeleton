@@ -34,6 +34,8 @@ on:
       - "backend/tests/test_conversation_storage_admission.py"
       - "backend/tests/test_conversation_governance.py"
       - "backend/tests/test_gameforge_artifact_builder.py"
+      - "scripts/verify_governance_closure.py"
+      - "tests/test_governance_independent_verifier.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_closure_evidence.json"
       - "machine/ai_implementation_handoff.json"
@@ -57,10 +59,11 @@ jobs:
       PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
 
     steps:
-      - name: Check out repository
+      - name: Check out exact PR head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -97,3 +100,83 @@ jobs:
           backend/tests/test_conversation_storage_admission.py
           backend/tests/test_conversation_governance.py
           backend/tests/test_gameforge_artifact_builder.py
+
+  governance-independent:
+    name: Independent governance verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent governance verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_governance_independent_verifier.py
+
+      - name: Run independent exact-head governance scan
+        env:
+          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_governance_closure.py
+          --evidence-out .governance-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".governance-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit(
+                  "independent governance receipt does not match exact PR head"
+              )
+          if receipt.get("verifier") != "independent-governance-v1":
+              raise SystemExit("unexpected independent governance verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent governance verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 12:
+              raise SystemExit("independent governance boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) < 9:
+              raise SystemExit("independent governance mirror coverage is incomplete")
+          if not receipt.get("blueprint_digest"):
+              raise SystemExit("governance blueprint digest is missing")
+          if not receipt.get("state_topology_digest"):
+              raise SystemExit("governance state-topology digest is missing")
+          print(
+              "independent governance exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+              "mirrors=",
+              len(receipt["mirror_pairs"]),
+          )
+          PY
+
