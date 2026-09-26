@@ -13,13 +13,28 @@ _BOOTSTRAP_ISSUES = frozenset({1685})
 _APPROVAL_LABELS = frozenset({"supervisor-ready", "build-approved", "security-approved"})
 
 
+def _label_names(issue: Mapping[str, Any]) -> set[str]:
+    """Normalize issue labels given as GitHub objects or plain strings."""
+    raw = issue.get("labels", [])
+    if not isinstance(raw, (list, tuple)):
+        return set()
+    names: set[str] = set()
+    for item in raw:
+        if isinstance(item, Mapping):
+            name = item.get("name")
+        elif isinstance(item, str):
+            name = item
+        else:
+            continue
+        if isinstance(name, str) and name.strip():
+            names.add(name.strip().lower())
+    return names
+
+
 def _priority(issue: Mapping[str, Any]) -> int:
-    labels = {
-        str(item.get("name", item)).lower()
-        for item in issue.get("labels", [])
-        if isinstance(item, (str, Mapping))
-    }
-    if labels & {"security", "critical", "p0"}:
+    labels = _label_names(issue)
+    # security-approved issues are security work that has cleared review.
+    if labels & {"security", "security-approved", "critical", "p0"}:
         return 100
     if labels & {"bug", "ci", "p1"}:
         return 90
@@ -29,11 +44,7 @@ def _priority(issue: Mapping[str, Any]) -> int:
 def _eligible(issue: Mapping[str, Any]) -> bool:
     title = str(issue.get("title", "")).strip()
     number = issue.get("number")
-    labels = {
-        str(item.get("name", item)).lower()
-        for item in issue.get("labels", [])
-        if isinstance(item, (str, Mapping))
-    }
+    labels = _label_names(issue)
     try:
         issue_number = int(number)
     except (TypeError, ValueError):
