@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from core.conversations import ConversationStorageUnavailable
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
