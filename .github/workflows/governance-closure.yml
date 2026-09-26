@@ -32,6 +32,7 @@ on:
       - "skeleton/testing/test_memory_projection.py"
       - "backend/tests/test_route_privacy.py"
       - "backend/tests/test_conversation_storage_admission.py"
+      - "backend/tests/test_conversation_governance.py"
       - "backend/tests/test_gameforge_artifact_builder.py"
       - "machine/ai_app_construction.json"
       - "machine/ai_closure_evidence.json"
@@ -94,4 +95,5 @@ jobs:
           python -m pytest -q --noconftest
           backend/tests/test_route_privacy.py
           backend/tests/test_conversation_storage_admission.py
+          backend/tests/test_conversation_governance.py
           backend/tests/test_gameforge_artifact_builder.py
