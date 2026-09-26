@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from types import SimpleNamespace
 from uuid import uuid4
+from datetime import datetime, timezone
 
 import pytest
 
@@ -254,6 +255,142 @@ async def test_governed_deletion_fails_closed_on_cross_tenant_action():
 
     assert database.log == []
     assert len(database["conversation_threads"].docs) == 1
+
+
+@pytest.mark.asyncio
+async def test_thread_governance_selection_includes_only_explicit_linked_records():
+    tenant_id = "tenant-a"
+    thread_id = str(uuid4())
+    branch_id = str(uuid4())
+    user_id = str(uuid4())
+    assistant_id = str(uuid4())
+    memory_id = str(uuid4())
+    foreign_memory_id = str(uuid4())
+    now = datetime(2026, 9, 26, tzinfo=timezone.utc)
+
+    from skeleton.contracts.conversation import (
+        ConversationAuthorType,
+        ConversationMessage,
+        ConversationThread,
+        ConversationThreadState,
+    )
+
+    thread = ConversationThread(
+        thread_id=thread_id,
+        tenant_id=tenant_id,
+        owner_id="owner-a",
+        created_at=now,
+        updated_at=now,
+        version=3,
+        message_sequence=2,
+        active_branch_id=branch_id,
+        state=ConversationThreadState.ACTIVE,
+        title="Linked",
+    )
+    user = ConversationMessage(
+        message_id=user_id,
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=now,
+        idempotency_key="user-linked",
+        content="remember this",
+    )
+    assistant = ConversationMessage(
+        message_id=assistant_id,
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=now,
+        idempotency_key="assistant-linked",
+        content="remembered",
+        parent_message_id=user_id,
+        causal_user_message_id=user_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:linked",
+        memory_refs=("memory:" + memory_id,),
+    )
+    authority = object.__new__(MongoConversationAuthority)
+
+    async def get_thread(*_args, **_kwargs):
+        return thread
+
+    async def list_messages(*_args, after_sequence=0, **_kwargs):
+        return (user, assistant) if after_sequence == 0 else ()
+
+    async def inventory_reader(*, tenant_id: str):
+        return {
+            "tenant_id": tenant_id,
+            "records": [
+                {
+                    "record_id": thread_id,
+                    "tenant_id": tenant_id,
+                    "owner_plane": "conversation",
+                    "source_ref": "conversation-thread://" + thread_id,
+                    "state": "active",
+                },
+                {
+                    "record_id": user_id,
+                    "tenant_id": tenant_id,
+                    "owner_plane": "conversation",
+                    "source_ref": (
+                        "conversation-message://"
+                        + thread_id
+                        + "/"
+                        + user_id
+                    ),
+                    "state": "active",
+                },
+                {
+                    "record_id": assistant_id,
+                    "tenant_id": tenant_id,
+                    "owner_plane": "conversation",
+                    "source_ref": (
+                        "conversation-message://"
+                        + thread_id
+                        + "/"
+                        + assistant_id
+                    ),
+                    "state": "active",
+                },
+                {
+                    "record_id": memory_id,
+                    "tenant_id": tenant_id,
+                    "owner_plane": "memory",
+                    "source_ref": "memory://assistant/" + memory_id,
+                    "state": "active",
+                },
+                {
+                    "record_id": foreign_memory_id,
+                    "tenant_id": tenant_id,
+                    "owner_plane": "memory",
+                    "source_ref": (
+                        "memory://assistant/" + foreign_memory_id
+                    ),
+                    "state": "active",
+                },
+            ],
+        }
+
+    authority.get_thread = get_thread
+    authority.list_messages = list_messages
+    authority.governance_inventory_reader = inventory_reader
+
+    selected = await authority.governed_record_ids_for_thread(
+        thread_id,
+        tenant_id=tenant_id,
+        owner_id="owner-a",
+    )
+
+    assert set(selected) == {
+        thread_id,
+        user_id,
+        assistant_id,
+        memory_id,
+    }
+    assert foreign_memory_id not in selected
 
 
 @pytest.mark.asyncio
