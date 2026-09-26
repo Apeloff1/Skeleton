@@ -1918,8 +1918,8 @@
       "id": "gap-verification-evidence-contract",
       "plane": "reasoning-verification",
       "priority": "P0",
-      "status": "open",
-      "gap": "Verification components exist, but the canonical runtime still lacks one durable claim/evidence/postcondition verification contract. Current confidence/rubric loops can score outputs without proving which claims were grounded, which tool side effects satisfied postconditions, or which uncertainty is calibrated. A fully functional AI finalizer needs evidence-bound verdicts rather than a generic confidence number.",
+      "status": "in-progress",
+      "gap": "Canonical verification contracts, deterministic claim/evidence grounding, risk-selected policy, tool postcondition adapters, bounded semantic verifier/repair logic and durable observable VerificationReceipt persistence are implemented. The cognitive execution runtime already materializes and persists canonical receipts before terminal finalization. Remaining convergence is production wiring of evidence materialization plus SemanticVerificationRuntime for policy-selected independent verification, production action-postcondition aggregation, and end-to-end repair/qualified/block publication semantics through the execution finalizer.",
       "construction": [
         "define VerificationRequest, VerificationReceipt, ClaimRecord, EvidenceReference and PostconditionCheck contracts",
         "select verification level from capability/risk policy rather than model preference",
@@ -1942,8 +1942,19 @@
         "repair lineage and max-repair tests",
         "high-impact block cannot be bypassed by generator retry",
         "verification receipt binds operation/execution/turn/result and evidence ids",
-        "no hidden reasoning text is required for audit/replay"
-      ]
+        "no hidden reasoning text is required for audit/replay",
+        "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
+        "skeleton/intelligence/verification_policy.py selects verification level from risk, claim kind and action effect without model confidence",
+        "skeleton/intelligence/verification_runtime.py implements deterministic evidence policy plus bounded provider-backed semantic PASS/REPAIR/QUALIFY/ABSTAIN/BLOCK finalization",
+        "skeleton/retrieval/verification.py validates citation identity, scope and independent evidence origins",
+        "skeleton/skills/verification.py binds postcondition observations to durable ToolExecutionReceipt status and lineage",
+        "skeleton/persistence/execution_repository.py durably persists verification receipts before terminal execution finalization",
+        "skeleton/intelligence/execution_runtime.py materializes canonical VerificationReceipt and stores it before committing terminal AIExecutionResult",
+        "skeleton/testing/test_verification_runtime.py covers scope integrity, model-evidence non-authority, independent-origin policy, contradiction, tool postconditions, observable receipt privacy, semantic-provider routing, fail-closed outage, repair lineage, citation rebinding and bounded repair budgets",
+        "skeleton/testing/test_execution_runtime.py proves canonical verification receipt persistence, fail-closed missing evidence and verification-before-finalization ordering",
+        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head"
+      ],
+      "verification_state": "core-contract-runtime-and-receipt-persistence-implemented-production-semantic-evidence-binding-open"
     },
     {
       "id": "gap-provider-interaction-protocol",
@@ -5691,7 +5702,7 @@
   "verification_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "in-progress",
     "gap": "gap-verification-evidence-contract",
     "planned_modules": {
       "contracts": "skeleton/contracts/verification.py",
@@ -5952,7 +5963,25 @@
         "target": "domain verifier adapter under canonical policy/receipt semantics"
       }
     ],
-    "privacy_rule": "verification/audit stores claims, evidence ids/digests, checks and verdicts; hidden chain-of-thought is neither required nor persisted"
+    "privacy_rule": "verification/audit stores claims, evidence ids/digests, checks and verdicts; hidden chain-of-thought is neither required nor persisted",
+    "implemented_surfaces": [
+      "canonical claim/evidence/postcondition/check/receipt contracts",
+      "risk and action-effect verification policy",
+      "deterministic citation/scope/independent-origin grounding",
+      "tool receipt postcondition adapter",
+      "bounded semantic provider verifier with structured output",
+      "repair lineage and citation-rebinding fence",
+      "high-impact fail-closed block semantics",
+      "durable execution verification receipt persistence before terminal finalization",
+      "observable receipt privacy without hidden chain-of-thought"
+    ],
+    "remaining_surfaces": [
+      "materialize authorized execution evidence into canonical EvidenceReference values during production finalization",
+      "wire SemanticVerificationRuntime to the production canonical provider adapter for policy-selected independent verification",
+      "aggregate production tool/action postconditions into final verification",
+      "map qualified/abstain/repair/block dispositions into execution publication/finalization semantics",
+      "collect exact-head cognitive verification closure evidence and independent signoff"
+    ]
   },
   "provider_interaction_protocol": {
     "schema_version": 1,
