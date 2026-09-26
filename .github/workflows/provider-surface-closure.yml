@@ -122,10 +122,11 @@ jobs:
           skeleton/testing/test_engine_cross_service_boundary.py
 
       - name: Run product provider-isolation facade contracts
-        run: >-
-          python -m pytest -q --noconftest -p pytest_asyncio.plugin
-          backend/tests/test_engine_chat.py
-          tests/test_provider_runtime_boundary.py
+        run: |
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin \
+            backend/tests/test_engine_chat.py
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin \
+            tests/test_provider_runtime_boundary.py
 
       - name: Assert exact-head provider evidence receipt
         env:
