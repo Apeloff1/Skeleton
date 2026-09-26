@@ -15,8 +15,7 @@ router = APIRouter(prefix="/agents", tags=["Multi-Agent Systems"])
 
 # LLM Setup
 try:
-    from core.engine_chat import EngineChat, UserMessage
-    LLM_AVAILABLE = True
+        LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
 
