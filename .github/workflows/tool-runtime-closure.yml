@@ -1,0 +1,173 @@
+name: Tool Runtime Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/skills/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/ai/runtime/skills/**"
+      - "skeleton/ai/runtime/intelligence/execution_runtime.py"
+      - "backend/services/tool_registry.py"
+      - "backend/tests/test_tool_registry_canonical_delegate.py"
+      - "backend/tests/test_tool_registry_scoped_adapters.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_execution_runtime.py"
+      - "scripts/check_tool_runtime_boundary.py"
+      - "scripts/verify_tool_runtime_closure.py"
+      - "tests/test_tool_runtime_boundary.py"
+      - "tests/test_tool_runtime_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/tool-runtime-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tool-runtime-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tool-runtime-contracts:
+    name: Tool runtime contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused tool runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+
+      - name: Audit canonical tool runtime boundary
+        run: python scripts/check_tool_runtime_boundary.py
+
+      - name: Run boundary validator regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_tool_runtime_boundary.py
+
+      - name: Run canonical runtime and durable receipt contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_receipt_store.py
+
+      - name: Run backend compatibility delegation contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_tool_registry_canonical_delegate.py
+          backend/tests/test_tool_registry_scoped_adapters.py
+
+      - name: Run cognitive lineage and minimal projection contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_execution_runtime.py
+
+  tool-runtime-independent:
+    name: Independent tool runtime verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent tool verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_tool_runtime_independent_verifier.py
+
+      - name: Run independent exact-head tool runtime scan
+        env:
+          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_tool_runtime_closure.py
+          --evidence-out .tool-runtime-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".tool-runtime-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit(
+                  "independent tool-runtime receipt does not match exact PR head"
+              )
+          if receipt.get("verifier") != "independent-tool-runtime-v1":
+              raise SystemExit("unexpected independent tool-runtime verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent tool-runtime verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 6:
+              raise SystemExit("independent tool-runtime boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) < 5:
+              raise SystemExit("independent tool-runtime mirror coverage is incomplete")
+          dependencies = set(receipt.get("dependency_graph") or [])
+          expected_dependencies = {
+              "gap-governance-registry",
+              "gap-cost-admission",
+              "gap-provider-surface-convergence",
+          }
+          if dependencies != expected_dependencies:
+              raise SystemExit("tool-runtime dependency graph receipt is invalid")
+          if not receipt.get("handoff_digest"):
+              raise SystemExit("tool-runtime handoff digest is missing")
+          print(
+              "independent tool-runtime exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+              "mirrors=",
+              len(receipt["mirror_pairs"]),
+          )
+          PY
