@@ -204,13 +204,28 @@ export class WorkspaceController {
       item => item.id === conversationId,
     );
     if (!current?.sessionId) return false;
+    const sessionId = current.sessionId;
     try {
-      const hydrated = await this.hydrateConversation(current);
+      const result = await this.historyTransport(sessionId);
+      if (
+        result.ok === false
+        || result.available === false
+        || result.session_id !== sessionId
+        || !Array.isArray(result.turns)
+      ) {
+        return false;
+      }
       const latest = this.snapshot.workspace.conversations.find(
         item => item.id === conversationId,
       );
-      if (!latest || this.running?.conversationId === conversationId) return false;
-      const projection = await this.hydrateConversation(latest);
+      if (
+        !latest
+        || latest.sessionId !== sessionId
+        || this.running?.conversationId === conversationId
+      ) {
+        return false;
+      }
+      const projection = projectCanonicalHistory(latest, result);
       this.change(updateConversation(
         this.snapshot.workspace,
         conversationId,
