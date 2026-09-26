@@ -17,13 +17,15 @@ The browser is a cache/projection. Provider history is never authoritative.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+import json
+from typing import Any, Awaitable, Callable, Mapping
 from uuid import uuid4
 
 from pymongo import ASCENDING, DESCENDING, ReturnDocument
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core.databases import core_db
+from core.engine_client import EngineClient
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -51,6 +53,29 @@ def _thread_doc(thread: ConversationThread) -> dict[str, Any]:
     payload["created_at"] = thread.created_at
     payload["updated_at"] = thread.updated_at
     return payload
+
+
+def _storage_bytes(payload: object) -> int:
+    try:
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+            default=(
+                lambda value: (
+                    value.astimezone(timezone.utc).isoformat()
+                    if isinstance(value, datetime)
+                    else str(value)
+                )
+            ),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ConversationStorageUnavailable(
+            "conversation storage payload is not deterministic JSON"
+        ) from exc
+    return len(encoded)
 
 
 def _message_doc(message: ConversationMessage) -> dict[str, Any]:
@@ -111,10 +136,50 @@ def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
 class MongoConversationAuthority:
     """Server-authoritative conversation repository for product runtime."""
 
-    def __init__(self, database=core_db) -> None:
+    def __init__(
+        self,
+        database=core_db,
+        *,
+        storage_admitter: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
+    ) -> None:
         self.database = database
         self.threads = database["conversation_threads"]
         self.messages = database["conversation_messages"]
+        self.storage_admitter = storage_admitter
+
+    async def _admit_storage(
+        self,
+        *,
+        tenant_id: str,
+        resource_id: str,
+        write_id: str,
+        payload: object,
+    ) -> Mapping[str, Any] | None:
+        admitter = self.storage_admitter
+        if admitter is None:
+            return None
+        try:
+            receipt = await admitter(
+                tenant_id=str(tenant_id),
+                capability="conversation-persistence",
+                resource_id=str(resource_id),
+                write_id=str(write_id),
+                storage_bytes=max(1, _storage_bytes(payload)),
+            )
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "conversation storage admission is unavailable"
+            ) from exc
+        if not isinstance(receipt, Mapping):
+            raise ConversationStorageUnavailable(
+                "conversation storage admission returned invalid receipt"
+            )
+        admitted = int(receipt.get("storage_bytes") or 0)
+        if admitted < _storage_bytes(payload):
+            raise ConversationStorageUnavailable(
+                "conversation storage admission under-accounted payload"
+            )
+        return receipt
 
     async def ensure_indexes(self) -> None:
         try:
@@ -186,6 +251,12 @@ class MongoConversationAuthority:
             state=ConversationThreadState.ACTIVE,
             title=title,
             data_class=data_class,
+        )
+        await self._admit_storage(
+            tenant_id=thread.tenant_id,
+            resource_id="conversation-thread",
+            write_id="thread:" + thread.thread_id,
+            payload=thread.as_dict(),
         )
         try:
             await self.threads.insert_one(_thread_doc(thread))
@@ -490,6 +561,25 @@ class MongoConversationAuthority:
             prepared["_commit_state"] = "prepared"
             prepared["_expected_thread_version"] = expected_thread_version
             prepared["_activate_branch"] = bool(activate_branch)
+            await self._admit_storage(
+                tenant_id=tenant_id,
+                resource_id="conversation-message",
+                write_id=(
+                    "message:"
+                    + message.thread_id
+                    + ":"
+                    + message.idempotency_key
+                ),
+                payload={
+                    "message": message.as_dict(),
+                    "thread_commit": {
+                        "thread_id": message.thread_id,
+                        "expected_version": expected_thread_version,
+                        "sequence": message.sequence,
+                        "activate_branch": bool(activate_branch),
+                    },
+                },
+            )
             await self.messages.insert_one(prepared)
         except ConversationConflict:
             raise
@@ -913,6 +1003,25 @@ class MongoConversationAuthority:
             allowed_current = [ConversationThreadState.DELETING.value]
         else:
             allowed_current = []
+        await self._admit_storage(
+            tenant_id=tenant_id,
+            resource_id="conversation-thread-state",
+            write_id=(
+                "state:"
+                + str(thread_id)
+                + ":"
+                + str(expected_version)
+                + ":"
+                + state.value
+            ),
+            payload={
+                "thread_id": str(thread_id),
+                "tenant_id": str(tenant_id),
+                "owner_id": str(owner_id),
+                "expected_version": expected_version,
+                "state": state.value,
+            },
+        )
         try:
             updated = await self.threads.find_one_and_update(
                 {
@@ -952,7 +1061,14 @@ class MongoConversationAuthority:
         return _thread_from_doc(updated)
 
 
-conversation_authority = MongoConversationAuthority()
+_conversation_engine_client = EngineClient.from_env()
+conversation_authority = MongoConversationAuthority(
+    storage_admitter=(
+        None
+        if _conversation_engine_client is None
+        else _conversation_engine_client.admit_storage_write
+    )
+)
 
 
 __all__ = [
