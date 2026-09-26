@@ -208,6 +208,7 @@ class ProviderRequest:
     purpose: str = "model-inference"
     tenant_id: str | None = None
     operation_id: str | None = None
+    admission_operation_id: str | None = None
     execution_id: str | None = None
     turn_id: str | None = None
     estimated_cost_usd: float = 0.0
@@ -1331,10 +1332,22 @@ def _provider_operation_id(request: ProviderRequest) -> str:
 
 
 def _provider_admission_operation_id(request: ProviderRequest) -> str:
-    """Use canonical operation identity when present, else one invocation lease ID."""
+    """Resolve one quota/admission identity without changing lineage identity."""
 
+    if request.admission_operation_id is not None:
+        value = request.admission_operation_id.strip()
+        if not value:
+            raise ProviderPolicyError(
+                "provider admission operation identity is invalid"
+            )
+        return value
     if request.operation_id is not None:
-        return request.operation_id.strip()
+        value = request.operation_id.strip()
+        if not value:
+            raise ProviderPolicyError(
+                "provider operation identity is invalid"
+            )
+        return value
     return "provider-invocation-" + str(uuid4())
 
 
