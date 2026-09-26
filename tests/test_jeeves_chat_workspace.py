@@ -1261,3 +1261,46 @@ def test_idless_pending_jeeves_turn_resumes_with_server_assigned_identity(
     assert messages[1].idempotency_key == (
         "jeeves-assistant:" + pending.idempotency_key
     )
+
+
+def test_canonical_history_failure_blocks_append_and_generation(
+    route,
+    monkeypatch,
+):
+    calls = {"append": 0, "generate": 0}
+
+    async def unavailable_history(_session_id):
+        raise RuntimeError("canonical history read failed")
+
+    async def forbidden_append(*_args, **_kwargs):
+        calls["append"] += 1
+        raise AssertionError("append must not run without canonical history")
+
+    async def forbidden_generate(*_args, **_kwargs):
+        calls["generate"] += 1
+        raise AssertionError("generation must not run without canonical history")
+
+    monkeypatch.setattr(route, "_load_server_history", unavailable_history)
+    monkeypatch.setattr(route, "_append_canonical_user_turn", forbidden_append)
+    monkeypatch.setattr(route, "_generate_text", forbidden_generate)
+
+    with _chat_client(
+        route,
+        monkeypatch,
+        _MemoryChatCollection(),
+        forbidden_generate,
+        canonical=_CanonicalConversationAuthority(),
+    ) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-history-failure",
+                "client_message_id": "history-failure-1",
+                "message": "hello",
+            },
+        )
+
+    assert response.status_code == 503
+    assert "canonical conversation history is unavailable" in response.text
+    assert "canonical history read failed" not in response.text
+    assert calls == {"append": 0, "generate": 0}
