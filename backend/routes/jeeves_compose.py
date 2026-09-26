@@ -12,6 +12,7 @@ routes/jeeves_compose.py — Jeeves SOTA composer + chat (/api/jeeves).
 from __future__ import annotations
 
 import hashlib
+import os
 import time
 import uuid
 from typing import Annotated, Any, Dict, List, Optional
@@ -205,6 +206,200 @@ async def compose(req: ComposeReq):
 def _chat_col():
     from core.databases import core_db
     return core_db["jeeves_chat"]
+
+
+def _canonical_chat_enabled() -> bool:
+    return os.getenv(
+        "SKL_JEEVES_CANONICAL_CONVERSATIONS",
+        "",
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _canonical_authority():
+    from core.conversations import conversation_authority
+    return conversation_authority
+
+
+def _canonical_session_identity(session_id: str) -> tuple[str, str]:
+    return "jeeves-compat", "jeeves-session:" + session_id
+
+
+def _canonical_thread_id(session_id: str) -> str:
+    return str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "skeleton-jeeves-session:" + session_id,
+        )
+    )
+
+
+def _canonical_branch_id(session_id: str) -> str:
+    return str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "skeleton-jeeves-session-branch:" + session_id,
+        )
+    )
+
+
+def _canonical_user_idempotency(client_message_id: str | None) -> str:
+    if client_message_id:
+        return "jeeves-user:" + client_message_id
+    return "jeeves-user:" + uuid.uuid4().hex
+
+
+async def _ensure_canonical_thread(session_id: str):
+    from skeleton.persistence.conversation_repository import (
+        ConversationConflict,
+        ConversationNotFound,
+    )
+
+    authority = _canonical_authority()
+    tenant_id, owner_id = _canonical_session_identity(session_id)
+    thread_id = _canonical_thread_id(session_id)
+    try:
+        thread = await authority.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+    except ConversationNotFound:
+        try:
+            thread = await authority.create_thread(
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                title="Jeeves " + session_id[:64],
+                data_class="internal",
+                thread_id=thread_id,
+                branch_id=_canonical_branch_id(session_id),
+            )
+        except ConversationConflict:
+            thread = await authority.get_thread(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+    return authority, thread, tenant_id, owner_id
+
+
+def _canonical_history_from_messages(messages) -> List[HistoryMessage]:
+    from skeleton.contracts.conversation import ConversationAuthorType
+
+    history: List[HistoryMessage] = []
+    for message in messages:
+        if not isinstance(message.content, str) or not message.content.strip():
+            continue
+        if message.author_type is ConversationAuthorType.USER:
+            history.append(
+                HistoryMessage(
+                    role="user",
+                    content=message.content[:4000],
+                )
+            )
+        elif message.author_type is ConversationAuthorType.ASSISTANT:
+            history.append(
+                HistoryMessage(
+                    role="assistant",
+                    content=message.content[:4000],
+                )
+            )
+    return history[-_MAX_SERVER_HISTORY_MESSAGES:]
+
+
+async def _load_canonical_history(
+    session_id: str,
+) -> tuple[List[HistoryMessage], bool]:
+    try:
+        authority, thread, tenant_id, owner_id = (
+            await _ensure_canonical_thread(session_id)
+        )
+        messages = await authority.active_transcript(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        return _canonical_history_from_messages(messages), True
+    except Exception:
+        return [], False
+
+
+async def _append_canonical_user_turn(
+    req: ChatReq,
+    session_id: str,
+):
+    authority, thread, tenant_id, owner_id = (
+        await _ensure_canonical_thread(session_id)
+    )
+    thread, message = await authority.append_user_message(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+        content=req.message,
+        idempotency_key=_canonical_user_idempotency(
+            req.client_message_id
+        ),
+        expected_thread_version=thread.version,
+        data_class="internal",
+    )
+    return authority, thread, message, tenant_id, owner_id
+
+
+async def _commit_canonical_assistant_turn(
+    *,
+    authority,
+    thread,
+    user_message,
+    tenant_id: str,
+    owner_id: str,
+    session_id: str,
+    client_message_id: str | None,
+    generated: Dict[str, Any],
+):
+    operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            (
+                "skeleton-jeeves-operation:"
+                + session_id
+                + ":"
+                + user_message.message_id
+            ),
+        )
+    )
+    execution_id = generated.get("engine_execution_id")
+    if execution_id:
+        ai_result_id = "engine-result:" + str(execution_id)
+    else:
+        result_digest = hashlib.sha256(
+            (
+                str(generated.get("model") or "")
+                + "\x1f"
+                + str(generated.get("text") or "")
+            ).encode("utf-8")
+        ).hexdigest()
+        ai_result_id = "jeeves-qualified-result:" + result_digest[:40]
+    assistant_key = (
+        "jeeves-assistant:"
+        + (client_message_id or user_message.idempotency_key)
+    )
+    return await authority.commit_assistant_message(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+        content=str(generated.get("text") or ""),
+        idempotency_key=assistant_key,
+        expected_thread_version=thread.version,
+        causal_user_message_id=user_message.message_id,
+        operation_id=operation_id,
+        ai_result_id=ai_result_id,
+        tool_receipt_refs=(),
+        citation_refs=tuple(
+            str(item)
+            for item in generated.get("engine_evidence_refs") or ()
+            if str(item).strip()
+        ),
+        data_class="internal",
+    )
 
 
 _MAX_SERVER_HISTORY_MESSAGES = 20
