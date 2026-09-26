@@ -140,7 +140,7 @@ jobs:
 
       - name: Verify exact-head Jeeves cutover
         env:
-          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/verify_jeeves_conversation_cutover.py
           --evidence-out .jeeves-conversation-cutover.json
