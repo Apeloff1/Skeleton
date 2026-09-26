@@ -75,7 +75,7 @@ async def call_llm(system: str, prompt: str) -> str:
             instruction_policy=InstructionPolicy(
                 policy_id="backend.collaboration.ai-pairing",
                 version="1",
-                instructions=system,
+                instructions=system.strip(),
             )
         ).with_model("openai", "gpt-4o")
         response = await chat.send_message(UserMessage(text=prompt))
