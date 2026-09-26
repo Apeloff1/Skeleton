@@ -212,4 +212,3 @@ def test_independent_verifier_rejects_drifted_ai_provider_mirror(
         "canonical provider runtime AI mirror drifted from source" in error
         for error in receipt["errors"]
     )
-
