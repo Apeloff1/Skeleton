@@ -36,8 +36,6 @@ from .builder_dna_translator import (
 
 router = APIRouter(prefix="/code-to-app", tags=["Code to App Pipeline"])
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
-
 # ─── Hardening knobs ────────────────────────────────────────────────────
 # Wall-clock timeout for any single LLM call. Anything past this is almost
 # certainly a stuck upstream — fail fast and let the client retry banner
@@ -118,7 +116,6 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
     for attempt in range(1, attempts + 1):
         try:
             chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
                 session_id=f"codedock-app-{uuid.uuid4().hex[:8]}",
                 system_message=system_prompt,
             ).with_model("openai", "gpt-4o")
