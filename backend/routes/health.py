@@ -67,7 +67,7 @@ async def health_check():
         "services": {
             "api": "running",
             "database": "connected",
-            "ai": "available" if os.environ.get('EMERGENT_LLM_KEY') else "limited"
+            "ai": "engine_managed"
         },
         "uptime": "operational",
         "canonical_application": _canonical_application()
