@@ -105,6 +105,30 @@ test('remount replaces stale device transcript with canonical server history', (
 test('remount keeps device cache with notice when canonical history is unavailable', () => {});
 test('durable backend session identity survives timestamp age and skew', () => {});
 """,
+        "backend/routes/conversations.py": """
+@router.post("/{thread_id}/messages/{message_id}/regenerate")
+async def regenerate_assistant_message():
+    command_from_context()
+    _compile_chat_context()
+    _provider_history()
+    EngineClient.from_env()
+    conversation_authority.regenerate_assistant_message()
+    ai_result_id = "engine-result:" + result.execution_id
+    payload = {
+        "regenerated_from": target.message_id,
+        "causal_user_message_id": causal.message_id,
+    }
+""",
+        "backend/tests/test_conversation_regeneration_route.py": """
+async def test_regenerate_route_runs_engine_then_commits_new_branch():
+    pass
+
+async def test_regenerate_route_never_commits_when_engine_unavailable():
+    pass
+
+async def test_regenerate_route_rejects_stale_version_before_engine_resolution():
+    pass
+""",
     }
     for rel, source in files.items():
         path = root / rel
@@ -126,7 +150,7 @@ def test_cutover_verifier_accepts_migration_read_only_legacy_store(
     assert receipt["errors"] == []
     assert receipt["head_sha"] == "conversation-head"
     assert receipt["legacy_read_accesses"] == 1
-    assert len(receipt["digests"]) == 8
+    assert len(receipt["digests"]) == 10
 
 
 def test_cutover_verifier_rejects_legacy_write(tmp_path: Path) -> None:
