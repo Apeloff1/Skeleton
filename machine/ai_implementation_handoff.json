@@ -203,11 +203,13 @@
         "skeleton/retrieval/governance.py canonical governed retrieval owner",
         "skeleton/vault/lifecycle_adapters.py governed retrieval lifecycle adapter",
         "skeleton/api/server.py composes governed retrieval owner and executor",
-        "skeleton/testing/test_lifecycle_adapters.py and test_governance_runtime_binding.py prove retrieval lifecycle behavior"
+        "skeleton/testing/test_lifecycle_adapters.py and test_governance_runtime_binding.py prove retrieval lifecycle behavior",
+        "skeleton/memory/projection.py governs derived vector/TF-IDF projection writes and tombstone deletion acknowledgement",
+        "skeleton/api/server.py binds canonical governance into production async projection dispatch",
+        "skeleton/testing/test_memory_projection.py proves fail-closed derived retrieval lifecycle ordering"
       ],
       "remaining": [
         "bridge provider privacy ceilings into every application route",
-        "complete derived memory projection/index deletion acknowledgement",
         "bridge provider/tool privacy ceilings into every application route",
         "collect exact-head and independent governance closure evidence",
         "register artifact records at remaining canonical write boundaries",
