@@ -841,10 +841,18 @@ async def ai_chat(
             "latency_ms": (time.monotonic() - engine_started) * 1000.0,
             "engine_execution_id": engine_result.execution_id,
             "engine_verification": engine_result.verification,
-            "engine_evidence_refs": list(engine_result.evidence_refs),
-            "engine_tool_receipts": list(engine_result.tool_receipts),
-            "engine_memory_refs": list(engine_result.memory_refs),
-            "engine_artifact_refs": list(engine_result.artifact_refs),
+            "engine_evidence_refs": list(
+                getattr(engine_result, "evidence_refs", ())
+            ),
+            "engine_tool_receipts": list(
+                getattr(engine_result, "tool_receipts", ())
+            ),
+            "engine_memory_refs": list(
+                getattr(engine_result, "memory_refs", ())
+            ),
+            "engine_artifact_refs": list(
+                getattr(engine_result, "artifact_refs", ())
+            ),
         }
     else:
         result = await call_llm(
