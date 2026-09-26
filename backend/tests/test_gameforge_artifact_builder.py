@@ -272,4 +272,3 @@ def test_governed_artifact_requires_tenant_before_canonical_write(tmp_path):
     assert store.calls == []
     assert list(tmp_path.glob("*.zip")) == []
     assert list(tmp_path.glob("*.pending")) == []
-
