@@ -489,22 +489,23 @@ async def request_conversation_deletion(
     expected_thread_version: Annotated[int, Query(ge=1)],
     user=Depends(require_role("viewer")),
 ):
-    """Enter deletion lifecycle without claiming downstream propagation is done."""
+    """Execute governed deletion across canonical conversation-linked state."""
 
     tenant_id, owner_id = _identity(user)
     try:
-        thread = await conversation_authority.set_state(
+        result = await conversation_authority.delete_thread_with_governance(
             thread_id,
             tenant_id=tenant_id,
             owner_id=owner_id,
-            expected_version=expected_thread_version,
-            state=ConversationThreadState.DELETING,
+            expected_thread_version=expected_thread_version,
         )
     except Exception as exc:
         raise _translate(exc) from exc
     return {
-        "thread": thread.as_dict(),
-        "deletion_state": "deleting",
-        "complete": False,
-        "detail": "Conversation deletion propagation is queued for governance lifecycle handling.",
+        "thread": result["thread"],
+        "deletion_state": "deleted",
+        "complete": True,
+        "plan_id": result["plan_id"],
+        "record_ids": result["record_ids"],
+        "linked_execution": result["linked_execution"],
     }
