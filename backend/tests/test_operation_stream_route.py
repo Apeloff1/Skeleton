@@ -27,7 +27,9 @@ class _Request:
         return False
 
 
-def _operation(tenant_id: str = "tenant-a") -> OperationEnvelope:
+def _operation(
+    tenant_id: str = "tenant-a", idempotency_key: str = "idem-route"
+) -> OperationEnvelope:
     return OperationEnvelope(
         operation_id=str(uuid4()),
         tenant_id=tenant_id,
@@ -35,7 +37,7 @@ def _operation(tenant_id: str = "tenant-a") -> OperationEnvelope:
         capability="chat",
         created_at=BASE_TIME,
         deadline=BASE_TIME + timedelta(minutes=10),
-        idempotency_key="idem-route",
+        idempotency_key=idempotency_key,
         trace_id="trace-route",
     )
 
@@ -443,7 +445,8 @@ def test_slow_browser_replay_on_one_operation_does_not_block_another(tmp_path: P
     events_a = SQLiteOperationEventStore(event_path); events_b = SQLiteOperationEventStore(event_path)
     transport_a = OperationStreamTransport(operations_a, events_a, worker_id="worker-a")
     transport_b = OperationStreamTransport(operations_b, events_b, worker_id="worker-b")
-    slow = _operation(); fast = _operation()
+    # Distinct idempotency keys: identical keys dedupe to one durable operation.
+    slow = _operation(idempotency_key="idem-slow"); fast = _operation(idempotency_key="idem-fast")
     slow_current = operations_a.create(slow, now=BASE_TIME)
     for index, state in enumerate((OperationState.VALIDATED, OperationState.AUTHORIZED, OperationState.ADMITTED), start=1):
         slow_current = operations_a.transition(slow.operation_id, state, expected_version=slow_current.version, now=BASE_TIME + timedelta(seconds=index))
