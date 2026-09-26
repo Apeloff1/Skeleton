@@ -369,15 +369,22 @@
         "terminal operation state persistence",
         "transactional operation-state plus event-intent outbox",
         "retry-stable outbox event identity compatible with canonical stream",
-        "operation state reopen/corruption/outbox integration regressions"
+        "operation state reopen/corruption/outbox integration regressions",
+        "backend/services/rag_state_repository.py is the canonical Mongo authority for learning sessions, concepts, user progress, co-coding context and feedback",
+        "backend/tests/test_rag_state_authority.py proves Chroma projection failure cannot roll back canonical Mongo state and stale projection entries cannot resurrect missing authority",
+        "RAGService.migrate_legacy_chroma_state imports legacy Chroma-owned product state into Mongo and rebuild_projections_from_mongo recreates projections from authority",
+        "skeleton/persistence/operation_runtime.py binds production reasoning to durable OperationEnvelope state with transactional outbox and background reconciliation",
+        "skeleton/api/server.py starts the durable operation outbox dispatcher during Genesis wiring and closes it during shutdown",
+        "scripts/state_recovery_drill.py now performs destructive operation SQLite backup/restore verification and reconciles restored unpublished outbox rows",
+        ".github/workflows/state-recovery-drill.yml executes Mongo authoritative-first recovery and operation SQLite recovery drills",
+        "docker-compose.yml persists engine execution, submission/approval, tool receipt, quota/usage and shared-pressure SQLite state on skeleton_data",
+        "machine/state_topology.json v1.8.0 binds cognitive execution/result/approval/tool/quota authorities to durable engine SQLite stores"
       ],
       "remaining": [
-        "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
-        "bind production orchestration paths to durable operation repository",
-        "run durable outbox dispatcher as part of runtime lifecycle",
-        "define production backup and retention policy for operation state",
-        "prove Mongo authoritative restore before all derived index rebuilds",
-        "run derived-store loss and rebuild drill"
+        "exercise destructive backup/restore of the complete engine SQLite state bundle",
+        "finalize operator retention/backup policy for engine/governance durable state",
+        "collect fresh exact-head state topology/recovery/App Assembly/Backend Quality evidence",
+        "obtain independent closure verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
