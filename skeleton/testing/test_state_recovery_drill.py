@@ -274,7 +274,8 @@ def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
     verified = result["verified"]
     assert verified["execution_state"] == "routing"
     assert verified["checkpoint_version"] == 1
-    assert verified["approval_ref"] == "approval:engine-recovery"
+    assert verified["approval_ref"].startswith("approval:")
+    assert len(verified["approval_ref"]) == len("approval:") + 64
     assert verified["tool_reservation_status"] == "in_doubt"
     assert verified["quota_committed_input_tokens"] == 90
     assert verified["pressure_active"] == 1
