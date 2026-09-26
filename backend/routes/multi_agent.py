@@ -9,7 +9,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime
-import os
 import uuid
 
 router = APIRouter(prefix="/agents", tags=["Multi-Agent Systems"])
@@ -21,7 +20,6 @@ try:
 except Exception:
     LLM_AVAILABLE = False
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # AGENT DEFINITIONS
@@ -219,7 +217,7 @@ _AGENT_ROUTER_TASK = {
 
 async def run_agent(agent_id: str, task: str, context: str = "") -> Dict[str, Any]:
     """Run a single agent — now backed by Jeeves consult + vault patterns."""
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"agent": agent_id, "error": "LLM not available", "output": ""}
     
     agent = AGENT_ROLES.get(agent_id)
