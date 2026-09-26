@@ -330,10 +330,15 @@ async def test_governed_artifact_retention_expiry_physically_deletes_bytes(
     ) is None
     lifecycle = state.governance_lifecycle.get(record.record_id)
     assert lifecycle["state"] == "deleted"
-    receipts = state.governance_lifecycle.deletion_receipts(
-        record.record_id
+    receipts = state.governance_lifecycle.receipts(
+        tenant_id="tenant-retention"
     )
-    assert len(receipts) == 1
-    assert receipts[0]["target"] == "artifact"
+    record_receipts = [
+        receipt
+        for receipt in receipts
+        if receipt.record_id == record.record_id
+    ]
+    assert len(record_receipts) == 1
+    assert record_receipts[0].target == "artifact"
     state.close_governance_registry()
 
