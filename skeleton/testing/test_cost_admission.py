@@ -184,4 +184,3 @@ def test_non_provider_usage_defaults_to_zero_provider_attempts() -> None:
     )
     assert decision.estimated.provider_attempts == 0
     assert decision.remaining["provider_attempts"] == 3
-
