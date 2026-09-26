@@ -343,4 +343,3 @@ async def test_authority_rejects_mismatched_governance_receipt() -> None:
         )
 
     assert db["conversation_threads"].inserts == []
-
