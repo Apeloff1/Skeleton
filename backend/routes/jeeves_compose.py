@@ -516,6 +516,64 @@ async def _commit_canonical_assistant_turn(
     )
 
 
+async def _canonical_replay_turn(
+    session_id: str,
+    client_message_id: str,
+    user_message: str,
+    compatibility_turn: Dict[str, Any],
+) -> Dict[str, Any]:
+    authority, thread, tenant_id, owner_id = (
+        await _ensure_canonical_thread(session_id)
+    )
+    messages = await authority.active_transcript(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    user_key = _canonical_user_idempotency(client_message_id)
+    canonical_user = next(
+        (
+            message
+            for message in messages
+            if message.idempotency_key == user_key
+        ),
+        None,
+    )
+    if canonical_user is None:
+        raise HTTPException(
+            status_code=409,
+            detail="canonical conversation replay state is incomplete",
+        )
+    if canonical_user.content != user_message:
+        raise HTTPException(
+            status_code=409,
+            detail="client_message_id was already used for different content",
+        )
+    assistant_key = "jeeves-assistant:" + client_message_id
+    canonical_assistant = next(
+        (
+            message
+            for message in messages
+            if message.idempotency_key == assistant_key
+            and message.causal_user_message_id
+            == canonical_user.message_id
+        ),
+        None,
+    )
+    if canonical_assistant is None:
+        raise HTTPException(
+            status_code=409,
+            detail="this message is already being processed; retry after it completes",
+        )
+    replay = _replay_turn(compatibility_turn)
+    replay["reply"] = canonical_assistant.content
+    replay["operation_id"] = canonical_assistant.operation_id
+    replay["ai_result_id"] = canonical_assistant.ai_result_id
+    replay["canonical_thread_id"] = thread.thread_id
+    replay["canonical_message_id"] = canonical_assistant.message_id
+    return replay
+
+
 _MAX_SERVER_HISTORY_MESSAGES = 20
 
 
@@ -543,10 +601,13 @@ async def _load_server_history(
 ) -> tuple[List[HistoryMessage], bool]:
     """Load the server-owned transcript projection for one compatibility session.
 
-    The availability flag distinguishes an empty server-owned transcript from
-    a storage outage. Caller history is never accepted as conversation
-    authority, including during empty-thread and degraded-storage cases.
+    Canonical mode reads ConversationThread/ConversationMessage authority and
+    uses legacy rows only as one-way migration input. Caller history is never
+    accepted as conversation authority.
     """
+
+    if _canonical_chat_enabled():
+        return await _load_canonical_history(session_id)
 
     try:
         collection = _chat_col()
@@ -630,6 +691,13 @@ async def _claim_idempotent_turn(
         req.message,
     )
     if existing is not None:
+        if _canonical_chat_enabled():
+            return None, await _canonical_replay_turn(
+                session_id,
+                req.client_message_id,
+                req.message,
+                existing,
+            )
         return None, _replay_turn(existing)
 
     turn_key = _turn_id(session_id, req.client_message_id)
@@ -651,6 +719,13 @@ async def _claim_idempotent_turn(
             req.message,
         )
         if existing is not None:
+            if _canonical_chat_enabled():
+                return None, await _canonical_replay_turn(
+                    session_id,
+                    req.client_message_id,
+                    req.message,
+                    existing,
+                )
             return None, _replay_turn(existing)
         raise HTTPException(
             status_code=503,
