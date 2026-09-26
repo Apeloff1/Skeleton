@@ -1817,6 +1817,196 @@ class EngineExecutionService:
             record=inventory,
         )
 
+    def _authorize_external_governance(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+    ) -> tuple[str, str]:
+        principal = _bounded_storage_text(
+            verified_service_principal,
+            "service_principal",
+        )
+        tenant = _bounded_storage_text(tenant_id, "tenant_id")
+        grant = self.authorities.grant_for(principal)
+        if "engine:governance" not in grant.scopes:
+            raise EngineAuthorityError(
+                "engine governance scope denied"
+            )
+        if not grant.allows_tenant(tenant):
+            raise EngineAuthorityError(
+                "engine governance tenant denied"
+            )
+        return principal, tenant
+
+    def request_external_governance_deletion(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        record_ids: tuple[str, ...] | None = None,
+        reason: str = "tenant-request",
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        normalized_ids: tuple[str, ...] | None = None
+        if record_ids is not None:
+            if isinstance(record_ids, (str, bytes)):
+                raise EngineServiceError("record_ids must be a tuple")
+            normalized_ids = tuple(
+                dict.fromkeys(
+                    _bounded_storage_text(
+                        value,
+                        "record_id",
+                        maximum=512,
+                    )
+                    for value in record_ids
+                )
+            )
+            if not normalized_ids:
+                raise EngineServiceError(
+                    "record_ids must not be empty when supplied"
+                )
+            if len(normalized_ids) > 10_000:
+                raise EngineServiceError("too many governance record_ids")
+        reason_key = _bounded_storage_text(
+            reason,
+            "reason",
+            maximum=512,
+        )
+        timestamp = (
+            None
+            if now is None
+            else _aware(now, "governance_deletion.now").timestamp()
+        )
+        try:
+            plan = registry.request_deletion(
+                tenant,
+                record_ids=normalized_ids,
+                reason=reason_key,
+                now=timestamp,
+            )
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "external governance deletion plan rejected"
+            ) from exc
+        return {
+            "schema_version": 1,
+            "plan_id": plan.plan_id,
+            "tenant_id": plan.tenant_id,
+            "reason": plan.reason,
+            "created_at": plan.created_at,
+            "actions": [
+                {
+                    "record_id": action.record_id,
+                    "tenant_id": action.tenant_id,
+                    "target": action.target,
+                    "source_ref": action.source_ref,
+                    "reason": action.reason,
+                }
+                for action in plan.actions
+            ],
+        }
+
+    def acknowledge_external_governance_deletion(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        plan_id: str,
+        record_id: str,
+        target: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        record_key = _bounded_storage_text(
+            record_id,
+            "record_id",
+            maximum=512,
+        )
+        try:
+            inventory = registry.lifecycle.get(record_key)
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "governance deletion record is unavailable"
+            ) from exc
+        if inventory.get("tenant_id") != tenant:
+            raise EngineAuthorityError(
+                "engine governance tenant denied"
+            )
+        timestamp = (
+            None
+            if now is None
+            else _aware(now, "governance_ack.now").timestamp()
+        )
+        try:
+            receipt = registry.acknowledge_deletion(
+                _bounded_storage_text(
+                    plan_id,
+                    "plan_id",
+                    maximum=512,
+                ),
+                record_key,
+                _bounded_storage_text(
+                    target,
+                    "target",
+                    maximum=256,
+                ).lower(),
+                now=timestamp,
+            )
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "governance deletion acknowledgement rejected"
+            ) from exc
+        return {
+            "schema_version": 1,
+            "receipt_id": receipt.receipt_id,
+            "plan_id": receipt.plan_id,
+            "record_id": receipt.record_id,
+            "target": receipt.target,
+            "state": receipt.state.value,
+            "completed_at": receipt.completed_at,
+        }
+
+    def external_governance_inventory(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+    ) -> dict[str, Any]:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        inventory = registry.export_inventory(tenant)
+        return {
+            "schema_version": 1,
+            "tenant_id": str(inventory["tenant_id"]),
+            "count": int(inventory["count"]),
+            "records": [dict(row) for row in inventory["records"]],
+        }
+
     def _execution_admission_request(
         self,
         command: EngineExecutionCommand,
