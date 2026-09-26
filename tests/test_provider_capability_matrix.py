@@ -278,9 +278,11 @@ def test_cli_rejects_unreadable_json(tmp_path: Path) -> None:
         raise AssertionError("unreadable JSON must fail closed")
 
 
-def test_not_wired_into_quality_gates() -> None:
-    quality_gates = (REPO_ROOT / "scripts" / "quality-gates.sh").read_text(encoding="utf-8")
-    assert "check_provider_capability_matrix.py" not in quality_gates
-    assert "test_provider_capability_matrix.py" not in quality_gates
+def test_provider_matrix_is_wired_into_quality_gates_and_routing() -> None:
+    quality_gates = (
+        REPO_ROOT / "scripts" / "quality-gates.sh"
+    ).read_text(encoding="utf-8")
+    assert "check_provider_capability_matrix.py" in quality_gates
+    assert "test_provider_capability_matrix.py" in quality_gates
     routing = REPO_ROOT / "skeleton" / "frontier" / "model_routing.py"
-    assert not routing.exists()
+    assert routing.exists()
