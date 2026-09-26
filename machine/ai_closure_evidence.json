@@ -416,7 +416,15 @@
         "skeleton/api/server.py registers Mongo memory as both governance deletion target and export owner",
         "skeleton/testing/test_mongo_memory_repository.py covers Mongo restart/reinstantiation, isolation, version/idempotency fencing, projection recovery, governed writes and canonical lifecycle export/delete",
         "skeleton/testing/test_memory_projection.py proves vector/TFIDF/MAG/CAG projections rebuild from canonical memory and projection failure cannot roll back authority",
-        "skeleton/testing/test_memory_writeback.py proves provenance/review policy, governance fail-closed behavior and storage admission metering"
+        "skeleton/testing/test_memory_writeback.py proves provenance/review policy, governance fail-closed behavior and storage admission metering",
+        "skeleton/api/server.py exposes canonical memory readiness and fails health when Mongo memory is configured but the repository/writer/projection bundle is unbound",
+        "backend/core/engine_client.py accepts only explicit memory_write_intent with content_from=verified_final_output and delegates engine:memory only for those commands",
+        "skeleton/api/engine_runtime.py forwards a FinalizationBindingHook into CognitiveExecutionRuntime",
+        "skeleton/api/server.py binds verified finalization to AsyncGovernedMemoryWriter, creating stable governed MemoryWriteProposal identities and returning durable memory refs",
+        "skeleton/testing/test_execution_runtime.py proves failed verification never invokes finalization binding and staged terminal memory refs survive crash/recovery",
+        "skeleton/testing/test_governance_runtime_binding.py proves explicit verified memory finalization is a no-op without intent, fails closed without canonical authority, and binds execution/context/provider/tool provenance on commit",
+        "backend/tests/test_engine_client.py proves memory authority is delegated only for normalized verified-final-output intents",
+        "scripts/state_recovery_drill.py destructive Mongo recovery now includes canonical memory records, idempotency receipts, revision history and projection outbox; derived rebuild includes active canonical memory and excludes tombstones"
       ],
       "closure_evidence_required": [
         "durable memory write/read/restart test",
@@ -433,13 +441,19 @@
       "outstanding_evidence": [
         "dependency must close: gap-state-authority-convergence",
         "dependency must close: gap-governance-registry",
-        "fresh exact-head Mongo memory/App Assembly validation",
+        "fresh exact-head State Recovery Drill including canonical memory authority",
+        "fresh exact-head memory client/runtime/governance regression evidence",
+        "product-owned explicit long-term-memory journey using memory_write_intent",
+        "fresh exact-head App Assembly and Backend Quality evidence",
         "independent closure verification"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
         "dependency must close: gap-governance-registry",
-        "fresh exact-head Mongo memory/App Assembly validation",
+        "fresh exact-head State Recovery Drill including canonical memory authority",
+        "fresh exact-head memory client/runtime/governance regression evidence",
+        "product-owned explicit long-term-memory journey using memory_write_intent",
+        "fresh exact-head App Assembly and Backend Quality evidence",
         "independent closure verification"
       ],
       "close_when": [
