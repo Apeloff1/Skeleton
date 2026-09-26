@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 
 from core.engine_client import EngineUnavailableError
 from skeleton.contracts.conversation import (
@@ -12,6 +13,9 @@ from skeleton.contracts.conversation import (
     ConversationMessage,
     ConversationThread,
     ConversationThreadState,
+)
+from skeleton.persistence.conversation_repository import (
+    ConversationStorageUnavailable,
 )
 
 
@@ -205,3 +209,131 @@ async def test_chat_never_commits_assistant_when_engine_is_unavailable(
     assert response["success"] is False
     assert response["error_code"] == "engine_unavailable"
     assert commit_calls == []
+
+
+@pytest.mark.asyncio
+async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identity(
+    monkeypatch,
+) -> None:
+    import routes.ai as route
+
+    thread, user_message = _thread_and_user_message()
+    captured_commands = []
+    commit_attempts = 0
+
+    async def append_user_message(*_args, **_kwargs):
+        # Models repository idempotent replay of the already-committed user
+        # message after a crash between engine completion and assistant commit.
+        return thread, user_message
+
+    async def active_transcript(*_args, **_kwargs):
+        return (user_message,)
+
+    async def commit_assistant_message(thread_id, **kwargs):
+        nonlocal commit_attempts
+        commit_attempts += 1
+        if commit_attempts == 1:
+            raise ConversationStorageUnavailable(
+                "simulated post-engine commit outage"
+            )
+        committed = ConversationThread(
+            thread_id=thread.thread_id,
+            tenant_id=thread.tenant_id,
+            owner_id=thread.owner_id,
+            created_at=thread.created_at,
+            updated_at=thread.updated_at,
+            version=3,
+            message_sequence=2,
+            active_branch_id=thread.active_branch_id,
+            state=thread.state,
+            title=thread.title,
+            data_class=thread.data_class,
+        )
+        assistant = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=thread.thread_id,
+            branch_id=thread.active_branch_id,
+            sequence=2,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=_now(),
+            idempotency_key=kwargs["idempotency_key"],
+            content=kwargs["content"],
+            parent_message_id=user_message.message_id,
+            causal_user_message_id=user_message.message_id,
+            operation_id=kwargs["operation_id"],
+            ai_result_id=kwargs["ai_result_id"],
+            context_id=kwargs["context_id"],
+            context_digest=kwargs["context_digest"],
+            context_source_snapshot=kwargs["context_source_snapshot"],
+            context_compiler_version=kwargs["context_compiler_version"],
+            data_class="confidential",
+        )
+        return committed, assistant
+
+    fake_authority = SimpleNamespace(
+        append_user_message=append_user_message,
+        active_transcript=active_transcript,
+        commit_assistant_message=commit_assistant_message,
+    )
+    fake_client = SimpleNamespace(
+        config=SimpleNamespace(
+            service_principal="codedock-backend",
+            execution_timeout_s=30.0,
+        )
+    )
+
+    async def execute(command):
+        captured_commands.append(command)
+        return SimpleNamespace(
+            final_output="Verified terminal answer.",
+            execution_id=command.execution_request.execution_id,
+            verification="verification:terminal",
+            evidence_refs=("evidence:terminal",),
+            tool_receipts=(),
+            memory_refs=(),
+            artifact_refs=(),
+        )
+
+    fake_client.execute = execute
+    monkeypatch.setattr(route, "conversation_authority", fake_authority)
+    monkeypatch.setattr(route.EngineClient, "from_env", lambda: fake_client)
+
+    request = _request(route, thread.thread_id)
+
+    with pytest.raises(HTTPException) as first_error:
+        await route.ai_chat(
+            request,
+            user={"tenant_id": "tenant-a", "email": "owner-a"},
+        )
+
+    assert first_error.value.status_code == 503
+    assert commit_attempts == 1
+    assert len(captured_commands) == 1
+
+    response = await route.ai_chat(
+        request,
+        user={"tenant_id": "tenant-a", "email": "owner-a"},
+    )
+
+    assert response["success"] is True
+    assert response["response"] == "Verified terminal answer."
+    assert commit_attempts == 2
+    assert len(captured_commands) == 2
+
+    first, second = captured_commands
+    assert first.operation.operation_id == second.operation.operation_id
+    assert (
+        first.execution_request.execution_id
+        == second.execution_request.execution_id
+    )
+    assert first.compiled_context.context_digest == (
+        second.compiled_context.context_digest
+    )
+    assert first.compiled_context.handoff_digest == (
+        second.compiled_context.handoff_digest
+    )
+    assert first.submission_digest == second.submission_digest
+    assert first.operation.created_at != second.operation.created_at
+    assert response["ai_result_id"] == (
+        "engine-result:" + second.execution_request.execution_id
+    )
