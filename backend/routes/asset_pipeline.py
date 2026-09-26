@@ -9,7 +9,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/assets", tags=["Asset Pipeline"])
 
@@ -19,8 +18,6 @@ try:
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
-
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # ASSET TYPES & CONFIGURATIONS
@@ -198,9 +195,9 @@ async def generate_sprite(request: Sprite2DRequest):
     
     # AI-enhanced generation prompt
     generation_prompt = ""
-    if LLM_AVAILABLE and EMERGENT_KEY:
+    if LLM_AVAILABLE:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
+            llm = LlmChat(model="gpt-4o")
             llm.add_message("system", """You are an expert pixel artist and game asset designer. 
             Generate detailed, professional asset creation specifications and prompts for AI image generators.
             Include specific details about colors, shapes, shading, and style consistency.""")
@@ -273,9 +270,9 @@ async def generate_3d_model(request: Model3DRequest):
     
     # AI-enhanced generation
     generation_prompt = ""
-    if LLM_AVAILABLE and EMERGENT_KEY:
+    if LLM_AVAILABLE:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
+            llm = LlmChat(model="gpt-4o")
             llm.add_message("system", """You are an expert 3D artist and game asset designer.
             Generate detailed, professional 3D model specifications and prompts for AI 3D generators like Meshy, Tripo, and manual modeling.""")
             llm.add_message("user", f"""Create a detailed 3D asset generation specification for:
@@ -413,9 +410,9 @@ async def generate_asset_batch(request: AssetBatchRequest):
     }
     
     # Generate style guide if AI available
-    if LLM_AVAILABLE and EMERGENT_KEY and request.consistent_style:
+    if LLM_AVAILABLE and request.consistent_style:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
+            llm = LlmChat(model="gpt-4o")
             llm.add_message("system", "You are a game art director. Create consistent style guides for game assets.")
             llm.add_message("user", f"""Create a style guide for a {request.game_type} game with {request.art_style} art style.
             Project: {request.project_name}
