@@ -764,7 +764,7 @@
       ],
       "work_package": "WP-P0-CONTEXT-COMPILER",
       "blueprint": "context_compiler_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Converge all model-visible instructions, conversation, memory, retrieval, artifacts, tools and skills through one deterministic governed ContextEnvelope compiler.",
       "target_files": {
         "contracts": [
@@ -781,11 +781,17 @@
           "skeleton/retrieval",
           "skeleton/memory",
           "skeleton/skills",
-          "backend/routes/ai.py"
+          "backend/routes/ai.py",
+          "scripts/check_context_execution_boundary.py",
+          "scripts/check_instruction_policy_boundary.py",
+          ".github/workflows/backend-quality.yml",
+          ".github/workflows/app-assembly.yml"
         ],
         "tests": [
           "skeleton/testing/test_context_compiler.py",
-          "skeleton/testing/test_instruction_policy.py"
+          "skeleton/testing/test_instruction_policy.py",
+          "tests/test_context_execution_boundary.py",
+          "tests/test_instruction_policy_boundary.py"
         ]
       },
       "ordered_steps": [
@@ -845,14 +851,18 @@
         "compiler omission_reasons record compacted_to:<derived-segment-id> for replay/audit",
         "skeleton/testing/test_context_compiler.py covers compaction lineage, trust downgrade, hard token bounds, control refusal and compiler admission",
         "backend/services/ai_assistant_svc.py delegates model execution through EngineTextRequest/execute_engine_text and owns no provider transport or credentials",
-        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary"
+        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary",
+        "scripts/check_context_execution_boundary.py statically rejects direct ProviderRequest/ProviderRegistry/legacy provider ownership in product routes/services/GameForge",
+        "tests/test_context_execution_boundary.py proves product AI surfaces may use only the canonical engine/context compatibility boundary",
+        "scripts/check_instruction_policy_boundary.py requires every product EngineChat construction to bind an explicit instruction_policy",
+        "tests/test_instruction_policy_boundary.py covers missing policy, anonymous system-message override, aliased EngineChat imports and canonical policy acceptance",
+        ".github/workflows/backend-quality.yml runs context execution and instruction-policy boundary gates",
+        ".github/workflows/app-assembly.yml runs both boundaries and their regressions on the assembled application"
       ],
       "remaining": [
-        "add semantic/multi-segment summary policy only where deterministic excerpt compaction is insufficient",
-        "run repository-wide source scan and migrate any remaining direct provider/prompt construction",
-        "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
-        "prove canonical model turns cannot bypass digest-bound ContextEnvelope projection",
-        "collect fresh exact-head validation and independent closure evidence"
+        "close conversation/memory/tool/governance dependency gaps",
+        "collect fresh exact-head Backend Quality/App Assembly context and instruction-policy boundary evidence",
+        "obtain independent context-compiler closure verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
