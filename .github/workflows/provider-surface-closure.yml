@@ -13,7 +13,13 @@ on:
       - "skeleton/api/**"
       - "skeleton/ai/runtime/**"
       - "backend/core/ai_provider_compat.py"
+      - "backend/core/engine_text.py"
+      - "backend/core/engine_chat.py"
       - "backend/emergentintegrations/llm/chat.py"
+      - "backend/routes/lafs.py"
+      - "backend/routes/jeeves_compose.py"
+      - "backend/tests/test_engine_chat.py"
+      - "tests/test_provider_runtime_boundary.py"
       - "backend/services/tool_registry.py"
       - "scripts/check_provider_bootstrap.py"
       - "scripts/check_provider_capability_matrix.py"
@@ -114,6 +120,12 @@ jobs:
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_engine_cross_service_boundary.py
+
+      - name: Run product provider-isolation facade contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_engine_chat.py
+          tests/test_provider_runtime_boundary.py
 
       - name: Assert exact-head provider evidence receipt
         env:
