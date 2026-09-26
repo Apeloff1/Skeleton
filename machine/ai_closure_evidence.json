@@ -169,7 +169,11 @@
         "skeleton/testing/test_governance_runtime_binding.py production retrieval lifecycle binding regression",
         "skeleton/memory/projection.py governance-bound derived vector/TF-IDF retrieval lifecycle",
         "skeleton/api/server.py production AsyncMemoryProjectionCoordinator shares canonical GovernanceRegistry",
-        "skeleton/testing/test_memory_projection.py derived retrieval registration/delete acknowledgement regressions"
+        "skeleton/testing/test_memory_projection.py derived retrieval registration/delete acknowledgement regressions",
+        "skeleton/artifact_plane/governance.py governance-before-mutation canonical artifact authority",
+        "skeleton/vault/lifecycle_adapters.py GovernedArtifactLifecycleAdapter tenant-bound delete/export adapter",
+        "skeleton/api/server.py production canonical artifact store startup binding",
+        "skeleton/testing/test_server_governance_binding.py physical artifact export/delete/retention regressions"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -181,14 +185,11 @@
         "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
         "fresh exact-head governance audit/conversation lifecycle validation",
-        "artifact canonical write registration",
-        "artifact production physical delete/export/retention adapter composition"
+        "fresh exact-head validation of production governed artifact lifecycle composition"
       ],
       "blockers": [
         "provider/tool privacy ceilings enforced across every application route",
-        "exact-head Stage-0/App Assembly verification and independent signoff",
-        "artifact canonical write registration",
-        "artifact production physical delete/export/retention adapter composition"
+        "exact-head Stage-0/App Assembly verification and independent signoff"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
