@@ -253,6 +253,50 @@ def _verify_dependency_graph(root: Path, errors: list[str]) -> dict[str, Any]:
             errors.append(
                 "tool-runtime closure gate lost invariant phrase: " + phrase
             )
+
+    construction = _load_json(root / "machine/ai_app_construction.json")
+    gaps = construction.get("gap_register")
+    dependency_status: dict[str, str] = {}
+    tool_status = "missing"
+    if not isinstance(gaps, list):
+        errors.append("construction gap_register must be a list")
+    else:
+        for item in gaps:
+            if not isinstance(item, dict):
+                continue
+            gap_id = str(item.get("id") or "")
+            status = str(item.get("status") or "")
+            if gap_id == "gap-tool-runtime-convergence":
+                tool_status = status
+            if gap_id in EXPECTED_DEPENDENCIES:
+                dependency_status[gap_id] = status
+
+    missing_status = sorted(EXPECTED_DEPENDENCIES - set(dependency_status))
+    if missing_status:
+        errors.append(
+            "tool-runtime dependency statuses missing from construction: "
+            + ", ".join(missing_status)
+        )
+
+    if tool_status == "closed":
+        open_dependencies = sorted(
+            gap_id
+            for gap_id in EXPECTED_DEPENDENCIES
+            if dependency_status.get(gap_id) != "closed"
+        )
+        if open_dependencies:
+            errors.append(
+                "closed tool-runtime gap has non-closed dependencies: "
+                + ", ".join(open_dependencies)
+            )
+    elif tool_status not in {"open", "closed"}:
+        errors.append("tool-runtime construction status is invalid or missing")
+
+    entry["_verified_dependency_status"] = {
+        gap_id: dependency_status.get(gap_id, "missing")
+        for gap_id in sorted(EXPECTED_DEPENDENCIES)
+    }
+    entry["_verified_tool_status"] = tool_status
     return entry
 
 
@@ -279,6 +323,10 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         "boundary_digests": boundary_digests,
         "mirror_pairs": mirrors,
         "dependency_graph": sorted(EXPECTED_DEPENDENCIES),
+        "dependency_status": dict(
+            handoff.get("_verified_dependency_status") or {}
+        ),
+        "tool_status": handoff.get("_verified_tool_status"),
         "handoff_digest": handoff_digest,
         "errors": errors,
         "valid": not errors,
