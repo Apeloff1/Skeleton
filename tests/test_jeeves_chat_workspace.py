@@ -408,7 +408,7 @@ def test_server_transcript_overrides_conflicting_client_history(route, monkeypat
 
     assert response.status_code == 200
     body = response.json()
-    assert body["history_source"] == "server"
+    assert body["history_source"] == "canonical"
     assert body["history_messages_used"] == 2
     assert "SERVER QUESTION" in captured["context"]
     assert "SERVER ANSWER" in captured["context"]
@@ -509,15 +509,12 @@ def test_legacy_history_is_never_model_visible_or_persisted(
         )
 
     assert first.status_code == 200
-    assert (
-        first.json()["history_source"]
-        == "server-empty-legacy-ignored"
-    )
+    assert first.json()["history_source"] == "canonical"
     assert contexts[0] == ""
     assert all("legacy_history" not in row for row in collection.rows)
 
     assert second.status_code == 200
-    assert second.json()["history_source"] == "server"
+    assert second.json()["history_source"] == "canonical"
     assert "new question" in contexts[1]
     assert "answer-1" in contexts[1]
     assert "legacy question" not in contexts[1]
@@ -525,20 +522,22 @@ def test_legacy_history_is_never_model_visible_or_persisted(
     assert "tampered replacement" not in contexts[1]
 
 
-def test_history_is_ignored_when_server_storage_is_unavailable(
+def test_client_history_is_ignored_when_legacy_migration_store_is_unavailable(
     route,
     monkeypatch,
 ):
     captured = {}
+    canonical = _CanonicalConversationAuthority()
 
     def unavailable_collection():
-        raise OSError("storage unavailable")
+        raise OSError("legacy storage unavailable")
 
     async def generate(query, recalled, needs_reasoning, conversation_context=""):
         captured["context"] = conversation_context
-        return {"text": "degraded", "tier": "free", "model": "test"}
+        return {"text": "canonical", "tier": "free", "model": "test"}
 
     monkeypatch.setattr(route, "_chat_col", unavailable_collection)
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
     monkeypatch.setattr(route, "_canon_context", lambda query: [])
     monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
     monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
@@ -559,9 +558,8 @@ def test_history_is_ignored_when_server_storage_is_unavailable(
         )
 
     assert response.status_code == 200
-    assert response.json()["history_source"] == (
-        "unavailable-legacy-ignored"
-    )
+    assert response.json()["history_source"] == "canonical"
+    assert response.json()["persisted"] is True
     assert captured["context"] == ""
     assert "ATTACKER HISTORY" not in response.text
 
@@ -765,7 +763,6 @@ def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns(
     route,
     monkeypatch,
 ):
-    monkeypatch.setenv("SKL_JEEVES_CANONICAL_CONVERSATIONS", "1")
     legacy = _MemoryChatCollection(
         [
             {
@@ -860,7 +857,6 @@ def test_canonical_jeeves_mode_fails_closed_if_authority_is_unavailable(
     route,
     monkeypatch,
 ):
-    monkeypatch.setenv("SKL_JEEVES_CANONICAL_CONVERSATIONS", "1")
     legacy = _MemoryChatCollection()
 
     class BrokenAuthority:
@@ -883,3 +879,16 @@ def test_canonical_jeeves_mode_fails_closed_if_authority_is_unavailable(
 
     assert response.status_code == 503
     assert "canonical conversation authority is unavailable" in response.text
+
+
+def test_jeeves_chat_legacy_collection_is_migration_read_only(route) -> None:
+    source = Path(route.__file__).read_text(encoding="utf-8")
+
+    assert "SKL_JEEVES_CANONICAL_CONVERSATIONS" not in source
+    assert "_chat_col().insert_one" not in source
+    assert "_chat_col().update_one" not in source
+    assert "_chat_col().delete_one" not in source
+    assert "return core_db[\"jeeves_chat\"]" in source
+    assert "_legacy_complete_rows" in source
+    assert "_import_legacy_rows_to_canonical" in source
+
