@@ -1700,7 +1700,7 @@
       "plane": "application-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical ConversationThread/ConversationMessage authority, Mongo persistence, first-class APIs, server-owned chat context compilation, stable retry identity, Jeeves one-time legacy import, canonical engine-backed regeneration, first-class tool/memory/evidence/artifact lineage, split-owner governed delete/export, and browser refresh/reconnect reconstruction are implemented. Remaining functional convergence is automatic retention-expiry propagation, followed by declared dependency and exact-head closure evidence.",
+      "gap": "Canonical conversation authority, engine-backed regeneration, browser reconstruction, durable engine result lineage, governed delete/export, and bounded cross-plane retention/deletion propagation are implemented. Remaining work is declared dependency closure plus fresh exact-head evidence.",
       "construction": [
         "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
         "persist thread/message authority in backend core Mongo rather than client memory or provider history",
@@ -1725,7 +1725,7 @@
         "context projection preserves selected message/citation/tool provenance",
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
-      "verification_state": "canonical-cutover-regenerate-refresh-lineage-delete-export-implemented-retention-expiry-open",
+      "verification_state": "conversation-authority-functional-cutover-complete-dependency-evidence-open",
       "progress": {
         "state": "in_progress",
         "completed": [
@@ -1757,10 +1757,15 @@
           "SQLite and Mongo canonical conversation paths preserve memory lineage",
           "thread-scoped governance selection includes only canonical conversation rows and explicitly referenced lifecycle records",
           "engine-owned linked lifecycle targets execute before backend-owned physical conversation deletion",
-          "conversation deletion claims completion only after cross-plane propagation succeeds"
+          "conversation deletion claims completion only after cross-plane propagation succeeds",
+          "engine terminal tool, memory, evidence and artifact refs persist on canonical assistant messages",
+          "SQLite and Mongo conversation authorities preserve first-class memory reference lineage",
+          "conversation deletion selects only canonical conversation rows plus explicitly referenced governed records",
+          "engine-owned linked deletion targets execute through lifecycle adapters before conversation physical deletion",
+          "distributed deletion plan execution is retry-safe through pending unacknowledged action reads",
+          "conversation deletion API claims completion only after linked governance propagation succeeds"
         ],
         "remaining": [
-          "execute automatic retention-expiry propagation for canonical conversation rows and explicitly linked governed records",
           "close gap-state-authority-convergence and gap-governance-registry",
           "collect fresh exact-head Conversation Authority Closure Gate and independent verifier evidence"
         ]
