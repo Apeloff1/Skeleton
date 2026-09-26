@@ -19,6 +19,11 @@ from typing import Annotated, Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from core.engine_text import (
+    EngineTextError,
+    EngineTextRequest,
+    execute_engine_text,
+)
 from gameforge.jeeves.free_tier import free_tier
 from gameforge.jeeves import artifacts as ART
 from gameforge.jeeves.chat_contract import (
@@ -79,23 +84,44 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
                      "This response is using local extraction rather than generative reasoning. "
                      "Try a more specific question or add relevant project details.")
         return {"text": text, "tier": tier, "model": f"{tier}-extractive"}
-    # paid escalation
-    import os
-    key = os.getenv("EMERGENT_LLM_KEY", "")
-    if key:
-        try:
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            chat = LlmChat(api_key=key, session_id=uuid.uuid4().hex,
-                           system_message="You are Jeeves, the GameForge master orchestrator. "
-                           "Answer grounded in the canon; cite [n]. Be precise.").with_model(
-                           "anthropic", "claude-sonnet-4-6")
-            reply = await chat.send_message(UserMessage(text=f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"))
-            return {"text": reply, "tier": "paid", "model": "anthropic:claude-sonnet-4-6"}
-        except Exception:  # noqa: BLE001
-            pass
-    return {"text": "The generative provider is unavailable. I couldn't produce an answer to this request. "
-                    "Please try again after checking the provider configuration.",
-            "tier": "local", "model": "unavailable-fallback"}
+    # Generative escalation is engine-owned. Product routes never activate
+    # provider SDKs or credentials directly.
+    prompt = f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"
+    identity = hashlib.sha256(
+        (query + "\x1f" + prompt).encode("utf-8")
+    ).hexdigest()
+    try:
+        response = await execute_engine_text(
+            EngineTextRequest(
+                instructions=(
+                    "You are Jeeves, the GameForge master orchestrator. "
+                    "Answer grounded in the supplied canon; cite [n] when "
+                    "grounding is available. Be precise."
+                ),
+                prompt=prompt,
+                idempotency_key="jeeves-chat:" + identity,
+                instruction_policy_id="backend.jeeves.chat",
+                instruction_policy_version="1",
+                actor_id="jeeves-compose",
+                capability="assistant.compat",
+                max_output_tokens=8_192,
+            )
+        )
+        return {
+            "text": response.text,
+            "tier": "paid",
+            "model": "skeleton-engine",
+        }
+    except EngineTextError:
+        return {
+            "text": (
+                "The generative engine is unavailable. I couldn't produce "
+                "an answer to this request. Please try again after checking "
+                "the engine configuration."
+            ),
+            "tier": "local",
+            "model": "unavailable-fallback",
+        }
 
 
 def _build_artifacts(forms: List[str], title: str, text: str, ds: Dict,
