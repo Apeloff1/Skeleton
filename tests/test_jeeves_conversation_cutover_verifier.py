@@ -141,6 +141,14 @@ async def regenerate_assistant_message():
         "regenerated_from": target.message_id,
         "causal_user_message_id": causal.message_id,
     }
+
+@router.delete("/{thread_id}")
+async def request_conversation_deletion():
+    result = await conversation_authority.delete_thread_with_governance()
+    return {
+        "deletion_state": "deleted",
+        "complete": True,
+    }
 """,
         "backend/tests/test_conversation_regeneration_route.py": """
 async def test_regenerate_route_runs_engine_then_commits_new_branch():
