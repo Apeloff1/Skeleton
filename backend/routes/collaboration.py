@@ -70,7 +70,7 @@ class RefactorSuggestionRequest(BaseModel):
 # ============================================================================
 
 async def call_llm(system: str, prompt: str) -> str:
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return "LLM not available"
     try:
         chat = LlmChat(api_key=EMERGENT_KEY, system_message=system).with_model("openai", "gpt-4o")
