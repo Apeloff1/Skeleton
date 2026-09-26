@@ -455,7 +455,7 @@ async def create_game_project(request: GameProjectRequest):
             4. Asset list with priorities
             5. Development milestones
             6. Estimated timeline""")
-            project["ai_specification"] = llm.chat()
+            project["ai_specification"] = await llm.chat()
         except Exception:
             pass
     
