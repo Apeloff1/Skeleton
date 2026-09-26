@@ -83,6 +83,9 @@ class ServerState:
         self.engine_pressure_ledger: Optional[Any] = None
         self.governance_lifecycle: Optional[Any] = None
         self.governance_registry: Optional[Any] = None
+        self.canonical_memory_mongo_client: Optional[Any] = None
+        self.canonical_memory_repository: Optional[Any] = None
+        self.canonical_memory_writer: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
@@ -120,6 +123,58 @@ class ServerState:
             lifecycle.close()
         self.governance_registry = None
         self.governance_lifecycle = None
+
+    async def bind_canonical_memory_writer(
+        self,
+        database: Any | None = None,
+    ) -> Any:
+        """Bind the production Mongo memory authority to governance/admission."""
+
+        if self.canonical_memory_writer is not None:
+            return self.canonical_memory_writer
+        if self.engine_execution_admission_runtime is None:
+            self.bind_engine_execution_service()
+        admission_runtime = self.engine_execution_admission_runtime
+        if admission_runtime is None:
+            raise RuntimeError(
+                "engine execution admission must be bound before memory"
+            )
+
+        from skeleton.config.settings import get_settings
+        from skeleton.memory.writeback import AsyncGovernedMemoryWriter
+        from skeleton.persistence.memory_repository import (
+            MongoMemoryRepository,
+        )
+
+        if database is None:
+            from motor.motor_asyncio import AsyncIOMotorClient
+
+            mongo = get_settings().mongo
+            client = AsyncIOMotorClient(
+                mongo.uri,
+                serverSelectionTimeoutMS=mongo.timeout_ms,
+            )
+            database = client[mongo.database]
+            self.canonical_memory_mongo_client = client
+
+        repository = MongoMemoryRepository(database)
+        await repository.ensure_indexes()
+        writer = AsyncGovernedMemoryWriter(
+            repository,
+            governance=self.bind_governance_registry(),
+            admission_runtime=admission_runtime,
+        )
+        self.canonical_memory_repository = repository
+        self.canonical_memory_writer = writer
+        return writer
+
+    async def close_canonical_memory_writer(self) -> None:
+        client = self.canonical_memory_mongo_client
+        self.canonical_memory_writer = None
+        self.canonical_memory_repository = None
+        self.canonical_memory_mongo_client = None
+        if client is not None:
+            client.close()
 
     def bind_swarm_runtime(self, runtime: Any) -> Any:
         """Replace the live swarm runtime and atomically rebind dependent control planes."""
@@ -340,6 +395,7 @@ class ServerState:
                             "engine:approve",
                             "engine:media",
                             "engine:admission",
+                            "engine:governance",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,
@@ -421,6 +477,7 @@ class ServerState:
             submissions,
             authorities,
             admission_runtime=execution_admission_runtime,
+            governance_registry=self.bind_governance_registry(),
         )
         provider_registry = ProviderRegistry.from_env(
             admission_runtime=provider_admission_runtime,
@@ -542,6 +599,12 @@ def _public_dev_surfaces_enabled() -> bool:
     }
 
 
+def _canonical_memory_mongo_configured() -> bool:
+    """Return whether the production canonical Mongo memory binding is configured."""
+
+    return bool(os.environ.get("SKL_MONGO_URI", "").strip())
+
+
 def _gate_open_prefixes() -> tuple[str, ...]:
     from skeleton.api.middleware import DEFAULT_OPEN_PREFIXES
 
@@ -623,11 +686,14 @@ def create_app() -> Any:
             state.wire_from_genesis(Genesis(seed=42).boot())
         state.bind_governance_registry()
         state.bind_engine_execution_service()
+        if _canonical_memory_mongo_configured():
+            await state.bind_canonical_memory_writer()
         await state.recover_engine_executions()
 
     @app.on_event("shutdown")
     async def shutdown():
         state = get_state()
+        await state.close_canonical_memory_writer()
         await state.close_engine_execution_service()
         state.close_governance_registry()
         state.close_operation_runtime()
