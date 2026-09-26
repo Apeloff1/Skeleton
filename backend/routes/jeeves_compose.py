@@ -219,11 +219,11 @@ def _history_from_turn_rows(
 async def _load_server_history(
     session_id: str,
 ) -> tuple[List[HistoryMessage], bool]:
-    """Load the canonical transcript projection for one session.
+    """Load the server-owned transcript projection for one compatibility session.
 
-    The availability flag distinguishes an empty server-owned thread from a
-    storage outage. Caller history may bootstrap an empty legacy thread, but it
-    never overrides an existing durable transcript.
+    The availability flag distinguishes an empty server-owned transcript from
+    a storage outage. Caller history is never accepted as conversation
+    authority, including during empty-thread and degraded-storage cases.
     """
 
     try:
