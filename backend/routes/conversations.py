@@ -247,6 +247,8 @@ async def regenerate_assistant_message(
             tenant_id=tenant_id,
             owner_id=owner_id,
         )
+        if thread.version != body.expected_thread_version:
+            raise ConversationConflict("thread version conflict")
         messages = await conversation_authority.list_messages(
             thread_id,
             tenant_id=tenant_id,
