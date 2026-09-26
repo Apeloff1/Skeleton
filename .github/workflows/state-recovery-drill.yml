@@ -70,6 +70,12 @@ jobs:
           --restored-database "skeleton_recovery_drill_restored"
           --output "${RUNNER_TEMP}/state-recovery.json"
 
+      - name: Run authoritative operation SQLite backup restore drill
+        run: >-
+          python scripts/state_recovery_drill.py live-sqlite
+          --workdir "${RUNNER_TEMP}/operation-sqlite-recovery"
+          --output "${RUNNER_TEMP}/operation-sqlite-recovery.json"
+
       - name: Verify recovery evidence and ordering
         run: |
           python - <<'PY'
@@ -100,4 +106,38 @@ jobs:
           print("phases:", " -> ".join(actual))
           print("backup/restore digest:", report["backup_digest"])
           print("derived digest:", report["derived_projection_digest"])
+          PY
+
+      - name: Verify operation SQLite recovery evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "operation-sqlite-recovery.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          phases = [
+              "seed_operation_authority",
+              "backup_operation_authority",
+              "destroy_operation_authority",
+              "restore_operation_authority",
+              "verify_operation_authority",
+              "reconcile_operation_outbox",
+              "ready",
+          ]
+          actual = [event["phase"] for event in report["journal"]["events"]]
+          assert report["status"] == "passed"
+          assert report["backup_digest"] == report["restore_digest"]
+          assert report["journal"]["complete"] is True
+          assert actual == phases
+          evidence = report["journal"]["events"][4]["evidence"]
+          assert evidence["state"] == "admitted"
+          assert evidence["version"] == 4
+          reconciliation = report["journal"]["events"][5]["evidence"]
+          assert reconciliation["remaining"] == 0
+          assert reconciliation["published"] == 4
+          print("operation-sqlite-recovery: OK")
+          print("phases:", " -> ".join(actual))
+          print("backup/restore digest:", report["backup_digest"])
           PY
