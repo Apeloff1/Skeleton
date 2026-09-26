@@ -316,7 +316,8 @@ class IdleStudioV2Tests(unittest.TestCase):
             class RecordingReasoner(_FakeReasoner):
                 def __init__(self, api_key="", model=None, timeout=45.0, scrub_environment=False) -> None:  # noqa: ANN001
                     super().__init__("")
-                    self.api_key = api_key
+                    import os
+                    self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
                     self.payloads = list(payloads)
                     self.index = 0
 
