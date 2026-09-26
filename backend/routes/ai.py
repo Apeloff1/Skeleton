@@ -825,7 +825,8 @@ async def ai_chat(
 
     if engine_client is not None:
         engine_started = time.monotonic()
-        engine_deadline = datetime.now(timezone.utc) + timedelta(
+        engine_started_at = datetime.now(timezone.utc)
+        engine_deadline = engine_started_at + timedelta(
             seconds=engine_client.config.execution_timeout_s
         )
         try:
@@ -843,7 +844,7 @@ async def ai_chat(
                 verification_profile="assistant_proposal",
                 history=history,
                 service_principal=engine_client.config.service_principal,
-                created_at=datetime.now(timezone.utc),
+                created_at=engine_started_at,
                 deadline=engine_deadline,
                 trace_id="chat:" + operation_id,
                 max_model_turns=4,
