@@ -88,7 +88,12 @@
         "backend/core/conversations.py canonical Mongo thread/message/state writes admit storage through the engine before mutation",
         "backend/core/engine_client.py bounded authenticated external storage admission client",
         "skeleton/api/engine_routes.py /admission/storage canonical engine boundary",
-        "backend/tests/test_conversation_storage_admission.py fail-closed and replay-stable conversation admission regressions"
+        "backend/tests/test_conversation_storage_admission.py fail-closed and replay-stable conversation admission regressions",
+        "skeleton/api/server.py live canonical Mongo memory composition owner",
+        "skeleton/api/server.py production-configured startup binds AsyncGovernedMemoryWriter to existing execution admission and governance owners",
+        "skeleton/testing/test_governance_runtime_binding.py injected-database canonical Mongo memory binding regression",
+        "pyproject.toml Motor/PyMongo runtime dependency declaration",
+        "skeleton/ai/runtime/api/server.py canonical mirror"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -99,12 +104,11 @@
       "outstanding_evidence": [
         "admission at every expensive non-provider action",
         "fresh exact-head validation of metered durable engine/cognitive storage writes",
-        "bind AsyncGovernedMemoryWriter into the live production Mongo memory construction path",
-        "admission at expensive derived retrieval/index rebuild boundaries where allocation is material"
+        "admission at expensive derived retrieval/index rebuild boundaries where allocation is material",
+        "fresh exact-head validation of live canonical Mongo memory composition"
       ],
       "blockers": [
-        "admission at every expensive non-provider action",
-        "live production Mongo memory writer binding still needs the admitted AsyncGovernedMemoryWriter"
+        "admission at every expensive non-provider action"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
