@@ -357,7 +357,7 @@ class CognitiveExecutionRuntime:
             turn.as_dict(),
             now=now,
         )
-        return self._append_turn(
+        return self.repository.append_turn(
             turn,
             expected_execution_version=expected_execution_version,
             now=now,
@@ -1125,7 +1125,7 @@ class CognitiveExecutionRuntime:
             checkpoint_ref=checkpoint_ref,
             status="provider_completed",
         )
-        execution = self.repository.append_turn(
+        execution = self._append_turn(
             turn,
             expected_execution_version=execution.version,
             now=now,
@@ -1167,7 +1167,7 @@ class CognitiveExecutionRuntime:
                 raise CognitiveExecutionError("provider checkpoint disappeared")
             turns = self.repository.turns(execution.execution_id)
             parent_turn_id = turns[-1].turn_id if turns else None
-            execution = self.repository.append_turn(
+            execution = self._append_turn(
                 AgentTurn(
                     operation_id=execution.operation_id,
                     execution_id=execution.execution_id,
@@ -1660,7 +1660,7 @@ class CognitiveExecutionRuntime:
             "skeleton-agent-turn",
             f"{execution.execution_id}:tool:{turn_index}",
         )
-        execution = self.repository.append_turn(
+        execution = self._append_turn(
             AgentTurn(
                 operation_id=execution.operation_id,
                 execution_id=execution.execution_id,
