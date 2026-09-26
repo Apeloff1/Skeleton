@@ -2575,7 +2575,7 @@ class CognitiveExecutionRuntime:
                 execution,
                 payload,
                 status="failed",
-                error_code="verification_blocked",
+                error_code="verification_failed",
                 now=now,
                 verification=verification,
             )
