@@ -2182,7 +2182,7 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical product/RAG state is Mongo-authoritative with rebuildable Chroma projections; production reasoning is bound to durable OperationEnvelope state with continuous transactional-outbox reconciliation; cognitive execution/checkpoint/result, submission/approval, tool receipt/idempotency, quota/usage and pressure coordination are production-bound to persistent engine SQLite stores; Mongo and operation-SQLite destructive recovery drills enforce authority verification before derived/outbox rebuild. Remaining closure is fresh exact-head validation of the new recovery/topology changes, whole-engine-bundle deployment recovery evidence, and independent verification.",
+      "gap": "State authority convergence is substantially implemented: Jeeves RAG product state is Mongo-authoritative with rebuildable Chroma projections; production Skeleton reasoning uses durable OperationEnvelope state with transactional outbox and continuous reconciliation; authoritative Mongo recovery is verified before derived rebuild; operation SQLite backup/restore and restored outbox reconciliation are rehearsed; and cognitive execution/result/approval/tool/quota/pressure state is production-bound to durable engine SQLite stores. Remaining closure work is full engine-bundle backup/restore rehearsal, retention/operator policy finalization, exact-head evidence, and independent verification.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2203,7 +2203,26 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "implementation-complete-pending-exact-head-and-independent-recovery-evidence"
+      "verification_state": "rag-operation-mongo-and-operation-sqlite-recovery-proven-engine-bundle-rehearsal-and-exact-head-open",
+      "progress": {
+        "completed": [
+          "canonical RAG user/session/progress/feedback state migrated to Mongo authority",
+          "Chroma retained as rebuildable derived projection",
+          "production reasoning bound to durable OperationEnvelope repository",
+          "durable transactional outbox dispatcher runs in runtime lifecycle",
+          "Mongo authoritative restore verified before derived rebuild",
+          "operation SQLite online-backup destructive restore rehearsal",
+          "restored operation outbox identity and reconciliation verification",
+          "cognitive execution/result/approval/tool/quota state bound to persistent engine SQLite stores",
+          "engine quota and shared-pressure state persisted in Compose"
+        ],
+        "remaining": [
+          "extend destructive backup/restore rehearsal across the complete engine SQLite bundle",
+          "finalize operator retention/backup policy for the durable engine SQLite bundle and governance state",
+          "collect fresh exact-head State Recovery Drill, App Assembly, Backend Quality and state-topology validation evidence",
+          "independent closure verification"
+        ]
+      }
     },
     {
       "id": "gap-cost-admission",
@@ -7230,7 +7249,11 @@
       "production human approval/submission ledger bound to persistent SQLite",
       "production tool idempotency receipt ledger bound to persistent SQLite",
       "production quota/usage ledger bound to persistent SQLite",
-      "production shared-pressure coordination bound to persistent SQLite"
+      "production shared-pressure coordination bound to persistent SQLite",
+      "runtime outbox dispatcher lifecycle",
+      "Mongo authoritative-first recovery drill",
+      "operation SQLite backup/restore and restored outbox reconciliation drill",
+      "durable cognitive execution/result/approval/tool/quota/pressure bindings"
     ],
     "sqlite_domains": [
       "canonical operation state and transactional outbox",
