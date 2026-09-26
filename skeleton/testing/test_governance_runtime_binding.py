@@ -297,3 +297,43 @@ async def test_server_state_composes_governed_retrieval_lifecycle() -> None:
     )
     assert retrieval.size("tenant-a") == 0
     state.close_governance_registry()
+
+@pytest.mark.asyncio
+async def test_governed_artifact_retention_expiry_physically_deletes_bytes(
+    tmp_path,
+) -> None:
+    state = ServerState()
+    artifacts = state.bind_canonical_artifact_store(tmp_path / "artifacts")
+
+    record = artifacts.write_bytes(
+        tenant_id="tenant-retention",
+        artifact_id="expiring-build.zip",
+        payload=b"expiring-artifact",
+        data_class="internal",
+        purposes=("artifact-delivery", "download"),
+        created_at=10.0,
+        retention_until=20.0,
+    )
+    assert artifacts.read_bytes(
+        "tenant-retention",
+        "expiring-build.zip",
+    ) == b"expiring-artifact"
+
+    results = await state.governance_lifecycle_executor.execute_retention_expiry(
+        now=21.0,
+    )
+
+    assert len(results) == 1
+    assert artifacts.read_bytes(
+        "tenant-retention",
+        "expiring-build.zip",
+    ) is None
+    lifecycle = state.governance_lifecycle.get(record.record_id)
+    assert lifecycle["state"] == "deleted"
+    receipts = state.governance_lifecycle.deletion_receipts(
+        record.record_id
+    )
+    assert len(receipts) == 1
+    assert receipts[0]["target"] == "artifact"
+    state.close_governance_registry()
+
