@@ -313,7 +313,7 @@
       "depends_on": [],
       "work_package": "WP-P0-STATE-AUTHORITY",
       "blueprint": "state_authority_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Separate logical state authority from storage technology and prove durable recovery of canonical state before rebuilding projections.",
       "target_files": {
         "contracts": [
@@ -378,12 +378,16 @@
         "scripts/state_recovery_drill.py now performs destructive operation SQLite backup/restore verification and reconciles restored unpublished outbox rows",
         ".github/workflows/state-recovery-drill.yml executes Mongo authoritative-first recovery and operation SQLite recovery drills",
         "docker-compose.yml persists engine execution, submission/approval, tool receipt, quota/usage and shared-pressure SQLite state on skeleton_data",
-        "machine/state_topology.json v1.8.0 binds cognitive execution/result/approval/tool/quota authorities to durable engine SQLite stores"
+        "machine/state_topology.json v1.8.0 binds cognitive execution/result/approval/tool/quota authorities to durable engine SQLite stores",
+        "scripts/state_recovery_drill.py destructively backs up/restores canonical operation SQLite and reconciles restored outbox identities",
+        "scripts/state_recovery_drill.py backs up/restores the five-store engine SQLite bundle and reopens execution, submission/approval, tool-idempotency, quota and shared-pressure state",
+        "machine/state_backup_policy.json defines required authoritative SQLite stores, restore order and retention floors",
+        "scripts/state_backup_bundle.py creates online SQLite backups with integrity, binary SHA256, logical snapshot and bundle-digest verification",
+        "skeleton/testing/test_state_backup_bundle.py proves required-store fail-closed behavior and backup tamper detection",
+        "docker-compose.yml persists engine execution, submission, tool receipt, quota and shared-pressure state under skeleton_data"
       ],
       "remaining": [
-        "exercise destructive backup/restore of the complete engine SQLite state bundle",
-        "finalize operator retention/backup policy for engine/governance durable state",
-        "collect fresh exact-head state topology/recovery/App Assembly/Backend Quality evidence",
+        "collect fresh exact-head State Recovery Drill/state-topology/App Assembly/Backend Quality evidence",
         "obtain independent closure verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
@@ -473,7 +477,7 @@
       ],
       "work_package": "WP-P0-MEMORY-AUTHORITY",
       "blueprint": "memory_runtime_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "implemented_pending_closure",
       "objective": "Bind the existing storage-neutral memory/retrieval contracts to durable tenant-scoped canonical memory while keeping vector/MAG/CAG/process stores derived or compatibility-only.",
       "target_files": {
         "contracts": [
@@ -522,8 +526,20 @@
         "repository outage degradation"
       ],
       "closure_gate": "long-term memory is durable, governed, tenant-scoped and recoverable; no vector/MAG/CAG/process store is the sole source of canonical user memory",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/persistence/memory_repository.py provides production MongoMemoryRepository with tenant/namespace isolation, idempotency, optimistic versioning, revisions, tombstones, expiry and projection outbox",
+        "skeleton/api/server.py binds MongoMemoryRepository + AsyncGovernedMemoryWriter + AsyncMemoryProjectionCoordinator when SKL_MONGO_URI is configured",
+        "skeleton/vault/lifecycle_adapters.py provides MongoMemoryLifecycleAdapter for canonical governed memory export and tombstone deletion",
+        "skeleton/api/server.py registers Mongo memory as both governance deletion target and export owner",
+        "skeleton/testing/test_mongo_memory_repository.py covers Mongo restart/reinstantiation, isolation, version/idempotency fencing, projection recovery, governed writes and canonical lifecycle export/delete",
+        "skeleton/testing/test_memory_projection.py proves vector/TFIDF/MAG/CAG projections rebuild from canonical memory and projection failure cannot roll back authority",
+        "skeleton/testing/test_memory_writeback.py proves provenance/review policy, governance fail-closed behavior and storage admission metering"
+      ],
+      "remaining": [
+        "close gap-state-authority-convergence and gap-governance-registry",
+        "collect fresh exact-head Mongo memory/App Assembly evidence",
+        "obtain independent closure verification"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
