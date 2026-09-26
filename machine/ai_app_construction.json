@@ -1700,7 +1700,7 @@
       "plane": "application-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical ConversationThread/ConversationMessage authority, Mongo persistence, first-class APIs, server-owned /ai/chat context compilation, stable retry identity, assistant result binding primitives and branch/regenerate repository primitives are implemented. Jeeves no longer owns provider credentials and no caller-supplied history can enter model context, including degraded-storage paths. Remaining convergence is migrating Jeeves compatibility storage/workspace reconstruction onto canonical ConversationThread/Message authority, wiring regenerate through engine execution, and completing governance/browser reconstruction closure evidence.",
+      "gap": "Canonical ConversationThread/ConversationMessage authority, Mongo persistence, first-class APIs, server-owned chat context compilation, stable retry identity, Jeeves one-time legacy import, canonical engine-backed regeneration, governed delete/export, and browser refresh/reconnect reconstruction are implemented. Remaining functional convergence is retention/reference propagation across conversation-linked artifacts, memory projections and summaries, followed by declared dependency and exact-head closure evidence.",
       "construction": [
         "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
         "persist thread/message authority in backend core Mongo rather than client memory or provider history",
@@ -1725,7 +1725,7 @@
         "context projection preserves selected message/citation/tool provenance",
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
-      "verification_state": "canonical-chat-authority-and-client-history-isolation-implemented-jeeves-store-cutover-open",
+      "verification_state": "canonical-cutover-regenerate-refresh-delete-export-implemented-retention-closure-open",
       "progress": {
         "state": "in_progress",
         "completed": [
@@ -1745,14 +1745,19 @@
           "backend /ai/chat compiles server-owned transcript through ContextCompiler",
           "Jeeves generative escalation delegates through canonical engine boundary",
           "Jeeves caller history is ignored in normal, empty-thread and degraded-storage paths",
-          "Jeeves compatibility tests prove server transcript authority and retry idempotency"
+          "Jeeves compatibility tests prove server transcript authority and retry idempotency",
+          "Jeeves legacy compatibility rows import once into canonical ConversationThread/ConversationMessage authority",
+          "canonical Jeeves history is server-owned after migration and legacy storage remains migration-read-only",
+          "regenerate executes through canonical engine and commits a new immutable assistant branch with operation/result/context lineage",
+          "governed conversation delete physically removes payload before lifecycle acknowledgement",
+          "governed conversation export is tenant-scoped and registry-driven",
+          "WorkspaceController remount and refresh reconstruct completed transcript from canonical server history",
+          "device-local transcript never becomes provider/model context authority"
         ],
         "remaining": [
-          "migrate Jeeves jeeves_chat compatibility rows onto canonical ConversationThread/ConversationMessage authority",
-          "migrate Jeeves WorkspaceController/device reconstruction to canonical conversation API projection",
-          "wire regenerate through engine execution and canonical regenerate_assistant_message",
-          "complete conversation governance delete/export/retention propagation across referenced artifacts/memory/summaries",
-          "prove browser refresh/reconnect reconstructs identical active transcript from canonical server authority"
+          "complete retention/reference propagation across conversation-linked artifacts, memory projections and summaries",
+          "close gap-state-authority-convergence and gap-governance-registry",
+          "collect fresh exact-head Conversation Authority Closure Gate and independent verifier evidence"
         ]
       }
     },
