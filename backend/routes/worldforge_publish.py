@@ -8,6 +8,7 @@ Currently hosts the branching-quest generator; monograph/poster/streaming
 remain in worldforge.py and can migrate here in a later pass.
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
 import uuid
 from datetime import datetime, timezone
@@ -220,8 +221,14 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
             for m in ensemble:
                 prov = MODEL_CATALOG.get(m, {}).get("provider", "openai")
                 try:
-                    chat = EngineChat(session_id=f"mono-{job_id[:8]}",
-                                   system_message=MONOGRAPH_SYSTEM).with_model(prov, m)
+                    chat = EngineChat(
+                        session_id=f"mono-{job_id[:8]}",
+                        instruction_policy=InstructionPolicy(
+                            policy_id="backend.worldforge.monograph",
+                            version="1",
+                            instructions=MONOGRAPH_SYSTEM,
+                        ),
+                    ).with_model(prov, m)
                     resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=300)
                     return (resp.content if hasattr(resp, "content") else str(resp)), m
                 except Exception as e:
@@ -350,8 +357,17 @@ def _poster_worker(job_id: str, cfg: WorldConfig, style: str):
         prompt = _poster_prompt(world, cfg, style)
 
         async def _gen():
-            chat = EngineChat(session_id=f"poster-{job_id[:8]}",
-                           system_message="You generate photorealistic scientific Earth-observation map imagery.")
+            chat = EngineChat(
+                session_id=f"poster-{job_id[:8]}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.worldforge.poster",
+                    version="1",
+                    instructions=(
+                        "You generate photorealistic scientific "
+                        "Earth-observation map imagery."
+                    ),
+                ),
+            )
             chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))
 
