@@ -32,7 +32,11 @@ def _segment(
     return ContextSegment.from_content(
         segment_id=str(uuid4()),
         kind=kind,
-        source_type="test",
+        source_type=(
+            "product-policy"
+            if trust is ContextTrust.TRUSTED_CONTROL
+            else "test"
+        ),
         source_id=source_id,
         content=content,
         trust_level=trust,
