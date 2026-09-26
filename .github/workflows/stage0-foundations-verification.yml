@@ -19,6 +19,11 @@ on:
       - "skeleton/observability/**"
       - "backend/routes/governance.py"
       - "skeleton/testing/test_data_governance.py"
+      - "skeleton/skills/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_execution_runtime.py"
       - "skeleton/testing/test_data_lifecycle.py"
       - "skeleton/testing/test_governance_registry.py"
       - "skeleton/testing/test_governance_audit.py"
@@ -117,6 +122,9 @@ jobs:
           skeleton/testing/test_governance_audit.py
           skeleton/testing/test_governance_runtime_binding.py
           skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_receipt_store.py
+          skeleton/testing/test_execution_runtime.py
 
       - name: Record governance verification head
         run: echo "Governance lifecycle verified at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
