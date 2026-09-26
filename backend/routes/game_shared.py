@@ -50,7 +50,7 @@ async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None)
             instruction_policy=InstructionPolicy(
                 policy_id="backend.game-shared.generation",
                 version="1",
-                instructions=system_prompt,
+                instructions=system_prompt.strip(),
             ),
         ).with_model("openai", "gpt-4o")
 
