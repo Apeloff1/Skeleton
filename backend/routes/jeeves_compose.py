@@ -204,14 +204,8 @@ def _turn_id(session_id: str, client_message_id: str) -> str:
 
 def _history_from_turn_rows(
     rows: List[Dict[str, Any]],
-    legacy_history: List[Dict[str, str]] | None = None,
 ) -> List[HistoryMessage]:
     messages: List[HistoryMessage] = []
-    for item in legacy_history or []:
-        try:
-            messages.append(HistoryMessage.model_validate(item))
-        except Exception:
-            continue
     for row in rows:
         user = row.get("role_user")
         assistant = row.get("role_jeeves")
@@ -252,24 +246,7 @@ async def _load_server_history(
         rows = await cursor.to_list(_MAX_SERVER_HISTORY_MESSAGES // 2)
         rows.reverse()
 
-        legacy_history: List[Dict[str, str]] = []
-        try:
-            seed = await collection.find_one(
-                {
-                    "session_id": session_id,
-                    "legacy_history.0": {"$exists": True},
-                },
-                {"_id": 0, "legacy_history": 1},
-            )
-            raw_seed = seed.get("legacy_history") if isinstance(seed, dict) else None
-            if isinstance(raw_seed, list):
-                legacy_history = [
-                    item for item in raw_seed if isinstance(item, dict)
-                ][-_MAX_SERVER_HISTORY_MESSAGES:]
-        except Exception:
-            legacy_history = []
-
-        return _history_from_turn_rows(rows, legacy_history), True
+        return _history_from_turn_rows(rows), True
     except Exception:
         return [], False
 
@@ -393,15 +370,20 @@ async def chat(req: ChatReq):
     if history_available and server_history:
         effective_history = server_history
         history_source = "server"
-        legacy_seed: List[Dict[str, str]] = []
     elif history_available:
-        effective_history = list(req.history)
-        history_source = "legacy-bootstrap" if req.history else "server-empty"
-        legacy_seed = [item.model_dump() for item in req.history]
+        effective_history = []
+        history_source = (
+            "server-empty-legacy-ignored"
+            if req.history
+            else "server-empty"
+        )
     else:
-        effective_history = list(req.history)
-        history_source = "client-degraded" if req.history else "unavailable"
-        legacy_seed = []
+        effective_history = []
+        history_source = (
+            "unavailable-legacy-ignored"
+            if req.history
+            else "unavailable"
+        )
 
     context_req = req.model_copy(update={"history": effective_history})
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
@@ -459,9 +441,6 @@ async def chat(req: ChatReq):
         "status": "complete",
         "ts": time.time(),
     }
-    if legacy_seed:
-        turn["legacy_history"] = legacy_seed
-
     persisted = True
     if claim_key is not None:
         await _finalize_claim(claim_key, turn)
