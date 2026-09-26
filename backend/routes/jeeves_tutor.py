@@ -12,6 +12,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Literal
@@ -210,7 +211,11 @@ Always be helpful, accurate, and adapt to the user's level."""
         try:
             chat = EngineChat(
                 session_id=session_id or f"jeeves-{uuid.uuid4().hex[:8]}",
-                system_message=system,
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.jeeves-tutor.response",
+                    version="1",
+                    instructions=system,
+                ),
             ).with_model("openai", "gpt-4o")
             response = await asyncio.wait_for(
                 chat.send_message(UserMessage(text=prompt)),
