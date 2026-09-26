@@ -2005,7 +2005,7 @@
       "plane": "orchestration",
       "priority": "P0",
       "status": "open",
-      "gap": "The repository has provider, routing, context, verification, tool, operation and stream primitives, but there is not yet one canonical durable AI execution loop that owns a complete model-turn/tool-turn cycle from admitted operation to verified final result. Without this contract, features can call the model or tools independently while bypassing shared budgets, checkpoints, approval, replay and final evidence binding.",
+      "gap": "The canonical durable cognitive execution loop is implementation-complete: AIExecution contracts, restart-safe execution/turn/checkpoint/finalization persistence, bounded provider->tool->provider orchestration, approval wait/resume, cancellation/deadline checks, governed tool lineage, verification, finalization, operation-level admission and metered durable execution storage are production-bound through the engine boundary. A dedicated Cognitive Execution Closure Gate now binds exact-head runtime/repository/engine regressions and an independent source/mirror/dependency verifier. Remaining closure is the declared lower-stage dependency closures plus a fresh green exact-head gate.",
       "construction": [
         "define AIExecutionRequest and AIExecutionResult as orchestration-owned envelopes bound to OperationEnvelope",
         "define AgentTurn with stable turn_id, parent_turn_id, operation_id, context digest, route decision, provider receipt, tool receipts, verification receipt and usage delta",
@@ -2035,7 +2035,7 @@
         "final AIExecutionResult references trace, route, provider, tool, verification, usage, memory/artifact and stream evidence",
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
       ],
-      "status_detail": "detailed runtime blueprint added; implementation modules and durable state binding remain"
+      "status_detail": "implementation-complete pending declared dependency closures and fresh exact-head Cognitive Execution Closure Gate"
     },
     {
       "id": "gap-streaming-protocol",
@@ -4431,7 +4431,7 @@
   "cognitive_runtime_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "planned-p0",
+    "status": "implemented-pending-closure",
     "gap": "gap-cognitive-execution-loop",
     "objective": "Specify the exact runtime, state, contracts, recovery, safety and evidence semantics required for one fully functional AI execution path without introducing a second orchestration framework.",
     "target_modules": {
@@ -5007,6 +5007,20 @@
           "P0 closure"
         ]
       }
+    ],
+    "closure_gate": "Cognitive Execution Closure Gate must pass on the exact PR head with runtime/repository/engine regressions and independent source/mirror/dependency verification.",
+    "implementation_evidence": [
+      "skeleton/contracts/ai_execution.py provider-neutral execution/turn/checkpoint/result contracts",
+      "skeleton/persistence/execution_repository.py restart-safe execution, turn, checkpoint, finalization intent/result and outbox authority",
+      "skeleton/intelligence/execution_runtime.py bounded provider->tool->provider loop with wait/resume, verification and finalization",
+      "skeleton/api/engine_service.py operation-level admission, approval and metered durable submission/execution writes",
+      "skeleton/api/engine_runtime.py engine-owned CognitiveExecutionRuntime coordination",
+      "skeleton/testing/test_execution_runtime.py bounded loop, approval, lineage, recovery, verification and finalization regressions",
+      "skeleton/testing/test_execution_repository.py durable checkpoint/turn/finalization/recovery regressions",
+      "skeleton/testing/test_engine_execution_service.py engine admission/approval/storage accounting regressions",
+      "skeleton/testing/test_engine_execution_coordinator.py restart/recovery engine coordination regressions",
+      "scripts/verify_cognitive_execution_closure.py independent source/mirror/dependency verifier",
+      ".github/workflows/cognitive-execution-closure.yml exact-head closure gate"
     ]
   },
   "conversation_runtime_contract": {
