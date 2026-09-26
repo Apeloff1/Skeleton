@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 from pathlib import Path
 import tempfile
 import time
@@ -376,6 +377,9 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
         )
     finally:
         pending_path.unlink(missing_ok=True)
+
+    if governed_store is not None:
+        shutil.rmtree(workdir, ignore_errors=True)
 
     record = register_artifact(
         build_id,
