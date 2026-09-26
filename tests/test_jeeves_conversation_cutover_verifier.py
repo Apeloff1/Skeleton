@@ -78,13 +78,20 @@ def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns():
 """,
         "frontend/features/Jeeves/WorkspaceController.ts": """
 export type HistoryTransport = unknown;
+function projectCanonicalHistory() {}
 class WorkspaceController {
-  canonicalMessages() {}
   rehydrateServerTranscripts() {
     throw new Error('canonical conversation history unavailable');
   }
-  save() {
-    return { sessionUpdatedAt: Date.now() };
+  refreshCanonical() {
+    return projectCanonicalHistory();
+  }
+  commit(response) {
+    return {
+      id: response.canonical_message_id,
+      thread: response.canonical_thread_id,
+      sessionUpdatedAt: Date.now(),
+    };
   }
 }
 """,
@@ -95,15 +102,25 @@ const restored = {
   sessionId,
   sessionUpdatedAt: sessionId ? sessionUpdatedAt : 0,
 };
+// The browser cache never sends its transcript back as provider context.
+export function buildChatBody() {
+  return { session_id: sessionId };
+}
+function canonicalTurnText() {}
+export function projectCanonicalHistory() {}
 """,
         "frontend/features/Jeeves/ChatWorkspace.tsx": """
 type ChatHistoryResponse = unknown;
 const path = '/api/jeeves/chat/' + sessionId + '?limit=50';
+controller.refreshCanonical();
 """,
         "frontend/scripts/test-jeeves-workspace.cjs": """
 test('remount replaces stale device transcript with canonical server history', () => {});
 test('remount keeps device cache with notice when canonical history is unavailable', () => {});
 test('durable backend session identity survives timestamp age and skew', () => {});
+test('outgoing Jeeves requests never serialize the device-local transcript', () => {});
+test('canonical projection preserves unresolved local user work only', () => {});
+test('successful send caches canonical thread and assistant identities', () => {});
 """,
         "backend/routes/conversations.py": """
 @router.post("/{thread_id}/messages/{message_id}/regenerate")
@@ -218,3 +235,22 @@ def test_cutover_verifier_rejects_ttl_session_expiry_regression(
     assert receipt["valid"] is False
     assert "workspace model regained TTL-based canonical session expiry" in receipt["errors"]
 
+def test_cutover_verifier_rejects_client_transcript_authority(
+    tmp_path: Path,
+) -> None:
+    root = _write_valid_repo(tmp_path)
+    path = root / "frontend" / "features" / "Jeeves" / "workspace.ts"
+    source = path.read_text(encoding="utf-8")
+    source = source.replace(
+        "return { session_id: sessionId };",
+        "return { session_id: sessionId, history: [] };",
+    )
+    path.write_text(source, encoding="utf-8")
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert (
+        "Jeeves buildChatBody regained caller transcript authority"
+        in receipt["errors"]
+    )
