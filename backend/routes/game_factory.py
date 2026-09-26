@@ -30,7 +30,7 @@ load_dotenv()
 
 # LLM Integration
 try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     LLM_AVAILABLE = True
 except ImportError:
     LLM_AVAILABLE = False
@@ -1885,7 +1885,7 @@ async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None)
         return {"success": False, "response": None, "error": "LLM not available"}
 
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             session_id=session_id or str(uuid.uuid4()),
             system_message=system_prompt
         ).with_model("openai", "gpt-4o")
