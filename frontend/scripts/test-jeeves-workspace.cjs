@@ -21,8 +21,12 @@ function storage(initial = {}) {
   const data = new Map(Object.entries(initial));
   return { data, getItem: async key => data.get(key) ?? null, setItem: async (key, value) => { data.set(key, value); } };
 }
-async function controller(transport = async () => ({ reply: 'Answer', session_id: 'server-1' }), disk = storage()) {
-  const store = new WorkspaceController(disk, transport);
+async function controller(
+  transport = async () => ({ reply: 'Answer', session_id: 'server-1' }),
+  disk = storage(),
+  historyTransport = undefined,
+) {
+  const store = new WorkspaceController(disk, transport, historyTransport);
   await store.initialize();
   await tick();
   return store;
@@ -67,15 +71,104 @@ test('pending work is restored as retryable and attachment bytes never persist',
   assert.equal(restored.conversations[0].messages[0].artifactCount, 1);
 });
 
-test('expired and future backend session timestamps fall back to conversation identity', () => {
+
+test('remount replaces stale device transcript with canonical server history', async () => {
+  const workspace = W.createWorkspace();
+  Object.assign(workspace.conversations[0], {
+    sessionId: 'server-1',
+    sessionUpdatedAt: 1,
+    messages: [
+      message({ id: 'local-user', text: 'stale local question' }),
+      message({ id: 'local-ai', role: 'jeeves', text: 'stale local answer' }),
+    ],
+  });
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) });
+  let requested = null;
+
+  const store = await controller(
+    undefined,
+    disk,
+    async sessionId => {
+      requested = sessionId;
+      return {
+        ok: true,
+        available: true,
+        session_id: sessionId,
+        history_source: 'canonical',
+        turns: [{
+          client_message_id: 'client-turn-1',
+          role_user: 'canonical question',
+          role_jeeves: 'canonical answer',
+          user_ts: 100,
+          assistant_ts: 101,
+          model: 'skeleton-engine',
+          tier: 'canonical',
+          canonical_user_message_id: 'canonical-user-1',
+          canonical_assistant_message_id: 'canonical-assistant-1',
+        }],
+      };
+    },
+  );
+
+  assert.equal(requested, 'server-1');
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['canonical question', 'canonical answer'],
+  );
+  assert.deepEqual(
+    store.active.messages.map(item => item.id),
+    ['client-turn-1', 'canonical-assistant-1'],
+  );
+  assert.deepEqual(
+    store.active.messages.map(item => item.createdAt),
+    [100000, 101000],
+  );
+  assert.equal(store.active.messages[1].model, 'skeleton-engine');
+  assert.equal(store.getSnapshot().notice, null);
+  const persisted = W.decodeWorkspace(disk.data.get(W.WORKSPACE_KEY));
+  assert.deepEqual(
+    persisted.conversations[0].messages.map(item => item.text),
+    ['canonical question', 'canonical answer'],
+  );
+});
+
+test('remount keeps device cache with notice when canonical history is unavailable', async () => {
+  const workspace = W.createWorkspace();
+  Object.assign(workspace.conversations[0], {
+    sessionId: 'server-2',
+    messages: [message({ text: 'cached question' })],
+  });
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) });
+
+  const store = await controller(
+    undefined,
+    disk,
+    async () => {
+      throw new Error('offline');
+    },
+  );
+
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['cached question'],
+  );
+  assert.match(store.getSnapshot().notice, /could not be refreshed/i);
+  assert.equal(store.getSnapshot().ready, true);
+});
+
+test('durable backend session identity survives timestamp age and skew', () => {
   const now = Date.now();
   for (const time of [now - W.SESSION_TTL - 1, now + 100000]) {
     const workspace = W.createWorkspace();
-    Object.assign(workspace.conversations[0], { sessionId: 'stale', sessionUpdatedAt: time });
-    assert.equal(W.decodeWorkspace(W.encodeWorkspace(workspace), now).conversations[0].sessionId, null);
+    Object.assign(workspace.conversations[0], {
+      sessionId: 'stable-session',
+      sessionUpdatedAt: time,
+    });
+    const restored = W.decodeWorkspace(W.encodeWorkspace(workspace), now);
+    assert.equal(restored.conversations[0].sessionId, 'stable-session');
     assert.equal(
-      W.buildChatBody(workspace.conversations[0], 'hello', undefined, now).session_id,
-      workspace.conversations[0].id,
+      W.buildChatBody(restored.conversations[0], 'hello', undefined, now).session_id,
+      'stable-session',
     );
   }
 });
