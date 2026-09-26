@@ -5,6 +5,7 @@ More game pipelines • More specialized agents • AAA Studio Team
 3 System Blurbs enforced as immutable laws across all chats.
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -649,7 +650,11 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
         try:
             chat = EngineChat(
                 session_id=f"groupchat_{chat_id}_{agent_id}_{str(uuid.uuid4())[:8]}",
-                system_message=system_prompt
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.pipeline-agents.groupchat",
+                    version="1",
+                    instructions=system_prompt,
+                ),
             ).with_model("openai", "gpt-4o")
             
             response_text = await chat.send_message(UserMessage(text=user_message))
