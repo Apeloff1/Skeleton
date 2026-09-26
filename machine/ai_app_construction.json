@@ -7792,6 +7792,35 @@
         ]
       },
       {
+        "path": "backend/routes/jeeves_compose.py",
+        "role": "Jeeves product chat/compose adapter delegating generative execution through canonical EngineChat over the Skeleton engine",
+        "required_tokens": [
+          "EngineChat",
+          "UserMessage",
+          "backend.jeeves.chat"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
+        "path": "backend/routes/lafs.py",
+        "role": "LAFS/Jeeves grounded-answer adapter delegating generative execution through canonical EngineChat over the Skeleton engine",
+        "required_tokens": [
+          "EngineChat",
+          "UserMessage",
+          "LAFS_JEEVES_POLICY",
+          "evidence_required"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
+      },
+      {
         "path": "backend/services/tool_registry.py",
         "role": "legacy tool compatibility facade; model-provider work is engine-owned",
         "required_tokens": [
@@ -7811,20 +7840,6 @@
         "required_tokens": [
           "OpenAISyncProviderAdapter",
           "ProviderRequest"
-        ],
-        "forbidden_edge_classes": [
-          "credential",
-          "network_transport",
-          "sdk_client"
-        ]
-      },
-      {
-        "path": "backend/routes/jeeves_compose.py",
-        "role": "Jeeves product chat/compose adapter delegating generative execution through canonical EngineChat over the Skeleton engine",
-        "required_tokens": [
-          "EngineChat",
-          "UserMessage",
-          "backend.jeeves.chat"
         ],
         "forbidden_edge_classes": [
           "credential",
