@@ -37,6 +37,8 @@ SKIP_PREFIXES = (
     Path("skeleton/ai/research/external"),
     Path("skeleton/ai/research/legacy"),
 )
+CANONICAL_PROVIDER_RUNTIME = Path("skeleton/provider_runtime.py")
+CANONICAL_PROVIDER_MIRROR = Path("skeleton/ai/runtime/provider_runtime.py")
 VENDOR_SDK_ROOTS = {
     "openai",
     "anthropic",
@@ -372,9 +374,29 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
 
     scanned = 0
     discovered: list[dict[str, Any]] = []
+    canonical_provider = root / CANONICAL_PROVIDER_RUNTIME
+    provider_mirror = root / CANONICAL_PROVIDER_MIRROR
+    if provider_mirror.exists():
+        try:
+            canonical_bytes = canonical_provider.read_bytes()
+            mirror_bytes = provider_mirror.read_bytes()
+        except OSError as exc:
+            errors.append(
+                "canonical provider mirror could not be verified: "
+                + type(exc).__name__
+            )
+        else:
+            if canonical_bytes != mirror_bytes:
+                errors.append(
+                    "canonical provider runtime AI mirror drifted from source"
+                )
+
     for path in _production_python_files(root):
         scanned += 1
-        rel = path.relative_to(root).as_posix()
+        rel_path = path.relative_to(root)
+        rel = rel_path.as_posix()
+        if rel_path == CANONICAL_PROVIDER_MIRROR:
+            continue
         _source, tree = _parse_source(path)
         edges = _source_edges(tree)
         active = {key for key, values in edges.items() if values}
