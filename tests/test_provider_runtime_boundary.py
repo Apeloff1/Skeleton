@@ -206,6 +206,35 @@ def test_lafs_has_no_shadow_or_local_provider_runtime() -> None:
 
 
 
+def test_lafs_is_declared_engine_chat_isolation_surface() -> None:
+    import json
+
+    contract = json.loads(
+        (ROOT / "machine" / "ai_app_construction.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    surfaces = {
+        item["path"]: item
+        for item in contract["provider_surface_convergence_blueprint"][
+            "application_isolation_surfaces"
+        ]
+    }
+    entry = surfaces["backend/routes/lafs.py"]
+
+    assert set(entry["forbidden_edge_classes"]) == {
+        "credential",
+        "network_transport",
+        "sdk_client",
+    }
+    assert set(entry["required_tokens"]) == {
+        "EngineChat",
+        "UserMessage",
+        "LAFS_JEEVES_POLICY",
+        "evidence_required",
+    }
+
+
 def test_backend_tool_registry_is_declared_provider_isolation_surface() -> None:
     import json
 
