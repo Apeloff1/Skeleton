@@ -18,7 +18,7 @@ from skeleton.forge.verify_loop import forge_verify_until_green
 _BIN, _SOURCE, _ = pt.resolve_binary()
 needs_godot = pytest.mark.skipif(_BIN is None, reason="no Godot binary (set SKELETON_GODOT_BIN)")
 
-ANSWERS = {b["id"]: list(b["options"])[0] for b in BEATS if b["id"] != "era_explicit"}
+ANSWERS = {b["id"]: next(iter(b["options"])) for b in BEATS if b["id"] != "era_explicit"}
 
 
 @pytest.fixture(autouse=True)
@@ -52,14 +52,14 @@ def test_normalise_mode_rejects_unknown():
 
 
 def test_scan_log_keeps_errors_and_drops_benign_noise():
-    log = "\n".join([
-        "Godot Engine v4.3.stable",
-        "SCRIPT ERROR: Parse Error: Expected expression.",
-        "   at: GDScript::reload (res://scripts/a.gd:3)",
-        "ERROR: No export template found at the expected path:",
-        "ERROR: Failed to load script \"res://b.gd\" with error \"Parse error\".",
-        "WARNING: something harmless",
-    ])
+    log = (
+        "Godot Engine v4.3.stable\n"
+        "SCRIPT ERROR: Parse Error: Expected expression.\n"
+        "   at: GDScript::reload (res://scripts/a.gd:3)\n"
+        "ERROR: No export template found at the expected path:\n"
+        "ERROR: Failed to load script \"res://b.gd\" with error \"Parse error\".\n"
+        "WARNING: something harmless\n"
+    )
     errors = pt.scan_log(log)
     assert errors == [
         "SCRIPT ERROR: Parse Error: Expected expression.",
