@@ -1,0 +1,107 @@
+name: AI Dependency Closure
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - "scripts/verify_ai_dependency_closure.py"
+      - "scripts/verify_governance_closure.py"
+      - "scripts/verify_cost_admission_closure.py"
+      - "scripts/verify_provider_surface_closure.py"
+      - "scripts/verify_tool_runtime_closure.py"
+      - "tests/test_ai_dependency_closure.py"
+      - ".github/workflows/governance-closure.yml"
+      - ".github/workflows/cost-admission-closure.yml"
+      - ".github/workflows/provider-surface-closure.yml"
+      - ".github/workflows/tool-runtime-closure.yml"
+      - ".github/workflows/ai-dependency-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-dependency-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-closure:
+    name: Stage-0 dependency closure integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run dependency closure verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_ai_dependency_closure.py
+
+      - name: Verify exact-head Stage-0 dependency graph
+        env:
+          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_ai_dependency_closure.py
+          --evidence-out .ai-dependency-closure.json
+          --print-evidence
+
+      - name: Assert exact-head dependency receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".ai-dependency-closure.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("dependency closure receipt head mismatch")
+          if receipt.get("verifier") != "ai-dependency-closure-v1":
+              raise SystemExit("unexpected dependency closure verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("dependency closure verification failed")
+          if len(receipt.get("closure_surface_digests") or {}) < 8:
+              raise SystemExit("dependency closure surface coverage is incomplete")
+          expected_prereqs = {
+              "gap-governance-registry",
+              "gap-cost-admission",
+              "gap-provider-surface-convergence",
+          }
+          if set(receipt.get("prerequisite_status") or {}) != expected_prereqs:
+              raise SystemExit("dependency closure prerequisite set drifted")
+          print(
+              "ai dependency exact-head receipt:",
+              expected,
+              "prerequisites_closed=",
+              receipt["prerequisites_closed"],
+              "tool_runtime_status=",
+              receipt["tool_runtime_status"],
+          )
+          PY
