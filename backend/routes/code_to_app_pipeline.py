@@ -9,6 +9,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException, Request
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
@@ -117,7 +118,11 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
         try:
             chat = EngineChat(
                 session_id=f"codedock-app-{uuid.uuid4().hex[:8]}",
-                system_message=system_prompt,
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.code-to-app.generation",
+                    version="1",
+                    instructions=system_prompt,
+                ),
             ).with_model("openai", "gpt-4o")
             response = await asyncio.wait_for(
                 chat.send_message(UserMessage(text=prompt)),
