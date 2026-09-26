@@ -12,6 +12,7 @@ import threading
 from typing import Any, Mapping
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
     EngineAuthorityRegistry,
@@ -85,15 +86,23 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     return result
 
 
+def _json_bytes(value: object) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise EngineServiceError(
+            "engine storage payload must be deterministic JSON"
+        ) from exc
+
+
 def _digest(value: Mapping[str, Any]) -> str:
-    encoded = json.dumps(
-        dict(value),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return hashlib.sha256(_json_bytes(dict(value))).hexdigest()
 
 
 def _execution_admission_operation_id(operation_id: str) -> str:
@@ -1370,6 +1379,39 @@ class EngineExecutionService:
         self.submissions = submissions
         self.authorities = authorities
         self.admission_runtime = admission_runtime
+        self._usage_meter = (
+            None
+            if admission_runtime is None
+            else ArtifactUsageMeter(admission_runtime)
+        )
+
+    def meter_execution_storage(
+        self,
+        command: EngineExecutionCommand,
+        resource_id: str,
+        write_id: str,
+        payload: object,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        meter = self._usage_meter
+        if meter is None:
+            return
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "storage.now")
+        )
+        operation_id = _execution_admission_operation_id(
+            command.operation.operation_id
+        )
+        meter.meter_storage(
+            operation_id,
+            str(resource_id),
+            str(write_id),
+            len(_json_bytes(payload)),
+            now_wall=instant.timestamp(),
+        )
 
     def _execution_admission_request(
         self,
@@ -1528,6 +1570,13 @@ class EngineExecutionService:
             command,
             now=instant,
         )
+        self.meter_execution_storage(
+            command,
+            "engine-execution-state",
+            "create:" + command.execution_request.execution_id,
+            command.execution_request.as_dict(),
+            now=instant,
+        )
         try:
             execution = self.repository.create(
                 command.execution_request,
@@ -1565,6 +1614,16 @@ class EngineExecutionService:
                 + "/events"
             ),
             trace_id=command.operation.trace_id,
+        )
+        self.meter_execution_storage(
+            command,
+            "engine-submission",
+            "submission:" + execution.execution_id,
+            {
+                "command": command.as_dict(),
+                "ack": ack.as_dict(),
+            },
+            now=instant,
         )
         try:
             return self.submissions.remember(
