@@ -229,4 +229,3 @@ async def test_server_state_composes_governed_retrieval_lifecycle() -> None:
     )
     assert retrieval.size("tenant-a") == 0
     state.close_governance_registry()
-
