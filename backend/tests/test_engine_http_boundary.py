@@ -384,7 +384,7 @@ async def test_backend_client_crosses_authenticated_engine_boundary_idempotently
 
     assert ack["operation_id"] == context.operation_id
     assert ack["execution_id"] == context.execution_id
-    assert ack["state"] == "created"
+    assert ack["state"] == "admitted"
     accepted_at = ack["accepted_at"]
 
     retry = _command(
