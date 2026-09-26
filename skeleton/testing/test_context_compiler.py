@@ -11,6 +11,11 @@ from skeleton.contracts.context import (
     ContextSegment,
     ContextTrust,
 )
+from skeleton.contracts.conversation import (
+    ConversationAuthorType,
+    ConversationMessage,
+    ConversationThread,
+)
 from skeleton.context.compaction import (
     ContextCompactionError,
     compact_context_segment,
@@ -21,6 +26,7 @@ from skeleton.context.compiler import (
     project_provider_context,
 )
 from skeleton.context.policy import ContextCompilePolicy
+from skeleton.context.sources.conversation import conversation_message_segment
 from skeleton.context.sources.tool import tool_result_segment
 from skeleton.skills.tool_contract import (
     ToolExecutionReceipt,
@@ -480,6 +486,174 @@ def test_provider_projection_uses_highest_priority_latest_user_as_prompt() -> No
     ) == (
         ("user", "Earlier question."),
         ("assistant", "Earlier answer."),
+    )
+
+
+def test_conversation_adapter_emits_authoritative_sequence_provenance() -> None:
+    thread_id = str(uuid4())
+    branch_id = str(uuid4())
+    thread = ConversationThread(
+        thread_id=thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=BASE,
+        updated_at=BASE,
+        version=1,
+        message_sequence=3,
+        active_branch_id=branch_id,
+    )
+    message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=3,
+        author_type=ConversationAuthorType.USER,
+        created_at=BASE,
+        idempotency_key="sequence-provenance",
+        content="Canonical ordered message.",
+        data_class="internal",
+    )
+
+    segment = conversation_message_segment(
+        thread,
+        message,
+        purpose="model-inference",
+    )
+
+    assert "conversation-sequence:3" in segment.provenance
+
+
+def test_provider_projection_uses_canonical_sequence_for_equal_timestamp_history() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    thread_id = str(uuid4())
+    branch_id = str(uuid4())
+    thread = ConversationThread(
+        thread_id=thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=BASE,
+        updated_at=BASE,
+        version=5,
+        message_sequence=5,
+        active_branch_id=branch_id,
+        data_class="internal",
+    )
+
+    user1 = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=BASE,
+        idempotency_key="u1",
+        content="Question one.",
+        data_class="internal",
+    )
+    assistant1 = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=BASE,
+        idempotency_key="a1",
+        content="Answer one.",
+        parent_message_id=user1.message_id,
+        causal_user_message_id=user1.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:a1",
+        data_class="internal",
+    )
+    user2 = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=3,
+        author_type=ConversationAuthorType.USER,
+        created_at=BASE,
+        idempotency_key="u2",
+        content="Question two.",
+        parent_message_id=assistant1.message_id,
+        data_class="internal",
+    )
+    assistant2 = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=4,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=BASE,
+        idempotency_key="a2",
+        content="Answer two.",
+        parent_message_id=user2.message_id,
+        causal_user_message_id=user2.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:a2",
+        data_class="internal",
+    )
+    current = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread_id,
+        branch_id=branch_id,
+        sequence=5,
+        author_type=ConversationAuthorType.USER,
+        created_at=BASE,
+        idempotency_key="u3",
+        content="Current question.",
+        parent_message_id=assistant2.message_id,
+        data_class="internal",
+    )
+    policy = _segment(
+        "Canonical instruction.",
+        kind=ContextKind.PRODUCT_INSTRUCTION,
+        trust=ContextTrust.TRUSTED_CONTROL,
+        source_type="product-policy",
+        source_id="policy:sequence",
+        priority=1000,
+        relevance=1.0,
+        mandatory=True,
+        purpose="model-inference",
+    )
+    segments = tuple(
+        conversation_message_segment(
+            thread,
+            message,
+            purpose="model-inference",
+        )
+        for message in (assistant2, user1, current, assistant1, user2)
+    )
+
+    envelope = ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=ContextBudget(
+            max_context_tokens=4096,
+            reserved_output_tokens=512,
+            reserved_tool_result_tokens=0,
+            reserved_policy_tokens=512,
+            safety_margin_tokens=128,
+            max_segment_tokens=2048,
+            max_artifact_tokens=1024,
+            max_tool_result_tokens=1024,
+        ),
+        segments=(policy, *segments),
+        compiled_at=BASE,
+    )
+    projection = project_provider_context(envelope)
+
+    assert projection.prompt == "Current question."
+    assert tuple(
+        (item["role"], item["content"])
+        for item in projection.history
+    ) == (
+        ("user", "Question one."),
+        ("assistant", "Answer one."),
+        ("user", "Question two."),
+        ("assistant", "Answer two."),
     )
 
 
