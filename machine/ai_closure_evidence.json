@@ -380,7 +380,17 @@
         "frontend/features/Jeeves/WorkspaceController.ts rehydrates and refreshes device state from canonical server history",
         "frontend/features/Jeeves/workspace.ts projectCanonicalHistory replaces stale completed cache while preserving unresolved local work and never serializes local transcript into model input",
         "frontend/scripts/test-jeeves-workspace.cjs proves remount reconstruction, durable session identity and device-transcript non-authority",
-        "scripts/verify_jeeves_conversation_cutover.py independently verifies legacy migration-read-only authority, canonical regeneration and workspace reconstruction boundaries"
+        "scripts/verify_jeeves_conversation_cutover.py independently verifies legacy migration-read-only authority, canonical regeneration and workspace reconstruction boundaries",
+        "skeleton/contracts/conversation.py carries first-class memory_refs alongside tool/citation/artifact references",
+        "skeleton/persistence/conversation_repository.py persists memory_refs_json with backward-compatible SQLite migration and round-trip coverage",
+        "backend/routes/ai.py and backend/routes/conversations.py bind engine tool receipts, memory refs, evidence refs and artifact refs into canonical assistant messages",
+        "backend/core/conversations.py resolves a thread-scoped, tenant-fenced governed record set from canonical conversation rows plus explicit message references",
+        "backend/core/conversations.py delete_thread_with_governance executes engine-owned linked targets before physical conversation deletion and fails closed on malformed or foreign plan actions",
+        "skeleton/vault/data_lifecycle.py pending_deletion_plan exposes only unacknowledged tenant-fenced actions for retry-safe distributed physical owners",
+        "skeleton/api/engine_service.py and engine_routes.py execute non-conversation lifecycle targets through registered engine lifecycle adapters",
+        "backend/tests/test_conversation_governance.py fences linked-record selection from unrelated tenant records",
+        "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation actions for backend authority",
+        "backend/tests/test_conversations_api.py proves completion is claimed only after governed propagation succeeds"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -395,13 +405,13 @@
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
       "outstanding_evidence": [
-        "conversation retention/reference propagation across referenced artifacts, memory projections and summaries",
+        "automatic retention-expiry propagation for canonical conversation rows and explicitly linked governed records",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
         "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
       ],
       "blockers": [
-        "conversation retention/reference propagation across referenced artifacts, memory projections and summaries",
+        "automatic retention-expiry propagation for canonical conversation rows and explicitly linked governed records",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
         "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
