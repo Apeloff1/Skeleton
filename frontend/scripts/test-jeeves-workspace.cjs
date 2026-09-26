@@ -95,14 +95,15 @@ test('remount replaces stale device transcript with canonical server history', a
         available: true,
         session_id: sessionId,
         history_source: 'canonical',
+        canonical_thread_id: 'thread-canonical-1',
         turns: [{
+          session_id: sessionId,
           client_message_id: 'client-turn-1',
           role_user: 'canonical question',
           role_jeeves: 'canonical answer',
-          user_ts: 100,
-          assistant_ts: 101,
-          model: 'skeleton-engine',
-          tier: 'canonical',
+          status: 'complete',
+          ts: 101,
+          canonical_thread_id: 'thread-canonical-1',
           canonical_user_message_id: 'canonical-user-1',
           canonical_assistant_message_id: 'canonical-assistant-1',
         }],
@@ -121,9 +122,9 @@ test('remount replaces stale device transcript with canonical server history', a
   );
   assert.deepEqual(
     store.active.messages.map(item => item.createdAt),
-    [100000, 101000],
+    [101000, 101001],
   );
-  assert.equal(store.active.messages[1].model, 'skeleton-engine');
+  assert.equal(store.active.canonicalThreadId, 'thread-canonical-1');
   assert.equal(store.getSnapshot().notice, null);
   const persisted = W.decodeWorkspace(disk.data.get(W.WORKSPACE_KEY));
   assert.deepEqual(
@@ -357,14 +358,70 @@ test('storage quota failure preserves in-memory work and retry saves latest stat
   assert.equal(W.decodeWorkspace(disk.data.get(W.WORKSPACE_KEY)).conversations[0].draft, 'precious draft');
 });
 
-test('history excludes failed turns and is bounded by count and characters', () => {
+test('outgoing Jeeves requests never serialize the device-local transcript', () => {
   const conversation = W.createConversation();
-  conversation.messages = Array.from({ length: 100 }, (_, i) => message({ text: String(i).padEnd(4000, 'x'), status: i === 99 ? 'failed' : 'complete' }));
-  const body = W.buildChatBody(conversation, 'next');
-  assert.ok(body.history.length <= 20);
-  assert.ok(body.history.reduce((n, m) => n + m.content.length, 0) <= 24000);
-  assert.ok(!body.history.some(m => m.content.startsWith('99')));
-  assert.ok(body.history.at(-1).content.startsWith('98'));
+  conversation.messages = Array.from({ length: 20 }, (_, i) => message({
+    text: `local-only-${i}`,
+    status: 'complete',
+  }));
+  const body = W.buildChatBody(conversation, 'next', undefined, Date.now(), 'turn-next');
+  assert.equal(Object.hasOwn(body, 'history'), false);
+  assert.equal(JSON.stringify(body).includes('local-only-'), false);
+  assert.equal(body.client_message_id, 'turn-next');
+  assert.equal(body.session_id, conversation.id);
+});
+
+test('canonical projection preserves unresolved local user work only', () => {
+  const conversation = W.createConversation(1000);
+  conversation.sessionId = 'server-preserve';
+  conversation.messages = [
+    message({ id: 'stale-complete', text: 'stale complete', status: 'complete' }),
+    message({ id: 'retry-local', text: 'retry me', status: 'failed' }),
+  ];
+
+  const projected = W.projectCanonicalHistory(conversation, {
+    ok: true,
+    available: true,
+    session_id: 'server-preserve',
+    canonical_thread_id: 'thread-preserve',
+    turns: [{
+      session_id: 'server-preserve',
+      client_message_id: 'canonical-user',
+      role_user: 'server question',
+      role_jeeves: 'server answer',
+      status: 'complete',
+      ts: 12,
+      canonical_assistant_message_id: 'canonical-assistant',
+    }],
+  }, 13000);
+
+  assert.deepEqual(
+    projected.messages.map(item => [item.id, item.text, item.status]),
+    [
+      ['canonical-user', 'server question', 'complete'],
+      ['canonical-assistant', 'server answer', 'complete'],
+      ['retry-local', 'retry me', 'failed'],
+    ],
+  );
+  assert.equal(projected.canonicalThreadId, 'thread-preserve');
+  assert.equal(projected.messages.some(item => item.text === 'stale complete'), false);
+});
+
+test('successful send caches canonical thread and assistant identities', async () => {
+  const store = await controller(async body => ({
+    ok: true,
+    session_id: body.session_id,
+    reply: 'canonical reply',
+    canonical_thread_id: 'thread-send',
+    canonical_message_id: 'assistant-send',
+    persisted: true,
+  }));
+  store.edit({ draft: 'question' });
+  await store.send();
+
+  assert.equal(store.active.canonicalThreadId, 'thread-send');
+  assert.equal(store.active.messages.at(-1).id, 'assistant-send');
+  assert.equal(store.active.messages.at(-1).text, 'canonical reply');
 });
 
 test('retry after remount requires reattaching an unsaved file', async () => {
