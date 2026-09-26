@@ -121,7 +121,7 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.code-to-app.generation",
                     version="1",
-                    instructions=system_prompt,
+                    instructions=system_prompt.strip(),
                 ),
             ).with_model("openai", "gpt-4o")
             response = await asyncio.wait_for(
