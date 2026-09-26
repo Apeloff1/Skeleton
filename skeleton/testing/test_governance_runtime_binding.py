@@ -341,4 +341,3 @@ async def test_governed_artifact_retention_expiry_physically_deletes_bytes(
     assert len(record_receipts) == 1
     assert record_receipts[0].target == "artifact"
     state.close_governance_registry()
-
