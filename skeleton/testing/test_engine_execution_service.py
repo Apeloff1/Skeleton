@@ -603,6 +603,7 @@ def _service_with_approval_scope(tmp_path):
                 "engine:cancel",
                 "engine:events",
                 "engine:approve",
+                "engine:admission",
             )
         ),
     )
