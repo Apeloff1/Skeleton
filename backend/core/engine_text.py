@@ -264,14 +264,10 @@ async def execute_engine_text(
             tenant_id=request.tenant_id,
             source="backend.engine_text",
         )
-    except Exception as exc:
-        from skeleton.vault.data_governance import DataGovernanceDenied
-
-        if isinstance(exc, DataGovernanceDenied):
-            raise EngineTextError(
-                "route privacy denied engine text request"
-            ) from exc
-        raise
+    except DataGovernanceDenied as exc:
+        raise EngineTextError(
+            "route privacy denied engine text request"
+        ) from exc
     active_client = client
     if active_client is None:
         try:
