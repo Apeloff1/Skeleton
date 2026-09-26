@@ -34,7 +34,7 @@ import os
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 
 router = APIRouter(prefix="/education", tags=["Interactive Education"])
 
@@ -209,7 +209,7 @@ ACHIEVEMENTS = [
 
 async def call_education_ai(prompt: str, system_prompt: str) -> str:
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             session_id=f"edu-{uuid.uuid4().hex[:8]}",
             system_message=system_prompt
         ).with_model("openai", "gpt-4o")
