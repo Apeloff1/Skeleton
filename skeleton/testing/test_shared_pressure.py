@@ -155,6 +155,47 @@ def test_expired_lease_is_reclaimed_after_restart(tmp_path: Path) -> None:
     assert replacement.lease_id != lease.lease_id
 
 
+def test_operation_lease_acquire_is_retry_stable_across_instances(tmp_path: Path) -> None:
+    path = tmp_path / "pressure.sqlite3"
+    first = _ledger(path)
+    lease = first.acquire(
+        "ai-work",
+        "tenant-a",
+        "op-retry",
+        "worker-a",
+        priority=5,
+        lease_seconds=4.0,
+        now=10.0,
+    )
+
+    restarted = SqliteSharedPressureLedger(path)
+    retried = restarted.acquire(
+        "ai-work",
+        "tenant-a",
+        "op-retry",
+        "worker-a",
+        priority=5,
+        lease_seconds=30.0,
+        now=10.5,
+    )
+
+    assert retried == lease
+    assert restarted.snapshot("ai-work", tenant_id="tenant-a", now=10.6).active == 1
+
+    with pytest.raises(
+        SharedPressureConflict,
+        match="operation already leased with different ownership",
+    ):
+        restarted.acquire(
+            "ai-work",
+            "tenant-a",
+            "op-retry",
+            "worker-b",
+            priority=5,
+            now=10.7,
+        )
+
+
 def test_owner_fencing_blocks_foreign_release_and_renew(tmp_path: Path) -> None:
     ledger = _ledger(tmp_path / "pressure.sqlite3")
     lease = ledger.acquire(
