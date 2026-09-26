@@ -214,7 +214,7 @@ Always be helpful, accurate, and adapt to the user's level."""
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.jeeves-tutor.response",
                     version="1",
-                    instructions=system,
+                    instructions=system.strip(),
                 ),
             ).with_model("openai", "gpt-4o")
             response = await asyncio.wait_for(
