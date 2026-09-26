@@ -954,3 +954,161 @@ async def test_async_governed_writer_tombstones_on_governance_failure(
     )
     assert len(rows) == 1
     assert rows[0].state is MemoryState.TOMBSTONED
+
+@pytest.mark.asyncio
+async def test_async_governed_writer_supports_remote_engine_boundaries() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="remote-governed")
+    admissions = []
+    governance = []
+
+    async def admit(**kwargs):
+        admissions.append(dict(kwargs))
+        return {
+            "receipt_id": "storage-admission:remote-memory",
+            "storage_bytes": kwargs["storage_bytes"],
+        }
+
+    async def reconcile(**kwargs):
+        governance.append(dict(kwargs))
+        return {
+            "mode": "reconcile",
+            "record": {
+                "record_id": kwargs["record_id"],
+                "tenant_id": kwargs["tenant_id"],
+                "owner_plane": "memory",
+                "state": "active",
+            },
+        }
+
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        storage_admitter=admit,
+        governance_reconciler=reconcile,
+    )
+    writer.stage(proposal)
+
+    record = await writer.commit(proposal.proposal_id, now=_now())
+
+    assert record.state is MemoryState.ACTIVE
+    assert len(admissions) == 1
+    assert admissions[0]["capability"] == "memory-persistence"
+    assert admissions[0]["resource_id"] == "memory:tenant-a:assistant"
+    assert admissions[0]["write_id"] == proposal.proposal_id
+    assert admissions[0]["storage_bytes"] > 0
+
+    assert len(governance) == 1
+    governed = governance[0]
+    assert governed["mode"] == "reconcile"
+    assert governed["plane"] == "memory"
+    assert governed["record_id"] == record.memory_id
+    assert governed["tenant_id"] == record.tenant_id
+    assert governed["source_ref"] == (
+        f"memory://{record.namespace}/{record.memory_id}"
+    )
+    assert governed["purposes"] == (
+        "model-inference",
+        "retrieval-synthesis",
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_remote_memory_admission_failure_prevents_mongo_write() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="remote-admission-denied")
+
+    async def deny(**_kwargs):
+        raise RuntimeError("engine unavailable")
+
+    async def govern(**kwargs):
+        return {
+            "mode": "reconcile",
+            "record": {
+                "record_id": kwargs["record_id"],
+                "tenant_id": kwargs["tenant_id"],
+                "owner_plane": "memory",
+                "state": "active",
+            },
+        }
+
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        storage_admitter=deny,
+        governance_reconciler=govern,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="remote resource admission",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    assert db["canonical_memory_records"].docs == []
+
+
+@pytest.mark.asyncio
+async def test_async_remote_governance_failure_tombstones_mongo_memory() -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    proposal = _proposal(key="remote-governance-denied")
+
+    async def admit(**kwargs):
+        return {
+            "receipt_id": "storage-admission:remote-memory",
+            "storage_bytes": kwargs["storage_bytes"],
+        }
+
+    async def deny_governance(**_kwargs):
+        raise RuntimeError("engine governance unavailable")
+
+    writer = AsyncGovernedMemoryWriter(
+        repo,
+        storage_admitter=admit,
+        governance_reconciler=deny_governance,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="memory was tombstoned",
+    ):
+        await writer.commit(proposal.proposal_id, now=_now())
+
+    rows = await repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        include_tombstoned=True,
+    )
+    assert len(rows) == 1
+    assert rows[0].state is MemoryState.TOMBSTONED
+
+
+def test_async_governed_writer_rejects_double_local_remote_owners() -> None:
+    repo = MongoMemoryRepository(FakeDatabase())
+    governance = GovernanceRegistry()
+
+    async def admit(**_kwargs):
+        return {}
+
+    async def reconcile(**_kwargs):
+        return {}
+
+    with pytest.raises(ValueError, match="governance owners"):
+        AsyncGovernedMemoryWriter(
+            repo,
+            governance=governance,
+            governance_reconciler=reconcile,
+        )
+
+    with pytest.raises(ValueError, match="admission owners"):
+        AsyncGovernedMemoryWriter(
+            repo,
+            governance=governance,
+            admission_runtime=AdmissionRuntime(),
+            storage_admitter=admit,
+        )
+
