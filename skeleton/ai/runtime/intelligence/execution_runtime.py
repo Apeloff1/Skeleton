@@ -22,7 +22,10 @@ from skeleton.contracts.verification import (
     VerificationRisk,
 )
 from skeleton.intelligence.admission import ResourceBudget
-from skeleton.intelligence.verification_runtime import VerificationRuntime
+from skeleton.intelligence.verification_runtime import (
+    VerificationRuntime,
+    materialize_verification_receipt,
+)
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import ProviderToolCall, ProviderToolDefinition
 from skeleton.provider_runtime import AIMessage, ProviderAdapter, ProviderRequest
@@ -2027,31 +2030,40 @@ class CognitiveExecutionRuntime:
             verifier_id="execution-runtime:canonical-stage3",
         )
         policy = assessment.policy
-        check = assessment.check
-        receipt = {
-            "claim_id": claim.claim_id,
-            "claim_digest": claim.digest,
-            "verification_profile": verification_profile,
-            "claim_kind": claim.kind.value,
-            "risk": claim.risk.value,
-            "outcome": assessment.outcome.value,
-            "policy_satisfied": assessment.policy_satisfied,
-            "policy": {
-                "level": int(policy.level),
-                "required_modes": list(policy.required_modes),
-                "min_independent_origins": policy.min_independent_origins,
-                "allow_model_only_evidence": policy.allow_model_only_evidence,
-                "require_postcondition": policy.require_postcondition,
-                "reasons": list(policy.reasons),
-            },
-            "issues": list(assessment.issues),
-            "check_id": None if check is None else check.check_id,
-            "verified_at": instant.isoformat(),
-            "verifier_id": "execution-runtime:canonical-stage3",
-        }
+        canonical_receipt = materialize_verification_receipt(
+            claim,
+            assessment,
+            execution_id=execution.execution_id,
+            result_ref="execution-result:" + execution.execution_id,
+        )
+        self._meter_storage(
+            "verification-receipt",
+            "verification:" + canonical_receipt.receipt_id,
+            canonical_receipt.as_dict(),
+            now=instant,
+        )
+        self.repository.remember_verification_receipt(
+            canonical_receipt
+        )
+        receipt = canonical_receipt.as_dict()
+        receipt.update(
+            {
+                "verification_profile": verification_profile,
+                "claim_kind": claim.kind.value,
+                "risk": claim.risk.value,
+                "policy": {
+                    "level": int(policy.level),
+                    "required_modes": list(policy.required_modes),
+                    "min_independent_origins": policy.min_independent_origins,
+                    "allow_model_only_evidence": policy.allow_model_only_evidence,
+                    "require_postcondition": policy.require_postcondition,
+                    "reasons": list(policy.reasons),
+                },
+            }
+        )
         evidence_refs = tuple(
             "evidence:" + evidence_id
-            for evidence_id in assessment.grounding.supporting_evidence_ids
+            for evidence_id in canonical_receipt.supporting_evidence_ids
         )
         return ExecutionVerificationDecision(
             passed=assessment.policy_satisfied,
