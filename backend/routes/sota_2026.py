@@ -13,11 +13,10 @@ from datetime import datetime
 router = APIRouter(prefix="/sota", tags=["SOTA 2026"])
 
 # LLM Setup
-try:
-    from core.engine_chat import EngineChat, UserMessage
-    LLM_AVAILABLE = True
-except Exception:
-    LLM_AVAILABLE = False
+from core.engine_chat import EngineChat, UserMessage
+from core.engine_text import EngineTextError
+
+LLM_AVAILABLE = True
 
 
 # ============================================================================
@@ -134,7 +133,7 @@ Predict:
             },
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
+    except EngineTextError:
         return {"predictions": [], "error": "prediction_failed"}
 
 @router.post("/refactor")
@@ -182,7 +181,7 @@ Preserve behavior: {request.preserve_behavior}"""
             "preserve_behavior": request.preserve_behavior,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
+    except EngineTextError:
         return {"refactored_code": request.code, "error": "refactor_failed"}
 
 @router.post("/multi-model")
@@ -246,7 +245,7 @@ async def multi_model_orchestration(request: MultiModelRequest):
             "final_output": final_output,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
+    except EngineTextError:
         return {"result": None, "error": "orchestration_failed"}
 
 @router.post("/code-intel")
@@ -288,7 +287,7 @@ Provide detailed analysis for each type."""
             "analysis": response.content if hasattr(response, 'content') else str(response),
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
+    except EngineTextError:
         return {"analysis": {}, "error": "code_intel_failed"}
 
 @router.post("/autocomplete")
@@ -336,7 +335,7 @@ Provide smart completions."""
             "cursor": {"line": request.cursor_line, "column": request.cursor_column},
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
+    except EngineTextError:
         return {"completions": [], "error": "autocomplete_failed"}
 
 @router.post("/explain-like-expert")
@@ -378,5 +377,5 @@ Provide:
             "expertise_level": expertise_level,
             "timestamp": datetime.utcnow().isoformat()
         }
-    except Exception:
+    except EngineTextError:
         return {"explanation": "", "error": "explain_failed"}
