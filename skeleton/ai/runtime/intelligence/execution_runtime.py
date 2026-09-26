@@ -1619,6 +1619,12 @@ class CognitiveExecutionRuntime:
                     + ":provider-call:"
                     + call.call_id
                 ),
+                data_class=str(
+                    payload.get("tool_data_class", "internal")
+                ),
+                transfer_purpose=str(
+                    payload.get("tool_purpose", "tool-execution")
+                ),
             )
             receipt = await self.tool_runtime.execute(
                 tool_request,
