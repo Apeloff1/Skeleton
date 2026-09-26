@@ -86,8 +86,19 @@ _CURRENT_ROUTE_PRIVACY: ContextVar[RoutePrivacyContext | None] = ContextVar(
 
 
 def resolve_route_privacy(path: str) -> RoutePrivacyContext:
+    if not isinstance(path, str):
+        raise TypeError("path must be text")
+    normalized = path.strip()
+    if (
+        not normalized.startswith("/")
+        or "?" in normalized
+        or "#" in normalized
+    ):
+        raise ValueError(
+            "path must be an absolute URL path without query or fragment"
+        )
+    normalized = normalized.rstrip("/") or "/"
     policy = default_route_domain_policy()
-    normalized = policy._normalize_path(path)
     if policy.is_open(normalized):
         return RoutePrivacyContext(
             path=normalized,
