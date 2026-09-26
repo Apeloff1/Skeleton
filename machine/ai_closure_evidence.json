@@ -173,7 +173,12 @@
         "skeleton/artifact_plane/governance.py governance-before-mutation canonical artifact authority",
         "skeleton/vault/lifecycle_adapters.py GovernedArtifactLifecycleAdapter tenant-bound delete/export adapter",
         "skeleton/api/server.py production canonical artifact store startup binding",
-        "skeleton/testing/test_server_governance_binding.py physical artifact export/delete/retention regressions"
+        "skeleton/testing/test_server_governance_binding.py physical artifact export/delete/retention regressions",
+        "skeleton/artifact_plane/governance.py governance-before-mutation canonical artifact owner",
+        "skeleton/vault/lifecycle_adapters.py governed artifact physical delete/export adapter",
+        "skeleton/api/server.py startup composition of canonical governed artifact store",
+        "skeleton/testing/test_lifecycle_adapters.py artifact registration/export/delete/retention/fail-closed regressions",
+        "skeleton/testing/test_governance_runtime_binding.py production artifact lifecycle composition regression"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -185,7 +190,8 @@
         "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
         "fresh exact-head governance audit/conversation lifecycle validation",
-        "fresh exact-head validation of production governed artifact lifecycle composition"
+        "fresh exact-head validation of production governed artifact lifecycle composition",
+        "fresh exact-head governed artifact lifecycle validation"
       ],
       "blockers": [
         "provider/tool privacy ceilings enforced across every application route",
