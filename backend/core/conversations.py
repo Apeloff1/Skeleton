@@ -146,6 +146,7 @@ class MongoConversationAuthority:
         governance_deletion_planner: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_deletion_acker: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
         governance_inventory_reader: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
+        governance_engine_target_executor: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
     ) -> None:
         self.database = database
         self.threads = database["conversation_threads"]
@@ -155,6 +156,9 @@ class MongoConversationAuthority:
         self.governance_deletion_planner = governance_deletion_planner
         self.governance_deletion_acker = governance_deletion_acker
         self.governance_inventory_reader = governance_inventory_reader
+        self.governance_engine_target_executor = (
+            governance_engine_target_executor
+        )
 
     @staticmethod
     def _governed_conversation_location(
@@ -193,6 +197,251 @@ class MongoConversationAuthority:
         raise ConversationStorageUnavailable(
             "unsupported conversation governance source_ref"
         )
+
+    @staticmethod
+    def _governed_reference_tokens(
+        message: ConversationMessage,
+    ) -> set[str]:
+        refs: set[str] = set()
+        if message.content_ref:
+            refs.add(str(message.content_ref))
+        for values in (
+            message.attachment_refs,
+            message.tool_receipt_refs,
+            message.memory_refs,
+            message.citation_refs,
+            message.artifact_refs,
+        ):
+            refs.update(str(value) for value in values if str(value).strip())
+        return refs
+
+    async def governed_record_ids_for_thread(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+    ) -> tuple[str, ...]:
+        """Resolve only lifecycle records owned or explicitly referenced by a thread."""
+
+        reader = self.governance_inventory_reader
+        if reader is None:
+            raise ConversationStorageUnavailable(
+                "conversation governance inventory is unavailable"
+            )
+        thread = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if thread.message_sequence > 9_999:
+            raise ConversationStorageUnavailable(
+                "conversation exceeds governed deletion record bound"
+            )
+
+        messages: list[ConversationMessage] = []
+        after = 0
+        while after < thread.message_sequence:
+            page = await self.list_messages(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                after_sequence=after,
+                limit=500,
+            )
+            if not page:
+                raise ConversationStorageUnavailable(
+                    "conversation governance lineage is incomplete"
+                )
+            messages.extend(page)
+            after = page[-1].sequence
+
+        conversation_ids = {thread.thread_id}
+        conversation_ids.update(message.message_id for message in messages)
+        expected_sources = {
+            thread.thread_id: "conversation-thread://" + thread.thread_id,
+        }
+        expected_sources.update(
+            {
+                message.message_id: (
+                    "conversation-message://"
+                    + thread.thread_id
+                    + "/"
+                    + message.message_id
+                )
+                for message in messages
+            }
+        )
+        refs: set[str] = set()
+        for message in messages:
+            refs.update(self._governed_reference_tokens(message))
+
+        try:
+            inventory = await reader(tenant_id=str(tenant_id))
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "conversation governance inventory is unavailable"
+            ) from exc
+        if (
+            not isinstance(inventory, Mapping)
+            or inventory.get("tenant_id") != str(tenant_id)
+            or not isinstance(inventory.get("records"), list)
+        ):
+            raise ConversationStorageUnavailable(
+                "conversation governance inventory is malformed"
+            )
+
+        selected: set[str] = set()
+        found_conversation: set[str] = set()
+        for raw in inventory["records"]:
+            if not isinstance(raw, Mapping):
+                raise ConversationStorageUnavailable(
+                    "conversation governance inventory record is malformed"
+                )
+            if raw.get("tenant_id") != str(tenant_id):
+                continue
+            record_id = str(raw.get("record_id") or "").strip()
+            owner_plane = str(raw.get("owner_plane") or "").strip().lower()
+            source_ref = str(raw.get("source_ref") or "").strip()
+            if not record_id or not owner_plane or not source_ref:
+                raise ConversationStorageUnavailable(
+                    "conversation governance inventory record is malformed"
+                )
+
+            if owner_plane == "conversation" and record_id in conversation_ids:
+                if source_ref != expected_sources[record_id]:
+                    raise ConversationStorageUnavailable(
+                        "conversation governance record source mismatch"
+                    )
+                selected.add(record_id)
+                found_conversation.add(record_id)
+                continue
+
+            aliases = {
+                record_id,
+                source_ref,
+                owner_plane + ":" + record_id,
+            }
+            if refs.intersection(aliases):
+                selected.add(record_id)
+
+        missing = conversation_ids - found_conversation
+        if missing:
+            raise ConversationStorageUnavailable(
+                "conversation governance records are incomplete"
+            )
+        if len(selected) > 10_000:
+            raise ConversationStorageUnavailable(
+                "conversation governed deletion exceeds record bound"
+            )
+        return tuple(sorted(selected))
+
+    async def delete_thread_with_governance(
+        self,
+        thread_id: str,
+        *,
+        tenant_id: str,
+        owner_id: str,
+        expected_thread_version: int,
+        reason: str = "conversation-delete",
+    ) -> Mapping[str, Any]:
+        """Delete one conversation plus its explicitly linked governed records."""
+
+        initial = await self.get_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if initial.version != expected_thread_version:
+            raise ConversationConflict("thread version conflict")
+        record_ids = await self.governed_record_ids_for_thread(
+            thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+
+        if initial.state is not ConversationThreadState.DELETING:
+            deleting = await self.set_state(
+                thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+                expected_version=expected_thread_version,
+                state=ConversationThreadState.DELETING,
+            )
+        else:
+            deleting = initial
+
+        planner = self.governance_deletion_planner
+        if planner is None:
+            raise ConversationStorageUnavailable(
+                "conversation governance deletion protocol is unavailable"
+            )
+        try:
+            plan = await planner(
+                tenant_id=str(tenant_id),
+                record_ids=record_ids,
+                reason=str(reason),
+            )
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "conversation governance deletion plan is unavailable"
+            ) from exc
+        if (
+            not isinstance(plan, Mapping)
+            or not str(plan.get("plan_id") or "").strip()
+            or plan.get("tenant_id") != str(tenant_id)
+            or not isinstance(plan.get("actions"), list)
+        ):
+            raise ConversationStorageUnavailable(
+                "conversation governance deletion plan is malformed"
+            )
+
+        external_actions = [
+            raw
+            for raw in plan["actions"]
+            if isinstance(raw, Mapping)
+            and str(raw.get("target") or "").lower() != "conversation"
+        ]
+        engine_result: Mapping[str, Any] | None = None
+        if external_actions:
+            executor = self.governance_engine_target_executor
+            if executor is None:
+                raise ConversationStorageUnavailable(
+                    "conversation linked lifecycle executor is unavailable"
+                )
+            try:
+                engine_result = await executor(
+                    tenant_id=str(tenant_id),
+                    plan_id=str(plan["plan_id"]),
+                )
+            except Exception as exc:
+                raise ConversationStorageUnavailable(
+                    "conversation linked lifecycle propagation failed"
+                ) from exc
+            if (
+                not isinstance(engine_result, Mapping)
+                or engine_result.get("plan_id") != str(plan["plan_id"])
+                or engine_result.get("tenant_id") != str(tenant_id)
+            ):
+                raise ConversationStorageUnavailable(
+                    "conversation linked lifecycle receipt is malformed"
+                )
+
+        conversation_result = await self.execute_governed_deletion(
+            tenant_id=str(tenant_id),
+            record_ids=record_ids,
+            reason=str(reason),
+        )
+        return {
+            "thread": deleting.as_dict(),
+            "record_ids": list(record_ids),
+            "plan_id": conversation_result["plan_id"],
+            "linked_execution": (
+                None if engine_result is None else dict(engine_result)
+            ),
+            "conversation": dict(conversation_result),
+            "complete": True,
+        }
 
     async def execute_governed_deletion(
         self,
@@ -1385,6 +1634,11 @@ conversation_authority = MongoConversationAuthority(
         None
         if _conversation_engine_client is None
         else _conversation_engine_client.governance_inventory
+    ),
+    governance_engine_target_executor=(
+        None
+        if _conversation_engine_client is None
+        else _conversation_engine_client.execute_governance_deletion_engine_targets
     ),
 )
 
