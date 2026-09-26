@@ -48,8 +48,16 @@ def forge_verify_until_green(
     max_rounds: int = 3,
     min_gain: float = 0.05,
     accept_threshold: float | None = None,
+    repair_mode: str = "apply",
+    pack: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run revise-until-green over emitted project files.
+
+    ``repair_mode="apply"`` (default) lets each failed round apply the bounded
+    ``attempt_repair`` pass and re-verify the revised tree. ``"suggest"`` runs
+    the same planning but never mutates files, so the loop reports proposals
+    and stops at the first verdict. ``pack`` (the era pack that produced the
+    files) seeds canonical closure repair with the right era scaffold.
 
     Each round:
     1. ``ForgeVerifier.verify`` for project-level accept/reject.
@@ -69,6 +77,10 @@ def forge_verify_until_green(
         raise ValueError("max_rounds must be an integer >= 1")
     if isinstance(min_gain, bool) or not isinstance(min_gain, (int, float)) or min_gain < 0 or min_gain != min_gain:
         raise ValueError("min_gain must be a finite number >= 0")
+    from skeleton.forge.repair import REPAIR_MODES
+
+    if repair_mode not in REPAIR_MODES:
+        raise ValueError(f"repair_mode must be one of {REPAIR_MODES}")
     if accept_threshold is None:
         accept_threshold = threshold_for("forge", root=root, fallback=0.7)
     if isinstance(accept_threshold, bool) or not isinstance(accept_threshold, (int, float)) or not 0 < float(accept_threshold) <= 1:
@@ -133,7 +145,8 @@ def forge_verify_until_green(
                 "top_file_reports": [r.to_dict() for r in report.file_reports[:3]],
             }
             repaired = attempt_repair(
-                current, request=request, root=root, evidence=evidence
+                current, request=request, root=root, evidence=evidence,
+                mode=repair_mode, pack=pack,
             )
             state["repairs"].append({k: v for k, v in repaired.items() if k != "files"})
             revised_files = repaired.get("files")
@@ -187,6 +200,7 @@ def forge_verify_until_green(
         "repairs": list(state["repairs"]),
         "rounds_detail": list(state["rounds_detail"]),
         "threshold": threshold,
+        "repair_mode": repair_mode,
         "stopped_reason": trace.stopped_reason,
         "stored_prose": 0,
     }

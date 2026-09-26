@@ -16,6 +16,31 @@ from skeleton.organism.policy_enforcement import threshold_for
 _UNSAFE = re.compile(r"\b(eval|exec)\s*\(|except\s*:|os\.system|subprocess\.", re.M)
 
 
+def _strip_gd_comments(text: str) -> str:
+    """Drop ``#`` comments (outside string literals) from GDScript source."""
+    out = []
+    for line in text.split("\n"):
+        quote = ""
+        cut = len(line)
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            if quote:
+                if ch == "\\":
+                    i += 2
+                    continue
+                if ch == quote:
+                    quote = ""
+            elif ch in "\"'":
+                quote = ch
+            elif ch == "#":
+                cut = i
+                break
+            i += 1
+        out.append(line[:cut])
+    return "\n".join(out)
+
+
 @dataclass(frozen=True)
 class ForgeFileReport:
     path: str
@@ -115,7 +140,9 @@ class ForgeVerifier:
         has_extends = "extends " in text
         has_func = "func " in text
         has_class = "class_name " in text
-        unsafe = bool(_UNSAFE.search(text))
+        # Commented-out code never executes; scan only live code so a repaired
+        # ``# eval(...)`` line is not re-flagged as unsafe.
+        unsafe = bool(_UNSAFE.search(_strip_gd_comments(text)))
         structure = 0.0
         if has_extends:
             structure += 0.35
@@ -152,9 +179,15 @@ class ForgeVerifier:
             hard.append("unbalanced delimiters")
         if unsafe:
             hard.append("unsafe constructs detected")
-        lines = [l for l in text.splitlines() if l.strip()]
+        lines = [ln for ln in text.splitlines() if ln.strip()]
         size = 1.0 if 2 <= len(lines) <= 500 else (0.5 if lines else 0.0)
-        score = round(0.25 * syntax + 0.25 * safety + 0.25 * structure + 0.15 * grounded + 0.10 * size, 4)
+        score = 0.25 * syntax + 0.25 * safety + 0.25 * structure + 0.15 * grounded + 0.10 * size
+        if not has_extends:
+            # gdscript_check treats a missing ``extends`` as a project defect
+            # (the script cannot attach to its scene node); the per-file score
+            # must agree and fall below the default acceptance bar.
+            score -= 0.10
+        score = round(max(0.0, score), 4)
         issues.extend(hard)
         issues.extend(soft)
         issues = tuple(dict.fromkeys(issues))

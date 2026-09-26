@@ -203,13 +203,15 @@ class Forge:
         blueprint.add_component(component)
         return component
 
-    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False, max_rounds: int = 3) -> dict[str, Any]:
+    def materialise(self, blueprint: Blueprint, *, era: str = "extraction_now", target: str = "json", pack: dict[str, Any] | None = None, build_plan: dict[str, Any] | None = None, repair: bool = False, max_rounds: int = 3, repair_mode: str = "apply") -> dict[str, Any]:
         if not isinstance(target, str) or target not in {"godot", "json", "yaml"}:
             raise MaterialisationError("unknown materialisation target", context={"target": target})
         if not isinstance(repair, bool):
             raise ValueError("repair must be boolean")
         if isinstance(max_rounds, bool) or not isinstance(max_rounds, int) or max_rounds < 1:
             raise ValueError("max_rounds must be an integer >= 1")
+        if repair_mode not in {"apply", "suggest"}:
+            raise ValueError("repair_mode must be 'apply' or 'suggest'")
         from skeleton.forge.eras import compile_era
         from skeleton.forge.godot_emit import emit_godot
         from skeleton.forge.planner import MaterialisationPlanner
@@ -244,6 +246,8 @@ class Forge:
                     request=blueprint.name,
                     root=self._root,
                     max_rounds=max_rounds,
+                    repair_mode=repair_mode,
+                    pack=pack,
                 )
                 result["files"] = looped["files"]
                 result["file_count"] = len(looped["files"])
@@ -256,6 +260,7 @@ class Forge:
                     "stopped_reason": looped.get("stopped_reason"),
                     "rounds_detail": looped.get("rounds_detail"),
                     "threshold": looped.get("threshold"),
+                    "repair_mode": looped.get("repair_mode", repair_mode),
                 }
                 if looped.get("repairs"):
                     result["repair"] = looped["repairs"][-1]
