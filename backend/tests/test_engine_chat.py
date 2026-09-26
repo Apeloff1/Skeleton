@@ -385,3 +385,39 @@ async def test_engine_chat_queued_prompt_survives_transient_engine_failure():
     assert len(seen) == 2
     assert seen[0].idempotency_key == seen[1].idempotency_key
     assert seen[0].prompt == seen[1].prompt == "retry me"
+
+
+def test_engine_chat_implicit_sessions_do_not_cross_request_dedupe():
+    first = EngineChat(system_message="Policy")
+    second = EngineChat(system_message="Policy")
+
+    assert first.session_id.startswith("ephemeral:")
+    assert second.session_id.startswith("ephemeral:")
+    assert first.session_id != second.session_id
+    assert first._idempotency_key("same prompt") != (
+        second._idempotency_key("same prompt")
+    )
+
+
+def test_engine_chat_implicit_session_retry_identity_is_stable_per_builder():
+    chat = EngineChat(system_message="Policy")
+
+    first = chat._idempotency_key("retry prompt")
+    second = chat._idempotency_key("retry prompt")
+
+    assert first == second
+
+
+def test_engine_chat_explicit_session_is_stable_across_reconstructed_builders():
+    first = EngineChat(
+        session_id="stable-session",
+        system_message="Policy",
+    )
+    second = EngineChat(
+        session_id="stable-session",
+        system_message="Policy",
+    )
+
+    assert first._idempotency_key("same prompt") == (
+        second._idempotency_key("same prompt")
+    )
