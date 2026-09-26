@@ -19,7 +19,10 @@ from skeleton.memory.policy import (
     MemoryPolicyResult,
     MemoryWriteDecision,
 )
-from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.persistence.memory_repository import (
+    MongoMemoryRepository,
+    SQLiteMemoryRepository,
+)
 from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.vault.lifecycle_adapters import SQLiteMemoryLifecycleAdapter
 
@@ -263,7 +266,125 @@ class GovernedMemoryWriter:
             return tuple(sorted(self._staged))
 
 
+class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
+    """Async governed writer for the canonical Mongo memory authority.
+
+    It preserves the same policy, admission and lifecycle semantics as the
+    SQLite reference writer while awaiting the production repository boundary.
+    """
+
+    def __init__(
+        self,
+        repository: MongoMemoryRepository,
+        *,
+        governance: GovernanceRegistry,
+        policy: MemoryPolicyEngine | None = None,
+        admission_runtime: AdmissionRuntime | None = None,
+        purposes: tuple[str, ...] = (
+            "model-inference",
+            "retrieval-synthesis",
+        ),
+    ) -> None:
+        if not isinstance(repository, MongoMemoryRepository):
+            raise TypeError("repository must be MongoMemoryRepository")
+        if not isinstance(governance, GovernanceRegistry):
+            raise TypeError("governance must be GovernanceRegistry")
+        if (
+            admission_runtime is not None
+            and not isinstance(admission_runtime, AdmissionRuntime)
+        ):
+            raise TypeError("admission_runtime must be AdmissionRuntime")
+        normalized_purposes = tuple(
+            dict.fromkeys(str(value).strip().lower() for value in purposes)
+        )
+        if not normalized_purposes or any(
+            not value for value in normalized_purposes
+        ):
+            raise ValueError("purposes must contain non-empty values")
+        self.repository = repository
+        self.governance = governance
+        self.purposes = normalized_purposes
+        self.policy = policy or MemoryPolicyEngine()
+        self.admission_runtime = admission_runtime
+        self._usage_meter = (
+            None
+            if admission_runtime is None
+            else ArtifactUsageMeter(admission_runtime)
+        )
+        self._lock = threading.RLock()
+        self._staged: dict[str, StagedMemoryWrite] = {}
+
+    async def commit(
+        self,
+        proposal_id: str,
+        *,
+        review_approved: bool = False,
+        now: datetime | None = None,
+    ) -> MemoryRecord:
+        key = str(proposal_id).strip()
+        if not key:
+            raise MemoryWritebackError("proposal_id is required")
+        with self._lock:
+            staged = self._staged.get(key)
+            if staged is None:
+                raise MemoryWritebackError("proposal is not staged")
+            if staged.policy.decision is MemoryWriteDecision.DENY:
+                raise MemoryWriteDenied(staged.policy.reason)
+            if (
+                staged.policy.decision is MemoryWriteDecision.REVIEW
+                and not review_approved
+            ):
+                raise MemoryWriteDenied(staged.policy.reason)
+            proposal = staged.proposal
+            self._meter_storage(proposal, now=now)
+
+        record = await self.repository.commit(proposal, now=now)
+        try:
+            self.governance.reconcile_canonical_write(
+                "memory",
+                record_id=record.memory_id,
+                tenant_id=record.tenant_id,
+                source_ref=SQLiteMemoryLifecycleAdapter.source_ref(
+                    record.namespace,
+                    record.memory_id,
+                ),
+                data_class=record.data_class,
+                purposes=self.purposes,
+                deletion_targets=("memory",),
+                created_at=record.created_at.timestamp(),
+                retention_until=(
+                    None
+                    if record.expires_at is None
+                    else record.expires_at.timestamp()
+                ),
+                exportable=True,
+            )
+        except Exception as exc:
+            try:
+                await self.repository.tombstone(
+                    record.memory_id,
+                    tenant_id=record.tenant_id,
+                    namespace=record.namespace,
+                    expected_version=record.version,
+                    now=now,
+                )
+            except Exception as tombstone_exc:
+                raise MemoryWritebackError(
+                    "governance registration failed and memory could not be "
+                    "tombstoned fail-closed"
+                ) from tombstone_exc
+            raise MemoryWritebackError(
+                "governance registration failed; memory was tombstoned "
+                "fail-closed"
+            ) from exc
+
+        with self._lock:
+            self._staged.pop(key, None)
+        return record
+
+
 __all__ = [
+    "AsyncGovernedMemoryWriter",
     "GovernedMemoryWriter",
     "MemoryStageConflict",
     "MemoryWriteDenied",
