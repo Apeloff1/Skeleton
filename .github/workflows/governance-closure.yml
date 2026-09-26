@@ -133,7 +133,7 @@ jobs:
 
       - name: Run independent exact-head governance scan
         env:
-          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/verify_governance_closure.py
           --evidence-out .governance-independent.json
