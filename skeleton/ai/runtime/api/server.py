@@ -86,6 +86,8 @@ class ServerState:
         self.governance_audit_log: Optional[Any] = None
         self.governance_audit_timeline: Optional[Any] = None
         self.governance_lifecycle_adapters: Optional[Any] = None
+        self.governance_lifecycle_executor: Optional[Any] = None
+        self.canonical_retrieval_index: Optional[Any] = None
         self.canonical_memory_mongo_client: Optional[Any] = None
         self.canonical_memory_repository: Optional[Any] = None
         self.canonical_memory_writer: Optional[Any] = None
@@ -108,7 +110,10 @@ class ServerState:
         from skeleton.vault.data_lifecycle import DataLifecycleRegistry
         from skeleton.vault.governance_audit import GovernanceAuditTimeline
         from skeleton.vault.governance_registry import GovernanceRegistry
-        from skeleton.vault.lifecycle_adapters import LifecycleAdapterRegistry
+        from skeleton.vault.lifecycle_adapters import (
+            LifecycleAdapterRegistry,
+            LifecycleExecutor,
+        )
 
         path = os.environ.get(
             "SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -143,6 +148,11 @@ class ServerState:
         self.governance_audit_log = audit_log
         self.governance_audit_timeline = timeline
         self.governance_lifecycle_adapters = LifecycleAdapterRegistry()
+        self.governance_lifecycle_executor = LifecycleExecutor(
+            lifecycle,
+            self.governance_lifecycle_adapters,
+            timeline=timeline,
+        )
         self.governance_registry = GovernanceRegistry(
             lifecycle,
             timeline=timeline,
@@ -158,6 +168,33 @@ class ServerState:
         self.governance_audit_log = None
         self.governance_audit_timeline = None
         self.governance_lifecycle_adapters = None
+        self.governance_lifecycle_executor = None
+        self.canonical_retrieval_index = None
+
+    def bind_canonical_retrieval_index(self) -> Any:
+        """Bind one tenant-scoped governed retrieval owner to lifecycle execution."""
+
+        if self.canonical_retrieval_index is not None:
+            return self.canonical_retrieval_index
+
+        from skeleton.retrieval.governance import GovernedRetrievalIndex
+        from skeleton.vault.lifecycle_adapters import (
+            GovernedRetrievalLifecycleAdapter,
+        )
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+
+        retrieval = GovernedRetrievalIndex(governance)
+        adapter = GovernedRetrievalLifecycleAdapter(retrieval)
+        adapters.register_deletion("retrieval", adapter)
+        adapters.register_export("retrieval", adapter)
+        self.canonical_retrieval_index = retrieval
+        return retrieval
 
     async def bind_canonical_memory_writer(
         self,
@@ -728,6 +765,7 @@ def create_app() -> Any:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
         state.bind_governance_registry()
+        state.bind_canonical_retrieval_index()
         state.bind_engine_execution_service()
         if _canonical_memory_mongo_configured():
             await state.bind_canonical_memory_writer()
