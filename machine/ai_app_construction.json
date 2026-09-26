@@ -2055,7 +2055,7 @@
       "plane": "governance",
       "priority": "P0",
       "status": "open",
-      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, governed derived vector/TF-IDF projection registration and tombstone acknowledgement, payload-free WORM governance audit linkage, and canonical lifecycle adapters now exist. Remaining closure is artifact canonical write/adapter composition, route-wide provider/tool privacy enforcement, exact-head validation and independent verification.",
+      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, governed derived vector/TF-IDF projection registration and tombstone acknowledgement, payload-free WORM governance audit linkage, canonical artifact registration plus production delete/export/retention composition, and canonical lifecycle adapters now exist. Remaining closure is route-wide provider/tool privacy enforcement, exact-head validation and independent verification.",
       "construction": [
         "define data classes and transfer purposes",
         "bind data class to memory, artifact, retrieval and provider payloads",
@@ -2069,7 +2069,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "canonical lifecycle and registry contracts enforce tenant, purpose, retention/deletion/export metadata; memory, authoritative conversations, governed retrieval and derived vector/TF-IDF projection lifecycle are executable and audit-linked, while artifact production composition and route-wide privacy enforcement remain",
+      "status_detail": "canonical lifecycle and registry contracts enforce tenant, purpose, retention/deletion/export metadata; memory, authoritative conversations, governed retrieval, derived vector/TF-IDF projections, and the production governed artifact store are executable and audit-linked; route-wide privacy enforcement plus exact-head/independent closure evidence remain",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
