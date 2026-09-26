@@ -581,4 +581,3 @@ def test_default_tenant_quota_reuses_existing_policy_without_replacement() -> No
     snapshot = ledger.snapshot("tenant-a")
     assert snapshot["window_id"] == "existing-window"
     assert snapshot["quota"]["max_storage_bytes"] == 768
-
