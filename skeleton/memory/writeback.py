@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import threading
+from typing import Any, Awaitable, Callable, Mapping
 
 from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.contracts.memory_record import MemoryRecord, MemoryWriteProposal
@@ -266,20 +267,27 @@ class GovernedMemoryWriter:
             return tuple(sorted(self._staged))
 
 
+AsyncStorageAdmitter = Callable[..., Awaitable[Mapping[str, Any]]]
+AsyncGovernanceReconciler = Callable[..., Awaitable[Mapping[str, Any]]]
+
+
 class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
     """Async governed writer for the canonical Mongo memory authority.
 
-    It preserves the same policy, admission and lifecycle semantics as the
-    SQLite reference writer while awaiting the production repository boundary.
+    It supports either in-process governance/admission owners or authenticated
+    remote callbacks to the engine process. Mixing local and remote owners is
+    rejected so one write can never be double-governed or double-metered.
     """
 
     def __init__(
         self,
         repository: MongoMemoryRepository,
         *,
-        governance: GovernanceRegistry,
+        governance: GovernanceRegistry | None = None,
         policy: MemoryPolicyEngine | None = None,
         admission_runtime: AdmissionRuntime | None = None,
+        storage_admitter: AsyncStorageAdmitter | None = None,
+        governance_reconciler: AsyncGovernanceReconciler | None = None,
         purposes: tuple[str, ...] = (
             "model-inference",
             "retrieval-synthesis",
@@ -287,13 +295,36 @@ class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
     ) -> None:
         if not isinstance(repository, MongoMemoryRepository):
             raise TypeError("repository must be MongoMemoryRepository")
-        if not isinstance(governance, GovernanceRegistry):
+        if governance is not None and not isinstance(
+            governance,
+            GovernanceRegistry,
+        ):
             raise TypeError("governance must be GovernanceRegistry")
         if (
             admission_runtime is not None
             and not isinstance(admission_runtime, AdmissionRuntime)
         ):
             raise TypeError("admission_runtime must be AdmissionRuntime")
+        if governance is None and governance_reconciler is None:
+            raise TypeError(
+                "governance or governance_reconciler is required"
+            )
+        if governance is not None and governance_reconciler is not None:
+            raise ValueError(
+                "local and remote governance owners cannot be combined"
+            )
+        if admission_runtime is not None and storage_admitter is not None:
+            raise ValueError(
+                "local and remote admission owners cannot be combined"
+            )
+        if storage_admitter is not None and not callable(storage_admitter):
+            raise TypeError("storage_admitter must be callable")
+        if (
+            governance_reconciler is not None
+            and not callable(governance_reconciler)
+        ):
+            raise TypeError("governance_reconciler must be callable")
+
         normalized_purposes = tuple(
             dict.fromkeys(str(value).strip().lower() for value in purposes)
         )
@@ -306,6 +337,8 @@ class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
         self.purposes = normalized_purposes
         self.policy = policy or MemoryPolicyEngine()
         self.admission_runtime = admission_runtime
+        self.storage_admitter = storage_admitter
+        self.governance_reconciler = governance_reconciler
         self._usage_meter = (
             None
             if admission_runtime is None
@@ -313,6 +346,115 @@ class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
         )
         self._lock = threading.RLock()
         self._staged: dict[str, StagedMemoryWrite] = {}
+
+    async def _admit_storage_async(
+        self,
+        proposal: MemoryWriteProposal,
+        *,
+        now: datetime | None,
+    ) -> None:
+        admitter = self.storage_admitter
+        if admitter is None:
+            self._meter_storage(proposal, now=now)
+            return
+
+        payload = self._proposal_storage_payload(proposal)
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        try:
+            receipt = await admitter(
+                tenant_id=proposal.tenant_id,
+                capability="memory-persistence",
+                resource_id=(
+                    "memory:"
+                    + proposal.tenant_id
+                    + ":"
+                    + proposal.namespace
+                ),
+                write_id=proposal.proposal_id,
+                storage_bytes=max(1, len(encoded)),
+            )
+        except Exception as exc:
+            raise MemoryWritebackError(
+                "memory write denied by remote resource admission"
+            ) from exc
+        if not isinstance(receipt, Mapping):
+            raise MemoryWritebackError(
+                "remote memory admission returned invalid receipt"
+            )
+        admitted = int(receipt.get("storage_bytes") or 0)
+        if admitted < len(encoded):
+            raise MemoryWritebackError(
+                "remote memory admission under-accounted payload"
+            )
+
+    async def _reconcile_governance_async(
+        self,
+        record: MemoryRecord,
+    ) -> None:
+        source_ref = SQLiteMemoryLifecycleAdapter.source_ref(
+            record.namespace,
+            record.memory_id,
+        )
+        retention_until = (
+            None
+            if record.expires_at is None
+            else record.expires_at.timestamp()
+        )
+        reconciler = self.governance_reconciler
+        if reconciler is None:
+            governance = self.governance
+            assert governance is not None
+            governance.reconcile_canonical_write(
+                "memory",
+                record_id=record.memory_id,
+                tenant_id=record.tenant_id,
+                source_ref=source_ref,
+                data_class=record.data_class,
+                purposes=self.purposes,
+                deletion_targets=("memory",),
+                created_at=record.created_at.timestamp(),
+                retention_until=retention_until,
+                exportable=True,
+            )
+            return
+
+        receipt = await reconciler(
+            mode="reconcile",
+            plane="memory",
+            record_id=record.memory_id,
+            tenant_id=record.tenant_id,
+            source_ref=source_ref,
+            data_class=record.data_class,
+            purposes=self.purposes,
+            deletion_targets=("memory",),
+            created_at=record.created_at.timestamp(),
+            retention_until=retention_until,
+            exportable=True,
+        )
+        if not isinstance(receipt, Mapping):
+            raise MemoryWritebackError(
+                "remote memory governance returned invalid receipt"
+            )
+        governed = receipt.get("record")
+        if not isinstance(governed, Mapping):
+            raise MemoryWritebackError(
+                "remote memory governance receipt is malformed"
+            )
+        if (
+            governed.get("record_id") != record.memory_id
+            or governed.get("tenant_id") != record.tenant_id
+            or governed.get("owner_plane") != "memory"
+            or governed.get("state") != "active"
+        ):
+            raise MemoryWritebackError(
+                "remote memory governance identity mismatch"
+            )
 
     async def commit(
         self,
@@ -336,29 +478,11 @@ class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
             ):
                 raise MemoryWriteDenied(staged.policy.reason)
             proposal = staged.proposal
-            self._meter_storage(proposal, now=now)
 
+        await self._admit_storage_async(proposal, now=now)
         record = await self.repository.commit(proposal, now=now)
         try:
-            self.governance.reconcile_canonical_write(
-                "memory",
-                record_id=record.memory_id,
-                tenant_id=record.tenant_id,
-                source_ref=SQLiteMemoryLifecycleAdapter.source_ref(
-                    record.namespace,
-                    record.memory_id,
-                ),
-                data_class=record.data_class,
-                purposes=self.purposes,
-                deletion_targets=("memory",),
-                created_at=record.created_at.timestamp(),
-                retention_until=(
-                    None
-                    if record.expires_at is None
-                    else record.expires_at.timestamp()
-                ),
-                exportable=True,
-            )
+            await self._reconcile_governance_async(record)
         except Exception as exc:
             try:
                 await self.repository.tombstone(
@@ -384,7 +508,9 @@ class AsyncGovernedMemoryWriter(GovernedMemoryWriter):
 
 
 __all__ = [
+    "AsyncGovernanceReconciler",
     "AsyncGovernedMemoryWriter",
+    "AsyncStorageAdmitter",
     "GovernedMemoryWriter",
     "MemoryStageConflict",
     "MemoryWriteDenied",
