@@ -7820,10 +7820,10 @@
       },
       {
         "path": "backend/routes/jeeves_compose.py",
-        "role": "Jeeves product chat/compose adapter delegating generative execution to canonical Skeleton engine",
+        "role": "Jeeves product chat/compose adapter delegating generative execution through canonical EngineChat over the Skeleton engine",
         "required_tokens": [
-          "EngineTextRequest",
-          "execute_engine_text",
+          "EngineChat",
+          "UserMessage",
           "backend.jeeves.chat"
         ],
         "forbidden_edge_classes": [
