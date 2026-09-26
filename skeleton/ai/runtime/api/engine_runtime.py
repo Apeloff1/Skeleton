@@ -15,6 +15,7 @@ from skeleton.contracts.ai_execution import AIExecutionResult
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
+    FinalizationBindingHook,
     VerificationHook,
 )
 from skeleton.provider_runtime import (
@@ -63,6 +64,7 @@ class EngineExecutionCoordinator:
         provider_registry: ProviderRegistry | None = None,
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
+        finalization_binding_hook: FinalizationBindingHook | None = None,
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
@@ -70,6 +72,7 @@ class EngineExecutionCoordinator:
         self.provider_registry = provider_registry or ProviderRegistry.from_env()
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
+        self.finalization_binding_hook = finalization_binding_hook
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._closed = False
@@ -205,6 +208,7 @@ class EngineExecutionCoordinator:
             provider,
             self.tool_runtime,
             verification_hook=self.verification_hook,
+            finalization_binding_hook=self.finalization_binding_hook,
             storage_meter=(
                 lambda resource_id, write_id, payload, meter_now=None: (
                     self.service.meter_execution_storage(
