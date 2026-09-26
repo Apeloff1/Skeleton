@@ -93,7 +93,14 @@ def _ids() -> tuple[str, str, str]:
     return str(uuid4()), str(uuid4()), str(uuid4())
 
 
-def _compile(segments, *, budget=None, tools_enabled=False, policy=None):
+def _compile(
+    segments,
+    *,
+    budget=None,
+    tools_enabled=False,
+    policy=None,
+    compaction_max_tokens=None,
+):
     operation_id, execution_id, turn_id = _ids()
     return ContextCompiler(policy=policy).compile(
         operation_id=operation_id,
@@ -104,6 +111,7 @@ def _compile(segments, *, budget=None, tools_enabled=False, policy=None):
         budget=budget or _budget(),
         segments=segments,
         tools_enabled=tools_enabled,
+        compaction_max_tokens=compaction_max_tokens,
         compiled_at=BASE,
     )
 
@@ -579,3 +587,41 @@ def test_compaction_can_admit_previously_oversized_artifact() -> None:
     compacted = compact_context_segment(original, max_tokens=24)
     admitted = _compile([compacted], budget=budget)
     assert admitted.evidence_segments == (compacted,)
+
+
+def test_compiler_can_compact_oversized_evidence_with_auditable_mapping() -> None:
+    original = _segment(
+        "oversized evidence " * 300,
+        kind=ContextKind.ARTIFACT,
+        trust=ContextTrust.UNTRUSTED_EVIDENCE,
+        source_type="artifact",
+        source_id="artifact-auto-compact",
+        priority=500,
+        relevance=0.9,
+    )
+    budget = _budget(
+        max_context=140,
+        output=20,
+        tools=0,
+        policy=0,
+        safety=10,
+        segment=32,
+        artifact=32,
+        tool_result=32,
+    )
+
+    envelope = _compile(
+        [original],
+        budget=budget,
+        compaction_max_tokens=24,
+    )
+
+    assert len(envelope.evidence_segments) == 1
+    compacted = envelope.evidence_segments[0]
+    assert compacted.derived_from == (original.segment_id,)
+    assert compacted.token_estimate <= 24
+    reason = dict(envelope.omission_reasons)[original.segment_id]
+    assert reason == "compacted_to:" + compacted.segment_id
+    assert envelope.source_snapshot == (
+        (original.segment_id, original.content_digest),
+    )
