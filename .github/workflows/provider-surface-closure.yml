@@ -18,7 +18,11 @@ on:
       - "backend/emergentintegrations/llm/chat.py"
       - "backend/routes/lafs.py"
       - "backend/routes/jeeves_compose.py"
+      - "backend/routes/code_intelligence.py"
+      - "backend/routes/sota_2026.py"
       - "backend/tests/test_engine_chat.py"
+      - "backend/tests/test_code_intelligence_engine_boundary.py"
+      - "backend/tests/test_sota_2026_engine_boundary.py"
       - "tests/test_provider_runtime_boundary.py"
       - "backend/services/tool_registry.py"
       - "scripts/check_provider_bootstrap.py"
@@ -124,7 +128,9 @@ jobs:
       - name: Run product provider-isolation facade contracts
         run: |
           python -m pytest -q --noconftest -p pytest_asyncio.plugin \
-            backend/tests/test_engine_chat.py
+            backend/tests/test_engine_chat.py \
+            backend/tests/test_code_intelligence_engine_boundary.py \
+            backend/tests/test_sota_2026_engine_boundary.py
           python -m pytest -q --noconftest -p pytest_asyncio.plugin \
             tests/test_provider_runtime_boundary.py
 
