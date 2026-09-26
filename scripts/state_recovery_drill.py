@@ -20,8 +20,9 @@ import argparse
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import sqlite3
 from typing import Any, Iterable, Mapping
 
 SCRATCH_PREFIX = "skeleton_recovery_drill_"
@@ -467,10 +468,394 @@ def run_live_mongo_drill(
         client.close()
 
 
+
+@dataclass(frozen=True, slots=True)
+class SQLiteRecoveryEvent:
+    sequence: int
+    phase: str
+    evidence: Mapping[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "sequence": self.sequence,
+            "phase": self.phase,
+            "evidence": dict(self.evidence),
+        }
+
+
+class SQLiteRecoveryJournal:
+    """Strict restore ordering for authoritative operation SQLite state."""
+
+    _ORDER = (
+        "seed_operation_authority",
+        "backup_operation_authority",
+        "destroy_operation_authority",
+        "restore_operation_authority",
+        "verify_operation_authority",
+        "reconcile_operation_outbox",
+        "ready",
+    )
+
+    def __init__(self) -> None:
+        self.events: list[SQLiteRecoveryEvent] = []
+
+    def record(
+        self,
+        phase: str,
+        *,
+        evidence: Mapping[str, Any] | None = None,
+    ) -> SQLiteRecoveryEvent:
+        index = len(self.events)
+        if index >= len(self._ORDER):
+            raise RecoveryDrillError("SQLite recovery journal is already terminal")
+        expected = self._ORDER[index]
+        if phase != expected:
+            raise RecoveryDrillError(
+                f"SQLite recovery order violation: expected {expected}, got {phase}"
+            )
+        event = SQLiteRecoveryEvent(
+            sequence=index + 1,
+            phase=phase,
+            evidence=dict(evidence or {}),
+        )
+        self.events.append(event)
+        return event
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "policy": "operation-authority-first-outbox-second",
+            "complete": len(self.events) == len(self._ORDER),
+            "events": [event.as_dict() for event in self.events],
+        }
+
+
+def capture_sqlite_database(path: str | Path) -> dict[str, Any]:
+    """Capture deterministic schema/data evidence from one SQLite database."""
+
+    database_path = Path(path)
+    if not database_path.is_file():
+        raise RecoveryDrillError(
+            f"SQLite database does not exist: {database_path}"
+        )
+    conn = sqlite3.connect(str(database_path))
+    conn.row_factory = sqlite3.Row
+    try:
+        integrity = conn.execute("PRAGMA integrity_check").fetchone()
+        if integrity is None or str(integrity[0]).lower() != "ok":
+            raise RecoveryDrillError("SQLite integrity_check failed")
+        schema_rows = conn.execute(
+            """
+            SELECT type, name, tbl_name, sql
+            FROM sqlite_master
+            WHERE name NOT LIKE 'sqlite_%'
+            ORDER BY type, name
+            """
+        ).fetchall()
+        schema = [
+            {
+                "type": str(row["type"]),
+                "name": str(row["name"]),
+                "table": str(row["tbl_name"]),
+                "sql": None if row["sql"] is None else str(row["sql"]),
+            }
+            for row in schema_rows
+        ]
+        tables: dict[str, Any] = {}
+        for entry in schema:
+            if entry["type"] != "table":
+                continue
+            table = entry["name"]
+            escaped = '"' + table.replace('"', '""') + '"'
+            columns = [
+                str(row["name"])
+                for row in conn.execute(
+                    f"PRAGMA table_info({escaped})"
+                ).fetchall()
+            ]
+            rows = [
+                [row[column] for column in columns]
+                for row in conn.execute(
+                    f"SELECT * FROM {escaped}"
+                ).fetchall()
+            ]
+            rows.sort(key=canonical_json)
+            tables[table] = {
+                "columns": columns,
+                "rows": rows,
+                "row_count": len(rows),
+                "rows_digest": digest_payload(rows),
+            }
+        payload = {
+            "schema": schema,
+            "tables": tables,
+            "integrity": "ok",
+        }
+        payload["digest"] = digest_payload(payload)
+        return payload
+    finally:
+        conn.close()
+
+
+def online_backup_sqlite(
+    source: str | Path,
+    destination: str | Path,
+) -> None:
+    """Create a transactionally consistent SQLite backup using its backup API."""
+
+    source_path = Path(source)
+    destination_path = Path(destination)
+    if not source_path.is_file():
+        raise RecoveryDrillError(
+            f"SQLite backup source does not exist: {source_path}"
+        )
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    if destination_path.exists():
+        destination_path.unlink()
+
+    src = sqlite3.connect(str(source_path))
+    dst = sqlite3.connect(str(destination_path))
+    try:
+        src.backup(dst)
+        dst.commit()
+    finally:
+        dst.close()
+        src.close()
+
+
+def verify_sqlite_snapshot(
+    expected: Mapping[str, Any],
+    actual: Mapping[str, Any],
+) -> dict[str, Any]:
+    if expected.get("digest") != actual.get("digest"):
+        raise RecoveryDrillError(
+            "restored SQLite authority differs from backup"
+        )
+    expected_tables = expected.get("tables", {})
+    actual_tables = actual.get("tables", {})
+    if set(expected_tables) != set(actual_tables):
+        raise RecoveryDrillError(
+            "restored SQLite table set differs from backup"
+        )
+    return {
+        "digest": actual.get("digest"),
+        "tables": {
+            name: int(actual_tables[name].get("row_count", 0))
+            for name in sorted(actual_tables)
+        },
+        "integrity": actual.get("integrity"),
+    }
+
+
+class _RecoveryReasoner:
+    def reason(self, **_kwargs):
+        return {"answer": "recovery-drill"}
+
+
+def run_operation_sqlite_drill(
+    workdir: str | Path,
+    *,
+    cleanup: bool = True,
+) -> dict[str, Any]:
+    """Destroy/restore canonical operation state and reconcile its outbox."""
+
+    from skeleton.contracts.operation import OperationEnvelope, OperationState
+    from skeleton.frontier.operation_stream import ReplayCursor
+    from skeleton.frontier.operation_stream_store import (
+        SQLiteOperationEventStore,
+    )
+    from skeleton.persistence.operation_runtime import DurableOperationRuntime
+    from skeleton.persistence.operation_store import SQLiteOperationStore
+
+    root = Path(workdir)
+    root.mkdir(parents=True, exist_ok=True)
+    source_path = root / "operation_state.sqlite"
+    backup_path = root / "operation_state.backup.sqlite"
+    restored_path = root / "operation_state.restored.sqlite"
+    stream_path = root / "operation_stream.restored.sqlite"
+    for candidate in (
+        source_path,
+        backup_path,
+        restored_path,
+        stream_path,
+    ):
+        if candidate.exists():
+            candidate.unlink()
+
+    journal = SQLiteRecoveryJournal()
+    created_at = datetime(
+        2026,
+        9,
+        26,
+        0,
+        0,
+        tzinfo=timezone.utc,
+    )
+    operation_id = "00000000-0000-4000-8000-000000000901"
+    with SQLiteOperationStore(source_path) as operations:
+        current = operations.create(
+            OperationEnvelope(
+                operation_id=operation_id,
+                tenant_id="tenant-recovery",
+                actor_id="state-recovery-drill",
+                capability="intelligence.reason",
+                created_at=created_at,
+                deadline=created_at + timedelta(minutes=10),
+                idempotency_key="state-recovery-operation",
+                trace_id="state-recovery-trace",
+            ),
+            now=created_at,
+        )
+        for index, state in enumerate(
+            (
+                OperationState.VALIDATED,
+                OperationState.AUTHORIZED,
+                OperationState.ADMITTED,
+            ),
+            start=1,
+        ):
+            current = operations.transition(
+                operation_id,
+                state,
+                expected_version=current.version,
+                now=created_at + timedelta(seconds=index),
+            )
+        pending = operations.pending_outbox(
+            operation_id=operation_id
+        )
+        expected_outbox_ids = [item.outbox_id for item in pending]
+        journal.record(
+            "seed_operation_authority",
+            evidence={
+                "operation_id": operation_id,
+                "state": current.envelope.state.value,
+                "version": current.version,
+                "pending_outbox": len(pending),
+                "outbox_ids": expected_outbox_ids,
+            },
+        )
+
+    source_snapshot = capture_sqlite_database(source_path)
+    online_backup_sqlite(source_path, backup_path)
+    backup_snapshot = capture_sqlite_database(backup_path)
+    verify_sqlite_snapshot(source_snapshot, backup_snapshot)
+    journal.record(
+        "backup_operation_authority",
+        evidence={
+            "digest": backup_snapshot["digest"],
+            "tables": {
+                name: value["row_count"]
+                for name, value in backup_snapshot["tables"].items()
+            },
+        },
+    )
+
+    source_path.unlink()
+    journal.record(
+        "destroy_operation_authority",
+        evidence={"destroyed": str(source_path)},
+    )
+
+    online_backup_sqlite(backup_path, restored_path)
+    journal.record(
+        "restore_operation_authority",
+        evidence={"restored": str(restored_path)},
+    )
+
+    restored_snapshot = capture_sqlite_database(restored_path)
+    verification = verify_sqlite_snapshot(
+        backup_snapshot,
+        restored_snapshot,
+    )
+    restored_store = SQLiteOperationStore(restored_path)
+    restored = restored_store.get(operation_id)
+    restored_pending = restored_store.pending_outbox(
+        operation_id=operation_id
+    )
+    if restored.envelope.state is not OperationState.ADMITTED:
+        restored_store.close()
+        raise RecoveryDrillError(
+            "restored operation state is not the backed-up authority"
+        )
+    if restored.version != 4:
+        restored_store.close()
+        raise RecoveryDrillError(
+            "restored operation version changed"
+        )
+    if [item.outbox_id for item in restored_pending] != expected_outbox_ids:
+        restored_store.close()
+        raise RecoveryDrillError(
+            "restored pending outbox identity changed"
+        )
+    journal.record(
+        "verify_operation_authority",
+        evidence={
+            **verification,
+            "state": restored.envelope.state.value,
+            "version": restored.version,
+            "pending_outbox": len(restored_pending),
+        },
+    )
+
+    runtime = DurableOperationRuntime(
+        _RecoveryReasoner(),
+        restored_store,
+        SQLiteOperationEventStore(stream_path),
+    )
+    report = runtime.dispatch_outbox(operation_id=operation_id)
+    events = runtime.stream.replay(ReplayCursor(operation_id))
+    if report.remaining != 0:
+        runtime.close()
+        raise RecoveryDrillError(
+            "restored operation outbox did not fully reconcile"
+        )
+    if [event.event_id for event in events] != expected_outbox_ids:
+        runtime.close()
+        raise RecoveryDrillError(
+            "restored stream does not preserve outbox event identity"
+        )
+    journal.record(
+        "reconcile_operation_outbox",
+        evidence={
+            "published": report.published,
+            "remaining": report.remaining,
+            "event_types": [event.type for event in events],
+            "event_ids": [event.event_id for event in events],
+        },
+    )
+    runtime.close()
+
+    journal.record(
+        "ready",
+        evidence={
+            "authoritative_restore_verified": True,
+            "outbox_reconciliation_verified": True,
+        },
+    )
+    result = {
+        "status": "passed",
+        "operation_id": operation_id,
+        "backup_digest": backup_snapshot["digest"],
+        "restore_digest": restored_snapshot["digest"],
+        "journal": journal.as_dict(),
+    }
+    if cleanup:
+        for candidate in (
+            source_path,
+            backup_path,
+            restored_path,
+            stream_path,
+        ):
+            if candidate.exists():
+                candidate.unlink()
+    return result
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=["live-mongo"])
-    parser.add_argument("--uri", required=True)
+    parser.add_argument("mode", choices=["live-mongo", "live-sqlite"])
+    parser.add_argument("--uri")
+    parser.add_argument("--workdir")
     parser.add_argument(
         "--source-database",
         default=f"{SCRATCH_PREFIX}source",
@@ -486,14 +871,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    if args.mode != "live-mongo":
+    if args.mode == "live-mongo":
+        if not args.uri:
+            raise RecoveryDrillError("live-mongo requires --uri")
+        result = run_live_mongo_drill(
+            args.uri,
+            source_database=args.source_database,
+            restored_database=args.restored_database,
+            cleanup=not args.no_cleanup,
+        )
+    elif args.mode == "live-sqlite":
+        if not args.workdir:
+            raise RecoveryDrillError("live-sqlite requires --workdir")
+        result = run_operation_sqlite_drill(
+            args.workdir,
+            cleanup=not args.no_cleanup,
+        )
+    else:
         raise RecoveryDrillError("unsupported recovery drill mode")
-    result = run_live_mongo_drill(
-        args.uri,
-        source_database=args.source_database,
-        restored_database=args.restored_database,
-        cleanup=not args.no_cleanup,
-    )
     text = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         path = Path(args.output)
