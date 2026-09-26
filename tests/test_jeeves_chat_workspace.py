@@ -798,8 +798,13 @@ def test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns(
             "engine_evidence_refs": [],
         }
 
-    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
-    with _chat_client(route, monkeypatch, legacy, generate) as transport:
+    with _chat_client(
+        route,
+        monkeypatch,
+        legacy,
+        generate,
+        canonical=canonical,
+    ) as transport:
         payload = {
             "session_id": "conversation-canonical",
             "client_message_id": "message-2",
@@ -866,8 +871,13 @@ def test_canonical_jeeves_mode_fails_closed_if_authority_is_unavailable(
     async def generate(*_args, **_kwargs):
         raise AssertionError("generation must not run without authority")
 
-    monkeypatch.setattr(route, "_canonical_authority", BrokenAuthority)
-    with _chat_client(route, monkeypatch, legacy, generate) as transport:
+    with _chat_client(
+        route,
+        monkeypatch,
+        legacy,
+        generate,
+        canonical=BrokenAuthority(),
+    ) as transport:
         response = transport.post(
             "/api/jeeves/chat",
             json={
