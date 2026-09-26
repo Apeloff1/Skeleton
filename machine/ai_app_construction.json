@@ -1822,7 +1822,7 @@
       "plane": "prompt-context",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical context contracts, deterministic trust-aware packing, explicit omission reasons, provider-neutral projection, and conversation/retrieval/memory/artifact/skill/tool-schema/tool-result source adapters now exist. Remaining closure work is provenance-preserving compaction, making the cognitive runtime consume ContextEnvelope/provider projection directly, migrating legacy feature prompt/history assembly, and proving no canonical model turn bypasses the compiler.",
+      "gap": "Canonical context contracts, deterministic trust-aware packing, explicit omission reasons, provider-neutral projection, all declared source adapters, and authoritative ContextEnvelope-to-engine handoff projection now exist. Product compatibility prompts are digest-bound user-message segments and legacy command text cannot override projected context. Remaining closure work is provenance-preserving compaction, full legacy route/service convergence, versioned instruction-policy convergence, exact-head evidence, and dependency closure.",
       "construction": [
         "define ContextEnvelope and ContextSegment immutable contracts with source/trust/data-class/provenance/budget metadata",
         "materialize one ContextCompiler under skeleton/context for all cognitive runtime model turns",
@@ -1871,15 +1871,18 @@
           "artifact source adapter with authorization/content externalization",
           "admitted tool schema source adapter",
           "declarative skill instruction adapter",
-          "durable successful tool result adapter with receipt lineage"
+          "durable successful tool result adapter with receipt lineage",
+          "ContextEnvelope projection is authoritative when constructing EngineContextHandoff",
+          "compatibility user prompts are included in the immutable context digest",
+          "legacy command instructions/prompt/history cannot override canonical projected context"
         ],
         "remaining": [
           "provenance-preserving summary/compaction implementation",
-          "bind ContextEnvelope/provider projection directly into cognitive AgentTurn and ProviderRequest construction",
-          "migrate backend/routes/ai.py direct prompt/history assembly",
+          "migrate remaining backend/routes/ai.py compatibility prompt construction paths onto canonical source identities",
           "migrate backend/services/ai_assistant_svc.py direct ProviderRequest assembly",
           "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
-          "prove all canonical cognitive model turns originate from ContextCompiler"
+          "prove all canonical cognitive model turns originate from ContextCompiler or a digest-bound ContextEnvelope handoff",
+          "fresh exact-head and independent validation"
         ]
       }
     },
@@ -5548,13 +5551,15 @@
       "artifact adapter",
       "skill adapter",
       "admitted tool-schema adapter",
-      "durable tool-result adapter"
+      "durable tool-result adapter",
+      "authoritative ContextEnvelope -> EngineContextHandoff provider projection",
+      "digest-bound compatibility prompt projection"
     ],
     "remaining_surfaces": [
       "provenance-preserving compaction",
-      "direct ContextEnvelope -> cognitive ProviderRequest binding",
-      "legacy route/service prompt convergence",
-      "versioned instruction-policy convergence"
+      "remaining legacy route/service prompt convergence",
+      "versioned instruction-policy convergence",
+      "exact-head/independent closure evidence"
     ]
   },
   "verification_runtime_blueprint": {
