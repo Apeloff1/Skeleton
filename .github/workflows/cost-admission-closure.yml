@@ -1,0 +1,178 @@
+name: Cost Admission Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/intelligence/**"
+      - "skeleton/provider_runtime.py"
+      - "skeleton/skills/**"
+      - "skeleton/api/**"
+      - "skeleton/ai/runtime/**"
+      - "skeleton/artifact_plane/**"
+      - "skeleton/memory/**"
+      - "skeleton/persistence/**"
+      - "backend/core/conversations.py"
+      - "backend/core/engine_client.py"
+      - "backend/tests/test_conversation_storage_admission.py"
+      - "skeleton/testing/test_cost_admission.py"
+      - "skeleton/testing/test_admission_runtime.py"
+      - "skeleton/testing/test_tenant_quota.py"
+      - "skeleton/testing/test_tenant_quota_sqlite.py"
+      - "skeleton/testing/test_shared_pressure.py"
+      - "skeleton/testing/test_artifact_usage.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "skeleton/testing/test_memory_writeback.py"
+      - "skeleton/testing/test_memory_projection.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_provider_contract.py"
+      - "scripts/verify_cost_admission_closure.py"
+      - "tests/test_cost_admission_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/cost-admission-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cost-admission-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cost-admission-contracts:
+    name: Cost admission contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused admission runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+
+      - name: Run request quota and shared-pressure contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_cost_admission.py
+          skeleton/testing/test_admission_runtime.py
+          skeleton/testing/test_tenant_quota.py
+          skeleton/testing/test_tenant_quota_sqlite.py
+          skeleton/testing/test_shared_pressure.py
+
+      - name: Run artifact storage and engine persistence admission contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_artifact_usage.py
+          skeleton/testing/test_engine_execution_service.py
+
+      - name: Run memory projection and conversation admission contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_memory_projection.py
+          backend/tests/test_conversation_storage_admission.py
+
+      - name: Run tool and provider admission integration contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_provider_contract.py
+
+  cost-admission-independent:
+    name: Independent cost admission verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent cost verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_cost_admission_independent_verifier.py
+
+      - name: Run independent exact-head cost admission scan
+        env:
+          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_cost_admission_closure.py
+          --evidence-out .cost-admission-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".cost-admission-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit(
+                  "independent cost/admission receipt does not match exact PR head"
+              )
+          if receipt.get("verifier") != "independent-cost-admission-v1":
+              raise SystemExit("unexpected independent cost/admission verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent cost/admission verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 10:
+              raise SystemExit("independent cost/admission boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) < 8:
+              raise SystemExit("independent cost/admission mirror coverage is incomplete")
+          if not receipt.get("blueprint_digest"):
+              raise SystemExit("cost/admission blueprint digest is missing")
+          print(
+              "independent cost/admission exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+              "mirrors=",
+              len(receipt["mirror_pairs"]),
+          )
+          PY
