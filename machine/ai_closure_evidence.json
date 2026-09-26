@@ -354,7 +354,7 @@
       "plane": "application-api",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/conversation.py",
@@ -371,7 +371,16 @@
         "backend/routes/jeeves_compose.py routes generative escalation through EngineTextRequest/execute_engine_text rather than provider SDKs or credentials",
         "backend/routes/jeeves_compose.py ignores caller-supplied history for retrieval, prompting and persistence even when server storage is empty or unavailable",
         "tests/test_jeeves_chat_workspace.py proves server transcript wins over conflicting client history, legacy history is model-invisible, and canonical-engine delegation keeps conversation context out of trusted instructions",
-        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface"
+        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface",
+        "backend/routes/jeeves_compose.py imports legacy jeeves_chat rows once into canonical ConversationThread/ConversationMessage authority and serves canonical history thereafter",
+        "backend/routes/conversations.py regenerate endpoint executes through EngineClient then commits conversation_authority.regenerate_assistant_message with operation/result/context lineage",
+        "backend/tests/test_conversation_regeneration_route.py proves engine-before-commit, stale-version fencing and canonical regeneration lineage",
+        "backend/core/conversations.py governed deletion physically removes conversation payloads before acknowledgement and governed export reads registry-scoped conversation records",
+        "backend/tests/test_conversation_governance.py and backend/tests/test_conversation_storage_admission.py prove tenant-scoped governed delete/export behavior",
+        "frontend/features/Jeeves/WorkspaceController.ts rehydrates and refreshes device state from canonical server history",
+        "frontend/features/Jeeves/workspace.ts projectCanonicalHistory replaces stale completed cache while preserving unresolved local work and never serializes local transcript into model input",
+        "frontend/scripts/test-jeeves-workspace.cjs proves remount reconstruction, durable session identity and device-transcript non-authority",
+        "scripts/verify_jeeves_conversation_cutover.py independently verifies legacy migration-read-only authority, canonical regeneration and workspace reconstruction boundaries"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -386,22 +395,16 @@
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
       "outstanding_evidence": [
-        "Jeeves compatibility-store cutover to canonical ConversationThread/ConversationMessage authority",
-        "regenerate execution-to-result-to-canonical-branch validation",
-        "conversation deletion/export/retention propagation test",
-        "browser refresh/reconnect reconstruction test",
+        "conversation retention/reference propagation across referenced artifacts, memory projections and summaries",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
-        "fresh exact-head validation and independent closure verification"
+        "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
       ],
       "blockers": [
-        "Jeeves compatibility-store cutover to canonical ConversationThread/ConversationMessage authority",
-        "regenerate execution-to-result-to-canonical-branch validation",
-        "conversation deletion/export/retention propagation test",
-        "browser refresh/reconnect reconstruction test",
+        "conversation retention/reference propagation across referenced artifacts, memory projections and summaries",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
-        "fresh exact-head validation and independent closure verification"
+        "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
