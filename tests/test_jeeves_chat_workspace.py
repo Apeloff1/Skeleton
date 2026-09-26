@@ -918,3 +918,115 @@ def test_jeeves_chat_legacy_collection_is_migration_read_only(route) -> None:
     assert "return core_db[\"jeeves_chat\"]" in source
     assert "_legacy_complete_rows" in source
     assert "_import_legacy_rows_to_canonical" in source
+
+
+def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history(
+    route,
+    monkeypatch,
+):
+    legacy = _MemoryChatCollection()
+    canonical = _CanonicalConversationAuthority()
+    captured = {"calls": 0, "contexts": []}
+
+    async def seed():
+        authority, thread, tenant_id, owner_id = (
+            await route._ensure_canonical_thread("conversation-resume")
+        )
+        thread, prior_user = await authority.append_user_message(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content="prior question",
+            idempotency_key=route._canonical_user_idempotency("prior-1"),
+            expected_thread_version=thread.version,
+            data_class="internal",
+        )
+        thread, _prior_assistant = await authority.commit_assistant_message(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content="prior answer",
+            idempotency_key="jeeves-assistant:prior-1",
+            expected_thread_version=thread.version,
+            causal_user_message_id=prior_user.message_id,
+            operation_id=str(uuid4()),
+            ai_result_id="jeeves-qualified-result:prior",
+            data_class="internal",
+        )
+        thread, pending_user = await authority.append_user_message(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content="resume question",
+            idempotency_key=route._canonical_user_idempotency("resume-1"),
+            expected_thread_version=thread.version,
+            data_class="internal",
+        )
+        return thread, pending_user
+
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
+    seeded_thread, pending_user = asyncio.run(seed())
+
+    async def generate(
+        query,
+        recalled,
+        needs_reasoning,
+        conversation_context="",
+    ):
+        del recalled, needs_reasoning
+        captured["calls"] += 1
+        captured["contexts"].append(conversation_context)
+        assert query == "resume question"
+        return {
+            "text": "resumed answer",
+            "tier": "free",
+            "model": "test",
+            "engine_execution_id": None,
+            "engine_verification": None,
+            "engine_evidence_refs": [],
+        }
+
+    with _chat_client(
+        route,
+        monkeypatch,
+        legacy,
+        generate,
+        canonical=canonical,
+    ) as transport:
+        payload = {
+            "session_id": "conversation-resume",
+            "client_message_id": "resume-1",
+            "message": "resume question",
+        }
+        resumed = transport.post("/api/jeeves/chat", json=payload)
+        replay = transport.post("/api/jeeves/chat", json=payload)
+
+    assert resumed.status_code == 200
+    body = resumed.json()
+    assert body["replayed"] is False
+    assert body["reply"] == "resumed answer"
+    assert body["canonical_thread_id"] == seeded_thread.thread_id
+    assert captured["calls"] == 1
+
+    # Retry reconstruction must use the transcript *before* the pending user
+    # turn. The current question belongs only in current_question, not in the
+    # conversation history array.
+    context = captured["contexts"][0]
+    assert "prior question" in context
+    assert "prior answer" in context
+    assert context.count("resume question") == 1
+
+    messages = canonical.messages[seeded_thread.thread_id]
+    assert [message.author_type.value for message in messages] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+    ]
+    assert messages[2].message_id == pending_user.message_id
+    assert messages[3].causal_user_message_id == pending_user.message_id
+
+    assert replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    assert replay.json()["reply"] == "resumed answer"
+    assert captured["calls"] == 1
