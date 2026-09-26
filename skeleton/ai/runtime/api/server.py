@@ -339,6 +339,7 @@ class ServerState:
                             "engine:events",
                             "engine:approve",
                             "engine:media",
+                            "engine:admission",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,
