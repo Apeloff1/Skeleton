@@ -199,15 +199,19 @@
         "backend/core/conversations.py authoritative conversation writes are registered and support governed delete/export",
         "skeleton/vault/governance_audit.py and governance_registry.py audit canonical registration/reconcile/delete/export decisions",
         "skeleton/api/server.py composes durable governance audit timeline and lifecycle adapter registry",
-        "skeleton/testing/test_governance_audit.py and test_governance_runtime_binding.py prove redaction and restart durability"
+        "skeleton/testing/test_governance_audit.py and test_governance_runtime_binding.py prove redaction and restart durability",
+        "skeleton/retrieval/governance.py canonical governed retrieval owner",
+        "skeleton/vault/lifecycle_adapters.py governed retrieval lifecycle adapter",
+        "skeleton/api/server.py composes governed retrieval owner and executor",
+        "skeleton/testing/test_lifecycle_adapters.py and test_governance_runtime_binding.py prove retrieval lifecycle behavior"
       ],
       "remaining": [
         "bridge provider privacy ceilings into every application route",
-        "register retrieval/artifact records at canonical write boundaries",
-        "compose retrieval/artifact lifecycle adapters into production runtime",
         "complete derived memory projection/index deletion acknowledgement",
         "bridge provider/tool privacy ceilings into every application route",
-        "collect exact-head and independent governance closure evidence"
+        "collect exact-head and independent governance closure evidence",
+        "register artifact records at remaining canonical write boundaries",
+        "compose artifact lifecycle adapters into production runtime"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
