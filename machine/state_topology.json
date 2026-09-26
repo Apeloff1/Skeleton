@@ -763,7 +763,7 @@
       "logical_location": "SKL_MONGO_DATABASE.memory_records via canonical memory repository",
       "authority": "authoritative",
       "source_of_truth": true,
-      "status": "durable-repository-implemented",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -786,7 +786,11 @@
         "skeleton/memory/projection.py",
         "skeleton/testing/test_memory_repository.py",
         "skeleton/testing/test_mongo_memory_repository.py",
-        "skeleton/testing/test_memory_projection.py"
+        "skeleton/testing/test_memory_projection.py",
+        "skeleton/api/server.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/testing/test_governance_runtime_binding.py",
+        "pyproject.toml"
       ]
     }
   ],
