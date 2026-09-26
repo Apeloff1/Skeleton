@@ -11,6 +11,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
@@ -75,7 +76,11 @@ async def call_music_ai(prompt: str, system_prompt: str) -> str:
     try:
         chat = EngineChat(
             session_id=f"music-{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt
+            instruction_policy=InstructionPolicy(
+                policy_id="backend.music-pipeline.generation",
+                version="1",
+                instructions=system_prompt,
+            ),
         ).with_model("openai", "gpt-4o")
         
         response = await chat.send_message(UserMessage(text=prompt))
