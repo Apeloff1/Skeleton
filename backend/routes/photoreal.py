@@ -49,7 +49,6 @@ def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str):
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     t0 = time.time()
     try:
-        key = os.environ.get("EMERGENT_LLM_KEY")
 
         async def _gen():
             chat = LlmChat(session_id=f"pr-{job_id[:8]}",
