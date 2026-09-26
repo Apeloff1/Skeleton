@@ -1103,3 +1103,41 @@ async def test_execution_quota_lease_is_shared_with_tool_usage(
     assert closed["active_reservations"] == 0
     assert closed["committed"]["tool_calls"] == 1
     assert closed["committed"]["operations"] == 1
+
+def test_submit_meters_execution_and_submission_storage_without_replay_double_count(
+    tmp_path,
+) -> None:
+    service, _runtime, ledger = _admitted_service(tmp_path)
+    command = _command()
+
+    first = service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    first_snapshot = ledger.snapshot("tenant-a")
+    storage = first_snapshot["metered_by_category"]["storage"]
+
+    assert first.execution_id == command.execution_request.execution_id
+    assert storage["storage_bytes"] > 0
+    assert storage["artifact_bytes"] == 0
+    assert first_snapshot["usage_events"] == 2
+
+    replay = service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now() + timedelta(seconds=1),
+    )
+    replay_snapshot = ledger.snapshot("tenant-a")
+
+    assert replay == first
+    assert replay_snapshot["usage_events"] == 2
+    assert (
+        replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+        == storage["storage_bytes"]
+    )
+
