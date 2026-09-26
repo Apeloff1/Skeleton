@@ -26,6 +26,11 @@ from skeleton.skills.tool_receipt_store import (
     SQLiteToolReceiptStore,
     ToolReceiptConflict,
 )
+from skeleton.vault.data_governance import (
+    DataGovernanceDenied,
+    ToolTransferRequest,
+    evaluate_tool_transfer,
+)
 
 
 class ToolRuntimeError(RuntimeError):
@@ -103,6 +108,23 @@ def _meter_manifest_usage(
     )
 
 
+def _tool_governance_decision(
+    manifest: ToolManifest,
+    request: ToolExecutionRequest,
+):
+    return evaluate_tool_transfer(
+        ToolTransferRequest(
+            tool_id=manifest.tool_id,
+            data_policy=manifest.data_policy,
+            network_policy=manifest.network_policy,
+            data_class=request.data_class,
+            purpose=request.transfer_purpose,
+            tenant_id=request.tenant_id,
+            source="canonical-tool-runtime",
+        )
+    )
+
+
 def _receipt_id(request: ToolExecutionRequest, manifest: ToolManifest) -> str:
     parts = [request.operation_id]
     if request.execution_id is not None:
@@ -118,6 +140,11 @@ def _receipt_id(request: ToolExecutionRequest, manifest: ToolManifest) -> str:
             request.arguments_digest,
         )
     )
+    if (
+        request.data_class != "internal"
+        or request.transfer_purpose != "tool-execution"
+    ):
+        parts.extend((request.data_class, request.transfer_purpose))
     material = "\x1f".join(parts).encode("utf-8")
     digest = hashlib.sha256(material).hexdigest()
     # Receipt remains canonical UUID-shaped while deterministically derived.
@@ -149,7 +176,15 @@ class ToolRuntime:
         self._receipts: dict[tuple[str, str, str], ToolExecutionReceipt] = {}
         self._request_fingerprints: dict[
             tuple[str, str, str],
-            tuple[str, str, str | None, str | None, str | None],
+            tuple[
+                str,
+                str,
+                str | None,
+                str | None,
+                str | None,
+                str,
+                str,
+            ],
         ] = {}
 
     def register(self, manifest: ToolManifest, handler: ToolHandler) -> ToolManifest:
@@ -207,6 +242,8 @@ class ToolRuntime:
                 durable.receipt.execution_id,
                 durable.receipt.turn_id,
                 durable.receipt.call_id,
+                durable.receipt.data_class,
+                durable.receipt.transfer_purpose,
             )
             return durable.receipt
 
@@ -220,6 +257,7 @@ class ToolRuntime:
             raise TypeError("request must be ToolExecutionRequest")
         started = _utc(now)
         key = (request.tenant_id, request.operation_id, request.idempotency_key)
+        governance_decision_ref: str | None = None
 
         with self._lock:
             registered = self._registry.get(request.tool_id)
@@ -232,6 +270,8 @@ class ToolRuntime:
                 request.execution_id,
                 request.turn_id,
                 request.call_id,
+                request.data_class,
+                request.transfer_purpose,
             )
             previous_fingerprint = self._request_fingerprints.get(key)
             if previous_fingerprint is not None and previous_fingerprint != fingerprint:
@@ -262,11 +302,55 @@ class ToolRuntime:
                     finished_at=started,
                     error_code="arguments_invalid",
                     approval_ref=request.approval_ref,
+                    data_class=request.data_class,
+                    transfer_purpose=request.transfer_purpose,
+                    governance_decision_ref=governance_decision_ref,
                     metered_tool_calls=0,
                 )
                 self._request_fingerprints[key] = fingerprint
                 self._receipts[key] = receipt
                 return receipt
+
+            try:
+                governance = _tool_governance_decision(
+                    manifest,
+                    request,
+                )
+            except DataGovernanceDenied:
+                governance = None
+            if governance is None or not governance.permitted:
+                error_code = (
+                    "governance_denied"
+                    if governance is None
+                    else governance.reason_code
+                )
+                governance_decision_ref = (
+                    None if governance is None else governance.decision_id
+                )
+                receipt = ToolExecutionReceipt(
+                    receipt_id=_receipt_id(request, manifest),
+                    request_id=request.request_id,
+                    operation_id=request.operation_id,
+                    execution_id=request.execution_id,
+                    turn_id=request.turn_id,
+                    call_id=request.call_id,
+                    tenant_id=request.tenant_id,
+                    tool_id=request.tool_id,
+                    idempotency_key=request.idempotency_key,
+                    arguments_digest=request.arguments_digest,
+                    status=ToolExecutionStatus.DENIED,
+                    started_at=started,
+                    finished_at=started,
+                    error_code=error_code,
+                    approval_ref=request.approval_ref,                    data_class=request.data_class,
+                    transfer_purpose=request.transfer_purpose,
+                    governance_decision_ref=governance_decision_ref,
+                    metered_tool_calls=0,
+                )
+                self._request_fingerprints[key] = fingerprint
+                self._receipts[key] = receipt
+                return receipt
+            governance_decision_ref = governance.decision_id
 
             if manifest.approval_required:
                 expected_approval = approval_ref_for_request(request)
@@ -290,6 +374,9 @@ class ToolRuntime:
                         finished_at=started,
                         error_code="approval_required",
                         approval_ref=None,
+                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
                     )
                 if request.approval_ref != expected_approval:
@@ -309,6 +396,9 @@ class ToolRuntime:
                         finished_at=started,
                         error_code="approval_binding_mismatch",
                         approval_ref=request.approval_ref,
+                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
                     )
 
@@ -342,6 +432,9 @@ class ToolRuntime:
                         finished_at=started,
                         error_code="execution_in_doubt",
                         approval_ref=request.approval_ref,
+                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
                     )
 
@@ -374,6 +467,9 @@ class ToolRuntime:
                         finished_at=_utc(),
                         error_code="budget_denied",
                         approval_ref=request.approval_ref,
+                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
                     )
                     if self.receipt_store is not None:
@@ -408,6 +504,9 @@ class ToolRuntime:
                     finished_at=max(started, finished),
                     result_ref=result_ref,
                     approval_ref=request.approval_ref,
+                    data_class=request.data_class,
+                    transfer_purpose=request.transfer_purpose,
+                    governance_decision_ref=governance_decision_ref,
                     metered_tool_calls=1,
                 )
             except Exception as exc:
@@ -428,6 +527,9 @@ class ToolRuntime:
                     finished_at=max(started, finished),
                     error_code=type(exc).__name__,
                     approval_ref=request.approval_ref,
+                    data_class=request.data_class,
+                    transfer_purpose=request.transfer_purpose,
+                    governance_decision_ref=governance_decision_ref,
                     metered_tool_calls=1,
                 )
             if self.receipt_store is not None:
@@ -593,6 +695,7 @@ class AsyncToolRuntime:
             request.call_id,
         )
         owner = False
+        governance_decision_ref: str | None = None
 
         async with self._lock:
             registered = self._registry.get(request.tool_id)
@@ -634,11 +737,60 @@ class AsyncToolRuntime:
                         finished_at=started,
                         error_code="arguments_invalid",
                         approval_ref=request.approval_ref,
+                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
                     )
                     self._request_fingerprints[key] = fingerprint
                     self._receipts[key] = receipt
                     return receipt
+
+                try:
+                    governance = _tool_governance_decision(
+                        registered.manifest,
+                        request,
+                    )
+                except DataGovernanceDenied:
+                    governance = None
+                if governance is None or not governance.permitted:
+                    error_code = (
+                        "governance_denied"
+                        if governance is None
+                        else governance.reason_code
+                    )
+                    governance_decision_ref = (
+                        None
+                        if governance is None
+                        else governance.decision_id
+                    )
+                    receipt = ToolExecutionReceipt(
+                        receipt_id=_receipt_id(
+                            request,
+                            registered.manifest,
+                        ),
+                        request_id=request.request_id,
+                        operation_id=request.operation_id,
+                        execution_id=request.execution_id,
+                        turn_id=request.turn_id,
+                        call_id=request.call_id,
+                        tenant_id=request.tenant_id,
+                        tool_id=request.tool_id,
+                        idempotency_key=request.idempotency_key,
+                        arguments_digest=request.arguments_digest,
+                        status=ToolExecutionStatus.DENIED,
+                        started_at=started,
+                        finished_at=started,
+                        error_code=error_code,
+                        approval_ref=request.approval_ref,                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
+                        metered_tool_calls=0,
+                    )
+                    self._request_fingerprints[key] = fingerprint
+                    self._receipts[key] = receipt
+                    return receipt
+                governance_decision_ref = governance.decision_id
 
                 if registered.manifest.approval_required:
                     expected_approval = approval_ref_for_request(request)
@@ -662,6 +814,9 @@ class AsyncToolRuntime:
                             finished_at=started,
                             error_code="approval_required",
                             approval_ref=None,
+                            data_class=request.data_class,
+                            transfer_purpose=request.transfer_purpose,
+                            governance_decision_ref=governance_decision_ref,
                             metered_tool_calls=0,
                         )
                     if request.approval_ref != expected_approval:
@@ -681,6 +836,9 @@ class AsyncToolRuntime:
                             finished_at=started,
                             error_code="approval_binding_mismatch",
                             approval_ref=request.approval_ref,
+                            data_class=request.data_class,
+                            transfer_purpose=request.transfer_purpose,
+                            governance_decision_ref=governance_decision_ref,
                             metered_tool_calls=0,
                         )
 
@@ -714,6 +872,9 @@ class AsyncToolRuntime:
                             finished_at=started,
                             error_code="execution_in_doubt",
                             approval_ref=request.approval_ref,
+                            data_class=request.data_class,
+                            transfer_purpose=request.transfer_purpose,
+                            governance_decision_ref=governance_decision_ref,
                             metered_tool_calls=0,
                         )
 
@@ -752,6 +913,9 @@ class AsyncToolRuntime:
                         finished_at=_utc(),
                         error_code="budget_denied",
                         approval_ref=request.approval_ref,
+                        data_class=request.data_class,
+                        transfer_purpose=request.transfer_purpose,
+                        governance_decision_ref=governance_decision_ref,
                         metered_tool_calls=0,
                     )
                 else:
@@ -761,6 +925,7 @@ class AsyncToolRuntime:
                             registered,
                             request,
                             started=started,
+                            governance_decision_ref=governance_decision_ref,
                         )
             else:
                 semaphore = self._tool_semaphores[request.tool_id]
@@ -769,6 +934,7 @@ class AsyncToolRuntime:
                         registered,
                         request,
                         started=started,
+                        governance_decision_ref=governance_decision_ref,
                     )
             if self.receipt_store is not None:
                 receipt = self.receipt_store.commit(
@@ -799,6 +965,7 @@ class AsyncToolRuntime:
         request: ToolExecutionRequest,
         *,
         started: datetime,
+        governance_decision_ref: str | None,
     ) -> ToolExecutionReceipt:
         manifest = registered.manifest
         try:
@@ -844,6 +1011,9 @@ class AsyncToolRuntime:
                     error_code="postcondition_failed",
                     approval_ref=request.approval_ref,
                     compensation_ref=compensation_ref,
+                    data_class=request.data_class,
+                    transfer_purpose=request.transfer_purpose,
+                    governance_decision_ref=governance_decision_ref,
                     metered_tool_calls=1,
                 )
 
@@ -863,6 +1033,9 @@ class AsyncToolRuntime:
                 finished_at=max(started, _utc()),
                 result_ref=result_ref,
                 approval_ref=request.approval_ref,
+                data_class=request.data_class,
+                transfer_purpose=request.transfer_purpose,
+                governance_decision_ref=governance_decision_ref,
                 metered_tool_calls=1,
             )
         except Exception as exc:
@@ -882,6 +1055,9 @@ class AsyncToolRuntime:
                 finished_at=max(started, _utc()),
                 error_code=type(exc).__name__,
                 approval_ref=request.approval_ref,
+                data_class=request.data_class,
+                transfer_purpose=request.transfer_purpose,
+                governance_decision_ref=governance_decision_ref,
                 metered_tool_calls=1,
             )
 
