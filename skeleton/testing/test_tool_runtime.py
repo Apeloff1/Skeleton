@@ -38,6 +38,8 @@ def _manifest(
     *,
     effect: ToolEffect = ToolEffect.READ_ONLY,
     approval_required: bool = False,
+    data_policy: str = "internal:test",
+    network_policy: str = "none",
 ) -> ToolManifest:
     return ToolManifest(
         tool_id=tool_id,
@@ -51,6 +53,8 @@ def _manifest(
         },
         effect=effect,
         approval_required=approval_required,
+        data_policy=data_policy,
+        network_policy=network_policy,
     )
 
 
@@ -62,6 +66,8 @@ def _request(
     key: str = "idem-1",
     path: str = "README.md",
     approval_ref: str | None = None,
+    data_class: str = "internal",
+    transfer_purpose: str = "tool-execution",
 ) -> ToolExecutionRequest:
     return ToolExecutionRequest(
         request_id=request_id or str(uuid4()),
@@ -72,6 +78,8 @@ def _request(
         arguments={"path": path},
         requested_at=_now(),
         approval_ref=approval_ref,
+        data_class=data_class,
+        transfer_purpose=transfer_purpose,
     )
 
 
@@ -1038,3 +1046,118 @@ def test_manifest_rejects_invalid_estimated_cost() -> None:
                 "estimated_cost_usd": -0.01,
             },
         )
+
+def test_sync_tool_privacy_denial_precedes_meter_and_handler() -> None:
+    events: list[str] = []
+
+    class Meter:
+        def meter_tool_call(self, operation_id, event_id, *, now_wall=None):
+            events.append("meter")
+            return object()
+
+    runtime = ToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+    runtime.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        lambda request: events.append("handler") or "search:1",
+    )
+
+    receipt = runtime.execute(
+        _request(
+            tool_id="web.search",
+            data_class="internal",
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "tool_data_ceiling_exceeded"
+    assert receipt.governance_decision_ref.startswith("gov-tool-")
+    assert receipt.metered_tool_calls == 0
+    assert events == []
+
+
+def test_sync_public_tool_transfer_executes_with_governance_receipt() -> None:
+    calls: list[str] = []
+    runtime = ToolRuntime()
+    runtime.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        lambda request: calls.append(request.data_class) or "search:1",
+    )
+
+    receipt = runtime.execute(
+        _request(
+            tool_id="web.search",
+            data_class="public",
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert receipt.data_class == "public"
+    assert receipt.transfer_purpose == "tool-execution"
+    assert receipt.governance_decision_ref.startswith("gov-tool-")
+    assert calls == ["public"]
+
+
+def test_privacy_context_change_conflicts_for_same_idempotency_identity() -> None:
+    runtime = ToolRuntime()
+    runtime.register(_manifest(), lambda request: "artifact:1")
+    operation_id = str(uuid4())
+    runtime.execute(
+        _request(
+            operation_id=operation_id,
+            key="privacy-replay",
+            data_class="internal",
+        ),
+        now=_now(),
+    )
+
+    with pytest.raises(ToolExecutionConflict, match="privacy context"):
+        runtime.execute(
+            _request(
+                operation_id=operation_id,
+                key="privacy-replay",
+                data_class="public",
+            ),
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_async_tool_privacy_denial_precedes_handler() -> None:
+    calls: list[str] = []
+    runtime = AsyncToolRuntime()
+
+    async def handler(request):
+        calls.append(request.data_class)
+        return "search:1"
+
+    await runtime.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        handler,
+    )
+    receipt = await runtime.execute(
+        _request(
+            tool_id="web.search",
+            data_class="internal",
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "tool_data_ceiling_exceeded"
+    assert receipt.governance_decision_ref.startswith("gov-tool-")
+    assert calls == []
+
