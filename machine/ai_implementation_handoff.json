@@ -125,11 +125,13 @@
         "backend/tests/test_conversation_storage_admission.py proves fail-closed/replay-stable conversation admission",
         "skeleton/api/server.py constructs the live admitted governed Mongo memory writer when SKL_MONGO_URI is configured",
         "skeleton/testing/test_governance_runtime_binding.py proves one writer/repository owner reuses canonical governance and admission",
-        "pyproject.toml declares the production Mongo driver dependencies"
+        "pyproject.toml declares the production Mongo driver dependencies",
+        "skeleton/memory/projection.py admits material derived rebuild work before projection mutation",
+        "skeleton/testing/test_memory_projection.py proves fail-closed rebuild admission",
+        "skeleton/api/server.py binds admitted projection coordinator in production composition"
       ],
       "remaining": [
-        "collect exact-head and independent closure evidence",
-        "admit material retrieval/index rebuild work before allocation"
+        "collect exact-head and independent closure evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
