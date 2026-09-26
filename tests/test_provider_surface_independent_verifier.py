@@ -175,3 +175,41 @@ def test_independent_verifier_rejects_inconsistent_declared_edges(
         "discovery_edge_classes does not match ownership flags" in error
         for error in receipt["errors"]
     )
+
+def test_independent_verifier_accepts_byte_identical_ai_provider_mirror(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    mirror = root / "skeleton" / "ai" / "runtime"
+    mirror.mkdir(parents=True, exist_ok=True)
+    source = root / "skeleton" / "provider_runtime.py"
+    (mirror / "provider_runtime.py").write_bytes(source.read_bytes())
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is True
+    assert not any(
+        "provider runtime AI mirror drifted" in error
+        for error in receipt["errors"]
+    )
+
+
+def test_independent_verifier_rejects_drifted_ai_provider_mirror(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    mirror = root / "skeleton" / "ai" / "runtime"
+    mirror.mkdir(parents=True, exist_ok=True)
+    (mirror / "provider_runtime.py").write_text(
+        "import openai\n# drifted mirror\n",
+        encoding="utf-8",
+    )
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "canonical provider runtime AI mirror drifted from source" in error
+        for error in receipt["errors"]
+    )
+
