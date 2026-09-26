@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from typing import Any, Iterable
+from uuid import uuid4
 
 from core.engine_text import (
     EngineTextError,
@@ -105,7 +106,11 @@ class EngineChat:
             raise TypeError(
                 "EngineChat accepts at most three compatibility positional arguments"
             )
-        self.session_id = str(session_id or "")
+        self.session_id = str(
+            session_id
+            if session_id is not None and str(session_id).strip()
+            else ("ephemeral:" + str(uuid4()))
+        )
         if instruction_policy is not None and not isinstance(
             instruction_policy,
             InstructionPolicy,
