@@ -230,8 +230,7 @@ class EngineChat:
         normalized_role = str(role).strip().lower()
         text = str(content)
         if normalized_role == "system":
-            self.system_message = text
-            return self
+            return self.with_system_message(text)
         if normalized_role == "user":
             self._queued_prompt = text
             return self
