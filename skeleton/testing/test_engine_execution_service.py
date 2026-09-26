@@ -1103,4 +1103,3 @@ async def test_execution_quota_lease_is_shared_with_tool_usage(
     assert closed["active_reservations"] == 0
     assert closed["committed"]["tool_calls"] == 1
     assert closed["committed"]["operations"] == 1
-
