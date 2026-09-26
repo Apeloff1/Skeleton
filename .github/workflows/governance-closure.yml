@@ -179,4 +179,3 @@ jobs:
               len(receipt["mirror_pairs"]),
           )
           PY
-
