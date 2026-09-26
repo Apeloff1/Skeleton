@@ -925,6 +925,8 @@ async def invoke_canonical(
     request_id: str | None = None,
     approval_ref: str | None = None,
     delegated_authority_ref: str | None = None,
+    data_class: str = "internal",
+    transfer_purpose: str = "tool-execution",
 ) -> dict:
     """Execute through canonical request/receipt authority."""
 
@@ -948,6 +950,8 @@ async def invoke_canonical(
         requested_at=datetime.now(timezone.utc),
         approval_ref=approval_ref,
         delegated_authority_ref=delegated_authority_ref,
+        data_class=data_class,
+        transfer_purpose=transfer_purpose,
     )
     runtime = _CANONICAL_RUNTIME
     if runtime is None:
@@ -1013,6 +1017,8 @@ async def invoke(
     request_id: str | None = None,
     approval_ref: str | None = None,
     delegated_authority_ref: str = "legacy:backend/services/tool_registry.invoke",
+    data_class: str = "internal",
+    transfer_purpose: str = "tool-execution",
 ) -> dict:
     """Legacy-compatible entrypoint delegated through canonical authority."""
 
@@ -1058,6 +1064,8 @@ async def invoke(
         request_id=rid,
         approval_ref=approval_ref,
         delegated_authority_ref=delegated_authority_ref,
+        data_class=data_class,
+        transfer_purpose=transfer_purpose,
     )
 
 
@@ -1079,6 +1087,11 @@ async def invoke_many(calls: list[dict]) -> list[dict]:
             delegated_authority_ref=(
                 call.get("delegated_authority_ref")
                 or "legacy:backend/services/tool_registry.invoke_many"
+            ),
+            data_class=call.get("data_class") or "internal",
+            transfer_purpose=(
+                call.get("transfer_purpose")
+                or "tool-execution"
             ),
         )
         for call in calls
@@ -1111,6 +1124,8 @@ def describe() -> dict:
                 "approval_required": manifest.approval_required,
                 "idempotency_required": manifest.effect is not ToolEffect.READ_ONLY,
                 "canonical_version": manifest.version,
+                "data_policy": manifest.data_policy,
+                "network_policy": manifest.network_policy,
             }
         )
     return {
