@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""Verify Jeeves compatibility chat uses canonical conversation authority.
+
+The legacy jeeves_chat collection is allowed only as one-way migration input.
+New transcript writes, idempotency, replay and history must be owned by
+ConversationThread/ConversationMessage authority.
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import hashlib
+import json
+import os
+from pathlib import Path
+import sys
+from typing import Any, Sequence
+
+
+ROOT = Path(__file__).resolve().parents[1]
+ROUTE = Path("backend/routes/jeeves_compose.py")
+CONVERSATIONS = Path("backend/core/conversations.py")
+CONTRACT = Path("skeleton/contracts/conversation.py")
+WORKSPACE_TEST = Path("tests/test_jeeves_chat_workspace.py")
+
+REQUIRED_ROUTE_TOKENS = (
+    "_canonical_authority",
+    "_ensure_canonical_thread",
+    "_append_canonical_user_turn",
+    "_commit_canonical_assistant_turn",
+    "_canonical_existing_turn",
+    "_load_canonical_history",
+    "_import_legacy_rows_to_canonical",
+    "ConversationThread/ConversationMessage is the only mutable",
+)
+REQUIRED_AUTHORITY_TOKENS = (
+    "class MongoConversationAuthority",
+    "append_user_message",
+    "commit_assistant_message",
+    "active_transcript",
+    "idempotency_key",
+)
+FORBIDDEN_ROUTE_TOKENS = (
+    "SKL_JEEVES_CANONICAL_CONVERSATIONS",
+    "_chat_col().insert_one",
+    "_chat_col().update_one",
+    "_chat_col().delete_one",
+    "_chat_col().replace_one",
+    "_chat_col().find_one_and_update",
+)
+LEGACY_ALLOWED_FUNCTIONS = {"_legacy_complete_rows"}
+
+
+class VerificationError(RuntimeError):
+    """Jeeves conversation authority verification failed."""
+
+
+def _read(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise VerificationError(f"cannot read {path}") from exc
+
+
+def _function_for_node(tree: ast.AST) -> dict[ast.AST, str]:
+    owners: dict[ast.AST, str] = {}
+
+    class Visitor(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self.stack: list[str] = []
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self.stack.append(node.name)
+            owners[node] = node.name
+            self.generic_visit(node)
+            self.stack.pop()
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self.stack.append(node.name)
+            owners[node] = node.name
+            self.generic_visit(node)
+            self.stack.pop()
+
+        def generic_visit(self, node: ast.AST) -> None:
+            if self.stack:
+                owners[node] = self.stack[-1]
+            super().generic_visit(node)
+
+    Visitor().visit(tree)
+    return owners
+
+
+def _verify_legacy_reads(route_source: str, errors: list[str]) -> int:
+    try:
+        tree = ast.parse(route_source, filename=str(ROUTE))
+    except SyntaxError as exc:
+        raise VerificationError(f"cannot parse {ROUTE}: {exc}") from exc
+
+    owners = _function_for_node(tree)
+    reads = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Name) and func.id == "_chat_col"):
+            continue
+        owner = owners.get(node, "")
+        if owner not in LEGACY_ALLOWED_FUNCTIONS:
+            errors.append(
+                "legacy jeeves_chat access escaped migration reader: "
+                + (owner or "<module>")
+            )
+        reads += 1
+
+    if reads != 1:
+        errors.append(
+            "legacy jeeves_chat must have exactly one migration-read access "
+            f"(found {reads})"
+        )
+    return reads
+
+
+def verify_repository(root: Path = ROOT) -> dict[str, Any]:
+    errors: list[str] = []
+    route_path = root / ROUTE
+    authority_path = root / CONVERSATIONS
+    contract_path = root / CONTRACT
+    test_path = root / WORKSPACE_TEST
+
+    required = (route_path, authority_path, contract_path, test_path)
+    for path in required:
+        if not path.is_file():
+            errors.append(
+                "required conversation cutover file is missing: "
+                + str(path.relative_to(root))
+            )
+
+    if errors:
+        return {
+            "schema_version": 1,
+            "verifier": "jeeves-conversation-cutover-v1",
+            "head_sha": os.environ.get("GITHUB_SHA", "").strip() or "unknown",
+            "legacy_read_accesses": 0,
+            "digests": {},
+            "errors": errors,
+            "valid": False,
+        }
+
+    route = _read(route_path)
+    authority = _read(authority_path)
+    contract = _read(contract_path)
+    tests = _read(test_path)
+
+    for token in REQUIRED_ROUTE_TOKENS:
+        if token not in route:
+            errors.append(f"Jeeves route lost canonical authority token: {token}")
+    for token in REQUIRED_AUTHORITY_TOKENS:
+        if token not in authority:
+            errors.append(f"conversation authority lost token: {token}")
+    for token in FORBIDDEN_ROUTE_TOKENS:
+        if token in route:
+            errors.append(f"Jeeves route regained legacy authority token: {token}")
+
+    for token in (
+        "ConversationThread",
+        "ConversationMessage",
+        "ConversationAuthorType",
+        "idempotency_key",
+        "causal_user_message_id",
+        "operation_id",
+        "ai_result_id",
+    ):
+        if token not in contract:
+            errors.append(f"conversation contract lost token: {token}")
+
+    for token in (
+        "test_jeeves_chat_legacy_collection_is_migration_read_only",
+        "test_stable_client_message_id_replays_without_second_generation",
+        "test_client_message_id_conflict_is_rejected",
+        "test_canonical_jeeves_mode_migrates_legacy_then_owns_new_turns",
+    ):
+        if token not in tests:
+            errors.append(f"Jeeves cutover regression is missing: {token}")
+
+    legacy_reads = _verify_legacy_reads(route, errors)
+    digests = {
+        str(path.relative_to(root)): hashlib.sha256(
+            _read(path).encode("utf-8")
+        ).hexdigest()
+        for path in required
+    }
+    return {
+        "schema_version": 1,
+        "verifier": "jeeves-conversation-cutover-v1",
+        "head_sha": os.environ.get("GITHUB_SHA", "").strip() or "unknown",
+        "legacy_read_accesses": legacy_reads,
+        "digests": digests,
+        "errors": errors,
+        "valid": not errors,
+    }
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--evidence-out", type=Path)
+    parser.add_argument("--print-evidence", action="store_true")
+    args = parser.parse_args(argv)
+
+    try:
+        receipt = verify_repository(ROOT)
+    except VerificationError as exc:
+        print(f"jeeves-conversation-cutover: rejected: {exc}", file=sys.stderr)
+        return 1
+
+    if args.evidence_out is not None:
+        args.evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        args.evidence_out.write_text(
+            json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if args.print_evidence:
+        print(json.dumps(receipt, indent=2, sort_keys=True))
+
+    if not receipt["valid"]:
+        print("jeeves-conversation-cutover: rejected", file=sys.stderr)
+        for error in receipt["errors"]:
+            print(f"  - {error}", file=sys.stderr)
+        return 1
+
+    print(
+        "jeeves-conversation-cutover: OK "
+        f"(legacy_reads={receipt['legacy_read_accesses']}, "
+        f"files={len(receipt['digests'])})"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
