@@ -949,7 +949,7 @@
       ],
       "work_package": "WP-P0-VERIFICATION",
       "blueprint": "verification_runtime_blueprint",
-      "implementation_status": "planned",
+      "implementation_status": "in_progress",
       "objective": "Converge deterministic, evidence-grounded, action-postcondition and model-assisted verification into one observable receipt contract used by finalization.",
       "target_files": {
         "contracts": [
@@ -957,18 +957,24 @@
         ],
         "runtime": [
           "skeleton/intelligence/verification_policy.py",
-          "skeleton/intelligence/verification_runtime.py"
+          "skeleton/intelligence/verification_runtime.py",
+          "skeleton/intelligence/execution_runtime.py"
         ],
         "persistence": [
-          "verification receipt repository"
+          "verification receipt repository",
+          "skeleton/persistence/execution_repository.py"
         ],
         "integration": [
           "skeleton/retrieval",
           "skeleton/skills",
-          "skeleton/eval"
+          "skeleton/eval",
+          "skeleton/retrieval/verification.py",
+          "skeleton/skills/verification.py",
+          ".github/workflows/cognitive-execution-closure.yml"
         ],
         "tests": [
-          "skeleton/testing/test_verification_runtime.py"
+          "skeleton/testing/test_verification_runtime.py",
+          "skeleton/testing/test_execution_runtime.py"
         ]
       },
       "ordered_steps": [
@@ -999,8 +1005,26 @@
         "receipt privacy"
       ],
       "closure_gate": "every final result that claims verification carries an immutable observable VerificationReceipt whose required claims/actions are supported by declared evidence/checks",
-      "current_evidence": [],
-      "remaining": [],
+      "current_evidence": [
+        "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
+        "skeleton/intelligence/verification_policy.py selects verification level from risk, claim kind and action effect without model confidence",
+        "skeleton/intelligence/verification_runtime.py implements deterministic evidence policy plus bounded provider-backed semantic PASS/REPAIR/QUALIFY/ABSTAIN/BLOCK finalization",
+        "skeleton/retrieval/verification.py validates citation identity, scope and independent evidence origins",
+        "skeleton/skills/verification.py binds postcondition observations to durable ToolExecutionReceipt status and lineage",
+        "skeleton/persistence/execution_repository.py durably persists verification receipts before terminal execution finalization",
+        "skeleton/intelligence/execution_runtime.py materializes canonical VerificationReceipt and stores it before committing terminal AIExecutionResult",
+        "skeleton/testing/test_verification_runtime.py covers scope integrity, model-evidence non-authority, independent-origin policy, contradiction, tool postconditions, observable receipt privacy, semantic-provider routing, fail-closed outage, repair lineage, citation rebinding and bounded repair budgets",
+        "skeleton/testing/test_execution_runtime.py proves canonical verification receipt persistence, fail-closed missing evidence and verification-before-finalization ordering",
+        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head"
+      ],
+      "remaining": [
+        "materialize authorized execution evidence into EvidenceReference values in production finalization",
+        "wire SemanticVerificationRuntime through the canonical production provider adapter when policy requires independent semantic verification",
+        "bind durable tool receipts and postcondition observations into production action verification",
+        "integrate qualified/abstain/repair/block disposition handling into execution finalization",
+        "collect exact-head cognitive verification evidence and close lower-stage dependencies",
+        "obtain independent closure verification"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
