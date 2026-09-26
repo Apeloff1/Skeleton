@@ -219,6 +219,8 @@ Please provide a detailed, well-structured response."""
                     instructions=policy.instructions,
                     prompt=user_message,
                     idempotency_key="legacy-ai-assistant:" + identity,
+                    instruction_policy_id=policy.policy_id,
+                    instruction_policy_version=policy.version,
                     actor_id="legacy-ai-assistant",
                     capability="assistant.compat",
                     max_output_tokens=8_192,
