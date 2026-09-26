@@ -803,4 +803,3 @@ async def test_tenant_lifecycle_plan_deletes_bound_vector_projection() -> None:
         include_tombstoned=True,
     )
     assert current.memory_id == record.memory_id
-
