@@ -15,6 +15,7 @@ from core.engine_text import (
     execute_engine_text,
 )
 from skeleton.context.instruction_policy import InstructionPolicy
+from skeleton.vault.data_governance import DataGovernanceDenied
 
 
 def _terminal(execution_id: str) -> EngineTerminalResult:
@@ -230,3 +231,40 @@ def test_engine_text_requires_complete_instruction_policy_identity() -> None:
             idempotency_key="partial-policy",
             instruction_policy_id="backend.test.partial",
         )
+
+
+@pytest.mark.asyncio
+async def test_engine_text_privacy_denial_is_sanitized(monkeypatch) -> None:
+    def deny(**_kwargs):
+        raise DataGovernanceDenied("route secret must not leak")
+
+    monkeypatch.setattr(
+        "core.engine_text.require_route_provider_transfer",
+        deny,
+    )
+
+    class MustNotExecute:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, _command):
+            raise AssertionError(
+                "privacy denial must happen before engine execution"
+            )
+
+    with pytest.raises(
+        EngineTextError,
+        match="route privacy denied engine text request",
+    ) as caught:
+        await execute_engine_text(
+            EngineTextRequest(
+                instructions="Rules",
+                prompt="Hello",
+                idempotency_key="privacy-denied",
+            ),
+            client=MustNotExecute(),
+        )
+
+    assert "route secret" not in str(caught.value)
