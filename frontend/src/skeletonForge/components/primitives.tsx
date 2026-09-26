@@ -83,6 +83,7 @@ export function Button({
       accessibilityRole="button"
       accessibilityHint={a11yHint}
       accessibilityState={{ disabled: disabled || busy, busy }}
+      aria-busy={busy}
       style={({ pressed }) => [
         s.btn,
         compact && s.btnCompact,
