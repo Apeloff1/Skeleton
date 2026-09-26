@@ -1,0 +1,187 @@
+name: Cognitive Execution Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/ai_execution.py"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/persistence/execution_repository.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/api/engine_runtime.py"
+      - "skeleton/ai/runtime/contracts/ai_execution.py"
+      - "skeleton/ai/runtime/intelligence/execution_runtime.py"
+      - "skeleton/ai/runtime/persistence/execution_repository.py"
+      - "skeleton/ai/runtime/api/engine_service.py"
+      - "skeleton/ai/runtime/api/engine_runtime.py"
+      - "skeleton/testing/test_execution_runtime.py"
+      - "skeleton/testing/test_execution_repository.py"
+      - "skeleton/testing/test_engine_execution_service.py"
+      - "skeleton/testing/test_engine_execution_coordinator.py"
+      - "skeleton/testing/test_ai_execution_frontier.py"
+      - "backend/tests/test_execution_lifecycle_integration.py"
+      - "backend/tests/test_execution_evidence.py"
+      - "scripts/check_ai_execution_frontier.py"
+      - "scripts/verify_cognitive_execution_closure.py"
+      - "tests/test_cognitive_execution_independent_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/cognitive-execution-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cognitive-execution-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cognitive-execution-contracts:
+    name: Cognitive execution contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused cognitive execution dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+
+      - name: Audit AI execution frontier
+        run: python scripts/check_ai_execution_frontier.py
+
+      - name: Run durable execution repository contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_execution_repository.py
+
+      - name: Run bounded cognitive loop contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_execution_runtime.py
+          skeleton/testing/test_ai_execution_frontier.py
+
+      - name: Run engine admission approval and recovery contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_engine_execution_service.py
+          skeleton/testing/test_engine_execution_coordinator.py
+
+      - name: Run assembled execution lifecycle evidence contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_execution_lifecycle_integration.py
+          backend/tests/test_execution_evidence.py
+
+  cognitive-execution-independent:
+    name: Independent cognitive execution verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run independent cognitive verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_cognitive_execution_independent_verifier.py
+
+      - name: Run independent exact-head cognitive execution scan
+        env:
+          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_cognitive_execution_closure.py
+          --evidence-out .cognitive-execution-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".cognitive-execution-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit(
+                  "independent cognitive execution receipt does not match exact PR head"
+              )
+          if receipt.get("verifier") != "independent-cognitive-execution-v1":
+              raise SystemExit(
+                  "unexpected independent cognitive execution verifier identity"
+              )
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent cognitive execution verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 5:
+              raise SystemExit("cognitive execution boundary coverage is incomplete")
+          if len(receipt.get("mirror_pairs") or []) < 5:
+              raise SystemExit("cognitive execution mirror coverage is incomplete")
+          expected_dependencies = {
+              "gap-state-authority-convergence",
+              "gap-governance-registry",
+              "gap-cost-admission",
+              "gap-conversation-state-authority",
+              "gap-memory-durable-authority",
+              "gap-tool-runtime-convergence",
+              "gap-context-compiler-convergence",
+              "gap-provider-interaction-protocol",
+              "gap-verification-evidence-contract",
+          }
+          if set(receipt.get("dependency_graph") or []) != expected_dependencies:
+              raise SystemExit("cognitive execution dependency graph receipt is invalid")
+          if not receipt.get("handoff_digest"):
+              raise SystemExit("cognitive execution handoff digest is missing")
+          print(
+              "independent cognitive execution exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+              "mirrors=",
+              len(receipt["mirror_pairs"]),
+          )
+          PY
