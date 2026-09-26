@@ -27,11 +27,14 @@ from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import ProviderToolCall, ProviderToolDefinition
 from skeleton.provider_runtime import AIMessage, ProviderAdapter, ProviderRequest
 from skeleton.skills.tool_contract import (
+    ToolContractError,
     ToolEffect,
     ToolExecutionRequest,
     ToolExecutionReceipt,
     ToolExecutionStatus,
     approval_ref_for_request,
+    validate_json_schema,
+    validate_json_value,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
 from skeleton.vault.data_governance import (
@@ -209,6 +212,21 @@ def _positive_int(
     raw = mapping.get(key, default)
     if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
         raise CognitiveExecutionError(f"{key} must be a positive integer")
+    if raw > maximum:
+        raise CognitiveExecutionError(f"{key} exceeds hard execution limit")
+    return raw
+
+
+def _bounded_nonnegative_int(
+    mapping: Mapping[str, object],
+    key: str,
+    default: int,
+    *,
+    maximum: int,
+) -> int:
+    raw = mapping.get(key, default)
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise CognitiveExecutionError(f"{key} must be a non-negative integer")
     if raw > maximum:
         raise CognitiveExecutionError(f"{key} exceeds hard execution limit")
     return raw
@@ -709,6 +727,7 @@ class CognitiveExecutionRuntime:
                 ExecutionState.ASSEMBLING_CONTEXT,
                 ExecutionState.ROUTING,
                 ExecutionState.TOOL_COMPLETED,
+                ExecutionState.REPAIRING,
                 ExecutionState.DEGRADED,
             }:
                 execution = self._advance_to_provider_pending(
@@ -774,6 +793,7 @@ class CognitiveExecutionRuntime:
                 ExecutionState.ASSEMBLING_CONTEXT: ExecutionState.ROUTING,
                 ExecutionState.ROUTING: ExecutionState.PROVIDER_PENDING,
                 ExecutionState.TOOL_COMPLETED: ExecutionState.PROVIDER_PENDING,
+                ExecutionState.REPAIRING: ExecutionState.PROVIDER_PENDING,
                 ExecutionState.DEGRADED: ExecutionState.PROVIDER_PENDING,
             }.get(execution.state)
             if target is None:
@@ -886,6 +906,31 @@ class CognitiveExecutionRuntime:
         tools = await self._provider_tools(payload)
         deadline = self._deadline(payload)
         context_policy = dict(execution.request.context_policy)
+        structured_output_schema_raw = context_policy.get(
+            "structured_output_schema"
+        )
+        structured_output_schema = None
+        if structured_output_schema_raw is not None:
+            if not isinstance(structured_output_schema_raw, Mapping):
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="structured_output_schema_invalid",
+                    now=now,
+                )
+            try:
+                structured_output_schema = validate_json_schema(
+                    structured_output_schema_raw
+                )
+            except ToolContractError:
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="structured_output_schema_invalid",
+                    now=now,
+                )
         execution_budget = dict(execution.request.resource_budget)
         provider_budget = ResourceBudget(
             max_input_tokens=int(
@@ -999,13 +1044,7 @@ class CognitiveExecutionRuntime:
                     context_policy.get("estimated_cost_usd", 0.0)
                 ),
                 resource_budget=provider_budget,
-                structured_output_schema=(
-                    None
-                    if context_policy.get("structured_output_schema") is None
-                    else dict(
-                        context_policy["structured_output_schema"]
-                    )
-                ),
+                structured_output_schema=structured_output_schema,
                 tools=tools,
                 tool_choice=str(
                     context_policy.get(
@@ -1299,16 +1338,50 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
 
-        candidate = provider.get("text")
-        if not isinstance(candidate, str) or not candidate.strip():
+        structured_schema = execution.request.context_policy.get(
+            "structured_output_schema"
+        )
+        if structured_schema is not None:
             structured = provider.get("structured_output")
-            if isinstance(structured, dict):
-                candidate = json.dumps(
-                    structured,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
+            if not isinstance(structured, dict):
+                return await self._repair_structured_output(
+                    execution,
+                    payload,
+                    reason="provider returned no structured output object",
+                    approval_refs=approval_refs,
+                    now=now,
                 )
+            try:
+                validate_json_value(
+                    structured_schema,
+                    structured,
+                    path="structured_output",
+                )
+            except ToolContractError as exc:
+                return await self._repair_structured_output(
+                    execution,
+                    payload,
+                    reason=str(exc),
+                    approval_refs=approval_refs,
+                    now=now,
+                )
+            candidate = json.dumps(
+                structured,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        else:
+            candidate = provider.get("text")
+            if not isinstance(candidate, str) or not candidate.strip():
+                structured = provider.get("structured_output")
+                if isinstance(structured, dict):
+                    candidate = json.dumps(
+                        structured,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                    )
         if not isinstance(candidate, str) or not candidate.strip():
             return self._finalize_non_success(
                 execution,
@@ -1326,6 +1399,93 @@ class CognitiveExecutionRuntime:
         )
         execution, _ = self._checkpoint(execution, payload, now=now)
         return await self._verify_and_finalize(execution, payload, now=now)
+
+    async def _repair_structured_output(
+        self,
+        execution: AIExecution,
+        payload: dict[str, object],
+        *,
+        reason: str,
+        approval_refs: Mapping[str, str],
+        now: datetime | None,
+    ) -> ExecutionRunResult:
+        max_repairs = _bounded_nonnegative_int(
+            execution.request.stop_policy,
+            "max_structured_output_repairs",
+            1,
+            maximum=4,
+        )
+        raw_repairs = payload.get("structured_output_repairs", 0)
+        if (
+            isinstance(raw_repairs, bool)
+            or not isinstance(raw_repairs, int)
+            or raw_repairs < 0
+        ):
+            raise CognitiveExecutionError(
+                "structured_output_repairs checkpoint is corrupt"
+            )
+        if raw_repairs >= max_repairs:
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="structured_output_schema_validation_failed",
+                now=now,
+            )
+
+        schema = execution.request.context_policy.get(
+            "structured_output_schema"
+        )
+        if not isinstance(schema, Mapping):
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="structured_output_schema_invalid",
+                now=now,
+            )
+        try:
+            normalized_schema = validate_json_schema(schema)
+        except ToolContractError:
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="structured_output_schema_invalid",
+                now=now,
+            )
+
+        bounded_reason = str(reason).strip()[:1024] or "schema validation failed"
+        payload["structured_output_repairs"] = raw_repairs + 1
+        payload["structured_output_last_error"] = bounded_reason
+        payload["next_prompt"] = (
+            "The previous response failed the required structured-output "
+            "contract. Return exactly one corrected structured JSON object, "
+            "with no prose and no tool calls. Validation failure: "
+            + bounded_reason
+            + "\nRequired schema: "
+            + json.dumps(
+                normalized_schema,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        )
+        execution = self._transition(
+            execution,
+            ExecutionState.REPAIRING,
+            now=now,
+        )
+        execution, _ = self._checkpoint(
+            execution,
+            payload,
+            now=now,
+        )
+        return await self._drive(
+            execution.execution_id,
+            approval_refs=approval_refs,
+            now=now,
+        )
 
     async def _prepare_tool_batch(
         self,
