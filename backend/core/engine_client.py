@@ -540,6 +540,15 @@ def command_from_context(
             "assistant_proposal verification requires tool-free execution"
         )
 
+    context_data_class = max(
+        (
+            segment.data_class
+            for segment in context.selected_segments
+        ),
+        default="internal",
+        key=("public", "internal", "confidential", "restricted").index,
+    )
+
     normalized_memory_intent: dict[str, Any] | None = None
     if memory_write_intent is not None:
         intent = _json_object(
@@ -595,7 +604,7 @@ def command_from_context(
                 "memory_write_intent may only persist verified_final_output"
             )
         data_class = _text(
-            intent.get("data_class", handoff.data_class),
+            intent.get("data_class", context_data_class),
             "memory_write_intent.data_class",
             maximum=32,
         ).lower()
@@ -766,14 +775,7 @@ def command_from_context(
         context_digest=context.context_digest,
         compiler_version=context.compiler_version,
         source_snapshot=context.source_snapshot,
-        data_class=max(
-            (
-                segment.data_class
-                for segment in context.selected_segments
-            ),
-            default="internal",
-            key=("public", "internal", "confidential", "restricted").index,
-        ),
+        data_class=context_data_class,
         instructions=instruction_text,
         prompt=prompt_text,
         history=tuple(normalized_history),
