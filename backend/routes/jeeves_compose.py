@@ -651,10 +651,11 @@ async def _canonical_existing_turn(
         None,
     )
     if canonical_assistant is None:
-        raise HTTPException(
-            status_code=409,
-            detail="this message is already being processed; retry after it completes",
-        )
+        # A prior attempt may have crashed after committing the canonical
+        # user turn but before committing the assistant result. Treat that
+        # state as resumable instead of permanently deadlocking the retry
+        # identity.
+        return None
 
     ai_result_id = str(canonical_assistant.ai_result_id or "")
     return {
@@ -762,12 +763,20 @@ async def chat(req: ChatReq):
             req.client_message_id,
             req.message,
         )
-        if replay is None:
-            raise HTTPException(
-                status_code=409,
-                detail="canonical conversation replay state is incomplete",
-            )
-        return replay
+        if replay is not None:
+            return replay
+
+        # Resume an incomplete canonical turn. Server history was loaded
+        # before append_user_message(), so on retry it already contains the
+        # pending user turn. Remove exactly that trailing user entry so the
+        # regenerated engine request matches the original pre-turn context.
+        if (
+            effective_history
+            and effective_history[-1].role == "user"
+            and effective_history[-1].content == canonical_turn[2].content
+        ):
+            effective_history = effective_history[:-1]
+            history_source = "canonical-resume"
 
     context_req = req.model_copy(update={"history": effective_history})
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
