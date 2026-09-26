@@ -27,6 +27,10 @@ from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk, MemoryQueryResult
 from skeleton.persistence.memory_repository import SQLiteMemoryRepository
 from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+)
 
 
 class FakeStore(MemoryStore):
@@ -681,7 +685,10 @@ def test_retrieval_projection_registers_governance_before_physical_mutation() ->
     assert governed["state"] == "active"
     assert governed["exportable"] is False
     assert governed["purposes"] == ["retrieval-synthesis"]
-    assert governed["deletion_targets"] == ["retrieval"]
+    assert len(governed["deletion_targets"]) == 1
+    assert governed["deletion_targets"][0].startswith(
+        "memory-projection-"
+    )
 
 
 def test_governed_vector_projection_acknowledges_only_after_physical_delete() -> None:
@@ -734,5 +741,66 @@ def test_governed_vector_projection_acknowledges_only_after_physical_delete() ->
     assert final_inventory["records"][0]["state"] == "deleted"
     receipts = governance.lifecycle.receipts(tenant_id="tenant-a")
     assert len(receipts) == 1
-    assert receipts[0].target == "retrieval"
+    assert receipts[0].target == retrieval_record["deletion_targets"][0]
+    assert receipts[0].target.startswith("memory-projection-")
     assert receipts[0].record_id == retrieval_record["record_id"]
+
+@pytest.mark.asyncio
+async def test_tenant_lifecycle_plan_deletes_bound_vector_projection() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(
+            key="governed-vector-tenant-delete",
+            content="tenant lifecycle vector",
+        ),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    adapters = LifecycleAdapterRegistry()
+    executor = LifecycleExecutor(governance.lifecycle, adapters)
+    store = VectorStore(dims=32)
+    projection = VectorStoreProjection("tenant-vector", store)
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+        lifecycle_adapters=adapters,
+    )
+
+    synced = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert synced.degraded is False
+    assert store.stats()["documents"] == 1
+
+    inventory = governance.export_inventory("tenant-a")
+    retrieval_record = inventory["records"][0]
+    target = retrieval_record["deletion_targets"][0]
+    assert target.startswith("memory-projection-")
+
+    plan = governance.request_deletion(
+        "tenant-a",
+        record_ids=(retrieval_record["record_id"],),
+        reason="tenant-delete",
+    )
+    result = await executor.execute_deletion_plan(plan)
+
+    assert store.stats()["documents"] == 0
+    assert len(result.receipts) == 1
+    assert result.receipts[0].record_id == retrieval_record["record_id"]
+    assert result.receipts[0].target == target
+    final = governance.lifecycle.get(retrieval_record["record_id"])
+    assert final["state"] == "deleted"
+
+    # The canonical memory authority remains tombstone-independent: deleting a
+    # derived projection never erases the source record.
+    current = repo.get(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        include_tombstoned=True,
+    )
+    assert current.memory_id == record.memory_id
+
