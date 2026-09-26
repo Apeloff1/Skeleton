@@ -15,6 +15,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
+    EngineAuthorityError,
     EngineAuthorityRegistry,
 )
 from skeleton.contracts.ai_execution import (
@@ -103,6 +104,46 @@ def _json_bytes(value: object) -> bytes:
 
 def _digest(value: Mapping[str, Any]) -> str:
     return hashlib.sha256(_json_bytes(dict(value))).hexdigest()
+
+
+def _bounded_storage_text(
+    value: object,
+    field: str,
+    *,
+    maximum: int = 512,
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise EngineServiceError(f"{field} is required")
+    normalized = value.strip()
+    if normalized != value or len(normalized) > maximum:
+        raise EngineServiceError(f"{field} is invalid")
+    return normalized
+
+
+def _external_storage_operation_id(
+    service_principal: str,
+    tenant_id: str,
+    capability: str,
+    resource_id: str,
+    write_id: str,
+) -> str:
+    material = "\x1f".join(
+        (
+            "skeleton-external-storage",
+            service_principal,
+            tenant_id,
+            capability,
+            resource_id,
+            write_id,
+        )
+    )
+    return str(uuid5(NAMESPACE_URL, material))
+
+
+def _external_storage_receipt_id(operation_id: str) -> str:
+    return "storage-admission:" + hashlib.sha256(
+        operation_id.encode("utf-8")
+    ).hexdigest()
 
 
 def _execution_admission_operation_id(operation_id: str) -> str:
@@ -808,6 +849,38 @@ class EngineExecutionAck:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineStorageAdmissionReceipt:
+    receipt_id: str
+    operation_id: str
+    tenant_id: str
+    capability: str
+    resource_id: str
+    write_id: str
+    storage_bytes: int
+    admitted_at: datetime
+    quota_reservation_id: str | None = None
+    admission_decision_id: str | None = None
+    replayed: bool = False
+    schema_version: int = 1
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "receipt_id": self.receipt_id,
+            "operation_id": self.operation_id,
+            "tenant_id": self.tenant_id,
+            "capability": self.capability,
+            "resource_id": self.resource_id,
+            "write_id": self.write_id,
+            "storage_bytes": self.storage_bytes,
+            "admitted_at": self.admitted_at.isoformat(),
+            "quota_reservation_id": self.quota_reservation_id,
+            "admission_decision_id": self.admission_decision_id,
+            "replayed": self.replayed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class EngineExecutionStatus:
     operation_id: str
     execution_id: str
@@ -1411,6 +1484,168 @@ class EngineExecutionService:
             str(write_id),
             len(_json_bytes(payload)),
             now_wall=instant.timestamp(),
+        )
+
+    def consume_external_storage_write(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        capability: str,
+        resource_id: str,
+        write_id: str,
+        storage_bytes: int,
+        now: datetime | None = None,
+    ) -> EngineStorageAdmissionReceipt:
+        runtime = self.admission_runtime
+        meter = self._usage_meter
+        if runtime is None or meter is None:
+            raise EngineServiceError(
+                "engine storage admission runtime is unavailable"
+            )
+
+        principal = _bounded_storage_text(
+            verified_service_principal,
+            "service_principal",
+        )
+        tenant = _bounded_storage_text(tenant_id, "tenant_id")
+        capability_key = _bounded_storage_text(
+            capability,
+            "capability",
+            maximum=256,
+        )
+        resource_key = _bounded_storage_text(
+            resource_id,
+            "resource_id",
+            maximum=512,
+        )
+        write_key = _bounded_storage_text(
+            write_id,
+            "write_id",
+            maximum=1024,
+        )
+        if (
+            isinstance(storage_bytes, bool)
+            or not isinstance(storage_bytes, int)
+            or storage_bytes < 1
+            or storage_bytes > 1024 * 1024 * 1024
+        ):
+            raise EngineServiceError(
+                "storage_bytes must be within [1, 1GiB]"
+            )
+
+        grant = self.authorities.grant_for(principal)
+        if "engine:admission" not in grant.scopes:
+            raise EngineAuthorityError(
+                "engine admission scope denied"
+            )
+        if not grant.allows_tenant(tenant):
+            raise EngineAuthorityError(
+                "engine admission tenant denied"
+            )
+
+        operation_id = _external_storage_operation_id(
+            principal,
+            tenant,
+            capability_key,
+            resource_key,
+            write_key,
+        )
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "storage_admission.now")
+        )
+
+        completion_reader = getattr(
+            runtime.quota_ledger,
+            "completion_for_operation",
+            None,
+        )
+        if callable(completion_reader):
+            existing = completion_reader(tenant, operation_id)
+            if existing is not None:
+                if existing.actual.storage_bytes != storage_bytes:
+                    raise EngineServiceError(
+                        "external storage admission identity conflict"
+                    )
+                return EngineStorageAdmissionReceipt(
+                    receipt_id=_external_storage_receipt_id(
+                        operation_id
+                    ),
+                    operation_id=operation_id,
+                    tenant_id=tenant,
+                    capability=capability_key,
+                    resource_id=resource_key,
+                    write_id=write_key,
+                    storage_bytes=storage_bytes,
+                    admitted_at=datetime.fromtimestamp(
+                        existing.completed_at,
+                        timezone.utc,
+                    ),
+                    quota_reservation_id=existing.reservation_id,
+                    admission_decision_id=None,
+                    replayed=True,
+                )
+
+        request = AdmissionRequest(
+            operation_id=operation_id,
+            tenant_id=tenant,
+            capability="external-storage:" + capability_key,
+            budget=ResourceBudget(
+                max_storage_bytes=storage_bytes,
+            ),
+            estimate=UsageEstimate(
+                storage_bytes=storage_bytes,
+            ),
+        )
+        lease: AdmissionLease | None = None
+        try:
+            lease = runtime.admit(
+                request,
+                now_wall=instant.timestamp(),
+            )
+            meter.meter_storage(
+                operation_id,
+                resource_key,
+                write_key,
+                storage_bytes,
+                now_wall=instant.timestamp(),
+            )
+            completion = runtime.complete(
+                operation_id,
+                UsageEstimate(
+                    storage_bytes=storage_bytes,
+                ),
+                now_wall=instant.timestamp(),
+            )
+        except (AdmissionError, AdmissionRuntimeError) as exc:
+            if lease is not None:
+                try:
+                    runtime.release(operation_id)
+                except AdmissionRuntimeError:
+                    pass
+            raise EngineServiceError(
+                "external storage write denied by resource admission"
+            ) from exc
+
+        reservation_id = (
+            None
+            if completion.quota_completion is None
+            else completion.quota_completion.reservation_id
+        )
+        return EngineStorageAdmissionReceipt(
+            receipt_id=_external_storage_receipt_id(operation_id),
+            operation_id=operation_id,
+            tenant_id=tenant,
+            capability=capability_key,
+            resource_id=resource_key,
+            write_id=write_key,
+            storage_bytes=storage_bytes,
+            admitted_at=instant,
+            quota_reservation_id=reservation_id,
+            admission_decision_id=lease.decision.decision_id,
+            replayed=False,
         )
 
     def _execution_admission_request(
@@ -2125,6 +2360,7 @@ __all__ = [
     "EngineExecutionService",
     "EngineExecutionStatus",
     "EngineServiceError",
+    "EngineStorageAdmissionReceipt",
     "EngineSubmissionConflict",
     "EngineToolApproval",
     "SQLiteEngineSubmissionStore",
