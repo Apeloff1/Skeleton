@@ -28,7 +28,7 @@ import random
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -518,7 +518,7 @@ async def get_therapeutic_response(
     # For intense negative emotions, use AI for more personalized response
     if intensity > 0.7 and emotional_state in ["frustrated", "overwhelmed", "discouraged"]:
         try:
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY)
+            chat = EngineChat(api_key=EMERGENT_LLM_KEY)
             ai_prompt = f"""You are Jeeves, an emotionally intelligent AI tutor. The user is feeling {emotional_state} (intensity: {intensity}).
             
 Context: {context or 'Learning programming'}
