@@ -526,10 +526,18 @@ async def call_llm(
         ],
         "context_compiler_version": context_envelope.compiler_version,
         "engine_verification": result.verification,
-        "engine_evidence_refs": list(result.evidence_refs),
-        "engine_tool_receipts": list(result.tool_receipts),
-        "engine_memory_refs": list(result.memory_refs),
-        "engine_artifact_refs": list(result.artifact_refs),
+        "engine_evidence_refs": list(
+            getattr(result, "evidence_refs", ())
+        ),
+        "engine_tool_receipts": list(
+            getattr(result, "tool_receipts", ())
+        ),
+        "engine_memory_refs": list(
+            getattr(result, "memory_refs", ())
+        ),
+        "engine_artifact_refs": list(
+            getattr(result, "artifact_refs", ())
+        ),
     }
 
 
