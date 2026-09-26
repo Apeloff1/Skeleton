@@ -11,6 +11,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
@@ -211,7 +212,11 @@ async def call_education_ai(prompt: str, system_prompt: str) -> str:
     try:
         chat = EngineChat(
             session_id=f"edu-{uuid.uuid4().hex[:8]}",
-            system_message=system_prompt
+            instruction_policy=InstructionPolicy(
+                policy_id="backend.interactive-education.tutor",
+                version="1",
+                instructions=system_prompt,
+            ),
         ).with_model("openai", "gpt-4o")
         
         response = await chat.send_message(UserMessage(text=prompt))
