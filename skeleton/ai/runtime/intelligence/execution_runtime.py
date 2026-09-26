@@ -2571,11 +2571,27 @@ class CognitiveExecutionRuntime:
         final_output = verification.final_output or candidate.strip()
 
         if disposition == "block":
+            receipt = verification.as_dict()
+            claim_kind = str(receipt.get("claim_kind") or "")
+            risk = str(receipt.get("risk") or "")
+            semantic_block = isinstance(receipt.get("semantic"), Mapping)
+            explicit_block = (
+                semantic_block
+                or claim_kind == ClaimKind.ACTION_OUTCOME.value
+                or risk in {
+                    VerificationRisk.HIGH.value,
+                    VerificationRisk.CRITICAL.value,
+                }
+            )
             return self._finalize_non_success(
                 execution,
                 payload,
                 status="failed",
-                error_code="verification_blocked",
+                error_code=(
+                    "verification_blocked"
+                    if explicit_block
+                    else "verification_failed"
+                ),
                 now=now,
                 verification=verification,
             )
