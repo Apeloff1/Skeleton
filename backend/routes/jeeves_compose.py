@@ -780,12 +780,23 @@ async def _claim_idempotent_turn(
     )
     if existing is not None:
         if _canonical_chat_enabled():
-            return None, await _canonical_replay_turn(
-                session_id,
-                req.client_message_id,
-                req.message,
-                existing,
-            )
+            try:
+                return None, await _canonical_replay_turn(
+                    session_id,
+                    req.client_message_id,
+                    req.message,
+                    existing,
+                )
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        "canonical conversation replay is unavailable; "
+                        "retry later"
+                    ),
+                ) from exc
         return None, _replay_turn(existing)
 
     turn_key = _turn_id(session_id, req.client_message_id)
@@ -808,12 +819,23 @@ async def _claim_idempotent_turn(
         )
         if existing is not None:
             if _canonical_chat_enabled():
-                return None, await _canonical_replay_turn(
-                    session_id,
-                    req.client_message_id,
-                    req.message,
-                    existing,
-                )
+                try:
+                    return None, await _canonical_replay_turn(
+                        session_id,
+                        req.client_message_id,
+                        req.message,
+                        existing,
+                    )
+                except HTTPException:
+                    raise
+                except Exception as replay_exc:
+                    raise HTTPException(
+                        status_code=503,
+                        detail=(
+                            "canonical conversation replay is unavailable; "
+                            "retry later"
+                        ),
+                    ) from replay_exc
             return None, _replay_turn(existing)
         raise HTTPException(
             status_code=503,
