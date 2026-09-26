@@ -62,7 +62,7 @@ jobs:
 
       - name: Verify exact-head Stage-0 dependency graph
         env:
-          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/verify_ai_dependency_closure.py
           --evidence-out .ai-dependency-closure.json
