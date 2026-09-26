@@ -215,7 +215,7 @@ async def call_education_ai(prompt: str, system_prompt: str) -> str:
             instruction_policy=InstructionPolicy(
                 policy_id="backend.interactive-education.tutor",
                 version="1",
-                instructions=system_prompt,
+                instructions=system_prompt.strip(),
             ),
         ).with_model("openai", "gpt-4o")
         
