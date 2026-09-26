@@ -623,10 +623,6 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
     from emergentintegrations.llm.chat import LlmChat, UserMessage
     import uuid
     
-    EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
-    if not EMERGENT_KEY:
-        return []
-    
     # Determine which agents should respond based on chat room
     room_agents = {
         "creators_main": ["jeeves"],
@@ -652,7 +648,6 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
         
         try:
             chat = LlmChat(
-                api_key=EMERGENT_KEY,
                 session_id=f"groupchat_{chat_id}_{agent_id}_{str(uuid.uuid4())[:8]}",
                 system_message=system_prompt
             ).with_model("openai", "gpt-4o")
