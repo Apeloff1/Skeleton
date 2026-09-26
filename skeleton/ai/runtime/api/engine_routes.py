@@ -87,6 +87,14 @@ class EngineSpeechBody(BaseModel):
     response_format: str = Field(default="mp3", min_length=2, max_length=16)
 
 
+class EngineStorageAdmissionBody(BaseModel):
+    tenant_id: str = Field(min_length=1, max_length=512)
+    capability: str = Field(min_length=1, max_length=256)
+    resource_id: str = Field(min_length=1, max_length=512)
+    write_id: str = Field(min_length=1, max_length=1024)
+    storage_bytes: int = Field(ge=1, le=1024 * 1024 * 1024)
+
+
 class EngineToolApprovalBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
@@ -286,6 +294,29 @@ async def submit_execution(
         _raise_engine_error(exc)
         raise
     return ack.as_dict()
+
+
+@router.post("/admission/storage")
+def admit_storage_write(
+    body: EngineStorageAdmissionBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        receipt = service.consume_external_storage_write(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+            capability=body.capability,
+            resource_id=body.resource_id,
+            write_id=body.write_id,
+            storage_bytes=body.storage_bytes,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return receipt.as_dict()
 
 
 @router.get("/executions/{execution_id}")
