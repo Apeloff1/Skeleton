@@ -1488,4 +1488,3 @@ def test_external_governance_lifecycle_requires_governance_scope(tmp_path) -> No
             tenant_id="tenant-a",
             record_ids=("thread-denied",),
         )
-
