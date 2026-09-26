@@ -67,6 +67,7 @@ jobs:
           "PyJWT==2.14.0"
           "python-dotenv==1.2.3"
           "bcrypt==4.3.0"
+          "email-validator==2.3.0"
 
       - name: Run canonical backend conversation authority contracts
         run: >-
