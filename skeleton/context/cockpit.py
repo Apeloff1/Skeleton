@@ -10,6 +10,7 @@ Command language (one statement per apply):
   NICK HELIX
   LIGATE HELIX
   DETECT <text>
+  OBSERVE <text>
   BIND SLOT <pfc|midbrain|left|right> <local|echo>
   THINK <text>
   ACQUIRE <slot>
@@ -32,7 +33,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from skeleton.context.dodeca import Dodecahedron
 from skeleton.context.helix import DNAHelix
 from skeleton.context.ledger import ContextLedger
-from skeleton.context.oracle import Magic8Ball, OracleReading
+from skeleton.context.oracle import Magic8Ball, OracleReading, acquire
 from skeleton.context.snowball import Snowball
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 from skeleton.kernel.errors import SkeletonError
@@ -185,10 +186,23 @@ class Cockpit:
                       "own": self._brain().own.size}
         elif verb == "DETECT":
             text = " ".join(args)
-            era, scores = detect_era(text)
-            self.tensor = ContextTensor.from_era(era)
+            try:
+                era, scores = detect_era(text)
+                self.tensor = ContextTensor.from_era(era)
+            except ValueError as exc:
+                raise CockpitError(str(exc)) from exc
             self.blend = None
             result = {"era": era, "scores": scores}
+        elif verb == "OBSERVE":
+            text = " ".join(args)
+            try:
+                found = acquire(text, nonce=len(self.history))
+            except ValueError as exc:
+                raise CockpitError(str(exc)) from exc
+            self.tensor = found.tensor
+            self.blend = None
+            self.last_oracle = found.reading
+            result = found.to_dict()
         else:
             raise CockpitError("unknown command", context={"verb": verb, "line": line})
         self.history.append(line)

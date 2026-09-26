@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Sequence, Tuple
 
 from skeleton.context.dodeca import ADJ, Dodecahedron, FACES
-from skeleton.context.tensor import ContextTensor
+from skeleton.context.tensor import ContextTensor, detect_era
 
 # 20 canonical oracles — one per dodeca vertex. Tone is era-agnostic;
 # the lattice chooses *which* mouth speaks.
@@ -44,22 +44,23 @@ MOUTHS: Tuple[str, ...] = (
 # (our 12 faces) has degree 5. We assign 20 mouths to face-triples by
 # walking ordered neighbour wedges so the mapping is stable.
 def _vertex_faces() -> Tuple[Tuple[int, int, int], ...]:
+    """Twenty mouths, one per triangular face of the icosahedral graph.
+
+    Consecutive slots in an adjacency list are not a rotation, so a wedge
+    walk misses triangles and must not pad the gap with copies.
+    """
     triples: List[Tuple[int, int, int]] = []
-    seen = set()
-    for u in range(12):
-        nbrs = ADJ[u]
-        for i, v in enumerate(nbrs):
-            w = nbrs[(i + 1) % len(nbrs)]
-            # only count a triangle once (u,v,w where u is smallest)
-            if u < v and u < w and (v in ADJ[w] or w in ADJ[v]):
-                key = tuple(sorted((u, v, w)))
-                if key not in seen:
-                    seen.add(key)
-                    triples.append((u, v, w))
-    # Icosa has 20 faces; we should have 20 triples. Pad/truncate defensively.
-    while len(triples) < 20:
-        triples.append(triples[len(triples) % max(len(triples), 1)] if triples else (0, 1, 2))
-    return tuple(triples[:20])
+    for i, nbrs in enumerate(ADJ):
+        for a in nbrs:
+            if a <= i:
+                continue
+            for b in ADJ[a]:
+                if b <= a or i not in ADJ[b]:
+                    continue
+                triples.append((i, a, b))
+    if len(triples) != 20 or len(set(triples)) != 20:
+        raise RuntimeError("dodecahedron vertex map is not twenty unique mouths")
+    return tuple(triples)
 
 
 VERTEX_FACES: Tuple[Tuple[int, int, int], ...] = _vertex_faces()
@@ -98,7 +99,9 @@ class Magic8Ball:
         raw = []
         for triple in VERTEX_FACES:
             raw.append(sum(act[i] for i in triple) / 3.0)
-        total = sum(raw) or 1.0
+        total = sum(raw)
+        if total <= 0.0:
+            raise ValueError("oracle face activations do not light a mouth")
         return tuple(x / total for x in raw)
 
     def _seed_bytes(self, tensor: ContextTensor, nonce: int = 0) -> bytes:
@@ -106,6 +109,10 @@ class Magic8Ball:
         return hashlib.sha256(material).digest()
 
     def roll(self, tensor: ContextTensor, *, nonce: int = 0) -> OracleReading:
+        if not isinstance(tensor, ContextTensor):
+            raise TypeError("a roll needs a context cube")
+        if isinstance(nonce, bool) or not isinstance(nonce, int) or nonce < 0:
+            raise ValueError("nonce must be a non-negative integer")
         seed = self._seed_bytes(tensor, nonce)
         pick = _u32(seed) / 2**32
         acc = 0.0
@@ -127,3 +134,45 @@ class Magic8Ball:
     def top(self, n: int = 5) -> List[Tuple[int, float, str]]:
         ranked = sorted(enumerate(self._weights), key=lambda iw: -iw[1])
         return [(i, w, MOUTHS[i]) for i, w in ranked[:n]]
+
+
+@dataclass(frozen=True)
+class Acquisition:
+    """One observation acquired as a cube and the mouth that reads it."""
+
+    observation: str
+    era: str
+    scores: Dict[str, int]
+    tensor: ContextTensor
+    reading: OracleReading
+
+    def to_dict(self) -> Dict[str, object]:
+        return {
+            "observation": self.observation,
+            "era": self.era,
+            "scores": dict(self.scores),
+            "fingerprint": self.tensor.fingerprint(),
+            "reading": self.reading.to_dict(),
+        }
+
+
+def acquire(observation: str, *, nonce: int = 0) -> Acquisition:
+    """Turn one observation into a cube and a mouth.
+
+    A blank observation is rejected. An observation that matches no era,
+    or more than one era equally, is rejected. Nothing here substitutes
+    a default era or a canned reply.
+    """
+
+    if not isinstance(observation, str) or not observation.strip():
+        raise ValueError("observation is required")
+    era, scores = detect_era(observation)
+    tensor = ContextTensor.from_era(era)
+    reading = Magic8Ball(Dodecahedron.from_tensor(tensor)).roll(tensor, nonce=nonce)
+    return Acquisition(
+        observation=observation.strip(),
+        era=era,
+        scores=dict(scores),
+        tensor=tensor,
+        reading=reading,
+    )

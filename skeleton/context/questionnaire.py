@@ -95,7 +95,6 @@ BEATS: Tuple[Dict[str, Any], ...] = (
          "extraction_now": {"era": "extraction_now", "axes": {}},
          "soulslike": {"era": "soulslike", "axes": {}},
          "boomer_shooter": {"era": "boomer_shooter", "axes": {}},
-         "unspecified": {"era": "extraction_now", "axes": {}},
      }},
 )
 
@@ -119,25 +118,40 @@ class Intake:
 
 
 def intake(answers: Mapping[str, str]) -> Intake:
+    if not isinstance(answers, Mapping):
+        raise TypeError("intake answers are required")
+    known = {beat["id"]: beat for beat in BEATS}
     ballots: Dict[str, int] = {}
     axis_acc = {a: [] for a in AXES}  # type: Dict[str, List[float]]
     used = {}
     phrases = []
+    for key in answers:
+        if key not in known:
+            raise ValueError(f"unknown intake beat {key!r}")
     for beat in BEATS:
-        raw = answers.get(beat["id"])
-        if raw not in beat["options"]:
+        if beat["id"] not in answers:
             continue
+        raw = answers[beat["id"]]
+        if raw not in beat["options"]:
+            raise ValueError(f"unknown answer {raw!r} for {beat['id']}")
         opt = beat["options"][raw]
         used[beat["id"]] = raw
         era = opt["era"]
         ballots[era] = ballots.get(era, 0) + 1
         phrases.append(f"{beat['id']}={raw}")
         for axis, val in (opt.get("axes") or {}).items():
+            if axis not in axis_acc:
+                raise ValueError(f"unknown axis {axis!r}")
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                raise ValueError(f"{axis} must be a finite number")
             axis_acc[axis].append(float(val))
     if not ballots:
-        era = "extraction_now"
-    else:
-        era = max(ballots, key=lambda e: (ballots[e], e))
+        raise ValueError("intake has no answers")
+    best = max(ballots.values())
+    winners = [era for era, votes in ballots.items() if votes == best]
+    if len(winners) != 1:
+        raise ValueError("intake matched more than one era: " + ", ".join(sorted(winners)))
+    era = winners[0]
     base = ContextTensor.from_era(era)
     values = []
     for i, axis in enumerate(AXES):

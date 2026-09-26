@@ -58,7 +58,12 @@ _ERA_KEYWORDS: Dict[str, Tuple[str, ...]] = {
 
 
 def _clamp(v: float) -> float:
-    return 0.0 if v < 0.0 else 1.0 if v > 1.0 else float(v)
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise ValueError("axis value must be a finite number")
+    number = float(v)
+    if not math.isfinite(number):
+        raise ValueError("axis value must be a finite number")
+    return 0.0 if number < 0.0 else 1.0 if number > 1.0 else number
 
 
 @dataclass
@@ -74,34 +79,68 @@ class ContextTensor:
         object.__setattr__(self, "values", tuple(_clamp(v) for v in self.values))
 
     @classmethod
-    def from_mapping(cls, mapping: Mapping[str, float], *, era: str = "extraction_now") -> "ContextTensor":
-        return cls(tuple(float(mapping.get(a, 0.5)) for a in AXES), era=era)
+    def from_mapping(cls, mapping: Mapping[str, float], *, era: str) -> "ContextTensor":
+        if not isinstance(era, str) or not era.strip():
+            raise ValueError("era is required")
+        if not isinstance(mapping, Mapping):
+            raise TypeError("tensor mapping is required")
+        missing = [axis for axis in AXES if axis not in mapping]
+        if missing:
+            raise ValueError("tensor mapping is missing " + ", ".join(missing))
+        return cls(tuple(mapping[axis] for axis in AXES), era=era)
 
     @classmethod
     def from_era(cls, era: str) -> "ContextTensor":
+        if not isinstance(era, str) or not era.strip():
+            raise ValueError("era is required")
         if era in ERA_PROFILES:
             return cls.from_mapping(ERA_PROFILES[era], era=era)
         from skeleton.forge.eras import ERA_IDS, compile_era
-        if era in ERA_IDS:
-            pack = compile_era(era)
-            speed = float(pack["player"]["speed"])
-            glass = float(pack["ttk"]["player_glass"])
-            trash = float(pack["ttk"]["trash"])
-            perm = float(pack["meta"].get("permadeath") or 0.5)
-            mapping = {
-                "risk": perm,
-                "tempo": min(1.0, speed / 240.0),
-                "lethality": min(1.0, 2.0 / max(glass, 0.2)),
-                "opacity": min(1.0, trash / 8.0),
-                "scarcity": perm * 0.8 + 0.1,
-                "agency": min(1.0, speed / 200.0),
-                "spectacle": min(1.0, 1.2 - trash / 10.0),
-                "intimacy": max(0.0, 1.0 - perm),
-                "grind": min(1.0, float(pack["ttk"]["boss"]) / 200.0),
-                "authorial": 0.55,
-            }
-            return cls.from_mapping(mapping, era=era)
-        return cls.from_mapping(ERA_PROFILES["extraction_now"], era="extraction_now")
+        if era not in ERA_IDS:
+            raise ValueError(f"unknown era {era!r}")
+        pack = compile_era(era)
+        try:
+            speed = pack["player"]["speed"]
+            glass = pack["ttk"]["player_glass"]
+            trash = pack["ttk"]["trash"]
+            boss = pack["ttk"]["boss"]
+            perm = pack["meta"]["permadeath"]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"era {era!r} pack does not measure a cube") from exc
+        measured = {
+            "speed": speed,
+            "player_glass": glass,
+            "trash": trash,
+            "boss": boss,
+            "permadeath": perm,
+        }
+        for name, value in measured.items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise ValueError(f"era {era!r} {name} is not a finite number")
+        speed_f = float(speed)
+        glass_f = float(glass)
+        trash_f = float(trash)
+        boss_f = float(boss)
+        perm_f = float(perm)
+        if glass_f <= 0.0 or speed_f < 0.0 or trash_f < 0.0 or boss_f < 0.0 or not 0.0 <= perm_f <= 1.0:
+            raise ValueError(f"era {era!r} pack is not a usable cube")
+        # The pack has no authorial sensor. A derived cube may not invent one.
+        authorial = pack["meta"].get("authorial") if isinstance(pack.get("meta"), dict) else None
+        if isinstance(authorial, bool) or not isinstance(authorial, (int, float)) or not math.isfinite(float(authorial)):
+            raise ValueError(f"era {era!r} does not measure authorial")
+        mapping = {
+            "risk": perm_f,
+            "tempo": min(1.0, speed_f / 240.0),
+            "lethality": min(1.0, 2.0 / glass_f),
+            "opacity": min(1.0, trash_f / 8.0),
+            "scarcity": perm_f * 0.8 + 0.1,
+            "agency": min(1.0, speed_f / 200.0),
+            "spectacle": min(1.0, 1.2 - trash_f / 10.0),
+            "intimacy": max(0.0, 1.0 - perm_f),
+            "grind": min(1.0, boss_f / 200.0),
+            "authorial": float(authorial),
+        }
+        return cls.from_mapping(mapping, era=era)
 
     def as_dict(self) -> Dict[str, float]:
         return {a: round(v, 4) for a, v in zip(AXES, self.values)}
@@ -116,9 +155,15 @@ class ContextTensor:
         return ContextTensor(tuple(vals), era=self.era)
 
     def lerp(self, other: "ContextTensor", t: float) -> "ContextTensor":
-        t = _clamp(t)
-        vals = tuple(a + (b - a) * t for a, b in zip(self.values, other.values))
-        era = self.era if t < 0.5 else other.era
+        if not isinstance(other, ContextTensor):
+            raise TypeError("lerp target must be a context cube")
+        if isinstance(t, bool) or not isinstance(t, (int, float)) or not math.isfinite(float(t)):
+            raise ValueError("lerp t must be in [0, 1]")
+        blend = float(t)
+        if not 0.0 <= blend <= 1.0:
+            raise ValueError("lerp t must be in [0, 1]")
+        vals = tuple(a + (b - a) * blend for a, b in zip(self.values, other.values))
+        era = self.era if blend < 0.5 else other.era
         return ContextTensor(vals, era=era)
 
     def manhattan(self, other: "ContextTensor") -> float:
@@ -135,7 +180,7 @@ class ContextTensor:
         na = math.sqrt(sum(a * a for a in self.values))
         nb = math.sqrt(sum(b * b for b in other.values))
         if na == 0 or nb == 0:
-            return 0.0
+            raise ValueError("cosine is undefined for a zero cube")
         return dot / (na * nb)
 
     def fingerprint(self) -> str:
@@ -156,10 +201,15 @@ class ContextTensor:
 
 
 def detect_era(text: str) -> Tuple[str, Dict[str, int]]:
-    """Keyword vote. Ties fall back to extraction_now."""
-    blob = (text or "").lower()
+    """Keyword vote. A blank, unmatched, or tied observation is not an era."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("observation is required")
+    blob = text.lower()
     scores = {era: sum(1 for kw in kws if kw in blob) for era, kws in _ERA_KEYWORDS.items()}
-    winner = max(scores, key=lambda e: scores[e])
-    if scores[winner] == 0:
-        return "extraction_now", scores
-    return winner, scores
+    best = max(scores.values())
+    if best <= 0:
+        raise ValueError("observation did not match an era")
+    winners = [era for era, score in scores.items() if score == best]
+    if len(winners) != 1:
+        raise ValueError("observation matched more than one era: " + ", ".join(sorted(winners)))
+    return winners[0], scores

@@ -22,7 +22,7 @@ from skeleton.context.instruction_policy import (
     InstructionPolicyError,
     InstructionPolicyRegistry,
 )
-from skeleton.context.oracle import Magic8Ball, OracleReading
+from skeleton.context.oracle import Acquisition, Magic8Ball, OracleReading, acquire
 from skeleton.context.pipeline import GameForgeRun
 from skeleton.context.questionnaire import Intake, IntakeResult, Questionnaire, intake, BEATS
 from skeleton.context.skills_files import (
@@ -48,8 +48,10 @@ __all__ = [
     "ProviderContextProjection",
     "project_provider_context",
     "AXES",
+    "Acquisition",
     "ContextTensor",
     "detect_era",
+    "acquire",
     "Dodecahedron",
     "FACES",
     "Magic8Ball",

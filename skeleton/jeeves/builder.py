@@ -16,7 +16,8 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from skeleton.context.oracle import OracleReading
+from skeleton.context.dodeca import Dodecahedron
+from skeleton.context.oracle import Magic8Ball, OracleReading
 from skeleton.context.tensor import ContextTensor
 
 
@@ -304,8 +305,10 @@ class BuilderBrain:
             raise ValueError("era is required")
         cube = tensor or ContextTensor.from_era(era.split("~")[0])
         fp = cube.fingerprint()
-        oracle_index = int(reading.index) if reading is not None else -1
-        oracle_text = reading.text if reading is not None else "Signs point to a standard drop."
+        if reading is None:
+            reading = Magic8Ball(Dodecahedron.from_tensor(cube)).roll(cube)
+        oracle_index = int(reading.index)
+        oracle_text = reading.text
 
         left, right, pfc, authored, spoken = _author(pack, cube, era, cortex)
         bias = _bias_of(right)

@@ -109,7 +109,7 @@ class Dodecahedron:
                         seen.add(v)
                         nxt.append(v)
             frontier = nxt
-        return -1
+        raise ValueError("dodecahedron faces are disconnected")
 
     def to_dict(self) -> Dict[str, object]:
         return {
