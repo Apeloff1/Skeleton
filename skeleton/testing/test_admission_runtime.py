@@ -502,3 +502,83 @@ def test_shared_pressure_configuration_is_all_or_none(tmp_path) -> None:
             shared_pressure_scope="ai-work",
             shared_pressure_owner_id="worker-a",
         )
+
+def test_default_tenant_quota_is_provisioned_on_first_admission() -> None:
+    ledger = TenantQuotaLedger()
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="default-window",
+            max_operations=10,
+            max_input_tokens=1_000,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1024,
+            max_storage_bytes=2048,
+            max_concurrent_operations=4,
+        ),
+    )
+
+    lease = runtime.admit(
+        _request(
+            "op-autoprovision",
+            tenant_id="tenant-new",
+            input_tokens=5,
+            cost_usd=0.1,
+        ),
+        now_wall=10.0,
+    )
+
+    assert lease.quota_reservation is not None
+    snapshot = ledger.snapshot("tenant-new")
+    assert snapshot["window_id"] == "default-window"
+    assert snapshot["quota"]["max_storage_bytes"] == 2048
+    assert snapshot["active_reservations"] == 1
+
+
+def test_default_tenant_quota_reuses_existing_policy_without_replacement() -> None:
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="existing-window",
+            max_operations=3,
+            max_input_tokens=500,
+            max_output_tokens=500,
+            max_cost_usd=5.0,
+            max_tool_calls=50,
+            max_artifact_bytes=512,
+            max_storage_bytes=768,
+            max_concurrent_operations=2,
+        ),
+    )
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="default-window",
+            max_operations=10,
+            max_input_tokens=1_000,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1024,
+            max_storage_bytes=2048,
+            max_concurrent_operations=4,
+        ),
+    )
+
+    runtime.admit(
+        _request(
+            "op-existing-policy",
+            tenant_id="tenant-a",
+            input_tokens=5,
+            cost_usd=0.1,
+        ),
+        now_wall=10.0,
+    )
+
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["window_id"] == "existing-window"
+    assert snapshot["quota"]["max_storage_bytes"] == 768
+
