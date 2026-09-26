@@ -27,6 +27,7 @@ from skeleton.provider_runtime import (
     ProviderAdapter,
     ProviderImageRequest,
     ProviderInvocationError,
+    ProviderRegistry,
     ProviderRequest,
     ProviderResponse,
     ProviderSpeechRequest,
@@ -1051,3 +1052,36 @@ def test_provider_admission_identity_falls_back_to_parent_operation() -> None:
         operation_id="legacy-operation",
     )
     assert request.admission_operation_id is None
+
+
+def test_provider_registry_requires_distinct_semantic_verifier_identity() -> None:
+    generator = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="generator-model",
+        client=SimpleNamespace(),
+    )
+    distinct = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="verifier-model",
+        client=SimpleNamespace(),
+    )
+    registry = ProviderRegistry(
+        [generator],
+        active="openai",
+        verification_adapter=distinct,
+    )
+
+    assert registry.verification_adapter_for(generator) is distinct
+
+    same_identity = OpenAIProviderAdapter(
+        api_key="test-key",
+        model="generator-model",
+        client=SimpleNamespace(),
+    )
+    unsafe_registry = ProviderRegistry(
+        [generator],
+        active="openai",
+        verification_adapter=same_identity,
+    )
+
+    assert unsafe_registry.verification_adapter_for(generator) is None
