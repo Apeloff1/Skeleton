@@ -399,7 +399,16 @@
         "skeleton/api/engine_service.py and skeleton/vault/lifecycle_adapters.py execute non-conversation deletion targets through registered engine lifecycle adapters",
         "backend/tests/test_conversation_governance.py proves unrelated tenant records and unreferenced memory are excluded from conversation deletion selection",
         "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation targets pending while engine-owned memory deletion is acknowledged",
-        "backend/tests/test_conversations_api.py proves the API claims completion only after governed propagation succeeds"
+        "backend/tests/test_conversations_api.py proves the API claims completion only after governed propagation succeeds",
+        "skeleton/context/compiler.py binds current canonical conversation prompt selection to ContextEnvelope.turn_id",
+        "skeleton/testing/test_context_compiler.py proves current-turn prompt binding under equal timestamps",
+        "skeleton/api/engine_service.py plans tenant retention and executes non-conversation lifecycle targets without taking conversation physical ownership",
+        "skeleton/vault/data_lifecycle.py replays pending tenant retention plans with only outstanding actions",
+        "backend/core/conversations.py execute_due_retention completes engine and conversation physical ownership from one durable plan",
+        "backend/routes/conversations.py admin retention sweep drives tenant-scoped governed expiry",
+        "skeleton/testing/test_data_lifecycle.py proves retention replay plan identity and outstanding-action filtering",
+        "skeleton/testing/test_engine_execution_service.py proves split-owner retention keeps conversation actions pending after engine-owned acknowledgement",
+        "backend/tests/test_conversation_governance.py proves same-plan engine-first then conversation retention execution"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -411,7 +420,8 @@
         "assistant message binds to one operation and final execution result",
         "conversation deletion/export propagation test",
         "context projection preserves selected message/citation/tool provenance",
-        "browser refresh/reconnect reconstructs the same canonical transcript"
+        "browser refresh/reconnect reconstructs the same canonical transcript",
+        "conversation retention expiry propagation test"
       ],
       "outstanding_evidence": [
         "dependency closure: gap-state-authority-convergence",
