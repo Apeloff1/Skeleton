@@ -2151,7 +2151,7 @@
       "plane": "memory",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical long-term memory is production-bound to Mongo through MongoMemoryRepository, governed staged writeback and admission, with tenant/namespace isolation, idempotency/version fencing, immutable revision lineage, expiry/tombstones, durable projection outbox, canonical lifecycle export/delete and rebuildable vector/MAG/CAG/search projections. Remaining closure work is dependency closure plus fresh exact-head and independent verification.",
+      "gap": "Canonical long-term memory is production-bound to governed Mongo authority with tenant/namespace isolation, idempotency/version fencing, immutable revision history, retention/tombstones and durable projection outbox. Vector/TFIDF/MAG/CAG/process stores are derived. Server startup binds the canonical writer and exposes fail-closed health. The cognitive engine now accepts only explicit verified-final-output memory intents and commits them after verification through governed writeback. Destructive Mongo recovery includes canonical memory, revisions/idempotency/outbox and rebuilds only active derived memory. Remaining closure is lower-stage dependency closure, fresh exact-head evidence, product-owned policy activation for intended long-term-memory journeys, and independent verification.",
       "construction": [
         "reuse skeleton/frontier MemoryContract and RetrieverContract as canonical storage-neutral boundaries",
         "define durable MemoryRecord and MemoryWriteProposal contracts with tenant/user/namespace/data-class/purpose/provenance/retention/version metadata",
@@ -2176,7 +2176,7 @@
         "retrieval provenance points back to canonical memory records",
         "memory outage produces explicit degraded continuity behavior"
       ],
-      "verification_state": "mongo-authority-lifecycle-and-derived-rebuild-implemented-pending-closure",
+      "verification_state": "memory-authority-verified-finalization-and-destructive-recovery-implemented-pending-closure",
       "progress": {
         "state": "implemented_pending_closure",
         "completed": [
@@ -2186,11 +2186,17 @@
           "governed staged writeback with provenance/review/admission policy",
           "Mongo canonical memory lifecycle export and tombstone deletion",
           "derived vector/MAG/CAG/TFIDF projection rebuild and failure isolation",
-          "server startup binding for canonical Mongo memory authority"
+          "server startup binding for canonical Mongo memory authority",
+          "configured/unbound canonical memory health is fail-closed",
+          "explicit verified-final-output memory intent contract",
+          "engine finalization binding into governed canonical memory writer",
+          "failed verification cannot invoke memory finalization",
+          "destructive Mongo recovery includes canonical memory revisions/idempotency/outbox and active-only rebuild"
         ],
         "remaining": [
-          "close Stage-0 state-authority and governance dependencies",
-          "collect fresh exact-head Mongo memory/App Assembly validation",
+          "activate memory_write_intent only from explicit product/user policies that intend long-term persistence",
+          "close gap-state-authority-convergence and gap-governance-registry",
+          "collect fresh exact-head State Recovery Drill, memory regressions, App Assembly and Backend Quality evidence",
           "obtain independent closure verification"
         ]
       }
@@ -6941,9 +6947,15 @@
       "canonical memory governance lifecycle adapter",
       "durable projection outbox",
       "vector/TFIDF/MAG/CAG derived projection adapters",
-      "server production memory binding"
+      "server production memory binding",
+      "canonical memory readiness/degraded health signal",
+      "explicit verified-final-output memory intent contract",
+      "engine finalization hook into governed canonical memory writer",
+      "failed-verification memory write prohibition",
+      "destructive Mongo restore including canonical memory revisions/idempotency/outbox and active-only rebuild"
     ],
     "remaining_surfaces": [
+      "product-owned activation of explicit long-term-memory policies",
       "fresh exact-head validation",
       "declared dependency closure",
       "independent closure verification"
