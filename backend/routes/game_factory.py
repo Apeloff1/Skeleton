@@ -45,7 +45,6 @@ projects_collection = db.game_projects
 build_steps_collection = db.game_build_steps
 vault_collection = db.code_vault
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # =============================================================================
 # GAME GENRES & TEMPLATES - 52 Genres, 104 Specialists, 110 Templates
@@ -1887,7 +1886,6 @@ async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None)
 
     try:
         chat = LlmChat(
-            api_key=EMERGENT_KEY,
             session_id=session_id or str(uuid.uuid4()),
             system_message=system_prompt
         ).with_model("openai", "gpt-4o")
