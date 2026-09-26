@@ -923,7 +923,9 @@ def build_provider_surface_evidence(
         "head_sha": (
             head_sha
             if head_sha is not None
-            else os.environ.get("EVIDENCE_HEAD_SHA", "").strip()\n            or os.environ.get("GITHUB_SHA", "").strip()\n            or "unknown"
+            else os.environ.get("EVIDENCE_HEAD_SHA", "").strip()
+            or os.environ.get("GITHUB_SHA", "").strip()
+            or "unknown"
         ),
         "declared_surfaces": sorted(
             declared,
