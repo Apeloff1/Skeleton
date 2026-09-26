@@ -472,9 +472,20 @@
         "backend/gameforge/jeeves/chat_contract.py",
         "backend/routes/jeeves_compose.py",
         "tests/test_jeeves_chat_workspace.py",
-        "frontend/src/product/conversationClient.ts"
+        "frontend/src/product/conversationClient.ts",
+        "backend/routes/ai.py rejects caller conversation_history and compiles server-owned canonical thread transcript through ContextCompiler",
+        "backend/routes/jeeves_compose.py routes generative escalation through EngineTextRequest/execute_engine_text rather than provider SDKs or credentials",
+        "backend/routes/jeeves_compose.py ignores caller-supplied history for retrieval, prompting and persistence even when server storage is empty or unavailable",
+        "tests/test_jeeves_chat_workspace.py proves server transcript wins over conflicting client history, legacy history is model-invisible, and canonical-engine delegation keeps conversation context out of trusted instructions",
+        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface"
       ],
-      "remaining": [],
+      "remaining": [
+        "cut Jeeves compatibility storage over to canonical ConversationThread/ConversationMessage authority",
+        "wire regenerate through canonical engine execution and branch commit",
+        "finish conversation governance delete/export/retention propagation",
+        "prove frontend refresh/reconnect reconstruction from server authority",
+        "close declared Stage-0 dependencies and collect independent exact-head closure evidence"
+      ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
     {
