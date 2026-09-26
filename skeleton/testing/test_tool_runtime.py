@@ -1160,4 +1160,3 @@ async def test_async_tool_privacy_denial_precedes_handler() -> None:
     assert receipt.error_code == "tool_data_ceiling_exceeded"
     assert receipt.governance_decision_ref.startswith("gov-tool-")
     assert calls == []
-
