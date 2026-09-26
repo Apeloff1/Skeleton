@@ -142,7 +142,7 @@
       "depends_on": [],
       "work_package": "WP-P0-GOVERNANCE",
       "blueprint": "governance_runtime_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_closure",
       "objective": "A single enforceable data classification and transfer decision before provider/tool/persistence movement.",
       "target_files": {
         "contracts": [
@@ -158,10 +158,20 @@
         ],
         "integration": [
           "skeleton/provider_runtime.py",
-          "skeleton/skills"
+          "skeleton/skills",
+          ".github/workflows/governance-closure.yml"
         ],
         "tests": [
-          "skeleton/testing/test_data_governance.py"
+          "skeleton/testing/test_data_governance.py",
+          "skeleton/testing/test_data_lifecycle.py",
+          "skeleton/testing/test_governance_audit.py",
+          "skeleton/testing/test_lifecycle_adapters.py",
+          "skeleton/testing/test_governance_runtime_binding.py",
+          "skeleton/testing/test_memory_writeback.py",
+          "skeleton/testing/test_memory_projection.py",
+          "backend/tests/test_route_privacy.py",
+          "backend/tests/test_conversation_storage_admission.py",
+          "backend/tests/test_gameforge_artifact_builder.py"
         ]
       },
       "ordered_steps": [
@@ -219,12 +229,12 @@
         "backend/core/engine_text.py and services/tool_registry.py consume route privacy before outbound provider/tool work",
         "backend/routes/gameforge_build.py composes production builds into the canonical governed artifact owner with bounded retention",
         "backend/tests/test_route_privacy.py and test_gameforge_artifact_builder.py provide focused executable closure evidence",
-        "skeleton/testing/test_governance_runtime_binding.py proves physical artifact retention expiry"
+        "skeleton/testing/test_governance_runtime_binding.py proves physical artifact retention expiry",
+        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes"
       ],
       "remaining": [
-        "collect exact-head and independent governance closure evidence",
-        "collect exact-head governed artifact lifecycle evidence",
-        "collect fresh exact-head route privacy and governed artifact lifecycle evidence"
+        "collect fresh exact-head Governance Closure Gate and Stage-0/App Assembly evidence",
+        "obtain independent governance closure verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
