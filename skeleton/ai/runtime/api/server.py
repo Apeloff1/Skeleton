@@ -87,6 +87,7 @@ class ServerState:
         self.governance_audit_timeline: Optional[Any] = None
         self.governance_lifecycle_adapters: Optional[Any] = None
         self.governance_lifecycle_executor: Optional[Any] = None
+        self.canonical_artifact_store: Optional[Any] = None
         self.canonical_retrieval_index: Optional[Any] = None
         self.canonical_memory_mongo_client: Optional[Any] = None
         self.canonical_memory_repository: Optional[Any] = None
@@ -169,7 +170,58 @@ class ServerState:
         self.governance_audit_timeline = None
         self.governance_lifecycle_adapters = None
         self.governance_lifecycle_executor = None
+        self.canonical_artifact_store = None
         self.canonical_retrieval_index = None
+
+    def bind_canonical_artifact_store(
+        self,
+        root: str | Path | None = None,
+    ) -> Any:
+        """Bind one governed filesystem artifact authority to lifecycle execution."""
+
+        if self.canonical_artifact_store is not None:
+            return self.canonical_artifact_store
+
+        from pathlib import Path
+
+        from skeleton.artifact_plane.governance import GovernedArtifactStore
+        from skeleton.vault.lifecycle_adapters import (
+            GovernedArtifactLifecycleAdapter,
+        )
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+
+        if root is None:
+            override = os.environ.get(
+                "SKL_GOVERNANCE_ARTIFACT_ROOT",
+                "",
+            ).strip()
+            if override:
+                artifact_root = Path(override).expanduser()
+            else:
+                lifecycle_path = os.environ.get(
+                    "SKL_GOVERNANCE_LIFECYCLE_PATH",
+                    ":memory:",
+                ).strip() or ":memory:"
+                if lifecycle_path == ":memory:":
+                    artifact_root = Path.cwd() / ".skeleton-governed-artifacts"
+                else:
+                    lifecycle_file = Path(lifecycle_path).expanduser()
+                    artifact_root = lifecycle_file.parent / "governed_artifacts"
+        else:
+            artifact_root = Path(root).expanduser()
+
+        store = GovernedArtifactStore(artifact_root, governance)
+        adapter = GovernedArtifactLifecycleAdapter(store)
+        adapters.register_deletion("artifact", adapter)
+        adapters.register_export("artifact", adapter)
+        self.canonical_artifact_store = store
+        return store
 
     def bind_canonical_retrieval_index(self) -> Any:
         """Bind one tenant-scoped governed retrieval owner to lifecycle execution."""
@@ -767,6 +819,7 @@ def create_app() -> Any:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
         state.bind_governance_registry()
+        state.bind_canonical_artifact_store()
         state.bind_canonical_retrieval_index()
         state.bind_engine_execution_service()
         if _canonical_memory_mongo_configured():
