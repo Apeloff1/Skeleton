@@ -14,11 +14,9 @@ import re
 from typing import Any, List
 
 from core.engine_client import EngineClient, EngineClientError
-from core.engine_text import (
-    EngineTextError,
-    EngineTextRequest,
-    execute_engine_text,
-)
+from core.engine_chat import EngineChat, EngineTextError, UserMessage
+from core.engine_text import execute_engine_text
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 def _llm_provider_enum():
@@ -116,20 +114,25 @@ class AIHubService:
             separators=(",", ":"),
             ensure_ascii=False,
         ).encode("utf-8")
-        response = await self._engine_executor(
-            EngineTextRequest(
-                instructions=instructions,
-                prompt=prompt,
-                idempotency_key=(
-                    "ai-hub:" + hashlib.sha256(material).hexdigest()
-                ),
-                instruction_policy_id=policy_id,
-                instruction_policy_version=policy_version,
-                actor_id="ai-hub",
-                capability="assistant.compat",
-                verification_profile=verification_profile,
-                max_output_tokens=max_output_tokens,
-            )
+        policy = InstructionPolicy(
+            policy_id=policy_id,
+            version=policy_version,
+            instructions=instructions,
+        )
+        chat = EngineChat(
+            session_id=(
+                "ai-hub:" + hashlib.sha256(material).hexdigest()
+            ),
+            instruction_policy=policy,
+            actor_id="ai-hub",
+            capability="assistant.compat",
+            verification_profile=verification_profile,
+            engine_executor=self._engine_executor,
+        )
+        if max_output_tokens is not None:
+            chat.with_max_tokens(max_output_tokens)
+        response = await chat.send_message(
+            UserMessage(text=prompt)
         )
         return response.text
 
