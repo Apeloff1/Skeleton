@@ -2371,7 +2371,7 @@
       "plane": "model-provider",
       "priority": "P0",
       "status": "open",
-      "gap": "Provider transport, credentials, async/sync text, structured/tool interaction, image generation/variation/editing, speech, backend compatibility, Jeeves compatibility, and application-isolation enforcement are implementation-complete under skeleton/provider_runtime.py. A dedicated Provider Surface Closure Gate now binds exact-head inventory, bootstrap, SDK/network isolation, async/media/schema/stream regressions, capability validation, and engine cross-service isolation. Remaining closure is a fresh green exact-head gate plus independent verification.",
+      "gap": "Provider transport, credentials, async/sync text, structured/tool interaction, image generation/variation/editing, speech, backend compatibility, Jeeves compatibility, application isolation, and independent source-only ownership verification are implementation-complete under skeleton/provider_runtime.py. The dedicated Provider Surface Closure Gate binds exact-head inventory, bootstrap, SDK/network isolation, async/media/schema/stream regressions, capability validation, engine cross-service isolation, adversarial verifier regressions, and a SHA-bound independent receipt. Remaining closure is a fresh green exact-head gate.",
       "construction": [
         "promote async runtime provider implementation to skeleton/provider_runtime.py",
         "add dependency-free synchronous adapter under the same governance/admission/receipt boundary",
@@ -2392,7 +2392,7 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "verification_state": "provider-surface-closure-gate-pending",
-      "status_detail": "implementation-complete pending exact-head Provider Surface Closure Gate and independent verification"
+      "status_detail": "implementation-complete pending fresh exact-head Provider Surface Closure Gate"
     }
   ],
   "gap_closure_policy": {
@@ -7697,7 +7697,10 @@
       "malformed media size/mask/speed fail-closed before provider I/O",
       ".github/workflows/provider-surface-closure.yml exact-head provider closure gate",
       "scripts/check_provider_bootstrap.py emits exact-head secret-free provider inventory receipt",
-      "Provider Surface Closure Gate runs SDK/network isolation, async/sync/media/schema/stream and engine cross-service provider regressions"
+      "Provider Surface Closure Gate runs SDK/network isolation, async/sync/media/schema/stream and engine cross-service provider regressions",
+      "scripts/verify_provider_surface_closure.py independent source-only provider ownership and isolation verifier",
+      "tests/test_provider_surface_independent_verifier.py adversarial missing-source/mirror/declared-edge regressions",
+      ".github/workflows/provider-surface-closure.yml SHA-bound independent provider verifier receipt"
     ],
     "application_isolation_surfaces": [
       {
