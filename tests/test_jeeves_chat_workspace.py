@@ -1251,7 +1251,10 @@ def test_idless_pending_jeeves_turn_resumes_with_server_assigned_identity(
     assert body["reply"] == "recovered idless answer"
     assert body["replayed"] is False
     assert captured["calls"] == 1
-    assert captured["contexts"][0].count("resume without client id") == 1
+    # The pending user turn is the current query, not conversation history.
+    # Keeping it out of conversation_context preserves the original
+    # pre-turn engine semantics across crash/retry.
+    assert captured["contexts"][0].count("resume without client id") == 0
 
     messages = canonical.messages[seeded_thread.thread_id]
     assert len(messages) == 2
