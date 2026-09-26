@@ -96,6 +96,69 @@ def _instruction_key(segment: ContextSegment) -> tuple[Any, ...]:
     )
 
 
+_CONVERSATION_SEQUENCE_PREFIX = "conversation-sequence:"
+
+
+def _conversation_sequence(segment: ContextSegment) -> int | None:
+    for ref in segment.provenance:
+        if not ref.startswith(_CONVERSATION_SEQUENCE_PREFIX):
+            continue
+        raw = ref[len(_CONVERSATION_SEQUENCE_PREFIX) :]
+        try:
+            value = int(raw)
+        except ValueError:
+            return None
+        return value if value >= 1 else None
+    return None
+
+
+def _conversation_role_order(segment: ContextSegment) -> int:
+    return 0 if segment.kind is ContextKind.USER_MESSAGE else 1
+
+
+def _ordered_conversation(
+    segments: Iterable[ContextSegment],
+) -> tuple[ContextSegment, ...]:
+    values = tuple(segments)
+    if not values:
+        return ()
+
+    sequences = tuple(_conversation_sequence(segment) for segment in values)
+    if all(sequence is not None for sequence in sequences):
+        return tuple(
+            sorted(
+                values,
+                key=lambda segment: (
+                    int(_conversation_sequence(segment) or 0),
+                    segment.created_at.timestamp(),
+                    _conversation_role_order(segment),
+                    segment.segment_id,
+                ),
+            )
+        )
+
+    # Compatibility/import callers can legitimately materialize a whole
+    # request at one timestamp and may not have canonical sequence metadata.
+    # In that case preserve chronological time first, then causal role order,
+    # rather than allowing random UUID order to place an assistant before the
+    # user message it answers.
+    return tuple(
+        sorted(
+            values,
+            key=lambda segment: (
+                segment.created_at.timestamp(),
+                _conversation_role_order(segment),
+                (
+                    _conversation_sequence(segment)
+                    if _conversation_sequence(segment) is not None
+                    else 2**63 - 1
+                ),
+                segment.segment_id,
+            ),
+        )
+    )
+
+
 def _segment_limit(segment: ContextSegment, budget: ContextBudget) -> int:
     limit = budget.max_segment_tokens
     if segment.kind is ContextKind.ARTIFACT:
@@ -306,31 +369,26 @@ class ContextCompiler:
             if segment not in instructions and segment not in tool_schemas
         )
 
-        # Evidence order is deterministic and conversation messages preserve
-        # chronological order within their class for provider projection.
-        evidence = tuple(
+        # Conversation authority sequence is stronger than timestamp/UUID
+        # ordering. Non-conversation evidence retains deterministic rank order.
+        conversation_evidence = _ordered_conversation(
+            segment
+            for segment in evidence
+            if segment.kind
+            in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
+        )
+        ranked_evidence = tuple(
             sorted(
-                evidence,
-                key=lambda segment: (
-                    (
-                        0,
-                        segment.created_at.timestamp(),
-                        0.0,
-                        0.0,
-                        segment.segment_id,
-                    )
+                (
+                    segment
+                    for segment in evidence
                     if segment.kind
-                    in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
-                    else (
-                        1,
-                        -segment.priority,
-                        -segment.relevance,
-                        -segment.created_at.timestamp(),
-                        segment.segment_id,
-                    )
+                    not in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
                 ),
+                key=_rank_key,
             )
         )
+        evidence = conversation_evidence + ranked_evidence
         selected_for_digest = instructions + evidence + tool_schemas
         omitted_ids = tuple(sorted(omitted))
         digest = context_digest_payload(
@@ -390,11 +448,14 @@ def project_provider_context(
         # Do not leak internal segment labels into model policy text.
         instruction_blocks.append(_require_content(segment))
 
-    conversation = [
-        segment
-        for segment in envelope.evidence_segments
-        if segment.kind in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
-    ]
+    conversation = list(
+        _ordered_conversation(
+            segment
+            for segment in envelope.evidence_segments
+            if segment.kind
+            in {ContextKind.USER_MESSAGE, ContextKind.ASSISTANT_MESSAGE}
+        )
+    )
     non_conversation = [
         segment
         for segment in envelope.evidence_segments
