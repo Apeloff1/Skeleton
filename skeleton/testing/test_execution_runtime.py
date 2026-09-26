@@ -1223,3 +1223,241 @@ async def test_canonical_verification_receipt_is_persisted_before_terminal_resul
     assert stored.result_ref == "execution-result:exec-1"
     assert stored.claim_digest == payload["claim_digest"]
     assert repo.verification_receipts_for_execution("exec-1") == (stored,)
+
+
+def _semantic_pass_response(*, response_id: str = "semantic-pass") -> ProviderResponse:
+    return ProviderResponse(
+        text=None,
+        provider="fake",
+        model="fake-model",
+        request_id=response_id,
+        response_id=response_id,
+        structured_output={
+            "verdict": "pass",
+            "issues": [],
+        },
+        finish_reason=FinishReason.COMPLETED,
+        usage=ProviderUsage(
+            input_tokens=12,
+            output_tokens=4,
+            total_tokens=16,
+            usage_source="provider",
+        ),
+    )
+
+
+@pytest.mark.asyncio
+async def test_default_verification_publishes_exact_tool_evidence() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:readme"
+
+    await tools.register(_manifest(), handler)
+    provider = FakeProvider(
+        [
+            _tool_response("call-evidence"),
+            _text_response("artifact:readme", response_id="resp-evidence"),
+        ]
+    )
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    result = await runtime.start(
+        _request(allowed_tools=("repo.read",)),
+        instructions="Read and return the exact durable result reference.",
+        prompt="Read README.",
+        context_digest="1" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "completed"
+    assert result.result.final_output == "artifact:readme"
+    assert len(result.result.evidence_refs) == 1
+    receipt = result.result.verification_receipt
+    assert receipt["policy_satisfied"] is True
+    assert receipt["disposition"] == "publish"
+    assert receipt["semantic_required"] is False
+    assert receipt["claim_kind"] == "structured_output"
+
+
+@pytest.mark.asyncio
+async def test_synthesized_tool_claim_fails_closed_without_semantic_verifier() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:readme"
+
+    await tools.register(_manifest(), handler)
+    provider = FakeProvider(
+        [
+            _tool_response("call-synth"),
+            _text_response(
+                "The repository is healthy.",
+                response_id="resp-synth",
+            ),
+        ]
+    )
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    result = await runtime.start(
+        _request(allowed_tools=("repo.read",)),
+        instructions="Read and summarize.",
+        prompt="Assess the repository.",
+        context_digest="2" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.usage["error_code"] == "verification_failed"
+    receipt = result.result.verification_receipt
+    assert receipt["semantic_required"] is True
+    assert receipt["semantic_available"] is False
+    assert receipt["disposition"] == "block"
+    assert receipt["semantic"]["issues"] == [
+        "semantic_verifier_required_but_unavailable"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_synthesized_tool_claim_uses_semantic_verifier_with_distinct_admission_lineage() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:readme"
+
+    await tools.register(_manifest(), handler)
+    provider = FakeProvider(
+        [
+            _tool_response("call-semantic"),
+            _text_response(
+                "The repository summary is grounded in README.",
+                response_id="resp-summary",
+            ),
+            _semantic_pass_response(response_id="resp-semantic"),
+        ]
+    )
+    request = _request(allowed_tools=("repo.read",))
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        semantic_verification_adapter=provider,
+    )
+
+    result = await runtime.start(
+        request,
+        instructions="Read and summarize only supported content.",
+        prompt="Summarize README.",
+        context_digest="3" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "completed"
+    receipt = result.result.verification_receipt
+    assert receipt["semantic_required"] is True
+    assert receipt["semantic_available"] is True
+    assert receipt["disposition"] == "publish"
+    assert receipt["semantic"]["rounds"][0]["verdict"] == "pass"
+    semantic_request = provider.requests[-1]
+    assert semantic_request.purpose == "semantic-verification"
+    assert semantic_request.admission_operation_id is not None
+    assert semantic_request.admission_operation_id != request.operation_id
+    assert semantic_request.execution_id is not None
+    assert semantic_request.turn_id is not None
+
+
+@pytest.mark.asyncio
+async def test_qualified_verification_is_degraded_and_never_binds_verified_memory() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("candidate", response_id="resp-qualified")]
+    )
+    binding_calls = []
+
+    def verify(_request, _candidate, _context_digest):
+        return ExecutionVerificationDecision(
+            passed=False,
+            receipt={
+                "outcome": "passed",
+                "policy_satisfied": True,
+                "verifier_id": "test:qualified",
+            },
+            evidence_refs=("evidence:qualified",),
+            disposition="qualified",
+            final_output="qualified candidate",
+        )
+
+    def forbidden_binding(*args):
+        binding_calls.append(args)
+        raise AssertionError(
+            "qualified output must not enter verified-memory finalization"
+        )
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        verification_hook=verify,
+        finalization_binding_hook=forbidden_binding,
+    )
+    result = await runtime.start(
+        _request(),
+        instructions="Answer.",
+        prompt="Return a candidate.",
+        context_digest="4" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "degraded"
+    assert result.result.final_output == "qualified candidate"
+    assert result.result.memory_refs == ()
+    assert result.result.usage["verification_disposition"] == "qualified"
+    assert binding_calls == []
+
+
+@pytest.mark.asyncio
+async def test_abstain_verification_is_degraded_without_publishing_candidate() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("unsafe candidate", response_id="resp-abstain")]
+    )
+
+    def verify(_request, _candidate, _context_digest):
+        return ExecutionVerificationDecision(
+            passed=False,
+            receipt={
+                "outcome": "unknown",
+                "policy_satisfied": False,
+                "verifier_id": "test:abstain",
+            },
+            evidence_refs=(),
+            disposition="abstain",
+        )
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        verification_hook=verify,
+    )
+    result = await runtime.start(
+        _request(),
+        instructions="Answer only when supported.",
+        prompt="Return a candidate.",
+        context_digest="5" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "degraded"
+    assert result.result.final_output is None
+    assert result.result.usage["error_code"] == "verification_abstained"
