@@ -19,7 +19,6 @@ from fastapi import HTTPException
 
 from core.engine_client import EngineClient, EngineClientError
 from core.engine_chat import EngineChat, EngineTextError, UserMessage
-from core.engine_text import execute_engine_text
 from skeleton.context.instruction_policy import InstructionPolicy
 
 
@@ -52,7 +51,7 @@ class AIAssistantService:
             raise ValueError(
                 "local model runtime injection is disabled; use the canonical engine"
             )
-        self._engine_executor = engine_executor or execute_engine_text
+        self._engine_executor = engine_executor
         self.model = "engine-routed"
 
     @property
