@@ -126,7 +126,7 @@ jobs:
 
       - name: Run independent exact-head cognitive execution scan
         env:
-          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/verify_cognitive_execution_closure.py
           --evidence-out .cognitive-execution-independent.json
