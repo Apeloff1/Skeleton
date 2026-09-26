@@ -22,7 +22,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   skeleton/testing/test_provider_surface_inventory.py
 
 printf '\n== Provider capability matrix ==\n'
-python scripts/check_provider_capability_matrix.py
+python scripts/check_provider_capability_matrix.py machine/provider_capability_matrix.json
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q --noconftest \
   tests/test_provider_capability_matrix.py
 
