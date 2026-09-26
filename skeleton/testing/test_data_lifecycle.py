@@ -274,6 +274,43 @@ def test_durable_registry_survives_restart_with_pending_plan(tmp_path) -> None:
     again.close()
 
 
+def test_pending_deletion_plan_is_tenant_fenced_and_receipt_aware() -> None:
+    registry = DataLifecycleRegistry()
+    registry.register(
+        _record("linked", targets=("conversation", "artifact"))
+    )
+    plan = registry.request_deletion(
+        "tenant-a",
+        record_ids=("linked",),
+        now=20.0,
+    )
+    registry.acknowledge_deletion(
+        plan.plan_id,
+        "linked",
+        "artifact",
+        now=21.0,
+    )
+
+    pending = registry.pending_deletion_plan(
+        plan.plan_id,
+        tenant_id="tenant-a",
+    )
+
+    assert pending.plan_id == plan.plan_id
+    assert [
+        (action.record_id, action.target)
+        for action in pending.actions
+    ] == [("linked", "conversation")]
+    with pytest.raises(
+        DataGovernanceDenied,
+        match="cross-tenant deletion plan access denied",
+    ):
+        registry.pending_deletion_plan(
+            plan.plan_id,
+            tenant_id="tenant-b",
+        )
+
+
 def test_durable_registry_preserves_retention_plans_across_restart(tmp_path) -> None:
     path = tmp_path / "retention-lifecycle.sqlite3"
     first = DataLifecycleRegistry(path)
