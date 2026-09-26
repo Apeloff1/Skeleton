@@ -111,18 +111,21 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
     # provider SDKs or credentials directly.
     prompt = f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"
     execution_scope = _ENGINE_EXECUTION_SCOPE.get()
-    identity = hashlib.sha256(
-        (
-            str(execution_scope or "semantic")
-            + "\x1f"
-            + query
-            + "\x1f"
-            + prompt
-        ).encode("utf-8")
-    ).hexdigest()
+    engine_session_id = None
+    if execution_scope is not None:
+        identity = hashlib.sha256(
+            (
+                execution_scope
+                + "\x1f"
+                + query
+                + "\x1f"
+                + prompt
+            ).encode("utf-8")
+        ).hexdigest()
+        engine_session_id = "jeeves-" + identity[:24]
     try:
         chat = EngineChat(
-            session_id="jeeves-" + identity[:24],
+            session_id=engine_session_id,
             instruction_policy=JEEVES_CHAT_POLICY,
             actor_id="jeeves-compose",
             capability="assistant.compat",
