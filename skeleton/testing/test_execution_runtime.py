@@ -1181,3 +1181,41 @@ async def test_failed_verification_never_invokes_finalization_binding() -> None:
     assert result.result.status == "failed"
     assert result.result.memory_refs == ()
     assert binding_calls == []
+
+@pytest.mark.asyncio
+async def test_canonical_verification_receipt_is_persisted_before_terminal_result() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("proposal", response_id="resp-canonical-receipt")]
+    )
+    runtime = CognitiveExecutionRuntime(repo, provider, tools)
+
+    result = await runtime.start(
+        _request(
+            context_policy={
+                "capability": "assistant.chat",
+                "verification_profile": "assistant_proposal",
+            }
+        ),
+        instructions="Answer.",
+        prompt="Return a bounded proposal.",
+        context_digest="f" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    payload = result.result.verification_receipt
+    assert payload["receipt_id"]
+    assert payload["execution_id"] == "exec-1"
+    assert payload["result_ref"] == "execution-result:exec-1"
+    assert payload["policy_satisfied"] is True
+
+    stored = repo.verification_receipt(payload["receipt_id"])
+    assert stored is not None
+    assert stored.receipt_id == payload["receipt_id"]
+    assert stored.execution_id == "exec-1"
+    assert stored.result_ref == "execution-result:exec-1"
+    assert stored.claim_digest == payload["claim_digest"]
+    assert repo.verification_receipts_for_execution("exec-1") == (stored,)
