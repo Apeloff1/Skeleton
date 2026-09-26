@@ -24,6 +24,10 @@ from skeleton.jeeves.core import Jeeves, SessionMode
 from skeleton.kernel.events import EventBus
 from skeleton.pipelines.composer import PipelineComposer, Stage
 
+# Archetype names that ask the forge stage to compose the blueprint from the
+# vision (skeleton.forge.vision_compose) instead of stamping a preset.
+COMPOSE_ARCHETYPES = frozenset({"auto", "vision"})
+
 
 class GameForgeRun:
     def __init__(self, *, bus: Optional[EventBus] = None, cockpit: Optional[Cockpit] = None,
@@ -133,6 +137,7 @@ class GameForgeRun:
                 "verification": run.context.get("verification"),
                 "verify_loop": run.context.get("verify_loop"),
                 "repair": run.context.get("repair"),
+                "composition": run.context.get("composition"),
             },
             "jeeves": run.context.get("jeeves_advice"),
             "cortex": run.context.get("cortex"),
@@ -256,10 +261,18 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
     forge: Forge = ctx["forge"]
     cockpit: Cockpit = ctx["cockpit"]
     name = ctx.get("archetype") or "extraction"
-    try:
-        bp = default_library().build(forge, name)
-    except Exception:
-        bp = default_library().build(forge, "extraction")
+    composition = None
+    if name in COMPOSE_ARCHETYPES:
+        # Vision-derived component graph (opt-in via archetype="auto").
+        from skeleton.forge.vision_compose import compose_from_vision
+        bp, composed = compose_from_vision(forge, str(ctx.get("vision") or ""))
+        composition = composed.to_dict()
+        ctx["composition"] = composition
+    else:
+        try:
+            bp = default_library().build(forge, name)
+        except Exception:
+            bp = default_library().build(forge, "extraction")
     pack = ctx.get("pack")
     if not pack:
         from skeleton.forge.eras import compile_era
@@ -295,6 +308,8 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "room_bias": build_plan.room_bias,
         "verification_accepted": (art.get("verification") or {}).get("accepted"),
         "verify_loop_rounds": ((art.get("verify_loop") or {}).get("trace") or {}).get("rounds"),
+        "composition_features": (composition or {}).get("features"),
+        "composition_fallback": (composition or {}).get("fallback"),
     })
     return {
         "blueprint_id": art.get("blueprint_id"),
@@ -306,6 +321,7 @@ def _stage_forge(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "verification": art.get("verification"),
         "verify_loop": art.get("verify_loop"),
         "repair": art.get("repair"),
+        "composition": composition,
     }
 
 
