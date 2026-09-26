@@ -438,9 +438,40 @@ async def _append_canonical_user_turn(
     req: ChatReq,
     session_id: str,
 ):
+    from skeleton.contracts.conversation import ConversationAuthorType
+
     authority, thread, tenant_id, owner_id = (
         await _ensure_canonical_thread(session_id)
     )
+    transcript = await authority.active_transcript(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    if (
+        transcript
+        and transcript[-1].author_type is ConversationAuthorType.USER
+    ):
+        pending = transcript[-1]
+        expected_key = (
+            _canonical_user_idempotency(req.client_message_id)
+            if req.client_message_id is not None
+            else None
+        )
+        same_pending_turn = (
+            expected_key is not None
+            and pending.idempotency_key == expected_key
+            and pending.content == req.message
+        )
+        if not same_pending_turn:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "previous canonical turn is incomplete; "
+                    "retry after it completes"
+                ),
+            )
+
     prior_sequence = thread.message_sequence
     thread, message = await authority.append_user_message(
         thread.thread_id,
