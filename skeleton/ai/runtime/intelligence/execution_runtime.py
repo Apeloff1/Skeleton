@@ -18,11 +18,18 @@ from skeleton.contracts.ai_execution import (
 )
 from skeleton.contracts.verification import (
     ClaimKind,
+    EvidenceProducer,
+    EvidenceReference,
+    EvidenceRelation,
+    PostconditionObservation,
     VerificationClaim,
+    VerificationOutcome,
     VerificationRisk,
 )
 from skeleton.intelligence.admission import ResourceBudget
 from skeleton.intelligence.verification_runtime import (
+    FinalizationDisposition,
+    SemanticVerificationRuntime,
     VerificationRuntime,
     materialize_verification_receipt,
 )
@@ -58,6 +65,8 @@ class ExecutionVerificationDecision:
     passed: bool
     receipt: Mapping[str, object]
     evidence_refs: tuple[str, ...] = ()
+    disposition: str | None = None
+    final_output: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.passed, bool):
@@ -110,8 +119,26 @@ class ExecutionVerificationDecision:
                     raise CognitiveExecutionError(
                         "passed model-output verification requires external evidence refs"
                     )
+        disposition = self.disposition
+        if disposition is None:
+            disposition = "publish" if self.passed else "block"
+        if disposition not in {"publish", "qualified", "abstain", "block"}:
+            raise CognitiveExecutionError("verification disposition is invalid")
+        if self.passed and disposition != "publish":
+            raise CognitiveExecutionError(
+                "passed verification requires publish disposition"
+            )
+        final_output = self.final_output
+        if final_output is not None:
+            if not isinstance(final_output, str) or not final_output.strip():
+                raise CognitiveExecutionError(
+                    "verification final_output must be non-empty text"
+                )
+            final_output = final_output.strip()
         object.__setattr__(self, "receipt", normalized)
         object.__setattr__(self, "evidence_refs", tuple(refs))
+        object.__setattr__(self, "disposition", disposition)
+        object.__setattr__(self, "final_output", final_output)
 
     def as_dict(self) -> dict[str, object]:
         return dict(self.receipt)
@@ -338,6 +365,7 @@ class CognitiveExecutionRuntime:
         *,
         tool_result_resolver: ToolResultResolver | None = None,
         verification_hook: VerificationHook | None = None,
+        semantic_verification_adapter: ProviderAdapter | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
         storage_meter: StorageMeter | None = None,
     ) -> None:
@@ -354,6 +382,14 @@ class CognitiveExecutionRuntime:
             tool_result_resolver or self._default_tool_result_resolver
         )
         self.verification_hook = verification_hook
+        if (
+            semantic_verification_adapter is not None
+            and not hasattr(semantic_verification_adapter, "generate")
+        ):
+            raise TypeError(
+                "semantic_verification_adapter must implement generate"
+            )
+        self.semantic_verification_adapter = semantic_verification_adapter
         self.finalization_binding_hook = finalization_binding_hook
         self.storage_meter = storage_meter
         self._verification_runtime = VerificationRuntime()
@@ -502,6 +538,7 @@ class CognitiveExecutionRuntime:
             "tool_calls": 0,
             "provider_receipts": [],
             "tool_receipts": [],
+            "tool_verification_evidence": [],
             "usage_events": [],
             "pending_tool_calls": [],
             "pending_approval_call_ids": [],
@@ -1748,6 +1785,23 @@ class CognitiveExecutionRuntime:
 
         result_rows: list[dict[str, object]] = []
         receipt_ids = list(payload.get("tool_receipts", []))
+        verification_rows_raw = payload.get(
+            "tool_verification_evidence",
+            [],
+        )
+        if not isinstance(verification_rows_raw, list):
+            raise CognitiveExecutionError(
+                "tool verification evidence checkpoint is corrupt"
+            )
+        verification_rows = [
+            dict(item)
+            for item in verification_rows_raw
+            if isinstance(item, Mapping)
+        ]
+        if len(verification_rows) != len(verification_rows_raw):
+            raise CognitiveExecutionError(
+                "tool verification evidence checkpoint is corrupt"
+            )
         for call in calls:
             execution_id, turn_id, call_id = self._tool_lineage(
                 execution,
@@ -1852,6 +1906,10 @@ class CognitiveExecutionRuntime:
                     error_code="tool_result_resolution_failed",
                     now=now,
                 )
+            result_text = resolved.strip()
+            manifest, postcondition_observed = (
+                await self.tool_runtime.verification_metadata(call.tool_id)
+            )
             receipt_ids.append(receipt.receipt_id)
             result_rows.append(
                 {
@@ -1859,11 +1917,40 @@ class CognitiveExecutionRuntime:
                     "tool_id": call.tool_id,
                     "receipt_id": receipt.receipt_id,
                     "result_ref": receipt.result_ref,
-                    "result": resolved.strip(),
+                    "result": result_text,
                 }
             )
+            if not any(
+                item.get("receipt_id") == receipt.receipt_id
+                for item in verification_rows
+            ):
+                verification_rows.append(
+                    {
+                        "receipt_id": receipt.receipt_id,
+                        "tool_id": call.tool_id,
+                        "result_ref": receipt.result_ref,
+                        "result": result_text,
+                        "result_digest": hashlib.sha256(
+                            result_text.encode("utf-8")
+                        ).hexdigest(),
+                        "effect": manifest.effect.value,
+                        "risk_class": manifest.risk_class.value,
+                        "side_effect_class": (
+                            manifest.side_effect_class.value
+                        ),
+                        "postcondition_observed": postcondition_observed,
+                        "observed_at": receipt.finished_at.isoformat(),
+                        "execution_id": receipt.execution_id,
+                        "turn_id": receipt.turn_id,
+                        "call_id": receipt.call_id,
+                        "governance_decision_ref": (
+                            receipt.governance_decision_ref
+                        ),
+                    }
+                )
 
         payload["tool_receipts"] = receipt_ids
+        payload["tool_verification_evidence"] = verification_rows
         payload["tool_calls"] = int(payload.get("tool_calls", 0)) + len(calls)
         payload["pending_tool_calls"] = []
         payload["pending_approval_call_ids"] = []
