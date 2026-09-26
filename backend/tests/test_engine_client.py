@@ -1336,3 +1336,102 @@ async def test_storage_admission_client_rejects_invalid_size_before_io() -> None
         )
 
     assert called is False
+
+@pytest.mark.asyncio
+async def test_governance_write_client_posts_bounded_metadata() -> None:
+    seen = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["principal"] = request.headers.get("x-zaibatsu-attester")
+        seen["authorization"] = request.headers.get("authorization")
+        seen["body"] = __import__("json").loads(request.content)
+        return _json(
+            200,
+            {
+                "schema_version": 1,
+                "mode": "register",
+                "record": {
+                    "record_id": "message-1",
+                    "tenant_id": "tenant-a",
+                    "owner_plane": "conversation",
+                    "source_ref": "conversation-message://thread-1/message-1",
+                    "data_class": "internal",
+                    "purposes": ["model-inference"],
+                    "deletion_targets": ["conversation"],
+                    "created_at": 100.0,
+                    "retention_until": None,
+                    "exportable": True,
+                    "state": "active",
+                },
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    receipt = await client.reconcile_governed_write(
+        mode="register",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="internal",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+    )
+
+    assert receipt["record"]["owner_plane"] == "conversation"
+    assert seen["path"] == "/api/v1/engine/governance/writes"
+    assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
+    assert seen["body"] == {
+        "mode": "register",
+        "plane": "conversation",
+        "record_id": "message-1",
+        "tenant_id": "tenant-a",
+        "source_ref": "conversation-message://thread-1/message-1",
+        "data_class": "internal",
+        "purposes": ["model-inference"],
+        "deletion_targets": ["conversation"],
+        "created_at": 100.0,
+        "retention_until": None,
+        "exportable": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_governance_write_client_rejects_malformed_lists_before_io() -> None:
+    called = False
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return _json(500, {"detail": "must not be reached"})
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EngineProtocolError, match="purposes"):
+        await client.reconcile_governed_write(
+            mode="register",
+            plane="conversation",
+            record_id="message-1",
+            tenant_id="tenant-a",
+            source_ref="conversation-message://thread-1/message-1",
+            data_class="internal",
+            purposes=(),
+        )
+
+    assert called is False
+
