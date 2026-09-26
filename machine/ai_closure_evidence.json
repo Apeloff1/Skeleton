@@ -390,7 +390,16 @@
         "skeleton/api/engine_service.py and engine_routes.py execute non-conversation lifecycle targets through registered engine lifecycle adapters",
         "backend/tests/test_conversation_governance.py fences linked-record selection from unrelated tenant records",
         "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation actions for backend authority",
-        "backend/tests/test_conversations_api.py proves completion is claimed only after governed propagation succeeds"
+        "backend/tests/test_conversations_api.py proves completion is claimed only after governed propagation succeeds",
+        "skeleton/contracts/conversation.py carries first-class memory_refs alongside tool/citation/artifact lineage",
+        "backend/routes/ai.py and backend/routes/conversations.py persist engine tool, memory, evidence and artifact references into canonical assistant messages",
+        "backend/core/conversations.py resolves governed records only from the thread's canonical rows plus explicit message reference aliases, tenant-fenced and bounded",
+        "backend/core/conversations.py delete_thread_with_governance preflights the durable plan, executes engine-owned linked targets, then physically deletes and acknowledges conversation-owned rows",
+        "skeleton/vault/data_lifecycle.py pending_deletion_plan exposes only unacknowledged actions for retry-safe distributed physical ownership",
+        "skeleton/api/engine_service.py and skeleton/vault/lifecycle_adapters.py execute non-conversation deletion targets through registered engine lifecycle adapters",
+        "backend/tests/test_conversation_governance.py proves unrelated tenant records and unreferenced memory are excluded from conversation deletion selection",
+        "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation targets pending while engine-owned memory deletion is acknowledged",
+        "backend/tests/test_conversations_api.py proves the API claims completion only after governed propagation succeeds"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -405,13 +414,11 @@
         "browser refresh/reconnect reconstructs the same canonical transcript"
       ],
       "outstanding_evidence": [
-        "automatic retention-expiry propagation for canonical conversation rows and explicitly linked governed records",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
         "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
       ],
       "blockers": [
-        "automatic retention-expiry propagation for canonical conversation rows and explicitly linked governed records",
         "dependency closure: gap-state-authority-convergence",
         "dependency closure: gap-governance-registry",
         "fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
