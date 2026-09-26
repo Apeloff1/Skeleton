@@ -699,6 +699,22 @@ async def ai_chat(
 
     tenant_id, owner_id = _chat_identity(user)
     try:
+        existing_transcript = await conversation_authority.active_transcript(
+            request.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+        )
+        if (
+            existing_transcript
+            and existing_transcript[-1].author_type
+            is ConversationAuthorType.USER
+            and existing_transcript[-1].idempotency_key
+            != request.idempotency_key
+        ):
+            raise ConversationConflict(
+                "previous canonical turn is incomplete; retry after it completes"
+            )
+
         context_attachment_refs: tuple[str, ...] = ()
         if request.context:
             context_attachment_refs = (
