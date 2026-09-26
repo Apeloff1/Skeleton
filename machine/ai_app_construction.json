@@ -1874,12 +1874,14 @@
           "durable successful tool result adapter with receipt lineage",
           "ContextEnvelope projection is authoritative when constructing EngineContextHandoff",
           "compatibility user prompts are included in the immutable context digest",
-          "legacy command instructions/prompt/history cannot override canonical projected context"
+          "legacy command instructions/prompt/history cannot override canonical projected context",
+          "deterministic provenance-preserving evidence compaction primitive",
+          "compiler opt-in compaction of oversized artifact/tool/conversation evidence with auditable source mapping",
+          "legacy ai_assistant_svc and ai_hub_svc provider calls migrated through canonical engine-text/context compiler boundary"
         ],
         "remaining": [
-          "provenance-preserving summary/compaction implementation",
-          "migrate remaining backend/routes/ai.py compatibility prompt construction paths onto canonical source identities",
-          "migrate backend/services/ai_assistant_svc.py direct ProviderRequest assembly",
+          "multi-segment/semantic summary compaction where deterministic excerpts are insufficient",
+          "migrate any remaining direct feature prompt/provider assembly discovered by repository source scan",
           "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
           "prove all canonical cognitive model turns originate from ContextCompiler or a digest-bound ContextEnvelope handoff",
           "fresh exact-head and independent validation"
@@ -5553,11 +5555,15 @@
       "admitted tool-schema adapter",
       "durable tool-result adapter",
       "authoritative ContextEnvelope -> EngineContextHandoff provider projection",
-      "digest-bound compatibility prompt projection"
+      "digest-bound compatibility prompt projection",
+      "deterministic provenance-preserving evidence compaction",
+      "compiler-integrated oversized evidence compaction",
+      "ai_assistant_svc engine-text compatibility delegation",
+      "ai_hub_svc engine-text compatibility delegation"
     ],
     "remaining_surfaces": [
-      "provenance-preserving compaction",
-      "remaining legacy route/service prompt convergence",
+      "semantic/multi-segment summary compaction",
+      "remaining legacy direct prompt/provider source scan and convergence",
       "versioned instruction-policy convergence",
       "exact-head/independent closure evidence"
     ]
