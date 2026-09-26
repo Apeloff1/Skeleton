@@ -6,7 +6,7 @@ import pytest
 
 from core import engine_chat
 from core.engine_chat import EngineChat, UserMessage
-from core.engine_text import EngineTextResponse
+from core.engine_text import EngineTextError, EngineTextResponse
 from skeleton.context.instruction_policy import InstructionPolicy
 
 
