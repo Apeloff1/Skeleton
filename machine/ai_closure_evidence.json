@@ -249,7 +249,10 @@
         "skeleton/provider_runtime.py fail-closed media input validation before provider I/O",
         ".github/workflows/provider-surface-closure.yml dedicated exact-head provider closure workflow",
         "Provider Surface Closure Gate checks provider bootstrap inventory plus SDK/network runtime isolation",
-        "Provider Surface Closure Gate runs canonical async/sync/media/schema/stream provider regressions and engine cross-service isolation"
+        "Provider Surface Closure Gate runs canonical async/sync/media/schema/stream provider regressions and engine cross-service isolation",
+        "scripts/verify_provider_surface_closure.py independent AST/source ownership verifier",
+        "tests/test_provider_surface_independent_verifier.py adversarial ownership/mirror regression suite",
+        ".github/workflows/provider-surface-closure.yml exact-head independent verifier job and SHA-bound receipt"
       ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
@@ -261,12 +264,10 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "outstanding_evidence": [
-        "fresh exact-head Provider Surface Closure Gate",
-        "independent verification before closure"
+        "fresh exact-head Provider Surface Closure Gate"
       ],
       "blockers": [
-        "fresh exact-head Provider Surface Closure Gate",
-        "independent verification before closure"
+        "fresh exact-head Provider Surface Closure Gate"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
