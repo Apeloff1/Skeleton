@@ -804,6 +804,9 @@ class ServerState:
             authorities,
             admission_runtime=execution_admission_runtime,
             governance_registry=self.bind_governance_registry(),
+            governance_lifecycle_executor=(
+                self.governance_lifecycle_executor
+            ),
         )
         provider_registry = ProviderRegistry.from_env(
             admission_runtime=provider_admission_runtime,
