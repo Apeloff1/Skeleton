@@ -9,9 +9,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import json
+import time
 from typing import Iterable, Protocol
 
 from skeleton.contracts.memory_record import MemoryRecord, MemoryState
+from skeleton.intelligence.admission import (
+    AdmissionError,
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import (
+    AdmissionRuntime,
+    AdmissionRuntimeError,
+)
 from skeleton.memory.core import CAGStore, Chunk, InMemoryTFIDFStore, MAGStore
 from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk
@@ -22,6 +34,10 @@ from skeleton.persistence.memory_repository import (
     MongoMemoryRepository,
     SQLiteMemoryRepository,
 )
+
+
+class ProjectionAdmissionError(RuntimeError):
+    """Material projection rebuild was denied by resource admission."""
 
 
 class ProjectionState(str, Enum):
@@ -89,6 +105,76 @@ class ProjectionDispatchReport:
     @property
     def degraded(self) -> bool:
         return self.blocked_event_id is not None
+
+
+def _projection_material_bytes(records: Iterable[MemoryRecord]) -> int:
+    total = 0
+    for record in records:
+        encoded = json.dumps(
+            record.as_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        total += len(encoded)
+    return total
+
+
+def _admit_projection_rebuild(
+    runtime: AdmissionRuntime | None,
+    budget: ResourceBudget,
+    *,
+    operation_id: str | None,
+    tenant_id: str,
+    material_bytes: int,
+):
+    if runtime is None:
+        return None
+    op_id = "" if operation_id is None else str(operation_id).strip()
+    if not op_id:
+        raise ProjectionAdmissionError(
+            "admitted projection rebuild requires operation_id"
+        )
+    try:
+        return runtime.admit(
+            AdmissionRequest(
+                operation_id=op_id,
+                tenant_id=str(tenant_id),
+                capability="retrieval-index-rebuild",
+                budget=budget,
+                estimate=UsageEstimate(storage_bytes=material_bytes),
+            ),
+            now_wall=time.time(),
+        )
+    except (AdmissionError, AdmissionRuntimeError) as exc:
+        raise ProjectionAdmissionError(
+            "projection rebuild denied by resource admission"
+        ) from exc
+
+
+def _complete_projection_rebuild(
+    runtime: AdmissionRuntime | None,
+    lease,
+    *,
+    material_bytes: int,
+    started: float,
+) -> None:
+    if runtime is None or lease is None:
+        return
+    try:
+        runtime.complete(
+            lease.operation_id,
+            UsageEstimate(
+                storage_bytes=material_bytes,
+                wall_seconds=max(0.0, time.monotonic() - started),
+            ),
+            now_wall=time.time(),
+        )
+    except AdmissionRuntimeError as exc:
+        raise ProjectionAdmissionError(
+            "projection rebuild admission reconciliation failed"
+        ) from exc
 
 
 def _projection_batch(
@@ -371,10 +457,23 @@ class MemoryProjectionCoordinator:
     reinterpret canonical records.
     """
 
-    def __init__(self, repository: SQLiteMemoryRepository) -> None:
+    def __init__(
+        self,
+        repository: SQLiteMemoryRepository,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        rebuild_budget: ResourceBudget | None = None,
+    ) -> None:
         if not isinstance(repository, SQLiteMemoryRepository):
             raise TypeError("repository must be SQLiteMemoryRepository")
+        if (
+            admission_runtime is not None
+            and not isinstance(admission_runtime, AdmissionRuntime)
+        ):
+            raise TypeError("admission_runtime must be AdmissionRuntime")
         self.repository = repository
+        self.admission_runtime = admission_runtime
+        self.rebuild_budget = rebuild_budget or ResourceBudget()
 
     def export_subject(
         self,
@@ -598,8 +697,24 @@ class MemoryProjectionCoordinator:
         subject_id: str,
         projections: Iterable[MemoryProjection],
         known_projection_ids: Iterable[str] = (),
+        admission_operation_id: str | None = None,
     ) -> ProjectionSyncReport:
         projection_list = _projection_batch(projections)
+        records = self.repository.list_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            include_tombstoned=True,
+        )
+        material_bytes = _projection_material_bytes(records)
+        started = time.monotonic()
+        lease = _admit_projection_rebuild(
+            self.admission_runtime,
+            self.rebuild_budget,
+            operation_id=admission_operation_id,
+            tenant_id=tenant_id,
+            material_bytes=material_bytes,
+        )
         known_ids = tuple(dict.fromkeys(str(item).strip() for item in known_projection_ids))
         if any(not item for item in known_ids):
             raise ValueError("known_projection_ids must be non-empty ids")
@@ -616,12 +731,19 @@ class MemoryProjectionCoordinator:
                 # rebuild canonical rows; stale removal can be retried safely.
                 pass
 
-        return self.sync_subject(
+        report = self.sync_subject(
             tenant_id=tenant_id,
             namespace=namespace,
             subject_id=subject_id,
             projections=projection_list,
         )
+        _complete_projection_rebuild(
+            self.admission_runtime,
+            lease,
+            material_bytes=material_bytes,
+            started=started,
+        )
+        return report
 
 
 
@@ -629,10 +751,23 @@ class MemoryProjectionCoordinator:
 class AsyncMemoryProjectionCoordinator:
     """Async canonical -> projection synchronizer for Mongo authority."""
 
-    def __init__(self, repository: MongoMemoryRepository) -> None:
+    def __init__(
+        self,
+        repository: MongoMemoryRepository,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        rebuild_budget: ResourceBudget | None = None,
+    ) -> None:
         if not isinstance(repository, MongoMemoryRepository):
             raise TypeError("repository must be MongoMemoryRepository")
+        if (
+            admission_runtime is not None
+            and not isinstance(admission_runtime, AdmissionRuntime)
+        ):
+            raise TypeError("admission_runtime must be AdmissionRuntime")
         self.repository = repository
+        self.admission_runtime = admission_runtime
+        self.rebuild_budget = rebuild_budget or ResourceBudget()
 
     async def export_subject(
         self,
@@ -808,8 +943,24 @@ class AsyncMemoryProjectionCoordinator:
         subject_id: str,
         projections: Iterable[MemoryProjection],
         known_projection_ids: Iterable[str] = (),
+        admission_operation_id: str | None = None,
     ) -> ProjectionSyncReport:
         projection_list = _projection_batch(projections)
+        records = await self.repository.list_subject(
+            tenant_id=tenant_id,
+            namespace=namespace,
+            subject_id=subject_id,
+            include_tombstoned=True,
+        )
+        material_bytes = _projection_material_bytes(records)
+        started = time.monotonic()
+        lease = _admit_projection_rebuild(
+            self.admission_runtime,
+            self.rebuild_budget,
+            operation_id=admission_operation_id,
+            tenant_id=tenant_id,
+            material_bytes=material_bytes,
+        )
         known_ids = tuple(
             dict.fromkeys(str(item).strip() for item in known_projection_ids)
         )
@@ -821,12 +972,19 @@ class AsyncMemoryProjectionCoordinator:
                     projection.delete(memory_id)
             except Exception:
                 pass
-        return await self.sync_subject(
+        report = await self.sync_subject(
             tenant_id=tenant_id,
             namespace=namespace,
             subject_id=subject_id,
             projections=projection_list,
         )
+        _complete_projection_rebuild(
+            self.admission_runtime,
+            lease,
+            material_bytes=material_bytes,
+            started=started,
+        )
+        return report
 
     async def expire_and_sync_subject(
         self,
@@ -856,6 +1014,7 @@ __all__ = [
     "LegacyMemoryStoreProjection",
     "MAGStoreProjection",
     "MemoryProjection",
+    "ProjectionAdmissionError",
     "MemoryProjectionCoordinator",
     "ProjectionDispatchReport",
     "ProjectionEventDispatch",
