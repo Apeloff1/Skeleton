@@ -328,10 +328,181 @@ def seed_authoritative_state(database: Any) -> dict[str, int]:
         }
     )
 
+    memory_records = database["canonical_memory_records"]
+    memory_records.create_index(
+        [("repository_namespace", 1), ("memory_id", 1)],
+        unique=True,
+        name="canonical_memory_identity",
+    )
+    memory_records.create_index(
+        [
+            ("repository_namespace", 1),
+            ("tenant_id", 1),
+            ("namespace", 1),
+            ("subject_id", 1),
+            ("state", 1),
+            ("updated_at", 1),
+        ],
+        name="canonical_memory_subject",
+    )
+    memory_records.insert_many(
+        [
+            {
+                "repository_namespace": "memory",
+                "memory_id": "memory-recovery-active",
+                "tenant_id": "tenant-recovery",
+                "namespace": "assistant",
+                "subject_id": "user-recovery",
+                "kind": "semantic",
+                "version": 2,
+                "created_at": "2026-09-21T18:20:00+00:00",
+                "updated_at": "2026-09-21T18:25:00+00:00",
+                "idempotency_key": "memory-recovery-update",
+                "payload_digest": "a" * 64,
+                "content": "restored canonical memory",
+                "content_ref": None,
+                "provenance_refs": [
+                    "conversation:recovery",
+                    "operation:recovery",
+                ],
+                "source_operation_id": "00000000-0000-4000-8000-000000000921",
+                "expires_at": None,
+                "state": "active",
+                "data_class": "internal",
+                "schema_version": 1,
+            },
+            {
+                "repository_namespace": "memory",
+                "memory_id": "memory-recovery-tombstoned",
+                "tenant_id": "tenant-recovery",
+                "namespace": "assistant",
+                "subject_id": "user-recovery",
+                "kind": "semantic",
+                "version": 2,
+                "created_at": "2026-09-21T18:30:00+00:00",
+                "updated_at": "2026-09-21T18:35:00+00:00",
+                "idempotency_key": "memory-recovery-delete",
+                "payload_digest": "b" * 64,
+                "content": "deleted canonical memory",
+                "content_ref": None,
+                "provenance_refs": ["conversation:deleted"],
+                "source_operation_id": "00000000-0000-4000-8000-000000000922",
+                "expires_at": None,
+                "state": "tombstoned",
+                "data_class": "confidential",
+                "schema_version": 1,
+            },
+        ]
+    )
+
+    memory_idempotency = database["canonical_memory_idempotency"]
+    memory_idempotency.create_index(
+        [
+            ("repository_namespace", 1),
+            ("tenant_id", 1),
+            ("namespace", 1),
+            ("idempotency_key", 1),
+        ],
+        unique=True,
+        name="canonical_memory_idempotency",
+    )
+    memory_idempotency.insert_one(
+        {
+            "repository_namespace": "memory",
+            "tenant_id": "tenant-recovery",
+            "namespace": "assistant",
+            "idempotency_key": "memory-recovery-update",
+            "request_digest": "c" * 64,
+            "owner_token": "recovery-owner",
+            "status": "committed",
+            "result": {
+                "memory_id": "memory-recovery-active",
+                "version": 2,
+            },
+            "committed_at": "2026-09-21T18:25:00+00:00",
+        }
+    )
+
+    memory_revisions = database["canonical_memory_revisions"]
+    memory_revisions.create_index(
+        [
+            ("repository_namespace", 1),
+            ("memory_id", 1),
+            ("version", 1),
+        ],
+        unique=True,
+        name="canonical_memory_revision_identity",
+    )
+    memory_revisions.insert_many(
+        [
+            {
+                "repository_namespace": "memory",
+                "memory_id": "memory-recovery-active",
+                "tenant_id": "tenant-recovery",
+                "namespace": "assistant",
+                "version": 1,
+                "predecessor_version": None,
+                "mutation": "create",
+                "committed_at": "2026-09-21T18:20:00+00:00",
+                "record": {"memory_id": "memory-recovery-active", "version": 1},
+            },
+            {
+                "repository_namespace": "memory",
+                "memory_id": "memory-recovery-active",
+                "tenant_id": "tenant-recovery",
+                "namespace": "assistant",
+                "version": 2,
+                "predecessor_version": 1,
+                "mutation": "update",
+                "committed_at": "2026-09-21T18:25:00+00:00",
+                "record": {"memory_id": "memory-recovery-active", "version": 2},
+            },
+        ]
+    )
+
+    memory_outbox = database["canonical_memory_projection_outbox"]
+    memory_outbox.create_index(
+        [("repository_namespace", 1), ("event_id", 1)],
+        unique=True,
+        name="canonical_memory_projection_event_identity",
+    )
+    memory_outbox.create_index(
+        [
+            ("repository_namespace", 1),
+            ("published_at", 1),
+            ("created_at", 1),
+            ("memory_id", 1),
+            ("memory_version", 1),
+        ],
+        name="canonical_memory_projection_pending",
+    )
+    memory_outbox.insert_one(
+        {
+            "repository_namespace": "memory",
+            "event_id": "memory-recovery-projection-v2",
+            "tenant_id": "tenant-recovery",
+            "namespace": "assistant",
+            "memory_id": "memory-recovery-active",
+            "memory_version": 2,
+            "action": "upsert",
+            "record": {
+                "memory_id": "memory-recovery-active",
+                "version": 2,
+                "state": "active",
+            },
+            "created_at": "2026-09-21T18:25:00+00:00",
+            "published_at": None,
+        }
+    )
+
     return {
         "rag_user_progress": 2,
         "rag_learning_sessions": 2,
         "rag_feedback": 1,
+        "canonical_memory_records": 2,
+        "canonical_memory_idempotency": 1,
+        "canonical_memory_revisions": 2,
+        "canonical_memory_projection_outbox": 1,
     }
 
 
@@ -355,6 +526,24 @@ def rebuild_derived_projection(snapshot: Mapping[str, Any]) -> dict[str, Any]:
                     "digest": digest_payload(document),
                 }
             )
+    for document in collections.get(
+        "canonical_memory_records",
+        {},
+    ).get("documents", []):
+        if document.get("state") != "active":
+            continue
+        projected.append(
+            {
+                "source": "canonical_memory_records",
+                "record_id": str(document.get("memory_id", "")),
+                "tenant_or_user": str(
+                    document.get("tenant_id")
+                    or document.get("subject_id")
+                    or ""
+                ),
+                "digest": digest_payload(document),
+            }
+        )
     projected.sort(
         key=lambda row: (str(row["source"]), str(row["record_id"]))
     )
