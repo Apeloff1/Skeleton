@@ -46,7 +46,23 @@ class UserMessage:
 
 
 class EngineChatResponse(str):
-    """String response with compatibility text/content properties."""
+    """String response preserving canonical engine terminal lineage."""
+
+    def __new__(
+        cls,
+        text: str,
+        *,
+        execution_id: str,
+        verification: str | None,
+        evidence_refs: tuple[str, ...],
+        usage: Any,
+    ):
+        obj = str.__new__(cls, text)
+        obj.execution_id = execution_id
+        obj.verification = verification
+        obj.evidence_refs = evidence_refs
+        obj.usage = usage
+        return obj
 
     @property
     def content(self) -> str:
@@ -293,7 +309,13 @@ class EngineChat:
         self._history.append(
             {"role": "assistant", "content": response.text}
         )
-        return EngineChatResponse(response.text)
+        return EngineChatResponse(
+            response.text,
+            execution_id=response.execution_id,
+            verification=response.verification,
+            evidence_refs=tuple(response.evidence_refs),
+            usage=response.usage,
+        )
 
     async def chat(
         self,
