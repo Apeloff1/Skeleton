@@ -280,7 +280,7 @@
       "plane": "data-persistence",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "machine-readable state authority topology",
@@ -299,7 +299,13 @@
         "scripts/state_recovery_drill.py now performs destructive operation SQLite backup/restore verification and reconciles restored unpublished outbox rows",
         ".github/workflows/state-recovery-drill.yml executes Mongo authoritative-first recovery and operation SQLite recovery drills",
         "docker-compose.yml persists engine execution, submission/approval, tool receipt, quota/usage and shared-pressure SQLite state on skeleton_data",
-        "machine/state_topology.json v1.8.0 binds cognitive execution/result/approval/tool/quota authorities to durable engine SQLite stores"
+        "machine/state_topology.json v1.8.0 binds cognitive execution/result/approval/tool/quota authorities to durable engine SQLite stores",
+        "scripts/state_recovery_drill.py destructively backs up/restores canonical operation SQLite and reconciles restored outbox identities",
+        "scripts/state_recovery_drill.py backs up/restores the five-store engine SQLite bundle and reopens execution, submission/approval, tool-idempotency, quota and shared-pressure state",
+        "machine/state_backup_policy.json defines required authoritative SQLite stores, restore order and retention floors",
+        "scripts/state_backup_bundle.py creates online SQLite backups with integrity, binary SHA256, logical snapshot and bundle-digest verification",
+        "skeleton/testing/test_state_backup_bundle.py proves required-store fail-closed behavior and backup tamper detection",
+        "docker-compose.yml persists engine execution, submission, tool receipt, quota and shared-pressure state under skeleton_data"
       ],
       "closure_evidence_required": [
         "state topology validator passes",
@@ -312,16 +318,14 @@
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
       "outstanding_evidence": [
-        "complete engine SQLite bundle backup/restore rehearsal covering execution, submissions/approvals, tool receipts, quota/usage and shared-pressure state",
-        "operator retention/backup policy for durable engine SQLite/governance state",
-        "fresh exact-head state-topology, State Recovery Drill, App Assembly and Backend Quality evidence",
-        "independent verification"
+        "fresh exact-head State Recovery Drill and state-topology validation",
+        "fresh exact-head App Assembly/Backend Quality evidence",
+        "independent closure verification"
       ],
       "blockers": [
-        "complete engine SQLite bundle backup/restore rehearsal covering execution, submissions/approvals, tool receipts, quota/usage and shared-pressure state",
-        "operator retention/backup policy for durable engine SQLite/governance state",
-        "fresh exact-head state-topology, State Recovery Drill, App Assembly and Backend Quality evidence",
-        "independent verification"
+        "fresh exact-head State Recovery Drill and state-topology validation",
+        "fresh exact-head App Assembly/Backend Quality evidence",
+        "independent closure verification"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -403,9 +407,17 @@
       "plane": "memory",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/persistence/memory_repository.py provides production MongoMemoryRepository with tenant/namespace isolation, idempotency, optimistic versioning, revisions, tombstones, expiry and projection outbox",
+        "skeleton/api/server.py binds MongoMemoryRepository + AsyncGovernedMemoryWriter + AsyncMemoryProjectionCoordinator when SKL_MONGO_URI is configured",
+        "skeleton/vault/lifecycle_adapters.py provides MongoMemoryLifecycleAdapter for canonical governed memory export and tombstone deletion",
+        "skeleton/api/server.py registers Mongo memory as both governance deletion target and export owner",
+        "skeleton/testing/test_mongo_memory_repository.py covers Mongo restart/reinstantiation, isolation, version/idempotency fencing, projection recovery, governed writes and canonical lifecycle export/delete",
+        "skeleton/testing/test_memory_projection.py proves vector/TFIDF/MAG/CAG projections rebuild from canonical memory and projection failure cannot roll back authority",
+        "skeleton/testing/test_memory_writeback.py proves provenance/review policy, governance fail-closed behavior and storage admission metering"
+      ],
       "closure_evidence_required": [
         "durable memory write/read/restart test",
         "tenant/user/namespace isolation tests",
@@ -419,20 +431,16 @@
         "memory outage produces explicit degraded continuity behavior"
       ],
       "outstanding_evidence": [
-        "durable memory write/read/restart test",
-        "tenant/user/namespace isolation tests",
-        "unverified model speculation cannot become canonical memory",
-        "preference/outcome write policy tests",
-        "dedupe/version/conflict tests",
-        "canonical memory delete/export/retention propagation tests",
-        "vector/index loss and rebuild from canonical memory test",
-        "process-memory loss does not lose canonical memory test",
-        "retrieval provenance points back to canonical memory records",
-        "memory outage produces explicit degraded continuity behavior"
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry",
+        "fresh exact-head Mongo memory/App Assembly validation",
+        "independent closure verification"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry"
+        "dependency must close: gap-governance-registry",
+        "fresh exact-head Mongo memory/App Assembly validation",
+        "independent closure verification"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
