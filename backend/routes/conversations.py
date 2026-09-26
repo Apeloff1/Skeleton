@@ -401,6 +401,18 @@ async def regenerate_assistant_message(
                 context_digest=context.context_digest,
                 context_source_snapshot=context.source_snapshot,
                 context_compiler_version=context.compiler_version,
+                tool_receipt_refs=tuple(
+                    getattr(result, "tool_receipts", ())
+                ),
+                memory_refs=tuple(
+                    getattr(result, "memory_refs", ())
+                ),
+                citation_refs=tuple(
+                    getattr(result, "evidence_refs", ())
+                ),
+                artifact_refs=tuple(
+                    getattr(result, "artifact_refs", ())
+                ),
             )
         )
     except Exception as exc:
@@ -416,6 +428,15 @@ async def regenerate_assistant_message(
         "ai_result_id": "engine-result:" + result.execution_id,
         "verification": result.verification,
         "evidence_refs": list(result.evidence_refs),
+        "tool_receipt_refs": list(
+            getattr(result, "tool_receipts", ())
+        ),
+        "memory_refs": list(
+            getattr(result, "memory_refs", ())
+        ),
+        "artifact_refs": list(
+            getattr(result, "artifact_refs", ())
+        ),
     }
 
 
