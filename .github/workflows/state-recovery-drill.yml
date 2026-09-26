@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - "scripts/state_recovery_drill.py"
+      - "scripts/state_backup_bundle.py"
       - "skeleton/testing/test_state_recovery_drill.py"
+      - "skeleton/testing/test_state_backup_bundle.py"
+      - "machine/state_backup_policy.json"
       - "backend/services/rag_state_repository.py"
       - "backend/services/rag_service.py"
       - "backend/tests/test_rag_state_authority.py"
@@ -65,10 +68,13 @@ jobs:
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
 
-      - name: Run pure recovery contract tests
+      - name: Run pure recovery and backup contract tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest skeleton/testing/test_state_recovery_drill.py
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_state_recovery_drill.py
+          skeleton/testing/test_state_backup_bundle.py
 
       - name: Run live Mongo backup restore and rebuild drill
         run: >-
