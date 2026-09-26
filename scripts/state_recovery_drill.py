@@ -1362,7 +1362,7 @@ def run_engine_sqlite_bundle_drill(
     )
     if restored_state.state is not ExecutionState.ROUTING:
         raise RecoveryDrillError("restored execution state changed")
-    if restored_state.version != current.version:
+    if restored_state.version != checkpoint.execution_version:
         raise RecoveryDrillError("restored execution version changed")
     if (
         restored_checkpoint is None
