@@ -13,7 +13,10 @@ from skeleton.api.engine_authority import (
     EngineServiceGrant,
     engine_request_binding,
 )
-from skeleton.api.engine_runtime import EngineExecutionCoordinator
+from skeleton.api.engine_runtime import (
+    EngineExecutionCoordinator,
+    build_engine_tool_runtime,
+)
 from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
@@ -40,6 +43,20 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 def _now() -> datetime:
     return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+
+
+def test_engine_tool_runtime_factory_preserves_canonical_dependencies(tmp_path) -> None:
+    admission = AdmissionRuntime()
+    receipt_store = SQLiteToolReceiptStore(tmp_path / "tool-receipts.sqlite3")
+    try:
+        runtime = build_engine_tool_runtime(
+            admission_runtime=admission,
+            receipt_store=receipt_store,
+        )
+        assert runtime.admission_runtime is admission
+        assert runtime.receipt_store is receipt_store
+    finally:
+        receipt_store.close()
 
 
 def _verified_execution(
