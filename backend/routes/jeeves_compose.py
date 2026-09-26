@@ -419,38 +419,35 @@ async def _import_legacy_rows_to_canonical(
 async def _load_canonical_history(
     session_id: str,
 ) -> tuple[List[HistoryMessage], bool]:
-    try:
-        authority, thread, tenant_id, owner_id = (
-            await _ensure_canonical_thread(session_id)
-        )
-        messages = await authority.active_transcript(
-            thread.thread_id,
-            tenant_id=tenant_id,
-            owner_id=owner_id,
-        )
-        if not messages:
-            try:
-                legacy_rows = await _legacy_complete_rows(session_id)
-            except Exception:
-                # Legacy jeeves_chat is migration input only. Its absence must
-                # never downgrade a healthy canonical conversation authority.
-                legacy_rows = []
-            if legacy_rows:
-                await _import_legacy_rows_to_canonical(
-                    session_id,
-                    legacy_rows,
-                )
-                authority, thread, tenant_id, owner_id = (
-                    await _ensure_canonical_thread(session_id)
-                )
-                messages = await authority.active_transcript(
-                    thread.thread_id,
-                    tenant_id=tenant_id,
-                    owner_id=owner_id,
-                )
-        return _canonical_history_from_messages(messages), True
-    except Exception:
-        return [], False
+    authority, thread, tenant_id, owner_id = (
+        await _ensure_canonical_thread(session_id)
+    )
+    messages = await authority.active_transcript(
+        thread.thread_id,
+        tenant_id=tenant_id,
+        owner_id=owner_id,
+    )
+    if not messages:
+        try:
+            legacy_rows = await _legacy_complete_rows(session_id)
+        except Exception:
+            # Legacy jeeves_chat is migration input only. Its absence must
+            # never downgrade a healthy canonical conversation authority.
+            legacy_rows = []
+        if legacy_rows:
+            await _import_legacy_rows_to_canonical(
+                session_id,
+                legacy_rows,
+            )
+            authority, thread, tenant_id, owner_id = (
+                await _ensure_canonical_thread(session_id)
+            )
+            messages = await authority.active_transcript(
+                thread.thread_id,
+                tenant_id=tenant_id,
+                owner_id=owner_id,
+            )
+    return _canonical_history_from_messages(messages), True
 
 
 async def _append_canonical_user_turn(
@@ -771,7 +768,17 @@ async def chat(req: ChatReq):
     if replay is not None:
         return replay
 
-    server_history, history_available = await _load_server_history(sid)
+    try:
+        server_history, history_available = await _load_server_history(sid)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "canonical conversation history is unavailable; "
+                "retry later"
+            ),
+        ) from exc
+
     if history_available and server_history:
         effective_history = server_history
         history_source = "server"
