@@ -2182,7 +2182,7 @@
       "plane": "data-persistence",
       "priority": "P0",
       "status": "open",
-      "gap": "State authority convergence is partially implemented: Jeeves RAG product state is Mongo-authoritative; production Skeleton reasoning uses durable OperationEnvelope state with transactional outbox and continuous reconciliation; and a live Mongo recovery drill now proves authoritative backup/restore verification before derived rebuild. Remaining work is production backup/retention policy for operation SQLite and broader cognitive execution/result/approval/usage ledger bindings.",
+      "gap": "Canonical product/RAG state is Mongo-authoritative with rebuildable Chroma projections; production reasoning is bound to durable OperationEnvelope state with continuous transactional-outbox reconciliation; cognitive execution/checkpoint/result, submission/approval, tool receipt/idempotency, quota/usage and pressure coordination are production-bound to persistent engine SQLite stores; Mongo and operation-SQLite destructive recovery drills enforce authority verification before derived/outbox rebuild. Remaining closure is fresh exact-head validation of the new recovery/topology changes, whole-engine-bundle deployment recovery evidence, and independent verification.",
       "construction": [
         "use machine/state_topology.json as the canonical state authority registry",
         "move canonical user progress, feedback ownership, session ownership and other non-index product state from Chroma into backend core Mongo repositories",
@@ -2203,7 +2203,7 @@
         "derived-store loss and rebuild test",
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
-      "verification_state": "rag-operation-authority-and-mongo-restore-order-proven-operation-backup-and-cognitive-ledgers-open"
+      "verification_state": "implementation-complete-pending-exact-head-and-independent-recovery-evidence"
     },
     {
       "id": "gap-cost-admission",
@@ -7133,7 +7133,7 @@
   "state_authority_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "in-progress-p0",
+    "status": "implemented-pending-closure",
     "gap": "gap-state-authority-convergence",
     "registry": "machine/state_topology.json",
     "objective": "Every logical state domain has exactly one durable authority, explicit derived projections, transactional/reconciliation semantics, migration ownership, restore order and failure behavior.",
@@ -7161,9 +7161,7 @@
     "mongo_domains": [
       "conversation threads/messages",
       "canonical memory records",
-      "product/user state",
-      "governance lifecycle metadata",
-      "production AI execution ledgers unless a separately declared durable engine store replaces it"
+      "product/user state"
     ],
     "derived_domains": [
       "Chroma/vector embeddings",
@@ -7197,10 +7195,11 @@
     ],
     "recovery_order": [
       "configuration/secrets and service identity",
-      "Mongo/authoritative durable stores",
-      "operation/execution/tool/approval/verification/result ledgers",
-      "conversation and canonical memory",
-      "transactional outbox/event stream",
+      "Mongo authoritative application/memory state",
+      "operation-state SQLite authority",
+      "engine execution/submission/approval/tool/quota/pressure SQLite authorities",
+      "governance lifecycle SQLite authority",
+      "transactional outbox/event stream reconciliation",
       "derived retrieval/vector/search indexes",
       "process caches and frontend projections"
     ],
@@ -7221,7 +7220,26 @@
       "no authoritative record exists solely in process memory/Chroma/browser state",
       "production reasoning OperationEnvelope binding",
       "transactional outbox crash-after-append-before-ack reconciliation",
-      "operation runtime restart drain test"
+      "operation runtime restart drain test",
+      "production reasoning is bound to durable OperationEnvelope authority",
+      "continuous transactional outbox dispatcher is bound to server lifecycle",
+      "Mongo-authoritative Jeeves RAG state with rebuildable Chroma projections",
+      "authoritative-first Mongo backup/restore drill",
+      "operation SQLite destructive backup/restore and outbox reconciliation drill",
+      "production engine execution/checkpoint/result ledger bound to persistent SQLite",
+      "production human approval/submission ledger bound to persistent SQLite",
+      "production tool idempotency receipt ledger bound to persistent SQLite",
+      "production quota/usage ledger bound to persistent SQLite",
+      "production shared-pressure coordination bound to persistent SQLite"
+    ],
+    "sqlite_domains": [
+      "canonical operation state and transactional outbox",
+      "cognitive execution/turn/checkpoint/final result",
+      "engine submissions and human tool approvals",
+      "durable tool idempotency receipts/results",
+      "tenant quota reservations/completions/usage events",
+      "cross-process pressure/queue/lease coordination",
+      "governance lifecycle metadata"
     ]
   },
   "governance_runtime_blueprint": {
