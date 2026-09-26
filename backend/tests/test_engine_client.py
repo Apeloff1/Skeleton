@@ -1250,3 +1250,90 @@ def test_command_from_context_requires_positive_compiled_output_reserve() -> Non
             instructions="Policy",
             prompt="Prompt",
         )
+
+@pytest.mark.asyncio
+async def test_storage_admission_client_uses_engine_boundary_and_bounded_body() -> None:
+    seen = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["path"] = request.url.path
+        seen["principal"] = request.headers.get("x-zaibatsu-attester")
+        seen["authorization"] = request.headers.get("authorization")
+        seen["trace"] = request.headers.get("x-trace-id")
+        seen["body"] = __import__("json").loads(request.content)
+        return _json(
+            200,
+            {
+                "schema_version": 1,
+                "receipt_id": "storage-admission:test",
+                "operation_id": str(uuid4()),
+                "tenant_id": "tenant-a",
+                "capability": "conversation-persistence",
+                "resource_id": "conversation-message",
+                "write_id": "thread-a:idem-1",
+                "storage_bytes": 321,
+                "admitted_at": _now().isoformat(),
+                "quota_reservation_id": "qrs-test",
+                "admission_decision_id": "adm-test",
+                "replayed": False,
+            },
+        )
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+    receipt = await client.admit_storage_write(
+        tenant_id="tenant-a",
+        capability="conversation-persistence",
+        resource_id="conversation-message",
+        write_id="thread-a:idem-1",
+        storage_bytes=321,
+        trace_id="trace-storage",
+    )
+
+    assert receipt["storage_bytes"] == 321
+    assert seen["path"] == "/api/v1/engine/admission/storage"
+    assert seen["principal"] == "codedock-backend"
+    assert seen["authorization"] == "Bearer " + _SERVICE_TOKEN
+    assert seen["trace"] == "trace-storage"
+    assert seen["body"] == {
+        "tenant_id": "tenant-a",
+        "capability": "conversation-persistence",
+        "resource_id": "conversation-message",
+        "write_id": "thread-a:idem-1",
+        "storage_bytes": 321,
+    }
+
+
+@pytest.mark.asyncio
+async def test_storage_admission_client_rejects_invalid_size_before_io() -> None:
+    called = False
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal called
+        called = True
+        return _json(500, {"detail": "must not be reached"})
+
+    client = EngineClient(
+        EngineClientConfig(
+            service_token=_SERVICE_TOKEN,
+            base_url="http://skeleton:8001",
+        ),
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(EngineProtocolError, match="storage_bytes"):
+        await client.admit_storage_write(
+            tenant_id="tenant-a",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-a:idem-1",
+            storage_bytes=0,
+        )
+
+    assert called is False
+
