@@ -21,6 +21,7 @@ from skeleton.vault.data_lifecycle import (
     DeletionAction,
     DeletionPlan,
     DeletionReceipt,
+    GovernedDataRecord,
 )
 
 
@@ -96,6 +97,45 @@ class GovernanceAuditTimeline:
                 # Audit is authoritative. Telemetry export is best-effort.
                 pass
         return entry
+
+    def record_registration(
+        self,
+        record: GovernedDataRecord,
+        *,
+        mode: str = "register",
+        correlation_id: str | None = None,
+    ) -> AuditEntry:
+        normalized_mode = str(mode).strip().lower()
+        if normalized_mode not in {"register", "reconcile"}:
+            raise ValueError("governance registration audit mode is invalid")
+        return self._append(
+            entry_id=_event_id(
+                normalized_mode,
+                record.record_id,
+                record.tenant_id,
+                record.owner_plane,
+                record.data_class.label,
+                ",".join(record.purposes),
+                ",".join(record.deletion_targets),
+                record.retention_until,
+                record.exportable,
+            ),
+            action=f"governance.lifecycle.{normalized_mode}",
+            subject_key=record.record_id,
+            outcome="success",
+            correlation_id=correlation_id,
+            metadata={
+                "record_fp": _fingerprint(record.record_id),
+                "tenant_fp": _fingerprint(record.tenant_id),
+                "owner_plane": record.owner_plane,
+                "data_class": record.data_class.label,
+                "purposes": list(record.purposes),
+                "deletion_targets": list(record.deletion_targets),
+                "has_retention": record.retention_until is not None,
+                "exportable": record.exportable,
+                "source_ref_fp": _fingerprint(record.source_ref),
+            },
+        )
 
     def record_plan(
         self,
