@@ -240,6 +240,7 @@ async def test_legacy_failure_is_failed_receipt_not_success(
     result = await registry.invoke(
         "web_search",
         {"query": "test"},
+        data_class="public",
     )
 
     assert result["ok"] is False
