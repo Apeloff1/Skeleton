@@ -492,7 +492,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "verifier": "independent-provider-surface-v1",
-        "head_sha": os.environ.get("EVIDENCE_HEAD_SHA", "").strip()\n            or os.environ.get("GITHUB_SHA", "").strip()\n            or "unknown",
+        "head_sha": os.environ.get("EVIDENCE_HEAD_SHA", "").strip()
+            or os.environ.get("GITHUB_SHA", "").strip()
+            or "unknown",
         "scanned_python_files": scanned,
         "declared_surface_digest": hashlib.sha256(digest_bytes).hexdigest(),
         "declared_surfaces": declared_payload,
