@@ -45,10 +45,14 @@ class UserMessage:
 
 
 class EngineChatResponse(str):
-    """String response with a compatibility content property."""
+    """String response with compatibility text/content properties."""
 
     @property
     def content(self) -> str:
+        return str(self)
+
+    @property
+    def text(self) -> str:
         return str(self)
 
 
