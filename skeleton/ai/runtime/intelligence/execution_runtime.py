@@ -34,6 +34,11 @@ from skeleton.skills.tool_contract import (
     approval_ref_for_request,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
+from skeleton.vault.data_governance import (
+    DataGovernanceDenied,
+    ToolTransferRequest,
+    evaluate_tool_transfer,
+)
 
 
 class CognitiveExecutionError(RuntimeError):
@@ -436,6 +441,30 @@ class CognitiveExecutionRuntime:
         )
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise CognitiveExecutionError("execution tenant_id is invalid")
+        tool_data_class = (
+            request.tool_policy.get("data_class")
+            or request.context_policy.get("data_class")
+            or "internal"
+        )
+        tool_purpose = (
+            request.tool_policy.get("purpose")
+            or request.context_policy.get("tool_purpose")
+            or "tool-execution"
+        )
+        if (
+            not isinstance(tool_data_class, str)
+            or not tool_data_class.strip()
+        ):
+            raise CognitiveExecutionError(
+                "tool data classification is invalid"
+            )
+        if (
+            not isinstance(tool_purpose, str)
+            or not tool_purpose.strip()
+        ):
+            raise CognitiveExecutionError(
+                "tool transfer purpose is invalid"
+            )
 
         deadline = _parse_deadline(request)
         return {
@@ -445,6 +474,8 @@ class CognitiveExecutionRuntime:
             "context_digest": context_digest,
             "allowed_tool_ids": list(dict.fromkeys(item.strip() for item in allowed)),
             "tenant_id": tenant_id.strip(),
+            "tool_data_class": tool_data_class.strip().lower(),
+            "tool_purpose": tool_purpose.strip().lower(),
             "deadline": None if deadline is None else deadline.isoformat(),
             "model_turns": 0,
             "tool_calls": 0,
@@ -760,10 +791,40 @@ class CognitiveExecutionRuntime:
         raw = payload.get("allowed_tool_ids", [])
         if not isinstance(raw, list):
             raise CognitiveExecutionError("allowed_tool_ids checkpoint is corrupt")
+        tool_data_class = payload.get("tool_data_class", "internal")
+        tool_purpose = payload.get("tool_purpose", "tool-execution")
+        tenant_id = payload.get("tenant_id")
+        if (
+            not isinstance(tool_data_class, str)
+            or not tool_data_class.strip()
+            or not isinstance(tool_purpose, str)
+            or not tool_purpose.strip()
+            or not isinstance(tenant_id, str)
+            or not tenant_id.strip()
+        ):
+            raise CognitiveExecutionError(
+                "tool privacy checkpoint fields are invalid"
+            )
         tools: list[ProviderToolDefinition] = []
         for tool_id in raw:
             manifest = await self.tool_runtime.manifest(str(tool_id))
             if not manifest.enabled:
+                continue
+            try:
+                governance = evaluate_tool_transfer(
+                    ToolTransferRequest(
+                        tool_id=manifest.tool_id,
+                        data_policy=manifest.data_policy,
+                        network_policy=manifest.network_policy,
+                        data_class=tool_data_class,
+                        purpose=tool_purpose,
+                        tenant_id=tenant_id,
+                        source="cognitive-provider-projection",
+                    )
+                )
+            except DataGovernanceDenied:
+                continue
+            if not governance.permitted:
                 continue
             if (
                 manifest.effect is not ToolEffect.READ_ONLY
@@ -1453,6 +1514,12 @@ class CognitiveExecutionRuntime:
                 + execution.execution_id
                 + ":provider-call:"
                 + call.call_id
+            ),
+            data_class=str(
+                payload.get("tool_data_class", "internal")
+            ),
+            transfer_purpose=str(
+                payload.get("tool_purpose", "tool-execution")
             ),
         )
         return approval_ref_for_request(request)
