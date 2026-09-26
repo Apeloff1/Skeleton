@@ -5,6 +5,8 @@ on:
     paths:
       - "scripts/state_recovery_drill.py"
       - "scripts/state_backup_bundle.py"
+      - "scripts/verify_state_authority_closure.py"
+      - "tests/test_state_authority_independent_verifier.py"
       - "skeleton/testing/test_state_recovery_drill.py"
       - "skeleton/testing/test_state_backup_bundle.py"
       - "machine/state_backup_policy.json"
@@ -56,6 +58,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -197,3 +200,69 @@ jobs:
           print("engine-sqlite-bundle-recovery: OK")
           print("bundle digest:", report["bundle_digest"])
           PY
+
+  independent-state-authority:
+    name: Independent state authority verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent state authority verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_state_authority_independent_verifier.py
+
+      - name: Verify exact-head state authority and emit receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_state_authority_closure.py
+          --evidence-out .state-authority-evidence.json
+          --print-evidence
+
+      - name: Assert exact-head state authority receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".state-authority-evidence.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert receipt["schema_version"] == 1
+          assert receipt["verifier"] == "independent-state-authority-v1"
+          assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
+          assert receipt["valid"] is True
+          assert receipt["errors"] == []
+          assert len(receipt["authority_digest"]) == 64
+          assert len(receipt["authoritative_domains"]) >= 12
+          assert len(receipt["derived_domains"]) == 3
+          assert len(receipt["backup_stores"]) == 8
+          print("independent-state-authority: exact-head receipt OK")
+          print("authority digest:", receipt["authority_digest"])
+          PY
+
