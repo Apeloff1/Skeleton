@@ -737,9 +737,20 @@
       "plane": "reasoning-verification",
       "stage": 3,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
+        "skeleton/intelligence/verification_policy.py selects verification level from risk, claim kind and action effect without model confidence",
+        "skeleton/intelligence/verification_runtime.py implements deterministic evidence policy plus bounded provider-backed semantic PASS/REPAIR/QUALIFY/ABSTAIN/BLOCK finalization",
+        "skeleton/retrieval/verification.py validates citation identity, scope and independent evidence origins",
+        "skeleton/skills/verification.py binds postcondition observations to durable ToolExecutionReceipt status and lineage",
+        "skeleton/persistence/execution_repository.py durably persists verification receipts before terminal execution finalization",
+        "skeleton/intelligence/execution_runtime.py materializes canonical VerificationReceipt and stores it before committing terminal AIExecutionResult",
+        "skeleton/testing/test_verification_runtime.py covers scope integrity, model-evidence non-authority, independent-origin policy, contradiction, tool postconditions, observable receipt privacy, semantic-provider routing, fail-closed outage, repair lineage, citation rebinding and bounded repair budgets",
+        "skeleton/testing/test_execution_runtime.py proves canonical verification receipt persistence, fail-closed missing evidence and verification-before-finalization ordering",
+        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head"
+      ],
       "closure_evidence_required": [
         "structural verification tests",
         "claim-to-citation grounding tests",
@@ -753,21 +764,21 @@
         "no hidden reasoning text is required for audit/replay"
       ],
       "outstanding_evidence": [
-        "structural verification tests",
-        "claim-to-citation grounding tests",
-        "unsupported claim becomes qualified/abstain/block per policy",
-        "tool action postcondition verification tests",
-        "model verifier uses canonical provider/routing/admission boundary",
-        "self-confidence alone cannot mark evidence-required claim verified",
-        "repair lineage and max-repair tests",
-        "high-impact block cannot be bypassed by generator retry",
-        "verification receipt binds operation/execution/turn/result and evidence ids",
-        "no hidden reasoning text is required for audit/replay"
+        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
+        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
+        "production action verification consumes durable tool receipts and explicit postcondition observations",
+        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass",
+        "fresh exact-head Cognitive Execution Closure Gate including semantic verification regressions",
+        "declared dependency-gap closure and independent verification"
       ],
       "blockers": [
         "dependency must close: gap-context-compiler-convergence",
         "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-provider-interaction-protocol"
+        "dependency must close: gap-provider-interaction-protocol",
+        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
+        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
+        "production action verification consumes durable tool receipts and explicit postcondition observations",
+        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
