@@ -26,8 +26,16 @@ from skeleton.contracts.ai_execution import (
     ExecutionState,
 )
 from skeleton.contracts.operation import OperationEnvelope
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import ProviderToolCall
+from skeleton.skills.tool_contract import (
+    ToolExecutionRequest,
+    ToolExecutionStatus,
+    ToolManifest,
+)
+from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 
 def _now() -> datetime:
@@ -193,6 +201,32 @@ def _service(tmp_path, *, registry=None):
         SQLiteEngineSubmissionStore(tmp_path / "submissions.sqlite3"),
         registry or _registry(),
     )
+
+
+
+def _admitted_service(tmp_path):
+    ledger = TenantQuotaLedger()
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="engine-test-window",
+            max_operations=100,
+            max_input_tokens=1_000_000,
+            max_output_tokens=1_000_000,
+            max_cost_usd=100.0,
+            max_tool_calls=1_000,
+            max_artifact_bytes=10_000_000,
+            max_storage_bytes=10_000_000,
+            max_concurrent_operations=16,
+        ),
+    )
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-admitted.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "submissions-admitted.sqlite3"),
+        _registry(),
+        admission_runtime=runtime,
+    )
+    return service, runtime, ledger
 
 
 def test_command_rejects_tool_policy_handoff_mismatch() -> None:
@@ -981,3 +1015,92 @@ def test_engine_approval_uses_request_bound_runtime_capability(tmp_path) -> None
             expires_at=_now() + timedelta(minutes=5),
             now=_now(),
         )
+
+def test_submit_acquires_execution_quota_before_durable_allocation(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    command = _command()
+
+    ack = service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+
+    assert ack.execution_id == command.execution_request.execution_id
+    assert service.repository.get(ack.execution_id).execution_id == ack.execution_id
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 1
+    assert snapshot["reserved"]["operations"] == 1
+    assert len(runtime.snapshot()["active_operations"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_execution_quota_lease_is_shared_with_tool_usage(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    command = _command()
+    service.submit(
+        command,
+        verified_service_principal="backend-service",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    lease = service.ensure_execution_admission(
+        command,
+        now=_now(),
+    )
+    assert lease is not None
+
+    tools = AsyncToolRuntime(admission_runtime=runtime)
+
+    async def handler(_request):
+        return "artifact:engine-admission-test"
+
+    await tools.register(
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Read bounded repository state.",
+            input_schema={
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+                "additionalProperties": False,
+            },
+        ),
+        handler,
+    )
+    receipt = await tools.execute(
+        ToolExecutionRequest(
+            request_id=str(uuid4()),
+            operation_id=lease.operation_id,
+            tenant_id="tenant-a",
+            tool_id="repo.read",
+            idempotency_key="engine-tool-meter",
+            arguments={"path": "README.md"},
+            requested_at=_now(),
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    active = ledger.snapshot("tenant-a")
+    assert active["active_reservations"] == 1
+    assert active["metered_by_category"]["tool"]["tool_calls"] == 1
+
+    completion = service.complete_execution_admission(
+        command.execution_request.execution_id,
+        now=_now() + timedelta(seconds=1),
+    )
+    assert completion is not None
+    closed = ledger.snapshot("tenant-a")
+    assert closed["active_reservations"] == 0
+    assert closed["committed"]["tool_calls"] == 1
+    assert closed["committed"]["operations"] == 1
+
