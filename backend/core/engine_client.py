@@ -32,6 +32,7 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.context import ContextEnvelope
+from skeleton.context.compiler import project_provider_context
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.provider_contract import ProviderToolDefinition
 
@@ -409,13 +410,24 @@ def command_from_context(
         "service_principal",
         maximum=512,
     )
+    projection = project_provider_context(context)
+    projected_instructions = projection.instructions.strip()
     instruction_text = _text(
-        str(instructions).strip(),
+        (
+            projected_instructions
+            if projected_instructions
+            else str(instructions).strip()
+        ),
         "instructions",
         maximum=1_000_000,
     )
+    projected_prompt = projection.prompt.strip()
     prompt_text = _text(
-        str(prompt).strip(),
+        (
+            projected_prompt
+            if projected_prompt
+            else str(prompt).strip()
+        ),
         "prompt",
         maximum=1_000_000,
     )
@@ -527,7 +539,12 @@ def command_from_context(
         )
 
     normalized_history: list[tuple[str, str]] = []
-    for index, item in enumerate(history):
+    projected_history = (
+        projection.history
+        if projection.history
+        else tuple(history)
+    )
+    for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
             raise EngineProtocolError(
                 f"history[{index}] must be an object"
