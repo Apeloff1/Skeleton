@@ -161,7 +161,12 @@
         "skeleton/vault/governance_registry.py audit-linked canonical registration/reconciliation",
         "skeleton/api/server.py durable governance audit and lifecycle adapter registry composition",
         "skeleton/testing/test_governance_audit.py registration/reconciliation audit redaction evidence",
-        "skeleton/testing/test_governance_runtime_binding.py restart-safe governance WORM audit evidence"
+        "skeleton/testing/test_governance_runtime_binding.py restart-safe governance WORM audit evidence",
+        "skeleton/retrieval/governance.py governed tenant-scoped retrieval registration before mutation",
+        "skeleton/vault/lifecycle_adapters.py tenant-bound governed retrieval physical delete/export adapter",
+        "skeleton/api/server.py production retrieval owner plus lifecycle executor composition",
+        "skeleton/testing/test_lifecycle_adapters.py retrieval isolation/export/delete/retention regressions",
+        "skeleton/testing/test_governance_runtime_binding.py production retrieval lifecycle binding regression"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -173,16 +178,16 @@
         "memory derived projection/index deletion completion acknowledgement",
         "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
-        "retrieval/artifact canonical write registration",
-        "retrieval/artifact production physical delete/export/retention adapter composition",
-        "fresh exact-head governance audit/conversation lifecycle validation"
+        "fresh exact-head governance audit/conversation lifecycle validation",
+        "artifact canonical write registration",
+        "artifact production physical delete/export/retention adapter composition"
       ],
       "blockers": [
         "memory derived projection/index deletion completion acknowledgement",
         "provider/tool privacy ceilings enforced across every application route",
         "exact-head Stage-0/App Assembly verification and independent signoff",
-        "retrieval/artifact canonical write registration",
-        "retrieval/artifact production physical delete/export/retention adapter composition"
+        "artifact canonical write registration",
+        "artifact production physical delete/export/retention adapter composition"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
