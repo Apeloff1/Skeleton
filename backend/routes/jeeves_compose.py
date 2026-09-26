@@ -565,13 +565,43 @@ async def _canonical_replay_turn(
             status_code=409,
             detail="this message is already being processed; retry after it completes",
         )
-    replay = _replay_turn(compatibility_turn)
-    replay["reply"] = canonical_assistant.content
-    replay["operation_id"] = canonical_assistant.operation_id
-    replay["ai_result_id"] = canonical_assistant.ai_result_id
-    replay["canonical_thread_id"] = thread.thread_id
-    replay["canonical_message_id"] = canonical_assistant.message_id
-    return replay
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "reply": canonical_assistant.content,
+        "forms": list(compatibility_turn.get("forms") or ["text"]),
+        "tier": str(compatibility_turn.get("tier") or "canonical"),
+        "model": str(
+            compatibility_turn.get("model")
+            or (
+                "skeleton-engine"
+                if str(canonical_assistant.ai_result_id or "").startswith(
+                    "engine-result:"
+                )
+                else "canonical-jeeves"
+            )
+        ),
+        "modalities": list(
+            compatibility_turn.get("modalities") or ["text"]
+        ),
+        "artifacts": [],
+        "artifact_count": int(
+            compatibility_turn.get("artifact_count") or 0
+        ),
+        "grounded_in": int(
+            compatibility_turn.get("grounded_in") or 0
+        ),
+        "persisted": True,
+        "history_messages_used": int(
+            compatibility_turn.get("history_messages_used") or 0
+        ),
+        "history_source": "canonical",
+        "replayed": True,
+        "operation_id": canonical_assistant.operation_id,
+        "ai_result_id": canonical_assistant.ai_result_id,
+        "canonical_thread_id": thread.thread_id,
+        "canonical_message_id": canonical_assistant.message_id,
+    }
 
 
 _MAX_SERVER_HISTORY_MESSAGES = 20
@@ -782,6 +812,22 @@ async def chat(req: ChatReq):
             else "unavailable"
         )
 
+    canonical_turn = None
+    if _canonical_chat_enabled():
+        try:
+            canonical_turn = await _append_canonical_user_turn(
+                req,
+                sid,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "canonical conversation authority is unavailable; "
+                    "retry later"
+                ),
+            ) from exc
+
     context_req = req.model_copy(update={"history": effective_history})
     forms = _ALL_FORMS if req.force_all_forms else _detect_forms(req.message)
     recalled = _canon_context(retrieval_query(context_req))
@@ -822,6 +868,37 @@ async def chat(req: ChatReq):
         if artifact_forms else []
     )
 
+    canonical_assistant = None
+    if canonical_turn is not None:
+        (
+            canonical_authority,
+            canonical_thread,
+            canonical_user,
+            canonical_tenant,
+            canonical_owner,
+        ) = canonical_turn
+        try:
+            canonical_thread, canonical_assistant = (
+                await _commit_canonical_assistant_turn(
+                    authority=canonical_authority,
+                    thread=canonical_thread,
+                    user_message=canonical_user,
+                    tenant_id=canonical_tenant,
+                    owner_id=canonical_owner,
+                    session_id=sid,
+                    client_message_id=req.client_message_id,
+                    generated=gen,
+                )
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "canonical conversation result could not be committed; "
+                    "retry later"
+                ),
+            ) from exc
+
     turn = {
         "session_id": sid,
         "client_message_id": req.client_message_id,
@@ -843,8 +920,12 @@ async def chat(req: ChatReq):
     }
     persisted = True
     if claim_key is not None:
-        await _finalize_claim(claim_key, turn)
-    else:
+        try:
+            await _finalize_claim(claim_key, turn)
+        except HTTPException:
+            if canonical_assistant is None:
+                raise
+    elif not _canonical_chat_enabled():
         try:
             await _chat_col().insert_one(dict(turn))
         except Exception:
@@ -866,8 +947,32 @@ async def chat(req: ChatReq):
         "grounded_in": len(recalled),
         "persisted": persisted,
         "history_messages_used": len(effective_history),
-        "history_source": history_source,
+        "history_source": (
+            "canonical"
+            if canonical_assistant is not None
+            else history_source
+        ),
         "replayed": False,
+        "canonical_thread_id": (
+            canonical_thread.thread_id
+            if canonical_assistant is not None
+            else None
+        ),
+        "canonical_message_id": (
+            canonical_assistant.message_id
+            if canonical_assistant is not None
+            else None
+        ),
+        "operation_id": (
+            canonical_assistant.operation_id
+            if canonical_assistant is not None
+            else None
+        ),
+        "ai_result_id": (
+            canonical_assistant.ai_result_id
+            if canonical_assistant is not None
+            else None
+        ),
     }
 
 
