@@ -1623,7 +1623,10 @@ class EngineExecutionService:
             if lease is not None:
                 try:
                     runtime.release(operation_id)
-                except AdmissionRuntimeError:
+                except Exception:
+                    # Metered durable usage cannot be released. Preserve the
+                    # original admission/accounting failure and leave durable
+                    # recovery to the replay-safe quota operation identity.
                     pass
             raise EngineServiceError(
                 "external storage write denied by resource admission"
