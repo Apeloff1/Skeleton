@@ -336,6 +336,7 @@ async def route_complete(task: str, prompt: str, system: str = "",
             instruction_policy=LLM_ROUTER_POLICY,
             actor_id="llm-router",
             capability="assistant.compat",
+            verification_profile="assistant_proposal",
         ).with_max_tokens(8192)
         response = await asyncio.wait_for(
             chat.send_message(
