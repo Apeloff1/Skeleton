@@ -398,6 +398,7 @@ jobs:
         run: |
           yarn typecheck
           yarn test:operation-stream
+          yarn test:conversation
           yarn export:web
 
       - name: Compile assembly surface
@@ -567,7 +568,10 @@ jobs:
           backend/tests/test_ai_chat_engine_cutover.py
           backend/tests/test_ai_assist_engine_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_ai_chat_conversation_finalization.py
           backend/tests/test_conversation_regeneration.py
+          backend/tests/test_conversation_regeneration_route.py
+          backend/tests/test_conversation_storage_admission.py
           backend/tests/test_conversation_governance.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
