@@ -8,18 +8,16 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/game-genres", tags=["Game Genres"])
 
 # Try to import LLM
 try:
-    from emergentintegrations.llm.chat import LlmChat
+    from core.engine_chat import EngineChat
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
 
 # ============================================================================
 # COMPLETE GAME GENRES DATABASE
@@ -436,9 +434,9 @@ async def create_game_project(request: GameProjectRequest):
     }
     
     # AI-enhanced project generation
-    if LLM_AVAILABLE and EMERGENT_KEY:
+    if LLM_AVAILABLE:
         try:
-            llm = LlmChat(api_key=EMERGENT_KEY, model="gpt-4o")
+            llm = EngineChat(model="gpt-4o")
             llm.add_message("system", """You are an expert game designer and technical director.
             Create comprehensive game project specifications with detailed technical requirements.""")
             llm.add_message("user", f"""Create a detailed game project specification for:
@@ -457,7 +455,7 @@ async def create_game_project(request: GameProjectRequest):
             4. Asset list with priorities
             5. Development milestones
             6. Estimated timeline""")
-            project["ai_specification"] = llm.chat()
+            project["ai_specification"] = await llm.chat()
         except Exception:
             pass
     

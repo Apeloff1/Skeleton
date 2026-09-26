@@ -12,8 +12,10 @@ import threading
 from typing import Any, Mapping
 from uuid import NAMESPACE_URL, UUID, uuid5
 
+from skeleton.artifact_plane.usage import ArtifactUsageMeter
 from skeleton.api.engine_authority import (
     DelegatedAuthority,
+    EngineAuthorityError,
     EngineAuthorityRegistry,
 )
 from skeleton.contracts.ai_execution import (
@@ -24,8 +26,25 @@ from skeleton.contracts.operation import (
     OperationEnvelope,
     OperationState,
 )
+from skeleton.intelligence.admission import (
+    AdmissionError,
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import (
+    AdmissionCompletion,
+    AdmissionLease,
+    AdmissionRuntime,
+    AdmissionRuntimeError,
+)
+from skeleton.intelligence.quota import QuotaError
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
+from skeleton.vault.data_governance import DataGovernanceDenied
+from skeleton.vault.data_lifecycle import DeletionPlan, LifecycleError
+from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import LifecycleExecutor
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
@@ -73,15 +92,110 @@ def _json_object(value: object, field: str) -> dict[str, Any]:
     return result
 
 
+def _json_bytes(value: object) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise EngineServiceError(
+            "engine storage payload must be deterministic JSON"
+        ) from exc
+
+
 def _digest(value: Mapping[str, Any]) -> str:
-    encoded = json.dumps(
-        dict(value),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    return hashlib.sha256(_json_bytes(dict(value))).hexdigest()
+
+
+def _bounded_storage_text(
+    value: object,
+    field: str,
+    *,
+    maximum: int = 512,
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise EngineServiceError(f"{field} is required")
+    normalized = value.strip()
+    if normalized != value or len(normalized) > maximum:
+        raise EngineServiceError(f"{field} is invalid")
+    return normalized
+
+
+def _external_storage_operation_id(
+    service_principal: str,
+    tenant_id: str,
+    capability: str,
+    resource_id: str,
+    write_id: str,
+) -> str:
+    material = "\x1f".join(
+        (
+            "skeleton-external-storage",
+            service_principal,
+            tenant_id,
+            capability,
+            resource_id,
+            write_id,
+        )
+    )
+    return str(uuid5(NAMESPACE_URL, material))
+
+
+def _external_storage_receipt_id(operation_id: str) -> str:
+    return "storage-admission:" + hashlib.sha256(
+        operation_id.encode("utf-8")
+    ).hexdigest()
+
+
+def _execution_admission_operation_id(operation_id: str) -> str:
+    """Canonical execution/tool quota identity derived from parent operation."""
+
+    raw = str(operation_id).strip()
+    if not raw:
+        raise EngineServiceError("operation_id is required")
+    try:
+        return str(UUID(raw))
+    except (ValueError, AttributeError):
+        return str(
+            uuid5(
+                NAMESPACE_URL,
+                "skeleton-operation:" + raw,
+            )
+        )
+
+
+def _resource_budget_from_mapping(
+    values: Mapping[str, Any],
+) -> ResourceBudget:
+    if not isinstance(values, Mapping):
+        raise EngineServiceError("resource budget must be an object")
+    supported = {
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_cost_usd",
+        "max_wall_seconds",
+        "max_provider_attempts",
+        "max_tool_calls",
+        "max_artifact_bytes",
+        "max_storage_bytes",
+        "max_concurrency",
+        "max_queue_depth",
+    }
+    kwargs = {
+        key: values[key]
+        for key in supported
+        if key in values
+    }
+    try:
+        return ResourceBudget(**kwargs)
+    except (TypeError, ValueError, AdmissionError) as exc:
+        raise EngineServiceError(
+            "execution resource budget is invalid"
+        ) from exc
 
 
 def _operation_from_dict(payload: Mapping[str, Any]) -> OperationEnvelope:
@@ -740,6 +854,61 @@ class EngineExecutionAck:
 
 
 @dataclass(frozen=True, slots=True)
+class EngineStorageAdmissionReceipt:
+    receipt_id: str
+    operation_id: str
+    tenant_id: str
+    capability: str
+    resource_id: str
+    write_id: str
+    storage_bytes: int
+    admitted_at: datetime
+    quota_reservation_id: str | None = None
+    admission_decision_id: str | None = None
+    replayed: bool = False
+    schema_version: int = 1
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "receipt_id": self.receipt_id,
+            "operation_id": self.operation_id,
+            "tenant_id": self.tenant_id,
+            "capability": self.capability,
+            "resource_id": self.resource_id,
+            "write_id": self.write_id,
+            "storage_bytes": self.storage_bytes,
+            "admitted_at": self.admitted_at.isoformat(),
+            "quota_reservation_id": self.quota_reservation_id,
+            "admission_decision_id": self.admission_decision_id,
+            "replayed": self.replayed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class EngineGovernanceWriteReceipt:
+    mode: str
+    record: Mapping[str, Any]
+    schema_version: int = 1
+
+    def __post_init__(self) -> None:
+        normalized_mode = str(self.mode).strip().lower()
+        if normalized_mode not in {"register", "reconcile"}:
+            raise EngineServiceError("governance write mode is invalid")
+        if not isinstance(self.record, Mapping):
+            raise TypeError("record must be a mapping")
+        object.__setattr__(self, "mode", normalized_mode)
+        object.__setattr__(self, "record", dict(self.record))
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "mode": self.mode,
+            "record": dict(self.record),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class EngineExecutionStatus:
     operation_id: str
     execution_id: str
@@ -1293,6 +1462,10 @@ class EngineExecutionService:
         repository: SQLiteExecutionRepository,
         submissions: SQLiteEngineSubmissionStore,
         authorities: EngineAuthorityRegistry,
+        *,
+        admission_runtime: AdmissionRuntime | None = None,
+        governance_registry: GovernanceRegistry | None = None,
+        governance_lifecycle_executor: LifecycleExecutor | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -1300,9 +1473,799 @@ class EngineExecutionService:
             raise TypeError("submissions must be SQLiteEngineSubmissionStore")
         if not isinstance(authorities, EngineAuthorityRegistry):
             raise TypeError("authorities must be EngineAuthorityRegistry")
+        if (
+            admission_runtime is not None
+            and not isinstance(admission_runtime, AdmissionRuntime)
+        ):
+            raise TypeError("admission_runtime must be AdmissionRuntime")
+        if (
+            governance_registry is not None
+            and not isinstance(governance_registry, GovernanceRegistry)
+        ):
+            raise TypeError("governance_registry must be GovernanceRegistry")
+        if (
+            governance_lifecycle_executor is not None
+            and not isinstance(
+                governance_lifecycle_executor,
+                LifecycleExecutor,
+            )
+        ):
+            raise TypeError(
+                "governance_lifecycle_executor must be LifecycleExecutor"
+            )
         self.repository = repository
         self.submissions = submissions
         self.authorities = authorities
+        self.admission_runtime = admission_runtime
+        self.governance_registry = governance_registry
+        self.governance_lifecycle_executor = governance_lifecycle_executor
+        self._usage_meter = (
+            None
+            if admission_runtime is None
+            else ArtifactUsageMeter(admission_runtime)
+        )
+
+    def meter_execution_storage(
+        self,
+        command: EngineExecutionCommand,
+        resource_id: str,
+        write_id: str,
+        payload: object,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        meter = self._usage_meter
+        if meter is None:
+            return
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "storage.now")
+        )
+        operation_id = _execution_admission_operation_id(
+            command.operation.operation_id
+        )
+        meter.meter_storage(
+            operation_id,
+            str(resource_id),
+            str(write_id),
+            len(_json_bytes(payload)),
+            now_wall=instant.timestamp(),
+        )
+
+    def consume_external_storage_write(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        capability: str,
+        resource_id: str,
+        write_id: str,
+        storage_bytes: int,
+        now: datetime | None = None,
+    ) -> EngineStorageAdmissionReceipt:
+        runtime = self.admission_runtime
+        meter = self._usage_meter
+        if runtime is None or meter is None:
+            raise EngineServiceError(
+                "engine storage admission runtime is unavailable"
+            )
+
+        principal = _bounded_storage_text(
+            verified_service_principal,
+            "service_principal",
+        )
+        tenant = _bounded_storage_text(tenant_id, "tenant_id")
+        capability_key = _bounded_storage_text(
+            capability,
+            "capability",
+            maximum=256,
+        )
+        resource_key = _bounded_storage_text(
+            resource_id,
+            "resource_id",
+            maximum=512,
+        )
+        write_key = _bounded_storage_text(
+            write_id,
+            "write_id",
+            maximum=1024,
+        )
+        if (
+            isinstance(storage_bytes, bool)
+            or not isinstance(storage_bytes, int)
+            or storage_bytes < 1
+            or storage_bytes > 1024 * 1024 * 1024
+        ):
+            raise EngineServiceError(
+                "storage_bytes must be within [1, 1GiB]"
+            )
+
+        grant = self.authorities.grant_for(principal)
+        if "engine:admission" not in grant.scopes:
+            raise EngineAuthorityError(
+                "engine admission scope denied"
+            )
+        if not grant.allows_tenant(tenant):
+            raise EngineAuthorityError(
+                "engine admission tenant denied"
+            )
+
+        operation_id = _external_storage_operation_id(
+            principal,
+            tenant,
+            capability_key,
+            resource_key,
+            write_key,
+        )
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "storage_admission.now")
+        )
+
+        completion_reader = getattr(
+            runtime.quota_ledger,
+            "completion_for_operation",
+            None,
+        )
+        if callable(completion_reader):
+            try:
+                existing = completion_reader(tenant, operation_id)
+            except QuotaError:
+                # First-use in-memory ledgers have no tenant state until
+                # AdmissionRuntime provisions the configured default quota.
+                existing = None
+            if existing is not None:
+                if existing.actual.storage_bytes != storage_bytes:
+                    raise EngineServiceError(
+                        "external storage admission identity conflict"
+                    )
+                return EngineStorageAdmissionReceipt(
+                    receipt_id=_external_storage_receipt_id(
+                        operation_id
+                    ),
+                    operation_id=operation_id,
+                    tenant_id=tenant,
+                    capability=capability_key,
+                    resource_id=resource_key,
+                    write_id=write_key,
+                    storage_bytes=storage_bytes,
+                    admitted_at=datetime.fromtimestamp(
+                        existing.completed_at,
+                        timezone.utc,
+                    ),
+                    quota_reservation_id=existing.reservation_id,
+                    admission_decision_id=None,
+                    replayed=True,
+                )
+
+        request = AdmissionRequest(
+            operation_id=operation_id,
+            tenant_id=tenant,
+            capability="external-storage:" + capability_key,
+            budget=ResourceBudget(
+                max_storage_bytes=storage_bytes,
+            ),
+            estimate=UsageEstimate(
+                storage_bytes=storage_bytes,
+            ),
+        )
+        lease: AdmissionLease | None = None
+        try:
+            lease = runtime.admit(
+                request,
+                now_wall=instant.timestamp(),
+            )
+            meter.meter_storage(
+                operation_id,
+                resource_key,
+                write_key,
+                storage_bytes,
+                now_wall=instant.timestamp(),
+            )
+            completion = runtime.complete(
+                operation_id,
+                UsageEstimate(
+                    storage_bytes=storage_bytes,
+                ),
+                now_wall=instant.timestamp(),
+            )
+        except (AdmissionError, AdmissionRuntimeError) as exc:
+            if lease is not None:
+                try:
+                    runtime.release(operation_id)
+                except Exception:
+                    # Metered durable usage cannot be released. Preserve the
+                    # original admission/accounting failure and leave durable
+                    # recovery to the replay-safe quota operation identity.
+                    pass
+            raise EngineServiceError(
+                "external storage write denied by resource admission"
+            ) from exc
+
+        reservation_id = (
+            None
+            if completion.quota_completion is None
+            else completion.quota_completion.reservation_id
+        )
+        return EngineStorageAdmissionReceipt(
+            receipt_id=_external_storage_receipt_id(operation_id),
+            operation_id=operation_id,
+            tenant_id=tenant,
+            capability=capability_key,
+            resource_id=resource_key,
+            write_id=write_key,
+            storage_bytes=storage_bytes,
+            admitted_at=instant,
+            quota_reservation_id=reservation_id,
+            admission_decision_id=lease.decision.decision_id,
+            replayed=False,
+        )
+
+    def reconcile_external_governed_write(
+        self,
+        *,
+        verified_service_principal: str,
+        mode: str,
+        plane: str,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: str,
+        purposes: tuple[str, ...],
+        deletion_targets: tuple[str, ...] | None = None,
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+    ) -> EngineGovernanceWriteReceipt:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+
+        principal = _bounded_storage_text(
+            verified_service_principal,
+            "service_principal",
+        )
+        tenant = _bounded_storage_text(tenant_id, "tenant_id")
+        mode_key = _bounded_storage_text(
+            mode,
+            "mode",
+            maximum=32,
+        ).lower()
+        if mode_key not in {"register", "reconcile"}:
+            raise EngineServiceError("governance write mode is invalid")
+
+        plane_key = _bounded_storage_text(
+            plane,
+            "plane",
+            maximum=64,
+        ).lower()
+        if (
+            isinstance(purposes, (str, bytes))
+            or not isinstance(purposes, tuple)
+            or not 1 <= len(purposes) <= 32
+        ):
+            raise EngineServiceError(
+                "purposes must contain between 1 and 32 values"
+            )
+        normalized_purposes = tuple(
+            _bounded_storage_text(
+                value,
+                "purpose",
+                maximum=256,
+            ).lower()
+            for value in purposes
+        )
+        normalized_targets: tuple[str, ...] | None = None
+        if deletion_targets is not None:
+            if (
+                isinstance(deletion_targets, (str, bytes))
+                or not isinstance(deletion_targets, tuple)
+                or not 1 <= len(deletion_targets) <= 32
+            ):
+                raise EngineServiceError(
+                    "deletion_targets must contain between 1 and 32 values"
+                )
+            normalized_targets = tuple(
+                _bounded_storage_text(
+                    value,
+                    "deletion_target",
+                    maximum=256,
+                ).lower()
+                for value in deletion_targets
+            )
+
+        grant = self.authorities.grant_for(principal)
+        if "engine:governance" not in grant.scopes:
+            raise EngineAuthorityError(
+                "engine governance scope denied"
+            )
+        if not grant.allows_tenant(tenant):
+            raise EngineAuthorityError(
+                "engine governance tenant denied"
+            )
+
+        kwargs = {
+            "record_id": _bounded_storage_text(
+                record_id,
+                "record_id",
+                maximum=512,
+            ),
+            "tenant_id": tenant,
+            "source_ref": _bounded_storage_text(
+                source_ref,
+                "source_ref",
+                maximum=512,
+            ),
+            "data_class": _bounded_storage_text(
+                data_class,
+                "data_class",
+                maximum=64,
+            ),
+            "purposes": normalized_purposes,
+            "deletion_targets": normalized_targets,
+            "created_at": created_at,
+            "retention_until": retention_until,
+            "exportable": bool(exportable),
+        }
+        try:
+            if mode_key == "register":
+                record = registry.register_canonical_write(
+                    plane_key,
+                    **kwargs,
+                )
+            else:
+                record = registry.reconcile_canonical_write(
+                    plane_key,
+                    **kwargs,
+                )
+            inventory = registry.lifecycle.get(record.record_id)
+        except (DataGovernanceDenied, LifecycleError) as exc:
+            raise EngineServiceError(
+                "external governance write rejected"
+            ) from exc
+        if inventory["tenant_id"] != tenant:
+            raise EngineServiceError(
+                "governance write tenant reconciliation failed"
+            )
+        return EngineGovernanceWriteReceipt(
+            mode=mode_key,
+            record=inventory,
+        )
+
+    def _authorize_external_governance(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+    ) -> tuple[str, str]:
+        principal = _bounded_storage_text(
+            verified_service_principal,
+            "service_principal",
+        )
+        tenant = _bounded_storage_text(tenant_id, "tenant_id")
+        grant = self.authorities.grant_for(principal)
+        if "engine:governance" not in grant.scopes:
+            raise EngineAuthorityError(
+                "engine governance scope denied"
+            )
+        if not grant.allows_tenant(tenant):
+            raise EngineAuthorityError(
+                "engine governance tenant denied"
+            )
+        return principal, tenant
+
+    def request_external_governance_deletion(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        record_ids: tuple[str, ...] | None = None,
+        reason: str = "tenant-request",
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        normalized_ids: tuple[str, ...] | None = None
+        if record_ids is not None:
+            if isinstance(record_ids, (str, bytes)):
+                raise EngineServiceError("record_ids must be a tuple")
+            normalized_ids = tuple(
+                dict.fromkeys(
+                    _bounded_storage_text(
+                        value,
+                        "record_id",
+                        maximum=512,
+                    )
+                    for value in record_ids
+                )
+            )
+            if not normalized_ids:
+                raise EngineServiceError(
+                    "record_ids must not be empty when supplied"
+                )
+            if len(normalized_ids) > 10_000:
+                raise EngineServiceError("too many governance record_ids")
+        reason_key = _bounded_storage_text(
+            reason,
+            "reason",
+            maximum=512,
+        )
+        timestamp = (
+            None
+            if now is None
+            else _aware(now, "governance_deletion.now").timestamp()
+        )
+        try:
+            plan = registry.request_deletion(
+                tenant,
+                record_ids=normalized_ids,
+                reason=reason_key,
+                now=timestamp,
+            )
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "external governance deletion plan rejected"
+            ) from exc
+        return {
+            "schema_version": 1,
+            "plan_id": plan.plan_id,
+            "tenant_id": plan.tenant_id,
+            "reason": plan.reason,
+            "created_at": plan.created_at,
+            "actions": [
+                {
+                    "record_id": action.record_id,
+                    "tenant_id": action.tenant_id,
+                    "target": action.target,
+                    "source_ref": action.source_ref,
+                    "reason": action.reason,
+                }
+                for action in plan.actions
+            ],
+        }
+
+    def plan_external_governance_retention(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Create or recover one tenant-scoped retention expiry plan."""
+
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        timestamp = (
+            None
+            if now is None
+            else _aware(
+                now,
+                "governance_retention.now",
+            ).timestamp()
+        )
+        try:
+            plan = registry.lifecycle.plan_retention_expiry_for_tenant(
+                tenant,
+                now=timestamp,
+            )
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "external governance retention plan rejected"
+            ) from exc
+
+        if plan is None:
+            return {
+                "schema_version": 1,
+                "tenant_id": tenant,
+                "plan_id": None,
+                "reason": "retention-expired",
+                "created_at": None,
+                "actions": [],
+            }
+        return {
+            "schema_version": 1,
+            "tenant_id": plan.tenant_id,
+            "plan_id": plan.plan_id,
+            "reason": plan.reason,
+            "created_at": plan.created_at,
+            "actions": [
+                {
+                    "record_id": action.record_id,
+                    "tenant_id": action.tenant_id,
+                    "target": action.target,
+                    "source_ref": action.source_ref,
+                    "reason": action.reason,
+                }
+                for action in plan.actions
+            ],
+        }
+
+    async def execute_external_governance_engine_targets(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        plan_id: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Execute outstanding non-conversation lifecycle actions in-engine."""
+
+        registry = self.governance_registry
+        executor = self.governance_lifecycle_executor
+        if registry is None or executor is None:
+            raise EngineServiceError(
+                "engine governance lifecycle execution is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        plan_key = _bounded_storage_text(
+            plan_id,
+            "plan_id",
+            maximum=512,
+        )
+        try:
+            pending = registry.lifecycle.pending_deletion_plan(
+                plan_key,
+                tenant_id=tenant,
+            )
+        except (LifecycleError, DataGovernanceDenied) as exc:
+            raise EngineServiceError(
+                "external governance deletion plan is unavailable"
+            ) from exc
+
+        engine_actions = tuple(
+            action
+            for action in pending.actions
+            if action.target != "conversation"
+        )
+        if not engine_actions:
+            return {
+                "schema_version": 1,
+                "plan_id": pending.plan_id,
+                "tenant_id": pending.tenant_id,
+                "executed_targets": [],
+                "receipts": [],
+            }
+
+        engine_plan = DeletionPlan(
+            plan_id=pending.plan_id,
+            tenant_id=pending.tenant_id,
+            reason=pending.reason,
+            actions=engine_actions,
+            created_at=pending.created_at,
+        )
+        timestamp = (
+            None
+            if now is None
+            else _aware(
+                now,
+                "governance_execution.now",
+            ).timestamp()
+        )
+        try:
+            result = await executor.execute_deletion_plan(
+                engine_plan,
+                now=timestamp,
+            )
+        except Exception as exc:
+            raise EngineServiceError(
+                "engine governance target execution failed"
+            ) from exc
+        return {
+            "schema_version": 1,
+            "plan_id": result.plan_id,
+            "tenant_id": pending.tenant_id,
+            "executed_targets": sorted(
+                {action.target for action in engine_actions}
+            ),
+            "receipts": [
+                receipt.as_dict()
+                for receipt in result.receipts
+            ],
+        }
+
+    def acknowledge_external_governance_deletion(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        plan_id: str,
+        record_id: str,
+        target: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        record_key = _bounded_storage_text(
+            record_id,
+            "record_id",
+            maximum=512,
+        )
+        try:
+            inventory = registry.lifecycle.get(record_key)
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "governance deletion record is unavailable"
+            ) from exc
+        if inventory.get("tenant_id") != tenant:
+            raise EngineAuthorityError(
+                "engine governance tenant denied"
+            )
+        timestamp = (
+            None
+            if now is None
+            else _aware(now, "governance_ack.now").timestamp()
+        )
+        try:
+            receipt = registry.acknowledge_deletion(
+                _bounded_storage_text(
+                    plan_id,
+                    "plan_id",
+                    maximum=512,
+                ),
+                record_key,
+                _bounded_storage_text(
+                    target,
+                    "target",
+                    maximum=256,
+                ).lower(),
+                now=timestamp,
+            )
+        except LifecycleError as exc:
+            raise EngineServiceError(
+                "governance deletion acknowledgement rejected"
+            ) from exc
+        return {
+            "schema_version": 1,
+            "receipt_id": receipt.receipt_id,
+            "plan_id": receipt.plan_id,
+            "record_id": receipt.record_id,
+            "target": receipt.target,
+            "state": receipt.state.value,
+            "completed_at": receipt.completed_at,
+        }
+
+    def external_governance_inventory(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+    ) -> dict[str, Any]:
+        registry = self.governance_registry
+        if registry is None:
+            raise EngineServiceError(
+                "engine governance registry is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        inventory = registry.export_inventory(tenant)
+        return {
+            "schema_version": 1,
+            "tenant_id": str(inventory["tenant_id"]),
+            "count": int(inventory["count"]),
+            "records": [dict(row) for row in inventory["records"]],
+        }
+
+    def _execution_admission_request(
+        self,
+        command: EngineExecutionCommand,
+    ) -> AdmissionRequest:
+        return AdmissionRequest(
+            operation_id=_execution_admission_operation_id(
+                command.operation.operation_id
+            ),
+            tenant_id=command.operation.tenant_id,
+            capability="engine-execution",
+            budget=_resource_budget_from_mapping(
+                command.resource_budget
+            ),
+            estimate=UsageEstimate(),
+        )
+
+    def ensure_execution_admission(
+        self,
+        command: EngineExecutionCommand,
+        *,
+        now: datetime | None = None,
+    ) -> AdmissionLease | None:
+        runtime = self.admission_runtime
+        if runtime is None:
+            return None
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "admission.now")
+        )
+        try:
+            return runtime.admit(
+                self._execution_admission_request(command),
+                now_wall=instant.timestamp(),
+            )
+        except (AdmissionError, AdmissionRuntimeError) as exc:
+            raise EngineServiceError(
+                "engine execution denied by resource admission"
+            ) from exc
+
+    def complete_execution_admission(
+        self,
+        execution_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> AdmissionCompletion | None:
+        runtime = self.admission_runtime
+        if runtime is None:
+            return None
+        stored = self.submissions.get_by_execution_id(
+            str(execution_id)
+        )
+        if stored is None:
+            raise EngineServiceError(
+                "engine execution submission is unavailable"
+            )
+        lease = self.ensure_execution_admission(
+            stored.command,
+            now=now,
+        )
+        assert lease is not None
+        instant = (
+            datetime.now(timezone.utc)
+            if now is None
+            else _aware(now, "admission.now")
+        )
+        try:
+            return runtime.complete(
+                lease.operation_id,
+                UsageEstimate(),
+                now_wall=instant.timestamp(),
+            )
+        except AdmissionRuntimeError as exc:
+            raise EngineServiceError(
+                "engine execution admission completion failed"
+            ) from exc
+
+    def release_execution_admission(
+        self,
+        command: EngineExecutionCommand,
+    ) -> None:
+        runtime = self.admission_runtime
+        if runtime is None:
+            return
+        operation_id = _execution_admission_operation_id(
+            command.operation.operation_id
+        )
+        try:
+            runtime.release(operation_id)
+        except AdmissionRuntimeError:
+            pass
 
     def _validate(
         self,
@@ -1365,13 +2328,28 @@ class EngineExecutionService:
                 )
             return existing.ack
 
+        self.ensure_execution_admission(
+            command,
+            now=instant,
+        )
+        self.meter_execution_storage(
+            command,
+            "engine-execution-state",
+            "create:" + command.execution_request.execution_id,
+            command.execution_request.as_dict(),
+            now=instant,
+        )
         try:
             execution = self.repository.create(
                 command.execution_request,
                 now=instant,
             )
         except ExecutionRepositoryConflict as exc:
+            self.release_execution_admission(command)
             raise EngineSubmissionConflict(str(exc)) from exc
+        except Exception:
+            self.release_execution_admission(command)
+            raise
 
         idempotency_digest = _digest(
             {
@@ -1399,11 +2377,25 @@ class EngineExecutionService:
             ),
             trace_id=command.operation.trace_id,
         )
-        return self.submissions.remember(
-            service_principal=verified_service_principal,
-            command=command,
-            ack=ack,
+        self.meter_execution_storage(
+            command,
+            "engine-submission",
+            "submission:" + execution.execution_id,
+            {
+                "command": command.as_dict(),
+                "ack": ack.as_dict(),
+            },
+            now=instant,
         )
+        try:
+            return self.submissions.remember(
+                service_principal=verified_service_principal,
+                command=command,
+                ack=ack,
+            )
+        except Exception:
+            self.release_execution_admission(command)
+            raise
 
     def _stored_for_access(
         self,
@@ -1484,6 +2476,37 @@ class EngineExecutionService:
             for item in pending_ids
             if isinstance(item, str) and item.strip()
         }
+        tool_data_class = payload.get(
+            "tool_data_class",
+            "internal",
+        )
+        tool_purpose = payload.get(
+            "tool_purpose",
+            "tool-execution",
+        )
+        if (
+            not isinstance(tool_data_class, str)
+            or not tool_data_class.strip()
+            or not isinstance(tool_purpose, str)
+            or not tool_purpose.strip()
+        ):
+            raise EngineServiceError(
+                "durable approval checkpoint privacy context is malformed"
+            )
+        tool_data_class = tool_data_class.strip().lower()
+        tool_purpose = tool_purpose.strip().lower()
+        last_provider = payload.get("last_provider")
+        turn_id: str | None = None
+        if last_provider is not None:
+            if not isinstance(last_provider, Mapping):
+                raise EngineServiceError(
+                    "durable approval checkpoint provider lineage is malformed"
+                )
+            turn_id = str(last_provider.get("turn_id") or "").strip()
+            if not turn_id:
+                raise EngineServiceError(
+                    "durable approval checkpoint is missing provider turn_id"
+                )
         rows: list[dict[str, str]] = []
         for raw in calls:
             if not isinstance(raw, Mapping):
@@ -1521,6 +2544,15 @@ class EngineExecutionService:
                         "skeleton-operation:" + operation.operation_id,
                     )
                 )
+            lineage = (
+                {
+                    "execution_id": execution.execution_id,
+                    "turn_id": turn_id,
+                    "call_id": call_id,
+                }
+                if turn_id is not None
+                else {}
+            )
             tool_request = ToolExecutionRequest(
                 request_id=str(
                     uuid5(
@@ -1544,6 +2576,9 @@ class EngineExecutionService:
                     + ":provider-call:"
                     + call_id
                 ),
+                data_class=tool_data_class,
+                transfer_purpose=tool_purpose,
+                **lineage,
             )
             rows.append(
                 {
@@ -1872,7 +2907,9 @@ __all__ = [
     "EngineExecutionCommand",
     "EngineExecutionService",
     "EngineExecutionStatus",
+    "EngineGovernanceWriteReceipt",
     "EngineServiceError",
+    "EngineStorageAdmissionReceipt",
     "EngineSubmissionConflict",
     "EngineToolApproval",
     "SQLiteEngineSubmissionStore",

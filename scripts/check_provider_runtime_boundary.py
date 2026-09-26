@@ -28,10 +28,16 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOTS = ("backend", "skeleton")
 SKIP_PARTS = {"tests", "test", "__pycache__", ".venv", "venv", "node_modules"}
-NON_RUNTIME_MIRROR_PREFIXES = (Path("skeleton/ai/research/external"),)
+NON_RUNTIME_MIRROR_PREFIXES = (
+    Path("skeleton/ai/research/external"),
+    Path("skeleton/ai/runtime/provider_runtime.py"),
+)
 GOOGLE_MODULES = ("google.genai", "google.generativeai")
 LOCAL_EMERGENT_COMPAT_MODULE = "emergentintegrations.llm.chat"
-CANONICAL_PROVIDER_RUNTIME = Path("skeleton/provider_runtime.py")
+CANONICAL_PROVIDER_RUNTIMES = frozenset({
+    Path("skeleton/provider_runtime.py"),
+    Path("skeleton/ai/runtime/provider_runtime.py"),
+})
 VENDOR_PROVIDER_ROOTS = {
     "openai",
     "anthropic",
@@ -67,7 +73,7 @@ def _matches_prefix(module: str | None, prefixes: tuple[str, ...]) -> bool:
 
 
 def _is_canonical_provider_runtime(rel: Path) -> bool:
-    return rel == CANONICAL_PROVIDER_RUNTIME
+    return rel in CANONICAL_PROVIDER_RUNTIMES
 
 
 def _is_backend_path(rel: Path) -> bool:

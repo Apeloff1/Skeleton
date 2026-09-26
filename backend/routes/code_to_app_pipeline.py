@@ -29,14 +29,12 @@ ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
 # AI Integrations
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 from .builder_dna_translator import (
     translate_dna_to_prompt, sanitise_dna, stats as dna_stats,
 )
 
 router = APIRouter(prefix="/code-to-app", tags=["Code to App Pipeline"])
-
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # ─── Hardening knobs ────────────────────────────────────────────────────
 # Wall-clock timeout for any single LLM call. Anything past this is almost
@@ -117,8 +115,7 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
     last_err: Optional[Exception] = None
     for attempt in range(1, attempts + 1):
         try:
-            chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
+            chat = EngineChat(
                 session_id=f"codedock-app-{uuid.uuid4().hex[:8]}",
                 system_message=system_prompt,
             ).with_model("openai", "gpt-4o")

@@ -17,6 +17,7 @@ import base64
 import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import math
 import os
 from time import monotonic
 from typing import Any, Mapping, Sequence
@@ -31,6 +32,8 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.context import ContextEnvelope
+from skeleton.contracts.memory_record import MemoryKind
+from skeleton.context.compiler import project_provider_context
 from skeleton.contracts.operation import OperationEnvelope
 from skeleton.provider_contract import ProviderToolDefinition
 
@@ -395,6 +398,7 @@ def command_from_context(
     tool_choice: str | None = None,
     specific_tool_id: str | None = None,
     context_seed_refs: Sequence[str] = (),
+    memory_write_intent: Mapping[str, Any] | None = None,
 ) -> EngineExecutionCommand:
     """Build a digest-bound engine command from one immutable context snapshot."""
 
@@ -408,13 +412,24 @@ def command_from_context(
         "service_principal",
         maximum=512,
     )
+    projection = project_provider_context(context)
+    projected_instructions = projection.instructions.strip()
     instruction_text = _text(
-        str(instructions).strip(),
+        (
+            projected_instructions
+            if projected_instructions
+            else str(instructions).strip()
+        ),
         "instructions",
         maximum=1_000_000,
     )
+    projected_prompt = projection.prompt.strip()
     prompt_text = _text(
-        str(prompt).strip(),
+        (
+            projected_prompt
+            if projected_prompt
+            else str(prompt).strip()
+        ),
         "prompt",
         maximum=1_000_000,
     )
@@ -525,8 +540,139 @@ def command_from_context(
             "assistant_proposal verification requires tool-free execution"
         )
 
+    context_data_class = max(
+        (
+            segment.data_class
+            for segment in context.selected_segments
+        ),
+        default="internal",
+        key=("public", "internal", "confidential", "restricted").index,
+    )
+
+    normalized_memory_intent: dict[str, Any] | None = None
+    if memory_write_intent is not None:
+        intent = _json_object(
+            memory_write_intent,
+            "memory_write_intent",
+        )
+        allowed_memory_fields = {
+            "subject_id",
+            "namespace",
+            "kind",
+            "data_class",
+            "expires_at",
+            "idempotency_key",
+            "provenance_refs",
+            "content_from",
+        }
+        unknown_memory_fields = sorted(
+            set(intent) - allowed_memory_fields
+        )
+        if unknown_memory_fields:
+            raise EngineProtocolError(
+                "memory_write_intent contains unsupported fields: "
+                + ",".join(unknown_memory_fields)
+            )
+        subject_id = _text(
+            intent.get("subject_id"),
+            "memory_write_intent.subject_id",
+            maximum=512,
+        )
+        namespace = _text(
+            intent.get("namespace", "assistant"),
+            "memory_write_intent.namespace",
+            maximum=256,
+        )
+        kind = _text(
+            intent.get("kind"),
+            "memory_write_intent.kind",
+            maximum=64,
+        ).lower()
+        try:
+            MemoryKind(kind)
+        except ValueError as exc:
+            raise EngineProtocolError(
+                "memory_write_intent.kind is unsupported"
+            ) from exc
+        content_from = _text(
+            intent.get("content_from", "verified_final_output"),
+            "memory_write_intent.content_from",
+            maximum=64,
+        )
+        if content_from != "verified_final_output":
+            raise EngineProtocolError(
+                "memory_write_intent may only persist verified_final_output"
+            )
+        data_class = _text(
+            intent.get("data_class", context_data_class),
+            "memory_write_intent.data_class",
+            maximum=32,
+        ).lower()
+        if data_class not in {
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
+        }:
+            raise EngineProtocolError(
+                "memory_write_intent.data_class is unsupported"
+            )
+        expires_at = intent.get("expires_at")
+        normalized_expiry = None
+        if expires_at is not None:
+            normalized_expiry = _aware(
+                expires_at,
+                "memory_write_intent.expires_at",
+            ).isoformat()
+            if _aware(
+                expires_at,
+                "memory_write_intent.expires_at",
+            ) <= started:
+                raise EngineProtocolError(
+                    "memory_write_intent.expires_at must follow execution creation"
+                )
+        raw_refs = intent.get("provenance_refs", [])
+        if not isinstance(raw_refs, list):
+            raise EngineProtocolError(
+                "memory_write_intent.provenance_refs must be a list"
+            )
+        provenance_refs: list[str] = []
+        for index, raw_ref in enumerate(raw_refs):
+            ref = _text(
+                raw_ref,
+                f"memory_write_intent.provenance_refs[{index}]",
+                maximum=1024,
+            )
+            if ref not in provenance_refs:
+                provenance_refs.append(ref)
+            if len(provenance_refs) > 128:
+                raise EngineProtocolError(
+                    "memory_write_intent.provenance_refs exceeds maximum count"
+                )
+        normalized_memory_intent = {
+            "subject_id": subject_id,
+            "namespace": namespace,
+            "kind": kind,
+            "data_class": data_class,
+            "content_from": content_from,
+            "provenance_refs": provenance_refs,
+        }
+        if normalized_expiry is not None:
+            normalized_memory_intent["expires_at"] = normalized_expiry
+        if intent.get("idempotency_key") is not None:
+            normalized_memory_intent["idempotency_key"] = _text(
+                intent.get("idempotency_key"),
+                "memory_write_intent.idempotency_key",
+                maximum=1024,
+            )
+
     normalized_history: list[tuple[str, str]] = []
-    for index, item in enumerate(history):
+    projected_history = (
+        projection.history
+        if projection.history
+        else tuple(history)
+    )
+    for index, item in enumerate(projected_history):
         if not isinstance(item, Mapping):
             raise EngineProtocolError(
                 f"history[{index}] must be an object"
@@ -545,6 +691,35 @@ def command_from_context(
         if len(normalized_history) > 1024:
             raise EngineProtocolError("history exceeds maximum turn count")
 
+    input_capacity = context.budget.input_capacity(
+        tools_enabled=bool(normalized_tools)
+    )
+    if context.selected_tokens_estimate > input_capacity:
+        raise EngineProtocolError(
+            "compiled context exceeds bound input capacity"
+        )
+
+    reserved_output = int(context.budget.reserved_output_tokens)
+    if reserved_output <= 0:
+        raise EngineProtocolError(
+            "compiled context requires positive output reserve"
+        )
+    if max_output_tokens is None:
+        resolved_output_tokens = reserved_output
+    else:
+        resolved_output_tokens = _positive_int(
+            max_output_tokens,
+            "max_output_tokens",
+            maximum=131_072,
+        )
+        if (
+            reserved_output > 0
+            and resolved_output_tokens > reserved_output
+        ):
+            raise EngineProtocolError(
+                "max_output_tokens exceeds compiled context reserve"
+            )
+
     resource_budget = {
         "max_model_turns": _positive_int(
             max_model_turns,
@@ -556,13 +731,18 @@ def command_from_context(
             "max_tool_calls",
             maximum=1024,
         ),
+        "max_input_tokens": input_capacity,
+        "selected_input_tokens_estimate": (
+            context.selected_tokens_estimate
+        ),
+        "max_tool_result_tokens": int(
+            context.budget.reserved_tool_result_tokens
+        ),
         "max_elapsed_seconds": (due - started).total_seconds(),
     }
-    if max_output_tokens is not None:
-        resource_budget["max_output_tokens"] = _positive_int(
-            max_output_tokens,
-            "max_output_tokens",
-            maximum=131_072,
+    if resolved_output_tokens > 0:
+        resource_budget["max_output_tokens"] = (
+            resolved_output_tokens
         )
     stop_policy = {
         "max_repeat_tool_batches": _positive_int(
@@ -595,14 +775,7 @@ def command_from_context(
         context_digest=context.context_digest,
         compiler_version=context.compiler_version,
         source_snapshot=context.source_snapshot,
-        data_class=max(
-            (
-                segment.data_class
-                for segment in context.selected_segments
-            ),
-            default="internal",
-            key=("public", "internal", "confidential", "restricted").index,
-        ),
+        data_class=context_data_class,
         instructions=instruction_text,
         prompt=prompt_text,
         history=tuple(normalized_history),
@@ -610,26 +783,30 @@ def command_from_context(
         tool_choice=resolved_tool_choice,
         specific_tool_id=normalized_specific_tool_id,
     )
+    context_policy = {
+        "tenant_id": context.tenant_id,
+        "capability": cap,
+        "verification_profile": profile,
+        "data_class": handoff.data_class,
+        "context_id": context.context_id,
+        "context_digest": context.context_digest,
+        "compiler_version": context.compiler_version,
+        "handoff_digest": handoff.handoff_digest,
+        "tool_choice": resolved_tool_choice,
+        "specific_tool_id": normalized_specific_tool_id,
+        "source_snapshot": [
+            [segment_id, digest]
+            for segment_id, digest in context.source_snapshot
+        ],
+    }
+    if normalized_memory_intent is not None:
+        context_policy["memory_write_intent"] = normalized_memory_intent
+
     execution_request = AIExecutionRequest(
         operation_id=context.operation_id,
         execution_id=context.execution_id,
         objective=objective_text,
-        context_policy={
-            "tenant_id": context.tenant_id,
-            "capability": cap,
-            "verification_profile": profile,
-            "data_class": handoff.data_class,
-            "context_id": context.context_id,
-            "context_digest": context.context_digest,
-            "compiler_version": context.compiler_version,
-            "handoff_digest": handoff.handoff_digest,
-            "tool_choice": resolved_tool_choice,
-            "specific_tool_id": normalized_specific_tool_id,
-            "source_snapshot": [
-                [segment_id, digest]
-                for segment_id, digest in context.source_snapshot
-            ],
-        },
+        context_policy=context_policy,
         tool_policy={
             "tenant_id": context.tenant_id,
             "allowed_tool_ids": [
@@ -655,6 +832,8 @@ def command_from_context(
     ]
     if normalized_tools:
         authority_scopes.append("engine:approve")
+    if normalized_memory_intent is not None:
+        authority_scopes.append("engine:memory")
 
     authority = DelegatedAuthority(
         service_principal=principal,
@@ -1046,6 +1225,282 @@ class EngineClient:
         payload = dict(payload)
         payload["audio"] = audio
         return payload
+
+    async def admit_storage_write(
+        self,
+        *,
+        tenant_id: str,
+        capability: str,
+        resource_id: str,
+        write_id: str,
+        storage_bytes: int,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        if (
+            isinstance(storage_bytes, bool)
+            or not isinstance(storage_bytes, int)
+            or storage_bytes < 1
+            or storage_bytes > 1024 * 1024 * 1024
+        ):
+            raise EngineProtocolError(
+                "storage_bytes must be within [1, 1GiB]"
+            )
+        return await self._request(
+            "POST",
+            "/admission/storage",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "capability": _text(
+                    capability,
+                    "capability",
+                    maximum=256,
+                ),
+                "resource_id": _text(
+                    resource_id,
+                    "resource_id",
+                    maximum=512,
+                ),
+                "write_id": _text(
+                    write_id,
+                    "write_id",
+                    maximum=1024,
+                ),
+                "storage_bytes": storage_bytes,
+            },
+            trace_id=trace_id,
+        )
+
+    async def reconcile_governed_write(
+        self,
+        *,
+        mode: str,
+        plane: str,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: str,
+        purposes: Sequence[str],
+        deletion_targets: Sequence[str] | None = None,
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        if isinstance(purposes, (str, bytes)):
+            raise EngineProtocolError("purposes must be a sequence")
+        normalized_purposes = [
+            _text(value, "purpose", maximum=256).lower()
+            for value in purposes
+        ]
+        if not 1 <= len(normalized_purposes) <= 32:
+            raise EngineProtocolError(
+                "purposes must contain between 1 and 32 values"
+            )
+
+        normalized_targets: list[str] | None = None
+        if deletion_targets is not None:
+            if isinstance(deletion_targets, (str, bytes)):
+                raise EngineProtocolError(
+                    "deletion_targets must be a sequence"
+                )
+            normalized_targets = [
+                _text(value, "deletion_target", maximum=256).lower()
+                for value in deletion_targets
+            ]
+            if not 1 <= len(normalized_targets) <= 32:
+                raise EngineProtocolError(
+                    "deletion_targets must contain between 1 and 32 values"
+                )
+
+        def timestamp(value: float | None, field: str) -> float | None:
+            if value is None:
+                return None
+            if isinstance(value, bool):
+                raise EngineProtocolError(field + " must be finite")
+            number = float(value)
+            if not math.isfinite(number) or number < 0:
+                raise EngineProtocolError(field + " must be finite")
+            return number
+
+        return await self._request(
+            "POST",
+            "/governance/writes",
+            json_body={
+                "mode": _text(mode, "mode", maximum=32).lower(),
+                "plane": _text(plane, "plane", maximum=64).lower(),
+                "record_id": _text(
+                    record_id,
+                    "record_id",
+                    maximum=512,
+                ),
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "source_ref": _text(
+                    source_ref,
+                    "source_ref",
+                    maximum=512,
+                ),
+                "data_class": _text(
+                    data_class,
+                    "data_class",
+                    maximum=64,
+                ).lower(),
+                "purposes": normalized_purposes,
+                "deletion_targets": normalized_targets,
+                "created_at": timestamp(created_at, "created_at"),
+                "retention_until": timestamp(
+                    retention_until,
+                    "retention_until",
+                ),
+                "exportable": bool(exportable),
+            },
+            trace_id=trace_id,
+        )
+
+    async def plan_governance_retention(
+        self,
+        *,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/governance/retention/plan",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
+    async def request_governance_deletion(
+        self,
+        *,
+        tenant_id: str,
+        record_ids: Sequence[str] | None = None,
+        reason: str = "tenant-request",
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_ids: list[str] | None = None
+        if record_ids is not None:
+            if isinstance(record_ids, (str, bytes)):
+                raise EngineProtocolError("record_ids must be a sequence")
+            normalized_ids = [
+                _text(value, "record_id", maximum=512)
+                for value in record_ids
+            ]
+            if not 1 <= len(normalized_ids) <= 10_000:
+                raise EngineProtocolError(
+                    "record_ids must contain between 1 and 10000 values"
+                )
+        return await self._request(
+            "POST",
+            "/governance/deletions",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "record_ids": normalized_ids,
+                "reason": _text(
+                    reason,
+                    "reason",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
+    async def execute_governance_deletion_engine_targets(
+        self,
+        *,
+        tenant_id: str,
+        plan_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        plan = quote(
+            _text(plan_id, "plan_id", maximum=512),
+            safe="",
+        )
+        return await self._request(
+            "POST",
+            f"/governance/deletions/{plan}/execute-engine-targets",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
+    async def acknowledge_governance_deletion(
+        self,
+        *,
+        tenant_id: str,
+        plan_id: str,
+        record_id: str,
+        target: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/governance/deletions/acknowledgements",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "plan_id": _text(
+                    plan_id,
+                    "plan_id",
+                    maximum=512,
+                ),
+                "record_id": _text(
+                    record_id,
+                    "record_id",
+                    maximum=512,
+                ),
+                "target": _text(
+                    target,
+                    "target",
+                    maximum=256,
+                ).lower(),
+            },
+            trace_id=trace_id,
+        )
+
+    async def governance_inventory(
+        self,
+        *,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            "/governance/inventory",
+            params={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
 
     async def submit(
         self,

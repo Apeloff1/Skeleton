@@ -186,8 +186,11 @@ class GovernanceRegistry:
     def __init__(
         self,
         lifecycle: DataLifecycleRegistry | None = None,
+        *,
+        timeline: GovernanceAuditTimeline | None = None,
     ) -> None:
         self.lifecycle = lifecycle or DataLifecycleRegistry()
+        self.timeline = timeline
 
     def register(self, record: GovernedDataRecord) -> GovernedDataRecord:
         return self.lifecycle.register(record)
@@ -243,7 +246,60 @@ class GovernanceRegistry:
         }
         if created_at is not None:
             kwargs["created_at"] = created_at
-        return self.lifecycle.ensure_registered(GovernedDataRecord(**kwargs))
+        record = self.lifecycle.ensure_registered(GovernedDataRecord(**kwargs))
+        if self.timeline is not None:
+            self.timeline.record_registration(record, mode="register")
+        return record
+
+    def reconcile_canonical_write(
+        self,
+        plane: CanonicalDataPlane | str,
+        *,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: DataClass | str | int,
+        purposes: Iterable[str],
+        deletion_targets: Iterable[str] | None = None,
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+    ) -> GovernedDataRecord:
+        """Reconcile mutable lifecycle metadata for an active canonical write."""
+
+        canonical = CanonicalDataPlane.parse(plane)
+        policy = _CANONICAL_WRITE_POLICIES[canonical]
+        normalized_purposes = _normalized_string_values(
+            purposes,
+            field="purpose",
+        )
+        targets = (
+            _normalized_string_values(
+                deletion_targets,
+                field="deletion target",
+            )
+            if deletion_targets is not None
+            else policy.default_deletion_targets
+        )
+        kwargs: dict[str, Any] = {
+            "record_id": _required_text(record_id, "record_id"),
+            "tenant_id": _required_text(tenant_id, "tenant_id"),
+            "owner_plane": policy.owner_plane,
+            "source_ref": _required_text(source_ref, "source_ref"),
+            "data_class": DataClass.parse(data_class),
+            "purposes": normalized_purposes,
+            "deletion_targets": targets,
+            "retention_until": retention_until,
+            "exportable": bool(exportable),
+        }
+        if created_at is not None:
+            kwargs["created_at"] = created_at
+        record = self.lifecycle.reconcile_registered(
+            GovernedDataRecord(**kwargs)
+        )
+        if self.timeline is not None:
+            self.timeline.record_registration(record, mode="reconcile")
+        return record
 
     def context_for(
         self,

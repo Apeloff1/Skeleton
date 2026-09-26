@@ -21,23 +21,38 @@ of tool calls to run before producing its output).
 from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
-import os, asyncio, json, sqlite3, subprocess, tempfile
+import os, asyncio, json, sqlite3
 from typing import Any, Callable, Coroutine
 from uuid import uuid4
-from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.exec_guard import code_execution_enabled, execution_disabled_response, execution_disabled_message
+from core.route_privacy import require_route_tool_transfer
 from skeleton.skills import (
     AsyncToolRuntime,
     SQLiteToolReceiptStore,
+    ToolApprovalPolicy,
+    ToolAuthorityClass,
     ToolEffect,
+    ToolIdempotencyMode,
+    ToolRiskClass,
+    ToolSideEffectClass,
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
 )
+from skeleton.skills.tool_contract import validate_tool_arguments
+from skeleton.vault.data_lifecycle import DataLifecycleRegistry, LifecycleState
+from skeleton.vault.data_governance import DataGovernanceDenied
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.skills.tool_adapters import (
     ArtifactAdapterPolicy,
+    AsyncArtifactPackageAdapter,
+    AsyncDatabaseQueryAdapter,
+    AsyncJeevesConsultAdapter,
+    AsyncNetworkSearchAdapter,
+    AsyncSandboxCompileAdapter,
+    AsyncVaultQueryAdapter,
     DatabaseAdapterPolicy,
     NetworkEgressPolicy,
     SandboxAdapterPolicy,
@@ -50,7 +65,7 @@ from . import binary_builder
 
 _MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 _DB_NAME = os.environ.get("DB_NAME", "test_database")
-_client: AsyncIOMotorClient | None = None
+_client: Any | None = None
 
 _db_scope_raw = tuple(
     item.strip()
@@ -72,94 +87,42 @@ def _db():
     return _client[_DB_NAME]
 
 
+_VAULT_OWNER = AsyncVaultQueryAdapter(vault_port=vault_loader)
+_JEEVES_OWNER = AsyncJeevesConsultAdapter(
+    consultant_port=jeeves_consultant
+)
+_SANDBOX_OWNER = AsyncSandboxCompileAdapter(
+    policy=_SANDBOX_POLICY,
+    execution_enabled=lambda: code_execution_enabled(),
+    disabled_response=lambda name: execution_disabled_response(name),
+)
+_DATABASE_OWNER = AsyncDatabaseQueryAdapter(
+    database_provider=lambda: _db(),
+    policy=_DATABASE_POLICY,
+)
+_NETWORK_OWNER = AsyncNetworkSearchAdapter(policy=_NETWORK_POLICY)
+_ARTIFACT_OWNER = AsyncArtifactPackageAdapter(
+    database_provider=lambda: _db(),
+    package_builder=binary_builder,
+    policy=_ARTIFACT_POLICY,
+    execution_enabled=lambda: code_execution_enabled(),
+    disabled_response=lambda name: execution_disabled_response(name),
+)
+
+
 # ─────────────────────────────────────────────────────────────────
-# Tool implementations
+# Compatibility delegates
 # ─────────────────────────────────────────────────────────────────
 async def _tool_vault_query(params: dict) -> dict:
-    topic = params.get("topic") or params.get("collection") or ""
-    limit = int(params.get("limit", 10))
-    if params.get("collection"):
-        rows = vault_loader.query_collection(params["collection"], limit=limit,
-                                              contains=params.get("contains"))
-        return {"collection": params["collection"], "rows": rows, "count": len(rows)}
-    return {"topic": topic, "matches": vault_loader.query_topic(topic, limit=limit)}
+    return await _VAULT_OWNER.execute(params)
 
 
 async def _tool_jeeves_consult(params: dict) -> dict:
-    return await jeeves_consultant.consult(
-        params.get("context", "lesson"),
-        topic=params.get("topic", ""),
-        limit=int(params.get("limit", 1)),
-    )
+    return await _JEEVES_OWNER.execute(params)
 
 
 async def _tool_compile_code(params: dict) -> dict:
-    if not code_execution_enabled():
-        return execution_disabled_response("Tool compile execution")
-
-    scoped = _SANDBOX_POLICY.compile_request(params)
-    lang = scoped["language"]
-    code = scoped["code"]
-    timeout_seconds = scoped["timeout_seconds"]
-    max_output_bytes = scoped["max_output_bytes"]
-    max_memory_mb = scoped["max_memory_mb"]
-
-    suffix_map = {"c": ".c", "cpp": ".cpp", "cxx": ".cpp", "go": ".go", "rust": ".rs"}
-    cmd_map = {
-        "c": lambda src, out: ["gcc", src, "-o", out],
-        "cpp": lambda src, out: ["g++", src, "-o", out],
-        "cxx": lambda src, out: ["g++", src, "-o", out],
-        "go": lambda src, out: ["go", "build", "-o", out, src],
-        "rust": lambda src, out: ["rustc", src, "-o", out],
-    }
-
-    def _run_compile() -> dict:
-        with tempfile.TemporaryDirectory() as td:
-            src = os.path.join(td, f"src{suffix_map[lang]}")
-            outp = os.path.join(td, "a.out")
-            with open(src, "w", encoding="utf-8") as fh:
-                fh.write(code)
-
-            preexec_fn = None
-            if os.name == "posix":
-                def _limits():
-                    import resource
-                    memory_bytes = int(max_memory_mb) * 1024 * 1024
-                    resource.setrlimit(resource.RLIMIT_AS, (memory_bytes, memory_bytes))
-                    cpu_seconds = max(1, int(float(timeout_seconds)) + 1)
-                    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
-                preexec_fn = _limits
-
-            try:
-                with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
-                    proc = subprocess.Popen(
-                        cmd_map[lang](src, outp),
-                        stdout=stdout_file,
-                        stderr=stderr_file,
-                        preexec_fn=preexec_fn,
-                    )
-                    try:
-                        exit_code = proc.wait(timeout=timeout_seconds)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait()
-                        return {"ok": False, "error": "compile timed out"}
-
-                    def _tail(file_obj):
-                        size = file_obj.seek(0, os.SEEK_END)
-                        file_obj.seek(max(0, size - max_output_bytes), os.SEEK_SET)
-                        return file_obj.read().decode("utf-8", errors="replace")
-
-                    return {
-                        "ok": exit_code == 0,
-                        "stdout": _tail(stdout_file),
-                        "stderr": _tail(stderr_file),
-                        "exit_code": exit_code,
-                    }
-            except FileNotFoundError:
-                return {"ok": False, "error": "toolchain_missing"}
-
-    return await asyncio.to_thread(_run_compile)
+    return await _SANDBOX_OWNER.execute(params)
 
 
 async def _tool_run_code(params: dict) -> dict:
@@ -190,103 +153,15 @@ async def _tool_run_code(params: dict) -> dict:
 
 
 async def _tool_package_build(params: dict) -> dict:
-    if not code_execution_enabled():
-        return execution_disabled_response("Tool binary packaging")
-
-    scoped = _ARTIFACT_POLICY.package_request(params)
-    build_id = scoped["build_id"]
-    db = _db()
-    doc = await db.galaxy_builds.find_one({"build_id": build_id}, {"_id": 0})
-    if not doc:
-        return {"ok": False, "error": f"build_id not found: {build_id}"}
-
-    out = await binary_builder.package_build(doc, kinds=scoped["kinds"])
-    oversized = []
-    for artifact in out.get("artifacts", []):
-        size_bytes = int(artifact.get("size_bytes") or 0)
-        if size_bytes > scoped["max_output_bytes"]:
-            oversized.append(str(artifact.get("artifact_id") or "unknown"))
-            artifact_path = artifact.get("path")
-            if isinstance(artifact_path, str):
-                try:
-                    os.remove(artifact_path)
-                except (FileNotFoundError, OSError):
-                    pass
-        else:
-            artifact["retention_days"] = scoped["retention_days"]
-
-    if oversized:
-        return {
-            "ok": False,
-            "error": "artifact_too_large",
-            "artifacts_rejected": oversized,
-        }
-
-    try:
-        for art in out.get("artifacts", []):
-            await db.build_artifacts.update_one(
-                {"artifact_id": art["artifact_id"]},
-                {"$set": art},
-                upsert=True,
-            )
-    except Exception:
-        pass
-    return {"ok": True, **out}
+    return await _ARTIFACT_OWNER.execute(params)
 
 
 async def _tool_mongo_query(params: dict) -> dict:
-    scoped = _DATABASE_POLICY.query_request(params)
-    db = _db()
-    coll = scoped["collection"]
-    rows = await db[coll].find(
-        scoped["filter"],
-        scoped["project"],
-    ).limit(scoped["limit"]).to_list(length=scoped["limit"])
-    return {"ok": True, "collection": coll, "rows": rows, "count": len(rows)}
+    return await _DATABASE_OWNER.execute(params)
 
 
 async def _tool_web_search(params: dict) -> dict:
-    """Live web search through bounded egress and result policy."""
-    scoped = _NETWORK_POLICY.search_request(params)
-    query = scoped["query"]
-    max_results = scoped["max_results"]
-    kind = scoped["kind"]
-    try:
-        from ddgs import DDGS
-    except Exception:
-        return {"ok": False, "error": "ddgs_not_installed"}
-    try:
-        loop = asyncio.get_running_loop()
-
-        def _search():
-            with DDGS() as d:
-                if kind == "news":
-                    return list(d.news(query, max_results=max_results))
-                if kind == "images":
-                    return list(d.images(query, max_results=max_results))
-                return list(d.text(query, max_results=max_results))
-
-        results = await loop.run_in_executor(None, _search)
-        clean: list[dict[str, str]] = []
-        for raw in results:
-            if not isinstance(raw, dict):
-                continue
-            normalized = _NETWORK_POLICY.sanitize_result(raw)
-            if normalized is not None:
-                clean.append(normalized)
-            if len(clean) >= max_results:
-                break
-        return {
-            "ok": True,
-            "query": query,
-            "kind": kind,
-            "results": clean,
-            "count": len(clean),
-        }
-    except ToolAdapterDenied:
-        raise
-    except Exception:
-        return {"ok": False, "error": "web_search_failed"}
+    return await _NETWORK_OWNER.execute(params)
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -326,6 +201,19 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
                 "contains": {"type": "string", "maxLength": 512},
             }
         ),
+        output_schema={"type": "object"},
+        capabilities=("vault.read",),
+        authority_class=ToolAuthorityClass.READ,
+        risk_class=ToolRiskClass.LOW,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.NEVER,
+        network_policy="none",
+        data_policy="internal:bounded-vault",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=1024 * 1024,
+        max_concurrency=16,
+
     ),
     "jeeves_consult": ToolManifest(
         tool_id="jeeves_consult",
@@ -338,6 +226,19 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
                 "limit": {"type": "integer", "minimum": 1, "maximum": 20},
             }
         ),
+        output_schema={"type": "object"},
+        capabilities=("jeeves.read",),
+        authority_class=ToolAuthorityClass.READ,
+        risk_class=ToolRiskClass.LOW,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.NEVER,
+        network_policy="none",
+        data_policy="internal:persona-knowledge",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=256 * 1024,
+        max_concurrency=16,
+
     ),
     "compile_code": ToolManifest(
         tool_id="compile_code",
@@ -353,6 +254,19 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
             },
             required=["code"],
         ),
+        output_schema={"type": "object"},
+        capabilities=("sandbox.compile",),
+        authority_class=ToolAuthorityClass.PRIVILEGED,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.LOCAL_REVERSIBLE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.POLICY,
+        network_policy="none",
+        data_policy="ephemeral:sandbox-source",
+        cost_model={"kind": "resource", "meter": "compile_seconds"},
+        result_size_limit=128 * 1024,
+        max_concurrency=4,
+
     ),
     "run_code": ToolManifest(
         tool_id="run_code",
@@ -365,6 +279,20 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
             },
             required=["code"],
         ),
+        output_schema={"type": "object"},
+        capabilities=("sandbox.execute",),
+        authority_class=ToolAuthorityClass.PRIVILEGED,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.POLICY,
+        network_policy="none",
+        data_policy="ephemeral:sandbox-source",
+        cost_model={"kind": "disabled"},
+        result_size_limit=16 * 1024,
+        max_concurrency=1,
+        enabled=False,
+
     ),
     "package_build": ToolManifest(
         tool_id="package_build",
@@ -392,6 +320,19 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
             },
             required=["build_id"],
         ),
+        output_schema={"type": "object"},
+        capabilities=("artifact.package", "artifact.persist"),
+        authority_class=ToolAuthorityClass.WRITE,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.LOCAL_REVERSIBLE,
+        idempotency_mode=ToolIdempotencyMode.COMPENSATABLE,
+        approval_policy=ToolApprovalPolicy.ALWAYS,
+        network_policy="none",
+        data_policy="internal:build-artifact",
+        cost_model={"kind": "resource", "meter": "artifact_bytes"},
+        result_size_limit=2 * 1024 * 1024,
+        max_concurrency=2,
+
         effect=ToolEffect.REVERSIBLE,
         approval_required=True,
     ),
@@ -408,6 +349,19 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
             },
             required=["collection"],
         ),
+        output_schema={"type": "object"},
+        capabilities=("repository.read",),
+        authority_class=ToolAuthorityClass.READ,
+        risk_class=ToolRiskClass.MEDIUM,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.NEVER,
+        network_policy="database:scoped",
+        data_policy="internal:collection-allowlist",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=1024 * 1024,
+        max_concurrency=16,
+
     ),
     "web_search": ToolManifest(
         tool_id="web_search",
@@ -421,18 +375,69 @@ _TOOL_MANIFESTS: dict[str, ToolManifest] = {
                 "max_results": {"type": "integer", "minimum": 1, "maximum": 10},
             }
         ),
+        output_schema={"type": "object"},
+        capabilities=("network.search",),
+        authority_class=ToolAuthorityClass.READ,
+        risk_class=ToolRiskClass.MEDIUM,
+        side_effect_class=ToolSideEffectClass.NONE,
+        idempotency_mode=ToolIdempotencyMode.INTRINSIC,
+        approval_policy=ToolApprovalPolicy.NEVER,
+        network_policy="public-search:bounded-egress",
+        data_policy="public:untrusted",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=512 * 1024,
+        max_concurrency=8,
+
     ),
 }
 
 
 class _CompatibilityResultStore:
-    """Durable projection of canonical tool outputs for legacy callers."""
+    """Durable governed projection of canonical tool outputs for legacy callers."""
 
-    def __init__(self, path: str = ":memory:", max_entries: int = 4096) -> None:
+    _SOURCE_PREFIX = "tool-result://"
+    _DELETION_TARGET = "tool-result"
+
+    def __init__(
+        self,
+        path: str = ":memory:",
+        max_entries: int = 4096,
+        *,
+        governance: GovernanceRegistry | None = None,
+        retention_seconds: int = 7 * 24 * 60 * 60,
+    ) -> None:
+        if (
+            isinstance(max_entries, bool)
+            or not isinstance(max_entries, int)
+            or max_entries < 1
+        ):
+            raise ValueError("max_entries must be a positive integer")
+        if (
+            isinstance(retention_seconds, bool)
+            or not isinstance(retention_seconds, int)
+            or retention_seconds < 60
+            or retention_seconds > 365 * 24 * 60 * 60
+        ):
+            raise ValueError(
+                "retention_seconds must be within [60, 31536000]"
+            )
         self.max_entries = max_entries
+        self.retention_seconds = retention_seconds
         self._lock = asyncio.Lock()
+        self._path = str(path)
+        self._owns_governance = governance is None
+        if governance is None:
+            lifecycle_path = (
+                None
+                if self._path == ":memory:"
+                else self._path + ".governance.sqlite3"
+            )
+            governance = GovernanceRegistry(
+                DataLifecycleRegistry(lifecycle_path)
+            )
+        self.governance = governance
         self._connection = sqlite3.connect(
-            str(path),
+            self._path,
             check_same_thread=False,
             isolation_level=None,
             timeout=5.0,
@@ -443,14 +448,130 @@ class _CompatibilityResultStore:
             CREATE TABLE IF NOT EXISTS legacy_tool_result (
                 result_ref TEXT PRIMARY KEY,
                 result_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                tenant_id TEXT,
+                operation_id TEXT,
+                tool_id TEXT,
+                created_at_epoch REAL,
+                retention_until REAL
             )
             """
         )
+        existing_columns = {
+            str(row["name"])
+            for row in self._connection.execute(
+                "PRAGMA table_info(legacy_tool_result)"
+            ).fetchall()
+        }
+        for column, ddl in (
+            ("tenant_id", "TEXT"),
+            ("operation_id", "TEXT"),
+            ("tool_id", "TEXT"),
+            ("created_at_epoch", "REAL"),
+            ("retention_until", "REAL"),
+        ):
+            if column not in existing_columns:
+                self._connection.execute(
+                    f"ALTER TABLE legacy_tool_result ADD COLUMN {column} {ddl}"
+                )
 
-    async def put(self, request: ToolExecutionRequest, result: dict) -> str:
+    @classmethod
+    def source_ref(cls, result_ref: str) -> str:
+        value = str(result_ref).strip()
+        if not value:
+            raise ValueError("result_ref is required")
+        return cls._SOURCE_PREFIX + value
+
+    @classmethod
+    def _parse_source_ref(cls, source_ref: object) -> str:
+        raw = str(source_ref).strip()
+        if not raw.startswith(cls._SOURCE_PREFIX):
+            raise ValueError("tool result source_ref is invalid")
+        result_ref = raw[len(cls._SOURCE_PREFIX):]
+        if not result_ref:
+            raise ValueError("tool result source_ref is invalid")
+        return result_ref
+
+    @staticmethod
+    def _data_class(manifest: ToolManifest | None) -> str:
+        if manifest is None:
+            return "internal"
+        prefix = str(manifest.data_policy).split(":", 1)[0].strip().lower()
+        if prefix in {"public", "internal", "confidential", "restricted"}:
+            return prefix
+        return "internal"
+
+    @staticmethod
+    def _created_epoch(row: sqlite3.Row) -> float:
+        raw = row["created_at_epoch"]
+        if raw is not None:
+            return float(raw)
+        parsed = datetime.fromisoformat(str(row["created_at"]))
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).timestamp()
+
+    def _govern_result(
+        self,
+        *,
+        result_ref: str,
+        request: ToolExecutionRequest,
+        manifest: ToolManifest | None,
+        created_at: float,
+        retention_until: float,
+    ) -> None:
+        self.governance.register_canonical_write(
+            "artifact",
+            record_id=result_ref,
+            tenant_id=request.tenant_id,
+            source_ref=self.source_ref(result_ref),
+            data_class=self._data_class(manifest),
+            purposes=("model-inference",),
+            deletion_targets=(self._DELETION_TARGET,),
+            created_at=created_at,
+            retention_until=retention_until,
+            exportable=False,
+        )
+
+    def _capacity_plan(
+        self,
+        rows: list[sqlite3.Row],
+        *,
+        now: float,
+    ) -> list[tuple[str, str, str]]:
+        plans: list[tuple[str, str, str]] = []
+        for row in rows:
+            tenant_id = row["tenant_id"]
+            result_ref = row["result_ref"]
+            if tenant_id is None:
+                # Pre-governance legacy rows are retained until they are
+                # replayed/backfilled with tenant identity.
+                continue
+            plan = self.governance.request_deletion(
+                str(tenant_id),
+                record_ids=(str(result_ref),),
+                reason="tool-result-capacity",
+                now=now,
+            )
+            plans.append(
+                (plan.plan_id, str(result_ref), str(tenant_id))
+            )
+        return plans
+
+    async def put(
+        self,
+        request: ToolExecutionRequest,
+        result: dict,
+        *,
+        manifest: ToolManifest | None = None,
+    ) -> str:
         if not isinstance(result, dict):
             raise TypeError("legacy tool result must be an object")
+        if manifest is not None:
+            if manifest.tool_id != request.tool_id:
+                raise ValueError("tool result manifest does not match request")
+            validate_tool_arguments(manifest.output_schema or {}, result)
+
         encoded_text = json.dumps(
             result,
             sort_keys=True,
@@ -459,67 +580,213 @@ class _CompatibilityResultStore:
             default=str,
         )
         encoded = encoded_text.encode("utf-8")
-        identity = "\x1f".join(
-            (
-                request.operation_id,
-                request.tool_id,
-                request.idempotency_key,
-                request.arguments_digest,
+        if manifest is not None and len(encoded) > manifest.result_size_limit:
+            raise ValueError("tool result exceeds manifest result_size_limit")
+
+        identity_parts = [request.operation_id]
+        if request.execution_id is not None:
+            identity_parts.extend(
+                (request.execution_id, request.turn_id or "", request.call_id or "")
             )
-        ).encode("utf-8")
+        identity_parts.extend(
+            (request.tool_id, request.idempotency_key, request.arguments_digest)
+        )
+        identity = "\x1f".join(identity_parts).encode("utf-8")
         ref = "legacy-tool-result:" + hashlib.sha256(
             identity + b"\x1f" + encoded
         ).hexdigest()
+
         async with self._lock:
-            self._connection.execute("BEGIN IMMEDIATE")
-            try:
-                existing = self._connection.execute(
-                    "SELECT result_json FROM legacy_tool_result WHERE result_ref = ?",
-                    (ref,),
-                ).fetchone()
-                if existing is not None and existing["result_json"] != encoded_text:
-                    raise RuntimeError("legacy tool result digest collision")
-                self._connection.execute(
-                    """
-                    INSERT OR IGNORE INTO legacy_tool_result(
-                        result_ref, result_json, created_at
-                    ) VALUES (?, ?, ?)
-                    """,
-                    (ref, encoded_text, datetime.now(timezone.utc).isoformat()),
+            existing = self._connection.execute(
+                "SELECT * FROM legacy_tool_result WHERE result_ref = ?",
+                (ref,),
+            ).fetchone()
+            if existing is not None and existing["result_json"] != encoded_text:
+                raise RuntimeError("legacy tool result digest collision")
+            if existing is not None:
+                for column, expected in (
+                    ("tenant_id", request.tenant_id),
+                    ("operation_id", request.operation_id),
+                    ("tool_id", request.tool_id),
+                ):
+                    current = existing[column]
+                    if current is not None and str(current) != str(expected):
+                        raise RuntimeError(
+                            "legacy tool result governance identity conflict"
+                        )
+                created_epoch = self._created_epoch(existing)
+                retention_until = (
+                    float(existing["retention_until"])
+                    if existing["retention_until"] is not None
+                    else created_epoch + self.retention_seconds
                 )
+            else:
+                created_epoch = datetime.now(timezone.utc).timestamp()
+                retention_until = created_epoch + self.retention_seconds
+
+            # Governance is registered before payload mutation. A crash may
+            # therefore leave metadata for an absent payload, but never a
+            # durable payload without lifecycle authority.
+            self._govern_result(
+                result_ref=ref,
+                request=request,
+                manifest=manifest,
+                created_at=created_epoch,
+                retention_until=retention_until,
+            )
+
+            self._connection.execute("BEGIN IMMEDIATE")
+            plans: list[tuple[str, str, str]] = []
+            try:
                 self._connection.execute(
                     """
-                    DELETE FROM legacy_tool_result
-                    WHERE result_ref IN (
-                        SELECT result_ref
-                        FROM legacy_tool_result
-                        ORDER BY created_at DESC, result_ref DESC
-                        LIMIT -1 OFFSET ?
-                    )
+                    INSERT INTO legacy_tool_result(
+                        result_ref, result_json, created_at, tenant_id,
+                        operation_id, tool_id, created_at_epoch,
+                        retention_until
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(result_ref) DO UPDATE SET
+                        tenant_id = COALESCE(
+                            legacy_tool_result.tenant_id,
+                            excluded.tenant_id
+                        ),
+                        operation_id = COALESCE(
+                            legacy_tool_result.operation_id,
+                            excluded.operation_id
+                        ),
+                        tool_id = COALESCE(
+                            legacy_tool_result.tool_id,
+                            excluded.tool_id
+                        ),
+                        created_at_epoch = COALESCE(
+                            legacy_tool_result.created_at_epoch,
+                            excluded.created_at_epoch
+                        ),
+                        retention_until = COALESCE(
+                            legacy_tool_result.retention_until,
+                            excluded.retention_until
+                        )
+                    """,
+                    (
+                        ref,
+                        encoded_text,
+                        datetime.fromtimestamp(
+                            created_epoch,
+                            timezone.utc,
+                        ).isoformat(),
+                        request.tenant_id,
+                        request.operation_id,
+                        request.tool_id,
+                        created_epoch,
+                        retention_until,
+                    ),
+                )
+                overflow = self._connection.execute(
+                    """
+                    SELECT *
+                    FROM legacy_tool_result
+                    ORDER BY created_at_epoch DESC, created_at DESC, result_ref DESC
+                    LIMIT -1 OFFSET ?
                     """,
                     (self.max_entries,),
+                ).fetchall()
+                governed_overflow = [
+                    row for row in overflow if row["tenant_id"] is not None
+                ]
+                plans = self._capacity_plan(
+                    governed_overflow,
+                    now=datetime.now(timezone.utc).timestamp(),
                 )
+                for _, result_ref, _ in plans:
+                    self._connection.execute(
+                        "DELETE FROM legacy_tool_result WHERE result_ref = ?",
+                        (result_ref,),
+                    )
                 self._connection.execute("COMMIT")
             except Exception:
                 self._connection.execute("ROLLBACK")
                 raise
+
+            for plan_id, result_ref, _tenant_id in plans:
+                self.governance.acknowledge_deletion(
+                    plan_id,
+                    result_ref,
+                    self._DELETION_TARGET,
+                    now=datetime.now(timezone.utc).timestamp(),
+                )
         return ref
 
     async def get(self, ref: str) -> dict | None:
         async with self._lock:
             row = self._connection.execute(
-                "SELECT result_json FROM legacy_tool_result WHERE result_ref = ?",
+                "SELECT * FROM legacy_tool_result WHERE result_ref = ?",
                 (str(ref),),
             ).fetchone()
-        if row is None:
-            return None
-        value = json.loads(row["result_json"])
+            if row is None or row["tenant_id"] is None:
+                return None
+            lifecycle = self.governance.lifecycle.get(str(ref))
+            if lifecycle["state"] != LifecycleState.ACTIVE.value:
+                return None
+            retention_until = lifecycle.get("retention_until")
+            if (
+                retention_until is not None
+                and float(retention_until)
+                <= datetime.now(timezone.utc).timestamp()
+            ):
+                return None
+            if lifecycle["tenant_id"] != str(row["tenant_id"]):
+                raise RuntimeError("tool result governance tenant mismatch")
+            value = json.loads(row["result_json"])
         if not isinstance(value, dict):
             raise RuntimeError("durable legacy tool result is not an object")
         return value
 
+    async def delete(self, action) -> None:
+        result_ref = self._parse_source_ref(action.source_ref)
+        if result_ref != str(action.record_id):
+            raise RuntimeError("tool result lifecycle identity mismatch")
+        async with self._lock:
+            self._connection.execute(
+                """
+                DELETE FROM legacy_tool_result
+                WHERE result_ref = ? AND tenant_id = ?
+                """,
+                (result_ref, str(action.tenant_id)),
+            )
+
+    async def execute_retention_expiry(
+        self,
+        *,
+        now: float | None = None,
+    ) -> tuple[str, ...]:
+        timestamp = (
+            datetime.now(timezone.utc).timestamp()
+            if now is None
+            else float(now)
+        )
+        deleted: list[str] = []
+        plans = self.governance.plan_retention_expiry(now=timestamp)
+        for plan in plans:
+            for action in plan.actions:
+                if action.target != self._DELETION_TARGET:
+                    raise RuntimeError(
+                        "unexpected tool result deletion target"
+                    )
+                await self.delete(action)
+                self.governance.acknowledge_deletion(
+                    plan.plan_id,
+                    action.record_id,
+                    action.target,
+                    now=timestamp,
+                )
+                deleted.append(action.record_id)
+        return tuple(deleted)
+
     def close(self) -> None:
         self._connection.close()
+        if self._owns_governance:
+            self.governance.lifecycle.close()
+
 
 
 def _canonical_receipt_path() -> str:
@@ -528,6 +795,21 @@ def _canonical_receipt_path() -> str:
 
 def _canonical_result_path() -> str:
     return os.environ.get("BACKEND_TOOL_RESULT_PATH", ":memory:")
+
+
+def _canonical_result_retention_seconds() -> int:
+    raw = os.environ.get("BACKEND_TOOL_RESULT_RETENTION_SECONDS", "604800")
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            "BACKEND_TOOL_RESULT_RETENTION_SECONDS must be an integer"
+        ) from exc
+    if value < 60 or value > 365 * 24 * 60 * 60:
+        raise RuntimeError(
+            "BACKEND_TOOL_RESULT_RETENTION_SECONDS is outside safe bounds"
+        )
+    return value
 
 
 _CANONICAL_RUNTIME: AsyncToolRuntime | None = None
@@ -569,22 +851,14 @@ async def _package_compensator(
         store = _CANONICAL_RESULT_STORE
         result = await store.get(result_ref) if store is not None else None
         if result is not None:
-            for artifact in result.get("artifacts", []):
-                if not isinstance(artifact, dict):
-                    continue
-                path = artifact.get("path")
-                if isinstance(path, str):
-                    try:
-                        os.remove(path)
-                    except (FileNotFoundError, OSError):
-                        pass
-    material = (
-        request.operation_id
-        + "\x1f"
-        + request.tool_id
-        + "\x1f"
-        + request.idempotency_key
-    ).encode("utf-8")
+            _ARTIFACT_OWNER.compensate_result(result)
+    identity_parts = [request.operation_id]
+    if request.execution_id is not None:
+        identity_parts.extend(
+            (request.execution_id, request.turn_id or "", request.call_id or "")
+        )
+    identity_parts.extend((request.tool_id, request.idempotency_key))
+    material = "\x1f".join(identity_parts).encode("utf-8")
     return "compensation:" + hashlib.sha256(material).hexdigest()
 
 
@@ -601,7 +875,8 @@ async def _ensure_canonical_runtime() -> None:
             )
         if _CANONICAL_RESULT_STORE is None:
             _CANONICAL_RESULT_STORE = _CompatibilityResultStore(
-                _canonical_result_path()
+                _canonical_result_path(),
+                retention_seconds=_canonical_result_retention_seconds(),
             )
         runtime = _CANONICAL_RUNTIME
         store = _CANONICAL_RESULT_STORE
@@ -612,6 +887,7 @@ async def _ensure_canonical_runtime() -> None:
                 request: ToolExecutionRequest,
                 *,
                 _fn=fn,
+                _manifest=manifest,
             ) -> str:
                 try:
                     result = await _fn(dict(request.arguments))
@@ -619,7 +895,11 @@ async def _ensure_canonical_runtime() -> None:
                     result = {"ok": False, "error": "tool_denied"}
                 except Exception:
                     result = {"ok": False, "error": "tool_failed"}
-                return await store.put(request, result)
+                return await store.put(
+                    request,
+                    result,
+                    manifest=_manifest,
+                )
 
             await runtime.register(
                 manifest,
@@ -641,9 +921,14 @@ async def invoke_canonical(
     operation_id: str,
     tenant_id: str,
     idempotency_key: str,
+    execution_id: str | None = None,
+    turn_id: str | None = None,
+    call_id: str | None = None,
     request_id: str | None = None,
     approval_ref: str | None = None,
     delegated_authority_ref: str | None = None,
+    data_class: str = "internal",
+    transfer_purpose: str = "tool-execution",
 ) -> dict:
     """Execute through canonical request/receipt authority."""
 
@@ -653,10 +938,30 @@ async def invoke_canonical(
             "error": f"unknown tool: {tool}",
             "available": list(TOOLS.keys()),
         }
+    manifest = _TOOL_MANIFESTS[tool]
+    try:
+        require_route_tool_transfer(
+            tool_id=tool,
+            data_policy=manifest.data_policy,
+            network_policy=manifest.network_policy,
+            data_class=data_class,
+            purpose=transfer_purpose,
+            tenant_id=tenant_id,
+            source="backend.tool_registry",
+        )
+    except DataGovernanceDenied:
+        return {
+            "ok": False,
+            "error": "route_privacy_denied",
+            "tool": tool,
+        }
     await _ensure_canonical_runtime()
     request = ToolExecutionRequest(
         request_id=request_id or str(uuid4()),
         operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
         tenant_id=tenant_id,
         tool_id=tool,
         idempotency_key=idempotency_key,
@@ -664,6 +969,8 @@ async def invoke_canonical(
         requested_at=datetime.now(timezone.utc),
         approval_ref=approval_ref,
         delegated_authority_ref=delegated_authority_ref,
+        data_class=data_class,
+        transfer_purpose=transfer_purpose,
     )
     runtime = _CANONICAL_RUNTIME
     if runtime is None:
@@ -721,11 +1028,16 @@ async def invoke(
     params: dict,
     *,
     operation_id: str | None = None,
+    execution_id: str | None = None,
+    turn_id: str | None = None,
+    call_id: str | None = None,
     tenant_id: str = "legacy-backend",
     idempotency_key: str | None = None,
     request_id: str | None = None,
     approval_ref: str | None = None,
     delegated_authority_ref: str = "legacy:backend/services/tool_registry.invoke",
+    data_class: str = "internal",
+    transfer_purpose: str = "tool-execution",
 ) -> dict:
     """Legacy-compatible entrypoint delegated through canonical authority."""
 
@@ -763,11 +1075,16 @@ async def invoke(
         tool,
         normalized_params,
         operation_id=op_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        call_id=call_id,
         tenant_id=tenant_id,
         idempotency_key=key,
         request_id=rid,
         approval_ref=approval_ref,
         delegated_authority_ref=delegated_authority_ref,
+        data_class=data_class,
+        transfer_purpose=transfer_purpose,
     )
 
 
@@ -779,6 +1096,9 @@ async def invoke_many(calls: list[dict]) -> list[dict]:
             call.get("tool"),
             call.get("params", {}),
             operation_id=call.get("operation_id"),
+            execution_id=call.get("execution_id"),
+            turn_id=call.get("turn_id"),
+            call_id=call.get("call_id"),
             tenant_id=call.get("tenant_id") or "legacy-backend",
             idempotency_key=call.get("idempotency_key"),
             request_id=call.get("request_id"),
@@ -786,6 +1106,11 @@ async def invoke_many(calls: list[dict]) -> list[dict]:
             delegated_authority_ref=(
                 call.get("delegated_authority_ref")
                 or "legacy:backend/services/tool_registry.invoke_many"
+            ),
+            data_class=call.get("data_class") or "internal",
+            transfer_purpose=(
+                call.get("transfer_purpose")
+                or "tool-execution"
             ),
         )
         for call in calls
@@ -818,6 +1143,8 @@ def describe() -> dict:
                 "approval_required": manifest.approval_required,
                 "idempotency_required": manifest.effect is not ToolEffect.READ_ONLY,
                 "canonical_version": manifest.version,
+                "data_policy": manifest.data_policy,
+                "network_policy": manifest.network_policy,
             }
         )
     return {

@@ -70,6 +70,7 @@ class ResourceBudget:
     max_provider_attempts: int = 3
     max_tool_calls: int = 32
     max_artifact_bytes: int = 100 * 1024 * 1024
+    max_storage_bytes: int = 100 * 1024 * 1024
     max_concurrency: int = 32
     max_queue_depth: int = 1_000
 
@@ -80,6 +81,7 @@ class ResourceBudget:
             "max_provider_attempts",
             "max_tool_calls",
             "max_artifact_bytes",
+            "max_storage_bytes",
             "max_concurrency",
             "max_queue_depth",
         ):
@@ -102,6 +104,7 @@ class ResourceBudget:
             "max_provider_attempts": self.max_provider_attempts,
             "max_tool_calls": self.max_tool_calls,
             "max_artifact_bytes": self.max_artifact_bytes,
+            "max_storage_bytes": self.max_storage_bytes,
             "max_concurrency": self.max_concurrency,
             "max_queue_depth": self.max_queue_depth,
         }
@@ -115,9 +118,10 @@ class UsageEstimate:
     output_tokens: int = 0
     cost_usd: float = 0.0
     wall_seconds: float = 0.0
-    provider_attempts: int = 1
+    provider_attempts: int = 0
     tool_calls: int = 0
     artifact_bytes: int = 0
+    storage_bytes: int = 0
 
     def __post_init__(self) -> None:
         for field_name in (
@@ -126,12 +130,10 @@ class UsageEstimate:
             "provider_attempts",
             "tool_calls",
             "artifact_bytes",
+            "storage_bytes",
         ):
             value = getattr(self, field_name)
-            if field_name == "provider_attempts":
-                _positive_int(value, field=field_name)
-            else:
-                _nonnegative_int(value, field=field_name)
+            _nonnegative_int(value, field=field_name)
         _finite_nonnegative(self.cost_usd, field="cost_usd")
         _finite_nonnegative(self.wall_seconds, field="wall_seconds")
 
@@ -231,6 +233,9 @@ def _remaining(request: AdmissionRequest) -> dict[str, float | int]:
         "artifact_bytes": max(
             0, budget.max_artifact_bytes - estimate.artifact_bytes
         ),
+        "storage_bytes": max(
+            0, budget.max_storage_bytes - estimate.storage_bytes
+        ),
         "concurrency": max(
             0, budget.max_concurrency - request.pressure.active_operations
         ),
@@ -284,6 +289,11 @@ def evaluate_admission(
             estimate.artifact_bytes > budget.max_artifact_bytes,
             AdmissionStatus.REJECT,
             "artifact_budget_exceeded",
+        ),
+        (
+            estimate.storage_bytes > budget.max_storage_bytes,
+            AdmissionStatus.REJECT,
+            "storage_budget_exceeded",
         ),
         (
             pressure.active_operations >= budget.max_concurrency,

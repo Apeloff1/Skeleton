@@ -284,11 +284,13 @@ def test_in_memory_unknown_usage_is_durable_within_ledger_and_fail_closed() -> N
     resolved = ledger.resolve_unknown_usage(
         reservation.reservation_id,
         "unknown-1",
-        UsageEstimate(artifact_bytes=50),
-        max_artifact_bytes=100,
+        UsageEstimate(storage_bytes=50),
+        max_storage_bytes=100,
         now=11.5,
     )
     assert resolved.category == "storage"
+    assert resolved.delta.storage_bytes == 50
+    assert resolved.delta.artifact_bytes == 0
     assert ledger.snapshot("tenant-a")["unknown_usage_events"] == 0
 
     completion = ledger.complete(
@@ -296,7 +298,8 @@ def test_in_memory_unknown_usage_is_durable_within_ledger_and_fail_closed() -> N
         UsageEstimate(),
         now=12.0,
     )
-    assert completion.actual.artifact_bytes == 50
+    assert completion.actual.storage_bytes == 50
+    assert completion.actual.artifact_bytes == 0
 
 
 def test_release_refuses_to_erase_metered_usage() -> None:

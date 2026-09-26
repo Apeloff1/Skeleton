@@ -48,8 +48,8 @@ class ChatReq(BaseModel):
         default_factory=list,
         max_length=20,
         description=(
-            "Legacy bootstrap history only. Once a server transcript exists for session_id, "
-            "the backend ignores caller-supplied history and reconstructs context from durable state."
+            "Deprecated compatibility field. Caller-supplied history is ignored; "
+            "server-owned transcript state is the only conversation authority."
         ),
     )
 

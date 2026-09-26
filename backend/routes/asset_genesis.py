@@ -151,11 +151,11 @@ def _build_prompt(kind: str, desc: str, guide: str) -> str:
 # ── nano-banana worker (runs in a daemon thread, own loop) ───────────────────
 def _gen_one(prompt: str, tag: str) -> tuple[str | None, str]:
     """Blocking single-image generation. Returns (base64|None, mime)."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     from core.render_quality import PHOTOREAL_SUFFIX, upscale_b64
 
     async def _go():
-        chat = (LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"asset-{tag}",
+        chat = (EngineChat(api_key=EMERGENT_LLM_KEY, session_id=f"asset-{tag}",
                         system_message="You are a AAA game concept artist producing clean, "
                                        "production-ready game art assets.")
                 .with_model("gemini", "gemini-3.1-flash-image-preview")

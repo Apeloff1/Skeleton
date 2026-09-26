@@ -6,12 +6,14 @@ from uuid import uuid4
 
 import pytest
 
+from skeleton.artifact_plane.governance import GovernedArtifactStore
 from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
 from skeleton.frontier.memory import InMemoryStore
 from skeleton.persistence.memory_repository import (
     MemoryNotFound,
     SQLiteMemoryRepository,
 )
+from skeleton.retrieval.governance import GovernedRetrievalIndex
 from skeleton.retrieval.index import InvertedIndex
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
@@ -19,10 +21,13 @@ from skeleton.vault.data_lifecycle import (
     GovernedDataRecord,
     LifecycleState,
 )
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.vault.lifecycle_adapters import (
+    GovernedArtifactLifecycleAdapter,
     LifecycleAdapterMissing,
     LifecycleAdapterRegistry,
     LifecycleExecutionError,
+    GovernedRetrievalLifecycleAdapter,
     LifecycleExecutor,
     MemoryDeletionAdapter,
     MongoCollectionLifecycleAdapter,
@@ -401,3 +406,189 @@ async def test_sqlite_memory_lifecycle_cross_tenant_export_returns_no_payload(
         }
     )
     assert payload is None
+
+@pytest.mark.asyncio
+async def test_governed_retrieval_lifecycle_is_tenant_scoped_and_exportable() -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    retrieval = GovernedRetrievalIndex(governance)
+    adapter = GovernedRetrievalLifecycleAdapter(retrieval)
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("retrieval", adapter)
+    adapters.register_export("retrieval", adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+
+    first = retrieval.add(
+        tenant_id="tenant-a",
+        doc_id="shared-doc",
+        text="alpha tenant knowledge",
+        data_class="confidential",
+        created_at=10.0,
+    )
+    second = retrieval.add(
+        tenant_id="tenant-b",
+        doc_id="shared-doc",
+        text="beta tenant knowledge",
+        created_at=11.0,
+    )
+
+    assert first.record_id != second.record_id
+    assert retrieval.size("tenant-a") == 1
+    assert retrieval.size("tenant-b") == 1
+    assert retrieval.search("tenant-a", "alpha")[0].fragment_id == "shared-doc"
+    assert retrieval.search("tenant-a", "beta") == ()
+
+    exported = await executor.export_tenant("tenant-a")
+    assert len(exported.records) == 1
+    assert exported.records[0]["payload"] == {
+        "record_id": first.record_id,
+        "tenant_id": "tenant-a",
+        "doc_id": "shared-doc",
+        "text": "alpha tenant knowledge",
+    }
+
+    plan = lifecycle.request_deletion(
+        "tenant-a",
+        record_ids=(first.record_id,),
+        now=20.0,
+    )
+    result = await executor.execute_deletion_plan(plan, now=21.0)
+
+    assert result.receipts[-1].state is LifecycleState.DELETED
+    assert retrieval.size("tenant-a") == 0
+    assert retrieval.size("tenant-b") == 1
+    assert retrieval.export_record("tenant-a", "shared-doc") is None
+    assert retrieval.export_record("tenant-b", "shared-doc") is not None
+
+
+@pytest.mark.asyncio
+async def test_governed_retrieval_retention_physically_deletes_index_record() -> None:
+    lifecycle = DataLifecycleRegistry()
+    retrieval = GovernedRetrievalIndex(GovernanceRegistry(lifecycle))
+    adapter = GovernedRetrievalLifecycleAdapter(retrieval)
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("retrieval", adapter)
+    adapters.register_export("retrieval", adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+
+    record = retrieval.add(
+        tenant_id="tenant-a",
+        doc_id="expired-doc",
+        text="old retrieval material",
+        created_at=10.0,
+        retention_until=15.0,
+    )
+    assert retrieval.size("tenant-a") == 1
+
+    results = await executor.execute_retention_expiry(now=20.0)
+
+    assert len(results) == 1
+    assert lifecycle.get(record.record_id)["state"] == "deleted"
+    assert retrieval.size("tenant-a") == 0
+
+@pytest.mark.asyncio
+async def test_governed_artifact_write_registers_before_export_and_delete(
+    tmp_path,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    store = GovernedArtifactStore(tmp_path / "artifacts", governance)
+    adapter = GovernedArtifactLifecycleAdapter(store)
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("artifact", adapter)
+    adapters.register_export("artifact", adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+
+    record = store.write_bytes(
+        tenant_id="tenant-a",
+        artifact_id="report.bin",
+        payload=b"governed-artifact",
+        data_class="confidential",
+        purposes=("artifact-delivery",),
+        created_at=10.0,
+        retention_until=100.0,
+        exportable=True,
+    )
+
+    registered = lifecycle.get(record.record_id)
+    assert registered["tenant_id"] == "tenant-a"
+    assert registered["owner_plane"] == "artifact"
+    assert registered["source_ref"] == record.source_ref
+    assert registered["state"] == "active"
+    assert registered["data_class"] == "confidential"
+
+    exported = await executor.export_tenant("tenant-a")
+    assert len(exported.records) == 1
+    payload = exported.records[0]["payload"]
+    assert payload["artifact_id"] == "report.bin"
+    assert payload["tenant_id"] == "tenant-a"
+    assert payload["size_bytes"] == len(b"governed-artifact")
+
+    plan = lifecycle.request_deletion(
+        "tenant-a",
+        record_ids=(record.record_id,),
+        now=20.0,
+    )
+    result = await executor.execute_deletion_plan(plan, now=21.0)
+
+    assert result.receipts[-1].state is LifecycleState.DELETED
+    assert store.read_bytes("tenant-a", "report.bin") is None
+    assert lifecycle.get(record.record_id)["state"] == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_governed_artifact_retention_expiry_removes_physical_bytes(
+    tmp_path,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    store = GovernedArtifactStore(tmp_path / "artifacts", governance)
+    adapter = GovernedArtifactLifecycleAdapter(store)
+    adapters = LifecycleAdapterRegistry()
+    adapters.register_deletion("artifact", adapter)
+    adapters.register_export("artifact", adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+
+    record = store.write_bytes(
+        tenant_id="tenant-a",
+        artifact_id="expired.bin",
+        payload=b"expired",
+        created_at=10.0,
+        retention_until=15.0,
+    )
+    assert store.read_bytes("tenant-a", "expired.bin") == b"expired"
+
+    results = await executor.execute_retention_expiry(now=20.0)
+
+    assert len(results) == 1
+    assert results[0].receipts[-1].state is LifecycleState.DELETED
+    assert store.read_bytes("tenant-a", "expired.bin") is None
+    assert lifecycle.get(record.record_id)["state"] == "deleted"
+
+
+def test_governed_artifact_governance_failure_prevents_file_mutation(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    store = GovernedArtifactStore(tmp_path / "artifacts", governance)
+
+    def fail_registration(*_args, **_kwargs):
+        raise RuntimeError("governance unavailable")
+
+    monkeypatch.setattr(
+        governance,
+        "register_canonical_write",
+        fail_registration,
+    )
+
+    with pytest.raises(RuntimeError, match="governance unavailable"):
+        store.write_bytes(
+            tenant_id="tenant-a",
+            artifact_id="blocked.bin",
+            payload=b"must-not-persist",
+            created_at=10.0,
+        )
+
+    assert store.read_bytes("tenant-a", "blocked.bin") is None

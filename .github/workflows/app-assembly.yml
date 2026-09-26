@@ -39,6 +39,10 @@ on:
       - "skeleton/testing/test_provider_runtime_schema_parity.py"
       - "machine/ai_runtime_schemas.json"
       - "skeleton/testing/test_provider_surface_inventory.py"
+      - "scripts/check_context_execution_boundary.py"
+      - "tests/test_context_execution_boundary.py"
+      - "scripts/check_instruction_policy_boundary.py"
+      - "tests/test_instruction_policy_boundary.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/testing/test_operation_stream.py"
@@ -52,6 +56,7 @@ on:
       - "skeleton/contracts/memory_record.py"
       - "skeleton/contracts/ai_execution.py"
       - "skeleton/context/compiler.py"
+      - "skeleton/context/compaction.py"
       - "skeleton/context/policy.py"
       - "skeleton/context/sources/**"
       - "skeleton/testing/test_context_compiler.py"
@@ -121,6 +126,7 @@ on:
       - "backend/tests/test_ai_chat_engine_cutover.py"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversation_regeneration.py"
+      - "backend/tests/test_conversation_governance.py"
       - "skeleton/vault/data_governance.py"
       - "skeleton/vault/data_lifecycle.py"
       - "skeleton/vault/governance_registry.py"
@@ -341,6 +347,12 @@ jobs:
             echo "~~~"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Validate context execution boundary
+        run: python scripts/check_context_execution_boundary.py
+
+      - name: Validate instruction policy boundary
+        run: python scripts/check_instruction_policy_boundary.py
+
       - name: Install full assembly test runtime
         if: steps.scope.outputs.full == 'true'
         run: >-
@@ -359,6 +371,7 @@ jobs:
           "bcrypt==4.3.0"
           "PyJWT==2.14.0"
           "email-validator==2.3.0"
+          "loguru==0.7.3"
 
       - name: Install plan-only test runtime
         if: steps.scope.outputs.full != 'true'
@@ -391,6 +404,7 @@ jobs:
         run: |
           yarn typecheck
           yarn test:operation-stream
+          yarn test:conversation
           yarn export:web
 
       - name: Compile assembly surface
@@ -400,7 +414,7 @@ jobs:
           skeleton/app skeleton/ai/assistant skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
           skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py skeleton/contracts/ai_execution.py
-          skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
+          skeleton/context/compiler.py skeleton/context/compaction.py skeleton/context/policy.py skeleton/context/sources
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py skeleton/persistence/execution_repository.py
@@ -425,7 +439,7 @@ jobs:
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/check_ai_execution_frontier.py scripts/check_ai_assistant_control_plane.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
-          scripts/check_state_topology.py scripts/check_provider_bootstrap.py
+          scripts/check_state_topology.py scripts/check_provider_bootstrap.py scripts/check_context_execution_boundary.py scripts/check_instruction_policy_boundary.py
 
       - name: Audit repository-wide assembly contracts
         if: steps.scope.outputs.full == 'true'
@@ -525,6 +539,8 @@ jobs:
           skeleton/testing/test_app_installer.py
           skeleton/testing/test_windows_installer.py
           tests/test_provider_runtime_boundary.py
+          tests/test_context_execution_boundary.py
+          tests/test_instruction_policy_boundary.py
           tests/test_jeeves_local_provider_policy.py
           tests/test_jeeves_chat_workspace.py
 
@@ -559,7 +575,11 @@ jobs:
           backend/tests/test_ai_chat_engine_cutover.py
           backend/tests/test_ai_assist_engine_cutover.py
           backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_ai_chat_conversation_finalization.py
           backend/tests/test_conversation_regeneration.py
+          backend/tests/test_conversation_regeneration_route.py
+          backend/tests/test_conversation_storage_admission.py
+          backend/tests/test_conversation_governance.py
           backend/tests/test_model_router.py
           backend/tests/test_ai_service_provider_convergence.py
 

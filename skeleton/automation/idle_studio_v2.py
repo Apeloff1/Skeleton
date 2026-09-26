@@ -19,7 +19,11 @@ import re
 from typing import Any, Mapping, Sequence
 
 from .automation_safety import load_automation_safety
-from .chatgpt_adapter import ChatGPTReasoner, ReasoningRequest
+from .chatgpt_adapter import (
+    ChatGPTReasoner,
+    ReasoningRequest,
+    require_repository_provider_credentials_absent,
+)
 from .idle_studio import (
     FLEET,
     FLEET_SIZE,
@@ -604,8 +608,12 @@ def propose(state_path: Path, package_path: Path, audit_path: Path, report_path:
         canonical_tasks, generation_id = canonical_idle_work_items(data)
         claimed = _existing_studio_task_keys(pulls)
         tasks = [task for task in canonical_tasks if task.key not in claimed]
-        api_key = os.environ.pop("OPENAI_API_KEY", "").strip()
-        if not api_key:
+        reasoner = ChatGPTReasoner(
+            model=os.getenv("OPENAI_MODEL", "").strip() or None,
+            timeout=45.0,
+            scrub_environment=True,
+        )
+        if not reasoner.api_key:
             status = "missing-api-key"
         else:
             capacity = max(0, config.max_open_studio_prs - _open_studio_pr_count(pulls))
@@ -616,8 +624,6 @@ def propose(state_path: Path, package_path: Path, audit_path: Path, report_path:
                 status = "idle-no-work" if not tasks else "backpressure"
                 planner = PlannerDecision((), "canonical-shift-supervisor")
             else:
-                reasoner = ChatGPTReasoner(api_key=api_key, model=os.getenv("OPENAI_MODEL", "").strip() or None, timeout=45.0)
-                del api_key
                 selected = list(tasks[:limit])
                 planner = PlannerDecision(
                     tuple(task.key for task in selected),
@@ -747,8 +753,7 @@ def publish(package_path: Path, config: StudioConfig) -> int:
     entries = package.get("entries", [])
     if not base_sha or not isinstance(entries, list):
         raise ValueError("invalid package")
-    if os.getenv("OPENAI_API_KEY", "").strip():
-        raise ValueError("OPENAI_API_KEY must be absent during publish")
+    require_repository_provider_credentials_absent()
     repo = os.getenv("GITHUB_REPOSITORY", "").strip()
     token = os.environ.pop("GITHUB_TOKEN", "").strip() or os.environ.pop("GH_TOKEN", "").strip()
     if not repo or not token:

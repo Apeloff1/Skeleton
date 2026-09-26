@@ -143,6 +143,21 @@ def test_external_research_mirror_is_not_a_runtime_provider_surface(tmp_path: Pa
     assert audit_repository(tmp_path) == []
 
 
+def test_canonical_ai_provider_copy_is_nonexecuting_mirror(tmp_path: Path) -> None:
+    source = (
+        "import os\n"
+        "from openai import AsyncOpenAI\n"
+        "key = os.getenv('OPENAI_API_KEY')\n"
+    )
+    _write(tmp_path, "skeleton/provider_runtime.py", source)
+    _write(tmp_path, "skeleton/ai/runtime/provider_runtime.py", source)
+
+    assert audit_repository(tmp_path) == []
+    discovered = discover_provider_surfaces(tmp_path)
+    assert "skeleton/provider_runtime.py" in discovered
+    assert "skeleton/ai/runtime/provider_runtime.py" not in discovered
+
+
 def test_live_ai_research_surface_still_rejects_provider_sdk_imports(tmp_path: Path) -> None:
     _write(tmp_path, "skeleton/ai/research/live.py", "import openai\n")
 
@@ -179,14 +194,46 @@ def test_lafs_has_no_shadow_or_local_provider_runtime() -> None:
     assert "EMERGENT_LLM_KEY" not in source
     assert "emergentintegrations.llm.chat" not in source
     assert "ProviderRegistry.from_env()" not in source
-    assert "EngineTextRequest" in source
-    assert "execute_engine_text" in source
-    assert '(system + "\\x1f" + prompt).encode("utf-8")' in source
+    assert "EngineTextRequest" not in source
+    assert "execute_engine_text" not in source
+    assert "EngineChat" in source
+    assert "UserMessage" in source
+    assert "LAFS_JEEVES_POLICY" in source
     assert 'verification_profile="evidence_required"' in source
+    assert "session_id=" not in source
 
     discovered = discover_provider_surfaces(ROOT)
     assert relative not in discovered
 
+
+
+def test_lafs_is_declared_engine_chat_isolation_surface() -> None:
+    import json
+
+    contract = json.loads(
+        (ROOT / "machine" / "ai_app_construction.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    surfaces = {
+        item["path"]: item
+        for item in contract["provider_surface_convergence_blueprint"][
+            "application_isolation_surfaces"
+        ]
+    }
+    entry = surfaces["backend/routes/lafs.py"]
+
+    assert set(entry["forbidden_edge_classes"]) == {
+        "credential",
+        "network_transport",
+        "sdk_client",
+    }
+    assert set(entry["required_tokens"]) == {
+        "EngineChat",
+        "UserMessage",
+        "LAFS_JEEVES_POLICY",
+        "evidence_required",
+    }
 
 
 def test_backend_tool_registry_is_declared_provider_isolation_surface() -> None:

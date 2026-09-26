@@ -74,6 +74,21 @@ def test_valid_document_has_no_violations() -> None:
     assert validate_provider_capability_matrix(_doc()) == []
 
 
+def test_repository_canonical_matrix_is_complete_and_fail_closed() -> None:
+    path = REPO_ROOT / "machine" / "provider_capability_matrix.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+
+    assert validate_provider_capability_matrix(document) == []
+    assert document["schema_version"] == SCHEMA_VERSION
+    assert [row["provider_id"] for row in document["providers"]] == [
+        "skeleton-engine"
+    ]
+    capabilities = document["providers"][0]["capabilities"]
+    assert tuple(row["name"] for row in capabilities) == KNOWN_CAPABILITIES
+    assert all(row["status"] == "unknown" for row in capabilities)
+    assert all(row["evidence_refs"] == [] for row in capabilities)
+
+
 def test_unknown_capability_status_is_accepted() -> None:
     document = _doc(
         providers=[
@@ -278,9 +293,15 @@ def test_cli_rejects_unreadable_json(tmp_path: Path) -> None:
         raise AssertionError("unreadable JSON must fail closed")
 
 
-def test_not_wired_into_quality_gates() -> None:
-    quality_gates = (REPO_ROOT / "scripts" / "quality-gates.sh").read_text(encoding="utf-8")
-    assert "check_provider_capability_matrix.py" not in quality_gates
-    assert "test_provider_capability_matrix.py" not in quality_gates
+def test_provider_matrix_is_wired_into_quality_gates_and_routing() -> None:
+    quality_gates = (
+        REPO_ROOT / "scripts" / "quality-gates.sh"
+    ).read_text(encoding="utf-8")
+    assert (
+        "check_provider_capability_matrix.py "
+        "machine/provider_capability_matrix.json"
+        in quality_gates
+    )
+    assert "test_provider_capability_matrix.py" in quality_gates
     routing = REPO_ROOT / "skeleton" / "frontier" / "model_routing.py"
-    assert not routing.exists()
+    assert routing.exists()

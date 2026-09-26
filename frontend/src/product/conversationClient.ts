@@ -1,4 +1,5 @@
 import api, { type ApiResult } from '../utils/apiClient';
+import { validateConversationProjection } from './conversationProjection';
 
 export type ConversationThreadState = 'active' | 'archived' | 'deleting' | 'deleted';
 export type ConversationAuthorType = 'user' | 'assistant' | 'tool' | 'system-derived';
@@ -113,6 +114,34 @@ export async function listConversationMessages(
   };
 }
 
+
+export type ConversationSnapshot = {
+  thread: ConversationThread;
+  messages: ConversationMessage[];
+  lastSequence: number;
+};
+
+export async function reconstructConversation(
+  threadId: string,
+): Promise<ConversationSnapshot> {
+  const [thread, page] = await Promise.all([
+    getConversation(threadId),
+    listConversationMessages(threadId, {
+      activeOnly: true,
+      limit: 500,
+    }),
+  ]);
+  const projection = validateConversationProjection(
+    thread,
+    page.messages,
+  );
+  return {
+    thread,
+    messages: projection.messages,
+    lastSequence: projection.lastSequence,
+  };
+}
+
 export async function appendConversationMessage(
   thread: ConversationThread,
   input: {
@@ -156,6 +185,50 @@ export async function editConversationMessage(
     ),
     'Could not edit conversation message.',
   );
+}
+
+
+export async function regenerateConversationMessage(
+  thread: ConversationThread,
+  messageId: string,
+  input: { idempotencyKey: string },
+): Promise<{
+  thread: ConversationThread;
+  message: ConversationMessage;
+  regeneratedFrom: string;
+  causalUserMessageId: string;
+  operationId: string;
+  engineExecutionId: string;
+  aiResultId: string;
+}> {
+  const data = await requireData(
+    api.post<{
+      thread: ConversationThread;
+      message: ConversationMessage;
+      regenerated_from: string;
+      causal_user_message_id: string;
+      operation_id: string;
+      engine_execution_id: string;
+      ai_result_id: string;
+    }>(
+      '/api/v1/conversations/' + encodeURIComponent(thread.thread_id)
+        + '/messages/' + encodeURIComponent(messageId) + '/regenerate',
+      {
+        idempotency_key: input.idempotencyKey,
+        expected_thread_version: thread.version,
+      },
+    ),
+    'Could not regenerate conversation message.',
+  );
+  return {
+    thread: data.thread,
+    message: data.message,
+    regeneratedFrom: data.regenerated_from,
+    causalUserMessageId: data.causal_user_message_id,
+    operationId: data.operation_id,
+    engineExecutionId: data.engine_execution_id,
+    aiResultId: data.ai_result_id,
+  };
 }
 
 export async function updateConversationState(

@@ -59,6 +59,10 @@ def test_within_budget_is_admitted_with_deterministic_receipt() -> None:
             UsageEstimate(artifact_bytes=100 * 1024 * 1024 + 1),
             "artifact_budget_exceeded",
         ),
+        (
+            UsageEstimate(storage_bytes=100 * 1024 * 1024 + 1),
+            "storage_budget_exceeded",
+        ),
     ],
 )
 def test_resource_budget_excess_rejects_before_allocation(
@@ -112,6 +116,7 @@ def test_expired_or_impossible_deadline_rejects() -> None:
         lambda: ResourceBudget(max_cost_usd=math.nan),
         lambda: ResourceBudget(max_wall_seconds=0),
         lambda: ResourceBudget(max_provider_attempts=0),
+        lambda: ResourceBudget(max_storage_bytes=-1),
         lambda: ResourceBudget(max_concurrency=0),
     ],
 )
@@ -125,7 +130,8 @@ def test_invalid_budgets_fail_closed(budget) -> None:
     [
         lambda: UsageEstimate(input_tokens=-1),
         lambda: UsageEstimate(cost_usd=math.inf),
-        lambda: UsageEstimate(provider_attempts=0),
+        lambda: UsageEstimate(storage_bytes=-1),
+        lambda: UsageEstimate(provider_attempts=-1),
     ],
 )
 def test_invalid_estimates_fail_closed(estimate) -> None:
@@ -162,3 +168,19 @@ def test_receipt_exposes_budget_state_but_not_payload() -> None:
     assert payload["tenant_id"] == "tenant-1"
     assert "prompt" not in str(payload)
     assert "secret" not in str(payload)
+
+def test_non_provider_usage_defaults_to_zero_provider_attempts() -> None:
+    estimate = UsageEstimate(storage_bytes=128, tool_calls=1)
+
+    assert estimate.provider_attempts == 0
+    decision = require_admission(
+        AdmissionRequest(
+            operation_id="storage-op",
+            tenant_id="tenant-1",
+            capability="storage-write",
+            budget=ResourceBudget(),
+            estimate=estimate,
+        )
+    )
+    assert decision.estimated.provider_attempts == 0
+    assert decision.remaining["provider_attempts"] == 3

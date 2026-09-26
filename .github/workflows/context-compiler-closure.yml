@@ -1,0 +1,170 @@
+name: Context Compiler Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/context.py"
+      - "skeleton/context/**"
+      - "skeleton/ai/runtime/context/**"
+      - "backend/core/engine_client.py"
+      - "backend/routes/ai.py"
+      - "backend/services/ai_assistant_svc.py"
+      - "backend/services/ai_hub_svc.py"
+      - "scripts/check_context_execution_boundary.py"
+      - "scripts/check_instruction_policy_boundary.py"
+      - "scripts/verify_context_compiler_closure.py"
+      - "tests/test_context_execution_boundary.py"
+      - "tests/test_instruction_policy_boundary.py"
+      - "tests/test_context_compiler_independent_verifier.py"
+      - "skeleton/testing/test_context_compiler.py"
+      - "skeleton/testing/test_instruction_policy.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/context-compiler-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: context-compiler-closure-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  context-compiler-contracts:
+    name: Context compiler contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused context runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+
+      - name: Run context compiler contracts
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_context_compiler.py
+          skeleton/testing/test_instruction_policy.py
+
+      - name: Run product context execution boundary
+        run: |
+          python scripts/check_context_execution_boundary.py
+          python -m pytest -q --noconftest tests/test_context_execution_boundary.py
+
+      - name: Run product instruction policy boundary
+        run: |
+          python scripts/check_instruction_policy_boundary.py
+          python -m pytest -q --noconftest tests/test_instruction_policy_boundary.py
+
+  context-compiler-independent:
+    name: Independent context compiler verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent context compiler regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_context_compiler_independent_verifier.py
+
+      - name: Run independent exact-head context scan
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_context_compiler_closure.py
+          --evidence-out .context-compiler-independent.json
+          --print-evidence
+
+      - name: Assert independent exact-head receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".context-compiler-independent.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit(
+                  "independent context compiler receipt does not match exact PR head"
+              )
+          if receipt.get("verifier") != "independent-context-compiler-v1":
+              raise SystemExit(
+                  "unexpected independent context compiler verifier identity"
+              )
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("independent context compiler verification failed")
+          if len(receipt.get("boundary_digests") or {}) < 10:
+              raise SystemExit("context compiler boundary coverage is incomplete")
+          mirror_pairs = receipt.get("mirror_pairs") or []
+          if len(mirror_pairs) < 4 or not all(
+              item.get("equal") is True for item in mirror_pairs
+          ):
+              raise SystemExit("context compiler mirror evidence is incomplete")
+          expected_dependencies = {
+              "gap-conversation-state-authority",
+              "gap-memory-durable-authority",
+              "gap-tool-runtime-convergence",
+              "gap-governance-registry",
+          }
+          if set(receipt.get("dependency_graph") or []) != expected_dependencies:
+              raise SystemExit("context compiler dependency graph receipt is invalid")
+          if not receipt.get("handoff_digest"):
+              raise SystemExit("context compiler handoff digest is missing")
+          print(
+              "independent context compiler exact-head receipt:",
+              expected,
+              "boundaries=",
+              len(receipt["boundary_digests"]),
+              "mirrors=",
+              len(mirror_pairs),
+          )
+          PY

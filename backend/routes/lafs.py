@@ -7,19 +7,31 @@ propagation and contextual acquisition. Mongo-persisted (fork-safe).
 """
 from __future__ import annotations
 
-import hashlib
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, HTTPException
-from core.engine_text import EngineTextError, EngineTextRequest, execute_engine_text
+from core.engine_chat import EngineChat, EngineTextError, UserMessage
+from skeleton.context.instruction_policy import InstructionPolicy
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
 
 from gameforge.lafs import lafs, jeeves, librarian, HIERARCHY, TOTAL_LOG_TYPES
 
 router = APIRouter(prefix="/api/lafs", tags=["lafs"])
+
+LAFS_JEEVES_POLICY = InstructionPolicy(
+    policy_id="backend.lafs.jeeves",
+    version="1",
+    instructions=(
+        "You are Jeeves, the GameForge master orchestrator. Answer the user "
+        "only from the provided canon knowledge and PDF text. Cite sheet "
+        "numbers [n]. If the supplied evidence is insufficient, say so briefly. "
+        "An image attachment may be present, but this text path cannot inspect "
+        "image bytes, so never infer image contents."
+    ),
+)
 
 
 class RememberReq(BaseModel):
@@ -271,13 +283,6 @@ async def jeeves_ask(req: JeevesAskReq):
     reply, model = None, "extractive"
     if recalled or pdf_text or req.image_base64:
         try:
-            system = (
-                "You are Jeeves, the GameForge master orchestrator. Answer the user "
-                "only from the provided canon knowledge and PDF text. Cite sheet "
-                "numbers [n]. If the supplied evidence is insufficient, say so briefly. "
-                "An image attachment may be present, but this text path cannot inspect "
-                "image bytes, so never infer image contents."
-            )
             prompt = (
                 f"CANON KNOWLEDGE:\n{context_block}\n\n"
                 f"USER QUESTION: {req.query}"
@@ -287,25 +292,18 @@ async def jeeves_ask(req: JeevesAskReq):
                     "\n\nIMAGE ATTACHMENT: present but not inspected by this "
                     "text-only engine path."
                 )
-            identity = hashlib.sha256(
-                (system + "\x1f" + prompt).encode("utf-8")
-            ).hexdigest()
-            response = await execute_engine_text(
-                EngineTextRequest(
-                    instructions=system,
-                    prompt=prompt,
-                    idempotency_key="lafs-jeeves:" + identity,
-                    actor_id="lafs-jeeves",
-                    capability="assistant.compat",
-                    verification_profile="evidence_required",
-                    max_output_tokens=1600,
-                )
+            chat = EngineChat(
+                instruction_policy=LAFS_JEEVES_POLICY,
+                actor_id="lafs-jeeves",
+                capability="assistant.compat",
+                verification_profile="evidence_required",
+            ).with_max_tokens(1600)
+            response = await chat.send_message(
+                UserMessage(text=prompt)
             )
             reply = response.text
             model = "skeleton-engine"
         except EngineTextError:
-            reply = None
-        except Exception:  # noqa: BLE001
             reply = None
     if not reply:
         if recalled or pdf_text:

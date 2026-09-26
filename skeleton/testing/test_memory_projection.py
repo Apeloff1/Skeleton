@@ -4,17 +4,22 @@ from datetime import datetime, timezone
 import json
 from uuid import uuid4
 
+import pytest
+
 from skeleton.contracts.memory_record import (
     MemoryKind,
     MemoryWriteProposal,
     memory_payload_digest,
 )
 from skeleton.memory.core import CAGStore, InMemoryTFIDFStore, MAGStore
+from skeleton.intelligence.admission import ResourceBudget
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.memory.projection import (
     CAGStoreProjection,
     LegacyMemoryStoreProjection,
     MAGStoreProjection,
     MemoryProjectionCoordinator,
+    ProjectionAdmissionError,
     ProjectionState,
     TFIDFStoreProjection,
     VectorStoreProjection,
@@ -23,6 +28,11 @@ from skeleton.memory.vector import VectorStore
 from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk, MemoryQueryResult
 from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+)
 
 
 class FakeStore(MemoryStore):
@@ -534,3 +544,268 @@ def test_current_projection_event_must_match_canonical_record() -> None:
     assert report.blocked_event_id is not None
     assert report.attempts[0].results[0].projection == "canonical-fence"
     assert len(repo.pending_projection_events()) == 1
+
+def test_material_projection_rebuild_is_admitted_and_reconciled() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(
+            key="admitted-rebuild",
+            content="material canonical memory " * 16,
+        ),
+        now=_now(),
+    )
+    store = FakeStore()
+    runtime = AdmissionRuntime()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        admission_runtime=runtime,
+        rebuild_budget=ResourceBudget(max_storage_bytes=1024 * 1024),
+    )
+
+    report = coordinator.rebuild_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(LegacyMemoryStoreProjection("rag", store),),
+        admission_operation_id="retrieval-rebuild-1",
+    )
+
+    assert report.degraded is False
+    assert record.memory_id in store.items
+    assert runtime.snapshot()["active_operations"] == ()
+    telemetry = runtime.telemetry_snapshot()["metrics"]
+    assert telemetry["counters"]["admission.admitted_total"] == 1
+    assert telemetry["counters"]["admission.completed_total"] == 1
+    actual = telemetry["samples"]["admission.actual.storage_bytes"]
+    assert len(actual) == 1
+    assert actual[0] > 0
+
+
+def test_projection_rebuild_denial_happens_before_derived_mutation() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(
+            key="denied-rebuild",
+            content="large canonical memory " * 32,
+        ),
+        now=_now(),
+    )
+    store = FakeStore()
+    store.add(
+        MemoryChunk(
+            id="stale-id",
+            text="stale projection",
+            metadata={},
+            source_tier="derived:rag",
+        )
+    )
+    runtime = AdmissionRuntime()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        admission_runtime=runtime,
+        rebuild_budget=ResourceBudget(max_storage_bytes=1),
+    )
+
+    with pytest.raises(
+        ProjectionAdmissionError,
+        match="denied by resource admission",
+    ):
+        coordinator.rebuild_subject(
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+            projections=(LegacyMemoryStoreProjection("rag", store),),
+            known_projection_ids=("stale-id",),
+            admission_operation_id="retrieval-rebuild-denied",
+        )
+
+    assert "stale-id" in store.items
+    assert record.memory_id not in store.items
+    assert runtime.snapshot()["active_operations"] == ()
+
+
+def test_admitted_projection_rebuild_requires_operation_identity() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(
+        _proposal(key="missing-rebuild-id", content="canonical"),
+        now=_now(),
+    )
+    store = FakeStore()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        admission_runtime=AdmissionRuntime(),
+    )
+
+    with pytest.raises(
+        ProjectionAdmissionError,
+        match="requires operation_id",
+    ):
+        coordinator.rebuild_subject(
+            tenant_id="tenant-a",
+            namespace="assistant",
+            subject_id="user-a",
+            projections=(LegacyMemoryStoreProjection("rag", store),),
+        )
+
+    assert store.items == {}
+
+class _FailingRetrievalProjection:
+    governance_plane = "retrieval"
+    name = "failing-retrieval"
+
+    def upsert(self, record) -> None:
+        raise RuntimeError("projection write failed")
+
+    def delete(self, memory_id: str) -> None:
+        raise RuntimeError("projection delete failed")
+
+
+def test_retrieval_projection_registers_governance_before_physical_mutation() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(
+        _proposal(key="governed-retrieval-failure", content="alpha"),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+    )
+
+    report = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(_FailingRetrievalProjection(),),
+    )
+
+    assert report.degraded is True
+    inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(inventory) == 1
+    governed = inventory[0]
+    assert governed["owner_plane"] == "retrieval"
+    assert governed["state"] == "active"
+    assert governed["exportable"] is False
+    assert governed["purposes"] == ["retrieval-synthesis"]
+    assert len(governed["deletion_targets"]) == 1
+    assert governed["deletion_targets"][0].startswith(
+        "memory-projection-"
+    )
+
+
+def test_governed_vector_projection_acknowledges_only_after_physical_delete() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(key="governed-vector-delete", content="alpha vector"),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    store = VectorStore(dims=32)
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+    )
+    projection = VectorStoreProjection("vector", store)
+
+    first = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert first.degraded is False
+    assert store.stats()["documents"] == 1
+
+    active_inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(active_inventory) == 1
+    retrieval_record = active_inventory[0]
+    assert retrieval_record["owner_plane"] == "retrieval"
+    assert retrieval_record["state"] == "active"
+    assert retrieval_record["exportable"] is False
+
+    repo.tombstone(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=record.version,
+        now=_now(),
+    )
+    deleted = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+
+    assert deleted.degraded is False
+    assert store.stats()["documents"] == 0
+    final_inventory = governance.lifecycle.inventory(
+        "tenant-a",
+        include_deleted=True,
+    )
+    assert final_inventory[0]["state"] == "deleted"
+    receipts = governance.lifecycle.receipts(tenant_id="tenant-a")
+    assert len(receipts) == 1
+    assert receipts[0].target == retrieval_record["deletion_targets"][0]
+    assert receipts[0].target.startswith("memory-projection-")
+    assert receipts[0].record_id == retrieval_record["record_id"]
+
+@pytest.mark.asyncio
+async def test_tenant_lifecycle_plan_deletes_bound_vector_projection() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(
+            key="governed-vector-tenant-delete",
+            content="tenant lifecycle vector",
+        ),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    adapters = LifecycleAdapterRegistry()
+    executor = LifecycleExecutor(governance.lifecycle, adapters)
+    store = VectorStore(dims=32)
+    projection = VectorStoreProjection("tenant-vector", store)
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+        lifecycle_adapters=adapters,
+    )
+
+    synced = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert synced.degraded is False
+    assert store.stats()["documents"] == 1
+
+    inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(inventory) == 1
+    retrieval_record = inventory[0]
+    target = retrieval_record["deletion_targets"][0]
+    assert target.startswith("memory-projection-")
+
+    plan = governance.request_deletion(
+        "tenant-a",
+        record_ids=(retrieval_record["record_id"],),
+        reason="tenant-delete",
+    )
+    result = await executor.execute_deletion_plan(plan)
+
+    assert store.stats()["documents"] == 0
+    assert len(result.receipts) == 1
+    assert result.receipts[0].record_id == retrieval_record["record_id"]
+    assert result.receipts[0].target == target
+    final = governance.lifecycle.get(retrieval_record["record_id"])
+    assert final["state"] == "deleted"
+
+    # The canonical memory authority remains tombstone-independent: deleting a
+    # derived projection never erases the source record.
+    current = repo.get(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        include_tombstoned=True,
+    )
+    assert current.memory_id == record.memory_id

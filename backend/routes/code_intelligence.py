@@ -9,17 +9,14 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-import os
 
 router = APIRouter(prefix="/intelligence", tags=["Code Intelligence"])
 
-try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
-    LLM_AVAILABLE = True
-except Exception:
-    LLM_AVAILABLE = False
+from core.engine_chat import EngineChat, UserMessage
+from core.engine_text import EngineTextError
+from skeleton.context.instruction_policy import InstructionPolicy
 
-EMERGENT_KEY = os.getenv("EMERGENT_LLM_KEY", "")
+LLM_AVAILABLE = True
 
 # ============================================================================
 # REQUEST MODELS
@@ -103,14 +100,27 @@ class PerformanceRequest(BaseModel):
 # HELPER FUNCTION
 # ============================================================================
 
-async def call_llm(system: str, prompt: str) -> str:
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+async def call_llm(
+    policy_id: str,
+    system: str,
+    prompt: str,
+) -> str:
+    if not LLM_AVAILABLE:
         return "LLM not available"
     try:
-        chat = LlmChat(api_key=EMERGENT_KEY, system_message=system).with_model("openai", "gpt-4o")
+        policy = InstructionPolicy(
+            policy_id=policy_id,
+            version="1",
+            instructions=system,
+        )
+        chat = EngineChat(
+            instruction_policy=policy,
+            actor_id="code-intelligence",
+            capability="assistant.compat",
+        ).with_model("openai", "gpt-4o")
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
-    except Exception:
+    except EngineTextError:
         return "llm_request_failed"
 
 # ============================================================================
@@ -121,6 +131,7 @@ async def call_llm(system: str, prompt: str) -> str:
 async def semantic_code_search(request: SemanticSearchRequest):
     """Search code by meaning, not just text matching"""
     result = await call_llm(
+        "backend.code-intelligence.semantic-search",
         "You are a semantic code search engine. Find code that matches the user's intent, even if keywords don't match exactly. Return relevant code snippets with explanations.",
         f"""Search this {request.language} codebase for: "{request.query}"
 
@@ -144,6 +155,7 @@ Find up to {request.max_results} relevant sections. For each:
 async def auto_generate_documentation(request: AutoDocRequest):
     """Generate comprehensive documentation from code"""
     result = await call_llm(
+        "backend.code-intelligence.auto-document",
         f"You are a documentation expert. Generate {request.doc_style}-style documentation. Be thorough and precise.",
         f"""Generate complete documentation for this {request.language} code:
 
@@ -173,6 +185,7 @@ Generate:
 async def migrate_code(request: MigrationRequest):
     """Migrate code between languages while preserving logic"""
     result = await call_llm(
+        "backend.code-intelligence.migrate",
         f"You are an expert at code migration. Convert code from {request.source_lang} to {request.target_lang} while preserving functionality and using idiomatic patterns.",
         f"""Migrate this code from {request.source_lang} to {request.target_lang}:
 
@@ -197,6 +210,7 @@ Requirements:
 async def generate_tests(request: TestGenRequest):
     """Automatically generate comprehensive test cases"""
     result = await call_llm(
+        "backend.code-intelligence.generate-tests",
         f"You are a test engineering expert. Generate {request.framework} tests with {request.coverage_target} coverage.",
         f"""Generate comprehensive tests for this {request.language} code:
 
@@ -226,6 +240,7 @@ Generate:
 async def predict_bugs(request: BugPredictRequest):
     """Predict potential bugs before they occur"""
     result = await call_llm(
+        "backend.code-intelligence.predict-bugs",
         "You are a bug prediction AI. Analyze code to find potential bugs, race conditions, edge cases, and issues that could occur in production.",
         f"""Predict potential bugs in this {request.language} code:
 
@@ -254,6 +269,7 @@ For each potential bug:
 async def analyze_dependencies(request: DependencyRequest):
     """Smart dependency analysis with security and update checks"""
     result = await call_llm(
+        "backend.code-intelligence.analyze-dependencies",
         "You are a dependency analysis expert. Identify all dependencies, check for security issues, outdated versions, and license compatibility.",
         f"""Analyze dependencies in this {request.language} code:
 
@@ -283,6 +299,7 @@ Provide:
 async def analyze_architecture(request: ArchitectureRequest):
     """Deep architecture and design pattern analysis"""
     result = await call_llm(
+        "backend.code-intelligence.analyze-architecture",
         "You are a software architect. Analyze code architecture, identify patterns, anti-patterns, and provide improvement recommendations.",
         f"""Analyze the architecture of this {request.language} code:
 
@@ -311,6 +328,7 @@ Provide:
 async def design_api(request: APIDesignRequest):
     """AI-powered API design from requirements"""
     result = await call_llm(
+        "backend.code-intelligence.design-api",
         f"You are an API design expert. Design a {request.style.upper()} API that is intuitive, scalable, and follows best practices.",
         f"""Design an API based on this description:
 
@@ -340,6 +358,7 @@ Provide:
 async def generate_schema(request: SchemaGenRequest):
     """Generate database schemas from natural language requirements"""
     result = await call_llm(
+        "backend.code-intelligence.generate-schema",
         f"You are a database architect. Design optimal {request.database} schemas with proper normalization, indexes, and relationships.",
         f"""Generate a {request.database} database schema for:
 
@@ -368,6 +387,7 @@ Provide:
 async def resolve_merge_conflict(request: MergeConflictRequest):
     """AI-powered merge conflict resolution"""
     result = await call_llm(
+        "backend.code-intelligence.resolve-conflict",
         "You are a merge conflict resolution expert. Analyze conflicting code versions and produce the best merged result that preserves all intended functionality.",
         f"""Resolve this merge conflict in {request.language}:
 
@@ -402,6 +422,7 @@ Provide:
 async def ai_code_review(request: CodeReviewRequest):
     """Comprehensive AI-powered code review"""
     result = await call_llm(
+        "backend.code-intelligence.code-review",
         f"You are a senior code reviewer. Perform a {request.review_type} review. Be constructive but thorough.",
         f"""Review this {request.language} code:
 
@@ -431,6 +452,7 @@ Provide feedback on:
 async def profile_performance(request: PerformanceRequest):
     """AI-powered performance analysis and optimization"""
     result = await call_llm(
+        "backend.code-intelligence.profile-performance",
         f"You are a performance optimization expert. Analyze code for {request.optimize_for} issues and provide concrete optimizations.",
         f"""Analyze performance of this {request.language} code:
 

@@ -26,6 +26,7 @@ from skeleton.contracts.ai_execution import (
     ExecutionFinalizationIntent,
     ExecutionState,
 )
+from skeleton.contracts.verification import VerificationReceipt
 
 
 class ExecutionRepositoryError(RuntimeError):
@@ -203,6 +204,28 @@ class SQLiteExecutionRepository:
                         ON DELETE CASCADE
                 );
 
+                CREATE TABLE IF NOT EXISTS ai_verification_receipt (
+                    namespace TEXT NOT NULL,
+                    receipt_id TEXT NOT NULL,
+                    claim_id TEXT NOT NULL,
+                    execution_id TEXT,
+                    operation_id TEXT,
+                    result_ref TEXT,
+                    receipt_digest TEXT NOT NULL,
+                    receipt_json TEXT NOT NULL,
+                    verified_at TEXT NOT NULL,
+                    PRIMARY KEY(namespace, receipt_id),
+                    FOREIGN KEY(namespace, execution_id)
+                        REFERENCES ai_execution_state(namespace, execution_id)
+                        ON DELETE CASCADE
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_ai_verification_receipt_claim
+                ON ai_verification_receipt(namespace, claim_id, verified_at);
+
+                CREATE INDEX IF NOT EXISTS idx_ai_verification_receipt_execution
+                ON ai_verification_receipt(namespace, execution_id, verified_at);
+
                 CREATE TABLE IF NOT EXISTS ai_execution_finalization_intent (
                     namespace TEXT NOT NULL,
                     execution_id TEXT NOT NULL,
@@ -349,6 +372,59 @@ class SQLiteExecutionRepository:
         except Exception as exc:
             raise ExecutionRepositoryCorruption(
                 "persisted result violates contract"
+            ) from exc
+
+    @staticmethod
+    def _verification_receipt_from_row(
+        row: sqlite3.Row,
+    ) -> VerificationReceipt:
+        try:
+            payload = _json_object(row["receipt_json"], "receipt_json")
+            receipt = VerificationReceipt(
+                receipt_id=payload["receipt_id"],
+                claim_id=payload["claim_id"],
+                claim_digest=payload["claim_digest"],
+                tenant_id=payload["tenant_id"],
+                operation_id=payload.get("operation_id"),
+                execution_id=payload.get("execution_id"),
+                turn_id=payload.get("turn_id"),
+                result_ref=payload.get("result_ref"),
+                outcome=payload["outcome"],
+                policy_level=int(payload["policy_level"]),
+                required_modes=tuple(payload.get("required_modes") or ()),
+                policy_satisfied=bool(payload["policy_satisfied"]),
+                check_id=payload.get("check_id"),
+                verifier_id=payload["verifier_id"],
+                verified_at=_parse_time(
+                    payload["verified_at"],
+                    "verified_at",
+                ),
+                supporting_evidence_ids=tuple(
+                    payload.get("supporting_evidence_ids") or ()
+                ),
+                contradicting_evidence_ids=tuple(
+                    payload.get("contradicting_evidence_ids") or ()
+                ),
+                rejected_evidence_ids=tuple(
+                    payload.get("rejected_evidence_ids") or ()
+                ),
+                postcondition_observation_ids=tuple(
+                    payload.get("postcondition_observation_ids") or ()
+                ),
+                independent=bool(payload.get("independent", False)),
+                issues=tuple(payload.get("issues") or ()),
+                schema_version=int(payload.get("schema_version", 1)),
+            )
+            if receipt.digest != row["receipt_digest"]:
+                raise ExecutionRepositoryCorruption(
+                    "persisted verification receipt digest mismatch"
+                )
+            return receipt
+        except ExecutionRepositoryCorruption:
+            raise
+        except Exception as exc:
+            raise ExecutionRepositoryCorruption(
+                "persisted verification receipt violates contract"
             ) from exc
 
     @classmethod
@@ -780,6 +856,129 @@ class SQLiteExecutionRepository:
                 (self.namespace, execution_id),
             ).fetchone()
             return None if row is None else self._result_from_row(row)
+
+    def remember_verification_receipt(
+        self,
+        receipt: VerificationReceipt,
+    ) -> VerificationReceipt:
+        if not isinstance(receipt, VerificationReceipt):
+            raise TypeError("receipt must be VerificationReceipt")
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._connection.execute(
+                    """
+                    SELECT * FROM ai_verification_receipt
+                    WHERE namespace = ? AND receipt_id = ?
+                    """,
+                    (self.namespace, receipt.receipt_id),
+                ).fetchone()
+                if row is not None:
+                    existing = self._verification_receipt_from_row(row)
+                    if existing.as_dict() != receipt.as_dict():
+                        raise ExecutionRepositoryConflict(
+                            "verification receipt identity already differs"
+                        )
+                    self._connection.execute("COMMIT")
+                    return existing
+
+                if receipt.execution_id is not None:
+                    execution_row = self._connection.execute(
+                        """
+                        SELECT execution_id FROM ai_execution_state
+                        WHERE namespace = ? AND execution_id = ?
+                        """,
+                        (self.namespace, receipt.execution_id),
+                    ).fetchone()
+                    if execution_row is None:
+                        raise ExecutionRepositoryConflict(
+                            "verification receipt execution is unknown"
+                        )
+
+                self._connection.execute(
+                    """
+                    INSERT INTO ai_verification_receipt(
+                        namespace, receipt_id, claim_id, execution_id,
+                        operation_id, result_ref, receipt_digest,
+                        receipt_json, verified_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        self.namespace,
+                        receipt.receipt_id,
+                        receipt.claim_id,
+                        receipt.execution_id,
+                        receipt.operation_id,
+                        receipt.result_ref,
+                        receipt.digest,
+                        _json_dump(receipt.as_dict()),
+                        receipt.verified_at.isoformat(),
+                    ),
+                )
+                self._connection.execute("COMMIT")
+                return receipt
+            except sqlite3.IntegrityError as exc:
+                self._connection.execute("ROLLBACK")
+                raise ExecutionRepositoryConflict(
+                    "verification receipt identity conflict"
+                ) from exc
+            except Exception:
+                self._connection.execute("ROLLBACK")
+                raise
+
+    def verification_receipt(
+        self,
+        receipt_id: str,
+    ) -> VerificationReceipt | None:
+        with self._lock:
+            row = self._connection.execute(
+                """
+                SELECT * FROM ai_verification_receipt
+                WHERE namespace = ? AND receipt_id = ?
+                """,
+                (self.namespace, str(receipt_id)),
+            ).fetchone()
+            return (
+                None
+                if row is None
+                else self._verification_receipt_from_row(row)
+            )
+
+    def verification_receipts_for_execution(
+        self,
+        execution_id: str,
+    ) -> tuple[VerificationReceipt, ...]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM ai_verification_receipt
+                WHERE namespace = ? AND execution_id = ?
+                ORDER BY verified_at ASC, receipt_id ASC
+                """,
+                (self.namespace, str(execution_id)),
+            ).fetchall()
+            return tuple(
+                self._verification_receipt_from_row(row)
+                for row in rows
+            )
+
+    def verification_receipts_for_claim(
+        self,
+        claim_id: str,
+    ) -> tuple[VerificationReceipt, ...]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT * FROM ai_verification_receipt
+                WHERE namespace = ? AND claim_id = ?
+                ORDER BY verified_at ASC, receipt_id ASC
+                """,
+                (self.namespace, str(claim_id)),
+            ).fetchall()
+            return tuple(
+                self._verification_receipt_from_row(row)
+                for row in rows
+            )
 
     def finalization_intent(
         self,

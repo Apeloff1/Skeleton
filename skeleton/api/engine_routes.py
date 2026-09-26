@@ -87,6 +87,57 @@ class EngineSpeechBody(BaseModel):
     response_format: str = Field(default="mp3", min_length=2, max_length=16)
 
 
+class EngineStorageAdmissionBody(BaseModel):
+    tenant_id: str = Field(min_length=1, max_length=512)
+    capability: str = Field(min_length=1, max_length=256)
+    resource_id: str = Field(min_length=1, max_length=512)
+    write_id: str = Field(min_length=1, max_length=1024)
+    storage_bytes: int = Field(ge=1, le=1024 * 1024 * 1024)
+
+
+class EngineGovernanceWriteBody(BaseModel):
+    mode: str = Field(min_length=1, max_length=32)
+    plane: str = Field(min_length=1, max_length=64)
+    record_id: str = Field(min_length=1, max_length=512)
+    tenant_id: str = Field(min_length=1, max_length=512)
+    source_ref: str = Field(min_length=1, max_length=512)
+    data_class: str = Field(min_length=1, max_length=64)
+    purposes: list[str] = Field(min_length=1, max_length=32)
+    deletion_targets: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=32,
+    )
+    created_at: float | None = Field(default=None, ge=0)
+    retention_until: float | None = Field(default=None, ge=0)
+    exportable: bool = True
+
+
+class EngineGovernanceDeletionPlanBody(BaseModel):
+    tenant_id: str = Field(min_length=1, max_length=512)
+    record_ids: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        max_length=10_000,
+    )
+    reason: str = Field(
+        default="tenant-request",
+        min_length=1,
+        max_length=512,
+    )
+
+
+class EngineGovernancePlanExecutionBody(BaseModel):
+    tenant_id: str = Field(min_length=1, max_length=512)
+
+
+class EngineGovernanceDeletionAckBody(BaseModel):
+    tenant_id: str = Field(min_length=1, max_length=512)
+    plan_id: str = Field(min_length=1, max_length=512)
+    record_id: str = Field(min_length=1, max_length=512)
+    target: str = Field(min_length=1, max_length=256)
+
+
 class EngineToolApprovalBody(BaseModel):
     actor_id: str = Field(min_length=1, max_length=512)
     tenant_id: str = Field(min_length=1, max_length=512)
@@ -286,6 +337,165 @@ async def submit_execution(
         _raise_engine_error(exc)
         raise
     return ack.as_dict()
+
+
+@router.post("/admission/storage")
+def admit_storage_write(
+    body: EngineStorageAdmissionBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        receipt = service.consume_external_storage_write(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+            capability=body.capability,
+            resource_id=body.resource_id,
+            write_id=body.write_id,
+            storage_bytes=body.storage_bytes,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return receipt.as_dict()
+
+
+@router.post("/governance/writes")
+def reconcile_governed_write(
+    body: EngineGovernanceWriteBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        receipt = service.reconcile_external_governed_write(
+            verified_service_principal=principal,
+            mode=body.mode,
+            plane=body.plane,
+            record_id=body.record_id,
+            tenant_id=body.tenant_id,
+            source_ref=body.source_ref,
+            data_class=body.data_class,
+            purposes=tuple(body.purposes),
+            deletion_targets=(
+                None
+                if body.deletion_targets is None
+                else tuple(body.deletion_targets)
+            ),
+            created_at=body.created_at,
+            retention_until=body.retention_until,
+            exportable=body.exportable,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+    return receipt.as_dict()
+
+
+@router.post("/governance/retention/plan")
+def plan_governance_retention(
+    body: EngineGovernancePlanExecutionBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return service.plan_external_governance_retention(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
+@router.post("/governance/deletions")
+def request_governance_deletion(
+    body: EngineGovernanceDeletionPlanBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return service.request_external_governance_deletion(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+            record_ids=(
+                None
+                if body.record_ids is None
+                else tuple(body.record_ids)
+            ),
+            reason=body.reason,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
+@router.post(
+    "/governance/deletions/{plan_id}/execute-engine-targets"
+)
+async def execute_governance_engine_targets(
+    plan_id: str,
+    body: EngineGovernancePlanExecutionBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return await service.execute_external_governance_engine_targets(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+            plan_id=plan_id,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
+@router.post("/governance/deletions/acknowledgements")
+def acknowledge_governance_deletion(
+    body: EngineGovernanceDeletionAckBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return service.acknowledge_external_governance_deletion(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+            plan_id=body.plan_id,
+            record_id=body.record_id,
+            target=body.target,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
+@router.get("/governance/inventory")
+def governance_inventory(
+    request: Request,
+    tenant_id: str = Query(..., min_length=1, max_length=512),
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return service.external_governance_inventory(
+            verified_service_principal=principal,
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
 
 
 @router.get("/executions/{execution_id}")

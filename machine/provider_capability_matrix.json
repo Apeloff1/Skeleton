@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "providers": [
+    {
+      "provider_id": "skeleton-engine",
+      "capabilities": [
+        {
+          "name": "chat",
+          "status": "unknown",
+          "evidence_refs": []
+        },
+        {
+          "name": "tools",
+          "status": "unknown",
+          "evidence_refs": []
+        },
+        {
+          "name": "streaming",
+          "status": "unknown",
+          "evidence_refs": []
+        },
+        {
+          "name": "embeddings",
+          "status": "unknown",
+          "evidence_refs": []
+        },
+        {
+          "name": "structured_output",
+          "status": "unknown",
+          "evidence_refs": []
+        },
+        {
+          "name": "vision",
+          "status": "unknown",
+          "evidence_refs": []
+        },
+        {
+          "name": "audio",
+          "status": "unknown",
+          "evidence_refs": []
+        }
+      ]
+    }
+  ]
+}

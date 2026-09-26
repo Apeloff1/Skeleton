@@ -376,9 +376,6 @@ def _gate_ctx_block(target: dict) -> str:
 
 
 def _ai_review(stage: dict, target: dict, report: dict) -> list[str] | None:
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        return None
     try:
         import asyncio
         import json as _json
@@ -395,7 +392,7 @@ def _ai_review(stage: dict, target: dict, report: dict) -> list[str] | None:
                   f"SCORE: {report['final_score']} (issues fixed {report.get('total_issues_fixed', 0)}).")
 
         async def _run() -> str:
-            chat = LlmChat(api_key=key, session_id=f"gate_{stage['key']}",
+            chat = LlmChat(session_id=f"gate_{stage['key']}",
                            system_message=sysmsg).with_model("anthropic", "claude-sonnet-4-6")
             try:
                 chat = chat.with_max_tokens(600)
@@ -424,9 +421,6 @@ def _ai_review(stage: dict, target: dict, report: dict) -> list[str] | None:
 
 def _ai_panel(stage: dict, target: dict) -> list[dict] | None:
     """Single Claude call role-playing a 5-member review board (group chat)."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        return None
     try:
         import asyncio
         import json as _json
@@ -444,7 +438,7 @@ def _ai_panel(stage: dict, target: dict) -> list[dict] | None:
                   f"BRIEF: {(bp.get('brief') or '')[:400]}")
 
         async def _run() -> str:
-            chat = LlmChat(api_key=key, session_id=f"panel_{stage['key']}",
+            chat = LlmChat(session_id=f"panel_{stage['key']}",
                            system_message=sysmsg).with_model("anthropic", "claude-sonnet-4-6")
             try:
                 chat = chat.with_max_tokens(800)

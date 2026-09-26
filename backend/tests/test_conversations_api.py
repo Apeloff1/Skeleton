@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from core.conversations import ConversationStorageUnavailable
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
@@ -284,7 +285,7 @@ def test_edit_endpoint_creates_new_message_contract(route, app_client, monkeypat
     assert captured["content"] == "replacement"
 
 
-def test_delete_is_explicit_deletion_intent_not_false_completion(
+def test_delete_executes_governed_propagation_before_claiming_completion(
     route,
     app_client,
     monkeypatch,
@@ -305,14 +306,27 @@ def test_delete_is_explicit_deletion_intent_not_false_completion(
     )
     captured = {}
 
-    async def set_state(thread_id, **kwargs):
+    async def delete_thread_with_governance(thread_id, **kwargs):
         captured.update({"thread_id": thread_id, **kwargs})
-        return deleting
+        return {
+            "thread": deleting.as_dict(),
+            "record_ids": [original.thread_id],
+            "plan_id": "plan-delete-1",
+            "linked_execution": {
+                "plan_id": "plan-delete-1",
+                "tenant_id": original.tenant_id,
+                "executed_targets": ["memory"],
+                "receipts": [],
+            },
+            "complete": True,
+        }
 
     monkeypatch.setattr(
         route,
         "conversation_authority",
-        SimpleNamespace(set_state=set_state),
+        SimpleNamespace(
+            delete_thread_with_governance=delete_thread_with_governance
+        ),
     )
 
     response = app_client.delete(
@@ -320,6 +334,37 @@ def test_delete_is_explicit_deletion_intent_not_false_completion(
     )
 
     assert response.status_code == 200
-    assert response.json()["complete"] is False
-    assert response.json()["deletion_state"] == "deleting"
-    assert captured["state"] is ConversationThreadState.DELETING
+    body = response.json()
+    assert body["complete"] is True
+    assert body["deletion_state"] == "deleted"
+    assert body["plan_id"] == "plan-delete-1"
+    assert body["record_ids"] == [original.thread_id]
+    assert captured["expected_thread_version"] == 1
+
+
+def test_delete_never_claims_completion_when_governance_propagation_fails(
+    route,
+    app_client,
+    monkeypatch,
+):
+    original = _thread()
+
+    async def delete_thread_with_governance(*_args, **_kwargs):
+        raise ConversationStorageUnavailable(
+            "conversation linked lifecycle propagation failed"
+        )
+
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            delete_thread_with_governance=delete_thread_with_governance
+        ),
+    )
+
+    response = app_client.delete(
+        f"/api/v1/conversations/{original.thread_id}?expected_thread_version=1"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Conversation storage is unavailable"

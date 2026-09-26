@@ -9,10 +9,13 @@ from typing import Iterable
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
     EngineExecutionService,
+    EngineServiceError,
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import (
     CognitiveExecutionRuntime,
+    FinalizationBindingHook,
     VerificationHook,
 )
 from skeleton.provider_runtime import (
@@ -20,7 +23,25 @@ from skeleton.provider_runtime import (
     ProviderRegistry,
     ProviderUnavailableError,
 )
+from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
 from skeleton.skills.tool_runtime import AsyncToolRuntime
+
+
+def build_engine_tool_runtime(
+    *,
+    admission_runtime: AdmissionRuntime,
+    receipt_store: SQLiteToolReceiptStore,
+) -> AsyncToolRuntime:
+    """Construct the engine-owned canonical tool runtime at its owner boundary."""
+
+    if not isinstance(admission_runtime, AdmissionRuntime):
+        raise TypeError("admission_runtime must be AdmissionRuntime")
+    if not isinstance(receipt_store, SQLiteToolReceiptStore):
+        raise TypeError("receipt_store must be SQLiteToolReceiptStore")
+    return AsyncToolRuntime(
+        admission_runtime=admission_runtime,
+        receipt_store=receipt_store,
+    )
 
 
 class EngineExecutionCoordinatorError(RuntimeError):
@@ -43,6 +64,7 @@ class EngineExecutionCoordinator:
         provider_registry: ProviderRegistry | None = None,
         tool_runtime: AsyncToolRuntime | None = None,
         verification_hook: VerificationHook | None = None,
+        finalization_binding_hook: FinalizationBindingHook | None = None,
     ) -> None:
         if not isinstance(service, EngineExecutionService):
             raise TypeError("service must be EngineExecutionService")
@@ -50,6 +72,7 @@ class EngineExecutionCoordinator:
         self.provider_registry = provider_registry or ProviderRegistry.from_env()
         self.tool_runtime = tool_runtime or AsyncToolRuntime()
         self.verification_hook = verification_hook
+        self.finalization_binding_hook = finalization_binding_hook
         self._lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[None]] = {}
         self._closed = False
@@ -143,6 +166,14 @@ class EngineExecutionCoordinator:
     ) -> None:
         execution_id = command.execution_request.execution_id
         try:
+            self.service.ensure_execution_admission(command)
+        except EngineServiceError:
+            await self._finalize_failure(
+                execution_id,
+                "execution_admission_denied",
+            )
+            return
+        try:
             provider = self.provider_registry.require_active()
         except ProviderUnavailableError:
             await self._finalize_failure(
@@ -177,6 +208,18 @@ class EngineExecutionCoordinator:
             provider,
             self.tool_runtime,
             verification_hook=self.verification_hook,
+            finalization_binding_hook=self.finalization_binding_hook,
+            storage_meter=(
+                lambda resource_id, write_id, payload, meter_now=None: (
+                    self.service.meter_execution_storage(
+                        command,
+                        resource_id,
+                        write_id,
+                        payload,
+                        now=meter_now,
+                    )
+                )
+            ),
         )
         history = tuple(
             AIMessage(role=role, content=content)
@@ -203,6 +246,10 @@ class EngineExecutionCoordinator:
                 await runtime.resume(
                     execution_id,
                     approval_refs=approval_refs,
+                )
+            if self.service.repository.result(execution_id) is not None:
+                self.service.complete_execution_admission(
+                    execution_id
                 )
         except asyncio.CancelledError:
             raise
@@ -249,6 +296,10 @@ class EngineExecutionCoordinator:
             repository.finalize(
                 result,
                 expected_execution_version=current.version,
+                now=now,
+            )
+            self.service.complete_execution_admission(
+                execution_id,
                 now=now,
             )
         except Exception:

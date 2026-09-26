@@ -175,6 +175,7 @@ class SQLiteConversationRepository:
                     context_compiler_version TEXT,
                     attachment_refs_json TEXT NOT NULL,
                     tool_receipt_refs_json TEXT NOT NULL,
+                    memory_refs_json TEXT NOT NULL DEFAULT '[]',
                     citation_refs_json TEXT NOT NULL,
                     artifact_refs_json TEXT NOT NULL,
                     data_class TEXT NOT NULL,
@@ -204,6 +205,9 @@ class SQLiteConversationRepository:
                     "context_source_snapshot_json TEXT NOT NULL DEFAULT '[]'"
                 ),
                 "context_compiler_version": "context_compiler_version TEXT",
+                "memory_refs_json": (
+                    "memory_refs_json TEXT NOT NULL DEFAULT '[]'"
+                ),
             }
             for column, declaration in migrations.items():
                 if column not in columns:
@@ -262,6 +266,7 @@ class SQLiteConversationRepository:
                 context_compiler_version=row["context_compiler_version"],
                 attachment_refs=_parse_refs(row["attachment_refs_json"], "attachment_refs_json"),
                 tool_receipt_refs=_parse_refs(row["tool_receipt_refs_json"], "tool_receipt_refs_json"),
+                memory_refs=_parse_refs(row["memory_refs_json"], "memory_refs_json"),
                 citation_refs=_parse_refs(row["citation_refs_json"], "citation_refs_json"),
                 artifact_refs=_parse_refs(row["artifact_refs_json"], "artifact_refs_json"),
                 data_class=row["data_class"],
@@ -407,6 +412,7 @@ class SQLiteConversationRepository:
             and existing.context_compiler_version == candidate.context_compiler_version
             and existing.attachment_refs == candidate.attachment_refs
             and existing.tool_receipt_refs == candidate.tool_receipt_refs
+            and existing.memory_refs == candidate.memory_refs
             and existing.citation_refs == candidate.citation_refs
             and existing.artifact_refs == candidate.artifact_refs
             and existing.data_class == candidate.data_class
@@ -493,8 +499,9 @@ class SQLiteConversationRepository:
                         ai_result_id, context_id, context_digest,
                         context_source_snapshot_json, context_compiler_version,
                         attachment_refs_json, tool_receipt_refs_json,
-                        citation_refs_json, artifact_refs_json, data_class, schema_version
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        memory_refs_json, citation_refs_json, artifact_refs_json,
+                        data_class, schema_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         self.namespace,
@@ -518,6 +525,7 @@ class SQLiteConversationRepository:
                         message.context_compiler_version,
                         _json_refs(message.attachment_refs),
                         _json_refs(message.tool_receipt_refs),
+                        _json_refs(message.memory_refs),
                         _json_refs(message.citation_refs),
                         _json_refs(message.artifact_refs),
                         message.data_class,

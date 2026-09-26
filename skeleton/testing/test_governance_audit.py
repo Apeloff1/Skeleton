@@ -10,6 +10,7 @@ from skeleton.observability.tracing import InMemoryExporter, Tracer
 from skeleton.vault.audit import AuditLog
 from skeleton.vault.data_lifecycle import DataLifecycleRegistry, GovernedDataRecord
 from skeleton.vault.governance_audit import GovernanceAuditTimeline
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.vault.lifecycle_adapters import (
     LifecycleAdapterMissing,
     LifecycleAdapterRegistry,
@@ -264,3 +265,77 @@ async def test_export_missing_owner_adapter_is_audited_and_reads_nothing() -> No
     denied = next(entry for entry in audit.query(limit=20) if entry.outcome == "denied")
     assert denied.action == "governance.lifecycle.export"
     assert denied.metadata["missing_owner_planes"] == ["artifact"]
+
+def test_canonical_registration_and_reconciliation_are_audited_without_payload() -> None:
+    lifecycle = DataLifecycleRegistry()
+    timeline, audit, exporter = _timeline()
+    registry = GovernanceRegistry(lifecycle, timeline=timeline)
+
+    with correlation_scope("gov-register"):
+        registered = registry.register_canonical_write(
+            "artifact",
+            record_id="artifact-secret-id",
+            tenant_id="tenant-secret-a",
+            source_ref="artifact://TOP-SECRET-SOURCE",
+            data_class="confidential",
+            purposes=("model-inference",),
+            deletion_targets=("artifact",),
+            created_at=10.0,
+            retention_until=20.0,
+        )
+    with correlation_scope("gov-reconcile"):
+        reconciled = registry.reconcile_canonical_write(
+            "artifact",
+            record_id=registered.record_id,
+            tenant_id=registered.tenant_id,
+            source_ref=registered.source_ref,
+            data_class="restricted",
+            purposes=registered.purposes,
+            deletion_targets=registered.deletion_targets,
+            created_at=registered.created_at,
+            retention_until=30.0,
+        )
+
+    assert reconciled.data_class.label == "restricted"
+    entries = audit.query(limit=20)
+    actions = [entry.action for entry in entries]
+    assert "governance.lifecycle.register" in actions
+    assert "governance.lifecycle.reconcile" in actions
+
+    register_entry = next(
+        entry
+        for entry in entries
+        if entry.action == "governance.lifecycle.register"
+    )
+    reconcile_entry = next(
+        entry
+        for entry in entries
+        if entry.action == "governance.lifecycle.reconcile"
+    )
+    assert register_entry.metadata["correlation_id"] == "gov-register"
+    assert reconcile_entry.metadata["correlation_id"] == "gov-reconcile"
+    assert reconcile_entry.metadata["data_class"] == "restricted"
+    assert reconcile_entry.metadata["deletion_targets"] == ["artifact"]
+
+    rendered = repr(
+        [
+            {
+                "action": entry.action,
+                "subject_fp": entry.subject_fp,
+                "metadata": entry.metadata,
+            }
+            for entry in entries
+        ]
+    )
+    assert "artifact-secret-id" not in rendered
+    assert "tenant-secret-a" not in rendered
+    assert "TOP-SECRET-SOURCE" not in rendered
+
+    spans = exporter.query(limit=20)
+    assert {span.trace_id for span in spans} >= {
+        "gov-register",
+        "gov-reconcile",
+    }
+    rendered_spans = repr([span.to_dict() for span in spans])
+    assert "TOP-SECRET-SOURCE" not in rendered_spans
+    assert "tenant-secret-a" not in rendered_spans

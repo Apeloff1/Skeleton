@@ -1,0 +1,184 @@
+name: Conversation Authority Closure Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "skeleton/contracts/conversation.py"
+      - "skeleton/persistence/conversation_repository.py"
+      - "backend/core/conversations.py"
+      - "backend/routes/conversations.py"
+      - "backend/routes/ai.py"
+      - "backend/routes/jeeves_compose.py"
+      - "frontend/src/product/conversationClient.ts"
+      - "frontend/features/Jeeves/WorkspaceController.ts"
+      - "frontend/features/Jeeves/workspace.ts"
+      - "frontend/features/Jeeves/ChatWorkspace.tsx"
+      - "frontend/scripts/test-jeeves-workspace.cjs"
+      - "backend/tests/test_ai_chat_conversation_authority.py"
+      - "backend/tests/test_conversations_api.py"
+      - "backend/tests/test_conversation_regeneration.py"
+      - "backend/tests/test_conversation_regeneration_route.py"
+      - "backend/tests/test_conversation_governance.py"
+      - "tests/test_jeeves_chat_workspace.py"
+      - "scripts/verify_jeeves_conversation_cutover.py"
+      - "tests/test_jeeves_conversation_cutover_verifier.py"
+      - "machine/ai_app_construction.json"
+      - "machine/ai_closure_evidence.json"
+      - "machine/ai_implementation_handoff.json"
+      - ".github/workflows/conversation-authority-closure.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: conversation-authority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canonical-conversation-contracts:
+    name: Canonical conversation contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PYTHONPATH: ".:backend"
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install focused backend test runtime
+        run: >-
+          python -m pip install --disable-pip-version-check
+          -e ".[dev]"
+          "httpx==0.28.1"
+          "PyJWT==2.14.0"
+          "python-dotenv==1.2.3"
+          "bcrypt==4.3.0"
+          "email-validator==2.3.0"
+          "matplotlib==3.10.6"
+          "networkx==3.5"
+
+      - name: Run canonical backend conversation authority contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          backend/tests/test_ai_chat_conversation_authority.py
+          backend/tests/test_conversations_api.py
+          backend/tests/test_conversation_regeneration.py
+          backend/tests/test_conversation_regeneration_route.py
+          backend/tests/test_conversation_governance.py
+
+      # backend/tests and repository-root tests are both explicit Python
+      # packages named "tests"; isolate them in separate interpreters so one
+      # package cannot poison import resolution for the other.
+      - name: Run Jeeves backend compatibility contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          tests/test_jeeves_chat_workspace.py
+
+  jeeves-workspace-reconstruction:
+    name: Jeeves workspace reconstruction
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+
+      - name: Typecheck Jeeves workspace
+        working-directory: frontend
+        run: yarn typecheck:jeeves
+
+      - name: Run Jeeves remount and workspace contracts
+        working-directory: frontend
+        run: node --test scripts/test-jeeves-workspace.cjs
+
+  jeeves-cutover-independent:
+    name: Independent Jeeves conversation cutover
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=7.0.0"
+
+      - name: Run cutover verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_jeeves_conversation_cutover_verifier.py
+
+      - name: Verify exact-head Jeeves cutover
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_jeeves_conversation_cutover.py
+          --evidence-out .jeeves-conversation-cutover.json
+          --print-evidence
+
+      - name: Assert exact-head cutover receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".jeeves-conversation-cutover.json").read_text(encoding="utf-8")
+          )
+          expected = os.environ["EXPECTED_SHA"].strip()
+          if receipt.get("head_sha") != expected:
+              raise SystemExit("Jeeves cutover receipt head mismatch")
+          if receipt.get("verifier") != "jeeves-conversation-cutover-v1":
+              raise SystemExit("unexpected Jeeves cutover verifier identity")
+          if receipt.get("valid") is not True or receipt.get("errors"):
+              raise SystemExit("Jeeves conversation cutover verification failed")
+          if receipt.get("legacy_read_accesses") != 1:
+              raise SystemExit("legacy Jeeves store is not migration-read-only")
+          if len(receipt.get("digests") or {}) != 12:
+              raise SystemExit("Jeeves cutover digest coverage is incomplete")
+          print("jeeves conversation cutover receipt:", expected)
+          PY

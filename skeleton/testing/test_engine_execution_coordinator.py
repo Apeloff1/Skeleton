@@ -13,7 +13,10 @@ from skeleton.api.engine_authority import (
     EngineServiceGrant,
     engine_request_binding,
 )
-from skeleton.api.engine_runtime import EngineExecutionCoordinator
+from skeleton.api.engine_runtime import (
+    EngineExecutionCoordinator,
+    build_engine_tool_runtime,
+)
 from skeleton.api.engine_service import (
     EngineContextHandoff,
     EngineExecutionCommand,
@@ -22,7 +25,9 @@ from skeleton.api.engine_service import (
 )
 from skeleton.contracts.ai_execution import AIExecutionRequest
 from skeleton.contracts.operation import OperationEnvelope
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.execution_runtime import ExecutionVerificationDecision
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import (
     FinishReason,
@@ -38,6 +43,20 @@ from skeleton.skills.tool_runtime import AsyncToolRuntime
 
 def _now() -> datetime:
     return datetime(2026, 9, 23, 20, 30, tzinfo=timezone.utc)
+
+
+def test_engine_tool_runtime_factory_preserves_canonical_dependencies(tmp_path) -> None:
+    admission = AdmissionRuntime()
+    receipt_store = SQLiteToolReceiptStore(tmp_path / "tool-receipts.sqlite3")
+    try:
+        runtime = build_engine_tool_runtime(
+            admission_runtime=admission,
+            receipt_store=receipt_store,
+        )
+        assert runtime.admission_runtime is admission
+        assert runtime.receipt_store is receipt_store
+    finally:
+        receipt_store.close()
 
 
 def _verified_execution(
@@ -235,6 +254,59 @@ def _service(tmp_path):
         ]
     )
     return EngineExecutionService(repo, submissions, registry)
+
+
+
+def _admitted_service(tmp_path):
+    repo = SQLiteExecutionRepository(
+        tmp_path / "execution-admitted.sqlite3"
+    )
+    submissions = SQLiteEngineSubmissionStore(
+        tmp_path / "submissions-admitted.sqlite3"
+    )
+    registry = EngineAuthorityRegistry(
+        [
+            EngineServiceGrant(
+                service_principal="codedock-backend",
+                scopes=frozenset(
+                    {
+                        "engine:submit",
+                        "engine:read",
+                        "engine:cancel",
+                        "engine:events",
+                        "engine:approve",
+                    }
+                ),
+                tenant_ids=frozenset({"tenant-a"}),
+                capabilities=frozenset({"assistant.chat"}),
+            )
+        ]
+    )
+    ledger = TenantQuotaLedger()
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="engine-coordinator-test",
+            max_operations=100,
+            max_input_tokens=1_000_000,
+            max_output_tokens=1_000_000,
+            max_cost_usd=100.0,
+            max_tool_calls=1_000,
+            max_artifact_bytes=10_000_000,
+            max_storage_bytes=10_000_000,
+            max_concurrent_operations=16,
+        ),
+    )
+    return (
+        EngineExecutionService(
+            repo,
+            submissions,
+            registry,
+            admission_runtime=runtime,
+        ),
+        runtime,
+        ledger,
+    )
 
 
 async def _wait_result(service, execution_id: str):
@@ -783,3 +855,84 @@ async def test_coordinator_durable_approval_resumes_effect_once_after_restart(
     assert len(result.tool_receipts) == 1
     assert final_provider.requests
     await restarted.shutdown()
+
+@pytest.mark.asyncio
+async def test_coordinator_completes_execution_admission_at_terminal_state(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    _, command = _bundle(execution_id="exec-admitted-terminal")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert ledger.snapshot("tenant-a")["active_reservations"] == 1
+
+    coordinator = EngineExecutionCoordinator(
+        service,
+        provider_registry=FakeRegistry(FakeProvider()),
+        tool_runtime=AsyncToolRuntime(
+            admission_runtime=runtime,
+        ),
+        verification_hook=_verified_execution,
+    )
+    await coordinator.ensure_started(command)
+    result = await _wait_result(
+        service,
+        command.execution_request.execution_id,
+    )
+
+    assert result.status == "completed"
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["completions"] == 1
+    assert snapshot["committed"]["operations"] == 1
+    assert runtime.snapshot()["active_operations"] == ()
+    await coordinator.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_coordinator_rehydrates_execution_admission_after_local_restart(
+    tmp_path,
+) -> None:
+    service, runtime, ledger = _admitted_service(tmp_path)
+    _, command = _bundle(execution_id="exec-admission-restart")
+    service.submit(
+        command,
+        verified_service_principal="codedock-backend",
+        actor_id="actor-a",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    first_lease = service.ensure_execution_admission(
+        command,
+        now=_now(),
+    )
+    assert first_lease is not None
+
+    # Simulate process-local admission state loss while preserving the durable
+    # tenant reservation. A fresh runtime against the same quota owner must
+    # deterministically recover the same reservation.
+    recovered_runtime = AdmissionRuntime(quota_ledger=ledger)
+    recovered_service = EngineExecutionService(
+        service.repository,
+        service.submissions,
+        service.authorities,
+        admission_runtime=recovered_runtime,
+    )
+    recovered_lease = recovered_service.ensure_execution_admission(
+        command,
+        now=_now() + timedelta(seconds=1),
+    )
+
+    assert recovered_lease is not None
+    assert recovered_lease.quota_reservation is not None
+    assert first_lease.quota_reservation is not None
+    assert (
+        recovered_lease.quota_reservation.reservation_id
+        == first_lease.quota_reservation.reservation_id
+    )
+    assert ledger.snapshot("tenant-a")["active_reservations"] == 1

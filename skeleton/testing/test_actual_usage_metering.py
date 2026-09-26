@@ -47,6 +47,7 @@ def _request(
     *,
     max_tool_calls: int = 4,
     max_artifact_bytes: int = 1_000,
+    max_storage_bytes: int = 1_000,
 ) -> AdmissionRequest:
     return AdmissionRequest(
         operation_id=operation_id,
@@ -60,6 +61,7 @@ def _request(
             max_provider_attempts=3,
             max_tool_calls=max_tool_calls,
             max_artifact_bytes=max_artifact_bytes,
+            max_storage_bytes=max_storage_bytes,
             max_concurrency=4,
             max_queue_depth=100,
         ),
@@ -101,12 +103,16 @@ def test_skill_execution_retry_is_idempotent_and_commits_actual_usage(
     assert completion.quota_completion.actual.tool_calls == 1
 
 
-def test_artifact_and_storage_bytes_share_monotonic_byte_budget(
+def test_artifact_and_storage_bytes_use_independent_monotonic_budgets(
     tmp_path: Path,
 ) -> None:
     runtime, ledger = _runtime(tmp_path / "quota.sqlite3")
     runtime.admit(
-        _request("op-artifact", max_artifact_bytes=300),
+        _request(
+            "op-artifact",
+            max_artifact_bytes=300,
+            max_storage_bytes=180,
+        ),
         now_wall=10.0,
     )
     meter = ArtifactUsageMeter(runtime)
@@ -126,7 +132,7 @@ def test_artifact_and_storage_bytes_share_monotonic_byte_budget(
         now_wall=10.2,
     )
 
-    with pytest.raises(AdmissionError, match="operation_budget_exceeded:artifact_bytes"):
+    with pytest.raises(AdmissionError, match="operation_budget_exceeded:storage_bytes"):
         meter.meter_storage(
             "op-artifact",
             "report",
@@ -136,9 +142,10 @@ def test_artifact_and_storage_bytes_share_monotonic_byte_budget(
         )
 
     snapshot = ledger.snapshot("tenant-a")
-    assert snapshot["reserved"]["artifact_bytes"] == 270
+    assert snapshot["reserved"]["artifact_bytes"] == 120
+    assert snapshot["reserved"]["storage_bytes"] == 150
     assert snapshot["metered_by_category"]["artifact"]["artifact_bytes"] == 120
-    assert snapshot["metered_by_category"]["storage"]["artifact_bytes"] == 150
+    assert snapshot["metered_by_category"]["storage"]["storage_bytes"] == 150
 
     completion = runtime.complete(
         "op-artifact",
@@ -146,7 +153,8 @@ def test_artifact_and_storage_bytes_share_monotonic_byte_budget(
         now_wall=11.0,
     )
     assert completion.quota_completion is not None
-    assert completion.quota_completion.actual.artifact_bytes == 270
+    assert completion.quota_completion.actual.artifact_bytes == 120
+    assert completion.quota_completion.actual.storage_bytes == 150
 
 
 def test_unknown_usage_survives_runtime_restart_and_blocks_completion(
@@ -195,12 +203,16 @@ def test_unknown_usage_survives_runtime_restart_and_blocks_completion(
     assert completion.quota_completion.actual.tool_calls == 1
 
 
-def test_unknown_artifact_usage_can_only_resolve_inside_operation_budget(
+def test_unknown_storage_usage_can_only_resolve_inside_operation_budget(
     tmp_path: Path,
 ) -> None:
     runtime, _ = _runtime(tmp_path / "quota.sqlite3")
     runtime.admit(
-        _request("op-unknown-artifact", max_artifact_bytes=100),
+        _request(
+            "op-unknown-artifact",
+            max_artifact_bytes=100,
+            max_storage_bytes=100,
+        ),
         now_wall=10.0,
     )
     meter = ArtifactUsageMeter(runtime)
@@ -213,7 +225,7 @@ def test_unknown_artifact_usage_can_only_resolve_inside_operation_budget(
         now_wall=10.1,
     )
 
-    with pytest.raises(AdmissionError, match="operation_budget_exceeded:artifact_bytes"):
+    with pytest.raises(AdmissionError, match="operation_budget_exceeded:storage_bytes"):
         meter.resolve_unknown(
             "op-unknown-artifact",
             "storage",

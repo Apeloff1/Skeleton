@@ -1,9 +1,12 @@
 import {
   WORKSPACE_KEY, LEGACY_KEY, MAX_TEXT, MAX_CONTEXT, MAX_MESSAGES,
   addConversation, buildChatBody, createWorkspace, decodeWorkspace, deleteConversation,
-  encodeWorkspace, migrateLegacy, newId, updateConversation,
+  encodeWorkspace, migrateLegacy, newId, projectCanonicalHistory, updateConversation,
 } from './workspace';
-import type { Artifact, Attachment, ChatBody, Conversation, Message, Workspace } from './workspace';
+import type {
+  Artifact, Attachment, CanonicalChatTurn, ChatBody, ChatHistoryProjection,
+  Conversation, Message, Workspace,
+} from './workspace';
 import type { ChatHandoff } from './workbench/types';
 
 export interface WorkspaceStorage {
@@ -20,9 +23,18 @@ export type ChatResponse = {
   forms?: string[];
   artifacts?: Artifact[];
   persisted?: boolean;
+  canonical_thread_id?: string | null;
+  canonical_message_id?: string | null;
+  operation_id?: string | null;
+  ai_result_id?: string | null;
 };
 
 export type Transport = (body: ChatBody, signal: AbortSignal) => Promise<ChatResponse>;
+export type ChatHistoryTurn = CanonicalChatTurn;
+export type ChatHistoryResponse = ChatHistoryProjection;
+export type HistoryTransport = (
+  sessionId: string,
+) => Promise<ChatHistoryResponse>;
 
 export type WorkspaceSnapshot = {
   workspace: Workspace;
@@ -52,7 +64,11 @@ export class WorkspaceController {
   private loading: Promise<void> | null = null;
   private attachments = new Map<string, Attachment>();
 
-  constructor(private storage: WorkspaceStorage, private transport: Transport) {}
+  constructor(
+    private storage: WorkspaceStorage,
+    private transport: Transport,
+    private historyTransport?: HistoryTransport,
+  ) {}
 
   getSnapshot = (): WorkspaceSnapshot => this.snapshot;
 
@@ -73,15 +89,65 @@ export class WorkspaceController {
     return this.loading;
   }
 
+  private async hydrateConversation(
+    conversation: Conversation,
+  ): Promise<Conversation> {
+    if (!this.historyTransport || !conversation.sessionId) return conversation;
+    const result = await this.historyTransport(conversation.sessionId);
+    if (
+      result.ok === false
+      || result.available === false
+      || result.session_id !== conversation.sessionId
+      || !Array.isArray(result.turns)
+    ) {
+      throw new Error('canonical conversation history unavailable');
+    }
+    return projectCanonicalHistory(
+      conversation,
+      result,
+    );
+  }
+
+  private async rehydrateServerTranscripts(
+    workspace: Workspace,
+  ): Promise<{ workspace: Workspace; failed: number }> {
+    if (!this.historyTransport) return { workspace, failed: 0 };
+
+    let failed = 0;
+    const conversations = await Promise.all(
+      workspace.conversations.map(async conversation => {
+        if (!conversation.sessionId) return conversation;
+        try {
+          return await this.hydrateConversation(conversation);
+        } catch {
+          failed += 1;
+          return conversation;
+        }
+      }),
+    );
+    return {
+      workspace: { ...workspace, conversations },
+      failed,
+    };
+  }
+
   private async load(): Promise<void> {
     this.emit({ loadError: null, saveState: 'loading' });
     try {
       const saved = await this.storage.getItem(WORKSPACE_KEY);
       const legacy = saved === null ? await this.storage.getItem(LEGACY_KEY) : null;
-      const workspace = saved !== null ? decodeWorkspace(saved)
+      const local = saved !== null ? decodeWorkspace(saved)
         : legacy !== null ? migrateLegacy(legacy) : this.snapshot.workspace;
-      this.emit({ workspace, ready: true, saveState: 'saved' });
-      // Migration is additive: retain the legacy key as a recovery copy.
+      const hydrated = await this.rehydrateServerTranscripts(local);
+      this.emit({
+        workspace: hydrated.workspace,
+        ready: true,
+        saveState: 'saved',
+        notice: hydrated.failed
+          ? 'Some chats could not be refreshed from the server. Showing the last device cache for those chats.'
+          : null,
+      });
+      // Local persistence is a rebuildable cache plus drafts/workspace metadata.
       this.queueSave();
     } catch {
       this.emit({
@@ -128,6 +194,48 @@ export class WorkspaceController {
   retrySave = (): void => { this.queueSave(); };
   dismissNotice = (): void => { this.emit({ notice: null }); };
   notify = (notice: string): void => { this.emit({ notice }); };
+
+  async refreshCanonical(
+    conversationId = this.snapshot.workspace.activeId,
+  ): Promise<boolean> {
+    if (!this.snapshot.ready || !this.historyTransport) return false;
+    if (this.running?.conversationId === conversationId) return false;
+    const current = this.snapshot.workspace.conversations.find(
+      item => item.id === conversationId,
+    );
+    if (!current?.sessionId) return false;
+    const sessionId = current.sessionId;
+    try {
+      const result = await this.historyTransport(sessionId);
+      if (
+        result.ok === false
+        || result.available === false
+        || result.session_id !== sessionId
+        || !Array.isArray(result.turns)
+      ) {
+        return false;
+      }
+      const latest = this.snapshot.workspace.conversations.find(
+        item => item.id === conversationId,
+      );
+      if (
+        !latest
+        || latest.sessionId !== sessionId
+        || this.running?.conversationId === conversationId
+      ) {
+        return false;
+      }
+      const projection = projectCanonicalHistory(latest, result);
+      this.change(updateConversation(
+        this.snapshot.workspace,
+        conversationId,
+        () => projection,
+      ));
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   get active(): Conversation {
     return this.snapshot.workspace.conversations.find(c => c.id === this.snapshot.workspace.activeId)!;
@@ -198,6 +306,7 @@ export class WorkspaceController {
     if (!this.snapshot.workspace.conversations.some(c => c.id === id)) return;
     if (id !== this.active.id) this.cancel();
     this.change({ ...updateConversation(this.snapshot.workspace, id, c => ({ ...c, archived: false })), activeId: id });
+    void this.refreshCanonical(id);
   }
 
   remove(id: string): void {
@@ -307,13 +416,31 @@ export class WorkspaceController {
         throw new Error('Jeeves returned an empty response. Try again.');
       }
       const reply: Message = {
-        id: newId(), role: 'jeeves', text: response.reply.slice(0, MAX_TEXT), status: 'complete',
-        createdAt: Date.now(), tier: response.tier, model: response.model,
-        forms: response.forms, artifacts: response.artifacts || [], artifactCount: response.artifacts?.length || 0,
+        id: response.canonical_message_id || newId(),
+        role: 'jeeves',
+        text: response.reply.slice(0, MAX_TEXT),
+        status: 'complete',
+        createdAt: Date.now(),
+        tier: response.tier,
+        model: response.model,
+        forms: response.forms,
+        artifacts: response.artifacts || [],
+        artifactCount: response.artifacts?.length || 0,
       };
       this.change(updateConversation(this.snapshot.workspace, conversationId, c => ({
-        ...c, sessionId: response.session_id || c.sessionId, sessionUpdatedAt: Date.now(), updatedAt: Date.now(),
-        messages: [...c.messages.map(m => m.id === messageId ? { ...m, status: 'complete' as const, error: undefined } : m), reply],
+        ...c,
+        canonicalThreadId: response.canonical_thread_id || c.canonicalThreadId,
+        sessionId: response.session_id || c.sessionId,
+        sessionUpdatedAt: Date.now(),
+        updatedAt: Date.now(),
+        messages: [
+          ...c.messages.map(m => m.id === messageId ? {
+            ...m,
+            status: 'complete' as const,
+            error: undefined,
+          } : m),
+          reply,
+        ],
       })));
       this.attachments.delete(messageId);
       if (response.persisted === false) this.notify('The server could not save this exchange. Your device-local transcript is still available.');

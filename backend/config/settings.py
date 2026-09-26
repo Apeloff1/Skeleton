@@ -83,7 +83,8 @@ MAX_MEMORY_LIMIT_MB = 1024
 # =============================================================================
 # AI Configuration
 # =============================================================================
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+# Provider credentials are owned exclusively by skeleton/provider_runtime.py.
+EMERGENT_LLM_KEY = ""  # retired compatibility sentinel; never loads secrets
 DEFAULT_AI_MODEL = "gpt-4o"
 AI_TIMEOUT = 30  # seconds
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "topology_version": "1.7.0",
+  "topology_version": "1.8.0",
   "architecture_tag": "arch-map/v3.7",
   "status": "active",
   "title": "Skeleton State Authority and Persistence Topology",
@@ -129,8 +129,8 @@
       "production_role": "authoritative Skeleton operation-state repository with transactional event-intent outbox",
       "network": "in-process only",
       "authentication": "inherits orchestrator authority",
-      "backup": "required with skeleton_data when this binding is used for production; formal restore rehearsal remains open",
-      "restore": "reopen operation_state.sqlite, validate operation identity/state/version, then drain unpublished outbox rows before serving dependent operation traffic",
+      "backup": "required with skeleton_data; SQLite online-backup restore rehearsal verifies schema/data digest, operation state/version and unpublished outbox identity",
+      "restore": "restore operation_state.sqlite, verify integrity/schema/data digest plus canonical operation state/version and pending outbox identity, then reconcile unpublished rows into operation_stream before dependent traffic",
       "migration": "schema migration must preserve operation identity, state/version monotonicity, terminal fences and deterministic unpublished outbox identity",
       "evidence": [
         "skeleton/contracts/operation.py",
@@ -141,7 +141,12 @@
         "skeleton/api/server.py",
         "skeleton/config/settings.py",
         "docker-compose.yml",
-        "skeleton/testing/test_operation_runtime.py"
+        "skeleton/testing/test_operation_runtime.py",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
       ]
     },
     {
@@ -166,7 +171,9 @@
         "skeleton/api/server.py",
         "docker-compose.yml",
         "skeleton/testing/test_data_lifecycle.py",
-        "skeleton/testing/test_governance_runtime_binding.py"
+        "skeleton/testing/test_governance_runtime_binding.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
       ]
     },
     {
@@ -206,21 +213,57 @@
       ]
     },
     {
-      "id": "cognitive-execution-unbound",
-      "technology": "planned durable execution repository; production binding not yet materialized",
+      "id": "engine-cognitive-sqlite",
+      "technology": "SQLite durable engine bundle: execution, submissions/approvals, tool receipts, quota/usage and shared-pressure coordination",
+      "runtime_service": "skeleton",
+      "compose_file": "docker-compose.yml",
+      "volumes": [
+        "skeleton_data"
+      ],
+      "durability": "persistent named volume in Compose via /app/data; explicit :memory: defaults remain local/test-only",
+      "production_role": "authoritative cognitive execution/result/submission/approval/tool-receipt/quota state plus durable cross-process pressure coordination",
+      "network": "in-process only",
+      "authentication": "inherits authenticated engine service boundary, delegated authority and tenant binding",
+      "backup": "back up the /app/data engine SQLite set with skeleton_data using transactionally consistent SQLite/volume backup; operation-state online-backup rehearsal establishes the required SQLite restore mechanism while whole-bundle deployment backup remains operator controlled",
+      "restore": "restore engine_execution.sqlite, engine_submissions.sqlite, engine_tool_receipts.sqlite and engine_quota.sqlite before engine recovery; restore engine_pressure.sqlite or safely reconfigure/reap expired leases before admission; then recover resumable executions from durable submissions/checkpoints",
+      "migration": "preserve execution/turn/checkpoint/result identities and versions, submission/idempotency and approval bindings, tool receipt fences, quota reservations/completions/usage events, and pressure scope/lease semantics",
+      "evidence": [
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/intelligence/quota_sqlite.py",
+        "skeleton/intelligence/shared_pressure.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_engine_execution_service.py",
+        "skeleton/testing/test_engine_execution_coordinator.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_tenant_quota_sqlite.py",
+        "skeleton/testing/test_shared_pressure.py",
+        "machine/state_backup_policy.json",
+        "scripts/state_backup_bundle.py"
+      ]
+    },
+    {
+      "id": "verification-evidence-unbound",
+      "technology": "planned durable verification claim/postcondition repository; production binding not yet materialized",
       "runtime_service": null,
       "compose_file": null,
       "volumes": [],
       "durability": "unbound",
-      "production_role": "future authoritative storage boundary for AI execution, turn/checkpoint, approval, idempotency, usage and final-result state",
+      "production_role": "future authoritative storage boundary for standalone verification claim/evidence/postcondition records not already embedded in terminal execution results",
       "network": "in-process repository contract until production adapter is selected",
       "authentication": "inherits orchestration/tool authority and tenant binding",
-      "backup": "unimplemented until production repository binding",
-      "restore": "unimplemented until production repository binding; recovery semantics are defined in the cognitive runtime blueprint",
-      "migration": "future repository schema must preserve execution/turn identity, checkpoint fencing, approval binding, idempotency reservations, usage monotonicity and final-result terminality",
+      "backup": "unimplemented until standalone verification repository binding",
+      "restore": "unimplemented until standalone verification repository binding; terminal result verification payloads already remain inside the durable execution result",
+      "migration": "future verification repository schema must preserve verification identity, execution/turn/candidate lineage, evidence references, outcome/reason codes and repair lineage",
       "evidence": [
         "machine/ai_app_construction.json",
-        "skeleton/contracts/operation.py"
+        "skeleton/intelligence/verification.py",
+        "skeleton/intelligence/verifier.py"
       ]
     }
   ],
@@ -371,7 +414,7 @@
         "confidential"
       ],
       "transaction_scope": "vector collection operation",
-      "consistency": "eventually consistent projection; absence must degrade retrieval, not canonical state",
+      "consistency": "eventually consistent projection; material canonical-memory rebuilds are admitted before derived-store mutation; absence/failure degrades retrieval and never mutates canonical state",
       "retention": "rebuildable projection",
       "backup_restore": "rebuild only after authoritative source restore verification passes; backup optional when fully derived",
       "migration": "re-index from authoritative sources",
@@ -386,7 +429,10 @@
         "docker-compose.yml",
         "skeleton/config/settings.py",
         "scripts/state_recovery_drill.py",
-        ".github/workflows/state-recovery-drill.yml"
+        ".github/workflows/state-recovery-drill.yml",
+        "skeleton/memory/projection.py",
+        "skeleton/testing/test_memory_projection.py",
+        "skeleton/api/server.py"
       ]
     },
     {
@@ -403,8 +449,8 @@
       ],
       "transaction_scope": "BEGIN IMMEDIATE operation transition plus transactional outbox intent",
       "consistency": "legal monotonic OperationEnvelope transitions with optimistic version fencing, terminal finality, idempotency identity and same-transaction outbox intent; live /intelligence/reason uses DurableOperationRuntime with bounded background outbox reconciliation",
-      "retention": "operation/governance lifecycle controlled; mounted persistence exists while formal backup/retention rehearsal remains STATE-03 work",
-      "backup_restore": "persistent Compose binding and SQLite reopen/restart reconciliation are implemented; full operator backup/restore rehearsal remains required",
+      "retention": "operation/governance lifecycle controlled; mounted persistence and authoritative SQLite backup/restore rehearsal are implemented",
+      "backup_restore": "persistent Compose binding plus SQLite online-backup destruction/restore rehearsal verify operation identity/state/version and unpublished outbox identity before restored reconciliation",
       "migration": "preserve operation identity digest, state/version monotonicity, terminal status and unpublished outbox rows",
       "derived_from": [],
       "rebuildable": false,
@@ -419,7 +465,10 @@
         "skeleton/config/settings.py",
         "docker-compose.yml",
         "skeleton/testing/test_operation_runtime.py",
-        "skeleton/testing/test_operation_server_binding.py"
+        "skeleton/testing/test_operation_server_binding.py",
+        "scripts/state_recovery_drill.py",
+        "skeleton/testing/test_state_recovery_drill.py",
+        ".github/workflows/state-recovery-drill.yml"
       ]
     },
     {
@@ -511,11 +560,11 @@
     {
       "id": "cognitive-execution-ledger",
       "owner_plane": "orchestration",
-      "physical_store": "cognitive-execution-unbound",
-      "logical_location": "AIExecutionRequest / AgentTurn / ExecutionCheckpoint",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite; AIExecutionRequest / AgentTurn / ExecutionCheckpoint / AIExecutionResult",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -523,24 +572,32 @@
       "transaction_scope": "execution/turn/checkpoint compare-and-set boundary",
       "consistency": "turn index and checkpoint version are monotonic; only one resumable canonical checkpoint may be current for an execution",
       "retention": "operation/governance lifecycle controlled",
-      "backup_restore": "required after durable repository binding; restore must recreate exact latest committed checkpoint and turn lineage",
+      "backup_restore": "restore engine_execution.sqlite before engine recovery; repository corruption checks validate request identity, turn/checkpoint contracts and terminal result payloads before resume",
       "migration": "must preserve operation_id, execution_id, turn_id lineage, checkpoint version and terminal execution state",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-cognitive-execution-loop",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/contracts/operation.py"
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/api/server.py",
+        "skeleton/config/settings.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py",
+        "skeleton/testing/test_engine_execution_coordinator.py"
       ]
     },
     {
       "id": "tool-idempotency-ledger",
       "owner_plane": "tool-runtime",
-      "physical_store": "cognitive-execution-unbound",
-      "logical_location": "tool call reservation / execution receipt by operation_id + call_id",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite; durable tool reservation/result lifecycle",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -548,24 +605,30 @@
       "transaction_scope": "reserve/fence/complete one tool call identity",
       "consistency": "one call_id has one canonical reservation and terminal receipt; a completed side effect is never executed again during replay",
       "retention": "at least as long as the operation/result remains replayable or auditable",
-      "backup_restore": "required after durable repository binding",
+      "backup_restore": "restore engine_tool_receipts.sqlite before resumed execution can replay tool calls; persisted request/lineage/privacy fingerprints fence conflicting idempotency reuse",
       "migration": "preserve call_id, arguments digest, idempotency mode, fence/version, status, receipt and compensation metadata",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-tool-runtime-convergence",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/skills/manifest.py"
+        "skeleton/skills/tool_contract.py",
+        "skeleton/skills/tool_runtime.py",
+        "skeleton/skills/tool_receipt_store.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_tool_runtime.py",
+        "skeleton/testing/test_tool_receipt_store.py",
+        "skeleton/testing/test_execution_runtime.py"
       ]
     },
     {
       "id": "human-approval-ledger",
       "owner_plane": "tool-runtime",
-      "physical_store": "cognitive-execution-unbound",
-      "logical_location": "approval record bound to operation/execution/turn/call and arguments digest",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite; engine_tool_approval table",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -573,48 +636,59 @@
       "transaction_scope": "request/decision/expiry transition for one approval identity",
       "consistency": "approval applies only to the exact arguments digest and authority context; edited or expired requests require a new approval",
       "retention": "auditable through operation lifecycle and applicable governance retention",
-      "backup_restore": "required after durable repository binding",
+      "backup_restore": "restore engine_submissions.sqlite with execution state before resume; approval call/tool/arguments/idempotency identity and expiry remain restart-safe and fail closed after authority expiry",
       "migration": "preserve approval identity, arguments digest, risk class, requester/decider identities, expiry and decision",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-tool-runtime-convergence",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/contracts/operation.py"
+        "skeleton/api/engine_authority.py",
+        "skeleton/api/engine_service.py",
+        "skeleton/api/engine_runtime.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_engine_execution_service.py",
+        "skeleton/testing/test_engine_execution_coordinator.py"
       ]
     },
     {
       "id": "execution-usage-ledger",
       "owner_plane": "cost-capacity",
-      "physical_store": "cognitive-execution-unbound",
-      "logical_location": "per-operation/per-turn estimated and actual resource consumption",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_QUOTA_STATE_PATH=/app/data/engine_quota.sqlite; quota reservations/completions/usage events",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal"
       ],
       "transaction_scope": "monotonic append/update of normalized usage deltas",
       "consistency": "consumed budget cannot decrease; unknown actual usage is explicit and never normalized to zero",
       "retention": "billing/telemetry policy controlled; aggregate retention may exceed raw execution-detail retention",
-      "backup_restore": "required when used for quota/billing/release evidence",
+      "backup_restore": "restore engine_quota.sqlite before admission so active reservations, committed usage and replay-safe completion identities survive restart; Compose binds the ledger to skeleton_data",
       "migration": "preserve normalized units, provider/tool source, estimate-versus-actual distinction and monotonic cumulative totals",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-cognitive-execution-loop",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/intelligence/admission.py"
+        "skeleton/intelligence/admission.py",
+        "skeleton/intelligence/admission_runtime.py",
+        "skeleton/intelligence/quota_sqlite.py",
+        "skeleton/api/server.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_admission_runtime.py",
+        "skeleton/testing/test_tenant_quota_sqlite.py",
+        "skeleton/testing/test_actual_usage_metering.py"
       ]
     },
     {
       "id": "final-ai-result-ledger",
       "owner_plane": "orchestration",
-      "physical_store": "cognitive-execution-unbound",
-      "logical_location": "AIExecutionResult terminal record",
-      "authority": "authoritative-unbound",
+      "physical_store": "engine-cognitive-sqlite",
+      "logical_location": "SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite; ai_execution_result plus finalization intent/outbox",
+      "authority": "authoritative",
       "source_of_truth": true,
-      "status": "planned-contract",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
@@ -622,14 +696,19 @@
       "transaction_scope": "terminal result + verification/receipt references committed with execution terminal fence",
       "consistency": "at most one canonical final result per execution; OperationState may not become completed before the final result exists",
       "retention": "operation/governance lifecycle controlled; artifacts/memory have their own referenced retention policies",
-      "backup_restore": "required after durable repository binding",
+      "backup_restore": "restore engine_execution.sqlite before recovery; terminal results and staged finalization intents are validated against canonical execution identity/version and cannot be reconstructed from stream projections alone",
       "migration": "preserve final status/output reference, verification, route/provider/tool receipts, usage, memory/artifact refs and terminal event identity",
       "derived_from": [],
       "rebuildable": false,
       "gap": "gap-cognitive-execution-loop",
       "evidence": [
-        "machine/ai_app_construction.json",
-        "skeleton/contracts/operation.py"
+        "skeleton/contracts/ai_execution.py",
+        "skeleton/persistence/execution_repository.py",
+        "skeleton/intelligence/execution_runtime.py",
+        "skeleton/api/engine_runtime.py",
+        "docker-compose.yml",
+        "skeleton/testing/test_execution_repository.py",
+        "skeleton/testing/test_execution_runtime.py"
       ]
     },
     {
@@ -701,7 +780,7 @@
     {
       "id": "verification-receipt-ledger",
       "owner_plane": "reasoning-verification",
-      "physical_store": "cognitive-execution-unbound",
+      "physical_store": "verification-evidence-unbound",
       "logical_location": "VerificationReceipt / ClaimRecord / PostconditionCheck",
       "authority": "authoritative-unbound",
       "source_of_truth": true,
@@ -763,15 +842,15 @@
       "logical_location": "SKL_MONGO_DATABASE.memory_records via canonical memory repository",
       "authority": "authoritative",
       "source_of_truth": true,
-      "status": "durable-repository-implemented",
+      "status": "production-bound",
       "data_classes": [
         "internal",
         "confidential"
       ],
       "transaction_scope": "single canonical memory record/version plus lifecycle metadata; repository transaction where multi-record lifecycle updates require it",
-      "consistency": "durable SQLite reference and Mongo repository contracts enforce tenant/user namespace authority, idempotent writes, optimistic version fencing, immutable predecessor-linked revisions, tombstones, expiry, and durable projection-outbox intent; derived vector/MAG/CAG/index state remains non-authoritative and advances only from canonical records",
+      "consistency": "MongoMemoryRepository is the production tenant/namespace authority with idempotent writes, optimistic version fencing, immutable revision lineage, tombstones, expiry and durable projection-outbox intent; AsyncGovernedMemoryWriter gates writes through policy/governance/admission; MongoMemoryLifecycleAdapter executes governed canonical export/tombstone deletion; all vector/MAG/CAG/index state remains derived.",
       "retention": "governance-controlled by retention_class and expiry; deletion/export are first-class lifecycle operations",
-      "backup_restore": "required; restore canonical memory before rebuilding vector, MAG/CAG compatibility, or process-local projections",
+      "backup_restore": "canonical memory is part of authoritative Mongo recovery and must be restored and verified before any vector/MAG/CAG/search projection rebuild; lifecycle state is restored with governance before export/delete/retention actions resume",
       "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe/idempotency key, complete version/revision lineage, tombstone state, and unpublished projection-outbox events",
       "derived_from": [],
       "rebuildable": false,
@@ -786,7 +865,12 @@
         "skeleton/memory/projection.py",
         "skeleton/testing/test_memory_repository.py",
         "skeleton/testing/test_mongo_memory_repository.py",
-        "skeleton/testing/test_memory_projection.py"
+        "skeleton/testing/test_memory_projection.py",
+        "skeleton/api/server.py",
+        "skeleton/memory/writeback.py",
+        "skeleton/testing/test_governance_runtime_binding.py",
+        "pyproject.toml",
+        "skeleton/vault/lifecycle_adapters.py"
       ]
     }
   ],
@@ -1009,5 +1093,11 @@
     "production operation-state and stream SQLite files are mounted on skeleton_data rather than container-ephemeral storage",
     "derived Chroma/vector/cache/index rebuild is forbidden until authoritative restore verification passes",
     "governance lifecycle metadata, deletion plans, acknowledgements and receipts are restart-safe authoritative state and cannot rely solely on process memory"
-  ]
+  ],
+  "backup_policy": {
+    "contract": "machine/state_backup_policy.json",
+    "tool": "scripts/state_backup_bundle.py",
+    "recovery_drill": "scripts/state_recovery_drill.py",
+    "workflow": ".github/workflows/state-recovery-drill.yml"
+  }
 }

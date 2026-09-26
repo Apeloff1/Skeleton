@@ -21,8 +21,12 @@ function storage(initial = {}) {
   const data = new Map(Object.entries(initial));
   return { data, getItem: async key => data.get(key) ?? null, setItem: async (key, value) => { data.set(key, value); } };
 }
-async function controller(transport = async () => ({ reply: 'Answer', session_id: 'server-1' }), disk = storage()) {
-  const store = new WorkspaceController(disk, transport);
+async function controller(
+  transport = async () => ({ reply: 'Answer', session_id: 'server-1' }),
+  disk = storage(),
+  historyTransport = undefined,
+) {
+  const store = new WorkspaceController(disk, transport, historyTransport);
   await store.initialize();
   await tick();
   return store;
@@ -67,15 +71,144 @@ test('pending work is restored as retryable and attachment bytes never persist',
   assert.equal(restored.conversations[0].messages[0].artifactCount, 1);
 });
 
-test('expired and future backend session timestamps fall back to conversation identity', () => {
+
+test('remount replaces stale device transcript with canonical server history', async () => {
+  const workspace = W.createWorkspace();
+  Object.assign(workspace.conversations[0], {
+    sessionId: 'server-1',
+    sessionUpdatedAt: 1,
+    messages: [
+      message({ id: 'local-user', text: 'stale local question' }),
+      message({ id: 'local-ai', role: 'jeeves', text: 'stale local answer' }),
+    ],
+  });
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) });
+  let requested = null;
+
+  const store = await controller(
+    undefined,
+    disk,
+    async sessionId => {
+      requested = sessionId;
+      return {
+        ok: true,
+        available: true,
+        session_id: sessionId,
+        history_source: 'canonical',
+        canonical_thread_id: 'thread-canonical-1',
+        turns: [{
+          session_id: sessionId,
+          client_message_id: 'client-turn-1',
+          role_user: 'canonical question',
+          role_jeeves: 'canonical answer',
+          status: 'complete',
+          ts: 101,
+          canonical_thread_id: 'thread-canonical-1',
+          canonical_user_message_id: 'canonical-user-1',
+          canonical_assistant_message_id: 'canonical-assistant-1',
+        }],
+      };
+    },
+  );
+
+  assert.equal(requested, 'server-1');
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['canonical question', 'canonical answer'],
+  );
+  assert.deepEqual(
+    store.active.messages.map(item => item.id),
+    ['client-turn-1', 'canonical-assistant-1'],
+  );
+  assert.deepEqual(
+    store.active.messages.map(item => item.createdAt),
+    [101000, 101001],
+  );
+  assert.equal(store.active.canonicalThreadId, 'thread-canonical-1');
+  assert.equal(store.getSnapshot().notice, null);
+  const persisted = W.decodeWorkspace(disk.data.get(W.WORKSPACE_KEY));
+  assert.deepEqual(
+    persisted.conversations[0].messages.map(item => item.text),
+    ['canonical question', 'canonical answer'],
+  );
+});
+
+test('explicit reconnect refresh reprojects the active chat from server authority', async () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].sessionId = 'server-refresh';
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) });
+  let generation = 0;
+
+  const store = await controller(
+    undefined,
+    disk,
+    async sessionId => ({
+      ok: true,
+      available: true,
+      session_id: sessionId,
+      canonical_thread_id: 'thread-refresh',
+      turns: [{
+        session_id: sessionId,
+        client_message_id: 'refresh-user',
+        role_user: generation === 0 ? 'first question' : 'fresh question',
+        role_jeeves: generation === 0 ? 'first answer' : 'fresh answer',
+        status: 'complete',
+        ts: generation === 0 ? 10 : 20,
+        canonical_assistant_message_id: 'refresh-assistant',
+      }],
+    }),
+  );
+
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['first question', 'first answer'],
+  );
+  generation = 1;
+  assert.equal(await store.refreshCanonical(), true);
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['fresh question', 'fresh answer'],
+  );
+  assert.equal(store.active.canonicalThreadId, 'thread-refresh');
+});
+
+test('remount keeps device cache with notice when canonical history is unavailable', async () => {
+  const workspace = W.createWorkspace();
+  Object.assign(workspace.conversations[0], {
+    sessionId: 'server-2',
+    messages: [message({ text: 'cached question' })],
+  });
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) });
+
+  const store = await controller(
+    undefined,
+    disk,
+    async () => {
+      throw new Error('offline');
+    },
+  );
+
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['cached question'],
+  );
+  assert.match(store.getSnapshot().notice, /could not be refreshed/i);
+  assert.equal(store.getSnapshot().ready, true);
+});
+
+test('durable backend session identity survives timestamp age and skew', () => {
   const now = Date.now();
   for (const time of [now - W.SESSION_TTL - 1, now + 100000]) {
     const workspace = W.createWorkspace();
-    Object.assign(workspace.conversations[0], { sessionId: 'stale', sessionUpdatedAt: time });
-    assert.equal(W.decodeWorkspace(W.encodeWorkspace(workspace), now).conversations[0].sessionId, null);
+    Object.assign(workspace.conversations[0], {
+      sessionId: 'stable-session',
+      sessionUpdatedAt: time,
+    });
+    const restored = W.decodeWorkspace(W.encodeWorkspace(workspace), now);
+    assert.equal(restored.conversations[0].sessionId, 'stable-session');
     assert.equal(
-      W.buildChatBody(workspace.conversations[0], 'hello', undefined, now).session_id,
-      workspace.conversations[0].id,
+      W.buildChatBody(restored.conversations[0], 'hello', undefined, now).session_id,
+      'stable-session',
     );
   }
 });
@@ -264,14 +397,70 @@ test('storage quota failure preserves in-memory work and retry saves latest stat
   assert.equal(W.decodeWorkspace(disk.data.get(W.WORKSPACE_KEY)).conversations[0].draft, 'precious draft');
 });
 
-test('history excludes failed turns and is bounded by count and characters', () => {
+test('outgoing Jeeves requests never serialize the device-local transcript', () => {
   const conversation = W.createConversation();
-  conversation.messages = Array.from({ length: 100 }, (_, i) => message({ text: String(i).padEnd(4000, 'x'), status: i === 99 ? 'failed' : 'complete' }));
-  const body = W.buildChatBody(conversation, 'next');
-  assert.ok(body.history.length <= 20);
-  assert.ok(body.history.reduce((n, m) => n + m.content.length, 0) <= 24000);
-  assert.ok(!body.history.some(m => m.content.startsWith('99')));
-  assert.ok(body.history.at(-1).content.startsWith('98'));
+  conversation.messages = Array.from({ length: 20 }, (_, i) => message({
+    text: `local-only-${i}`,
+    status: 'complete',
+  }));
+  const body = W.buildChatBody(conversation, 'next', undefined, Date.now(), 'turn-next');
+  assert.equal(Object.hasOwn(body, 'history'), false);
+  assert.equal(JSON.stringify(body).includes('local-only-'), false);
+  assert.equal(body.client_message_id, 'turn-next');
+  assert.equal(body.session_id, conversation.id);
+});
+
+test('canonical projection preserves unresolved local user work only', () => {
+  const conversation = W.createConversation(1000);
+  conversation.sessionId = 'server-preserve';
+  conversation.messages = [
+    message({ id: 'stale-complete', text: 'stale complete', status: 'complete' }),
+    message({ id: 'retry-local', text: 'retry me', status: 'failed' }),
+  ];
+
+  const projected = W.projectCanonicalHistory(conversation, {
+    ok: true,
+    available: true,
+    session_id: 'server-preserve',
+    canonical_thread_id: 'thread-preserve',
+    turns: [{
+      session_id: 'server-preserve',
+      client_message_id: 'canonical-user',
+      role_user: 'server question',
+      role_jeeves: 'server answer',
+      status: 'complete',
+      ts: 12,
+      canonical_assistant_message_id: 'canonical-assistant',
+    }],
+  }, 13000);
+
+  assert.deepEqual(
+    projected.messages.map(item => [item.id, item.text, item.status]),
+    [
+      ['canonical-user', 'server question', 'complete'],
+      ['canonical-assistant', 'server answer', 'complete'],
+      ['retry-local', 'retry me', 'failed'],
+    ],
+  );
+  assert.equal(projected.canonicalThreadId, 'thread-preserve');
+  assert.equal(projected.messages.some(item => item.text === 'stale complete'), false);
+});
+
+test('successful send caches canonical thread and assistant identities', async () => {
+  const store = await controller(async body => ({
+    ok: true,
+    session_id: body.session_id,
+    reply: 'canonical reply',
+    canonical_thread_id: 'thread-send',
+    canonical_message_id: 'assistant-send',
+    persisted: true,
+  }));
+  store.edit({ draft: 'question' });
+  await store.send();
+
+  assert.equal(store.active.canonicalThreadId, 'thread-send');
+  assert.equal(store.active.messages.at(-1).id, 'assistant-send');
+  assert.equal(store.active.messages.at(-1).text, 'canonical reply');
 });
 
 test('retry after remount requires reattaching an unsaved file', async () => {

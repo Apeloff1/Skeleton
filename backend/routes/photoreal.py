@@ -46,13 +46,12 @@ def _prompt(kind: str, name: str, desc: str) -> str:
 
 
 def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str):
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     t0 = time.time()
     try:
-        key = os.environ.get("EMERGENT_LLM_KEY")
 
         async def _gen():
-            chat = LlmChat(api_key=key, session_id=f"pr-{job_id[:8]}",
+            chat = EngineChat(session_id=f"pr-{job_id[:8]}",
                            system_message="You generate photorealistic, cinematic, production-grade game art.")
             chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))

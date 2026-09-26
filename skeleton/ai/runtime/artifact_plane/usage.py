@@ -101,10 +101,15 @@ class ArtifactUsageMeter:
             or byte_count < 0
         ):
             raise ValueError("byte_count must be a non-negative integer")
+        delta = (
+            UsageEstimate(artifact_bytes=byte_count)
+            if normalized == "artifact"
+            else UsageEstimate(storage_bytes=byte_count)
+        )
         return self.runtime.resolve_unknown_usage(
             operation_id,
             _event_id(normalized, resource_id, write_id),
-            UsageEstimate(artifact_bytes=byte_count),
+            delta,
             now_wall=now_wall,
         )
 

@@ -22,18 +22,29 @@ from skeleton.contracts.verification import (
     VerificationRisk,
 )
 from skeleton.intelligence.admission import ResourceBudget
-from skeleton.intelligence.verification_runtime import VerificationRuntime
+from skeleton.intelligence.verification_runtime import (
+    VerificationRuntime,
+    materialize_verification_receipt,
+)
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
 from skeleton.provider_contract import ProviderToolCall, ProviderToolDefinition
 from skeleton.provider_runtime import AIMessage, ProviderAdapter, ProviderRequest
 from skeleton.skills.tool_contract import (
+    ToolContractError,
     ToolEffect,
     ToolExecutionRequest,
     ToolExecutionReceipt,
     ToolExecutionStatus,
     approval_ref_for_request,
+    validate_json_schema,
+    validate_json_value,
 )
 from skeleton.skills.tool_runtime import AsyncToolRuntime
+from skeleton.vault.data_governance import (
+    DataGovernanceDenied,
+    ToolTransferRequest,
+    evaluate_tool_transfer,
+)
 
 
 class CognitiveExecutionError(RuntimeError):
@@ -148,6 +159,10 @@ FinalizationBindingHook = Callable[
     [AIExecutionRequest, str, Mapping[str, object]],
     ExecutionFinalizationBindings | Awaitable[ExecutionFinalizationBindings],
 ]
+StorageMeter = Callable[
+    [str, str, object, datetime | None],
+    None,
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,6 +215,21 @@ def _positive_int(
     raw = mapping.get(key, default)
     if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
         raise CognitiveExecutionError(f"{key} must be a positive integer")
+    if raw > maximum:
+        raise CognitiveExecutionError(f"{key} exceeds hard execution limit")
+    return raw
+
+
+def _bounded_nonnegative_int(
+    mapping: Mapping[str, object],
+    key: str,
+    default: int,
+    *,
+    maximum: int,
+) -> int:
+    raw = mapping.get(key, default)
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        raise CognitiveExecutionError(f"{key} must be a non-negative integer")
     if raw > maximum:
         raise CognitiveExecutionError(f"{key} exceeds hard execution limit")
     return raw
@@ -309,6 +339,7 @@ class CognitiveExecutionRuntime:
         tool_result_resolver: ToolResultResolver | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
+        storage_meter: StorageMeter | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -324,7 +355,39 @@ class CognitiveExecutionRuntime:
         )
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
+        self.storage_meter = storage_meter
         self._verification_runtime = VerificationRuntime()
+
+    def _meter_storage(
+        self,
+        resource_id: str,
+        write_id: str,
+        payload: object,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        if self.storage_meter is None:
+            return
+        self.storage_meter(resource_id, write_id, payload, now)
+
+    def _append_turn(
+        self,
+        turn: AgentTurn,
+        *,
+        expected_execution_version: int,
+        now: datetime | None = None,
+    ) -> AIExecution:
+        self._meter_storage(
+            "execution-turn",
+            "turn:" + turn.execution_id + ":" + turn.turn_id,
+            turn.as_dict(),
+            now=now,
+        )
+        return self.repository.append_turn(
+            turn,
+            expected_execution_version=expected_execution_version,
+            now=now,
+        )
 
     @staticmethod
     async def _default_tool_result_resolver(
@@ -399,6 +462,30 @@ class CognitiveExecutionRuntime:
         )
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise CognitiveExecutionError("execution tenant_id is invalid")
+        tool_data_class = (
+            request.tool_policy.get("data_class")
+            or request.context_policy.get("data_class")
+            or "internal"
+        )
+        tool_purpose = (
+            request.tool_policy.get("purpose")
+            or request.context_policy.get("tool_purpose")
+            or "tool-execution"
+        )
+        if (
+            not isinstance(tool_data_class, str)
+            or not tool_data_class.strip()
+        ):
+            raise CognitiveExecutionError(
+                "tool data classification is invalid"
+            )
+        if (
+            not isinstance(tool_purpose, str)
+            or not tool_purpose.strip()
+        ):
+            raise CognitiveExecutionError(
+                "tool transfer purpose is invalid"
+            )
 
         deadline = _parse_deadline(request)
         return {
@@ -408,6 +495,8 @@ class CognitiveExecutionRuntime:
             "context_digest": context_digest,
             "allowed_tool_ids": list(dict.fromkeys(item.strip() for item in allowed)),
             "tenant_id": tenant_id.strip(),
+            "tool_data_class": tool_data_class.strip().lower(),
+            "tool_purpose": tool_purpose.strip().lower(),
             "deadline": None if deadline is None else deadline.isoformat(),
             "model_turns": 0,
             "tool_calls": 0,
@@ -437,6 +526,17 @@ class CognitiveExecutionRuntime:
         *,
         now: datetime | None = None,
     ) -> tuple[AIExecution, str]:
+        self._meter_storage(
+            "execution-checkpoint",
+            (
+                "checkpoint:"
+                + execution.execution_id
+                + ":"
+                + str(execution.checkpoint_version + 1)
+            ),
+            payload,
+            now=now,
+        )
         checkpoint = self.repository.checkpoint(
             execution.execution_id,
             payload,
@@ -559,6 +659,12 @@ class CognitiveExecutionRuntime:
                 )
             staged = self.repository.finalization_intent(execution_id)
             if staged is not None:
+                self._meter_storage(
+                    "execution-result",
+                    "result:" + execution_id,
+                    staged.result.as_dict(),
+                    now=now,
+                )
                 terminal = self.repository.finalize_staged(
                     execution_id,
                     now=now,
@@ -624,6 +730,7 @@ class CognitiveExecutionRuntime:
                 ExecutionState.ASSEMBLING_CONTEXT,
                 ExecutionState.ROUTING,
                 ExecutionState.TOOL_COMPLETED,
+                ExecutionState.REPAIRING,
                 ExecutionState.DEGRADED,
             }:
                 execution = self._advance_to_provider_pending(
@@ -689,6 +796,7 @@ class CognitiveExecutionRuntime:
                 ExecutionState.ASSEMBLING_CONTEXT: ExecutionState.ROUTING,
                 ExecutionState.ROUTING: ExecutionState.PROVIDER_PENDING,
                 ExecutionState.TOOL_COMPLETED: ExecutionState.PROVIDER_PENDING,
+                ExecutionState.REPAIRING: ExecutionState.PROVIDER_PENDING,
                 ExecutionState.DEGRADED: ExecutionState.PROVIDER_PENDING,
             }.get(execution.state)
             if target is None:
@@ -706,9 +814,41 @@ class CognitiveExecutionRuntime:
         raw = payload.get("allowed_tool_ids", [])
         if not isinstance(raw, list):
             raise CognitiveExecutionError("allowed_tool_ids checkpoint is corrupt")
+        tool_data_class = payload.get("tool_data_class", "internal")
+        tool_purpose = payload.get("tool_purpose", "tool-execution")
+        tenant_id = payload.get("tenant_id", "default")
+        if (
+            not isinstance(tool_data_class, str)
+            or not tool_data_class.strip()
+            or not isinstance(tool_purpose, str)
+            or not tool_purpose.strip()
+            or not isinstance(tenant_id, str)
+            or not tenant_id.strip()
+        ):
+            raise CognitiveExecutionError(
+                "tool privacy checkpoint fields are invalid"
+            )
         tools: list[ProviderToolDefinition] = []
         for tool_id in raw:
             manifest = await self.tool_runtime.manifest(str(tool_id))
+            if not manifest.enabled:
+                continue
+            try:
+                governance = evaluate_tool_transfer(
+                    ToolTransferRequest(
+                        tool_id=manifest.tool_id,
+                        data_policy=manifest.data_policy,
+                        network_policy=manifest.network_policy,
+                        data_class=tool_data_class,
+                        purpose=tool_purpose,
+                        tenant_id=tenant_id,
+                        source="cognitive-provider-projection",
+                    )
+                )
+            except DataGovernanceDenied:
+                continue
+            if not governance.permitted:
+                continue
             if (
                 manifest.effect is not ToolEffect.READ_ONLY
                 and self.tool_runtime.receipt_store is None
@@ -769,6 +909,31 @@ class CognitiveExecutionRuntime:
         tools = await self._provider_tools(payload)
         deadline = self._deadline(payload)
         context_policy = dict(execution.request.context_policy)
+        structured_output_schema_raw = context_policy.get(
+            "structured_output_schema"
+        )
+        structured_output_schema = None
+        if structured_output_schema_raw is not None:
+            if not isinstance(structured_output_schema_raw, Mapping):
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="structured_output_schema_invalid",
+                    now=now,
+                )
+            try:
+                structured_output_schema = validate_json_schema(
+                    structured_output_schema_raw
+                )
+            except ToolContractError:
+                return self._finalize_non_success(
+                    execution,
+                    payload,
+                    status="failed",
+                    error_code="structured_output_schema_invalid",
+                    now=now,
+                )
         execution_budget = dict(execution.request.resource_budget)
         provider_budget = ResourceBudget(
             max_input_tokens=int(
@@ -795,6 +960,12 @@ class CognitiveExecutionRuntime:
             max_artifact_bytes=int(
                 execution_budget.get(
                     "max_artifact_bytes",
+                    100 * 1024 * 1024,
+                )
+            ),
+            max_storage_bytes=int(
+                execution_budget.get(
+                    "max_storage_bytes",
                     100 * 1024 * 1024,
                 )
             ),
@@ -849,6 +1020,10 @@ class CognitiveExecutionRuntime:
                 ),
                 tenant_id=tenant_id,
                 operation_id=execution.operation_id,
+                admission_operation_id=_stable_uuid(
+                    "skeleton-provider-admission",
+                    execution.execution_id + ":" + turn_id,
+                ),
                 execution_id=execution.execution_id,
                 turn_id=turn_id,
                 context_id=(
@@ -872,13 +1047,7 @@ class CognitiveExecutionRuntime:
                     context_policy.get("estimated_cost_usd", 0.0)
                 ),
                 resource_budget=provider_budget,
-                structured_output_schema=(
-                    None
-                    if context_policy.get("structured_output_schema") is None
-                    else dict(
-                        context_policy["structured_output_schema"]
-                    )
-                ),
+                structured_output_schema=structured_output_schema,
                 tools=tools,
                 tool_choice=str(
                     context_policy.get(
@@ -1059,7 +1228,7 @@ class CognitiveExecutionRuntime:
             checkpoint_ref=checkpoint_ref,
             status="provider_completed",
         )
-        execution = self.repository.append_turn(
+        execution = self._append_turn(
             turn,
             expected_execution_version=execution.version,
             now=now,
@@ -1101,7 +1270,7 @@ class CognitiveExecutionRuntime:
                 raise CognitiveExecutionError("provider checkpoint disappeared")
             turns = self.repository.turns(execution.execution_id)
             parent_turn_id = turns[-1].turn_id if turns else None
-            execution = self.repository.append_turn(
+            execution = self._append_turn(
                 AgentTurn(
                     operation_id=execution.operation_id,
                     execution_id=execution.execution_id,
@@ -1172,16 +1341,50 @@ class CognitiveExecutionRuntime:
                 now=now,
             )
 
-        candidate = provider.get("text")
-        if not isinstance(candidate, str) or not candidate.strip():
+        structured_schema = execution.request.context_policy.get(
+            "structured_output_schema"
+        )
+        if structured_schema is not None:
             structured = provider.get("structured_output")
-            if isinstance(structured, dict):
-                candidate = json.dumps(
-                    structured,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=False,
+            if not isinstance(structured, dict):
+                return await self._repair_structured_output(
+                    execution,
+                    payload,
+                    reason="provider returned no structured output object",
+                    approval_refs=approval_refs,
+                    now=now,
                 )
+            try:
+                validate_json_value(
+                    structured_schema,
+                    structured,
+                    path="structured_output",
+                )
+            except ToolContractError as exc:
+                return await self._repair_structured_output(
+                    execution,
+                    payload,
+                    reason=str(exc),
+                    approval_refs=approval_refs,
+                    now=now,
+                )
+            candidate = json.dumps(
+                structured,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        else:
+            candidate = provider.get("text")
+            if not isinstance(candidate, str) or not candidate.strip():
+                structured = provider.get("structured_output")
+                if isinstance(structured, dict):
+                    candidate = json.dumps(
+                        structured,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                    )
         if not isinstance(candidate, str) or not candidate.strip():
             return self._finalize_non_success(
                 execution,
@@ -1199,6 +1402,93 @@ class CognitiveExecutionRuntime:
         )
         execution, _ = self._checkpoint(execution, payload, now=now)
         return await self._verify_and_finalize(execution, payload, now=now)
+
+    async def _repair_structured_output(
+        self,
+        execution: AIExecution,
+        payload: dict[str, object],
+        *,
+        reason: str,
+        approval_refs: Mapping[str, str],
+        now: datetime | None,
+    ) -> ExecutionRunResult:
+        max_repairs = _bounded_nonnegative_int(
+            execution.request.stop_policy,
+            "max_structured_output_repairs",
+            1,
+            maximum=4,
+        )
+        raw_repairs = payload.get("structured_output_repairs", 0)
+        if (
+            isinstance(raw_repairs, bool)
+            or not isinstance(raw_repairs, int)
+            or raw_repairs < 0
+        ):
+            raise CognitiveExecutionError(
+                "structured_output_repairs checkpoint is corrupt"
+            )
+        if raw_repairs >= max_repairs:
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="structured_output_schema_validation_failed",
+                now=now,
+            )
+
+        schema = execution.request.context_policy.get(
+            "structured_output_schema"
+        )
+        if not isinstance(schema, Mapping):
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="structured_output_schema_invalid",
+                now=now,
+            )
+        try:
+            normalized_schema = validate_json_schema(schema)
+        except ToolContractError:
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="failed",
+                error_code="structured_output_schema_invalid",
+                now=now,
+            )
+
+        bounded_reason = str(reason).strip()[:1024] or "schema validation failed"
+        payload["structured_output_repairs"] = raw_repairs + 1
+        payload["structured_output_last_error"] = bounded_reason
+        payload["next_prompt"] = (
+            "The previous response failed the required structured-output "
+            "contract. Return exactly one corrected structured JSON object, "
+            "with no prose and no tool calls. Validation failure: "
+            + bounded_reason
+            + "\nRequired schema: "
+            + json.dumps(
+                normalized_schema,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        )
+        execution = self._transition(
+            execution,
+            ExecutionState.REPAIRING,
+            now=now,
+        )
+        execution, _ = self._checkpoint(
+            execution,
+            payload,
+            now=now,
+        )
+        return await self._drive(
+            execution.execution_id,
+            approval_refs=approval_refs,
+            now=now,
+        )
 
     async def _prepare_tool_batch(
         self,
@@ -1334,18 +1624,48 @@ class CognitiveExecutionRuntime:
             + str(call.arguments_digest)
         )
 
+    @staticmethod
+    def _tool_lineage(
+        execution: AIExecution,
+        payload: Mapping[str, object],
+        call: ProviderToolCall,
+    ) -> tuple[str, str, str]:
+        last_provider = payload.get("last_provider")
+        if not isinstance(last_provider, Mapping):
+            raise CognitiveExecutionError(
+                "tool execution is missing provider-turn lineage"
+            )
+        turn_id = last_provider.get("turn_id")
+        if not isinstance(turn_id, str) or not turn_id.strip():
+            raise CognitiveExecutionError(
+                "tool execution is missing provider turn_id"
+            )
+        if not isinstance(call.call_id, str) or not call.call_id.strip():
+            raise CognitiveExecutionError(
+                "tool execution is missing provider call_id"
+            )
+        return execution.execution_id, turn_id.strip(), call.call_id.strip()
+
     def _approval_ref_for_call(
         self,
         execution: AIExecution,
         payload: Mapping[str, object],
         call: ProviderToolCall,
     ) -> str:
+        execution_id, turn_id, call_id = self._tool_lineage(
+            execution,
+            payload,
+            call,
+        )
         request = ToolExecutionRequest(
             request_id=_stable_uuid(
                 "skeleton-tool-request",
                 execution.execution_id + ":" + call.call_id,
             ),
             operation_id=_tool_operation_uuid(execution.operation_id),
+            execution_id=execution_id,
+            turn_id=turn_id,
+            call_id=call_id,
             tenant_id=str(payload["tenant_id"]),
             tool_id=call.tool_id,
             idempotency_key=self._tool_idempotency_key(execution, call),
@@ -1357,6 +1677,12 @@ class CognitiveExecutionRuntime:
                 + execution.execution_id
                 + ":provider-call:"
                 + call.call_id
+            ),
+            data_class=str(
+                payload.get("tool_data_class", "internal")
+            ),
+            transfer_purpose=str(
+                payload.get("tool_purpose", "tool-execution")
             ),
         )
         return approval_ref_for_request(request)
@@ -1423,12 +1749,20 @@ class CognitiveExecutionRuntime:
         result_rows: list[dict[str, object]] = []
         receipt_ids = list(payload.get("tool_receipts", []))
         for call in calls:
+            execution_id, turn_id, call_id = self._tool_lineage(
+                execution,
+                payload,
+                call,
+            )
             tool_request = ToolExecutionRequest(
                 request_id=_stable_uuid(
                     "skeleton-tool-request",
                     execution.execution_id + ":" + call.call_id,
                 ),
                 operation_id=_tool_operation_uuid(execution.operation_id),
+                execution_id=execution_id,
+                turn_id=turn_id,
+                call_id=call_id,
                 tenant_id=str(payload["tenant_id"]),
                 tool_id=call.tool_id,
                 idempotency_key=self._tool_idempotency_key(
@@ -1447,6 +1781,12 @@ class CognitiveExecutionRuntime:
                     + execution.execution_id
                     + ":provider-call:"
                     + call.call_id
+                ),
+                data_class=str(
+                    payload.get("tool_data_class", "internal")
+                ),
+                transfer_purpose=str(
+                    payload.get("tool_purpose", "tool-execution")
                 ),
             )
             receipt = await self.tool_runtime.execute(
@@ -1556,7 +1896,7 @@ class CognitiveExecutionRuntime:
             "skeleton-agent-turn",
             f"{execution.execution_id}:tool:{turn_index}",
         )
-        execution = self.repository.append_turn(
+        execution = self._append_turn(
             AgentTurn(
                 operation_id=execution.operation_id,
                 execution_id=execution.execution_id,
@@ -1690,31 +2030,40 @@ class CognitiveExecutionRuntime:
             verifier_id="execution-runtime:canonical-stage3",
         )
         policy = assessment.policy
-        check = assessment.check
-        receipt = {
-            "claim_id": claim.claim_id,
-            "claim_digest": claim.digest,
-            "verification_profile": verification_profile,
-            "claim_kind": claim.kind.value,
-            "risk": claim.risk.value,
-            "outcome": assessment.outcome.value,
-            "policy_satisfied": assessment.policy_satisfied,
-            "policy": {
-                "level": int(policy.level),
-                "required_modes": list(policy.required_modes),
-                "min_independent_origins": policy.min_independent_origins,
-                "allow_model_only_evidence": policy.allow_model_only_evidence,
-                "require_postcondition": policy.require_postcondition,
-                "reasons": list(policy.reasons),
-            },
-            "issues": list(assessment.issues),
-            "check_id": None if check is None else check.check_id,
-            "verified_at": instant.isoformat(),
-            "verifier_id": "execution-runtime:canonical-stage3",
-        }
+        canonical_receipt = materialize_verification_receipt(
+            claim,
+            assessment,
+            execution_id=execution.execution_id,
+            result_ref="execution-result:" + execution.execution_id,
+        )
+        self._meter_storage(
+            "verification-receipt",
+            "verification:" + canonical_receipt.receipt_id,
+            canonical_receipt.as_dict(),
+            now=instant,
+        )
+        self.repository.remember_verification_receipt(
+            canonical_receipt
+        )
+        receipt = canonical_receipt.as_dict()
+        receipt.update(
+            {
+                "verification_profile": verification_profile,
+                "claim_kind": claim.kind.value,
+                "risk": claim.risk.value,
+                "policy": {
+                    "level": int(policy.level),
+                    "required_modes": list(policy.required_modes),
+                    "min_independent_origins": policy.min_independent_origins,
+                    "allow_model_only_evidence": policy.allow_model_only_evidence,
+                    "require_postcondition": policy.require_postcondition,
+                    "reasons": list(policy.reasons),
+                },
+            }
+        )
         evidence_refs = tuple(
             "evidence:" + evidence_id
-            for evidence_id in assessment.grounding.supporting_evidence_ids
+            for evidence_id in canonical_receipt.supporting_evidence_ids
         )
         return ExecutionVerificationDecision(
             passed=assessment.policy_satisfied,
@@ -1750,9 +2099,21 @@ class CognitiveExecutionRuntime:
         *,
         now: datetime | None,
     ) -> ExecutionRunResult:
+        self._meter_storage(
+            "execution-finalization-intent",
+            "intent:" + execution.execution_id,
+            result.as_dict(),
+            now=now,
+        )
         self.repository.stage_finalization(
             result,
             expected_execution_version=execution.version,
+            now=now,
+        )
+        self._meter_storage(
+            "execution-result",
+            "result:" + execution.execution_id,
+            result.as_dict(),
             now=now,
         )
         terminal = self.repository.finalize_staged(
@@ -1916,4 +2277,5 @@ __all__ = [
     "ExecutionRunResult",
     "ExecutionVerificationDecision",
     "PendingApproval",
+    "StorageMeter",
 ]

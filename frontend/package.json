@@ -16,7 +16,8 @@
     "test:jeeves": "node --test scripts/test-jeeves-workspace.cjs scripts/jeeves-workbench/*.test.cjs",
     "export:web": "expo export --platform web",
     "audit:policy:test": "node ./scripts/test-enforce-yarn-audit.js",
-    "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs"
+    "test:operation-stream": "node --test scripts/test-operation-stream-reducer.mjs",
+    "test:conversation": "node --test scripts/test-conversation-projection.mjs"
   },
   "engines": {
     "node": ">=24"

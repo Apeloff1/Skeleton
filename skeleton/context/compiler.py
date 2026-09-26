@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 from uuid import NAMESPACE_URL, uuid5
 
+from skeleton.context.compaction import (
+    ContextCompactionError,
+    compact_context_segment,
+)
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -126,6 +130,7 @@ class ContextCompiler:
         budget: ContextBudget,
         segments: Iterable[ContextSegment],
         tools_enabled: bool = False,
+        compaction_max_tokens: int | None = None,
         compiled_at: datetime | None = None,
     ) -> ContextEnvelope:
         if isinstance(segments, (str, bytes)):
@@ -137,6 +142,14 @@ class ContextCompiler:
             raise ContextCompilationError("context segment ids must be unique")
         if not isinstance(tools_enabled, bool):
             raise TypeError("tools_enabled must be boolean")
+        if compaction_max_tokens is not None and (
+            isinstance(compaction_max_tokens, bool)
+            or not isinstance(compaction_max_tokens, int)
+            or compaction_max_tokens < 1
+        ):
+            raise ValueError(
+                "compaction_max_tokens must be a positive integer"
+            )
 
         source_snapshot = tuple(
             sorted(
@@ -176,6 +189,25 @@ class ContextCompiler:
                     raise ContextCompilationError(
                         f"required control segment exceeds token limit: {segment.segment_id}"
                     )
+                if compaction_max_tokens is not None:
+                    target = min(limit, compaction_max_tokens)
+                    try:
+                        compacted = compact_context_segment(
+                            segment,
+                            max_tokens=target,
+                        )
+                    except ContextCompactionError:
+                        compacted = None
+                    if (
+                        compacted is not None
+                        and compacted is not segment
+                        and compacted.token_estimate <= limit
+                    ):
+                        omitted[segment.segment_id] = (
+                            "compacted_to:" + compacted.segment_id
+                        )
+                        admitted.append(compacted)
+                        continue
                 omitted[segment.segment_id] = "segment_limit_exceeded"
                 continue
             admitted.append(segment)
@@ -354,10 +386,9 @@ def project_provider_context(
 
     instruction_blocks: list[str] = []
     for segment in envelope.instruction_segments:
-        content = _require_content(segment)
-        instruction_blocks.append(
-            f"[{segment.kind.value.upper()}:{segment.source_id}]\n{content}"
-        )
+        # Provenance is already digest-bound in the envelope source snapshot.
+        # Do not leak internal segment labels into model policy text.
+        instruction_blocks.append(_require_content(segment))
 
     conversation = [
         segment
@@ -372,24 +403,48 @@ def project_provider_context(
 
     prompt = ""
     history: list[dict[str, str]] = []
-    if conversation:
-        last = conversation[-1]
-        prompt_index = len(conversation) - 1 if last.kind is ContextKind.USER_MESSAGE else -1
-        for index, segment in enumerate(conversation):
-            content = _require_content(segment)
-            if index == prompt_index:
-                prompt = content
-                continue
-            history.append(
-                {
-                    "role": (
-                        "user"
-                        if segment.kind is ContextKind.USER_MESSAGE
-                        else "assistant"
-                    ),
-                    "content": content,
-                }
-            )
+    prompt_segment: ContextSegment | None = None
+    user_segments = [
+        segment
+        for segment in conversation
+        if segment.kind is ContextKind.USER_MESSAGE
+    ]
+    if user_segments:
+        # Canonical conversation sources bind the current turn directly to the
+        # envelope turn_id. This avoids UUID-order prompt selection when a
+        # replay/import fixture gives several turns the same timestamp.
+        current_turn = [
+            segment
+            for segment in user_segments
+            if segment.source_type == "conversation"
+            and segment.source_id == envelope.turn_id
+        ]
+        candidates = current_turn or user_segments
+        prompt_segment = max(
+            candidates,
+            key=lambda segment: (
+                segment.created_at.timestamp(),
+                segment.priority,
+                segment.relevance,
+                segment.segment_id,
+            ),
+        )
+        prompt = _require_content(prompt_segment)
+
+    for segment in conversation:
+        if segment is prompt_segment:
+            continue
+        content = _require_content(segment)
+        history.append(
+            {
+                "role": (
+                    "user"
+                    if segment.kind is ContextKind.USER_MESSAGE
+                    else "assistant"
+                ),
+                "content": content,
+            }
+        )
 
     evidence_blocks: list[str] = []
     for segment in non_conversation:

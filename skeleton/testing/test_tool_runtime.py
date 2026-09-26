@@ -3,13 +3,19 @@ from __future__ import annotations
 import asyncio
 from dataclasses import replace
 from datetime import datetime, timezone
+import hashlib
 from uuid import uuid4
 
 import pytest
 
 from skeleton.skills.tool_contract import (
+    ToolApprovalPolicy,
+    ToolAuthorityClass,
     ToolContractError,
     ToolEffect,
+    ToolIdempotencyMode,
+    ToolRiskClass,
+    ToolSideEffectClass,
     ToolExecutionRequest,
     ToolExecutionStatus,
     ToolManifest,
@@ -32,6 +38,8 @@ def _manifest(
     *,
     effect: ToolEffect = ToolEffect.READ_ONLY,
     approval_required: bool = False,
+    data_policy: str = "internal:test",
+    network_policy: str = "none",
 ) -> ToolManifest:
     return ToolManifest(
         tool_id=tool_id,
@@ -45,6 +53,8 @@ def _manifest(
         },
         effect=effect,
         approval_required=approval_required,
+        data_policy=data_policy,
+        network_policy=network_policy,
     )
 
 
@@ -56,6 +66,8 @@ def _request(
     key: str = "idem-1",
     path: str = "README.md",
     approval_ref: str | None = None,
+    data_class: str = "internal",
+    transfer_purpose: str = "tool-execution",
 ) -> ToolExecutionRequest:
     return ToolExecutionRequest(
         request_id=request_id or str(uuid4()),
@@ -66,6 +78,8 @@ def _request(
         arguments={"path": path},
         requested_at=_now(),
         approval_ref=approval_ref,
+        data_class=data_class,
+        transfer_purpose=transfer_purpose,
     )
 
 
@@ -724,4 +738,425 @@ async def test_async_pending_durable_reservation_fails_closed_without_effect(
     assert receipt.status is ToolExecutionStatus.DENIED
     assert receipt.error_code == "execution_in_doubt"
     assert receipt.metered_tool_calls == 0
+    assert calls == []
+
+def test_tool_request_requires_complete_execution_lineage() -> None:
+    with pytest.raises(ToolContractError, match="must be supplied together"):
+        ToolExecutionRequest(
+            request_id=str(uuid4()),
+            operation_id=str(uuid4()),
+            execution_id=str(uuid4()),
+            tenant_id="tenant-a",
+            tool_id="repo.read",
+            idempotency_key="partial-lineage",
+            arguments={"path": "README.md"},
+            requested_at=_now(),
+        )
+
+
+def test_approval_binding_preserves_legacy_identity_and_binds_full_lineage() -> None:
+    request = _request(key="approval-legacy")
+    legacy_material = "\x1f".join(
+        (
+            request.operation_id,
+            request.tenant_id,
+            request.tool_id,
+            request.arguments_digest,
+        )
+    ).encode("utf-8")
+    legacy_ref = "approval:" + hashlib.sha256(legacy_material).hexdigest()
+
+    assert approval_ref_for_request(request) == legacy_ref
+
+    lineaged = replace(
+        request,
+        execution_id=str(uuid4()),
+        turn_id=str(uuid4()),
+        call_id=str(uuid4()),
+    )
+    assert approval_ref_for_request(lineaged) != legacy_ref
+
+def test_manifest_governance_metadata_is_normalized_and_serialized() -> None:
+    manifest = ToolManifest(
+        tool_id="repo.write",
+        version="2.1.0",
+        description="Write one bounded repository object",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        output_schema={"type": "object"},
+        capabilities=("repository.write", "repository.write"),
+        authority_class=ToolAuthorityClass.WRITE,
+        risk_class=ToolRiskClass.HIGH,
+        side_effect_class=ToolSideEffectClass.LOCAL_REVERSIBLE,
+        idempotency_mode=ToolIdempotencyMode.RESERVATION_FENCE,
+        approval_policy=ToolApprovalPolicy.ALWAYS,
+        network_policy="none",
+        data_policy="internal:repository",
+        cost_model={"kind": "request", "estimated_units": 1},
+        result_size_limit=65536,
+        max_concurrency=4,
+        effect=ToolEffect.REVERSIBLE,
+    )
+
+    payload = manifest.as_dict()
+    assert manifest.capabilities == ("repository.write",)
+    assert manifest.approval_required is True
+    assert payload["authority_class"] == "write"
+    assert payload["risk_class"] == "high"
+    assert payload["side_effect_class"] == "local_reversible"
+    assert payload["idempotency_mode"] == "reservation_fence"
+    assert payload["approval_policy"] == "always"
+    assert payload["network_policy"] == "none"
+    assert payload["data_policy"] == "internal:repository"
+    assert payload["cost_model"] == {
+        "kind": "request",
+        "estimated_units": 1,
+    }
+    assert payload["result_size_limit"] == 65536
+    assert payload["max_concurrency"] == 4
+    assert payload["enabled"] is True
+
+
+def test_non_read_manifest_requires_explicit_idempotency_mode() -> None:
+    with pytest.raises(
+        ToolContractError,
+        match="non-read authority requires an idempotency mode",
+    ):
+        ToolManifest(
+            tool_id="repo.write",
+            version="1.0.0",
+            description="Unsafe write manifest",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+            },
+            authority_class=ToolAuthorityClass.WRITE,
+        )
+
+
+def test_critical_or_irreversible_manifest_requires_approval_policy() -> None:
+    with pytest.raises(
+        ToolContractError,
+        match="critical tools require non-never approval policy",
+    ):
+        ToolManifest(
+            tool_id="ops.critical",
+            version="1.0.0",
+            description="Critical operator action",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+            },
+            risk_class=ToolRiskClass.CRITICAL,
+        )
+
+    with pytest.raises(
+        ToolContractError,
+        match="irreversible side effects require approval policy",
+    ):
+        ToolManifest(
+            tool_id="repo.erase",
+            version="1.0.0",
+            description="Irreversible local change",
+            input_schema={
+                "type": "object",
+                "additionalProperties": False,
+            },
+            authority_class=ToolAuthorityClass.DESTRUCTIVE,
+            risk_class=ToolRiskClass.HIGH,
+            side_effect_class=ToolSideEffectClass.LOCAL_IRREVERSIBLE,
+            idempotency_mode=ToolIdempotencyMode.RESERVATION_FENCE,
+        )
+
+
+def test_manifest_output_schema_and_bounds_fail_closed() -> None:
+    with pytest.raises(ToolContractError):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Bad output contract",
+            input_schema={"type": "object"},
+            output_schema={"type": "definitely-not-json"},
+        )
+
+    with pytest.raises(ToolContractError, match="result_size_limit"):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Oversized result contract",
+            input_schema={"type": "object"},
+            result_size_limit=2 * 1024 * 1024 * 1024,
+        )
+
+    with pytest.raises(ToolContractError, match="max_concurrency"):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="Invalid concurrency contract",
+            input_schema={"type": "object"},
+            max_concurrency=0,
+        )
+
+def test_manifest_cost_model_is_metered_before_sync_handler() -> None:
+    events = []
+
+    class Meter:
+        def record_usage_event(
+            self,
+            operation_id,
+            event_id,
+            category,
+            delta,
+            *,
+            now_wall=None,
+        ):
+            events.append(
+                (
+                    "meter",
+                    operation_id,
+                    event_id,
+                    category,
+                    delta.tool_calls,
+                    delta.cost_usd,
+                )
+            )
+            return object()
+
+    runtime = ToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+    manifest = ToolManifest(
+        tool_id="repo.read",
+        version="1.0.0",
+        description="metered read",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        cost_model={
+            "kind": "request",
+            "estimated_cost_usd": 0.25,
+        },
+    )
+    runtime.register(
+        manifest,
+        lambda request: events.append(("handler", request.operation_id))
+        or "artifact:metered",
+    )
+    request = _request()
+
+    receipt = runtime.execute(request, now=_now())
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert events[0][0] == "meter"
+    assert events[0][1] == request.operation_id
+    assert events[0][3:] == ("tool", 1, 0.25)
+    assert events[1] == ("handler", request.operation_id)
+
+
+@pytest.mark.asyncio
+async def test_async_manifest_max_concurrency_is_enforced_per_tool() -> None:
+    runtime = AsyncToolRuntime()
+    entered_first = asyncio.Event()
+    release_first = asyncio.Event()
+    entered_second = asyncio.Event()
+    active = 0
+    peak = 0
+    calls = 0
+
+    async def handler(_request):
+        nonlocal active, peak, calls
+        calls += 1
+        active += 1
+        peak = max(peak, active)
+        try:
+            if calls == 1:
+                entered_first.set()
+                await release_first.wait()
+            else:
+                entered_second.set()
+            await asyncio.sleep(0)
+            return f"artifact:{calls}"
+        finally:
+            active -= 1
+
+    manifest = ToolManifest(
+        tool_id="repo.read",
+        version="1.0.0",
+        description="serialized read",
+        input_schema={
+            "type": "object",
+            "properties": {"path": {"type": "string"}},
+            "required": ["path"],
+            "additionalProperties": False,
+        },
+        max_concurrency=1,
+    )
+    await runtime.register(manifest, handler)
+
+    first = asyncio.create_task(
+        runtime.execute(
+            _request(
+                operation_id=str(uuid4()),
+                key="concurrency-first",
+            ),
+            now=_now(),
+        )
+    )
+    await entered_first.wait()
+
+    second = asyncio.create_task(
+        runtime.execute(
+            _request(
+                operation_id=str(uuid4()),
+                key="concurrency-second",
+            ),
+            now=_now(),
+        )
+    )
+    await asyncio.sleep(0)
+    assert entered_second.is_set() is False
+
+    release_first.set()
+    first_receipt, second_receipt = await asyncio.gather(first, second)
+
+    assert first_receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert second_receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert entered_second.is_set() is True
+    assert peak == 1
+    assert calls == 2
+
+
+def test_manifest_rejects_invalid_estimated_cost() -> None:
+    with pytest.raises(
+        ToolContractError,
+        match="estimated_cost_usd must be non-negative numeric",
+    ):
+        ToolManifest(
+            tool_id="repo.read",
+            version="1.0.0",
+            description="bad cost",
+            input_schema={"type": "object"},
+            cost_model={
+                "kind": "request",
+                "estimated_cost_usd": -0.01,
+            },
+        )
+
+def test_sync_tool_privacy_denial_precedes_meter_and_handler() -> None:
+    events: list[str] = []
+
+    class Meter:
+        def meter_tool_call(self, operation_id, event_id, *, now_wall=None):
+            events.append("meter")
+            return object()
+
+    runtime = ToolRuntime(admission_runtime=Meter())  # type: ignore[arg-type]
+    runtime.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        lambda request: events.append("handler") or "search:1",
+    )
+
+    receipt = runtime.execute(
+        _request(
+            tool_id="web.search",
+            data_class="internal",
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "tool_data_ceiling_exceeded"
+    assert receipt.governance_decision_ref.startswith("gov-tool-")
+    assert receipt.metered_tool_calls == 0
+    assert events == []
+
+
+def test_sync_public_tool_transfer_executes_with_governance_receipt() -> None:
+    calls: list[str] = []
+    runtime = ToolRuntime()
+    runtime.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        lambda request: calls.append(request.data_class) or "search:1",
+    )
+
+    receipt = runtime.execute(
+        _request(
+            tool_id="web.search",
+            data_class="public",
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.SUCCEEDED
+    assert receipt.data_class == "public"
+    assert receipt.transfer_purpose == "tool-execution"
+    assert receipt.governance_decision_ref.startswith("gov-tool-")
+    assert calls == ["public"]
+
+
+def test_privacy_context_change_conflicts_for_same_idempotency_identity() -> None:
+    runtime = ToolRuntime()
+    runtime.register(_manifest(), lambda request: "artifact:1")
+    operation_id = str(uuid4())
+    runtime.execute(
+        _request(
+            operation_id=operation_id,
+            key="privacy-replay",
+            data_class="internal",
+        ),
+        now=_now(),
+    )
+
+    with pytest.raises(ToolExecutionConflict, match="privacy context"):
+        runtime.execute(
+            _request(
+                operation_id=operation_id,
+                key="privacy-replay",
+                data_class="public",
+            ),
+            now=_now(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_async_tool_privacy_denial_precedes_handler() -> None:
+    calls: list[str] = []
+    runtime = AsyncToolRuntime()
+
+    async def handler(request):
+        calls.append(request.data_class)
+        return "search:1"
+
+    await runtime.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        handler,
+    )
+    receipt = await runtime.execute(
+        _request(
+            tool_id="web.search",
+            data_class="internal",
+        ),
+        now=_now(),
+    )
+
+    assert receipt.status is ToolExecutionStatus.DENIED
+    assert receipt.error_code == "tool_data_ceiling_exceeded"
+    assert receipt.governance_decision_ref.startswith("gov-tool-")
     assert calls == []

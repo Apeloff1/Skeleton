@@ -19,17 +19,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from core.http_errors import internal_http_error
 import uuid
-import os
 
 # Load environment
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 
 router = APIRouter(prefix="/music", tags=["AI Music Pipeline"])
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # ============================================================================
 # REQUEST MODELS
@@ -75,8 +73,7 @@ class MusicTheoryRequest(BaseModel):
 
 async def call_music_ai(prompt: str, system_prompt: str) -> str:
     try:
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
+        chat = EngineChat(
             session_id=f"music-{uuid.uuid4().hex[:8]}",
             system_message=system_prompt
         ).with_model("openai", "gpt-4o")

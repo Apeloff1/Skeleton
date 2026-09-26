@@ -93,6 +93,187 @@ def _normalized_identifier(value: Any, *, field: str, required: bool) -> str:
         raise DataGovernanceDenied(f"{field} is too long")
     return text
 
+_ALLOWED_TOOL_PURPOSES = frozenset(
+    {
+        "tool-execution",
+        "code-assistance",
+        "retrieval-synthesis",
+        "verification",
+        "evaluation",
+        "artifact-build",
+    }
+)
+
+
+def _tool_policy_ceiling(data_policy: str) -> DataClass:
+    raw = _normalized_identifier(
+        data_policy,
+        field="data_policy",
+        required=True,
+    ).lower()
+    prefix = raw.split(":", 1)[0]
+    mapping = {
+        "public": DataClass.PUBLIC,
+        "ephemeral": DataClass.INTERNAL,
+        "internal": DataClass.INTERNAL,
+        "confidential": DataClass.CONFIDENTIAL,
+        "restricted": DataClass.RESTRICTED,
+    }
+    try:
+        return mapping[prefix]
+    except KeyError as exc:
+        raise DataGovernanceDenied("unknown tool data policy") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class ToolTransferRequest:
+    tool_id: str
+    data_policy: str
+    network_policy: str
+    data_class: DataClass | str | int = DataClass.INTERNAL
+    purpose: str = "tool-execution"
+    tenant_id: str | None = None
+    source: str = "application"
+
+    def normalized(self) -> "ToolTransferRequest":
+        return ToolTransferRequest(
+            tool_id=_normalized_identifier(
+                self.tool_id,
+                field="tool_id",
+                required=True,
+            ).lower(),
+            data_policy=_normalized_identifier(
+                self.data_policy,
+                field="data_policy",
+                required=True,
+            ).lower(),
+            network_policy=_normalized_identifier(
+                self.network_policy,
+                field="network_policy",
+                required=True,
+            ).lower(),
+            data_class=DataClass.parse(self.data_class),
+            purpose=_normalized_identifier(
+                self.purpose,
+                field="purpose",
+                required=True,
+            ).lower(),
+            tenant_id=(
+                _normalized_identifier(
+                    self.tenant_id,
+                    field="tenant_id",
+                    required=False,
+                )
+                or None
+            ),
+            source=_normalized_identifier(
+                self.source,
+                field="source",
+                required=True,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolTransferDecision:
+    decision_id: str
+    permitted: bool
+    tool_id: str
+    data_class: str
+    data_policy: str
+    network_policy: str
+    purpose: str
+    tenant_bound: bool
+    reason_code: str
+    routing_privacy: str
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "decision_id": self.decision_id,
+            "permitted": self.permitted,
+            "tool_id": self.tool_id,
+            "data_class": self.data_class,
+            "data_policy": self.data_policy,
+            "network_policy": self.network_policy,
+            "purpose": self.purpose,
+            "tenant_bound": self.tenant_bound,
+            "reason_code": self.reason_code,
+            "routing_privacy": self.routing_privacy,
+        }
+
+
+def _tool_decision_id(
+    request: ToolTransferRequest,
+    reason_code: str,
+) -> str:
+    classification = DataClass.parse(request.data_class)
+    material = "\x1f".join(
+        (
+            request.tool_id,
+            request.data_policy,
+            request.network_policy,
+            classification.label,
+            request.purpose,
+            request.tenant_id or "",
+            request.source,
+            reason_code,
+        )
+    ).encode("utf-8")
+    return "gov-tool-" + hashlib.sha256(material).hexdigest()[:24]
+
+
+def evaluate_tool_transfer(
+    request: ToolTransferRequest,
+) -> ToolTransferDecision:
+    """Evaluate tool privacy/network policy before reservation or side effects."""
+
+    normalized = request.normalized()
+    classification = DataClass.parse(normalized.data_class)
+    ceiling = _tool_policy_ceiling(normalized.data_policy)
+
+    if normalized.purpose not in _ALLOWED_TOOL_PURPOSES:
+        reason = "tool_purpose_not_allowed"
+        permitted = False
+    elif classification > ceiling:
+        reason = "tool_data_ceiling_exceeded"
+        permitted = False
+    elif classification >= DataClass.CONFIDENTIAL and not normalized.tenant_id:
+        reason = "tool_sensitive_data_requires_tenant"
+        permitted = False
+    elif (
+        classification is DataClass.RESTRICTED
+        and normalized.network_policy != "none"
+    ):
+        reason = "restricted_network_tool_denied"
+        permitted = False
+    else:
+        reason = "tool_policy_permits"
+        permitted = True
+
+    return ToolTransferDecision(
+        decision_id=_tool_decision_id(normalized, reason),
+        permitted=permitted,
+        tool_id=normalized.tool_id,
+        data_class=classification.label,
+        data_policy=normalized.data_policy,
+        network_policy=normalized.network_policy,
+        purpose=normalized.purpose,
+        tenant_bound=bool(normalized.tenant_id),
+        reason_code=reason,
+        routing_privacy=classification.routing_privacy,
+    )
+
+
+def require_tool_transfer(
+    request: ToolTransferRequest,
+) -> ToolTransferDecision:
+    """Return a payload-free decision receipt or fail closed before tool I/O."""
+
+    decision = evaluate_tool_transfer(request)
+    if not decision.permitted:
+        raise DataGovernanceDenied(decision.reason_code)
+    return decision
+
 
 @dataclass(frozen=True, slots=True)
 class ProviderTransferRequest:
@@ -222,6 +403,10 @@ __all__ = [
     "DataGovernanceError",
     "ProviderTransferDecision",
     "ProviderTransferRequest",
+    "ToolTransferDecision",
+    "ToolTransferRequest",
     "evaluate_provider_transfer",
+    "evaluate_tool_transfer",
     "require_provider_transfer",
+    "require_tool_transfer",
 ]

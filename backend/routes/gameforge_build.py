@@ -10,14 +10,16 @@ PyInstaller) are reported honestly as unavailable unless the toolchain is instal
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
+import time
 import zipfile
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from core.exec_guard import code_execution_enabled, execution_disabled_response
@@ -35,8 +37,86 @@ from core.gameforge_artifact_builder import (
 
 router = APIRouter(prefix="/api/gameforge/build", tags=["gameforge-build"])
 
+try:
+    from routes.gameforge_auth import require_role
+    _viewer = require_role("viewer")
+    _editor = require_role("editor")
+except Exception:  # noqa: BLE001
+    def _viewer():  # type: ignore
+        return {"email": "anonymous", "role": "admin", "dev_mode": True}
+
+    _editor = _viewer
+
 _ARTIFACTS = str(DEFAULT_ARTIFACTS_ROOT)
 os.makedirs(_ARTIFACTS, exist_ok=True)
+
+
+def _artifact_retention_seconds() -> int:
+    raw = os.environ.get("GAMEFORGE_ARTIFACT_RETENTION_DAYS", "30")
+    try:
+        days = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            "GAMEFORGE_ARTIFACT_RETENTION_DAYS must be an integer"
+        ) from exc
+    if days < 1 or days > 365:
+        raise RuntimeError(
+            "GAMEFORGE_ARTIFACT_RETENTION_DAYS must be within [1, 365]"
+        )
+    return days * 24 * 60 * 60
+
+
+def _tenant_id(user: Any) -> str:
+    if isinstance(user, dict):
+        explicit = str(user.get("tenant_id") or "").strip()
+        if explicit:
+            return explicit
+        email = str(user.get("email") or "").strip().lower()
+        if email:
+            return "user-" + hashlib.sha256(email.encode("utf-8")).hexdigest()[:32]
+    raise ValueError("authenticated tenant identity is required")
+
+
+def _governed_store():
+    from skeleton.api.server import get_state
+
+    return get_state().bind_canonical_artifact_store()
+
+
+def _legacy_allowed(user: Any) -> bool:
+    return isinstance(user, dict) and user.get("dev_mode") is True
+
+
+def _governed_register(
+    *,
+    build_id: str,
+    game_name: str,
+    kind: str,
+    payload: bytes,
+    tenant_id: str,
+    built_at: float | None = None,
+) -> dict:
+    store = _governed_store()
+    timestamp = time.time() if built_at is None else float(built_at)
+    canonical = store.write_bytes(
+        tenant_id=tenant_id,
+        artifact_id=build_id,
+        payload=payload,
+        data_class="internal",
+        purposes=("artifact-delivery", "download"),
+        created_at=timestamp,
+        retention_until=timestamp + _artifact_retention_seconds(),
+        exportable=True,
+    )
+    return _register(
+        build_id,
+        game_name,
+        kind,
+        None,
+        built_at=timestamp,
+        canonical_record=canonical,
+        tenant_id=tenant_id,
+    )
 
 def _has_pyinstaller() -> bool:
     import importlib.util
@@ -79,7 +159,7 @@ class DesktopBody(BaseModel):
 
 
 @router.post("/desktop")
-async def build_desktop(b: DesktopBody):
+async def build_desktop(b: DesktopBody, user=Depends(_editor)):
     """Real native desktop binary via PyInstaller (Linux ELF in this environment)."""
     if not code_execution_enabled():
         return execution_disabled_response("Desktop native build")
@@ -114,19 +194,28 @@ async def build_desktop(b: DesktopBody):
     binary = _resolve_under_dir(workdir, "dist", build_id)
     if proc.returncode != 0 or not os.path.exists(binary):
         return {"ok": False, "error": "pyinstaller build failed", "stderr": proc.stderr[-400:]}
-    zip_path = _resolve_under_dir(_ARTIFACTS, f"{build_id}.zip")
+    zip_path = _resolve_under_dir(workdir, f"{build_id}.zip")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(binary, os.path.basename(binary))
-    rec = _register(build_id, safe_name, "desktop", zip_path)
+    tenant = _tenant_id(user)
+    binary_bytes = os.path.getsize(binary)
+    rec = _governed_register(
+        build_id=build_id,
+        game_name=safe_name,
+        kind="desktop",
+        payload=zip_path.read_bytes(),
+        tenant_id=tenant,
+    )
+    shutil.rmtree(workdir, ignore_errors=True)
     rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
-    rec["binary_bytes"] = os.path.getsize(binary)
+    rec["binary_bytes"] = binary_bytes
     rec["platform"] = "linux-x86_64"
     rec["ok"] = True
     return rec
 
 
 @router.post("/godot")
-async def build_godot(b: BuildBody):
+async def build_godot(b: BuildBody, user=Depends(_editor)):
     """Generate a real, importable Godot 4 project (project.godot + scene + script)
     from the gamefiles and validate it with the native Godot engine (headless).
     The bundled Godot 4.3 binary actually runs the project to prove it boots."""
@@ -183,7 +272,15 @@ async def build_godot(b: BuildBody):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         for name in ("project.godot", "main.gd", "main.tscn", "gamefiles.json"):
             z.write(_resolve_under_dir(workdir, name), name)
-    rec = _register(build_id, safe_name, "godot", zip_path)
+    tenant = _tenant_id(user)
+    rec = _governed_register(
+        build_id=build_id,
+        game_name=safe_name,
+        kind="godot",
+        payload=zip_path.read_bytes(),
+        tenant_id=tenant,
+    )
+    shutil.rmtree(workdir, ignore_errors=True)
     rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
     rec["importable_godot_project"] = True
     rec["engine_validated"] = engine_validated
@@ -198,19 +295,52 @@ class BuildBody(BaseModel):
     game_name: str = Field(..., min_length=1, max_length=200)
 
 
+async def _build_web_for_user(b: BuildBody, user: Any):
+    tenant = _tenant_id(user)
+    timestamp = time.time()
+    return build_web_artifact(
+        b.game_name,
+        built_at=timestamp,
+        governed_store=_governed_store(),
+        tenant_id=tenant,
+        retention_until=timestamp + _artifact_retention_seconds(),
+    )
+
+
+async def _build_source_for_user(b: BuildBody, user: Any):
+    tenant = _tenant_id(user)
+    timestamp = time.time()
+    return build_source_artifact(
+        b.game_name,
+        built_at=timestamp,
+        governed_store=_governed_store(),
+        tenant_id=tenant,
+        retention_until=timestamp + _artifact_retention_seconds(),
+    )
+
+
 @router.post("/web")
-async def build_web(b: BuildBody):
-    return build_web_artifact(b.game_name)
+async def build_web(b: BuildBody, user=Depends(_editor)):
+    return await _build_web_for_user(b, user)
 
 
 @router.post("/source")
-async def build_source(b: BuildBody):
-    return build_source_artifact(b.game_name)
+async def build_source(b: BuildBody, user=Depends(_editor)):
+    return await _build_source_for_user(b, user)
 
 
 @router.get("/list")
-async def list_builds(game_name: Optional[str] = Query(None, max_length=200)):
-    q = {"game_name": game_name} if game_name else {}
+async def list_builds(
+    game_name: Optional[str] = Query(None, max_length=200),
+    user=Depends(_viewer),
+):
+    tenant = _tenant_id(user)
+    clauses: list[dict] = [{"tenant_id": tenant}]
+    if _legacy_allowed(user):
+        clauses.append({"tenant_id": {"$exists": False}})
+    q: dict = {"$or": clauses}
+    if game_name:
+        q["game_name"] = game_name
     try:
         rows = list(_db()["gameforge_builds"].find(q, {"_id": 0}).sort("built_at", -1).limit(50))
     except Exception:  # noqa: BLE001
@@ -221,13 +351,38 @@ async def list_builds(game_name: Optional[str] = Query(None, max_length=200)):
 
 
 @router.get("/download/{build_id}")
-async def download(build_id: str):
+async def download(build_id: str, user=Depends(_viewer)):
     try:
         safe_id = _safe_segment(build_id, what="build_id")
+        tenant = _tenant_id(user)
     except ValueError:
         return {"ok": False, "error": "build not found"}
-    rec = _db()["gameforge_builds"].find_one({"build_id": safe_id}, {"_id": 0})
-    if not rec:
+
+    rec = _db()["gameforge_builds"].find_one(
+        {"build_id": safe_id, "tenant_id": tenant},
+        {"_id": 0},
+    )
+    if rec is not None and rec.get("source_ref"):
+        payload = _governed_store().read_bytes(tenant, safe_id)
+        if payload is None:
+            return {"ok": False, "error": "build not found"}
+        return Response(
+            content=payload,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{rec.get("filename") or safe_id + ".zip"}"'
+                )
+            },
+        )
+
+    if not _legacy_allowed(user):
+        return {"ok": False, "error": "build not found"}
+    rec = _db()["gameforge_builds"].find_one(
+        {"build_id": safe_id, "tenant_id": {"$exists": False}},
+        {"_id": 0},
+    )
+    if not rec or not rec.get("path"):
         return {"ok": False, "error": "build not found"}
     try:
         path = _resolve_under_dir(_ARTIFACTS, os.path.basename(rec["path"]))

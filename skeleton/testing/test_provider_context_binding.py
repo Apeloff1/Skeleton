@@ -61,7 +61,7 @@ def _response(envelope, **overrides):
         "text": "ok",
         "provider": "test",
         "model": "test",
-        "finish_reason": FinishReason.STOP,
+        "finish_reason": FinishReason.COMPLETED,
         "context_id": envelope.context_id,
         "context_digest": envelope.context_digest,
         "context_source_snapshot": envelope.source_snapshot,

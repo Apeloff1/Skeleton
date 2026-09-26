@@ -24,6 +24,7 @@ from skeleton.contracts.verification import (
     VerificationClaim,
     VerificationLevel,
     VerificationOutcome,
+    VerificationReceipt,
     VerificationRisk,
 )
 from skeleton.intelligence.verification_policy import (
@@ -52,6 +53,96 @@ class VerificationAssessment:
     grounding: GroundingAssessment
     check: VerificationCheck | None
     issues: tuple[str, ...]
+    verified_at: datetime
+    verifier_id: str
+
+
+def _receipt_id(
+    claim: VerificationClaim,
+    assessment: VerificationAssessment,
+    *,
+    execution_id: str | None,
+    result_ref: str | None,
+) -> str:
+    material = json.dumps(
+        {
+            "claim_digest": claim.digest,
+            "execution_id": execution_id,
+            "result_ref": result_ref,
+            "outcome": assessment.outcome.value,
+            "policy_level": int(assessment.policy.level),
+            "required_modes": list(assessment.policy.required_modes),
+            "policy_satisfied": assessment.policy_satisfied,
+            "check_id": (
+                None if assessment.check is None else assessment.check.check_id
+            ),
+            "verified_at": assessment.verified_at.isoformat(),
+            "verifier_id": assessment.verifier_id,
+            "supporting_evidence_ids": list(
+                assessment.grounding.supporting_evidence_ids
+            ),
+            "contradicting_evidence_ids": list(
+                assessment.grounding.contradicting_evidence_ids
+            ),
+            "rejected_evidence_ids": list(
+                assessment.grounding.rejected_evidence_ids
+            ),
+            "issues": list(assessment.issues),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+    return str(uuid5(NAMESPACE_URL, "verification-receipt:" + material))
+
+
+def materialize_verification_receipt(
+    claim: VerificationClaim,
+    assessment: VerificationAssessment,
+    *,
+    execution_id: str | None = None,
+    result_ref: str | None = None,
+) -> VerificationReceipt:
+    """Create one deterministic observable receipt from a verification assessment."""
+
+    if not isinstance(claim, VerificationClaim):
+        raise TypeError("claim must be VerificationClaim")
+    if not isinstance(assessment, VerificationAssessment):
+        raise TypeError("assessment must be VerificationAssessment")
+    if assessment.claim_id != claim.claim_id:
+        raise ValueError("assessment claim_id does not match claim")
+    check = assessment.check
+    return VerificationReceipt(
+        receipt_id=_receipt_id(
+            claim,
+            assessment,
+            execution_id=execution_id,
+            result_ref=result_ref,
+        ),
+        claim_id=claim.claim_id,
+        claim_digest=claim.digest,
+        tenant_id=claim.tenant_id,
+        operation_id=claim.operation_id,
+        execution_id=execution_id,
+        turn_id=claim.turn_id,
+        result_ref=result_ref,
+        outcome=assessment.outcome,
+        policy_level=assessment.policy.level,
+        required_modes=assessment.policy.required_modes,
+        policy_satisfied=assessment.policy_satisfied,
+        check_id=None if check is None else check.check_id,
+        verifier_id=assessment.verifier_id,
+        verified_at=assessment.verified_at,
+        supporting_evidence_ids=assessment.grounding.supporting_evidence_ids,
+        contradicting_evidence_ids=assessment.grounding.contradicting_evidence_ids,
+        rejected_evidence_ids=assessment.grounding.rejected_evidence_ids,
+        postcondition_observation_ids=(
+            () if check is None else check.postcondition_observation_ids
+        ),
+        independent=False if check is None else check.independent,
+        issues=assessment.issues,
+    )
 
 
 def _utc(value: datetime) -> datetime:
@@ -238,6 +329,8 @@ class VerificationRuntime:
             grounding=grounding,
             check=check,
             issues=tuple(dict.fromkeys(issues)),
+            verified_at=instant,
+            verifier_id=verifier_id.strip(),
         )
 
 
@@ -940,4 +1033,5 @@ __all__ = [
     "SemanticVerificationRuntime",
     "VerificationAssessment",
     "VerificationRuntime",
+    "materialize_verification_receipt",
 ]

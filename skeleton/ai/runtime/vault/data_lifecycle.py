@@ -17,7 +17,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
+import json
 import math
+from pathlib import Path
+import sqlite3
 import threading
 import time
 from typing import Any, Iterable
@@ -222,13 +225,246 @@ def _digest(prefix: str, *values: object) -> str:
 
 
 class DataLifecycleRegistry:
-    """Thread-safe governance metadata registry and deletion coordinator."""
+    """Thread-safe governance metadata registry and deletion coordinator.
 
-    def __init__(self) -> None:
+    Supplying a SQLite path persists lifecycle metadata, deletion plans,
+    acknowledgement state and receipts across process restarts. Governed user
+    payloads remain in their canonical owner repositories.
+    """
+
+    _SNAPSHOT_SCHEMA_VERSION = 1
+
+    def __init__(self, path: str | Path | None = None) -> None:
         self._lock = threading.RLock()
         self._entries: dict[str, _Entry] = {}
         self._plans: dict[str, DeletionPlan] = {}
         self._receipts: list[DeletionReceipt] = []
+        self._connection: sqlite3.Connection | None = None
+        if path is not None:
+            self._connection = sqlite3.connect(
+                str(path),
+                check_same_thread=False,
+                isolation_level=None,
+                timeout=5.0,
+            )
+            self._connection.row_factory = sqlite3.Row
+            with self._lock:
+                self._connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS data_lifecycle_snapshot (
+                        singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                        schema_version INTEGER NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        updated_at REAL NOT NULL
+                    )
+                    """
+                )
+                self._load_snapshot_locked()
+
+    @staticmethod
+    def _record_payload(record: GovernedDataRecord) -> dict[str, Any]:
+        return {
+            "record_id": record.record_id,
+            "tenant_id": record.tenant_id,
+            "owner_plane": record.owner_plane,
+            "source_ref": record.source_ref,
+            "data_class": record.data_class.label,
+            "purposes": list(record.purposes),
+            "deletion_targets": list(record.deletion_targets),
+            "created_at": record.created_at,
+            "retention_until": record.retention_until,
+            "exportable": record.exportable,
+        }
+
+    @staticmethod
+    def _record_from_payload(payload: dict[str, Any]) -> GovernedDataRecord:
+        return GovernedDataRecord(
+            record_id=payload["record_id"],
+            tenant_id=payload["tenant_id"],
+            owner_plane=payload["owner_plane"],
+            source_ref=payload["source_ref"],
+            data_class=payload["data_class"],
+            purposes=tuple(payload["purposes"]),
+            deletion_targets=tuple(payload["deletion_targets"]),
+            created_at=float(payload["created_at"]),
+            retention_until=(
+                None
+                if payload.get("retention_until") is None
+                else float(payload["retention_until"])
+            ),
+            exportable=bool(payload["exportable"]),
+        )
+
+    def _snapshot_locked(self) -> dict[str, Any]:
+        return {
+            "schema_version": self._SNAPSHOT_SCHEMA_VERSION,
+            "entries": [
+                {
+                    "record": self._record_payload(entry.record),
+                    "state": entry.state.value,
+                    "active_plan_id": entry.active_plan_id,
+                    "deletion_reason": entry.deletion_reason,
+                    "acknowledged_targets": sorted(entry.acknowledged_targets),
+                }
+                for _, entry in sorted(self._entries.items())
+            ],
+            "plans": [
+                plan.as_dict()
+                for _, plan in sorted(self._plans.items())
+            ],
+            "receipts": [receipt.as_dict() for receipt in self._receipts],
+        }
+
+    def _restore_payload_locked(self, payload: dict[str, Any]) -> None:
+        if payload.get("schema_version") != self._SNAPSHOT_SCHEMA_VERSION:
+            raise LifecycleError("unsupported lifecycle snapshot schema version")
+
+        entries: dict[str, _Entry] = {}
+        for raw in payload.get("entries", []):
+            if not isinstance(raw, dict) or not isinstance(raw.get("record"), dict):
+                raise LifecycleError("lifecycle snapshot entry is invalid")
+            record = self._record_from_payload(raw["record"])
+            state = LifecycleState(raw["state"])
+            acknowledged_raw = raw.get("acknowledged_targets") or []
+            if not isinstance(acknowledged_raw, list):
+                raise LifecycleError("lifecycle acknowledged targets are invalid")
+            acknowledged = {
+                _required_id(value, "acknowledged target")
+                for value in acknowledged_raw
+            }
+            if not acknowledged.issubset(set(record.deletion_targets)):
+                raise LifecycleError(
+                    "lifecycle snapshot acknowledges undeclared deletion target"
+                )
+            entry = _Entry(
+                record=record,
+                state=state,
+                active_plan_id=raw.get("active_plan_id"),
+                deletion_reason=raw.get("deletion_reason"),
+                acknowledged_targets=acknowledged,
+            )
+            if record.record_id in entries:
+                raise LifecycleError("duplicate lifecycle record in snapshot")
+            entries[record.record_id] = entry
+
+        plans: dict[str, DeletionPlan] = {}
+        for raw in payload.get("plans", []):
+            if not isinstance(raw, dict):
+                raise LifecycleError("lifecycle snapshot plan is invalid")
+            actions = tuple(
+                DeletionAction(
+                    record_id=item["record_id"],
+                    tenant_id=item["tenant_id"],
+                    target=item["target"],
+                    source_ref=item["source_ref"],
+                    reason=item["reason"],
+                )
+                for item in raw.get("actions", [])
+            )
+            plan = DeletionPlan(
+                plan_id=raw["plan_id"],
+                tenant_id=raw["tenant_id"],
+                reason=raw["reason"],
+                actions=actions,
+                created_at=float(raw["created_at"]),
+            )
+            if plan.plan_id in plans:
+                raise LifecycleError("duplicate deletion plan in snapshot")
+            plans[plan.plan_id] = plan
+
+        receipts = [
+            DeletionReceipt(
+                receipt_id=raw["receipt_id"],
+                plan_id=raw["plan_id"],
+                record_id=raw["record_id"],
+                target=raw["target"],
+                state=LifecycleState(raw["state"]),
+                completed_at=float(raw["completed_at"]),
+            )
+            for raw in payload.get("receipts", [])
+        ]
+
+        for entry in entries.values():
+            if entry.active_plan_id is not None and entry.active_plan_id not in plans:
+                raise LifecycleError(
+                    "lifecycle snapshot references unknown active deletion plan"
+                )
+
+        self._entries = entries
+        self._plans = plans
+        self._receipts = receipts
+
+    def _load_snapshot_locked(self) -> None:
+        if self._connection is None:
+            return
+        row = self._connection.execute(
+            """
+            SELECT schema_version, payload_json
+            FROM data_lifecycle_snapshot
+            WHERE singleton = 1
+            """
+        ).fetchone()
+        if row is None:
+            return
+        if int(row["schema_version"]) != self._SNAPSHOT_SCHEMA_VERSION:
+            raise LifecycleError("unsupported lifecycle snapshot schema version")
+        try:
+            payload = json.loads(row["payload_json"])
+        except json.JSONDecodeError as exc:
+            raise LifecycleError("lifecycle snapshot is invalid JSON") from exc
+        if not isinstance(payload, dict):
+            raise LifecycleError("lifecycle snapshot must be an object")
+        self._restore_payload_locked(payload)
+
+    def _persist_locked(self) -> None:
+        if self._connection is None:
+            return
+        payload = json.dumps(
+            self._snapshot_locked(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        )
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            self._connection.execute(
+                """
+                INSERT INTO data_lifecycle_snapshot(
+                    singleton, schema_version, payload_json, updated_at
+                ) VALUES (1, ?, ?, ?)
+                ON CONFLICT(singleton) DO UPDATE SET
+                    schema_version = excluded.schema_version,
+                    payload_json = excluded.payload_json,
+                    updated_at = excluded.updated_at
+                """,
+                (self._SNAPSHOT_SCHEMA_VERSION, payload, time.time()),
+            )
+            self._connection.execute("COMMIT")
+        except Exception:
+            self._connection.execute("ROLLBACK")
+            raise
+
+    def _recover_after_persist_failure_locked(self) -> None:
+        if self._connection is None:
+            return
+        self._entries = {}
+        self._plans = {}
+        self._receipts = []
+        self._load_snapshot_locked()
+
+    def _persist_or_recover_locked(self) -> None:
+        try:
+            self._persist_locked()
+        except Exception:
+            self._recover_after_persist_failure_locked()
+            raise
+
+    def close(self) -> None:
+        with self._lock:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
 
     def register(self, record: GovernedDataRecord) -> GovernedDataRecord:
         with self._lock:
@@ -237,6 +473,7 @@ class DataLifecycleRegistry:
                     f"record already registered: {record.record_id}"
                 )
             self._entries[record.record_id] = _Entry(record=record)
+            self._persist_or_recover_locked()
         return record
 
     def ensure_registered(self, record: GovernedDataRecord) -> GovernedDataRecord:
@@ -253,12 +490,62 @@ class DataLifecycleRegistry:
             existing = self._entries.get(record.record_id)
             if existing is None:
                 self._entries[record.record_id] = _Entry(record=record)
+                self._persist_or_recover_locked()
                 return record
             if existing.record == record:
                 return existing.record
             raise LifecycleConflict(
                 f"record identity conflicts with existing governance metadata: {record.record_id}"
             )
+
+    def reconcile_registered(
+        self,
+        record: GovernedDataRecord,
+    ) -> GovernedDataRecord:
+        """Create or update active lifecycle metadata for one canonical record.
+
+        Record identity, tenant, owner, source, purposes, deletion targets,
+        creation time and exportability are immutable. Classification and
+        retention deadline may change while the record is active. Pending or
+        deleted records cannot be revived by a canonical write.
+        """
+
+        if not isinstance(record, GovernedDataRecord):
+            raise TypeError("record must be a GovernedDataRecord")
+        with self._lock:
+            existing = self._entries.get(record.record_id)
+            if existing is None:
+                self._entries[record.record_id] = _Entry(record=record)
+                self._persist_or_recover_locked()
+                return record
+            if existing.state is not LifecycleState.ACTIVE:
+                raise LifecycleConflict(
+                    "cannot reconcile lifecycle metadata for non-active record"
+                )
+            current = existing.record
+            immutable_pairs = (
+                (current.tenant_id, record.tenant_id, "tenant"),
+                (current.owner_plane, record.owner_plane, "owner plane"),
+                (current.source_ref, record.source_ref, "source reference"),
+                (current.purposes, record.purposes, "purposes"),
+                (
+                    current.deletion_targets,
+                    record.deletion_targets,
+                    "deletion targets",
+                ),
+                (current.created_at, record.created_at, "created_at"),
+                (current.exportable, record.exportable, "exportability"),
+            )
+            for left, right, field in immutable_pairs:
+                if left != right:
+                    raise LifecycleConflict(
+                        "canonical lifecycle identity changed: " + field
+                    )
+            if current == record:
+                return current
+            existing.record = record
+            self._persist_or_recover_locked()
+            return record
 
     def get(self, record_id: str) -> dict[str, Any]:
         key = _required_id(record_id, "record_id")
@@ -308,6 +595,7 @@ class DataLifecycleRegistry:
         tenant_id: str,
         reason: str,
         now: float,
+        persist: bool = False,
     ) -> DeletionPlan:
         actions: list[DeletionAction] = []
         ids = sorted(entry.record.record_id for entry in entries)
@@ -358,6 +646,8 @@ class DataLifecycleRegistry:
             created_at=now,
         )
         self._plans[plan.plan_id] = plan
+        if persist:
+            self._persist_or_recover_locked()
         return plan
 
     def request_deletion(
@@ -447,7 +737,137 @@ class DataLifecycleRegistry:
                 tenant_id=tenant,
                 reason=normalized_reason,
                 now=timestamp,
+                persist=True,
             )
+
+    def pending_deletion_plan(
+        self,
+        plan_id: str,
+        *,
+        tenant_id: str | None = None,
+    ) -> DeletionPlan:
+        """Return only unacknowledged actions for a durable deletion plan.
+
+        This is the retry/reconciliation read boundary for distributed physical
+        owners. It never creates, merges, or mutates a plan.
+        """
+
+        plan_key = _required_id(plan_id, "plan_id")
+        tenant = (
+            None
+            if tenant_id is None
+            else _required_id(tenant_id, "tenant_id")
+        )
+        with self._lock:
+            try:
+                plan = self._plans[plan_key]
+            except KeyError as exc:
+                raise LifecycleError("unknown deletion plan") from exc
+            if tenant is not None and plan.tenant_id != tenant:
+                raise DataGovernanceDenied(
+                    "cross-tenant deletion plan access denied"
+                )
+
+            outstanding: list[DeletionAction] = []
+            for action in plan.actions:
+                try:
+                    entry = self._entries[action.record_id]
+                except KeyError as exc:
+                    raise LifecycleError(
+                        "deletion plan references unknown lifecycle record"
+                    ) from exc
+                if entry.record.tenant_id != plan.tenant_id:
+                    raise LifecycleError(
+                        "deletion plan lifecycle tenant mismatch"
+                    )
+                if entry.active_plan_id != plan.plan_id:
+                    if entry.state is LifecycleState.DELETED:
+                        continue
+                    raise LifecycleConflict(
+                        "deletion plan is not active for lifecycle record"
+                    )
+                if action.target in entry.acknowledged_targets:
+                    continue
+                outstanding.append(action)
+
+            return DeletionPlan(
+                plan_id=plan.plan_id,
+                tenant_id=plan.tenant_id,
+                reason=plan.reason,
+                actions=tuple(outstanding),
+                created_at=plan.created_at,
+            )
+
+    def plan_retention_expiry_for_tenant(
+        self,
+        tenant_id: str,
+        *,
+        now: float | None = None,
+    ) -> DeletionPlan | None:
+        """Create one durable retention plan for an authorized tenant only."""
+
+        tenant = _required_id(tenant_id, "tenant_id")
+        timestamp = (
+            time.time()
+            if now is None
+            else _finite_timestamp(now, "now")
+        )
+        with self._lock:
+            active_retention_plan_ids = {
+                entry.active_plan_id
+                for entry in self._entries.values()
+                if entry.record.tenant_id == tenant
+                and entry.state is LifecycleState.DELETE_PENDING
+                and entry.active_plan_id is not None
+                and self._plans.get(entry.active_plan_id) is not None
+                and self._plans[entry.active_plan_id].reason
+                == "retention-expired"
+            }
+            if active_retention_plan_ids:
+                if len(active_retention_plan_ids) != 1:
+                    raise LifecycleConflict(
+                        "tenant has multiple active retention plans"
+                    )
+                active_plan_id = next(iter(active_retention_plan_ids))
+                existing = self._plans[active_plan_id]
+                outstanding: list[DeletionAction] = []
+                for action in existing.actions:
+                    entry = self._entries.get(action.record_id)
+                    if (
+                        entry is None
+                        or entry.record.tenant_id != tenant
+                        or entry.active_plan_id != active_plan_id
+                    ):
+                        continue
+                    if action.target in entry.acknowledged_targets:
+                        continue
+                    outstanding.append(action)
+                return DeletionPlan(
+                    plan_id=existing.plan_id,
+                    tenant_id=existing.tenant_id,
+                    reason=existing.reason,
+                    actions=tuple(outstanding),
+                    created_at=existing.created_at,
+                )
+
+            entries = [
+                entry
+                for entry in self._entries.values()
+                if entry.record.tenant_id == tenant
+                and entry.state is LifecycleState.ACTIVE
+                and entry.record.retention_until is not None
+                and entry.record.retention_until <= timestamp
+            ]
+            if not entries:
+                return None
+            plan = self._plan(
+                entries,
+                tenant_id=tenant,
+                reason="retention-expired",
+                now=timestamp,
+                persist=True,
+            )
+            return plan
 
     def plan_retention_expiry(
         self,
@@ -474,6 +894,8 @@ class DataLifecycleRegistry:
                 )
                 for tenant, entries in sorted(by_tenant.items())
             ]
+            if plans:
+                self._persist_or_recover_locked()
         return tuple(plans)
 
     def acknowledge_deletion(
@@ -531,6 +953,7 @@ class DataLifecycleRegistry:
                 completed_at=timestamp,
             )
             self._receipts.append(receipt)
+            self._persist_or_recover_locked()
             return receipt
 
     def receipts(

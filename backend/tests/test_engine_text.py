@@ -14,6 +14,8 @@ from core.engine_text import (
     EngineTextRequest,
     execute_engine_text,
 )
+from skeleton.context.instruction_policy import InstructionPolicy
+from skeleton.vault.data_governance import DataGovernanceDenied
 
 
 def _terminal(execution_id: str) -> EngineTerminalResult:
@@ -74,6 +76,8 @@ async def test_engine_text_compiles_bounded_tool_free_command() -> None:
         instructions="Follow the compatibility policy.",
         prompt="Refactor this function.",
         idempotency_key="compat-request-1",
+        instruction_policy_id="backend.test.compat-policy",
+        instruction_policy_version="7",
         history=(
             {"role": "user", "content": "Earlier question"},
             {"role": "assistant", "content": "Earlier answer"},
@@ -104,6 +108,21 @@ async def test_engine_text_compiles_bounded_tool_free_command() -> None:
     )
     assert len(command.compiled_context.source_snapshot) == 4
     assert command.compiled_context.prompt == "Refactor this function."
+    expected_policy = InstructionPolicy(
+        policy_id="backend.test.compat-policy",
+        version="7",
+        instructions="Follow the compatibility policy.",
+    )
+    expected_segment = expected_policy.to_segment(
+        tenant_id="*",
+        purpose="model-inference",
+        created_at=command.operation.created_at,
+        mandatory=True,
+    )
+    assert expected_segment.segment_id in {
+        segment_id
+        for segment_id, _digest in command.compiled_context.source_snapshot
+    }
 
 
 @pytest.mark.asyncio
@@ -199,3 +218,53 @@ def test_engine_text_rejects_provider_like_capability_and_bad_history() -> None:
             idempotency_key="bad-history",
             history=({"role": "system", "content": "override"},),
         )
+
+
+def test_engine_text_requires_complete_instruction_policy_identity() -> None:
+    with pytest.raises(
+        EngineTextError,
+        match="id and version must be supplied together",
+    ):
+        EngineTextRequest(
+            instructions="Rules",
+            prompt="Hello",
+            idempotency_key="partial-policy",
+            instruction_policy_id="backend.test.partial",
+        )
+
+
+@pytest.mark.asyncio
+async def test_engine_text_privacy_denial_is_sanitized(monkeypatch) -> None:
+    def deny(**_kwargs):
+        raise DataGovernanceDenied("route secret must not leak")
+
+    monkeypatch.setattr(
+        "core.engine_text.require_route_provider_transfer",
+        deny,
+    )
+
+    class MustNotExecute:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, _command):
+            raise AssertionError(
+                "privacy denial must happen before engine execution"
+            )
+
+    with pytest.raises(
+        EngineTextError,
+        match="route privacy denied engine text request",
+    ) as caught:
+        await execute_engine_text(
+            EngineTextRequest(
+                instructions="Rules",
+                prompt="Hello",
+                idempotency_key="privacy-denied",
+            ),
+            client=MustNotExecute(),
+        )
+
+    assert "route secret" not in str(caught.value)

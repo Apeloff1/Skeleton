@@ -4,10 +4,23 @@ on:
   pull_request:
     paths:
       - "scripts/state_recovery_drill.py"
+      - "scripts/state_backup_bundle.py"
+      - "scripts/verify_state_authority_closure.py"
+      - "tests/test_state_authority_independent_verifier.py"
       - "skeleton/testing/test_state_recovery_drill.py"
+      - "skeleton/testing/test_state_backup_bundle.py"
+      - "machine/state_backup_policy.json"
       - "backend/services/rag_state_repository.py"
       - "backend/services/rag_service.py"
       - "backend/tests/test_rag_state_authority.py"
+      - "skeleton/persistence/operation_store.py"
+      - "skeleton/persistence/operation_runtime.py"
+      - "skeleton/persistence/execution_repository.py"
+      - "skeleton/api/engine_service.py"
+      - "skeleton/skills/tool_receipt_store.py"
+      - "skeleton/intelligence/quota_sqlite.py"
+      - "skeleton/intelligence/shared_pressure.py"
+      - "skeleton/config/settings.py"
       - "machine/state_topology.json"
       - "machine/ai_app_construction.json"
       - "docker-compose.yml"
@@ -26,6 +39,8 @@ jobs:
     name: Authoritative-first recovery
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      PYTHONPATH: "."
 
     services:
       mongo:
@@ -43,6 +58,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -56,11 +72,15 @@ jobs:
           "pymongo>=4.10,<5"
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
 
-      - name: Run pure recovery contract tests
+      - name: Run pure recovery and backup contract tests
         env:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
-        run: python -m pytest -q --noconftest skeleton/testing/test_state_recovery_drill.py
+        run: >-
+          python -m pytest -q --noconftest
+          skeleton/testing/test_state_recovery_drill.py
+          skeleton/testing/test_state_backup_bundle.py
 
       - name: Run live Mongo backup restore and rebuild drill
         run: >-
@@ -69,6 +89,18 @@ jobs:
           --source-database "skeleton_recovery_drill_source"
           --restored-database "skeleton_recovery_drill_restored"
           --output "${RUNNER_TEMP}/state-recovery.json"
+
+      - name: Run authoritative operation SQLite backup restore drill
+        run: >-
+          python scripts/state_recovery_drill.py live-sqlite
+          --workdir "${RUNNER_TEMP}/operation-sqlite-recovery"
+          --output "${RUNNER_TEMP}/operation-sqlite-recovery.json"
+
+      - name: Run full engine SQLite bundle backup restore drill
+        run: >-
+          python scripts/state_recovery_drill.py live-engine-sqlite
+          --workdir "${RUNNER_TEMP}/engine-sqlite-recovery"
+          --output "${RUNNER_TEMP}/engine-sqlite-recovery.json"
 
       - name: Verify recovery evidence and ordering
         run: |
@@ -100,4 +132,136 @@ jobs:
           print("phases:", " -> ".join(actual))
           print("backup/restore digest:", report["backup_digest"])
           print("derived digest:", report["derived_projection_digest"])
+          PY
+
+      - name: Verify operation SQLite recovery evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "operation-sqlite-recovery.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          phases = [
+              "seed_operation_authority",
+              "backup_operation_authority",
+              "destroy_operation_authority",
+              "restore_operation_authority",
+              "verify_operation_authority",
+              "reconcile_operation_outbox",
+              "ready",
+          ]
+          actual = [event["phase"] for event in report["journal"]["events"]]
+          assert report["status"] == "passed"
+          assert report["backup_digest"] == report["restore_digest"]
+          assert report["journal"]["complete"] is True
+          assert actual == phases
+          evidence = report["journal"]["events"][4]["evidence"]
+          assert evidence["state"] == "admitted"
+          assert evidence["version"] == 4
+          reconciliation = report["journal"]["events"][5]["evidence"]
+          assert reconciliation["remaining"] == 0
+          assert reconciliation["published"] == 4
+          print("operation-sqlite-recovery: OK")
+          print("phases:", " -> ".join(actual))
+          print("backup/restore digest:", report["backup_digest"])
+          PY
+
+      - name: Verify engine SQLite bundle recovery evidence
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["RUNNER_TEMP"]) / "engine-sqlite-recovery.json"
+          report = json.loads(path.read_text(encoding="utf-8"))
+          assert report["status"] == "passed"
+          assert report["bundle_digest"] == report["restored_bundle_digest"]
+          assert set(report["stores"]) == {
+              "execution",
+              "pressure",
+              "quota",
+              "submissions",
+              "tool_receipts",
+          }
+          for store in report["stores"].values():
+              assert store["backup_digest"] == store["restore_digest"]
+          verified = report["verified"]
+          assert verified["execution_state"] == "routing"
+          assert verified["checkpoint_version"] == 1
+          assert verified["approval_ref"].startswith("approval:")
+          assert len(verified["approval_ref"]) == len("approval:") + 64
+          assert verified["tool_reservation_status"] == "in_doubt"
+          assert verified["quota_committed_input_tokens"] == 90
+          assert verified["pressure_active"] == 1
+          assert verified["pressure_queued"] == 1
+          print("engine-sqlite-bundle-recovery: OK")
+          print("bundle digest:", report["bundle_digest"])
+          PY
+
+  independent-state-authority:
+    name: Independent state authority verifier
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: "."
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Install independent verifier test dependency
+        run: >-
+          python -m pip install --disable-pip-version-check
+          "pytest>=8,<9"
+
+      - name: Run independent state authority verifier regressions
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_state_authority_independent_verifier.py
+
+      - name: Verify exact-head state authority and emit receipt
+        env:
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: >-
+          python scripts/verify_state_authority_closure.py
+          --evidence-out .state-authority-evidence.json
+          --print-evidence
+
+      - name: Assert exact-head state authority receipt
+        env:
+          EXPECTED_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(
+              Path(".state-authority-evidence.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          assert receipt["schema_version"] == 1
+          assert receipt["verifier"] == "independent-state-authority-v1"
+          assert receipt["head_sha"] == os.environ["EXPECTED_SHA"]
+          assert receipt["valid"] is True
+          assert receipt["errors"] == []
+          assert len(receipt["authority_digest"]) == 64
+          assert len(receipt["authoritative_domains"]) >= 12
+          assert len(receipt["derived_domains"]) == 3
+          assert len(receipt["backup_stores"]) == 8
+          print("independent-state-authority: exact-head receipt OK")
+          print("authority digest:", receipt["authority_digest"])
           PY

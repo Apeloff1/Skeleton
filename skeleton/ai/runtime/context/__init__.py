@@ -1,5 +1,10 @@
 """Context substrate — tensor cube, dodeca oracle, DNA helix, ledger, snowball, cockpit."""
 
+from skeleton.context.compaction import (
+    COMPACTION_VERSION,
+    ContextCompactionError,
+    compact_context_segment,
+)
 from skeleton.context.compiler import (
     COMPILER_VERSION,
     ContextCompilationError,
@@ -39,6 +44,9 @@ from skeleton.context.snowball import Snowball, STAGES as SNOWBALL_STAGES
 from skeleton.context.tensor import AXES, ContextTensor, detect_era
 
 __all__ = [
+    "COMPACTION_VERSION",
+    "ContextCompactionError",
+    "compact_context_segment",
     "COMPILER_VERSION",
     "ContextAdmissionDecision",
     "ContextCompilationError",

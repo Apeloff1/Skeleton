@@ -69,6 +69,59 @@ def test_assistant_message_requires_operation_and_result_binding() -> None:
         )
 
 
+def test_assistant_memory_refs_round_trip_through_sqlite_authority() -> None:
+    repo = SQLiteConversationRepository()
+    thread = repo.create_thread(
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        created_at=_now(),
+    )
+    user = _message(
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author=ConversationAuthorType.USER,
+        content="remember this",
+        idempotency_key="user-memory",
+    )
+    thread, _ = repo.append_message(
+        user,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+    assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=2,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="assistant-memory",
+        content="remembered",
+        parent_message_id=user.message_id,
+        causal_user_message_id=user.message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:memory",
+        memory_refs=("memory:abc", "memory:def"),
+    )
+    thread, stored = repo.append_message(
+        assistant,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+        expected_thread_version=thread.version,
+    )
+
+    loaded = repo.list_messages(
+        thread.thread_id,
+        tenant_id="tenant-a",
+        owner_id="owner-a",
+    )
+
+    assert stored.memory_refs == ("memory:abc", "memory:def")
+    assert loaded[-1].memory_refs == stored.memory_refs
+
+
 def test_thread_authorization_is_fail_closed() -> None:
     repo = SQLiteConversationRepository()
     thread = repo.create_thread(

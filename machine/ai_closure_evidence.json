@@ -32,7 +32,7 @@
       "plane": "cost-capacity",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_verification",
       "closure_decision": "open",
       "evidence_present": [
         "ResourceBudget and UsageEstimate contracts",
@@ -47,7 +47,60 @@
         "provider text usage reconciliation from returned token usage",
         "image/speech artifact-byte reconciliation",
         "media provider admission through the shared runtime",
-        "quota exhaustion and shared saturation regression coverage"
+        "quota exhaustion and shared saturation regression coverage",
+        "skeleton/intelligence/quota_sqlite.py durable tenant quota/window persistence",
+        "skeleton/testing/test_tenant_quota_sqlite.py restart and multi-worker reservation regression coverage",
+        "Stage 0 Foundations Verification exercises restart-safe quota/admission",
+        "skeleton/intelligence/admission_runtime.py estimate/actual/delta aggregate telemetry",
+        "skeleton/testing/test_admission_runtime.py payload-free telemetry regression",
+        "skeleton/skills/tool_runtime.py manifest-aware tool call/cost metering",
+        "skeleton/testing/test_tenant_quota_sqlite.py restart recovery and concurrent reservation evidence",
+        "skeleton/intelligence/admission_runtime.py payload-free estimate/actual/delta telemetry",
+        "skeleton/testing/test_admission_runtime.py admission telemetry regression suite",
+        "skeleton/artifact_plane/usage.py artifact/storage write usage adapter",
+        "skeleton/testing/test_artifact_usage.py storage usage category, replay, budget and unknown-resolution regressions",
+        "backend/services/tool_registry.py manifest-aware tool call and estimated-cost metering",
+        "skeleton/intelligence/admission.py independent max_storage_bytes/storage_bytes admission dimension",
+        "skeleton/intelligence/quota.py independent storage tenant quota and usage accounting",
+        "skeleton/intelligence/quota_sqlite.py additive storage quota schema migration with legacy ceiling backfill",
+        "skeleton/artifact_plane/usage.py storage writes and unknown usage resolve on storage_bytes rather than artifact_bytes",
+        "skeleton/testing/test_artifact_usage.py independent artifact/storage budget regressions",
+        "skeleton/testing/test_tenant_quota_sqlite.py restart-safe storage usage plus pre-storage schema migration regression",
+        "skeleton/intelligence/admission.py distinct max_storage_bytes and storage_bytes admission contract",
+        "skeleton/intelligence/quota.py independent in-memory storage quota dimension and enforcement",
+        "skeleton/intelligence/admission_runtime.py independent storage usage metering and telemetry",
+        "skeleton/artifact_plane/usage.py storage writes meter storage_bytes rather than artifact_bytes",
+        "skeleton/testing/test_artifact_usage.py proves artifact/storage budget independence",
+        "skeleton/testing/test_tenant_quota_sqlite.py proves restart-safe storage usage and legacy schema migration",
+        "skeleton/intelligence/shared_pressure.py restart-safe SQLite cross-process concurrency and queue coordinator",
+        "skeleton/testing/test_shared_pressure.py cross-process overbooking, tenant fairness, queue caps, lease expiry, owner fencing, soft shedding and atomic promotion regressions",
+        "skeleton/intelligence/admission_runtime.py shared pressure snapshot/acquire/release integration",
+        "skeleton/ai/runtime/intelligence/shared_pressure.py byte-identical canonical AI runtime mirror",
+        "skeleton/api/engine_service.py meters durable execution-state and submission payloads through the operation admission lease before persistence",
+        "skeleton/intelligence/execution_runtime.py meters checkpoint, turn, finalization-intent and terminal-result payloads with deterministic write identities",
+        "skeleton/api/engine_runtime.py binds cognitive storage metering to the same operation-level admission lease",
+        "skeleton/testing/test_engine_execution_service.py proves durable engine write metering and replay stability",
+        "skeleton/testing/test_execution_runtime.py proves cognitive checkpoint/turn/result storage metering",
+        "skeleton/memory/writeback.py GovernedMemoryWriter meters canonical SQLite memory writes before commit when admission is bound",
+        "skeleton/memory/writeback.py AsyncGovernedMemoryWriter applies the same policy/admission/governance/tombstone contract to MongoMemoryRepository",
+        "skeleton/testing/test_memory_writeback.py proves admitted SQLite memory persistence, no-lease denial and replay-stable metering",
+        "skeleton/testing/test_mongo_memory_repository.py proves admitted Mongo memory persistence, replay stability, no-lease denial and fail-closed governance tombstoning",
+        "backend/core/conversations.py canonical Mongo thread/message/state writes admit storage through the engine before mutation",
+        "backend/core/engine_client.py bounded authenticated external storage admission client",
+        "skeleton/api/engine_routes.py /admission/storage canonical engine boundary",
+        "backend/tests/test_conversation_storage_admission.py fail-closed and replay-stable conversation admission regressions",
+        "skeleton/api/server.py live canonical Mongo memory composition owner",
+        "skeleton/api/server.py production-configured startup binds AsyncGovernedMemoryWriter to existing execution admission and governance owners",
+        "skeleton/testing/test_governance_runtime_binding.py injected-database canonical Mongo memory binding regression",
+        "pyproject.toml Motor/PyMongo runtime dependency declaration",
+        "skeleton/ai/runtime/api/server.py canonical mirror",
+        "skeleton/memory/projection.py admitted sync/async material rebuild boundary",
+        "skeleton/testing/test_memory_projection.py pre-mutation denial and successful reconciliation regressions",
+        "skeleton/api/server.py live admitted AsyncMemoryProjectionCoordinator composition",
+        "skeleton/ai/runtime/memory/projection.py canonical mirror",
+        ".github/workflows/cost-admission-closure.yml dedicated exact-head cost/admission closure workflow",
+        "scripts/verify_cost_admission_closure.py independent production-boundary and mirror verifier",
+        "tests/test_cost_admission_independent_verifier.py independent verifier regression suite"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -56,18 +109,10 @@
         "cost telemetry test"
       ],
       "outstanding_evidence": [
-        "durable tenant quota/window persistence and restart recovery",
-        "estimate-vs-actual cost telemetry in the canonical observability plane",
-        "actual tool and storage usage accounting",
-        "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment"
+        "fresh exact-head Cost Admission Closure Gate"
       ],
       "blockers": [
-        "durable tenant quota/window persistence and restart recovery",
-        "estimate-vs-actual cost telemetry in the canonical observability plane",
-        "actual tool and storage usage accounting",
-        "admission at every expensive non-provider action",
-        "cross-process/distributed pressure feed for multi-worker deployment"
+        "fresh exact-head Cost Admission Closure Gate"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -88,7 +133,7 @@
       "plane": "governance",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "baseline data class registry",
@@ -111,7 +156,44 @@
         "skeleton/testing/test_data_lifecycle.py restart/deletion-plan/receipt durability evidence",
         "skeleton/testing/test_lifecycle_adapters.py canonical SQLite memory lifecycle evidence",
         "skeleton/testing/test_governance_runtime_binding.py production runtime persistence evidence",
-        "skeleton/testing/test_memory_writeback.py canonical write registration/reconciliation evidence"
+        "skeleton/testing/test_memory_writeback.py canonical write registration/reconciliation evidence",
+        "backend/core/conversations.py canonical conversation governance registration plus governed delete/export execution",
+        "backend/tests/test_conversation_storage_admission.py authoritative conversation governance regressions",
+        "skeleton/vault/governance_audit.py payload-free WORM registration/reconcile/delete/export audit timeline",
+        "skeleton/vault/governance_registry.py audit-linked canonical registration/reconciliation",
+        "skeleton/api/server.py durable governance audit and lifecycle adapter registry composition",
+        "skeleton/testing/test_governance_audit.py registration/reconciliation audit redaction evidence",
+        "skeleton/testing/test_governance_runtime_binding.py restart-safe governance WORM audit evidence",
+        "skeleton/retrieval/governance.py governed tenant-scoped retrieval registration before mutation",
+        "skeleton/vault/lifecycle_adapters.py tenant-bound governed retrieval physical delete/export adapter",
+        "skeleton/api/server.py production retrieval owner plus lifecycle executor composition",
+        "skeleton/testing/test_lifecycle_adapters.py retrieval isolation/export/delete/retention regressions",
+        "skeleton/testing/test_governance_runtime_binding.py production retrieval lifecycle binding regression",
+        "skeleton/memory/projection.py governance-bound derived vector/TF-IDF retrieval lifecycle",
+        "skeleton/api/server.py production AsyncMemoryProjectionCoordinator shares canonical GovernanceRegistry",
+        "skeleton/testing/test_memory_projection.py derived retrieval registration/delete acknowledgement regressions",
+        "skeleton/artifact_plane/governance.py governance-before-mutation canonical artifact authority",
+        "skeleton/vault/lifecycle_adapters.py GovernedArtifactLifecycleAdapter tenant-bound delete/export adapter",
+        "skeleton/api/server.py production canonical artifact store startup binding",
+        "skeleton/testing/test_server_governance_binding.py physical artifact export/delete/retention regressions",
+        "skeleton/artifact_plane/governance.py governance-before-mutation canonical artifact owner",
+        "skeleton/vault/lifecycle_adapters.py governed artifact physical delete/export adapter",
+        "skeleton/api/server.py startup composition of canonical governed artifact store",
+        "skeleton/testing/test_lifecycle_adapters.py artifact registration/export/delete/retention/fail-closed regressions",
+        "skeleton/testing/test_governance_runtime_binding.py production artifact lifecycle composition regression",
+        "backend/core/route_privacy.py complete route-domain privacy ceiling registry",
+        "backend/api_middleware.py request-scoped route privacy binding",
+        "backend/core/engine_text.py pre-provider route privacy enforcement",
+        "backend/services/tool_registry.py pre-tool route privacy enforcement",
+        "backend/tests/test_route_privacy.py provider/tool privacy and context isolation regressions",
+        "backend/core/gameforge_artifact_builder.py canonical governed production artifact write path",
+        "backend/routes/gameforge_build.py tenant-scoped governed artifact download/list/build and bounded retention",
+        "backend/tests/test_gameforge_artifact_builder.py governed artifact production regressions",
+        "skeleton/testing/test_governance_runtime_binding.py physical artifact retention expiry through production lifecycle adapters",
+        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes",
+        "scripts/verify_governance_closure.py independent source-only governance blueprint/state-topology/boundary/mirror verifier",
+        "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
+        ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -120,20 +202,14 @@
         "retention expiry test"
       ],
       "outstanding_evidence": [
-        "conversation/retrieval/artifact canonical write registration",
-        "memory derived projection/index deletion completion acknowledgement",
-        "conversation/retrieval/artifact physical delete/export/retention adapters",
-        "provider/tool privacy ceilings enforced across every application route",
-        "canonical audit linkage for lifecycle registration/delete/export/retention",
-        "exact-head Stage-0/App Assembly verification and independent signoff"
+        "fresh exact-head Governance Closure Gate",
+        "fresh exact-head Stage-0/App Assembly governance verification",
+        "fresh exact-head Governance Closure Gate independent verifier receipt"
       ],
       "blockers": [
-        "conversation/retrieval/artifact canonical write registration",
-        "memory derived projection/index deletion completion acknowledgement",
-        "conversation/retrieval/artifact physical delete/export/retention adapters",
-        "provider/tool privacy ceilings enforced across every application route",
-        "canonical audit linkage for lifecycle registration/delete/export/retention",
-        "exact-head Stage-0/App Assembly verification and independent signoff"
+        "fresh exact-head Governance Closure Gate",
+        "fresh exact-head Stage-0/App Assembly governance verification",
+        "fresh exact-head Governance Closure Gate independent verifier receipt"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -154,7 +230,7 @@
       "plane": "model-provider",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_verification",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/testing/test_provider_contract.py",
@@ -166,7 +242,17 @@
         "skeleton/jeeves/providers.py canonical-runtime compatibility facade",
         "backend/services/tool_registry.py declared provider-isolation surface with retired llm_chat alias",
         "backend/tests/test_tool_registry_canonical_delegate.py provider credential/SDK source isolation regression",
-        "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation"
+        "backend/services/tool_registry.py retired-provider compatibility facade with declared credential/SDK/network isolation",
+        "skeleton/testing/test_provider_contract.py canonical async provider text/deadline regression suite",
+        "skeleton/testing/test_provider_contract.py canonical image generation/variation/edit and speech regression suite",
+        "skeleton/testing/test_provider_contract.py provider media failure releases admission lease",
+        "skeleton/provider_runtime.py fail-closed media input validation before provider I/O",
+        ".github/workflows/provider-surface-closure.yml dedicated exact-head provider closure workflow",
+        "Provider Surface Closure Gate checks provider bootstrap inventory plus SDK/network runtime isolation",
+        "Provider Surface Closure Gate runs canonical async/sync/media/schema/stream provider regressions and engine cross-service isolation",
+        "scripts/verify_provider_surface_closure.py independent AST/source ownership verifier",
+        "tests/test_provider_surface_independent_verifier.py adversarial ownership/mirror regression suite",
+        ".github/workflows/provider-surface-closure.yml exact-head independent verifier job and SHA-bound receipt"
       ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
@@ -178,14 +264,11 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "outstanding_evidence": [
-        "exact-head provider-surface inventory receipt with no unexplained credential/network/SDK edges",
-        "exact-head canonical async/synchronous provider regression suites",
-        "exact-head media provider boundary regression suite",
-        "exact-head application isolation scan including backend tool registry",
-        "independent verification before closure",
-        "exact-head provider bootstrap inventory and SDK/network isolation gate"
+        "fresh exact-head Provider Surface Closure Gate"
       ],
-      "blockers": [],
+      "blockers": [
+        "fresh exact-head Provider Surface Closure Gate"
+      ],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
@@ -205,7 +288,7 @@
       "plane": "data-persistence",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "machine-readable state authority topology",
@@ -215,7 +298,22 @@
         "terminal operation state persistence",
         "transactional operation-state plus event-intent outbox",
         "retry-stable outbox event identity compatible with canonical stream",
-        "operation state reopen/corruption/outbox integration regressions"
+        "operation state reopen/corruption/outbox integration regressions",
+        "backend/services/rag_state_repository.py is the canonical Mongo authority for learning sessions, concepts, user progress, co-coding context and feedback",
+        "backend/tests/test_rag_state_authority.py proves Chroma projection failure cannot roll back canonical Mongo state and stale projection entries cannot resurrect missing authority",
+        "RAGService.migrate_legacy_chroma_state imports legacy Chroma-owned product state into Mongo and rebuild_projections_from_mongo recreates projections from authority",
+        "skeleton/persistence/operation_runtime.py binds production reasoning to durable OperationEnvelope state with transactional outbox and background reconciliation",
+        "skeleton/api/server.py starts the durable operation outbox dispatcher during Genesis wiring and closes it during shutdown",
+        "scripts/state_recovery_drill.py now performs destructive operation SQLite backup/restore verification and reconciles restored unpublished outbox rows",
+        ".github/workflows/state-recovery-drill.yml executes Mongo authoritative-first recovery and operation SQLite recovery drills",
+        "docker-compose.yml persists engine execution, submission/approval, tool receipt, quota/usage and shared-pressure SQLite state on skeleton_data",
+        "machine/state_topology.json v1.8.0 binds cognitive execution/result/approval/tool/quota authorities to durable engine SQLite stores",
+        "scripts/state_recovery_drill.py destructively backs up/restores canonical operation SQLite and reconciles restored outbox identities",
+        "scripts/state_recovery_drill.py backs up/restores the five-store engine SQLite bundle and reopens execution, submission/approval, tool-idempotency, quota and shared-pressure state",
+        "machine/state_backup_policy.json defines required authoritative SQLite stores, restore order and retention floors",
+        "scripts/state_backup_bundle.py creates online SQLite backups with integrity, binary SHA256, logical snapshot and bundle-digest verification",
+        "skeleton/testing/test_state_backup_bundle.py proves required-store fail-closed behavior and backup tamper detection",
+        "docker-compose.yml persists engine execution, submission, tool receipt, quota and shared-pressure state under skeleton_data"
       ],
       "closure_evidence_required": [
         "state topology validator passes",
@@ -228,20 +326,14 @@
         "no authoritative domain exists solely in Chroma, process memory or snapshots"
       ],
       "outstanding_evidence": [
-        "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
-        "bind production orchestration paths to durable operation repository",
-        "run durable outbox dispatcher as part of runtime lifecycle",
-        "define production backup and retention policy for operation state",
-        "prove Mongo authoritative restore before all derived index rebuilds",
-        "run derived-store loss and rebuild drill"
+        "fresh exact-head State Recovery Drill and state-topology validation",
+        "fresh exact-head App Assembly/Backend Quality evidence",
+        "independent closure verification"
       ],
       "blockers": [
-        "migrate canonical RAG user progress/feedback/session records from Chroma to Mongo",
-        "bind production orchestration paths to durable operation repository",
-        "run durable outbox dispatcher as part of runtime lifecycle",
-        "define production backup and retention policy for operation state",
-        "prove Mongo authoritative restore before all derived index rebuilds",
-        "run derived-store loss and rebuild drill"
+        "fresh exact-head State Recovery Drill and state-topology validation",
+        "fresh exact-head App Assembly/Backend Quality evidence",
+        "independent closure verification"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -262,7 +354,7 @@
       "plane": "application-api",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/conversation.py",
@@ -274,7 +366,53 @@
         "backend/gameforge/jeeves/chat_contract.py",
         "backend/routes/jeeves_compose.py",
         "tests/test_jeeves_chat_workspace.py",
-        "frontend/src/product/conversationClient.ts"
+        "frontend/src/product/conversationClient.ts",
+        "backend/routes/ai.py rejects caller conversation_history and compiles server-owned canonical thread transcript through ContextCompiler",
+        "backend/routes/jeeves_compose.py routes generative escalation through EngineTextRequest/execute_engine_text rather than provider SDKs or credentials",
+        "backend/routes/jeeves_compose.py ignores caller-supplied history for retrieval, prompting and persistence even when server storage is empty or unavailable",
+        "tests/test_jeeves_chat_workspace.py proves server transcript wins over conflicting client history, legacy history is model-invisible, and canonical-engine delegation keeps conversation context out of trusted instructions",
+        "machine/ai_app_construction.json declares Jeeves chat as a provider-isolated application surface",
+        "backend/routes/jeeves_compose.py imports legacy jeeves_chat rows once into canonical ConversationThread/ConversationMessage authority and serves canonical history thereafter",
+        "backend/routes/conversations.py regenerate endpoint executes through EngineClient then commits conversation_authority.regenerate_assistant_message with operation/result/context lineage",
+        "backend/tests/test_conversation_regeneration_route.py proves engine-before-commit, stale-version fencing and canonical regeneration lineage",
+        "backend/core/conversations.py governed deletion physically removes conversation payloads before acknowledgement and governed export reads registry-scoped conversation records",
+        "backend/tests/test_conversation_governance.py and backend/tests/test_conversation_storage_admission.py prove tenant-scoped governed delete/export behavior",
+        "frontend/features/Jeeves/WorkspaceController.ts rehydrates and refreshes device state from canonical server history",
+        "frontend/features/Jeeves/workspace.ts projectCanonicalHistory replaces stale completed cache while preserving unresolved local work and never serializes local transcript into model input",
+        "frontend/scripts/test-jeeves-workspace.cjs proves remount reconstruction, durable session identity and device-transcript non-authority",
+        "scripts/verify_jeeves_conversation_cutover.py independently verifies legacy migration-read-only authority, canonical regeneration and workspace reconstruction boundaries",
+        "skeleton/contracts/conversation.py carries first-class memory_refs alongside tool/citation/artifact references",
+        "skeleton/persistence/conversation_repository.py persists memory_refs_json with backward-compatible SQLite migration and round-trip coverage",
+        "backend/routes/ai.py and backend/routes/conversations.py bind engine tool receipts, memory refs, evidence refs and artifact refs into canonical assistant messages",
+        "backend/core/conversations.py resolves a thread-scoped, tenant-fenced governed record set from canonical conversation rows plus explicit message references",
+        "backend/core/conversations.py delete_thread_with_governance executes engine-owned linked targets before physical conversation deletion and fails closed on malformed or foreign plan actions",
+        "skeleton/vault/data_lifecycle.py pending_deletion_plan exposes only unacknowledged tenant-fenced actions for retry-safe distributed physical owners",
+        "skeleton/api/engine_service.py and engine_routes.py execute non-conversation lifecycle targets through registered engine lifecycle adapters",
+        "backend/tests/test_conversation_governance.py fences linked-record selection from unrelated tenant records",
+        "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation actions for backend authority",
+        "backend/tests/test_conversations_api.py proves completion is claimed only after governed propagation succeeds",
+        "skeleton/contracts/conversation.py carries first-class memory_refs alongside tool/citation/artifact lineage",
+        "backend/routes/ai.py and backend/routes/conversations.py persist engine tool, memory, evidence and artifact references into canonical assistant messages",
+        "backend/core/conversations.py resolves governed records only from the thread's canonical rows plus explicit message reference aliases, tenant-fenced and bounded",
+        "backend/core/conversations.py delete_thread_with_governance preflights the durable plan, executes engine-owned linked targets, then physically deletes and acknowledges conversation-owned rows",
+        "skeleton/vault/data_lifecycle.py pending_deletion_plan exposes only unacknowledged actions for retry-safe distributed physical ownership",
+        "skeleton/api/engine_service.py and skeleton/vault/lifecycle_adapters.py execute non-conversation deletion targets through registered engine lifecycle adapters",
+        "backend/tests/test_conversation_governance.py proves unrelated tenant records and unreferenced memory are excluded from conversation deletion selection",
+        "skeleton/testing/test_engine_execution_service.py proves split-owner deletion leaves conversation targets pending while engine-owned memory deletion is acknowledged",
+        "backend/tests/test_conversations_api.py proves the API claims completion only after governed propagation succeeds",
+        "skeleton/context/compiler.py binds current canonical conversation prompt selection to ContextEnvelope.turn_id",
+        "skeleton/testing/test_context_compiler.py proves current-turn prompt binding under equal timestamps",
+        "skeleton/api/engine_service.py plans tenant retention and executes non-conversation lifecycle targets without taking conversation physical ownership",
+        "skeleton/vault/data_lifecycle.py replays pending tenant retention plans with only outstanding actions",
+        "backend/core/conversations.py execute_due_retention completes engine and conversation physical ownership from one durable plan",
+        "backend/routes/conversations.py admin retention sweep drives tenant-scoped governed expiry",
+        "skeleton/testing/test_data_lifecycle.py proves retention replay plan identity and outstanding-action filtering",
+        "skeleton/testing/test_engine_execution_service.py proves split-owner retention keeps conversation actions pending after engine-owned acknowledgement",
+        "backend/tests/test_conversation_governance.py proves same-plan engine-first then conversation retention execution",
+        "backend/tests/test_ai_chat_conversation_finalization.py proves post-engine assistant-commit failure retries with identical operation/execution/context/submission identity and different pending turns are blocked",
+        "tests/test_jeeves_chat_workspace.py proves pending canonical Jeeves turns resume after crash, current user input is not duplicated into retry history, idless pending turns reuse server-assigned identity, different pending turns serialize, and optimistic races return retryable conflicts",
+        "frontend/src/product/conversationProjection.ts plus frontend/scripts/test-conversation-projection.mjs prove deterministic refresh/reconnect ordering, foreign-thread rejection and projection/version fencing",
+        "backend/routes/conversations.py plus backend/tests/test_conversation_regeneration_route.py prove engine-before-commit regeneration with immutable supersedes/causal lineage"
       ],
       "closure_evidence_required": [
         "new-thread and multi-turn continuation tests",
@@ -286,23 +424,18 @@
         "assistant message binds to one operation and final execution result",
         "conversation deletion/export propagation test",
         "context projection preserves selected message/citation/tool provenance",
-        "browser refresh/reconnect reconstructs the same canonical transcript"
+        "browser refresh/reconnect reconstructs the same canonical transcript",
+        "conversation retention expiry propagation test"
       ],
       "outstanding_evidence": [
-        "new-thread and multi-turn continuation tests",
-        "client cannot inject hidden prior assistant/system messages as canonical history",
-        "cross-tenant/thread authorization denial",
-        "duplicate message idempotency test",
-        "ordered pagination and concurrent append test",
-        "edit/regenerate branch lineage test",
-        "assistant message binds to one operation and final execution result",
-        "conversation deletion/export propagation test",
-        "context projection preserves selected message/citation/tool provenance",
-        "browser refresh/reconnect reconstructs the same canonical transcript"
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-governance-registry",
+        "fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
       ],
       "blockers": [
-        "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry"
+        "dependency closure: gap-state-authority-convergence",
+        "dependency closure: gap-governance-registry",
+        "fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -323,9 +456,30 @@
       "plane": "memory",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/persistence/memory_repository.py provides production MongoMemoryRepository with tenant/namespace isolation, idempotency, optimistic versioning, revisions, tombstones, expiry and projection outbox",
+        "skeleton/api/server.py binds MongoMemoryRepository + AsyncGovernedMemoryWriter + AsyncMemoryProjectionCoordinator when SKL_MONGO_URI is configured",
+        "skeleton/vault/lifecycle_adapters.py provides MongoMemoryLifecycleAdapter for canonical governed memory export and tombstone deletion",
+        "skeleton/api/server.py registers Mongo memory as both governance deletion target and export owner",
+        "skeleton/testing/test_mongo_memory_repository.py covers Mongo restart/reinstantiation, isolation, version/idempotency fencing, projection recovery, governed writes and canonical lifecycle export/delete",
+        "skeleton/testing/test_memory_projection.py proves vector/TFIDF/MAG/CAG projections rebuild from canonical memory and projection failure cannot roll back authority",
+        "skeleton/testing/test_memory_writeback.py proves provenance/review policy, governance fail-closed behavior and storage admission metering",
+        "skeleton/api/server.py exposes canonical memory readiness and fails health when Mongo memory is configured but the repository/writer/projection bundle is unbound",
+        "backend/core/engine_client.py accepts only explicit memory_write_intent with content_from=verified_final_output and delegates engine:memory only for those commands",
+        "skeleton/api/engine_runtime.py forwards a FinalizationBindingHook into CognitiveExecutionRuntime",
+        "skeleton/api/server.py binds verified finalization to AsyncGovernedMemoryWriter, creating stable governed MemoryWriteProposal identities and returning durable memory refs",
+        "skeleton/testing/test_execution_runtime.py proves failed verification never invokes finalization binding and staged terminal memory refs survive crash/recovery",
+        "skeleton/testing/test_governance_runtime_binding.py proves explicit verified memory finalization is a no-op without intent, fails closed without canonical authority, and binds execution/context/provider/tool provenance on commit",
+        "backend/tests/test_engine_client.py proves memory authority is delegated only for normalized verified-final-output intents",
+        "scripts/state_recovery_drill.py destructive Mongo recovery now includes canonical memory records, idempotency receipts, revision history and projection outbox; derived rebuild includes active canonical memory and excludes tombstones",
+        "backend/routes/ai.py exposes AIChatMemoryPolicy as an explicit opt-in product/user long-term-memory policy and emits no memory_write_intent by default",
+        "backend/routes/ai.py translates opt-in only into content_from=verified_final_output with stable conversation/user-policy provenance and fails closed when the canonical engine is unavailable",
+        "backend/tests/test_ai_chat_engine_cutover.py proves default chat has no engine:memory scope, explicit preference persistence delegates engine:memory and commits returned memory_refs, and opt-in without the canonical engine never falls back to local/provider execution",
+        "backend/routes/ai.py exposes AIChatMemoryPolicy as explicit authenticated opt-in and translates it only into verified_final_output memory intent",
+        "backend/tests/test_ai_chat_memory_policy.py proves memory policy defaults off, rejects subject spoofing/unnormalized namespace/naive expiry, reaches delegated engine:memory on opt-in, persists returned memory refs, and fails closed without canonical engine or legacy-provider fallback"
+      ],
       "closure_evidence_required": [
         "durable memory write/read/restart test",
         "tenant/user/namespace isolation tests",
@@ -339,20 +493,16 @@
         "memory outage produces explicit degraded continuity behavior"
       ],
       "outstanding_evidence": [
-        "durable memory write/read/restart test",
-        "tenant/user/namespace isolation tests",
-        "unverified model speculation cannot become canonical memory",
-        "preference/outcome write policy tests",
-        "dedupe/version/conflict tests",
-        "canonical memory delete/export/retention propagation tests",
-        "vector/index loss and rebuild from canonical memory test",
-        "process-memory loss does not lose canonical memory test",
-        "retrieval provenance points back to canonical memory records",
-        "memory outage produces explicit degraded continuity behavior"
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry",
+        "fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
+        "independent verification before canonical closure"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
-        "dependency must close: gap-governance-registry"
+        "dependency must close: gap-governance-registry",
+        "fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
+        "independent verification before canonical closure"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -373,7 +523,7 @@
       "plane": "tool-runtime",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_verification",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
@@ -382,7 +532,33 @@
         "skeleton/skills/tool_adapters/ scoped sandbox/database/network/artifact policy adapters",
         "backend/services/tool_registry.py compatibility delegation with retired nested llm_chat provider path",
         "backend/tests/test_tool_registry_canonical_delegate.py durable restart replay/provider isolation evidence",
-        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence"
+        "backend/tests/test_tool_registry_scoped_adapters.py sandbox/database/network/artifact denial evidence",
+        "skeleton/skills/tool_contract.py lineage-capable request/receipt and approval binding",
+        "skeleton/skills/tool_receipt_store.py durable execution/turn/call lineage migration and replay fencing",
+        "skeleton/testing/test_tool_receipt_store.py lineage replay/conflict/migration regressions",
+        "backend/tests/test_tool_registry_canonical_delegate.py lineage propagation/restart replay regression",
+        "skeleton/intelligence/execution_runtime.py canonical execution/provider-turn/provider-call lineage binding",
+        "skeleton/testing/test_execution_runtime.py end-to-end model-tool-model lineage regression",
+        "skeleton/skills/tool_adapters/owners.py canonical async execution owners for vault/Jeeves/sandbox/database/network/artifact surfaces",
+        "backend/services/tool_registry.py delegation-only executable compatibility handlers",
+        "backend/tests/test_tool_registry_scoped_adapters.py no-privileged-body source regression plus delegation tests",
+        "skeleton/skills/tool_contract.py rich typed ToolManifest governance metadata and invariants",
+        "backend/services/tool_registry.py explicit production manifest authority/risk/idempotency/network/data/cost metadata",
+        "skeleton/intelligence/execution_runtime.py enabled-only minimal ProviderToolDefinition projection",
+        "skeleton/testing/test_execution_runtime.py provider projection non-leak regression",
+        "skeleton/testing/test_tool_runtime.py manifest governance invariant regression set",
+        "skeleton/skills/tool_runtime.py AdmissionRuntime cost/tool-call reconciliation from manifest cost_model",
+        "skeleton/skills/tool_runtime.py per-tool max_concurrency semaphore enforcement",
+        "skeleton/testing/test_tool_runtime.py cost-before-effect and concurrency regressions",
+        "backend/services/tool_registry.py governed CompatibilityResultStore with restart-persistent lifecycle metadata and fail-closed registration",
+        "backend/services/tool_registry.py output-schema/result-size enforcement plus retention/capacity deletion lifecycle",
+        "backend/tests/test_tool_registry_canonical_delegate.py governed result restart/fail-closed/capacity/retention regression suite",
+        "skeleton/testing/test_tool_runtime.py malformed nested schema and rich manifest invariant coverage",
+        "skeleton/testing/test_execution_runtime.py enabled-only minimal model-visible tool inventory proof",
+        "backend/services/tool_registry.py governed durable result classification/retention binding",
+        ".github/workflows/tool-runtime-closure.yml dedicated exact-head tool-runtime closure workflow",
+        "scripts/verify_tool_runtime_closure.py independent ownership/lineage/delegation/mirror/dependency verifier",
+        "tests/test_tool_runtime_independent_verifier.py independent verifier regression suite"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
@@ -397,20 +573,13 @@
         "tool receipt lineage binds operation/execution/turn/call identity"
       ],
       "outstanding_evidence": [
-        "tool manifest schema validation/fuzz coverage against malformed nested schemas",
-        "model-visible inventory proof that only admitted/enabled tools are projected",
-        "move remaining privileged backend I/O handlers behind canonical adapter owners",
-        "complete execution/turn/call lineage fields on canonical tool receipts",
-        "bind governance classification/retention to durable tool results",
-        "bind cost/admission reconciliation across tool/artifact/storage usage",
-        "exact-head App Assembly and provider-surface isolation evidence"
+        "fresh exact-head Tool Runtime Closure Gate"
       ],
       "blockers": [
         "dependency must close: gap-governance-registry",
         "dependency must close: gap-cost-admission",
         "dependency must close: gap-provider-surface-convergence",
-        "remaining privileged backend I/O handlers need adapter-owner cutover",
-        "full execution/turn/call receipt lineage remains incomplete"
+        "fresh exact-head Tool Runtime Closure Gate"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -431,7 +600,7 @@
       "plane": "prompt-context",
       "stage": 2,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/contracts/context.py",
@@ -439,7 +608,35 @@
         "skeleton/context/compiler.py",
         "skeleton/context/sources/conversation.py",
         "skeleton/context/sources/retrieval.py",
-        "skeleton/testing/test_context_compiler.py"
+        "skeleton/testing/test_context_compiler.py",
+        "skeleton/context/sources/conversation.py canonical conversation message adapter",
+        "skeleton/context/sources/retrieval.py ACL/provenance-bound retrieval adapter",
+        "skeleton/context/sources/memory.py active tenant-bound canonical memory adapter",
+        "skeleton/context/sources/artifact.py authorized materialized artifact adapter",
+        "skeleton/context/sources/skill.py trusted declarative skill instruction adapter",
+        "skeleton/context/sources/tool.py trusted minimal tool-schema adapter",
+        "skeleton/context/sources/tool.py successful durable tool-receipt result adapter with operation/execution/turn/call/governance provenance",
+        "skeleton/context/compiler.py deterministic trust-aware packing, omission ledger and provider-neutral projection",
+        "skeleton/testing/test_context_compiler.py deterministic digest/packing, mandatory policy, tenant/data-class, injection and budget regressions",
+        "skeleton/testing/test_context_compiler.py tool-result lineage/fail-closed/result-limit regressions",
+        "backend/core/engine_client.py derives EngineContextHandoff instructions/prompt/history from project_provider_context(ContextEnvelope) whenever canonical projection content exists",
+        "backend/core/engine_client.py prevents legacy caller text/history from overriding projected ContextEnvelope content",
+        "backend/routes/ai.py binds compatibility prompts as USER_MESSAGE ContextSegments so prompt content participates in context_digest",
+        "backend/tests/test_engine_client.py proves attacker-supplied legacy instructions/prompt/history cannot override canonical projected context",
+        "skeleton/context/compaction.py provides deterministic single-segment evidence compaction with hard token bounds",
+        "context compaction preserves tenant, purpose, data class, retention class, source content digest and derived_from lineage",
+        "trusted-control and mandatory context cannot enter the compaction path",
+        "skeleton/context/compiler.py optionally compacts oversized eligible evidence while preserving the original source_snapshot",
+        "compiler omission_reasons record compacted_to:<derived-segment-id> for replay/audit",
+        "skeleton/testing/test_context_compiler.py covers compaction lineage, trust downgrade, hard token bounds, control refusal and compiler admission",
+        "backend/services/ai_assistant_svc.py delegates model execution through EngineTextRequest/execute_engine_text and owns no provider transport or credentials",
+        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary",
+        "scripts/check_context_execution_boundary.py statically rejects direct ProviderRequest/ProviderRegistry/legacy provider ownership in product routes/services/GameForge",
+        "tests/test_context_execution_boundary.py proves product AI surfaces may use only the canonical engine/context compatibility boundary",
+        "scripts/check_instruction_policy_boundary.py requires every product EngineChat construction to bind an explicit instruction_policy",
+        "tests/test_instruction_policy_boundary.py covers missing policy, anonymous system-message override, aliased EngineChat imports and canonical policy acceptance",
+        ".github/workflows/backend-quality.yml runs context execution and instruction-policy boundary gates",
+        ".github/workflows/app-assembly.yml runs both boundaries and their regressions on the assembled application"
       ],
       "closure_evidence_required": [
         "deterministic context snapshot/digest tests",
@@ -455,23 +652,18 @@
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "outstanding_evidence": [
-        "deterministic context snapshot/digest tests",
-        "same canonical inputs produce same selected segment order under fixed budget",
-        "system/policy segments cannot be displaced by untrusted content",
-        "client history injection cannot enter trusted instruction tier",
-        "cross-tenant memory/retrieval/artifact segments are denied",
-        "token budget/output headroom tests",
-        "oversized tool/artifact result externalization tests",
-        "summary/compaction provenance tests",
-        "citation/source ids survive context projection",
-        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
-        "legacy control-prompt source scan and compatibility prompt-parity tests"
+        "fresh exact-head Backend Quality context/instruction-policy boundary evidence",
+        "fresh exact-head App Assembly context/instruction-policy boundary evidence",
+        "declared dependency-gap closure",
+        "independent context-compiler closure verification"
       ],
       "blockers": [
         "dependency must close: gap-conversation-state-authority",
         "dependency must close: gap-memory-durable-authority",
         "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-governance-registry"
+        "dependency must close: gap-governance-registry",
+        "fresh exact-head Backend Quality context/instruction-policy boundary evidence",
+        "fresh exact-head App Assembly context/instruction-policy boundary evidence"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -492,9 +684,23 @@
       "plane": "model-provider",
       "stage": 2,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "implemented",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "machine/ai_runtime_schemas.json defines provider-neutral ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderRequest/ProviderResponse and ProviderDeltaKind schema surfaces",
+        "skeleton/provider_contract.py implements FinishReason, ProviderDeltaKind, ProviderToolDefinition, ProviderToolCall, ProviderUsage, ProviderStructuredOutput and ProviderDelta contracts",
+        "skeleton/provider_runtime.py accepts neutral tool definitions, structured_output_schema, tool_choice, specific_tool_id and deadline on ProviderRequest",
+        "skeleton/provider_runtime.py normalizes provider-native tool calls, structured output, usage and finish reasons before returning ProviderResponse",
+        "skeleton/provider_runtime.py rejects provider tool calls that were not offered by the admitted request",
+        "skeleton/provider_runtime.py converts normalized responses into ordered provider-neutral deltas via provider_response_deltas",
+        "ProviderAdapter.stream exposes the neutral delta contract even when the provider transport is non-streaming",
+        "skeleton/testing/test_provider_contract.py covers canonical tool-call digest validation and unknown usage semantics",
+        "skeleton/testing/test_provider_contract.py covers sync tool-only normalization, unoffered-tool denial and structured output projection",
+        "skeleton/testing/test_provider_contract.py covers sync and async deadline rejection/clamping before provider I/O",
+        "skeleton/testing/test_provider_contract.py covers neutral delta ordering and default stream finalization",
+        "skeleton/testing/test_provider_contract.py covers async provider transport normalization and admission reconciliation",
+        "skeleton/intelligence/execution_runtime.py projects only admitted minimal ProviderToolDefinition values and consumes neutral provider tool/structured outputs"
+      ],
       "closure_evidence_required": [
         "text-only compatibility tests",
         "structured output success/invalid schema tests",
@@ -508,16 +714,10 @@
         "no provider SDK/native response object escapes provider_runtime"
       ],
       "outstanding_evidence": [
-        "text-only compatibility tests",
-        "structured output success/invalid schema tests",
-        "single/multiple normalized tool-call tests",
-        "unknown/unoffered tool-call rejection",
-        "tool argument size/count bound tests",
-        "finish reason normalization tests",
-        "usage normalization/unknown-field tests",
-        "deadline/cancellation provider tests",
-        "stream delta ordering/finalization tests when streaming enabled",
-        "no provider SDK/native response object escapes provider_runtime"
+        "fresh exact-head execution of provider protocol and provider-boundary regression suites",
+        "fresh exact-head proof that provider-native SDK/response types remain isolated inside provider_runtime",
+        "declared dependency-gap closure",
+        "independent verification before gap closure"
       ],
       "blockers": [
         "dependency must close: gap-provider-surface-convergence",
@@ -544,9 +744,20 @@
       "plane": "reasoning-verification",
       "stage": 3,
       "gap_status": "open",
-      "implementation_state": "planned",
+      "implementation_state": "in_progress",
       "closure_decision": "open",
-      "evidence_present": [],
+      "evidence_present": [
+        "skeleton/contracts/verification.py defines canonical VerificationClaim, EvidenceReference, PostconditionSpec/Observation, VerificationCheck and immutable VerificationReceipt contracts",
+        "skeleton/intelligence/verification_policy.py selects verification level from risk, claim kind and action effect without model confidence",
+        "skeleton/intelligence/verification_runtime.py implements deterministic evidence policy plus bounded provider-backed semantic PASS/REPAIR/QUALIFY/ABSTAIN/BLOCK finalization",
+        "skeleton/retrieval/verification.py validates citation identity, scope and independent evidence origins",
+        "skeleton/skills/verification.py binds postcondition observations to durable ToolExecutionReceipt status and lineage",
+        "skeleton/persistence/execution_repository.py durably persists verification receipts before terminal execution finalization",
+        "skeleton/intelligence/execution_runtime.py materializes canonical VerificationReceipt and stores it before committing terminal AIExecutionResult",
+        "skeleton/testing/test_verification_runtime.py covers scope integrity, model-evidence non-authority, independent-origin policy, contradiction, tool postconditions, observable receipt privacy, semantic-provider routing, fail-closed outage, repair lineage, citation rebinding and bounded repair budgets",
+        "skeleton/testing/test_execution_runtime.py proves canonical verification receipt persistence, fail-closed missing evidence and verification-before-finalization ordering",
+        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head"
+      ],
       "closure_evidence_required": [
         "structural verification tests",
         "claim-to-citation grounding tests",
@@ -560,21 +771,21 @@
         "no hidden reasoning text is required for audit/replay"
       ],
       "outstanding_evidence": [
-        "structural verification tests",
-        "claim-to-citation grounding tests",
-        "unsupported claim becomes qualified/abstain/block per policy",
-        "tool action postcondition verification tests",
-        "model verifier uses canonical provider/routing/admission boundary",
-        "self-confidence alone cannot mark evidence-required claim verified",
-        "repair lineage and max-repair tests",
-        "high-impact block cannot be bypassed by generator retry",
-        "verification receipt binds operation/execution/turn/result and evidence ids",
-        "no hidden reasoning text is required for audit/replay"
+        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
+        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
+        "production action verification consumes durable tool receipts and explicit postcondition observations",
+        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass",
+        "fresh exact-head Cognitive Execution Closure Gate including semantic verification regressions",
+        "declared dependency-gap closure and independent verification"
       ],
       "blockers": [
         "dependency must close: gap-context-compiler-convergence",
         "dependency must close: gap-tool-runtime-convergence",
-        "dependency must close: gap-provider-interaction-protocol"
+        "dependency must close: gap-provider-interaction-protocol",
+        "production execution evidence is materialized as authorized canonical EvidenceReference records before verification",
+        "policy-selected semantic verifier is invoked through the production canonical governed/admitted provider adapter",
+        "production action verification consumes durable tool receipts and explicit postcondition observations",
+        "qualified/abstain/repair/block outcomes are integrated into execution finalization without bypass"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
@@ -595,7 +806,7 @@
       "plane": "orchestration",
       "stage": 4,
       "gap_status": "open",
-      "implementation_state": "architecture-detailed",
+      "implementation_state": "implementation-complete",
       "closure_decision": "open",
       "evidence_present": [
         "canonical execution loop ownership selected",
@@ -605,7 +816,20 @@
         "memory writeback policy defined",
         "verification and finalization protocol defined",
         "usage and observability contract defined",
-        "implementation slices ordered"
+        "implementation slices ordered",
+        "skeleton/contracts/ai_execution.py materializes AIExecutionRequest, AgentTurn, ExecutionCheckpoint, ExecutionFinalizationIntent and AIExecutionResult",
+        "skeleton/persistence/execution_repository.py provides restart-safe execution, turn, checkpoint, staged finalization, result and outbox authority",
+        "skeleton/intelligence/execution_runtime.py owns the bounded canonical model->tool->model loop",
+        "skeleton/intelligence/execution_runtime.py supports waiting_for_user approval suspension and durable resume",
+        "skeleton/intelligence/execution_runtime.py enforces bounded model/tool/deadline/cancellation flow and verification before terminal result",
+        "skeleton/skills/tool_runtime.py plus durable receipt store bind governed tool authority, lineage and idempotency",
+        "skeleton/api/engine_service.py binds operation-level execution admission, approval and metered durable execution/submission writes",
+        "skeleton/api/engine_runtime.py binds engine-owned provider/tool execution to CognitiveExecutionRuntime",
+        "skeleton/testing/test_execution_runtime.py covers prompt/tool loops, approval, lineage, verification, finalization and restart paths",
+        "skeleton/testing/test_execution_repository.py covers durable checkpoint/turn/finalization/recovery contracts",
+        "skeleton/testing/test_engine_execution_service.py and test_engine_execution_coordinator.py cover engine admission/approval/recovery integration",
+        "scripts/verify_cognitive_execution_closure.py independently verifies ownership, mirror parity and dependency graph",
+        ".github/workflows/cognitive-execution-closure.yml binds exact-head runtime and independent verification"
       ],
       "closure_evidence_required": [
         "prompt-only execution reaches completed with one bound result receipt",
@@ -621,13 +845,16 @@
         "golden journey proves one request can retrieve context, call a tool, resume, verify, persist and stream a final answer"
       ],
       "outstanding_evidence": [
-        "materialize contract modules",
-        "bind durable repositories",
-        "extend provider structured/tool output boundary",
-        "implement governed tool runtime integration",
-        "implement execution loop",
-        "implement frontend/backend transport integration",
-        "prove fault and golden-journey evidence"
+        "dependency must close: gap-state-authority-convergence",
+        "dependency must close: gap-governance-registry",
+        "dependency must close: gap-cost-admission",
+        "dependency must close: gap-conversation-state-authority",
+        "dependency must close: gap-memory-durable-authority",
+        "dependency must close: gap-tool-runtime-convergence",
+        "dependency must close: gap-context-compiler-convergence",
+        "dependency must close: gap-provider-interaction-protocol",
+        "dependency must close: gap-verification-evidence-contract",
+        "fresh exact-head Cognitive Execution Closure Gate"
       ],
       "blockers": [
         "dependency must close: gap-state-authority-convergence",
@@ -639,13 +866,7 @@
         "dependency must close: gap-context-compiler-convergence",
         "dependency must close: gap-provider-interaction-protocol",
         "dependency must close: gap-verification-evidence-contract",
-        "materialize contract modules",
-        "bind durable repositories",
-        "extend provider structured/tool output boundary",
-        "implement governed tool runtime integration",
-        "implement execution loop",
-        "implement frontend/backend transport integration",
-        "prove fault and golden-journey evidence"
+        "fresh exact-head Cognitive Execution Closure Gate"
       ],
       "close_when": [
         "all declared dependency gaps are closed",

@@ -220,10 +220,17 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
     assert command.delegated_authority.service_principal == "codedock-backend"
     assert command.compiled_context.context_id == body["context"]["context_id"]
     assert command.compiled_context.context_digest == body["context"]["context_digest"]
-    assert command.compiled_context.history == (
+    assert command.compiled_context.history[:2] == (
         ("user", "prior question"),
         ("assistant", "prior answer"),
     )
+    assert len(command.compiled_context.history) == 3
+    evidence_role, evidence_text = command.compiled_context.history[2]
+    assert evidence_role == "user"
+    assert "BEGIN UNTRUSTED CONTEXT DATA" in evidence_text
+    assert "kind=artifact" in evidence_text
+    assert "ephemeral code evidence" in evidence_text
+    assert "END UNTRUSTED CONTEXT DATA" in evidence_text
     assert "conversation:" + initial.thread_id in command.context_seed_refs
     assert any(
         ref.startswith("ephemeral-context-sha256:")
@@ -239,6 +246,10 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
     assert body["engine_execution_id"] == execution_id
     assert body["engine_verification"] == "verification:engine-test"
     assert body["engine_evidence_refs"] == ["evidence:engine-test"]
+    assert "memory_write_intent" not in (
+        command.execution_request.context_policy
+    )
+    assert "engine:memory" not in command.delegated_authority.scopes
 
 
 def test_configured_engine_outage_never_falls_back_to_backend_provider(
@@ -331,3 +342,228 @@ def test_configured_engine_outage_never_falls_back_to_backend_provider(
     assert committed["legacy"] == 0
     assert body["user_message"]["message_id"] == user_message.message_id
     assert body["thread"]["version"] == 2
+
+
+
+def test_explicit_chat_memory_policy_delegates_verified_memory_and_commits_refs(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="memory-opt-in",
+        content="remember my preference",
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=_now(),
+        version=2,
+        message_sequence=1,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+    captured = {}
+
+    async def append_user_message(*_args, **_kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*_args, **_kwargs):
+        return (user_message,)
+
+    async def commit_assistant_message(thread_id, **kwargs):
+        captured["commit"] = {"thread_id": thread_id, **kwargs}
+        assistant = ConversationMessage(
+            message_id=str(uuid4()),
+            thread_id=initial.thread_id,
+            branch_id=initial.active_branch_id,
+            sequence=2,
+            author_type=ConversationAuthorType.ASSISTANT,
+            created_at=_now(),
+            idempotency_key=kwargs["idempotency_key"],
+            content=kwargs["content"],
+            parent_message_id=user_message.message_id,
+            causal_user_message_id=user_message.message_id,
+            operation_id=kwargs["operation_id"],
+            ai_result_id=kwargs["ai_result_id"],
+            memory_refs=tuple(kwargs.get("memory_refs") or ()),
+        )
+        committed = ConversationThread(
+            thread_id=initial.thread_id,
+            tenant_id=initial.tenant_id,
+            owner_id=initial.owner_id,
+            created_at=initial.created_at,
+            updated_at=_now(),
+            version=3,
+            message_sequence=2,
+            active_branch_id=initial.active_branch_id,
+            state=initial.state,
+            title=initial.title,
+            data_class=initial.data_class,
+        )
+        return committed, assistant
+
+    class FakeEngineClient:
+        config = EngineClientConfig(
+            base_url="http://skeleton:8001",
+            service_principal="codedock-backend",
+            execution_timeout_s=5,
+        )
+
+        async def execute(self, command):
+            captured["command"] = command
+            return SimpleNamespace(
+                operation_id=command.operation.operation_id,
+                execution_id=command.execution_request.execution_id,
+                final_output="You prefer concise answers.",
+                verification="verification:memory-policy",
+                evidence_refs=(),
+                tool_receipts=(),
+                memory_refs=("memory:preference-1",),
+                artifact_refs=(),
+            )
+
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: FakeEngineClient()),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=commit_assistant_message,
+        ),
+    )
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "remember my preference",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "memory-opt-in",
+            "expected_thread_version": 1,
+            "memory_policy": {
+                "persist_verified_response": True,
+                "kind": "preference",
+                "namespace": "assistant",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    command = captured["command"]
+    intent = command.execution_request.context_policy[
+        "memory_write_intent"
+    ]
+    assert intent["subject_id"] == "anonymous"
+    assert intent["namespace"] == "assistant"
+    assert intent["kind"] == "preference"
+    assert intent["content_from"] == "verified_final_output"
+    assert (
+        "user-policy:verified-response-memory"
+        in intent["provenance_refs"]
+    )
+    assert "engine:memory" in command.delegated_authority.scopes
+    assert captured["commit"]["memory_refs"] == (
+        "memory:preference-1",
+    )
+    assert response.json()["assistant_message"]["memory_refs"] == [
+        "memory:preference-1"
+    ]
+
+
+def test_memory_opt_in_without_canonical_engine_fails_closed(
+    route,
+    client,
+    monkeypatch,
+):
+    initial = _thread()
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=initial.thread_id,
+        branch_id=initial.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="memory-no-engine",
+        content="remember this",
+    )
+    after_user = ConversationThread(
+        thread_id=initial.thread_id,
+        tenant_id=initial.tenant_id,
+        owner_id=initial.owner_id,
+        created_at=initial.created_at,
+        updated_at=_now(),
+        version=2,
+        message_sequence=1,
+        active_branch_id=initial.active_branch_id,
+        state=initial.state,
+        title=initial.title,
+        data_class=initial.data_class,
+    )
+
+    async def append_user_message(*_args, **_kwargs):
+        return after_user, user_message
+
+    async def active_transcript(*_args, **_kwargs):
+        return (user_message,)
+
+    async def forbidden_commit(*_args, **_kwargs):
+        raise AssertionError(
+            "memory opt-in must not commit without canonical engine"
+        )
+
+    async def forbidden_provider(*_args, **_kwargs):
+        raise AssertionError(
+            "memory opt-in must not use legacy/local provider path"
+        )
+
+    monkeypatch.setattr(
+        route.EngineClient,
+        "from_env",
+        classmethod(lambda cls, **kwargs: None),
+    )
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            append_user_message=append_user_message,
+            active_transcript=active_transcript,
+            commit_assistant_message=forbidden_commit,
+        ),
+    )
+    monkeypatch.setattr(route, "call_llm", forbidden_provider)
+
+    response = client.post(
+        "/ai/chat",
+        json={
+            "message": "remember this",
+            "thread_id": initial.thread_id,
+            "idempotency_key": "memory-no-engine",
+            "expected_thread_version": 1,
+            "memory_policy": {
+                "persist_verified_response": True,
+                "kind": "semantic",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is False
+    assert body["error_code"] == "memory_persistence_unavailable"
+    assert body["ai_generated"] is False
