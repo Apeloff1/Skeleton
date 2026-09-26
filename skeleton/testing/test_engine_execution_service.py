@@ -1222,4 +1222,3 @@ def test_external_storage_admission_requires_dedicated_scope(tmp_path) -> None:
             storage_bytes=64,
             now=_now(),
         )
-
