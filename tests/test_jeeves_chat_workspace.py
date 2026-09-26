@@ -1304,3 +1304,67 @@ def test_canonical_history_failure_blocks_append_and_generation(
     assert "canonical conversation history is unavailable" in response.text
     assert "canonical history read failed" not in response.text
     assert calls == {"append": 0, "generate": 0}
+
+
+def test_retrieval_outage_leaves_resumable_canonical_turn(
+    route,
+    monkeypatch,
+):
+    canonical = _CanonicalConversationAuthority()
+    legacy = _MemoryChatCollection()
+    calls = {"generate": 0}
+
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
+    monkeypatch.setattr(route, "_chat_col", lambda: legacy)
+    monkeypatch.setattr(route, "_canon_context", lambda _query: None)
+    monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
+    monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
+
+    async def generate(*_args, **_kwargs):
+        calls["generate"] += 1
+        return {
+            "text": "recovered after retrieval",
+            "tier": "free",
+            "model": "test",
+            "engine_execution_id": None,
+            "engine_verification": None,
+            "engine_evidence_refs": [],
+        }
+
+    monkeypatch.setattr(route, "_generate_text", generate)
+    app = FastAPI()
+    app.include_router(route.router)
+    payload = {
+        "session_id": "conversation-retrieval-outage",
+        "client_message_id": "retrieval-outage-1",
+        "message": "ground this turn",
+    }
+
+    with TestClient(app) as transport:
+        first = transport.post("/api/jeeves/chat", json=payload)
+
+        assert first.status_code == 503
+        assert "canonical retrieval is unavailable" in first.text
+        assert calls["generate"] == 0
+
+        thread_id = route._canonical_thread_id(
+            "conversation-retrieval-outage"
+        )
+        messages = canonical.messages[thread_id]
+        assert len(messages) == 1
+        pending = messages[0]
+        assert pending.author_type is ConversationAuthorType.USER
+        assert pending.idempotency_key == "jeeves-user:retrieval-outage-1"
+
+        monkeypatch.setattr(route, "_canon_context", lambda _query: [])
+        second = transport.post("/api/jeeves/chat", json=payload)
+
+    assert second.status_code == 200
+    assert second.json()["reply"] == "recovered after retrieval"
+    assert second.json()["replayed"] is False
+    assert calls["generate"] == 1
+
+    messages = canonical.messages[thread_id]
+    assert len(messages) == 2
+    assert messages[0].message_id == pending.message_id
+    assert messages[1].causal_user_message_id == pending.message_id
