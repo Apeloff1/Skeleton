@@ -483,6 +483,22 @@ async def update_thread_state(
     return {"thread": thread.as_dict()}
 
 
+@router.post("/retention/sweep")
+async def sweep_conversation_retention(
+    user=Depends(require_role("admin")),
+):
+    """Execute one tenant-scoped governed retention sweep."""
+
+    tenant_id, _owner_id = _identity(user)
+    try:
+        result = await conversation_authority.execute_due_retention(
+            tenant_id=tenant_id,
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+    return dict(result)
+
+
 @router.delete("/{thread_id}")
 async def request_conversation_deletion(
     thread_id: str,
