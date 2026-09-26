@@ -811,6 +811,21 @@ class SemanticVerificationRuntime:
                     "semantic-verification-operation:" + claim.claim_id,
                 )
             )
+            semantic_execution_id = str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "semantic-verification-execution:" + claim.claim_id,
+                )
+            )
+            semantic_turn_id = claim.turn_id or str(
+                uuid5(
+                    NAMESPACE_URL,
+                    "semantic-verification-turn:"
+                    + claim.claim_id
+                    + ":"
+                    + str(round_index),
+                )
+            )
             request = ProviderRequest(
                 instructions=_SEMANTIC_INSTRUCTIONS,
                 prompt=_semantic_prompt(
@@ -823,7 +838,17 @@ class SemanticVerificationRuntime:
                 purpose="semantic-verification",
                 tenant_id=claim.tenant_id,
                 operation_id=operation_id,
-                turn_id=claim.turn_id,
+                admission_operation_id=str(
+                    uuid5(
+                        NAMESPACE_URL,
+                        "semantic-verification-admission:"
+                        + claim.claim_id
+                        + ":"
+                        + str(round_index),
+                    )
+                ),
+                execution_id=semantic_execution_id,
+                turn_id=semantic_turn_id,
                 structured_output_schema=_SEMANTIC_SCHEMA,
                 tool_choice="none",
             )
