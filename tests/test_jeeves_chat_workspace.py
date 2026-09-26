@@ -43,14 +43,19 @@ def client(route, monkeypatch):
     monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
     monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
 
-    async def generate(*args):
-        return {"text": "A grounded answer", "tier": "local", "model": "test-extractive"}
+    async def generate(*args, **kwargs):
+        del args, kwargs
+        return {
+            "text": "A grounded answer",
+            "tier": "local",
+            "model": "test-extractive",
+        }
 
-    async def insert(turn):
-        return None
-
+    legacy = _MemoryChatCollection()
+    canonical = _CanonicalConversationAuthority()
     monkeypatch.setattr(route, "_generate_text", generate)
-    monkeypatch.setattr(route, "_chat_col", lambda: SimpleNamespace(insert_one=insert))
+    monkeypatch.setattr(route, "_chat_col", lambda: legacy)
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
     app = FastAPI()
     app.include_router(route.router)
     with TestClient(app) as transport:
@@ -101,7 +106,11 @@ def test_decoded_attachment_size_boundary(route):
         route.ChatReq(message="read", pdf_base64=oversized)
 
 
-def test_context_is_used_for_retrieval_and_generation(client, route, monkeypatch):
+def test_client_history_is_ignored_but_project_context_is_used(
+    client,
+    route,
+    monkeypatch,
+):
     captured = {}
 
     def recall(query):
@@ -121,22 +130,28 @@ def test_context_is_used_for_retrieval_and_generation(client, route, monkeypatch
                     {"role": "assistant", "content": "Use a character body."}],
     })
     assert response.status_code == 200
-    assert response.json()["history_messages_used"] == 2
+    assert response.json()["history_messages_used"] == 0
+    assert response.json()["history_source"] == "canonical"
     assert "Godot 2D platformer" in captured["retrieval"]
-    assert "move the player" in captured["retrieval"]
-    assert '"role": "assistant"' in captured["prompt"]
+    assert "move the player" not in captured["retrieval"]
+    assert '"role": "assistant"' not in captured["prompt"]
     assert '"current_question": "What about collisions?"' in captured["prompt"]
     assert captured["query"] == "What about collisions?"
 
 
-def test_database_failure_is_disclosed_without_losing_response(client, route, monkeypatch):
-    async def unavailable(turn):
-        raise OSError("database down")
+def test_retired_legacy_store_failure_does_not_block_canonical_chat(
+    client,
+    route,
+    monkeypatch,
+):
+    def unavailable():
+        raise OSError("legacy database down")
 
-    monkeypatch.setattr(route, "_chat_col", lambda: SimpleNamespace(insert_one=unavailable))
+    monkeypatch.setattr(route, "_chat_col", unavailable)
     response = client.post("/api/jeeves/chat", json={"message": "hello"})
     assert response.status_code == 200
-    assert response.json()["persisted"] is False
+    assert response.json()["persisted"] is True
+    assert response.json()["history_source"] == "canonical"
     assert response.json()["reply"]
     assert "database down" not in response.text
 
@@ -146,32 +161,51 @@ def test_history_limit_is_validated(client, limit):
     assert client.get(f"/api/jeeves/chat/session?limit={limit}").status_code == 422
 
 
-def test_history_returns_latest_window_in_chronological_order(client, route, monkeypatch):
-    rows = [{"ts": i, "role_user": str(i)} for i in range(10)]
-
-    class Cursor:
-        def sort(self, key, order):
-            assert (key, order) == ("ts", -1)
-            return self
-
-        async def to_list(self, limit):
-            return list(reversed(rows))[:limit]
-
-    monkeypatch.setattr(route, "_chat_col", lambda: SimpleNamespace(find=lambda *args: Cursor()))
+def test_history_returns_latest_canonical_window_in_order(
+    client,
+    route,
+    monkeypatch,
+):
+    rows = [
+        {
+            "session_id": "session",
+            "client_message_id": f"legacy-{i}",
+            "role_user": f"question-{i}",
+            "role_jeeves": f"answer-{i}",
+            "status": "complete",
+            "ts": float(i),
+        }
+        for i in range(10)
+    ]
+    monkeypatch.setattr(
+        route,
+        "_chat_col",
+        lambda: _MemoryChatCollection(rows),
+    )
     body = client.get("/api/jeeves/chat/session?limit=3").json()
-    assert [turn["ts"] for turn in body["turns"]] == [7, 8, 9]
+    assert [turn["role_user"] for turn in body["turns"]] == [
+        "question-7",
+        "question-8",
+        "question-9",
+    ]
     assert body["available"] is True
+    assert body["history_source"] == "canonical"
 
 
-def test_history_unavailability_is_distinct_from_empty_history(client, route, monkeypatch):
+def test_retired_legacy_history_unavailability_keeps_empty_canonical_history_available(
+    client,
+    route,
+    monkeypatch,
+):
     def fail():
-        raise OSError("secret connection details")
+        raise OSError("secret legacy connection details")
 
     monkeypatch.setattr(route, "_chat_col", fail)
     response = client.get("/api/jeeves/chat/session")
-    assert response.json()["available"] is False
-    assert response.json()["ok"] is False
+    assert response.json()["available"] is True
+    assert response.json()["ok"] is True
     assert response.json()["turns"] == []
+    assert response.json()["history_source"] == "canonical"
     assert "secret" not in response.text
 
 
@@ -321,8 +355,17 @@ class _MemoryChatCollection:
         return SimpleNamespace(matched_count=0)
 
 
-def _chat_client(route, monkeypatch, collection, generate):
+def _chat_client(
+    route,
+    monkeypatch,
+    collection,
+    generate,
+    *,
+    canonical=None,
+):
+    canonical = canonical or _CanonicalConversationAuthority()
     monkeypatch.setattr(route, "_chat_col", lambda: collection)
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
     monkeypatch.setattr(route, "_canon_context", lambda query: [])
     monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
     monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
