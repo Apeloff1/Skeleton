@@ -27,6 +27,7 @@ from uuid import uuid4
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
 from core.exec_guard import code_execution_enabled, execution_disabled_response, execution_disabled_message
+from core.route_privacy import require_route_tool_transfer
 from skeleton.skills import (
     AsyncToolRuntime,
     SQLiteToolReceiptStore,
@@ -42,6 +43,7 @@ from skeleton.skills import (
 )
 from skeleton.skills.tool_contract import validate_tool_arguments
 from skeleton.vault.data_lifecycle import DataLifecycleRegistry, LifecycleState
+from skeleton.vault.data_governance import DataGovernanceDenied
 from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.skills.tool_adapters import (
     ArtifactAdapterPolicy,
@@ -935,6 +937,23 @@ async def invoke_canonical(
             "ok": False,
             "error": f"unknown tool: {tool}",
             "available": list(TOOLS.keys()),
+        }
+    manifest = _TOOL_MANIFESTS[tool]
+    try:
+        require_route_tool_transfer(
+            tool_id=tool,
+            data_policy=manifest.data_policy,
+            network_policy=manifest.network_policy,
+            data_class=data_class,
+            purpose=transfer_purpose,
+            tenant_id=tenant_id,
+            source="backend.tool_registry",
+        )
+    except DataGovernanceDenied:
+        return {
+            "ok": False,
+            "error": "route_privacy_denied",
+            "tool": tool,
         }
     await _ensure_canonical_runtime()
     request = ToolExecutionRequest(
