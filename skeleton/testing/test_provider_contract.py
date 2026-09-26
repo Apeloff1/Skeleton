@@ -11,6 +11,8 @@ import pytest
 
 from skeleton.automation.free_model import FreeModelClient, ModelError, redact_secrets
 from skeleton.jeeves.providers import AnthropicProvider, OpenAIProvider
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.provider_contract import (
     FinishReason,
     ProviderProtocolError,
@@ -985,3 +987,68 @@ async def test_async_speech_rejects_non_numeric_speed_before_io() -> None:
 
     assert client.audio.speech.calls == []
     assert adapter.admission_runtime.snapshot()["active_operations"] == ()
+
+@pytest.mark.asyncio
+async def test_provider_turn_admission_identity_allows_durable_multi_turn_quota() -> None:
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="window-provider-turns",
+            max_operations=4,
+            max_input_tokens=100_000,
+            max_output_tokens=100_000,
+            max_cost_usd=100.0,
+            max_tool_calls=100,
+            max_artifact_bytes=100 * 1024 * 1024,
+            max_storage_bytes=100 * 1024 * 1024,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    client = _AsyncClient()
+    adapter = OpenAIProviderAdapter(
+        api_key="test-runtime-key",
+        model="test-model",
+        max_retries=0,
+        client=client,
+        admission_runtime=runtime,
+    )
+
+    parent_operation = "operation-parent"
+    first = await adapter.generate(
+        ProviderRequest(
+            instructions="answer",
+            prompt="turn one",
+            tenant_id="tenant-a",
+            operation_id=parent_operation,
+            admission_operation_id="provider-turn-one",
+        )
+    )
+    second = await adapter.generate(
+        ProviderRequest(
+            instructions="answer",
+            prompt="turn two",
+            tenant_id="tenant-a",
+            operation_id=parent_operation,
+            admission_operation_id="provider-turn-two",
+        )
+    )
+
+    assert first.text == "async answer"
+    assert second.text == "async answer"
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["active_reservations"] == 0
+    assert snapshot["completions"] == 2
+    assert snapshot["committed"]["operations"] == 2
+    assert runtime.snapshot()["active_operations"] == ()
+
+
+def test_provider_admission_identity_falls_back_to_parent_operation() -> None:
+    request = ProviderRequest(
+        instructions="answer",
+        prompt="legacy",
+        operation_id="legacy-operation",
+    )
+    assert request.admission_operation_id is None
+
