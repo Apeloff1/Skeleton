@@ -129,6 +129,10 @@ class ExecutionVerificationDecision:
             raise CognitiveExecutionError(
                 "passed verification requires publish disposition"
             )
+        if not self.passed and disposition == "publish":
+            raise CognitiveExecutionError(
+                "publish disposition requires passed verification"
+            )
         final_output = self.final_output
         if final_output is not None:
             if not isinstance(final_output, str) or not final_output.strip():
@@ -2563,32 +2567,91 @@ class CognitiveExecutionRuntime:
             now=now,
         )
         verification_ref = _verification_ref(verification)
-        if not verification.passed:
+        disposition = verification.disposition or "block"
+        final_output = verification.final_output or candidate.strip()
+
+        if disposition == "block":
             return self._finalize_non_success(
                 execution,
                 payload,
                 status="failed",
-                error_code="verification_failed",
+                error_code="verification_blocked",
                 now=now,
                 verification=verification,
+            )
+        if disposition == "abstain":
+            return self._finalize_non_success(
+                execution,
+                payload,
+                status="degraded",
+                error_code="verification_abstained",
+                now=now,
+                verification=verification,
+            )
+        if disposition == "qualified":
+            terminal_event = (
+                "stream-terminal:"
+                + execution.execution_id
+                + ":qualified:"
+                + hashlib.sha256(
+                    final_output.encode("utf-8")
+                ).hexdigest()[:24]
+            )
+            result = AIExecutionResult(
+                operation_id=execution.operation_id,
+                execution_id=execution.execution_id,
+                status="degraded",
+                final_output=final_output,
+                verification=verification_ref,
+                verification_receipt=verification.as_dict(),
+                evidence_refs=verification.evidence_refs,
+                provider_receipts=tuple(
+                    str(item)
+                    for item in payload.get("provider_receipts", [])
+                ),
+                tool_receipts=tuple(
+                    str(item)
+                    for item in payload.get("tool_receipts", [])
+                ),
+                usage={
+                    "model_turns": int(payload.get("model_turns", 0)),
+                    "tool_calls": int(payload.get("tool_calls", 0)),
+                    "provider_usage": list(payload.get("usage_events", [])),
+                    "verification_disposition": "qualified",
+                },
+                stream_terminal_event=terminal_event,
+                completed_at=(
+                    datetime.now(timezone.utc)
+                    if now is None
+                    else now.astimezone(timezone.utc)
+                ),
+            )
+            return self._commit_terminal_result(
+                execution,
+                result,
+                now=now,
+            )
+        if disposition != "publish" or not verification.passed:
+            raise CognitiveExecutionError(
+                "verification disposition/passed invariant violated"
             )
 
         bindings = await self._finalization_bindings(
             execution,
-            candidate,
+            final_output,
             payload,
         )
         terminal_event = (
             "stream-terminal:"
             + execution.execution_id
             + ":"
-            + hashlib.sha256(candidate.encode("utf-8")).hexdigest()[:24]
+            + hashlib.sha256(final_output.encode("utf-8")).hexdigest()[:24]
         )
         result = AIExecutionResult(
             operation_id=execution.operation_id,
             execution_id=execution.execution_id,
             status="completed",
-            final_output=candidate.strip(),
+            final_output=final_output,
             verification=verification_ref,
             verification_receipt=verification.as_dict(),
             evidence_refs=verification.evidence_refs,
@@ -2606,6 +2669,7 @@ class CognitiveExecutionRuntime:
                 "model_turns": int(payload.get("model_turns", 0)),
                 "tool_calls": int(payload.get("tool_calls", 0)),
                 "provider_usage": list(payload.get("usage_events", [])),
+                "verification_disposition": "publish",
             },
             stream_terminal_event=terminal_event,
             completed_at=(
