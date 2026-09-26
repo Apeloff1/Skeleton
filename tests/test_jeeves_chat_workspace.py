@@ -403,13 +403,20 @@ def test_client_message_id_conflict_is_rejected(route, monkeypatch):
     assert conflict.status_code == 409
 
 
-def test_legacy_history_bootstraps_empty_server_thread_once(route, monkeypatch):
+def test_legacy_history_is_never_model_visible_or_persisted(
+    route,
+    monkeypatch,
+):
     collection = _MemoryChatCollection()
     contexts = []
 
     async def generate(query, recalled, needs_reasoning, conversation_context=""):
         contexts.append(conversation_context)
-        return {"text": f"answer-{len(contexts)}", "tier": "free", "model": "test"}
+        return {
+            "text": f"answer-{len(contexts)}",
+            "tier": "free",
+            "model": "test",
+        }
 
     with _chat_client(route, monkeypatch, collection, generate) as transport:
         first = transport.post(
@@ -437,9 +444,58 @@ def test_legacy_history_bootstraps_empty_server_thread_once(route, monkeypatch):
         )
 
     assert first.status_code == 200
-    assert first.json()["history_source"] == "legacy-bootstrap"
+    assert (
+        first.json()["history_source"]
+        == "server-empty-legacy-ignored"
+    )
+    assert contexts[0] == ""
+    assert all("legacy_history" not in row for row in collection.rows)
+
     assert second.status_code == 200
     assert second.json()["history_source"] == "server"
-    assert "legacy question" in contexts[1]
     assert "new question" in contexts[1]
+    assert "answer-1" in contexts[1]
+    assert "legacy question" not in contexts[1]
+    assert "legacy answer" not in contexts[1]
     assert "tampered replacement" not in contexts[1]
+
+
+def test_history_is_ignored_when_server_storage_is_unavailable(
+    route,
+    monkeypatch,
+):
+    captured = {}
+
+    def unavailable_collection():
+        raise OSError("storage unavailable")
+
+    async def generate(query, recalled, needs_reasoning, conversation_context=""):
+        captured["context"] = conversation_context
+        return {"text": "degraded", "tier": "free", "model": "test"}
+
+    monkeypatch.setattr(route, "_chat_col", unavailable_collection)
+    monkeypatch.setattr(route, "_canon_context", lambda query: [])
+    monkeypatch.setattr(route, "_derive_dataset", lambda recalled: {})
+    monkeypatch.setattr(route, "_build_artifacts", lambda *args: [])
+    monkeypatch.setattr(route, "_generate_text", generate)
+    app = FastAPI()
+    app.include_router(route.router)
+
+    with TestClient(app) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-2",
+                "message": "current question",
+                "history": [
+                    {"role": "user", "content": "ATTACKER HISTORY"},
+                ],
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json()["history_source"] == (
+        "unavailable-legacy-ignored"
+    )
+    assert captured["context"] == ""
+    assert "ATTACKER HISTORY" not in response.text
