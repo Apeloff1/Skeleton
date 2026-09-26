@@ -120,12 +120,13 @@
         "skeleton/testing/test_engine_execution_service.py and test_execution_runtime.py prove durable write metering",
         "skeleton/memory/writeback.py meters governed SQLite memory commits against source-operation storage admission",
         "skeleton/memory/writeback.py AsyncGovernedMemoryWriter extends admitted governed persistence to MongoMemoryRepository",
-        "skeleton/testing/test_memory_writeback.py and test_mongo_memory_repository.py prove memory admission fail-closed and replay behavior"
+        "skeleton/testing/test_memory_writeback.py and test_mongo_memory_repository.py prove memory admission fail-closed and replay behavior",
+        "backend/core/conversations.py binds production Mongo conversation writes to engine storage admission",
+        "backend/tests/test_conversation_storage_admission.py proves fail-closed/replay-stable conversation admission"
       ],
       "remaining": [
         "collect exact-head and independent closure evidence",
         "bind admitted AsyncGovernedMemoryWriter to the live Mongo memory owner",
-        "introduce a shared cross-process admission contract for authoritative conversation persistence",
         "admit material retrieval/index rebuild work before allocation"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
