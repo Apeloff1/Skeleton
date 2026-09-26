@@ -85,6 +85,11 @@ def _valid_repo(tmp_path: Path) -> Path:
         'CANONICAL_DELEGATION = "skeleton/provider_runtime.py"\n',
         encoding="utf-8",
     )
+    mirror = root / "skeleton" / "ai" / "runtime"
+    mirror.mkdir(parents=True, exist_ok=True)
+    (mirror / "provider_runtime.py").write_bytes(
+        (root / "skeleton" / "provider_runtime.py").read_bytes()
+    )
     _write_contract(root)
     return root
 
@@ -101,7 +106,7 @@ def test_independent_verifier_accepts_declared_provider_ownership(
     assert receipt["valid"] is True
     assert receipt["errors"] == []
     assert receipt["head_sha"] == "abc123"
-    assert receipt["scanned_python_files"] == 2
+    assert receipt["scanned_python_files"] == 3
     assert receipt["declared_surface_digest"]
     edges = {
         row["path"]: set(row["edge_classes"])
@@ -212,3 +217,68 @@ def test_independent_verifier_rejects_drifted_ai_provider_mirror(
         "canonical provider runtime AI mirror drifted from source" in error
         for error in receipt["errors"]
     )
+
+def test_independent_verifier_rejects_missing_canonical_provider_source(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    (root / "skeleton" / "provider_runtime.py").unlink()
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "canonical provider runtime source is missing" in receipt["errors"]
+    assert any(
+        "declared provider owner is missing: skeleton/provider_runtime.py"
+        in error
+        for error in receipt["errors"]
+    )
+
+
+def test_independent_verifier_rejects_missing_canonical_provider_mirror(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    (
+        root
+        / "skeleton"
+        / "ai"
+        / "runtime"
+        / "provider_runtime.py"
+    ).unlink()
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert "canonical provider runtime AI mirror is missing" in receipt["errors"]
+
+
+def test_independent_verifier_rejects_declared_edge_loss(
+    tmp_path: Path,
+) -> None:
+    root = _valid_repo(tmp_path)
+    source = root / "skeleton" / "provider_runtime.py"
+    source.write_text(
+        "\n".join(
+            [
+                "import os",
+                'key = os.getenv("OPENAI_API_KEY")',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    mirror = root / "skeleton" / "ai" / "runtime" / "provider_runtime.py"
+    mirror.write_bytes(source.read_bytes())
+
+    receipt = verify_repository(root)
+
+    assert receipt["valid"] is False
+    assert any(
+        "skeleton/provider_runtime.py lost declared provider edges: "
+        in error
+        and "network_transport" in error
+        and "sdk_client" in error
+        for error in receipt["errors"]
+    )
+
