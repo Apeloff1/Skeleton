@@ -67,6 +67,7 @@ jobs:
           "pymongo>=4.10,<5"
           "pydantic==2.13.5"
           "pydantic-settings==2.15.0"
+          "fastapi==0.136.1"
 
       - name: Run pure recovery and backup contract tests
         env:
