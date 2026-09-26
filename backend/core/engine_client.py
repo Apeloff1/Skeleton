@@ -1403,6 +1403,30 @@ class EngineClient:
             trace_id=trace_id,
         )
 
+    async def execute_governance_deletion_engine_targets(
+        self,
+        *,
+        tenant_id: str,
+        plan_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        plan = quote(
+            _text(plan_id, "plan_id", maximum=512),
+            safe="",
+        )
+        return await self._request(
+            "POST",
+            f"/governance/deletions/{plan}/execute-engine-targets",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
     async def acknowledge_governance_deletion(
         self,
         *,
