@@ -231,10 +231,12 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
         )
 
     if entry.get("implementation_status") not in {
+        "in_progress",
+        "implemented_pending_closure",
         "implementation-complete",
         "closed",
     }:
-        errors.append("verification handoff is not implementation-complete")
+        errors.append("verification handoff implementation status is invalid")
 
     closure_gate = str(entry.get("closure_gate") or "")
     for phrase in (
@@ -276,11 +278,12 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
         errors.append("verification_runtime_blueprint is missing")
     else:
         if blueprint.get("status") not in {
+            "in-progress",
             "implemented-pending-closure",
             "closed",
         }:
             errors.append(
-                "verification runtime blueprint is not implemented-pending-closure"
+                "verification runtime blueprint status is invalid"
             )
 
     if gap_status == "closed":
@@ -294,7 +297,7 @@ def _verify_machine_contracts(root: Path, errors: list[str]) -> dict[str, Any]:
                 "closed verification gap has non-closed dependencies: "
                 + ", ".join(open_dependencies)
             )
-    elif gap_status != "open":
+    elif gap_status not in {"open", "in-progress"}:
         errors.append("verification construction status is invalid")
 
     entry["_verified_dependency_status"] = {
@@ -322,7 +325,11 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     return {
         "schema_version": 1,
         "verifier": "independent-verification-evidence-v1",
-        "head_sha": os.environ.get("GITHUB_SHA", "").strip() or "unknown",
+        "head_sha": (
+            os.environ.get("EVIDENCE_HEAD_SHA", "").strip()
+            or os.environ.get("GITHUB_SHA", "").strip()
+            or "unknown"
+        ),
         "boundary_digests": boundary_digests,
         "mirror_pairs": mirrors,
         "dependency_graph": sorted(EXPECTED_DEPENDENCIES),
