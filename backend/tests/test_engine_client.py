@@ -1336,4 +1336,3 @@ async def test_storage_admission_client_rejects_invalid_size_before_io() -> None
         )
 
     assert called is False
-
