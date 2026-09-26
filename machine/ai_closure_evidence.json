@@ -131,7 +131,7 @@
       "plane": "governance",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_closure",
       "closure_decision": "open",
       "evidence_present": [
         "baseline data class registry",
@@ -187,7 +187,8 @@
         "backend/core/gameforge_artifact_builder.py canonical governed production artifact write path",
         "backend/routes/gameforge_build.py tenant-scoped governed artifact download/list/build and bounded retention",
         "backend/tests/test_gameforge_artifact_builder.py governed artifact production regressions",
-        "skeleton/testing/test_governance_runtime_binding.py physical artifact retention expiry through production lifecycle adapters"
+        "skeleton/testing/test_governance_runtime_binding.py physical artifact retention expiry through production lifecycle adapters",
+        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes"
       ],
       "closure_evidence_required": [
         "provider transfer denial test",
@@ -196,15 +197,14 @@
         "retention expiry test"
       ],
       "outstanding_evidence": [
-        "exact-head Stage-0/App Assembly verification and independent signoff",
-        "fresh exact-head governance audit/conversation lifecycle validation",
-        "fresh exact-head validation of production governed artifact lifecycle composition",
-        "fresh exact-head governed artifact lifecycle validation",
-        "fresh exact-head route privacy middleware/provider/tool regression validation",
-        "fresh exact-head GameForge governed artifact retention validation"
+        "fresh exact-head Governance Closure Gate",
+        "fresh exact-head Stage-0/App Assembly governance verification",
+        "independent governance closure verification"
       ],
       "blockers": [
-        "exact-head Stage-0/App Assembly verification and independent signoff"
+        "fresh exact-head Governance Closure Gate",
+        "fresh exact-head Stage-0/App Assembly governance verification",
+        "independent governance closure verification"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
