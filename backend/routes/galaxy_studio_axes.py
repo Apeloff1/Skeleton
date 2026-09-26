@@ -6,6 +6,7 @@ ONLY the options that pertain to that spec, with advanced options dominating.
 Every selection resolves to concrete forge directives (the actual change).
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 from fastapi import APIRouter
@@ -83,8 +84,14 @@ def flavor(req: FlavorReq):
                   f"{g}. Be specific and production-grounded; no fluff.")
 
         async def _run():
-            chat = EngineChat(session_id=f"axis-{opt['id']}",
-                           system_message="You are a senior technical art director.")
+            chat = EngineChat(
+                session_id=f"axis-{opt['id']}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.galaxy-studio.axes-flavor",
+                    version="1",
+                    instructions="You are a senior technical art director.",
+                ),
+            )
             chat.with_model("anthropic", "claude-sonnet-4-5-20250929")
             return await chat.send_message(UserMessage(text=prompt))
         base["flavor"] = (asyncio.run(_run()) or "").strip()
