@@ -66,6 +66,7 @@ jobs:
           "httpx==0.28.1"
           "PyJWT==2.14.0"
           "python-dotenv==1.2.3"
+          "bcrypt==4.3.0"
 
       - name: Run canonical backend conversation authority contracts
         run: >-
