@@ -17,6 +17,7 @@
 ║  exact missing structural checks (so the UI can prompt a regenerate).      ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
+from skeleton.context.instruction_policy import InstructionPolicy
 import os
 import threading
 import base64
@@ -189,8 +190,14 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
         try:
-            chat = EngineChat(session_id=sid,
-                           system_message=system).with_model(provider, model)
+            chat = EngineChat(
+                session_id=sid,
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.playable.generation",
+                    version="1",
+                    instructions=system,
+                ),
+            ).with_model(provider, model)
             resp = await chat.send_message(UserMessage(text=prompt))
             content = resp.content if hasattr(resp, "content") else str(resp)
             return {"content": content, "model": model, "provider": provider,
