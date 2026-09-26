@@ -323,14 +323,14 @@ async def auto_quiz_from_chapter(payload: dict = Body(...)):
     excerpt = body_md[:6000]
 
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from core.engine_chat import EngineChat, UserMessage
         from .dna_translator_core import translate as translate_dna
         from .dna_domains import ACADEMY_DOMAIN
         import os, uuid, json as _json
         dna_block = translate_dna(mastery_dna, ACADEMY_DOMAIN)
         dna_injection = f"\n\n{dna_block}" if dna_block else ""
         chat = (
-            LlmChat(session_id=f"quiz-{uuid.uuid4().hex[:8]}",
+            EngineChat(session_id=f"quiz-{uuid.uuid4().hex[:8]}",
                     system_message=(
                         "You are an expert technical examiner. Given a chapter of educational text, "
                         "produce a JSON array of 5 multiple-choice questions that test comprehension "
