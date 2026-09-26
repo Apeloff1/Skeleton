@@ -22,6 +22,7 @@ from skeleton.persistence.memory_repository import (
     MemoryNotFound,
     SQLiteMemoryRepository,
 )
+from skeleton.retrieval.governance import GovernedRetrievalIndex
 from skeleton.vault.governance_audit import GovernanceAuditTimeline
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
@@ -240,6 +241,56 @@ class SQLiteMemoryLifecycleAdapter:
         except MemoryNotFound:
             return None
         return current.as_dict()
+
+
+class GovernedRetrievalLifecycleAdapter:
+    """Physical delete/export adapter for canonical governed retrieval."""
+
+    def __init__(self, retrieval: GovernedRetrievalIndex) -> None:
+        if not isinstance(retrieval, GovernedRetrievalIndex):
+            raise TypeError(
+                "retrieval must be GovernedRetrievalIndex"
+            )
+        self.retrieval = retrieval
+
+    def _identity(
+        self,
+        record_id: object,
+        tenant_id: object,
+        source_ref: object,
+    ) -> tuple[str, str]:
+        tenant, doc_id = self.retrieval.parse_source_ref(source_ref)
+        if tenant != str(tenant_id):
+            raise LifecycleAdapterError(
+                "retrieval lifecycle tenant mismatch"
+            )
+        expected = self.retrieval.lifecycle_record_id(tenant, doc_id)
+        if expected != str(record_id):
+            raise LifecycleAdapterError(
+                "retrieval lifecycle identity mismatch"
+            )
+        return tenant, doc_id
+
+    async def delete(self, action: DeletionAction) -> None:
+        tenant, doc_id = self._identity(
+            action.record_id,
+            action.tenant_id,
+            action.source_ref,
+        )
+        await _await_if_needed(
+            self.retrieval.remove(tenant, doc_id)
+        )
+
+    async def export(
+        self,
+        record: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        tenant, doc_id = self._identity(
+            record.get("record_id"),
+            record.get("tenant_id"),
+            record.get("source_ref"),
+        )
+        return self.retrieval.export_record(tenant, doc_id)
 
 
 class RetrievalIndexDeletionAdapter:
@@ -484,6 +535,7 @@ __all__ = [
     "DeletionExecutionResult",
     "ExportAdapter",
     "GovernedExport",
+    "GovernedRetrievalLifecycleAdapter",
     "LifecycleAdapterError",
     "LifecycleAdapterMissing",
     "LifecycleAdapterRegistry",
