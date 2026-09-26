@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 from uuid import NAMESPACE_URL, uuid5
 
+from skeleton.context.compaction import (
+    ContextCompactionError,
+    compact_context_segment,
+)
 from skeleton.contracts.context import (
     ContextBudget,
     ContextEnvelope,
@@ -126,6 +130,7 @@ class ContextCompiler:
         budget: ContextBudget,
         segments: Iterable[ContextSegment],
         tools_enabled: bool = False,
+        compaction_max_tokens: int | None = None,
         compiled_at: datetime | None = None,
     ) -> ContextEnvelope:
         if isinstance(segments, (str, bytes)):
@@ -137,6 +142,14 @@ class ContextCompiler:
             raise ContextCompilationError("context segment ids must be unique")
         if not isinstance(tools_enabled, bool):
             raise TypeError("tools_enabled must be boolean")
+        if compaction_max_tokens is not None and (
+            isinstance(compaction_max_tokens, bool)
+            or not isinstance(compaction_max_tokens, int)
+            or compaction_max_tokens < 1
+        ):
+            raise ValueError(
+                "compaction_max_tokens must be a positive integer"
+            )
 
         source_snapshot = tuple(
             sorted(
@@ -176,6 +189,25 @@ class ContextCompiler:
                     raise ContextCompilationError(
                         f"required control segment exceeds token limit: {segment.segment_id}"
                     )
+                if compaction_max_tokens is not None:
+                    target = min(limit, compaction_max_tokens)
+                    try:
+                        compacted = compact_context_segment(
+                            segment,
+                            max_tokens=target,
+                        )
+                    except ContextCompactionError:
+                        compacted = None
+                    if (
+                        compacted is not None
+                        and compacted is not segment
+                        and compacted.token_estimate <= limit
+                    ):
+                        omitted[segment.segment_id] = (
+                            "compacted_to:" + compacted.segment_id
+                        )
+                        admitted.append(compacted)
+                        continue
                 omitted[segment.segment_id] = "segment_limit_exceeded"
                 continue
             admitted.append(segment)
