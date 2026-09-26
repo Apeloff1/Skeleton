@@ -159,6 +159,7 @@ def register_artifact(
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
     built_at: float | int | None = None,
     canonical_record: Any | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any]:
     if canonical_record is None:
         if path is None:
@@ -194,6 +195,7 @@ def register_artifact(
     if source_ref is not None:
         record["source_ref"] = source_ref
         record["governance_record_id"] = governance_record_id
+        record["tenant_id"] = str(tenant_id or "").strip()
     try:
         database()["gameforge_builds"].update_one(
             {"build_id": build_id},
@@ -383,6 +385,7 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
         artifacts_root=artifacts_root,
         built_at=timestamp,
         canonical_record=canonical_record,
+        tenant_id=tenant_id,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
@@ -476,6 +479,7 @@ def build_source_artifact(
         artifacts_root=artifacts_root,
         built_at=timestamp,
         canonical_record=canonical_record,
+        tenant_id=tenant_id,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
