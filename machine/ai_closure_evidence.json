@@ -80,7 +80,11 @@
         "skeleton/intelligence/execution_runtime.py meters checkpoint, turn, finalization-intent and terminal-result payloads with deterministic write identities",
         "skeleton/api/engine_runtime.py binds cognitive storage metering to the same operation-level admission lease",
         "skeleton/testing/test_engine_execution_service.py proves durable engine write metering and replay stability",
-        "skeleton/testing/test_execution_runtime.py proves cognitive checkpoint/turn/result storage metering"
+        "skeleton/testing/test_execution_runtime.py proves cognitive checkpoint/turn/result storage metering",
+        "skeleton/memory/writeback.py GovernedMemoryWriter meters canonical SQLite memory writes before commit when admission is bound",
+        "skeleton/memory/writeback.py AsyncGovernedMemoryWriter applies the same policy/admission/governance/tombstone contract to MongoMemoryRepository",
+        "skeleton/testing/test_memory_writeback.py proves admitted SQLite memory persistence, no-lease denial and replay-stable metering",
+        "skeleton/testing/test_mongo_memory_repository.py proves admitted Mongo memory persistence, replay stability, no-lease denial and fail-closed governance tombstoning"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -91,11 +95,14 @@
       "outstanding_evidence": [
         "admission at every expensive non-provider action",
         "fresh exact-head validation of metered durable engine/cognitive storage writes",
-        "admission at remaining expensive conversation/retrieval/memory persistence boundaries"
+        "bind AsyncGovernedMemoryWriter into the live production Mongo memory construction path",
+        "admission at authoritative conversation persistence boundaries",
+        "admission at expensive derived retrieval/index rebuild boundaries where allocation is material"
       ],
       "blockers": [
         "admission at every expensive non-provider action",
-        "admission at remaining expensive conversation/retrieval/memory persistence boundaries"
+        "live production Mongo memory writer binding still needs the admitted AsyncGovernedMemoryWriter",
+        "authoritative conversation persistence has no shared cross-process admission lease"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
