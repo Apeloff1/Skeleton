@@ -36,7 +36,7 @@
       "depends_on": [],
       "work_package": "WP-P0-COST-ADMISSION",
       "blueprint": "cost_admission_blueprint",
-      "implementation_status": "in_progress",
+      "implementation_status": "implemented_pending_verification",
       "objective": "Reject or reroute unaffordable work before expensive allocation.",
       "target_files": {
         "contracts": [
@@ -128,10 +128,13 @@
         "pyproject.toml declares the production Mongo driver dependencies",
         "skeleton/memory/projection.py admits material derived rebuild work before projection mutation",
         "skeleton/testing/test_memory_projection.py proves fail-closed rebuild admission",
-        "skeleton/api/server.py binds admitted projection coordinator in production composition"
+        "skeleton/api/server.py binds admitted projection coordinator in production composition",
+        ".github/workflows/cost-admission-closure.yml exact-head closure gate",
+        "scripts/verify_cost_admission_closure.py independently verifies admission boundary tokens, durable schema and AI mirror parity",
+        "closure gate covers quota, shared pressure, engine persistence, tool/provider, memory/projection and conversation admission"
       ],
       "remaining": [
-        "collect exact-head and independent closure evidence"
+        "collect fresh exact-head Cost Admission Closure Gate evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
