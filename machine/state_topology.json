@@ -371,7 +371,7 @@
         "confidential"
       ],
       "transaction_scope": "vector collection operation",
-      "consistency": "eventually consistent projection; absence must degrade retrieval, not canonical state",
+      "consistency": "eventually consistent projection; material canonical-memory rebuilds are admitted before derived-store mutation; absence/failure degrades retrieval and never mutates canonical state",
       "retention": "rebuildable projection",
       "backup_restore": "rebuild only after authoritative source restore verification passes; backup optional when fully derived",
       "migration": "re-index from authoritative sources",
@@ -386,7 +386,10 @@
         "docker-compose.yml",
         "skeleton/config/settings.py",
         "scripts/state_recovery_drill.py",
-        ".github/workflows/state-recovery-drill.yml"
+        ".github/workflows/state-recovery-drill.yml",
+        "skeleton/memory/projection.py",
+        "skeleton/testing/test_memory_projection.py",
+        "skeleton/api/server.py"
       ]
     },
     {
