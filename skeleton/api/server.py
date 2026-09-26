@@ -471,7 +471,10 @@ class ServerState:
             EngineAuthorityRegistry,
             EngineServiceGrant,
         )
-        from skeleton.api.engine_runtime import EngineExecutionCoordinator
+        from skeleton.api.engine_runtime import (
+            EngineExecutionCoordinator,
+            build_engine_tool_runtime,
+        )
         from skeleton.api.engine_service import (
             EngineExecutionService,
             SQLiteEngineSubmissionStore,
@@ -494,7 +497,6 @@ class ServerState:
         )
         from skeleton.provider_runtime import ProviderRegistry
         from skeleton.skills.tool_receipt_store import SQLiteToolReceiptStore
-        from skeleton.skills.tool_runtime import AsyncToolRuntime
 
         settings = get_settings().engine
         for raw_path in (
@@ -619,7 +621,7 @@ class ServerState:
         coordinator = EngineExecutionCoordinator(
             service,
             provider_registry=provider_registry,
-            tool_runtime=AsyncToolRuntime(
+            tool_runtime=build_engine_tool_runtime(
                 admission_runtime=execution_admission_runtime,
                 receipt_store=receipt_store,
             ),
