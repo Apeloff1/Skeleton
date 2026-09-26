@@ -2055,7 +2055,7 @@
       "plane": "governance",
       "priority": "P0",
       "status": "open",
-      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, governed derived vector/TF-IDF projection lifecycle, governed canonical artifact write/delete/export/retention, payload-free WORM governance audit linkage, and canonical lifecycle adapters now exist. Remaining closure is route-wide provider/tool privacy enforcement plus exact-head and independent verification.",
+      "gap": "A restart-safe lifecycle registry and canonical governance plane now cover memory, conversations, retrieval, derived projections, lifecycle-owned artifacts, provider transfers, canonical tools, and request-scoped route privacy ceilings. Remaining closure is fresh exact-head Stage-0/App Assembly validation and independent verification.",
       "construction": [
         "define data classes and transfer purposes",
         "bind data class to memory, artifact, retrieval and provider payloads",
@@ -2069,7 +2069,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "canonical lifecycle and registry contracts now cover memory, authoritative conversations, governed retrieval, derived vector/TF-IDF projections, and canonical artifacts with production lifecycle composition; route-wide provider/tool privacy enforcement and final exact-head verification remain",
+      "status_detail": "canonical lifecycle/write/delete/export/retention composition is production-bound; GameForge artifact production writes tenant-scoped governed bytes with bounded retention, and backend /api requests carry route-domain privacy ceilings enforced before engine provider and canonical tool boundaries; final exact-head and independent verification remain",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -2101,11 +2101,22 @@
         "skeleton/api/server.py binds canonical governed artifact store and lifecycle adapters at startup",
         "skeleton/testing/test_lifecycle_adapters.py proves registration-before-mutation, export/delete and retention expiry",
         "skeleton/testing/test_governance_runtime_binding.py proves production ServerState artifact lifecycle composition",
-        "skeleton/ai/runtime/api/server.py byte-identical canonical startup mirror"
+        "skeleton/ai/runtime/api/server.py byte-identical canonical startup mirror",
+        "backend/core/route_privacy.py request-scoped route-domain provider/tool privacy ceilings with catalog completeness validation",
+        "backend/api_middleware.py binds route privacy around every /api request",
+        "backend/core/engine_text.py enforces route privacy before canonical engine provider execution",
+        "backend/services/tool_registry.py enforces route privacy before canonical tool runtime initialization",
+        "backend/tests/test_route_privacy.py route-domain/provider/tool/context isolation regressions",
+        "backend/core/gameforge_artifact_builder.py lifecycle-capable canonical governed artifact production",
+        "backend/routes/gameforge_build.py tenant-scoped governed web/source/desktop/Godot production with bounded retention",
+        "backend/routes/gameforge_studio.py preserves authenticated tenant identity through Ship-It build calls",
+        "backend/tests/test_gameforge_artifact_builder.py governed canonical ZIP/fail-closed tenant regressions",
+        "skeleton/testing/test_governance_runtime_binding.py physical governed artifact retention-expiry regression"
       ],
       "outstanding_evidence": [
-        "bridge provider and tool privacy ceilings into every application route",
-        "exact-head Stage-0/App Assembly verification and independent signoff"
+        "fresh exact-head Stage-0/App Assembly governance verification",
+        "fresh exact-head backend route privacy and governed artifact regression execution",
+        "independent governance closure verification"
       ]
     },
     {
@@ -7286,7 +7297,10 @@
       "delete propagation through canonical and derived state",
       "export completeness",
       "retention expiry",
-      "audit receipt linkage"
+      "audit receipt linkage",
+      "request-scoped backend route privacy ceilings enforced at engine provider and canonical tool boundaries",
+      "tenant-scoped GameForge artifact production uses canonical GovernedArtifactStore",
+      "production GameForge artifacts receive bounded retention and physical expiry executes through lifecycle adapters"
     ],
     "current_evidence": [
       "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
