@@ -225,7 +225,7 @@
       "plane": "model-provider",
       "stage": 0,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_verification",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/testing/test_provider_contract.py",
@@ -241,7 +241,10 @@
         "skeleton/testing/test_provider_contract.py canonical async provider text/deadline regression suite",
         "skeleton/testing/test_provider_contract.py canonical image generation/variation/edit and speech regression suite",
         "skeleton/testing/test_provider_contract.py provider media failure releases admission lease",
-        "skeleton/provider_runtime.py fail-closed media input validation before provider I/O"
+        "skeleton/provider_runtime.py fail-closed media input validation before provider I/O",
+        ".github/workflows/provider-surface-closure.yml dedicated exact-head provider closure workflow",
+        "Provider Surface Closure Gate checks provider bootstrap inventory plus SDK/network runtime isolation",
+        "Provider Surface Closure Gate runs canonical async/sync/media/schema/stream provider regressions and engine cross-service isolation"
       ],
       "closure_evidence_required": [
         "canonical async provider regression suite",
@@ -253,14 +256,13 @@
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
       "outstanding_evidence": [
-        "exact-head provider-surface inventory receipt with no unexplained credential/network/SDK edges",
-        "exact-head application isolation scan including backend tool registry",
-        "independent verification before closure",
-        "exact-head provider bootstrap inventory and SDK/network isolation gate",
-        "fresh exact-head execution of canonical async/synchronous provider regression suites",
-        "fresh exact-head execution of media provider boundary regression suite"
+        "fresh exact-head Provider Surface Closure Gate",
+        "independent verification before closure"
       ],
-      "blockers": [],
+      "blockers": [
+        "fresh exact-head Provider Surface Closure Gate",
+        "independent verification before closure"
+      ],
       "close_when": [
         "all declared dependency gaps are closed",
         "all closure_evidence_required items have executable evidence",
