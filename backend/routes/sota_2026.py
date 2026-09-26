@@ -14,7 +14,7 @@ router = APIRouter(prefix="/sota", tags=["SOTA 2026"])
 
 # LLM Setup
 try:
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     LLM_AVAILABLE = True
 except Exception:
     LLM_AVAILABLE = False
@@ -100,7 +100,7 @@ async def predictive_assistance(request: PredictiveRequest):
         return {"predictions": [], "error": "LLM not available"}
     
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             system_message="""You are a predictive coding assistant. Based on the code and context:
 1. Predict what the user will likely code next (next 1-3 lines)
 2. Identify what they might be trying to achieve
@@ -153,7 +153,7 @@ async def auto_refactor(request: RefactorRequest):
     }
     
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             system_message=f"""You are an expert code refactoring agent. {focus_prompts.get(request.focus, focus_prompts['all'])}
 
 Rules:
@@ -205,7 +205,7 @@ async def multi_model_orchestration(request: MultiModelRequest):
     
     try:
         for strategy in strategies:
-            chat = LlmChat(
+            chat = EngineChat(
                 system_message=f"You are an expert programmer. {strategy['focus']}"
             ).with_model("openai", "gpt-4o")
             
@@ -224,7 +224,7 @@ async def multi_model_orchestration(request: MultiModelRequest):
         # Synthesize results based on consensus mode
         if request.consensus_mode == "best":
             # Use another call to pick the best
-            synth_chat = LlmChat(
+            synth_chat = EngineChat(
                 system_message="You are an expert at evaluating code solutions. Pick the best one and explain why."
             ).with_model("openai", "gpt-4o")
             
@@ -257,7 +257,7 @@ async def advanced_code_intelligence(request: CodeIntelRequest):
         return {"analysis": {}, "error": "LLM not available"}
     
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             system_message="""You are a code analysis expert. Provide deep insights about code:
 - Complexity analysis (cyclomatic, cognitive)
 - Design pattern detection
@@ -299,7 +299,7 @@ async def smart_autocomplete(request: AutoCompleteRequest):
         return {"completions": [], "error": "LLM not available"}
     
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             system_message="""You are an intelligent code autocomplete system. Given code and cursor position:
 1. Provide 3-5 relevant completions
 2. Include multi-line completions when appropriate
@@ -354,7 +354,7 @@ async def explain_like_expert(code: str, language: str = "python", expertise_lev
     }
     
     try:
-        chat = LlmChat(
+        chat = EngineChat(
             system_message=f"You are a principal engineer. {level_prompts.get(expertise_level, level_prompts['senior'])}"
         ).with_model("openai", "gpt-4o")
         
