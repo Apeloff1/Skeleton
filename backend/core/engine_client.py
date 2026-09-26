@@ -17,6 +17,7 @@ import base64
 import binascii
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import math
 import os
 from time import monotonic
 from typing import Any, Mapping, Sequence
@@ -1125,6 +1126,96 @@ class EngineClient:
                     maximum=1024,
                 ),
                 "storage_bytes": storage_bytes,
+            },
+            trace_id=trace_id,
+        )
+
+    async def reconcile_governed_write(
+        self,
+        *,
+        mode: str,
+        plane: str,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: str,
+        purposes: Sequence[str],
+        deletion_targets: Sequence[str] | None = None,
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        if isinstance(purposes, (str, bytes)):
+            raise EngineProtocolError("purposes must be a sequence")
+        normalized_purposes = [
+            _text(value, "purpose", maximum=256).lower()
+            for value in purposes
+        ]
+        if not 1 <= len(normalized_purposes) <= 32:
+            raise EngineProtocolError(
+                "purposes must contain between 1 and 32 values"
+            )
+
+        normalized_targets: list[str] | None = None
+        if deletion_targets is not None:
+            if isinstance(deletion_targets, (str, bytes)):
+                raise EngineProtocolError(
+                    "deletion_targets must be a sequence"
+                )
+            normalized_targets = [
+                _text(value, "deletion_target", maximum=256).lower()
+                for value in deletion_targets
+            ]
+            if not 1 <= len(normalized_targets) <= 32:
+                raise EngineProtocolError(
+                    "deletion_targets must contain between 1 and 32 values"
+                )
+
+        def timestamp(value: float | None, field: str) -> float | None:
+            if value is None:
+                return None
+            if isinstance(value, bool):
+                raise EngineProtocolError(field + " must be finite")
+            number = float(value)
+            if not math.isfinite(number) or number < 0:
+                raise EngineProtocolError(field + " must be finite")
+            return number
+
+        return await self._request(
+            "POST",
+            "/governance/writes",
+            json_body={
+                "mode": _text(mode, "mode", maximum=32).lower(),
+                "plane": _text(plane, "plane", maximum=64).lower(),
+                "record_id": _text(
+                    record_id,
+                    "record_id",
+                    maximum=512,
+                ),
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+                "source_ref": _text(
+                    source_ref,
+                    "source_ref",
+                    maximum=512,
+                ),
+                "data_class": _text(
+                    data_class,
+                    "data_class",
+                    maximum=64,
+                ).lower(),
+                "purposes": normalized_purposes,
+                "deletion_targets": normalized_targets,
+                "created_at": timestamp(created_at, "created_at"),
+                "retention_until": timestamp(
+                    retention_until,
+                    "retention_until",
+                ),
+                "exportable": bool(exportable),
             },
             trace_id=trace_id,
         )
