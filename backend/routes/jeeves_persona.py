@@ -152,28 +152,27 @@ async def jeeves_speak(req: SpeakRequest):
         parts.append(random.choice(catchphrases["sign_off"]))
     spoken_text = " ".join(p for p in parts if p).strip()
 
-    # Hand off to the real HD TTS pipeline (tts-1-hd via Emergent key).
+    # Speech execution is engine-owned; this route only shapes persona output.
     try:
-        import os
-        from emergentintegrations.llm.openai import OpenAITextToSpeech
-        api_key = os.environ.get("EMERGENT_LLM_KEY")
-        if not api_key:
-            raise HTTPException(500, "EMERGENT_LLM_KEY not configured")
-        model = "tts-1-hd"  # top-scale TTS — always HD
-        tts = OpenAITextToSpeech(api_key=api_key)
-        audio_b64 = await tts.generate_speech_base64(
-            text=spoken_text, model=model, voice=voice, speed=speed,
+        from core.expressive_tts import generate_expressive_tts
+
+        speech = await generate_expressive_tts(
+            spoken_text,
+            tone=ctx,
+            voice_override=voice,
+            speed_override=speed,
+            shape=False,
         )
         return {
             "status":       "success",
-            "voice":        voice,
-            "speed":        speed,
+            "voice":        speech["voice"],
+            "speed":        speech["speed"],
             "context":      ctx,
             "emoji":        emoji,
-            "spoken_text":  spoken_text,
-            "audio_base64": audio_b64,
-            "format":       "mp3",
-            "model":        model,
+            "spoken_text":  speech["spoken_text"],
+            "audio_base64": speech["audio_base64"],
+            "format":       speech["format"],
+            "model":        speech["model"],
         }
     except HTTPException:
         raise
