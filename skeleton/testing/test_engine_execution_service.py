@@ -184,6 +184,7 @@ def _registry(
         "engine:cancel",
         "engine:events",
         "engine:approve",
+        "engine:admission",
     ),
 ) -> EngineAuthorityRegistry:
     return EngineAuthorityRegistry(
