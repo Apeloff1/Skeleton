@@ -39,6 +39,8 @@ on:
       - "skeleton/testing/test_provider_runtime_schema_parity.py"
       - "machine/ai_runtime_schemas.json"
       - "skeleton/testing/test_provider_surface_inventory.py"
+      - "scripts/check_context_execution_boundary.py"
+      - "tests/test_context_execution_boundary.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/testing/test_operation_stream.py"
@@ -52,6 +54,7 @@ on:
       - "skeleton/contracts/memory_record.py"
       - "skeleton/contracts/ai_execution.py"
       - "skeleton/context/compiler.py"
+      - "skeleton/context/compaction.py"
       - "skeleton/context/policy.py"
       - "skeleton/context/sources/**"
       - "skeleton/testing/test_context_compiler.py"
@@ -341,6 +344,9 @@ jobs:
             echo "~~~"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Validate context execution boundary
+        run: python scripts/check_context_execution_boundary.py
+
       - name: Install full assembly test runtime
         if: steps.scope.outputs.full == 'true'
         run: >-
@@ -400,7 +406,7 @@ jobs:
           skeleton/app skeleton/ai/assistant skeleton/__main__.py skeleton/provider_contract.py
           skeleton/provider_runtime.py skeleton/contracts/operation.py
           skeleton/contracts/conversation.py skeleton/contracts/context.py skeleton/contracts/memory_record.py skeleton/contracts/ai_execution.py
-          skeleton/context/compiler.py skeleton/context/policy.py skeleton/context/sources
+          skeleton/context/compiler.py skeleton/context/compaction.py skeleton/context/policy.py skeleton/context/sources
           skeleton/skills/tool_contract.py skeleton/skills/tool_runtime.py skeleton/skills/tool_receipt_store.py skeleton/skills/tool_adapters
           backend/services/tool_registry.py
           skeleton/persistence/operation_store.py skeleton/persistence/conversation_repository.py skeleton/persistence/memory_repository.py skeleton/persistence/execution_repository.py
@@ -425,7 +431,7 @@ jobs:
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/check_ai_execution_frontier.py scripts/check_ai_assistant_control_plane.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
-          scripts/check_state_topology.py scripts/check_provider_bootstrap.py
+          scripts/check_state_topology.py scripts/check_provider_bootstrap.py scripts/check_context_execution_boundary.py
 
       - name: Audit repository-wide assembly contracts
         if: steps.scope.outputs.full == 'true'
@@ -525,6 +531,7 @@ jobs:
           skeleton/testing/test_app_installer.py
           skeleton/testing/test_windows_installer.py
           tests/test_provider_runtime_boundary.py
+          tests/test_context_execution_boundary.py
           tests/test_jeeves_local_provider_policy.py
           tests/test_jeeves_chat_workspace.py
 
