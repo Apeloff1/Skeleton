@@ -566,3 +566,131 @@ async def test_malformed_governance_delete_plan_cannot_mutate_mongo() -> None:
         )
 
     assert thread.thread_id in db["conversation_threads"].rows
+
+
+def _assistant_message(
+    thread: ConversationThread,
+    *,
+    parent: ConversationMessage,
+    causal_user_message_id: str,
+) -> ConversationMessage:
+    return ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=thread.message_sequence + 1,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="assistant-causal-fence",
+        content="verified assistant result",
+        parent_message_id=parent.message_id,
+        causal_user_message_id=causal_user_message_id,
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:exec-causal-fence",
+    )
+
+
+@pytest.mark.asyncio
+async def test_assistant_append_requires_causal_parent_to_be_user_message() -> None:
+    thread = _thread(sequence=1, version=2)
+    prior_assistant = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.ASSISTANT,
+        created_at=_now(),
+        idempotency_key="prior-assistant",
+        content="prior result",
+        parent_message_id=str(uuid4()),
+        causal_user_message_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:prior",
+    )
+    candidate = _assistant_message(
+        thread,
+        parent=prior_assistant,
+        causal_user_message_id=prior_assistant.message_id,
+    )
+    authority = object.__new__(MongoConversationAuthority)
+    authority.storage_admitter = None
+    authority.governance_registrar = None
+
+    async def recover(*_args, **_kwargs):
+        return thread
+
+    async def by_idempotency(*_args, **_kwargs):
+        return None
+
+    async def find_one(_query):
+        return {
+            **prior_assistant.as_dict(),
+            "_id": prior_assistant.message_id,
+            "_commit_state": "committed",
+        }
+
+    authority._recover_prepared = recover
+    authority._message_by_idempotency = by_idempotency
+    authority.messages = SimpleNamespace(find_one=find_one)
+
+    with pytest.raises(
+        Exception,
+        match="assistant result must bind its causal user message",
+    ):
+        await authority.append_message(
+            candidate,
+            tenant_id="tenant-a",
+            owner_id="owner-a",
+            expected_thread_version=2,
+        )
+
+
+@pytest.mark.asyncio
+async def test_assistant_append_requires_parent_and_causal_user_identity_match() -> None:
+    thread = _thread(sequence=1, version=2)
+    user_message = ConversationMessage(
+        message_id=str(uuid4()),
+        thread_id=thread.thread_id,
+        branch_id=thread.active_branch_id,
+        sequence=1,
+        author_type=ConversationAuthorType.USER,
+        created_at=_now(),
+        idempotency_key="causal-user",
+        content="question",
+    )
+    candidate = _assistant_message(
+        thread,
+        parent=user_message,
+        causal_user_message_id=str(uuid4()),
+    )
+    authority = object.__new__(MongoConversationAuthority)
+    authority.storage_admitter = None
+    authority.governance_registrar = None
+
+    async def recover(*_args, **_kwargs):
+        return thread
+
+    async def by_idempotency(*_args, **_kwargs):
+        return None
+
+    async def find_one(_query):
+        return {
+            **user_message.as_dict(),
+            "_id": user_message.message_id,
+            "_commit_state": "committed",
+        }
+
+    authority._recover_prepared = recover
+    authority._message_by_idempotency = by_idempotency
+    authority.messages = SimpleNamespace(find_one=find_one)
+
+    with pytest.raises(
+        Exception,
+        match="assistant result must bind its causal user message",
+    ):
+        await authority.append_message(
+            candidate,
+            tenant_id="tenant-a",
+            owner_id="owner-a",
+            expected_thread_version=2,
+        )
