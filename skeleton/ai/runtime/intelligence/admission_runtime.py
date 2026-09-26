@@ -35,6 +35,7 @@ from skeleton.intelligence.quota import (
     QuotaExceeded,
     QuotaReservation,
     QuotaUsageEvent,
+    TenantQuota,
     TenantQuotaLedger,
 )
 from skeleton.intelligence.shared_pressure import (
@@ -199,6 +200,7 @@ class AdmissionRuntime:
         self,
         *,
         quota_ledger: TenantQuotaLedger | None = None,
+        default_tenant_quota: TenantQuota | None = None,
         metrics_registry: MetricRegistry | None = None,
         shared_pressure_ledger: SqliteSharedPressureLedger | None = None,
         shared_pressure_scope: str | None = None,
@@ -215,7 +217,17 @@ class AdmissionRuntime:
             raise ValueError(
                 "shared pressure ledger, scope, and owner_id must be configured together"
             )
+        if default_tenant_quota is not None and quota_ledger is None:
+            raise ValueError(
+                "default_tenant_quota requires quota_ledger"
+            )
+        if (
+            default_tenant_quota is not None
+            and not isinstance(default_tenant_quota, TenantQuota)
+        ):
+            raise TypeError("default_tenant_quota must be TenantQuota")
         self.quota_ledger = quota_ledger
+        self.default_tenant_quota = default_tenant_quota
         self.metrics_registry = metrics_registry or MetricRegistry()
         self.shared_pressure_ledger = shared_pressure_ledger
         self.shared_pressure_scope = (
@@ -260,6 +272,32 @@ class AdmissionRuntime:
                 active_operations=len(self._active),
                 queue_depth=self._queue_depth,
             )
+
+    def _ensure_tenant_quota(self, tenant_id: str) -> None:
+        if self.quota_ledger is None or self.default_tenant_quota is None:
+            return
+        try:
+            self.quota_ledger.snapshot(tenant_id)
+            return
+        except QuotaError:
+            pass
+        try:
+            self.quota_ledger.configure(
+                tenant_id,
+                self.default_tenant_quota,
+            )
+        except QuotaConflict:
+            # Another worker may have won first-use provisioning.
+            try:
+                self.quota_ledger.snapshot(tenant_id)
+            except QuotaError as exc:
+                raise AdmissionRuntimeError(
+                    "tenant_quota_unavailable"
+                ) from exc
+        except QuotaError as exc:
+            raise AdmissionRuntimeError(
+                "tenant_quota_unavailable"
+            ) from exc
 
     def admit(
         self,
@@ -334,6 +372,7 @@ class AdmissionRuntime:
 
             reservation: QuotaReservation | None = None
             if self.quota_ledger is not None:
+                self._ensure_tenant_quota(request.tenant_id)
                 try:
                     reservation = self.quota_ledger.reserve(
                         request.tenant_id,
