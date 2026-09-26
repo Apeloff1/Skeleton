@@ -813,6 +813,43 @@ class DataLifecycleRegistry:
             else _finite_timestamp(now, "now")
         )
         with self._lock:
+            active_retention_plan_ids = {
+                entry.active_plan_id
+                for entry in self._entries.values()
+                if entry.record.tenant_id == tenant
+                and entry.state is LifecycleState.DELETE_PENDING
+                and entry.active_plan_id is not None
+                and self._plans.get(entry.active_plan_id) is not None
+                and self._plans[entry.active_plan_id].reason
+                == "retention-expired"
+            }
+            if active_retention_plan_ids:
+                if len(active_retention_plan_ids) != 1:
+                    raise LifecycleConflict(
+                        "tenant has multiple active retention plans"
+                    )
+                active_plan_id = next(iter(active_retention_plan_ids))
+                existing = self._plans[active_plan_id]
+                outstanding: list[DeletionAction] = []
+                for action in existing.actions:
+                    entry = self._entries.get(action.record_id)
+                    if (
+                        entry is None
+                        or entry.record.tenant_id != tenant
+                        or entry.active_plan_id != active_plan_id
+                    ):
+                        continue
+                    if action.target in entry.acknowledged_targets:
+                        continue
+                    outstanding.append(action)
+                return DeletionPlan(
+                    plan_id=existing.plan_id,
+                    tenant_id=existing.tenant_id,
+                    reason=existing.reason,
+                    actions=tuple(outstanding),
+                    created_at=existing.created_at,
+                )
+
             entries = [
                 entry
                 for entry in self._entries.values()
