@@ -183,7 +183,7 @@ class GenerateBody(BaseModel):
 async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
     """Run a provider-diverse LLM ensemble (fallback) WITHOUT touching the
     main-loop Mongo client — safe to drive from a fresh loop inside a thread."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     if not EMERGENT_LLM_KEY:
         return {"content": "", "error": "EMERGENT_LLM_KEY not configured", "model": None, "provider": None}
     sid = f"playable-{uuid.uuid4().hex[:8]}"
@@ -191,7 +191,7 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
         provider = MODEL_CATALOG.get(model, {}).get("provider", "openai")
         t0 = time.time()
         try:
-            chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
+            chat = EngineChat(api_key=EMERGENT_LLM_KEY, session_id=sid,
                            system_message=system).with_model(provider, model)
             resp = await chat.send_message(UserMessage(text=prompt))
             content = resp.content if hasattr(resp, "content") else str(resp)
