@@ -32,6 +32,20 @@ def _write_handoff(root: Path) -> None:
         encoding="utf-8",
     )
 
+    construction = {
+        "gap_register": [
+            *[
+                {"id": gap_id, "status": "open"}
+                for gap_id in sorted(EXPECTED_DEPENDENCIES)
+            ],
+            {"id": "gap-tool-runtime-convergence", "status": "open"},
+        ]
+    }
+    (machine / "ai_app_construction.json").write_text(
+        json.dumps(construction),
+        encoding="utf-8",
+    )
+
 
 def _valid_repo(tmp_path: Path) -> Path:
     root = tmp_path
