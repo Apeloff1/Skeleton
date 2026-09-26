@@ -134,4 +134,3 @@ def test_skeleton_runtime_declares_canonical_mongo_driver_dependencies() -> None
     assert '"pymongo==4.18.1"' in pyproject
     assert "SKL_MONGO_URI=" in compose
     assert "SKL_MONGO_DATABASE=skeleton" in compose
-
