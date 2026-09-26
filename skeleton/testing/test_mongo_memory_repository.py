@@ -35,6 +35,11 @@ from skeleton.persistence.memory_repository import (
     MongoMemoryRepository,
 )
 from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import (
+    LifecycleAdapterRegistry,
+    LifecycleExecutor,
+    MongoMemoryLifecycleAdapter,
+)
 
 
 def _matches(doc: dict, query: dict) -> bool:
@@ -1111,3 +1116,91 @@ def test_async_governed_writer_rejects_double_local_remote_owners() -> None:
             admission_runtime=AdmissionRuntime(),
             storage_admitter=admit,
         )
+
+
+@pytest.mark.asyncio
+async def test_mongo_memory_lifecycle_export_and_delete_use_canonical_authority(
+) -> None:
+    db = FakeDatabase()
+    repo = MongoMemoryRepository(db)
+    await repo.ensure_indexes()
+    record = await repo.commit(
+        _proposal(key="lifecycle-memory", content="governed memory"),
+        now=_now(),
+    )
+
+    governance = GovernanceRegistry()
+    source_ref = MongoMemoryLifecycleAdapter.source_ref(
+        record.namespace,
+        record.memory_id,
+    )
+    governance.reconcile_canonical_write(
+        "memory",
+        record_id=record.memory_id,
+        tenant_id=record.tenant_id,
+        source_ref=source_ref,
+        data_class=record.data_class,
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("memory",),
+        created_at=record.created_at.timestamp(),
+        exportable=True,
+    )
+    adapters = LifecycleAdapterRegistry()
+    lifecycle = MongoMemoryLifecycleAdapter(repo)
+    adapters.register_deletion("memory", lifecycle)
+    adapters.register_export("memory", lifecycle)
+    executor = LifecycleExecutor(governance.lifecycle, adapters)
+
+    exported = await executor.export_tenant(record.tenant_id)
+
+    assert exported.tenant_id == record.tenant_id
+    assert len(exported.records) == 1
+    assert exported.records[0]["payload"]["memory_id"] == record.memory_id
+    assert exported.records[0]["payload"]["content"] == "governed memory"
+
+    plan = governance.request_deletion(
+        record.tenant_id,
+        record_ids=(record.memory_id,),
+        reason="memory-lifecycle-test",
+    )
+    deleted = await executor.execute_deletion_plan(plan)
+
+    assert len(deleted.receipts) == 1
+    assert deleted.receipts[0].target == "memory"
+    tombstoned = await repo.get(
+        record.memory_id,
+        tenant_id=record.tenant_id,
+        namespace=record.namespace,
+        include_tombstoned=True,
+    )
+    assert tombstoned.state is MemoryState.TOMBSTONED
+    assert tombstoned.version == record.version + 1
+    with pytest.raises(MemoryNotFound):
+        await repo.get(
+            record.memory_id,
+            tenant_id=record.tenant_id,
+            namespace=record.namespace,
+        )
+
+
+@pytest.mark.asyncio
+async def test_server_registers_mongo_memory_lifecycle_adapters() -> None:
+    from skeleton.api.server import ServerState
+
+    state = ServerState()
+    state.engine_execution_admission_runtime = AdmissionRuntime()
+    db = FakeDatabase()
+
+    writer = await state.bind_canonical_memory_writer(database=db)
+
+    assert writer is state.canonical_memory_writer
+    assert isinstance(
+        state.governance_lifecycle_adapters.deletion("memory"),
+        MongoMemoryLifecycleAdapter,
+    )
+    assert (
+        state.governance_lifecycle_adapters.exporter("memory")
+        is state.governance_lifecycle_adapters.deletion("memory")
+    )
+    await state.close_canonical_memory_writer()
+    state.close_governance_registry()
