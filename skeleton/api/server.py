@@ -86,6 +86,7 @@ class ServerState:
         self.canonical_memory_mongo_client: Optional[Any] = None
         self.canonical_memory_repository: Optional[Any] = None
         self.canonical_memory_writer: Optional[Any] = None
+        self.canonical_memory_projection_coordinator: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
@@ -141,6 +142,7 @@ class ServerState:
             )
 
         from skeleton.config.settings import get_settings
+        from skeleton.memory.projection import AsyncMemoryProjectionCoordinator
         from skeleton.memory.writeback import AsyncGovernedMemoryWriter
         from skeleton.persistence.memory_repository import (
             MongoMemoryRepository,
@@ -166,12 +168,19 @@ class ServerState:
         )
         self.canonical_memory_repository = repository
         self.canonical_memory_writer = writer
+        self.canonical_memory_projection_coordinator = (
+            AsyncMemoryProjectionCoordinator(
+                repository,
+                admission_runtime=admission_runtime,
+            )
+        )
         return writer
 
     async def close_canonical_memory_writer(self) -> None:
         client = self.canonical_memory_mongo_client
         self.canonical_memory_writer = None
         self.canonical_memory_repository = None
+        self.canonical_memory_projection_coordinator = None
         self.canonical_memory_mongo_client = None
         if client is not None:
             client.close()
