@@ -5,6 +5,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
@@ -70,7 +71,13 @@ async def call_llm(system: str, prompt: str) -> str:
     if not LLM_AVAILABLE:
         return "LLM not available"
     try:
-        chat = EngineChat(system_message=system).with_model("openai", "gpt-4o")
+        chat = EngineChat(
+            instruction_policy=InstructionPolicy(
+                policy_id="backend.collaboration.ai-pairing",
+                version="1",
+                instructions=system,
+            )
+        ).with_model("openai", "gpt-4o")
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
     except Exception:
