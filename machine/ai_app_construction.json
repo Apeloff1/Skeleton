@@ -3711,7 +3711,8 @@
         "operation/result binding",
         "context projection",
         "delete/export",
-        "refresh/reconnect reconstruction"
+        "refresh/reconnect reconstruction",
+        "retention expiry propagation"
       ],
       "exit": "the server can reconstruct and authorize every model-visible prior message from canonical state without trusting client-supplied transcript history",
       "planned_outputs": [
@@ -3722,8 +3723,8 @@
         "frontend/src/product/conversationClient.ts"
       ],
       "progress": {
-        "state": "in_progress",
-        "completed_steps": 3,
+        "state": "implemented_pending_closure",
+        "completed_steps": 8,
         "total_steps": 8,
         "evidence": [
           "skeleton/contracts/conversation.py",
@@ -3735,7 +3736,20 @@
           "backend/gameforge/jeeves/chat_contract.py",
           "backend/routes/jeeves_compose.py",
           "tests/test_jeeves_chat_workspace.py",
-          "frontend/src/product/conversationClient.ts"
+          "frontend/src/product/conversationClient.ts",
+          "backend/routes/ai.py",
+          "backend/tests/test_ai_chat_engine_cutover.py",
+          "backend/tests/test_conversation_regeneration_route.py",
+          "backend/tests/test_conversation_governance.py",
+          "skeleton/context/compiler.py",
+          "skeleton/testing/test_context_compiler.py",
+          "skeleton/vault/data_lifecycle.py",
+          "skeleton/api/engine_service.py",
+          "skeleton/testing/test_engine_execution_service.py",
+          "frontend/features/Jeeves/WorkspaceController.ts",
+          "frontend/features/Jeeves/workspace.ts",
+          "frontend/scripts/test-jeeves-workspace.cjs",
+          "scripts/verify_jeeves_conversation_cutover.py"
         ]
       }
     },
