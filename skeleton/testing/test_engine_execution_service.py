@@ -1140,4 +1140,3 @@ def test_submit_meters_execution_and_submission_storage_without_replay_double_co
         replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
         == storage["storage_bytes"]
     )
-
