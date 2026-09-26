@@ -7,6 +7,7 @@ creature, or the game's cover. Generated images are cached per (game_id, kind, n
 reusable across the app.
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
 import os
 import uuid
@@ -51,8 +52,17 @@ def _worker(job_id: str, pid: str, kind: str, name: str, prompt: str):
     try:
 
         async def _gen():
-            chat = EngineChat(session_id=f"pr-{job_id[:8]}",
-                           system_message="You generate photorealistic, cinematic, production-grade game art.")
+            chat = EngineChat(
+                session_id=f"pr-{job_id[:8]}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.photoreal.image-generation",
+                    version="1",
+                    instructions=(
+                        "You generate photorealistic, cinematic, "
+                        "production-grade game art."
+                    ),
+                ),
+            )
             chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))
 
