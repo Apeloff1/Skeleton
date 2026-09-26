@@ -89,6 +89,7 @@ class EngineChat:
         verification_profile: str = "assistant_proposal",
         data_class: str = "internal",
         purpose: str = "model-inference",
+        engine_executor=None,
         **_: Any,
     ) -> None:
         positional = list(args)
@@ -135,6 +136,9 @@ class EngineChat:
         ).strip()
         self.data_class = str(data_class).strip().lower()
         self.purpose = str(purpose).strip()
+        self._engine_executor = engine_executor or execute_engine_text
+        if not callable(self._engine_executor):
+            raise TypeError("engine_executor must be callable")
         if not all(
             (
                 self.tenant_id,
@@ -300,7 +304,7 @@ class EngineChat:
             data_class=self.data_class,
             purpose=self.purpose,
         )
-        response: EngineTextResponse = await execute_engine_text(
+        response: EngineTextResponse = await self._engine_executor(
             request
         )
         self._history.append(
