@@ -7,7 +7,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "skeleton/contracts/ai_execution.py"
+      - "skeleton/contracts/verification.py"
       - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/intelligence/verification_policy.py"
+      - "skeleton/intelligence/verification_runtime.py"
+      - "skeleton/retrieval/verification.py"
+      - "skeleton/skills/verification.py"
       - "skeleton/persistence/execution_repository.py"
       - "skeleton/api/engine_service.py"
       - "skeleton/api/engine_runtime.py"
@@ -17,6 +22,7 @@ on:
       - "skeleton/ai/runtime/api/engine_service.py"
       - "skeleton/ai/runtime/api/engine_runtime.py"
       - "skeleton/testing/test_execution_runtime.py"
+      - "skeleton/testing/test_verification_runtime.py"
       - "skeleton/testing/test_execution_repository.py"
       - "skeleton/testing/test_engine_execution_service.py"
       - "skeleton/testing/test_engine_execution_coordinator.py"
@@ -81,6 +87,11 @@ jobs:
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           skeleton/testing/test_execution_runtime.py
           skeleton/testing/test_ai_execution_frontier.py
+
+      - name: Run canonical verification evidence contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
+          skeleton/testing/test_verification_runtime.py
 
       - name: Run engine admission approval and recovery contracts
         run: >-
