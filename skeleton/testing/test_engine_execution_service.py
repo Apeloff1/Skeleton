@@ -1366,7 +1366,6 @@ def test_external_governance_write_rejects_cross_tenant_and_bad_lists(
             tenant_id="tenant-a",
             source_ref="memory://assistant/memory-2",
             data_class="internal",
-            purposes=(), 
+            purposes=(),
         )
     lifecycle.close()
-
