@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import shutil
+import time
 import zipfile
 from typing import Any, Optional
 
@@ -50,6 +51,21 @@ _ARTIFACTS = str(DEFAULT_ARTIFACTS_ROOT)
 os.makedirs(_ARTIFACTS, exist_ok=True)
 
 
+def _artifact_retention_seconds() -> int:
+    raw = os.environ.get("GAMEFORGE_ARTIFACT_RETENTION_DAYS", "30")
+    try:
+        days = int(raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            "GAMEFORGE_ARTIFACT_RETENTION_DAYS must be an integer"
+        ) from exc
+    if days < 1 or days > 365:
+        raise RuntimeError(
+            "GAMEFORGE_ARTIFACT_RETENTION_DAYS must be within [1, 365]"
+        )
+    return days * 24 * 60 * 60
+
+
 def _tenant_id(user: Any) -> str:
     if isinstance(user, dict):
         explicit = str(user.get("tenant_id") or "").strip()
@@ -81,13 +97,15 @@ def _governed_register(
     built_at: float | None = None,
 ) -> dict:
     store = _governed_store()
+    timestamp = time.time() if built_at is None else float(built_at)
     canonical = store.write_bytes(
         tenant_id=tenant_id,
         artifact_id=build_id,
         payload=payload,
         data_class="internal",
         purposes=("artifact-delivery", "download"),
-        created_at=built_at,
+        created_at=timestamp,
+        retention_until=timestamp + _artifact_retention_seconds(),
         exportable=True,
     )
     return _register(
@@ -95,7 +113,7 @@ def _governed_register(
         game_name,
         kind,
         None,
-        built_at=built_at,
+        built_at=timestamp,
         canonical_record=canonical,
         tenant_id=tenant_id,
     )
@@ -279,19 +297,25 @@ class BuildBody(BaseModel):
 
 async def _build_web_for_user(b: BuildBody, user: Any):
     tenant = _tenant_id(user)
+    timestamp = time.time()
     return build_web_artifact(
         b.game_name,
+        built_at=timestamp,
         governed_store=_governed_store(),
         tenant_id=tenant,
+        retention_until=timestamp + _artifact_retention_seconds(),
     )
 
 
 async def _build_source_for_user(b: BuildBody, user: Any):
     tenant = _tenant_id(user)
+    timestamp = time.time()
     return build_source_artifact(
         b.game_name,
+        built_at=timestamp,
         governed_store=_governed_store(),
         tenant_id=tenant,
+        retention_until=timestamp + _artifact_retention_seconds(),
     )
 
 
