@@ -85,6 +85,7 @@ class EngineChat:
         self._max_output_tokens: int | None = None
         self._params: dict[str, Any] = {}
         self._history: list[dict[str, str]] = []
+        self._queued_prompt: str | None = None
 
     def with_model(self, provider: str, model: str) -> "EngineChat":
         # Routing metadata only; canonical engine policy owns provider choice.
@@ -119,6 +120,28 @@ class EngineChat:
     ) -> "EngineChat":
         self._params["temperature"] = float(temperature)
         return self
+
+    def add_message(
+        self,
+        role: str,
+        content: str,
+    ) -> "EngineChat":
+        normalized_role = str(role).strip().lower()
+        text = str(content)
+        if normalized_role == "system":
+            self.system_message = text
+            return self
+        if normalized_role == "user":
+            self._queued_prompt = text
+            return self
+        if normalized_role == "assistant":
+            self._history.append(
+                {"role": "assistant", "content": text}
+            )
+            return self
+        raise ValueError(
+            "engine chat role must be system, user, or assistant"
+        )
 
     @staticmethod
     def _prompt_text(message: Any) -> str:
@@ -181,8 +204,19 @@ class EngineChat:
         )
         return EngineChatResponse(response.text)
 
-    async def chat(self, message: Any) -> EngineChatResponse:
-        return await self.send_message(message)
+    async def chat(
+        self,
+        message: Any | None = None,
+    ) -> EngineChatResponse:
+        target = message
+        if target is None:
+            target = self._queued_prompt
+            self._queued_prompt = None
+        if target is None:
+            raise ValueError(
+                "engine chat requires a queued or explicit message"
+            )
+        return await self.send_message(target)
 
     async def generate(self, message: Any) -> EngineChatResponse:
         return await self.send_message(message)
