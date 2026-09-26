@@ -377,6 +377,26 @@ class ServerState:
 
     def is_healthy(self) -> Dict[str, Any]:
         checks = {}
+        memory_configured = _canonical_memory_mongo_configured()
+        memory_bound = (
+            self.canonical_memory_repository is not None
+            and self.canonical_memory_writer is not None
+            and self.canonical_memory_projection_coordinator is not None
+        )
+        checks["canonical_memory"] = {
+            "configured": memory_configured,
+            "bound": memory_bound,
+            "status": (
+                "ready"
+                if memory_bound
+                else ("unavailable" if memory_configured else "disabled")
+            ),
+            "error": (
+                "canonical memory authority configured but not bound"
+                if memory_configured and not memory_bound
+                else None
+            ),
+        }
         for attr in dir(self):
             if not attr.startswith("_") and not callable(getattr(self, attr)):
                 val = getattr(self, attr)
