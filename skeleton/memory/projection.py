@@ -12,7 +12,8 @@ from enum import Enum
 import hashlib
 import json
 import time
-from typing import Iterable, Protocol
+from typing import Any, Iterable, Protocol
+from urllib.parse import quote, unquote
 
 from skeleton.contracts.memory_record import MemoryRecord, MemoryState
 from skeleton.intelligence.admission import (
@@ -56,6 +57,86 @@ class MemoryProjection(Protocol):
 
     def delete(self, memory_id: str) -> None:
         ...
+
+
+def _projection_deletion_target(projection: MemoryProjection) -> str:
+    name = str(getattr(projection, "name", "")).strip()
+    if not name:
+        raise ValueError("governed projection requires a name")
+    digest = hashlib.sha256(name.encode("utf-8")).hexdigest()
+    return "memory-projection-" + digest[:24]
+
+
+class _MemoryProjectionLifecycleAdapter:
+    """Physical lifecycle adapter bound to one live derived projection."""
+
+    _PREFIX = "memory-projection://"
+
+    def __init__(self, projection: MemoryProjection) -> None:
+        if not _is_governed_retrieval_projection(projection):
+            raise TypeError("projection is not lifecycle-governed")
+        self.projection = projection
+        self.projection_name = str(projection.name).strip()
+        self.target = _projection_deletion_target(projection)
+
+    @classmethod
+    def source_ref(
+        cls,
+        tenant_id: str,
+        projection_name: str,
+        memory_id: str,
+    ) -> str:
+        tenant = str(tenant_id).strip()
+        name = str(projection_name).strip()
+        memory = str(memory_id).strip()
+        if not tenant or not name or not memory:
+            raise ValueError("projection lifecycle identity is incomplete")
+        return (
+            cls._PREFIX
+            + quote(tenant, safe="")
+            + "/"
+            + quote(name, safe="")
+            + "/"
+            + quote(memory, safe="")
+        )
+
+    @classmethod
+    def parse_source_ref(cls, source_ref: object) -> tuple[str, str, str]:
+        raw = str(source_ref).strip()
+        if not raw.startswith(cls._PREFIX):
+            raise ValueError("projection lifecycle source_ref is invalid")
+        tail = raw[len(cls._PREFIX):]
+        tenant_raw, sep1, remainder = tail.partition("/")
+        projection_raw, sep2, memory_raw = remainder.partition("/")
+        if not sep1 or not sep2 or not tenant_raw or not projection_raw or not memory_raw:
+            raise ValueError("projection lifecycle source_ref is invalid")
+        tenant = unquote(tenant_raw)
+        projection_name = unquote(projection_raw)
+        memory_id = unquote(memory_raw)
+        if not tenant or not projection_name or not memory_id:
+            raise ValueError("projection lifecycle source_ref is invalid")
+        return tenant, projection_name, memory_id
+
+    async def delete(self, action: Any) -> None:
+        tenant, projection_name, memory_id = self.parse_source_ref(
+            action.source_ref
+        )
+        if tenant != str(action.tenant_id):
+            raise ValueError("projection lifecycle tenant mismatch")
+        if projection_name != self.projection_name:
+            raise ValueError("projection lifecycle owner mismatch")
+        expected_record_id, _source_ref, expected_target = (
+            _retrieval_projection_identity(
+                self.projection,
+                tenant_id=tenant,
+                memory_id=memory_id,
+            )
+        )
+        if expected_record_id != str(action.record_id):
+            raise ValueError("projection lifecycle record identity mismatch")
+        if expected_target != str(action.target):
+            raise ValueError("projection lifecycle target mismatch")
+        self.projection.delete(memory_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,19 +304,40 @@ def _fence_projection_event(
 
 def _retrieval_projection_identity(
     projection: MemoryProjection,
-    record: MemoryRecord,
-) -> tuple[str, str]:
-    material = (
+    record: MemoryRecord | None = None,
+    *,
+    tenant_id: str | None = None,
+    memory_id: str | None = None,
+) -> tuple[str, str, str]:
+    tenant = (
         record.tenant_id
+        if record is not None
+        else str(tenant_id or "").strip()
+    )
+    memory = (
+        record.memory_id
+        if record is not None
+        else str(memory_id or "").strip()
+    )
+    name = str(projection.name).strip()
+    if not tenant or not memory or not name:
+        raise ValueError("projection lifecycle identity is incomplete")
+    material = (
+        tenant
         + "\x1f"
-        + projection.name
+        + name
         + "\x1f"
-        + record.memory_id
+        + memory
     ).encode("utf-8")
     digest = hashlib.sha256(material).hexdigest()
     return (
         "retrieval-" + digest[:40],
-        "retrieval://" + digest,
+        _MemoryProjectionLifecycleAdapter.source_ref(
+            tenant,
+            name,
+            memory,
+        ),
+        _projection_deletion_target(projection),
     )
 
 
@@ -253,7 +355,7 @@ def _ensure_retrieval_record(
     projection: MemoryProjection,
     record: MemoryRecord,
 ) -> str:
-    record_id, source_ref = _retrieval_projection_identity(
+    record_id, source_ref, deletion_target = _retrieval_projection_identity(
         projection,
         record,
     )
@@ -280,7 +382,7 @@ def _ensure_retrieval_record(
         source_ref=source_ref,
         data_class=record.data_class,
         purposes=("retrieval-synthesis",),
-        deletion_targets=("retrieval",),
+        deletion_targets=(deletion_target,),
         created_at=record.created_at.timestamp(),
         retention_until=(
             None
@@ -342,11 +444,12 @@ def _apply_projection_record(
         and retrieval_record_id is not None
         and plan is not None
     ):
+        deletion_target = _projection_deletion_target(projection)
         retrieval_actions = tuple(
             action
             for action in plan.actions
             if action.record_id == retrieval_record_id
-            and action.target == "retrieval"
+            and action.target == deletion_target
         )
         if len(retrieval_actions) != 1:
             raise RuntimeError(
@@ -355,7 +458,7 @@ def _apply_projection_record(
         governance.acknowledge_deletion(
             plan.plan_id,
             retrieval_record_id,
-            "retrieval",
+            deletion_target,
         )
     return 0, 1
 
@@ -605,6 +708,7 @@ class MemoryProjectionCoordinator:
         admission_runtime: AdmissionRuntime | None = None,
         rebuild_budget: ResourceBudget | None = None,
         governance: GovernanceRegistry | None = None,
+        lifecycle_adapters: Any | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteMemoryRepository):
             raise TypeError("repository must be SQLiteMemoryRepository")
@@ -620,8 +724,48 @@ class MemoryProjectionCoordinator:
             raise TypeError("governance must be GovernanceRegistry")
         self.repository = repository
         self.admission_runtime = admission_runtime
+        if (
+            lifecycle_adapters is not None
+            and not callable(
+                getattr(lifecycle_adapters, "register_deletion", None)
+            )
+        ):
+            raise TypeError(
+                "lifecycle_adapters must expose register_deletion"
+            )
         self.rebuild_budget = rebuild_budget or ResourceBudget()
         self.governance = governance
+        self.lifecycle_adapters = lifecycle_adapters
+        self._projection_lifecycle_bindings: dict[
+            str,
+            tuple[MemoryProjection, _MemoryProjectionLifecycleAdapter],
+        ] = {}
+
+    def _bind_projection_lifecycle_adapters(
+        self,
+        projections: tuple[MemoryProjection, ...],
+    ) -> None:
+        registry = self.lifecycle_adapters
+        if registry is None:
+            return
+        for projection in projections:
+            if not _is_governed_retrieval_projection(projection):
+                continue
+            target = _projection_deletion_target(projection)
+            current = self._projection_lifecycle_bindings.get(target)
+            if current is not None:
+                if current[0] is not projection:
+                    raise ValueError(
+                        "governed projection name is already bound "
+                        "to a different physical store"
+                    )
+                continue
+            adapter = _MemoryProjectionLifecycleAdapter(projection)
+            registry.register_deletion(target, adapter)
+            self._projection_lifecycle_bindings[target] = (
+                projection,
+                adapter,
+            )
 
     def export_subject(
         self,
@@ -654,6 +798,7 @@ class MemoryProjectionCoordinator:
             include_tombstoned=True,
         )
         projection_list = _projection_batch(projections)
+        self._bind_projection_lifecycle_adapters(projection_list)
 
         active = tuple(r for r in records if r.state is MemoryState.ACTIVE)
         tombstoned = tuple(r for r in records if r.state is MemoryState.TOMBSTONED)
@@ -715,6 +860,7 @@ class MemoryProjectionCoordinator:
             projections,
             require_nonempty=True,
         )
+        self._bind_projection_lifecycle_adapters(projection_list)
         try:
             events = self.repository.pending_projection_events(limit=limit)
         except MemoryProjectionEventCorruption as exc:
@@ -853,6 +999,7 @@ class MemoryProjectionCoordinator:
         admission_operation_id: str | None = None,
     ) -> ProjectionSyncReport:
         projection_list = _projection_batch(projections)
+        self._bind_projection_lifecycle_adapters(projection_list)
         records = self.repository.list_subject(
             tenant_id=tenant_id,
             namespace=namespace,
@@ -911,6 +1058,7 @@ class AsyncMemoryProjectionCoordinator:
         admission_runtime: AdmissionRuntime | None = None,
         rebuild_budget: ResourceBudget | None = None,
         governance: GovernanceRegistry | None = None,
+        lifecycle_adapters: Any | None = None,
     ) -> None:
         if not isinstance(repository, MongoMemoryRepository):
             raise TypeError("repository must be MongoMemoryRepository")
@@ -926,8 +1074,48 @@ class AsyncMemoryProjectionCoordinator:
             raise TypeError("governance must be GovernanceRegistry")
         self.repository = repository
         self.admission_runtime = admission_runtime
+        if (
+            lifecycle_adapters is not None
+            and not callable(
+                getattr(lifecycle_adapters, "register_deletion", None)
+            )
+        ):
+            raise TypeError(
+                "lifecycle_adapters must expose register_deletion"
+            )
         self.rebuild_budget = rebuild_budget or ResourceBudget()
         self.governance = governance
+        self.lifecycle_adapters = lifecycle_adapters
+        self._projection_lifecycle_bindings: dict[
+            str,
+            tuple[MemoryProjection, _MemoryProjectionLifecycleAdapter],
+        ] = {}
+
+    def _bind_projection_lifecycle_adapters(
+        self,
+        projections: tuple[MemoryProjection, ...],
+    ) -> None:
+        registry = self.lifecycle_adapters
+        if registry is None:
+            return
+        for projection in projections:
+            if not _is_governed_retrieval_projection(projection):
+                continue
+            target = _projection_deletion_target(projection)
+            current = self._projection_lifecycle_bindings.get(target)
+            if current is not None:
+                if current[0] is not projection:
+                    raise ValueError(
+                        "governed projection name is already bound "
+                        "to a different physical store"
+                    )
+                continue
+            adapter = _MemoryProjectionLifecycleAdapter(projection)
+            registry.register_deletion(target, adapter)
+            self._projection_lifecycle_bindings[target] = (
+                projection,
+                adapter,
+            )
 
     async def export_subject(
         self,
@@ -960,6 +1148,7 @@ class AsyncMemoryProjectionCoordinator:
             include_tombstoned=True,
         )
         projection_list = _projection_batch(projections)
+        self._bind_projection_lifecycle_adapters(projection_list)
 
         active = tuple(r for r in records if r.state is MemoryState.ACTIVE)
         tombstoned = tuple(r for r in records if r.state is MemoryState.TOMBSTONED)
@@ -1017,6 +1206,7 @@ class AsyncMemoryProjectionCoordinator:
             projections,
             require_nonempty=True,
         )
+        self._bind_projection_lifecycle_adapters(projection_list)
         events = await self.repository.pending_projection_events(limit=limit)
         attempts: list[ProjectionEventDispatch] = []
         published = 0
@@ -1111,6 +1301,7 @@ class AsyncMemoryProjectionCoordinator:
         admission_operation_id: str | None = None,
     ) -> ProjectionSyncReport:
         projection_list = _projection_batch(projections)
+        self._bind_projection_lifecycle_adapters(projection_list)
         records = await self.repository.list_subject(
             tenant_id=tenant_id,
             namespace=namespace,
