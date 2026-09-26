@@ -338,3 +338,50 @@ def test_engine_chat_idempotency_binds_history_but_not_unused_routing_hints():
     assert same_semantics._idempotency_key(prompt) != base._idempotency_key(
         prompt
     )
+
+
+@pytest.mark.asyncio
+async def test_engine_chat_queued_prompt_survives_transient_engine_failure():
+    seen = []
+    attempts = 0
+
+    async def execute(request):
+        nonlocal attempts
+        attempts += 1
+        seen.append(request)
+        if attempts == 1:
+            raise EngineTextError("temporary engine failure")
+        return EngineTextResponse(
+            text="recovered",
+            execution_id="execution-recovered",
+            verification="verified",
+            evidence_refs=(),
+            usage={},
+        )
+
+    chat = EngineChat(
+        session_id="session-retry",
+        engine_executor=execute,
+    )
+    chat.add_message("user", "retry me")
+
+    with pytest.raises(
+        EngineTextError,
+        match="temporary engine failure",
+    ):
+        await chat.chat()
+
+    assert chat._queued_prompt == "retry me"
+    assert chat._history == []
+
+    response = await chat.chat()
+
+    assert response == "recovered"
+    assert chat._queued_prompt is None
+    assert chat._history == [
+        {"role": "user", "content": "retry me"},
+        {"role": "assistant", "content": "recovered"},
+    ]
+    assert len(seen) == 2
+    assert seen[0].idempotency_key == seen[1].idempotency_key
+    assert seen[0].prompt == seen[1].prompt == "retry me"
