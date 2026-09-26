@@ -566,4 +566,3 @@ async def test_malformed_governance_delete_plan_cannot_mutate_mongo() -> None:
         )
 
     assert thread.thread_id in db["conversation_threads"].rows
-
