@@ -34,6 +34,31 @@ class ArtifactUsageMeter(Protocol):
         ...
 
 
+class GovernedArtifactStore(Protocol):
+    """Structural lifecycle store contract; avoids a hard backend->Skeleton import."""
+
+    def write_bytes(
+        self,
+        *,
+        tenant_id: str,
+        artifact_id: str,
+        payload: bytes,
+        data_class: str = "internal",
+        purposes: tuple[str, ...] = ("artifact-delivery",),
+        created_at: float | None = None,
+        retention_until: float | None = None,
+        exportable: bool = True,
+    ) -> Any:
+        ...
+
+    def read_bytes(
+        self,
+        tenant_id: str,
+        artifact_id: str,
+    ) -> bytes | None:
+        ...
+
+
 DEFAULT_ARTIFACTS_ROOT = Path(__file__).resolve().parents[1] / "artifacts" / "builds"
 
 _ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
@@ -129,28 +154,46 @@ def register_artifact(
     build_id: str,
     game_name: str,
     kind: str,
-    path: str | os.PathLike[str],
+    path: str | os.PathLike[str] | None,
     *,
     artifacts_root: str | os.PathLike[str] = DEFAULT_ARTIFACTS_ROOT,
     built_at: float | int | None = None,
+    canonical_record: Any | None = None,
 ) -> dict[str, Any]:
-    root = Path(artifacts_root).resolve()
-    real = Path(path).resolve()
-    if real != root and root not in real.parents:
-        raise ValueError("path escapes artifacts sandbox")
+    if canonical_record is None:
+        if path is None:
+            raise ValueError("path is required for unmanaged artifacts")
+        root = Path(artifacts_root).resolve()
+        real = Path(path).resolve()
+        if real != root and root not in real.parents:
+            raise ValueError("path escapes artifacts sandbox")
+        size = real.stat().st_size
+        digest = hashlib.sha256(real.read_bytes()).hexdigest()
+        filename = real.name
+        path_value: str | None = str(real)
+        source_ref = None
+        governance_record_id = None
+    else:
+        size = int(canonical_record.size_bytes)
+        digest = str(canonical_record.sha256)
+        filename = f"{build_id}.zip"
+        path_value = None
+        source_ref = str(canonical_record.source_ref)
+        governance_record_id = str(canonical_record.record_id)
 
-    size = real.stat().st_size
-    digest = hashlib.sha256(real.read_bytes()).hexdigest()
     record: dict[str, Any] = {
         "build_id": build_id,
         "game_name": game_name,
         "kind": kind,
-        "path": str(real),
-        "filename": real.name,
+        "path": path_value,
+        "filename": filename,
         "size_bytes": size,
         "sha256": digest,
         "built_at": _built_at(built_at),
     }
+    if source_ref is not None:
+        record["source_ref"] = source_ref
+        record["governance_record_id"] = governance_record_id
     try:
         database()["gameforge_builds"].update_one(
             {"build_id": build_id},
@@ -178,7 +221,14 @@ def _commit_metered_archive(
     operation_id: str | None,
     artifact_id: str,
     write_id: str,
-) -> None:
+    governed_store: GovernedArtifactStore | None = None,
+    tenant_id: str | None = None,
+    data_class: str = "internal",
+    purposes: tuple[str, ...] = ("artifact-delivery",),
+    created_at: float | None = None,
+    retention_until: float | None = None,
+    exportable: bool = True,
+) -> Any | None:
     if usage_meter is not None:
         operation = str(operation_id or "").strip()
         if not operation:
@@ -191,7 +241,24 @@ def _commit_metered_archive(
             write_id,
             pending_path.stat().st_size,
         )
+    if governed_store is not None:
+        tenant = str(tenant_id or "").strip()
+        if not tenant:
+            raise ValueError(
+                "tenant_id is required when governed artifact storage is enabled"
+            )
+        return governed_store.write_bytes(
+            tenant_id=tenant,
+            artifact_id=artifact_id,
+            payload=pending_path.read_bytes(),
+            data_class=data_class,
+            purposes=purposes,
+            created_at=created_at,
+            retention_until=retention_until,
+            exportable=exportable,
+        )
     os.replace(pending_path, final_path)
+    return None
 
 
 def _pending_archive_path(final_path: Path) -> Path:
@@ -228,6 +295,11 @@ def build_web_artifact(
     usage_meter: ArtifactUsageMeter | None = None,
     operation_id: str | None = None,
     write_id: str | None = None,
+    governed_store: GovernedArtifactStore | None = None,
+    tenant_id: str | None = None,
+    data_class: str = "internal",
+    retention_until: float | None = None,
+    exportable: bool = True,
 ) -> dict[str, Any]:
     source_files = _materialize_files(files, game_name)
     safe_name, build_id, workdir = artifact_build(
@@ -285,13 +357,20 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
         with zipfile.ZipFile(pending_path, "w", zipfile.ZIP_DEFLATED) as archive:
             _zip_write(archive, "index.html", index_path.read_bytes())
             _zip_write(archive, "game_data.json", data_path.read_bytes())
-        _commit_metered_archive(
+        canonical_record = _commit_metered_archive(
             pending_path,
             zip_path,
             usage_meter=usage_meter,
             operation_id=operation_id,
             artifact_id=build_id,
             write_id=write_id or build_id,
+            governed_store=governed_store,
+            tenant_id=tenant_id,
+            data_class=data_class,
+            purposes=("artifact-delivery", "download"),
+            created_at=timestamp,
+            retention_until=retention_until,
+            exportable=exportable,
         )
     finally:
         pending_path.unlink(missing_ok=True)
@@ -300,9 +379,10 @@ fetch('game_data.json').then(r=>r.json()).then(d=>console.log('gamefiles',d));
         build_id,
         safe_name,
         "web",
-        zip_path,
+        None if canonical_record is not None else zip_path,
         artifacts_root=artifacts_root,
         built_at=timestamp,
+        canonical_record=canonical_record,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
@@ -319,6 +399,11 @@ def build_source_artifact(
     usage_meter: ArtifactUsageMeter | None = None,
     operation_id: str | None = None,
     write_id: str | None = None,
+    governed_store: GovernedArtifactStore | None = None,
+    tenant_id: str | None = None,
+    data_class: str = "internal",
+    retention_until: float | None = None,
+    exportable: bool = True,
 ) -> dict[str, Any]:
     source_files = _materialize_files(files, game_name)
     safe_name, build_id, _workdir = artifact_build(
@@ -365,13 +450,20 @@ def build_source_artifact(
                     f"gamefiles/{candidate}",
                     str(item.get("content", "")),
                 )
-        _commit_metered_archive(
+        canonical_record = _commit_metered_archive(
             pending_path,
             zip_path,
             usage_meter=usage_meter,
             operation_id=operation_id,
             artifact_id=build_id,
             write_id=write_id or build_id,
+            governed_store=governed_store,
+            tenant_id=tenant_id,
+            data_class=data_class,
+            purposes=("artifact-delivery", "download"),
+            created_at=timestamp,
+            retention_until=retention_until,
+            exportable=exportable,
         )
     finally:
         pending_path.unlink(missing_ok=True)
@@ -380,9 +472,10 @@ def build_source_artifact(
         build_id,
         safe_name,
         "source",
-        zip_path,
+        None if canonical_record is not None else zip_path,
         artifacts_root=artifacts_root,
         built_at=timestamp,
+        canonical_record=canonical_record,
     )
     record["download_url"] = f"/api/gameforge/build/download/{build_id}"
     record["ok"] = True
