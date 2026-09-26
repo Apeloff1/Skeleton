@@ -1364,6 +1364,25 @@ class EngineClient:
             trace_id=trace_id,
         )
 
+    async def plan_governance_retention(
+        self,
+        *,
+        tenant_id: str,
+        trace_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/governance/retention/plan",
+            json_body={
+                "tenant_id": _text(
+                    tenant_id,
+                    "tenant_id",
+                    maximum=512,
+                ),
+            },
+            trace_id=trace_id,
+        )
+
     async def request_governance_deletion(
         self,
         *,
