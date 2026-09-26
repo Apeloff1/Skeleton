@@ -6,6 +6,13 @@ from uuid import uuid4
 import pytest
 
 from skeleton.contracts.memory_record import MemoryKind, MemoryWriteProposal
+from skeleton.intelligence.admission import (
+    AdmissionRequest,
+    ResourceBudget,
+    UsageEstimate,
+)
+from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.memory.policy import (
     MemoryPolicyEngine,
     MemoryWriteDecision,
@@ -248,3 +255,116 @@ def test_governance_persistence_failure_tombstones_memory_fail_closed(
     assert len(rows) == 1
     assert rows[0].active is False
     assert repo.pending_projection_events()[-1].action == "delete"
+
+def _admission_for(proposal: MemoryWriteProposal):
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        proposal.tenant_id,
+        TenantQuota(
+            window_id="memory-write-window",
+            max_operations=10,
+            max_input_tokens=10_000,
+            max_output_tokens=10_000,
+            max_cost_usd=100.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1_000_000,
+            max_storage_bytes=1_000_000,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    runtime.admit(
+        AdmissionRequest(
+            operation_id=proposal.source_operation_id,
+            tenant_id=proposal.tenant_id,
+            capability="memory-write",
+            budget=ResourceBudget(
+                max_storage_bytes=1_000_000,
+            ),
+            estimate=UsageEstimate(),
+        ),
+        now_wall=_now().timestamp(),
+    )
+    return runtime, ledger
+
+
+def test_governed_memory_commit_meters_storage_before_persistence() -> None:
+    repo = SQLiteMemoryRepository()
+    governance = GovernanceRegistry()
+    proposal = _proposal()
+    runtime, ledger = _admission_for(proposal)
+    writer = GovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    record = writer.commit(proposal.proposal_id, now=_now())
+    snapshot = ledger.snapshot("tenant-a")
+    storage = snapshot["metered_by_category"]["storage"]
+
+    assert record.content == "remember"
+    assert storage["storage_bytes"] > 0
+    assert storage["artifact_bytes"] == 0
+    assert snapshot["usage_events"] == 1
+
+
+def test_governed_memory_commit_requires_active_admission_when_bound() -> None:
+    repo = SQLiteMemoryRepository()
+    governance = GovernanceRegistry()
+    proposal = _proposal()
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        proposal.tenant_id,
+        TenantQuota(
+            window_id="memory-write-window",
+            max_storage_bytes=1_000_000,
+        ),
+    )
+    runtime = AdmissionRuntime(quota_ledger=ledger)
+    writer = GovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+
+    with pytest.raises(
+        MemoryWritebackError,
+        match="memory write denied by resource admission",
+    ):
+        writer.commit(proposal.proposal_id, now=_now())
+
+    assert repo.list_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+    ) == ()
+
+
+def test_governed_memory_replay_does_not_double_charge_storage() -> None:
+    repo = SQLiteMemoryRepository()
+    governance = GovernanceRegistry()
+    proposal = _proposal()
+    runtime, ledger = _admission_for(proposal)
+    writer = GovernedMemoryWriter(
+        repo,
+        governance=governance,
+        admission_runtime=runtime,
+    )
+    writer.stage(proposal)
+    first = writer.commit(proposal.proposal_id, now=_now())
+    first_snapshot = ledger.snapshot("tenant-a")
+
+    writer.stage(proposal)
+    replay = writer.commit(proposal.proposal_id, now=_now())
+    replay_snapshot = ledger.snapshot("tenant-a")
+
+    assert replay == first
+    assert replay_snapshot["usage_events"] == first_snapshot["usage_events"] == 1
+    assert (
+        replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+        == first_snapshot["metered_by_category"]["storage"]["storage_bytes"]
+    )
+
