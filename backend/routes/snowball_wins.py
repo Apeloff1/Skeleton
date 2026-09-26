@@ -109,8 +109,8 @@ async def pitch(pid: str):
     if brief:
         try:
             import uuid
-            from emergentintegrations.llm.chat import LlmChat, UserMessage
-            chat = LlmChat(session_id=f"pitch-{uuid.uuid4().hex[:8]}",
+            from core.engine_chat import EngineChat, UserMessage
+            chat = EngineChat(session_id=f"pitch-{uuid.uuid4().hex[:8]}",
                            system_message="You are a punchy game-marketing copywriter.").with_model("openai", "gpt-4o-mini")
             import asyncio
             resp = await asyncio.wait_for(chat.send_message(UserMessage(
