@@ -12,6 +12,7 @@ from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.memory.projection import AsyncMemoryProjectionCoordinator
 from skeleton.memory.writeback import AsyncGovernedMemoryWriter
 from skeleton.persistence.memory_repository import MongoMemoryRepository
+from skeleton.retrieval.governance import GovernedRetrievalIndex
 
 
 def test_server_state_binds_one_durable_governance_owner(
@@ -190,3 +191,42 @@ def test_server_state_restores_durable_governance_audit_chain(
     assert entries[0].outcome == "success"
     assert restarted.governance_audit_log.tamper_check() == (True, -1)
     restarted.close_governance_registry()
+
+@pytest.mark.asyncio
+async def test_server_state_composes_governed_retrieval_lifecycle() -> None:
+    state = ServerState()
+    retrieval = state.bind_canonical_retrieval_index()
+    replay = state.bind_canonical_retrieval_index()
+
+    assert replay is retrieval
+    assert isinstance(retrieval, GovernedRetrievalIndex)
+    assert state.governance_lifecycle_executor is not None
+    assert state.governance_lifecycle_adapters is not None
+
+    record = retrieval.add(
+        tenant_id="tenant-a",
+        doc_id="runtime-doc",
+        text="governed retrieval runtime",
+        created_at=10.0,
+    )
+    inventory = state.governance_registry.export_inventory("tenant-a")
+    assert inventory["records"][0]["record_id"] == record.record_id
+    assert inventory["records"][0]["owner_plane"] == "retrieval"
+
+    exported = await state.governance_lifecycle_executor.export_tenant(
+        "tenant-a"
+    )
+    assert exported.records[0]["payload"]["doc_id"] == "runtime-doc"
+
+    plan = state.governance_lifecycle.request_deletion(
+        "tenant-a",
+        record_ids=(record.record_id,),
+        now=20.0,
+    )
+    await state.governance_lifecycle_executor.execute_deletion_plan(
+        plan,
+        now=21.0,
+    )
+    assert retrieval.size("tenant-a") == 0
+    state.close_governance_registry()
+
