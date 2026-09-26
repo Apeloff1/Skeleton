@@ -891,4 +891,3 @@ def test_jeeves_chat_legacy_collection_is_migration_read_only(route) -> None:
     assert "return core_db[\"jeeves_chat\"]" in source
     assert "_legacy_complete_rows" in source
     assert "_import_legacy_rows_to_canonical" in source
-
