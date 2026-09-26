@@ -1882,7 +1882,7 @@ Output the FINAL COMPILED GAME PROJECT:
 
 async def call_llm(system_prompt: str, user_prompt: str, session_id: str = None) -> dict:
     """Call LLM with fallback to mock data."""
-    if not LLM_AVAILABLE or not EMERGENT_KEY:
+    if not LLM_AVAILABLE:
         return {"success": False, "response": None, "error": "LLM not available"}
 
     try:
