@@ -767,6 +767,20 @@ class TenantQuotaLedger:
             matched_state.completions.append(completion)
             return completion
 
+    def completion_for_operation(
+        self,
+        tenant_id: str,
+        operation_id: str,
+    ) -> QuotaCompletion | None:
+        tenant = _required_id(tenant_id, "tenant_id")
+        operation = _required_id(operation_id, "operation_id")
+        with self._lock:
+            state = self._state(tenant)
+            for completion in reversed(state.completions):
+                if completion.operation_id == operation:
+                    return completion
+            return None
+
     def snapshot(self, tenant_id: str) -> dict[str, Any]:
         tenant = _required_id(tenant_id, "tenant_id")
         with self._lock:
