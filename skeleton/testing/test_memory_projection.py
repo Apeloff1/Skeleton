@@ -26,6 +26,7 @@ from skeleton.memory.vector import VectorStore
 from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk, MemoryQueryResult
 from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.vault.governance_registry import GovernanceRegistry
 
 
 class FakeStore(MemoryStore):
@@ -641,3 +642,98 @@ def test_admitted_projection_rebuild_requires_operation_identity() -> None:
         )
 
     assert store.items == {}
+
+class _FailingRetrievalProjection:
+    governance_plane = "retrieval"
+    name = "failing-retrieval"
+
+    def upsert(self, record) -> None:
+        raise RuntimeError("projection write failed")
+
+    def delete(self, memory_id: str) -> None:
+        raise RuntimeError("projection delete failed")
+
+
+def test_retrieval_projection_registers_governance_before_physical_mutation() -> None:
+    repo = SQLiteMemoryRepository()
+    repo.commit(
+        _proposal(key="governed-retrieval-failure", content="alpha"),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+    )
+
+    report = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(_FailingRetrievalProjection(),),
+    )
+
+    assert report.degraded is True
+    inventory = governance.export_inventory("tenant-a")
+    assert inventory["count"] == 1
+    governed = inventory["records"][0]
+    assert governed["owner_plane"] == "retrieval"
+    assert governed["state"] == "active"
+    assert governed["exportable"] is False
+    assert governed["purposes"] == ["retrieval-synthesis"]
+    assert governed["deletion_targets"] == ["retrieval"]
+
+
+def test_governed_vector_projection_acknowledges_only_after_physical_delete() -> None:
+    repo = SQLiteMemoryRepository()
+    record = repo.commit(
+        _proposal(key="governed-vector-delete", content="alpha vector"),
+        now=_now(),
+    )
+    governance = GovernanceRegistry()
+    store = VectorStore(dims=32)
+    coordinator = MemoryProjectionCoordinator(
+        repo,
+        governance=governance,
+    )
+    projection = VectorStoreProjection("vector", store)
+
+    first = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+    assert first.degraded is False
+    assert store.stats()["documents"] == 1
+
+    active_inventory = governance.export_inventory("tenant-a")
+    assert active_inventory["count"] == 1
+    retrieval_record = active_inventory["records"][0]
+    assert retrieval_record["owner_plane"] == "retrieval"
+    assert retrieval_record["state"] == "active"
+    assert retrieval_record["exportable"] is False
+
+    repo.tombstone(
+        record.memory_id,
+        tenant_id="tenant-a",
+        namespace="assistant",
+        expected_version=record.version,
+        now=_now(),
+    )
+    deleted = coordinator.sync_subject(
+        tenant_id="tenant-a",
+        namespace="assistant",
+        subject_id="user-a",
+        projections=(projection,),
+    )
+
+    assert deleted.degraded is False
+    assert store.stats()["documents"] == 0
+    final_inventory = governance.export_inventory("tenant-a")
+    assert final_inventory["records"][0]["state"] == "deleted"
+    receipts = governance.lifecycle.receipts(tenant_id="tenant-a")
+    assert len(receipts) == 1
+    assert receipts[0].target == "retrieval"
+    assert receipts[0].record_id == retrieval_record["record_id"]
+
