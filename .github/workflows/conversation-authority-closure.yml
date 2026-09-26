@@ -14,6 +14,9 @@ on:
       - "backend/routes/jeeves_compose.py"
       - "frontend/src/product/conversationClient.ts"
       - "frontend/features/Jeeves/WorkspaceController.ts"
+      - "frontend/features/Jeeves/workspace.ts"
+      - "frontend/features/Jeeves/ChatWorkspace.tsx"
+      - "frontend/scripts/test-jeeves-workspace.cjs"
       - "backend/tests/test_ai_chat_conversation_authority.py"
       - "backend/tests/test_conversations_api.py"
       - "backend/tests/test_conversation_regeneration.py"
@@ -71,6 +74,37 @@ jobs:
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_conversation_governance.py
           tests/test_jeeves_chat_workspace.py
+
+  jeeves-workspace-reconstruction:
+    name: Jeeves workspace reconstruction
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v5.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install frontend dependencies without lifecycle scripts
+        working-directory: frontend
+        run: yarn install --ignore-scripts
+
+      - name: Typecheck Jeeves workspace
+        working-directory: frontend
+        run: yarn typecheck:jeeves
+
+      - name: Run Jeeves remount and workspace contracts
+        working-directory: frontend
+        run: node --test scripts/test-jeeves-workspace.cjs
 
   jeeves-cutover-independent:
     name: Independent Jeeves conversation cutover
@@ -131,7 +165,7 @@ jobs:
               raise SystemExit("Jeeves conversation cutover verification failed")
           if receipt.get("legacy_read_accesses") != 1:
               raise SystemExit("legacy Jeeves store is not migration-read-only")
-          if len(receipt.get("digests") or {}) != 4:
+          if len(receipt.get("digests") or {}) != 8:
               raise SystemExit("Jeeves cutover digest coverage is incomplete")
           print("jeeves conversation cutover receipt:", expected)
           PY
