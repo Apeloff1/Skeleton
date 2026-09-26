@@ -152,3 +152,83 @@ class ClockError(ECSError):
 
 class TransactionError(ECSError):
     code = "SIM.ECS.TRANSACTION"
+
+
+# --- Live (archetype / sparse-set) world runtime ---------------------------
+# Extend-only additions for the dense runtime world, scheduler, scripting
+# sandbox and forge adapter.  They reuse the existing hierarchy so callers can
+# keep catching ``ECSError`` / ``ValidationError`` / ``BoundsError``.
+
+
+class EntityHandleError(EntityError):
+    """A packed runtime entity handle is malformed, stale or not alive."""
+
+    code = "SIM.ECS.ENTITY_HANDLE"
+
+
+class ComponentTypeError(ComponentError):
+    """A component type is unknown, duplicated or used with the wrong storage."""
+
+    code = "SIM.ECS.COMPONENT_TYPE"
+
+
+class StructuralChangeError(ECSError):
+    """A structural world change was attempted while iteration was active."""
+
+    code = "SIM.ECS.STRUCTURAL_CHANGE"
+
+
+class AccessViolationError(ScheduleError):
+    """A system touched a component or resource it did not declare."""
+
+    code = "SIM.ECS.ACCESS_VIOLATION"
+
+
+class ScriptError(ECSError):
+    """Root failure for sandboxed game-logic scripts."""
+
+    code = "SIM.ECS.SCRIPT"
+
+
+class ScriptValidationError(ScriptError, ValidationError):
+    """Script source failed static (AST) policy validation.
+
+    ``context["violations"]`` carries ``[{"line", "col", "rule", "detail"}]``
+    in source order so editors can underline every rejected construct.
+    """
+
+    code = "SIM.ECS.SCRIPT_VALIDATION"
+
+
+class ScriptRuntimeError(ScriptError):
+    """A script raised an ordinary error while running inside the sandbox."""
+
+    code = "SIM.ECS.SCRIPT_RUNTIME"
+
+
+class ScriptLimitError(ScriptError, BoundsError):
+    """A script exceeded one of its execution budgets."""
+
+    code = "SIM.ECS.SCRIPT_LIMIT"
+
+
+class ScriptStepLimitError(ScriptLimitError):
+    code = "SIM.ECS.SCRIPT_STEP_LIMIT"
+
+
+class ScriptMemoryLimitError(ScriptLimitError):
+    code = "SIM.ECS.SCRIPT_MEMORY_LIMIT"
+
+
+class ScriptDepthLimitError(ScriptLimitError):
+    code = "SIM.ECS.SCRIPT_DEPTH_LIMIT"
+
+
+class ScriptTimeLimitError(ScriptLimitError):
+    code = "SIM.ECS.SCRIPT_TIME_LIMIT"
+
+
+class ForgeAdapterError(ValidationError):
+    """A forge blueprint / component graph could not be instantiated."""
+
+    code = "SIM.ECS.FORGE_ADAPTER"

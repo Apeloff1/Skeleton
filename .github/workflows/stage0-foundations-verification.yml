@@ -18,7 +18,16 @@ on:
       - "skeleton/artifact_plane/**"
       - "skeleton/observability/**"
       - "backend/routes/governance.py"
+      - "backend/core/route_privacy.py"
+      - "backend/tests/test_route_privacy.py"
+      - "scripts/check_tool_runtime_boundary.py"
+      - "tests/test_tool_runtime_boundary.py"
       - "skeleton/testing/test_data_governance.py"
+      - "skeleton/skills/**"
+      - "skeleton/intelligence/execution_runtime.py"
+      - "skeleton/testing/test_tool_runtime.py"
+      - "skeleton/testing/test_tool_receipt_store.py"
+      - "skeleton/testing/test_execution_runtime.py"
       - "skeleton/testing/test_data_lifecycle.py"
       - "skeleton/testing/test_governance_registry.py"
       - "skeleton/testing/test_governance_audit.py"
@@ -117,6 +126,20 @@ jobs:
           skeleton/testing/test_governance_audit.py
           skeleton/testing/test_governance_runtime_binding.py
           skeleton/testing/test_memory_writeback.py
+          skeleton/testing/test_tool_runtime.py
+          skeleton/testing/test_tool_receipt_store.py
+          skeleton/testing/test_execution_runtime.py
+          backend/tests/test_route_privacy.py
+
+      - name: Enforce canonical tool runtime boundary
+        run: python scripts/check_tool_runtime_boundary.py
+
+      - name: Verify tool boundary audit regressions
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: >-
+          python -m pytest -q --noconftest
+          tests/test_tool_runtime_boundary.py
 
       - name: Record governance verification head
         run: echo "Governance lifecycle verified at $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

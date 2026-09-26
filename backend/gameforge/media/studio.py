@@ -11,6 +11,7 @@ Turns a ``GameWorld`` into real deliverables:
 from __future__ import annotations
 
 import base64
+import hashlib
 import io
 import os
 import subprocess
@@ -146,26 +147,46 @@ def _commentary_script(world: GameWorld) -> str:
 
 
 def _tts_mp3(text: str, path: str) -> bool:
-    """Generate a commentary voice track via OpenAI TTS (Emergent key).
-    Always invoked from a worker thread (no running loop), so asyncio.run is safe."""
-    key = os.getenv("EMERGENT_LLM_KEY", "")
-    if not key:
-        return False
+    """Generate commentary audio through the canonical Skeleton engine boundary.
+
+    Provider credentials and provider transport remain engine-owned. This helper
+    is synchronous because media rendering calls it from a worker thread.
+    """
     try:
         import asyncio
-        from emergentintegrations.llm.openai.text_to_speech import OpenAITextToSpeech
+        from core.engine_client import EngineClient
 
-        async def _run():
-            tts = OpenAITextToSpeech(api_key=key)
-            audio = await tts.generate_speech(text=text[:4000], voice="onyx")
-            data = audio if isinstance(audio, (bytes, bytearray)) else bytes(audio)
-            with open(path, "wb") as f:
-                f.write(data)
+        material = (
+            text[:4000] + "\x1f" + os.path.basename(path)
+        ).encode("utf-8")
+        operation_id = (
+            "gameforge-media-tts:"
+            + hashlib.sha256(material).hexdigest()[:32]
+        )
 
-        asyncio.run(_run())
+        async def _run() -> bytes:
+            response = await EngineClient.from_env().synthesize_speech(
+                actor_id="gameforge-media",
+                tenant_id="default",
+                operation_id=operation_id,
+                text=text[:4000],
+                voice="onyx",
+                response_format="mp3",
+            )
+            audio = response.get("audio")
+            if not isinstance(audio, (bytes, bytearray)) or not audio:
+                raise RuntimeError("engine speech response is missing audio")
+            return bytes(audio)
+
+        data = asyncio.run(_run())
+        with open(path, "wb") as handle:
+            handle.write(data)
         return os.path.exists(path) and os.path.getsize(path) > 200
-    except Exception as e:  # noqa: BLE001
-        print(f"[media] TTS failed: {type(e).__name__}: {e}", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(
+            f"[media] TTS failed: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
         return False
 
 

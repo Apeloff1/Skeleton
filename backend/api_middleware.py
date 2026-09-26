@@ -36,6 +36,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from core.route_privacy import bind_route_privacy, reset_route_privacy
+
 log = logging.getLogger("api.middleware")
 
 
@@ -267,6 +269,20 @@ def _is_api_path(path: str) -> bool:
     return _matches_path_prefix(path, "/api")
 
 
+# ── Route privacy ─────────────────────────────────────────────────────
+class RoutePrivacyMiddleware(BaseHTTPMiddleware):
+    """Bind one fail-closed route-domain privacy context around each API request."""
+
+    async def dispatch(self, request: Request, call_next: Callable):
+        if not _is_api_path(request.url.path):
+            return await call_next(request)
+        token = bind_route_privacy(request.url.path)
+        try:
+            return await call_next(request)
+        finally:
+            reset_route_privacy(token)
+
+
 # ── Access log ────────────────────────────────────────────────────────
 class AccessLogMiddleware(BaseHTTPMiddleware):
     """Single structured log line per request."""
@@ -481,8 +497,9 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
 def install_middleware(app) -> None:
     """Install middleware in the intentional Starlette LIFO order.
 
-    Client → RateLimiter → RequestId → AccessLog → handler
+    Client → RoutePrivacy → RateLimiter → RequestId → AccessLog → handler
     """
     app.add_middleware(AccessLogMiddleware)
     app.add_middleware(RequestIdMiddleware)
     app.add_middleware(RateLimiterMiddleware)
+    app.add_middleware(RoutePrivacyMiddleware)

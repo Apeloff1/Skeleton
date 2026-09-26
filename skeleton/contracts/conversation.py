@@ -240,6 +240,7 @@ class ConversationMessage:
     context_compiler_version: str | None = None
     attachment_refs: tuple[str, ...] = ()
     tool_receipt_refs: tuple[str, ...] = ()
+    memory_refs: tuple[str, ...] = ()
     citation_refs: tuple[str, ...] = ()
     artifact_refs: tuple[str, ...] = ()
     data_class: str = "confidential"
@@ -333,6 +334,11 @@ class ConversationMessage:
         )
         object.__setattr__(
             self,
+            "memory_refs",
+            _refs(self.memory_refs, "memory_refs"),
+        )
+        object.__setattr__(
+            self,
             "citation_refs",
             _refs(self.citation_refs, "citation_refs"),
         )
@@ -392,6 +398,7 @@ class ConversationMessage:
             "context_compiler_version": self.context_compiler_version,
             "attachment_refs": list(self.attachment_refs),
             "tool_receipt_refs": list(self.tool_receipt_refs),
+            "memory_refs": list(self.memory_refs),
             "citation_refs": list(self.citation_refs),
             "artifact_refs": list(self.artifact_refs),
             "data_class": self.data_class,

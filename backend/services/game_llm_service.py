@@ -25,11 +25,8 @@ from loguru import logger
 load_dotenv()
 
 from core.engine_client import EngineClient, EngineClientError
-from core.engine_text import (
-    EngineTextError,
-    EngineTextRequest,
-    execute_engine_text,
-)
+from core.engine_chat import EngineChat, EngineTextError, UserMessage
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 class GameLLMService:
@@ -58,7 +55,7 @@ class GameLLMService:
         )
         self.model = "engine-routed"
         self.provider = "skeleton-engine"
-        self._engine_executor = engine_executor or execute_engine_text
+        self._engine_executor = engine_executor
 
     @property
     def available(self) -> bool:
@@ -102,18 +99,21 @@ class GameLLMService:
                 prompt,
             )
         ).encode("utf-8")
-        response = await self._engine_executor(
-            EngineTextRequest(
-                instructions=system_message,
-                prompt=prompt,
-                idempotency_key=(
-                    "game-llm:"
-                    + hashlib.sha256(material).hexdigest()
-                ),
-                actor_id="game-llm-service",
-                capability="assistant.compat",
-                max_output_tokens=16_384,
-            )
+        identity = hashlib.sha256(material).hexdigest()
+        policy = InstructionPolicy(
+            policy_id="backend.game-llm.generate",
+            version="1",
+            instructions=system_message,
+        )
+        chat = EngineChat(
+            session_id="game-llm:" + identity,
+            instruction_policy=policy,
+            actor_id="game-llm-service",
+            capability="assistant.compat",
+            engine_executor=self._engine_executor,
+        ).with_max_tokens(16_384)
+        response = await chat.send_message(
+            UserMessage(text=prompt)
         )
         return response.text
     

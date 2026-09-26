@@ -63,7 +63,7 @@ def validate_cloud_cloudinit(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-cloudinit:"+identifier, ("ubuntu","cloud","cloudinit",identifier,desired), "validated cloud-cloudinit")
+    return UbuntuAction("cloud-cloudinit:"+identifier, ("ubuntu","cloud","cloudinit",identifier,desired), "reconcile cloud-cloudinit")
 
 def plan_cloud_cloudinit(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-cloudinit plan."""
@@ -123,7 +123,7 @@ def validate_cloud_metadata(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-metadata:"+identifier, ("ubuntu","cloud","metadata",identifier,desired), "validated cloud-metadata")
+    return UbuntuAction("cloud-metadata:"+identifier, ("ubuntu","cloud","metadata",identifier,desired), "reconcile cloud-metadata")
 
 def plan_cloud_metadata(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-metadata plan."""
@@ -183,7 +183,7 @@ def validate_cloud_identity(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-identity:"+identifier, ("ubuntu","cloud","identity",identifier,desired), "validated cloud-identity")
+    return UbuntuAction("cloud-identity:"+identifier, ("ubuntu","cloud","identity",identifier,desired), "reconcile cloud-identity")
 
 def plan_cloud_identity(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-identity plan."""
@@ -243,7 +243,7 @@ def validate_cloud_instance(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-instance:"+identifier, ("ubuntu","cloud","instance",identifier,desired), "validated cloud-instance")
+    return UbuntuAction("cloud-instance:"+identifier, ("ubuntu","cloud","instance",identifier,desired), "reconcile cloud-instance")
 
 def plan_cloud_instance(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-instance plan."""
@@ -303,7 +303,7 @@ def validate_cloud_userdata(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-userdata:"+identifier, ("ubuntu","cloud","userdata",identifier,desired), "validated cloud-userdata")
+    return UbuntuAction("cloud-userdata:"+identifier, ("ubuntu","cloud","userdata",identifier,desired), "reconcile cloud-userdata")
 
 def plan_cloud_userdata(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-userdata plan."""
@@ -363,7 +363,7 @@ def validate_cloud_provision(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-provision:"+identifier, ("ubuntu","cloud","provision",identifier,desired), "validated cloud-provision")
+    return UbuntuAction("cloud-provision:"+identifier, ("ubuntu","cloud","provision",identifier,desired), "reconcile cloud-provision")
 
 def plan_cloud_provision(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-provision plan."""
@@ -423,7 +423,7 @@ def validate_cloud_image(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-image:"+identifier, ("ubuntu","cloud","image",identifier,desired), "validated cloud-image")
+    return UbuntuAction("cloud-image:"+identifier, ("ubuntu","cloud","image",identifier,desired), "reconcile cloud-image")
 
 def plan_cloud_image(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-image plan."""
@@ -483,7 +483,7 @@ def validate_cloud_agent(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-agent:"+identifier, ("ubuntu","cloud","agent",identifier,desired), "validated cloud-agent")
+    return UbuntuAction("cloud-agent:"+identifier, ("ubuntu","cloud","agent",identifier,desired), "reconcile cloud-agent")
 
 def plan_cloud_agent(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-agent plan."""
@@ -543,7 +543,7 @@ def validate_cloud_health(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-health:"+identifier, ("ubuntu","cloud","health",identifier,desired), "validated cloud-health")
+    return UbuntuAction("cloud-health:"+identifier, ("ubuntu","cloud","health",identifier,desired), "reconcile cloud-health")
 
 def plan_cloud_health(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-health plan."""
@@ -603,7 +603,7 @@ def validate_cloud_tags(identifier: str, desired: str = "present", *, enabled: b
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("cloud-tags:"+identifier, ("ubuntu","cloud","tags",identifier,desired), "validated cloud-tags")
+    return UbuntuAction("cloud-tags:"+identifier, ("ubuntu","cloud","tags",identifier,desired), "reconcile cloud-tags")
 
 def plan_cloud_tags(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic cloud-tags plan."""

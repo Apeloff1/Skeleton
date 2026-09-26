@@ -63,7 +63,7 @@ def validate_storage_mount(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-mount:"+identifier, ("ubuntu","storage","mount",identifier,desired), "validated storage-mount")
+    return UbuntuAction("storage-mount:"+identifier, ("ubuntu","storage","mount",identifier,desired), "reconcile storage-mount")
 
 def plan_storage_mount(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-mount plan."""
@@ -123,7 +123,7 @@ def validate_storage_fstab(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-fstab:"+identifier, ("ubuntu","storage","fstab",identifier,desired), "validated storage-fstab")
+    return UbuntuAction("storage-fstab:"+identifier, ("ubuntu","storage","fstab",identifier,desired), "reconcile storage-fstab")
 
 def plan_storage_fstab(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-fstab plan."""
@@ -183,7 +183,7 @@ def validate_storage_disk(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-disk:"+identifier, ("ubuntu","storage","disk",identifier,desired), "validated storage-disk")
+    return UbuntuAction("storage-disk:"+identifier, ("ubuntu","storage","disk",identifier,desired), "reconcile storage-disk")
 
 def plan_storage_disk(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-disk plan."""
@@ -243,7 +243,7 @@ def validate_storage_partition(identifier: str, desired: str = "present", *, ena
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-partition:"+identifier, ("ubuntu","storage","partition",identifier,desired), "validated storage-partition")
+    return UbuntuAction("storage-partition:"+identifier, ("ubuntu","storage","partition",identifier,desired), "reconcile storage-partition")
 
 def plan_storage_partition(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-partition plan."""
@@ -303,7 +303,7 @@ def validate_storage_lvm(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-lvm:"+identifier, ("ubuntu","storage","lvm",identifier,desired), "validated storage-lvm")
+    return UbuntuAction("storage-lvm:"+identifier, ("ubuntu","storage","lvm",identifier,desired), "reconcile storage-lvm")
 
 def plan_storage_lvm(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-lvm plan."""
@@ -363,7 +363,7 @@ def validate_storage_zfs(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-zfs:"+identifier, ("ubuntu","storage","zfs",identifier,desired), "validated storage-zfs")
+    return UbuntuAction("storage-zfs:"+identifier, ("ubuntu","storage","zfs",identifier,desired), "reconcile storage-zfs")
 
 def plan_storage_zfs(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-zfs plan."""
@@ -423,7 +423,7 @@ def validate_storage_raid(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-raid:"+identifier, ("ubuntu","storage","raid",identifier,desired), "validated storage-raid")
+    return UbuntuAction("storage-raid:"+identifier, ("ubuntu","storage","raid",identifier,desired), "reconcile storage-raid")
 
 def plan_storage_raid(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-raid plan."""
@@ -483,7 +483,7 @@ def validate_storage_quota(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-quota:"+identifier, ("ubuntu","storage","quota",identifier,desired), "validated storage-quota")
+    return UbuntuAction("storage-quota:"+identifier, ("ubuntu","storage","quota",identifier,desired), "reconcile storage-quota")
 
 def plan_storage_quota(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-quota plan."""
@@ -543,7 +543,7 @@ def validate_storage_tmpfs(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-tmpfs:"+identifier, ("ubuntu","storage","tmpfs",identifier,desired), "validated storage-tmpfs")
+    return UbuntuAction("storage-tmpfs:"+identifier, ("ubuntu","storage","tmpfs",identifier,desired), "reconcile storage-tmpfs")
 
 def plan_storage_tmpfs(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-tmpfs plan."""
@@ -603,7 +603,7 @@ def validate_storage_backup(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("storage-backup:"+identifier, ("ubuntu","storage","backup",identifier,desired), "validated storage-backup")
+    return UbuntuAction("storage-backup:"+identifier, ("ubuntu","storage","backup",identifier,desired), "reconcile storage-backup")
 
 def plan_storage_backup(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic storage-backup plan."""

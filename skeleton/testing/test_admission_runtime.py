@@ -19,6 +19,11 @@ from skeleton.intelligence.quota import (
     TenantQuota,
     TenantQuotaLedger,
 )
+from skeleton.intelligence.shared_pressure import (
+    SharedPressureConflict,
+    SharedPressurePolicy,
+    SqliteSharedPressureLedger,
+)
 
 
 def _request(
@@ -310,3 +315,269 @@ def test_metered_usage_cannot_be_discarded_by_release() -> None:
 
     with pytest.raises(QuotaConflict, match="cannot release reservation after metered usage"):
         runtime.release("op-metered-release")
+
+
+def test_completion_emits_payload_free_estimate_actual_delta_telemetry() -> None:
+    runtime = AdmissionRuntime()
+    request = _request(
+        "op-telemetry",
+        tenant_id="tenant-secret",
+        input_tokens=100,
+        cost_usd=1.0,
+    )
+
+    runtime.admit(request, now_wall=10.0)
+    runtime.complete(
+        "op-telemetry",
+        UsageEstimate(
+            input_tokens=80,
+            output_tokens=7,
+            cost_usd=0.4,
+            wall_seconds=0.6,
+            provider_attempts=1,
+            tool_calls=2,
+            artifact_bytes=64,
+            storage_bytes=32,
+        ),
+        now_wall=11.0,
+    )
+
+    telemetry = runtime.telemetry_snapshot()
+    metrics = telemetry["metrics"]
+
+    assert telemetry["schema_version"] == 1
+    assert metrics["counters"]["admission.admitted_total"] == 1
+    assert metrics["counters"]["admission.completed_total"] == 1
+
+    assert metrics["samples"]["admission.estimated.input_tokens"] == (100.0,)
+    assert metrics["samples"]["admission.actual.input_tokens"] == (80.0,)
+    assert metrics["samples"]["admission.delta.input_tokens"] == (-20.0,)
+
+    assert metrics["samples"]["admission.estimated.output_tokens"] == (5.0,)
+    assert metrics["samples"]["admission.actual.output_tokens"] == (7.0,)
+    assert metrics["samples"]["admission.delta.output_tokens"] == (2.0,)
+
+    assert metrics["samples"]["admission.estimated.cost_usd"] == (1.0,)
+    assert metrics["samples"]["admission.actual.cost_usd"] == (0.4,)
+    assert metrics["samples"]["admission.delta.cost_usd"] == pytest.approx((-0.6,))
+
+    assert metrics["samples"]["admission.actual.tool_calls"] == (2.0,)
+    assert metrics["samples"]["admission.delta.tool_calls"] == (2.0,)
+    assert metrics["samples"]["admission.actual.artifact_bytes"] == (64.0,)
+    assert metrics["samples"]["admission.delta.artifact_bytes"] == (64.0,)
+    assert metrics["samples"]["admission.estimated.storage_bytes"] == (0.0,)
+    assert metrics["samples"]["admission.actual.storage_bytes"] == (32.0,)
+    assert metrics["samples"]["admission.delta.storage_bytes"] == (32.0,)
+
+    serialized = repr(telemetry)
+    assert "op-telemetry" not in serialized
+    assert "tenant-secret" not in serialized
+
+
+def test_idempotent_replay_does_not_double_count_admission_telemetry() -> None:
+    runtime = AdmissionRuntime()
+    request = _request("op-telemetry-replay")
+
+    first = runtime.admit(request, now_wall=10.0)
+    second = runtime.admit(request, now_wall=11.0)
+
+    assert second == first
+    telemetry = runtime.telemetry_snapshot()["metrics"]
+    assert telemetry["counters"]["admission.admitted_total"] == 1
+    assert telemetry["samples"]["admission.estimated.input_tokens"] == (10.0,)
+
+def _shared_pressure_runtime(
+    path,
+    *,
+    owner_id: str,
+    quota_ledger: TenantQuotaLedger | None = None,
+) -> AdmissionRuntime:
+    pressure = SqliteSharedPressureLedger(path)
+    try:
+        pressure.configure(
+            SharedPressurePolicy(
+                scope="ai-work",
+                max_concurrency=1,
+                max_queue_depth=8,
+                max_tenant_concurrency=1,
+                max_tenant_queue_depth=4,
+                soft_shed_fraction=1.0,
+                protect_priority_at_or_below=100,
+                default_lease_seconds=30.0,
+            )
+        )
+    except SharedPressureConflict:
+        pass
+    return AdmissionRuntime(
+        quota_ledger=quota_ledger,
+        shared_pressure_ledger=pressure,
+        shared_pressure_scope="ai-work",
+        shared_pressure_owner_id=owner_id,
+    )
+
+
+def test_shared_pressure_prevents_cross_worker_overbooking(tmp_path) -> None:
+    path = tmp_path / "pressure.sqlite3"
+    first = _shared_pressure_runtime(path, owner_id="worker-a")
+    second = _shared_pressure_runtime(path, owner_id="worker-b")
+
+    first.admit(_request("op-a", max_concurrency=2), now_wall=10.0)
+
+    with pytest.raises(AdmissionError, match="shared_concurrency_saturated"):
+        second.admit(
+            _request(
+                "op-b",
+                tenant_id="tenant-b",
+                max_concurrency=2,
+            ),
+            now_wall=10.1,
+        )
+
+    assert first.pressure.active_operations == 1
+    assert second.pressure.active_operations == 0
+
+    first.complete(
+        "op-a",
+        UsageEstimate(),
+        now_wall=10.2,
+    )
+    admitted = second.admit(
+        _request(
+            "op-b",
+            tenant_id="tenant-b",
+            max_concurrency=2,
+        ),
+        now_wall=10.3,
+    )
+    assert admitted.operation_id == "op-b"
+
+
+def test_quota_denial_releases_shared_pressure_slot(tmp_path) -> None:
+    path = tmp_path / "pressure.sqlite3"
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="window-shared",
+            max_operations=10,
+            max_input_tokens=5,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_tool_calls=100,
+            max_artifact_bytes=10_000,
+            max_storage_bytes=10_000,
+            max_concurrent_operations=4,
+        ),
+    )
+    runtime = _shared_pressure_runtime(
+        path,
+        owner_id="worker-a",
+        quota_ledger=ledger,
+    )
+
+    with pytest.raises(
+        AdmissionError,
+        match="tenant_quota_exceeded:input_tokens",
+    ):
+        runtime.admit(
+            _request("op-denied", input_tokens=10),
+            now_wall=20.0,
+        )
+
+    pressure = SqliteSharedPressureLedger(path).snapshot(
+        "ai-work",
+        now=20.1,
+    )
+    assert pressure.active == 0
+
+
+def test_shared_pressure_configuration_is_all_or_none(tmp_path) -> None:
+    pressure = SqliteSharedPressureLedger(tmp_path / "pressure.sqlite3")
+
+    with pytest.raises(ValueError, match="configured together"):
+        AdmissionRuntime(shared_pressure_ledger=pressure)
+
+    with pytest.raises(ValueError, match="configured together"):
+        AdmissionRuntime(
+            shared_pressure_scope="ai-work",
+            shared_pressure_owner_id="worker-a",
+        )
+
+def test_default_tenant_quota_is_provisioned_on_first_admission() -> None:
+    ledger = TenantQuotaLedger()
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="default-window",
+            max_operations=10,
+            max_input_tokens=1_000,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1024,
+            max_storage_bytes=2048,
+            max_concurrent_operations=4,
+        ),
+    )
+
+    lease = runtime.admit(
+        _request(
+            "op-autoprovision",
+            tenant_id="tenant-new",
+            input_tokens=5,
+            cost_usd=0.1,
+        ),
+        now_wall=10.0,
+    )
+
+    assert lease.quota_reservation is not None
+    snapshot = ledger.snapshot("tenant-new")
+    assert snapshot["window_id"] == "default-window"
+    assert snapshot["quota"]["max_storage_bytes"] == 2048
+    assert snapshot["active_reservations"] == 1
+
+
+def test_default_tenant_quota_reuses_existing_policy_without_replacement() -> None:
+    ledger = TenantQuotaLedger()
+    ledger.configure(
+        "tenant-a",
+        TenantQuota(
+            window_id="existing-window",
+            max_operations=3,
+            max_input_tokens=500,
+            max_output_tokens=500,
+            max_cost_usd=5.0,
+            max_tool_calls=50,
+            max_artifact_bytes=512,
+            max_storage_bytes=768,
+            max_concurrent_operations=2,
+        ),
+    )
+    runtime = AdmissionRuntime(
+        quota_ledger=ledger,
+        default_tenant_quota=TenantQuota(
+            window_id="default-window",
+            max_operations=10,
+            max_input_tokens=1_000,
+            max_output_tokens=1_000,
+            max_cost_usd=10.0,
+            max_tool_calls=100,
+            max_artifact_bytes=1024,
+            max_storage_bytes=2048,
+            max_concurrent_operations=4,
+        ),
+    )
+
+    runtime.admit(
+        _request(
+            "op-existing-policy",
+            tenant_id="tenant-a",
+            input_tokens=5,
+            cost_usd=0.1,
+        ),
+        now_wall=10.0,
+    )
+
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["window_id"] == "existing-window"
+    assert snapshot["quota"]["max_storage_bytes"] == 768

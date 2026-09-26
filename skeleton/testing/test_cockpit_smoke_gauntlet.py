@@ -56,9 +56,13 @@ def test_cockpit_smoke_script_smoke_optional():
         pytest.skip("gauntlet script missing")
     if not os.access(SCRIPT, os.X_OK):
         pytest.skip("gauntlet script not executable")
+    if os.environ.get("SKELETON_COCKPIT_SMOKE_NESTED"):
+        pytest.skip("already running inside cockpit-smoke.sh (recursion guard)")
+    env = dict(os.environ, SKELETON_COCKPIT_SMOKE_NESTED="1")
     try:
         proc = subprocess.run(
             [str(SCRIPT)],
+            env=env,
             cwd=str(ROOT),
             capture_output=True,
             text=True,

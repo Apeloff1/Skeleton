@@ -6,8 +6,8 @@ ONLY the options that pertain to that spec, with advanced options dominating.
 Every selection resolves to concrete forge directives (the actual change).
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
-import os
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -75,23 +75,23 @@ def flavor(req: FlavorReq):
         return {"error": "unknown_option"}
     base = {"axis": req.axis_key, "option": opt["id"], "label": opt["label"],
             "tier": opt["tier"], "effect": opt["effect"]}
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        base["flavor"] = (f"{opt['label']} ({opt['tier']}): applies "
-                          + ", ".join(f"{k}={v}" for k, v in opt["effect"].items()) + ".")
-        base["llm"] = False
-        return base
     try:
         import asyncio
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from core.engine_chat import EngineChat, UserMessage
         g = (req.spec or {}).get("genre", "game")
         prompt = (f"In 2 punchy sentences, describe how the '{opt['label']}' choice "
                   f"({opt['tier']} tier; directives {opt['effect']}) concretely shapes a "
                   f"{g}. Be specific and production-grounded; no fluff.")
 
         async def _run():
-            chat = LlmChat(api_key=key, session_id=f"axis-{opt['id']}",
-                           system_message="You are a senior technical art director.")
+            chat = EngineChat(
+                session_id=f"axis-{opt['id']}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.galaxy-studio.axes-flavor",
+                    version="1",
+                    instructions="You are a senior technical art director.",
+                ),
+            )
             chat.with_model("anthropic", "claude-sonnet-4-5-20250929")
             return await chat.send_message(UserMessage(text=prompt))
         base["flavor"] = (asyncio.run(_run()) or "").strip()

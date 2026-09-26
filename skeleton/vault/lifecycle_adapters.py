@@ -20,6 +20,7 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 from skeleton.observability.correlation import correlation_scope, get_correlation_id
 from skeleton.persistence.memory_repository import (
     MemoryNotFound,
+    MongoMemoryRepository,
     SQLiteMemoryRepository,
 )
 from skeleton.vault.governance_audit import GovernanceAuditTimeline
@@ -240,6 +241,180 @@ class SQLiteMemoryLifecycleAdapter:
         except MemoryNotFound:
             return None
         return current.as_dict()
+
+
+class MongoMemoryLifecycleAdapter:
+    """Tenant-scoped lifecycle adapter for canonical Mongo memory authority."""
+
+    _PREFIX = SQLiteMemoryLifecycleAdapter._PREFIX
+
+    def __init__(self, repository: MongoMemoryRepository) -> None:
+        if not isinstance(repository, MongoMemoryRepository):
+            raise TypeError("repository must be MongoMemoryRepository")
+        self.repository = repository
+
+    @classmethod
+    def source_ref(cls, namespace: str, memory_id: str) -> str:
+        return SQLiteMemoryLifecycleAdapter.source_ref(
+            namespace,
+            memory_id,
+        )
+
+    @classmethod
+    def _parse_source_ref(cls, source_ref: object) -> tuple[str, str]:
+        return SQLiteMemoryLifecycleAdapter._parse_source_ref(source_ref)
+
+    async def delete(self, action: DeletionAction) -> None:
+        namespace, memory_id = self._parse_source_ref(action.source_ref)
+        if memory_id != action.record_id:
+            raise LifecycleAdapterError("memory lifecycle identity mismatch")
+        try:
+            current = await self.repository.get(
+                memory_id,
+                tenant_id=action.tenant_id,
+                namespace=namespace,
+                include_tombstoned=True,
+            )
+        except MemoryNotFound:
+            return
+        if not current.active:
+            return
+        await self.repository.tombstone(
+            memory_id,
+            tenant_id=action.tenant_id,
+            namespace=namespace,
+            expected_version=current.version,
+        )
+
+    async def export(
+        self,
+        record: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        namespace, memory_id = self._parse_source_ref(
+            record.get("source_ref")
+        )
+        if memory_id != str(record.get("record_id")):
+            raise LifecycleAdapterError("memory lifecycle identity mismatch")
+        try:
+            current = await self.repository.get(
+                memory_id,
+                tenant_id=str(record["tenant_id"]),
+                namespace=namespace,
+                include_tombstoned=False,
+            )
+        except MemoryNotFound:
+            return None
+        return current.as_dict()
+
+
+class GovernedArtifactLifecycleAdapter:
+    """Physical delete/export adapter for canonical governed artifacts."""
+
+    def __init__(self, artifacts: Any) -> None:
+        from skeleton.artifact_plane.governance import GovernedArtifactStore
+
+        if not isinstance(artifacts, GovernedArtifactStore):
+            raise TypeError("artifacts must be GovernedArtifactStore")
+        self.artifacts = artifacts
+
+    def _identity(
+        self,
+        record_id: object,
+        tenant_id: object,
+        source_ref: object,
+    ) -> tuple[str, str]:
+        tenant, artifact_id = self.artifacts.parse_source_ref(
+            source_ref
+        )
+        if tenant != str(tenant_id):
+            raise LifecycleAdapterError(
+                "artifact lifecycle tenant mismatch"
+            )
+        expected = self.artifacts.lifecycle_record_id(
+            tenant,
+            artifact_id,
+        )
+        if expected != str(record_id):
+            raise LifecycleAdapterError(
+                "artifact lifecycle identity mismatch"
+            )
+        return tenant, artifact_id
+
+    async def delete(self, action: DeletionAction) -> None:
+        tenant, artifact_id = self._identity(
+            action.record_id,
+            action.tenant_id,
+            action.source_ref,
+        )
+        await _await_if_needed(
+            self.artifacts.remove(tenant, artifact_id)
+        )
+
+    async def export(
+        self,
+        record: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        tenant, artifact_id = self._identity(
+            record.get("record_id"),
+            record.get("tenant_id"),
+            record.get("source_ref"),
+        )
+        return self.artifacts.export_record(
+            tenant,
+            artifact_id,
+        )
+
+
+class GovernedRetrievalLifecycleAdapter:
+    """Physical delete/export adapter for canonical governed retrieval."""
+
+    def __init__(self, retrieval: Any) -> None:
+        from skeleton.retrieval.governance import GovernedRetrievalIndex
+
+        if not isinstance(retrieval, GovernedRetrievalIndex):
+            raise TypeError(
+                "retrieval must be GovernedRetrievalIndex"
+            )
+        self.retrieval = retrieval
+
+    def _identity(
+        self,
+        record_id: object,
+        tenant_id: object,
+        source_ref: object,
+    ) -> tuple[str, str]:
+        tenant, doc_id = self.retrieval.parse_source_ref(source_ref)
+        if tenant != str(tenant_id):
+            raise LifecycleAdapterError(
+                "retrieval lifecycle tenant mismatch"
+            )
+        expected = self.retrieval.lifecycle_record_id(tenant, doc_id)
+        if expected != str(record_id):
+            raise LifecycleAdapterError(
+                "retrieval lifecycle identity mismatch"
+            )
+        return tenant, doc_id
+
+    async def delete(self, action: DeletionAction) -> None:
+        tenant, doc_id = self._identity(
+            action.record_id,
+            action.tenant_id,
+            action.source_ref,
+        )
+        await _await_if_needed(
+            self.retrieval.remove(tenant, doc_id)
+        )
+
+    async def export(
+        self,
+        record: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        tenant, doc_id = self._identity(
+            record.get("record_id"),
+            record.get("tenant_id"),
+            record.get("source_ref"),
+        )
+        return self.retrieval.export_record(tenant, doc_id)
 
 
 class RetrievalIndexDeletionAdapter:
@@ -483,7 +658,9 @@ __all__ = [
     "DeletionAdapter",
     "DeletionExecutionResult",
     "ExportAdapter",
+    "GovernedArtifactLifecycleAdapter",
     "GovernedExport",
+    "GovernedRetrievalLifecycleAdapter",
     "LifecycleAdapterError",
     "LifecycleAdapterMissing",
     "LifecycleAdapterRegistry",
@@ -491,6 +668,7 @@ __all__ = [
     "LifecycleExecutor",
     "MemoryDeletionAdapter",
     "MongoCollectionLifecycleAdapter",
+    "MongoMemoryLifecycleAdapter",
     "RetrievalIndexDeletionAdapter",
     "SQLiteMemoryLifecycleAdapter",
 ]

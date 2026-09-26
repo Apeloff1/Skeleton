@@ -274,6 +274,43 @@ def test_durable_registry_survives_restart_with_pending_plan(tmp_path) -> None:
     again.close()
 
 
+def test_pending_deletion_plan_is_tenant_fenced_and_receipt_aware() -> None:
+    registry = DataLifecycleRegistry()
+    registry.register(
+        _record("linked", targets=("conversation", "artifact"))
+    )
+    plan = registry.request_deletion(
+        "tenant-a",
+        record_ids=("linked",),
+        now=20.0,
+    )
+    registry.acknowledge_deletion(
+        plan.plan_id,
+        "linked",
+        "artifact",
+        now=21.0,
+    )
+
+    pending = registry.pending_deletion_plan(
+        plan.plan_id,
+        tenant_id="tenant-a",
+    )
+
+    assert pending.plan_id == plan.plan_id
+    assert [
+        (action.record_id, action.target)
+        for action in pending.actions
+    ] == [("linked", "conversation")]
+    with pytest.raises(
+        DataGovernanceDenied,
+        match="cross-tenant deletion plan access denied",
+    ):
+        registry.pending_deletion_plan(
+            plan.plan_id,
+            tenant_id="tenant-b",
+        )
+
+
 def test_durable_registry_preserves_retention_plans_across_restart(tmp_path) -> None:
     path = tmp_path / "retention-lifecycle.sqlite3"
     first = DataLifecycleRegistry(path)
@@ -298,6 +335,41 @@ def test_durable_registry_preserves_retention_plans_across_restart(tmp_path) -> 
     assert retry.plan_id == plans[0].plan_id
     assert retry.actions == plans[0].actions
     restarted.close()
+
+
+def test_tenant_retention_plan_replays_only_outstanding_actions() -> None:
+    registry = DataLifecycleRegistry()
+    registry.register(
+        _record(
+            "retention-linked",
+            targets=("memory", "conversation"),
+            retention_until=15.0,
+        )
+    )
+
+    first = registry.plan_retention_expiry_for_tenant(
+        "tenant-a",
+        now=20.0,
+    )
+    assert first is not None
+    registry.acknowledge_deletion(
+        first.plan_id,
+        "retention-linked",
+        "memory",
+        now=21.0,
+    )
+
+    replay = registry.plan_retention_expiry_for_tenant(
+        "tenant-a",
+        now=30.0,
+    )
+
+    assert replay is not None
+    assert replay.plan_id == first.plan_id
+    assert [
+        (action.record_id, action.target)
+        for action in replay.actions
+    ] == [("retention-linked", "conversation")]
 
 
 def test_durable_registry_rejects_corrupt_snapshot(tmp_path) -> None:

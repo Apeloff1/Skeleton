@@ -9,6 +9,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter, HTTPException, Request
 from core.http_errors import internal_http_error
 from pydantic import BaseModel, Field
@@ -29,14 +30,12 @@ ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
 # AI Integrations
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 from .builder_dna_translator import (
     translate_dna_to_prompt, sanitise_dna, stats as dna_stats,
 )
 
 router = APIRouter(prefix="/code-to-app", tags=["Code to App Pipeline"])
-
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # ─── Hardening knobs ────────────────────────────────────────────────────
 # Wall-clock timeout for any single LLM call. Anything past this is almost
@@ -117,10 +116,13 @@ async def call_ai(prompt: str, system_prompt: str, max_tokens: int = 8192) -> st
     last_err: Optional[Exception] = None
     for attempt in range(1, attempts + 1):
         try:
-            chat = LlmChat(
-                api_key=EMERGENT_LLM_KEY,
+            chat = EngineChat(
                 session_id=f"codedock-app-{uuid.uuid4().hex[:8]}",
-                system_message=system_prompt,
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.code-to-app.generation",
+                    version="1",
+                    instructions=system_prompt.strip(),
+                ),
             ).with_model("openai", "gpt-4o")
             response = await asyncio.wait_for(
                 chat.send_message(UserMessage(text=prompt)),

@@ -6,13 +6,13 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from skeleton.api.hmac_seal import require_seal
 from skeleton.api.charter_gate import require_charter
+from skeleton.api.hmac_seal import require_seal
 from skeleton.api.idempotency import IdempotencyGuard
 from skeleton.api.server import get_state
+from skeleton.app.assembly import load_manifest
 from skeleton.jeeves.core import SessionMode
 from skeleton.memory.guarded_compaction import compact_turns
-from skeleton.app.assembly import load_manifest
 
 router = APIRouter()
 _APP_MANIFEST = load_manifest()
@@ -1261,6 +1261,7 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
     repair = _bool_field(request, "repair", False)
     max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
+    from skeleton.forge.repair import REPAIR_MODES
 
     artefact = forge.materialise(
         bp,
@@ -1268,6 +1269,7 @@ async def forge_materialise(http_request: Request, request: Dict[str, Any], stat
         target=_text_field(request, "target", "json", allowed=MATERIALISE_TARGETS),
         repair=repair,
         max_rounds=max_rounds,
+        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
     )
     response = {
         "artefact": artefact,
@@ -1287,7 +1289,7 @@ async def forge_kinds(state=Depends(_state)) -> List[str]:
 
 @router.get("/forge/eras")
 async def forge_eras() -> Dict[str, Any]:
-    from skeleton.forge.eras import list_eras, compile_era
+    from skeleton.forge.eras import compile_era, list_eras
     return {"eras": list_eras(), "default": "extraction_now", "sample": compile_era("extraction_now")["primary_dps"]}
 
 
@@ -1296,8 +1298,8 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
-    from skeleton.forge.archetypes import default_library
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
+    from skeleton.forge.archetypes import default_library
 
     forge = _require(state.forge, "Forge")
     name = _text_field(request, "name", "extraction")
@@ -1306,7 +1308,10 @@ async def forge_archetype(http_request: Request, request: Dict[str, Any], state=
     bp = default_library().build(forge, name)
     repair = _bool_field(request, "repair", target == "godot")
     max_rounds = _int_field(request, "max_rounds", 3, minimum=1)
-    artefact = forge.materialise(bp, era=era, target=target, repair=repair, max_rounds=max_rounds)
+    from skeleton.forge.repair import REPAIR_MODES
+
+    repair_mode = _text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES)
+    artefact = forge.materialise(bp, era=era, target=target, repair=repair, max_rounds=max_rounds, repair_mode=repair_mode)
     response = {
         "blueprint_id": bp.blueprint_id,
         "artefact": artefact,
@@ -1358,19 +1363,51 @@ async def context_command(request: Dict[str, Any], state=Depends(_state)) -> Dic
     return _require(state.cockpit, "Cockpit").apply(_text_field(request, "command", ""))
 
 
+def _gameforge_runner(state: Any) -> Any:
+    """Return the context-pipeline runner behind /gameforge/run and /intake.
+
+    ``state.gameforge`` is the questionnaire ``skeleton.pipelines.GameForge``
+    (``intake``/``run``) and has no ``execute``; the ten-stage
+    ``GameForgeRun`` is built lazily here, sharing the server cockpit so
+    ``BIND ARCHETYPE`` / ``BLEND ERA`` issued via /context/command apply.
+    """
+    existing = getattr(state, "gameforge", None)
+    if existing is not None and callable(getattr(existing, "execute", None)):
+        return existing
+    runner = getattr(state, "gameforge_run", None)
+    if runner is None:
+        from skeleton.context.cockpit import Cockpit
+        from skeleton.context.pipeline import GameForgeRun
+
+        cockpit = getattr(state, "cockpit", None)
+        runner = GameForgeRun(cockpit=cockpit if isinstance(cockpit, Cockpit) else None)
+        try:
+            state.gameforge_run = runner
+        except AttributeError:
+            pass
+    return runner
+
+
 @router.post("/gameforge/run")
 async def gameforge_run(http_request: Request, request: Dict[str, Any], state=Depends(_state), attester: str = Depends(require_charter("forge", "run"))) -> Dict[str, Any]:
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
+    from skeleton.forge.playtest import PLAYTEST_MODES
+    from skeleton.forge.repair import REPAIR_MODES
 
-    runner = _require(state.gameforge, "GameForge")
+    runner = _gameforge_runner(state)
     out = runner.execute(
         _text_field(request, "vision", ""),
         era=_text_field(request, "era", "") or None,
-        archetype=_text_field(request, "archetype", "extraction"),
+        # Empty -> None so a cockpit BIND ARCHETYPE pin applies; the runner
+        # falls back to the canonical "extraction" preset.
+        archetype=_text_field(request, "archetype", "") or None,
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
+        answers=_mapping_field(request, "answers", None, optional=True) or None,
+        playtest=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
+        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
     )
     # files can be large; keep names in the HTTP body
     files = out.get("files") or {}
@@ -1387,12 +1424,14 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
     replay = _idempotency.replay(dict(http_request.headers))
     if replay is not None:
         return replay  # type: ignore[return-value]
-    from skeleton.context.questionnaire import intake
     from skeleton.application.command_contracts import MATERIALISE_TARGETS
+    from skeleton.context.questionnaire import intake
+    from skeleton.forge.playtest import PLAYTEST_MODES
+    from skeleton.forge.repair import REPAIR_MODES
 
     answers = _mapping_field(request, "answers", {}, optional=False) or {}
     taken = intake(answers)
-    runner = _require(state.gameforge, "GameForge")
+    runner = _gameforge_runner(state)
     out = runner.execute(
         taken.vision,
         era=taken.era,
@@ -1400,7 +1439,9 @@ async def gameforge_intake(http_request: Request, request: Dict[str, Any], state
         project_root=_text_field(request, "project_root", None, optional=True),
         overwrite=_bool_field(request, "overwrite", False),
         target=_text_field(request, "target", "godot", allowed=MATERIALISE_TARGETS),
-        archetype=_text_field(request, "archetype", "extraction"),
+        archetype=_text_field(request, "archetype", "") or None,
+        playtest=_text_field(request, "playtest", "off", allowed=PLAYTEST_MODES),
+        repair_mode=_text_field(request, "repair_mode", "apply", allowed=REPAIR_MODES),
     )
     files = out.get("files") or {}
     out = dict(out)

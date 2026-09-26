@@ -323,14 +323,7 @@ def emit_godot(
         "	$Room.text = \"ROOM %s\" % GameState.current_room\n"
         "	$Gen.text = GameState.generation\n"
     )
-    files["export_presets.cfg"] = (
-        "[preset.0]\nname=\"Linux/X11\"\nplatform=\"Linux/X11\"\nrunnable=true\n"
-        "export_path=\"builds/linux/game.x86_64\"\n\n"
-        "[preset.1]\nname=\"Windows Desktop\"\nplatform=\"Windows Desktop\"\nrunnable=true\n"
-        "export_path=\"builds/windows/game.exe\"\n\n"
-        "[preset.2]\nname=\"Web\"\nplatform=\"Web\"\nrunnable=false\n"
-        "export_path=\"builds/web/index.html\"\n"
-    )
+    files["export_presets.cfg"] = _export_presets()
     files["scripts/extract/extract_zone.gd"] = (
         "extends Area2D\n"
         "func _ready() -> void:\n"
@@ -592,3 +585,42 @@ def _level_tscn(graph: Dict[str, Any], hardware: Optional[Dict[str, Any]] = None
         "offset_bottom = 108.0",
     ])
     return "\n".join(lines) + "\n"
+
+
+# Godot 4.3 export presets. Every preset carries the keys the editor's
+# ConfigFile loader requires (export_filter/include_filter/exclude_filter and
+# a ``preset.N.options`` section); without them ``--import`` logs errors and
+# ``--export-*`` cannot resolve the preset.
+_EXPORT_PRESETS = (
+    ("Linux", "Linux", True, "builds/linux/game.x86_64", ('binary_format/architecture="x86_64"', "binary_format/embed_pck=false")),
+    ("Windows Desktop", "Windows Desktop", True, "builds/windows/game.exe", ('binary_format/architecture="x86_64"', "binary_format/embed_pck=false")),
+    ("Web", "Web", False, "builds/web/index.html", ("variant/extensions_support=false", "vram_texture_compression/for_desktop=true")),
+)
+
+
+def _export_presets() -> str:
+    blocks = []
+    for index, (name, platform, runnable, path, options) in enumerate(_EXPORT_PRESETS):
+        blocks.append(
+            f"[preset.{index}]\n"
+            f'name="{name}"\n'
+            f'platform="{platform}"\n'
+            f"runnable={'true' if runnable else 'false'}\n"
+            "dedicated_server=false\n"
+            'custom_features=""\n'
+            'export_filter="all_resources"\n'
+            'include_filter="data/*.json"\n'
+            'exclude_filter=""\n'
+            f'export_path="{path}"\n'
+            'encryption_include_filters=""\n'
+            'encryption_exclude_filters=""\n'
+            "encrypt_pck=false\n"
+            "encrypt_directory=false\n"
+            "\n"
+            f"[preset.{index}.options]\n"
+            'custom_template/debug=""\n'
+            'custom_template/release=""\n'
+            + "".join(f"{opt}\n" for opt in options)
+        )
+    return "\n".join(blocks)
+

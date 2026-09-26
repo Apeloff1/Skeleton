@@ -49,6 +49,8 @@ services:
       - SKL_ENGINE_EXECUTION_STATE_PATH=/app/data/engine_execution.sqlite
       - SKL_ENGINE_SUBMISSION_STATE_PATH=/app/data/engine_submissions.sqlite
       - SKL_ENGINE_TOOL_RECEIPT_PATH=/app/data/engine_tool_receipts.sqlite
+      - SKL_ENGINE_QUOTA_STATE_PATH=/app/data/engine_quota.sqlite
+      - SKL_ENGINE_PRESSURE_STATE_PATH=/app/data/engine_pressure.sqlite
       - SKL_GOVERNANCE_LIFECYCLE_PATH=/app/data/governance_lifecycle.sqlite
       - EMERGENT_LLM_KEY=${EMERGENT_LLM_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -99,6 +101,7 @@ services:
       - SKELETON_INTERNAL_URL=${SKELETON_INTERNAL_URL:-http://skeleton:8001}
       - SKL_ENGINE_SERVICE_TOKEN=${SKL_ENGINE_SERVICE_TOKEN:?SKL_ENGINE_SERVICE_TOKEN must be set to a high-entropy value}
       - SKL_ENGINE_SERVICE_PRINCIPAL=${SKL_ENGINE_SERVICE_PRINCIPAL:-codedock-backend}
+      - SKL_JEEVES_CANONICAL_CONVERSATIONS=${SKL_JEEVES_CANONICAL_CONVERSATIONS:-1}
     volumes:
       - backend_data:/app/data
     depends_on:

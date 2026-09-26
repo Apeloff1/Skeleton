@@ -63,7 +63,7 @@ def validate_ci_runner(identifier: str, desired: str = "present", *, enabled: bo
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-runner:"+identifier, ("ubuntu","ci","runner",identifier,desired), "validated ci-runner")
+    return UbuntuAction("ci-runner:"+identifier, ("ubuntu","ci","runner",identifier,desired), "reconcile ci-runner")
 
 def plan_ci_runner(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-runner plan."""
@@ -123,7 +123,7 @@ def validate_ci_cache(identifier: str, desired: str = "present", *, enabled: boo
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-cache:"+identifier, ("ubuntu","ci","cache",identifier,desired), "validated ci-cache")
+    return UbuntuAction("ci-cache:"+identifier, ("ubuntu","ci","cache",identifier,desired), "reconcile ci-cache")
 
 def plan_ci_cache(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-cache plan."""
@@ -183,7 +183,7 @@ def validate_ci_artifact(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-artifact:"+identifier, ("ubuntu","ci","artifact",identifier,desired), "validated ci-artifact")
+    return UbuntuAction("ci-artifact:"+identifier, ("ubuntu","ci","artifact",identifier,desired), "reconcile ci-artifact")
 
 def plan_ci_artifact(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-artifact plan."""
@@ -243,7 +243,7 @@ def validate_ci_workspace(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-workspace:"+identifier, ("ubuntu","ci","workspace",identifier,desired), "validated ci-workspace")
+    return UbuntuAction("ci-workspace:"+identifier, ("ubuntu","ci","workspace",identifier,desired), "reconcile ci-workspace")
 
 def plan_ci_workspace(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-workspace plan."""
@@ -303,7 +303,7 @@ def validate_ci_checkout(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-checkout:"+identifier, ("ubuntu","ci","checkout",identifier,desired), "validated ci-checkout")
+    return UbuntuAction("ci-checkout:"+identifier, ("ubuntu","ci","checkout",identifier,desired), "reconcile ci-checkout")
 
 def plan_ci_checkout(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-checkout plan."""
@@ -363,7 +363,7 @@ def validate_ci_toolchain(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-toolchain:"+identifier, ("ubuntu","ci","toolchain",identifier,desired), "validated ci-toolchain")
+    return UbuntuAction("ci-toolchain:"+identifier, ("ubuntu","ci","toolchain",identifier,desired), "reconcile ci-toolchain")
 
 def plan_ci_toolchain(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-toolchain plan."""
@@ -423,7 +423,7 @@ def validate_ci_test(identifier: str, desired: str = "present", *, enabled: bool
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-test:"+identifier, ("ubuntu","ci","test",identifier,desired), "validated ci-test")
+    return UbuntuAction("ci-test:"+identifier, ("ubuntu","ci","test",identifier,desired), "reconcile ci-test")
 
 def plan_ci_test(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-test plan."""
@@ -483,7 +483,7 @@ def validate_ci_lint(identifier: str, desired: str = "present", *, enabled: bool
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-lint:"+identifier, ("ubuntu","ci","lint",identifier,desired), "validated ci-lint")
+    return UbuntuAction("ci-lint:"+identifier, ("ubuntu","ci","lint",identifier,desired), "reconcile ci-lint")
 
 def plan_ci_lint(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-lint plan."""
@@ -543,7 +543,7 @@ def validate_ci_coverage(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-coverage:"+identifier, ("ubuntu","ci","coverage",identifier,desired), "validated ci-coverage")
+    return UbuntuAction("ci-coverage:"+identifier, ("ubuntu","ci","coverage",identifier,desired), "reconcile ci-coverage")
 
 def plan_ci_coverage(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-coverage plan."""
@@ -603,7 +603,7 @@ def validate_ci_publish(identifier: str, desired: str = "present", *, enabled: b
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("ci-publish:"+identifier, ("ubuntu","ci","publish",identifier,desired), "validated ci-publish")
+    return UbuntuAction("ci-publish:"+identifier, ("ubuntu","ci","publish",identifier,desired), "reconcile ci-publish")
 
 def plan_ci_publish(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic ci-publish plan."""

@@ -63,7 +63,7 @@ def validate_runtime_python(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-python:"+identifier, ("ubuntu","runtime","python",identifier,desired), "validated runtime-python")
+    return UbuntuAction("runtime-python:"+identifier, ("ubuntu","runtime","python",identifier,desired), "reconcile runtime-python")
 
 def plan_runtime_python(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-python plan."""
@@ -123,7 +123,7 @@ def validate_runtime_docker(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-docker:"+identifier, ("ubuntu","runtime","docker",identifier,desired), "validated runtime-docker")
+    return UbuntuAction("runtime-docker:"+identifier, ("ubuntu","runtime","docker",identifier,desired), "reconcile runtime-docker")
 
 def plan_runtime_docker(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-docker plan."""
@@ -183,7 +183,7 @@ def validate_runtime_containerd(identifier: str, desired: str = "present", *, en
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-containerd:"+identifier, ("ubuntu","runtime","containerd",identifier,desired), "validated runtime-containerd")
+    return UbuntuAction("runtime-containerd:"+identifier, ("ubuntu","runtime","containerd",identifier,desired), "reconcile runtime-containerd")
 
 def plan_runtime_containerd(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-containerd plan."""
@@ -243,7 +243,7 @@ def validate_runtime_podman(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-podman:"+identifier, ("ubuntu","runtime","podman",identifier,desired), "validated runtime-podman")
+    return UbuntuAction("runtime-podman:"+identifier, ("ubuntu","runtime","podman",identifier,desired), "reconcile runtime-podman")
 
 def plan_runtime_podman(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-podman plan."""
@@ -303,7 +303,7 @@ def validate_runtime_buildx(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-buildx:"+identifier, ("ubuntu","runtime","buildx",identifier,desired), "validated runtime-buildx")
+    return UbuntuAction("runtime-buildx:"+identifier, ("ubuntu","runtime","buildx",identifier,desired), "reconcile runtime-buildx")
 
 def plan_runtime_buildx(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-buildx plan."""
@@ -363,7 +363,7 @@ def validate_runtime_qemu(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-qemu:"+identifier, ("ubuntu","runtime","qemu",identifier,desired), "validated runtime-qemu")
+    return UbuntuAction("runtime-qemu:"+identifier, ("ubuntu","runtime","qemu",identifier,desired), "reconcile runtime-qemu")
 
 def plan_runtime_qemu(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-qemu plan."""
@@ -423,7 +423,7 @@ def validate_runtime_gcc(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-gcc:"+identifier, ("ubuntu","runtime","gcc",identifier,desired), "validated runtime-gcc")
+    return UbuntuAction("runtime-gcc:"+identifier, ("ubuntu","runtime","gcc",identifier,desired), "reconcile runtime-gcc")
 
 def plan_runtime_gcc(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-gcc plan."""
@@ -483,7 +483,7 @@ def validate_runtime_node(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-node:"+identifier, ("ubuntu","runtime","node",identifier,desired), "validated runtime-node")
+    return UbuntuAction("runtime-node:"+identifier, ("ubuntu","runtime","node",identifier,desired), "reconcile runtime-node")
 
 def plan_runtime_node(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-node plan."""
@@ -543,7 +543,7 @@ def validate_runtime_uv(identifier: str, desired: str = "present", *, enabled: b
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-uv:"+identifier, ("ubuntu","runtime","uv",identifier,desired), "validated runtime-uv")
+    return UbuntuAction("runtime-uv:"+identifier, ("ubuntu","runtime","uv",identifier,desired), "reconcile runtime-uv")
 
 def plan_runtime_uv(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-uv plan."""
@@ -603,7 +603,7 @@ def validate_runtime_pip(identifier: str, desired: str = "present", *, enabled: 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("runtime-pip:"+identifier, ("ubuntu","runtime","pip",identifier,desired), "validated runtime-pip")
+    return UbuntuAction("runtime-pip:"+identifier, ("ubuntu","runtime","pip",identifier,desired), "reconcile runtime-pip")
 
 def plan_runtime_pip(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic runtime-pip plan."""

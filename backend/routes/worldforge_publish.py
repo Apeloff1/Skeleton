@@ -8,8 +8,8 @@ Currently hosts the branching-quest generator; monograph/poster/streaming
 remain in worldforge.py and can migrate here in a later pass.
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
-import os
 import uuid
 from datetime import datetime, timezone
 
@@ -208,8 +208,8 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
     loop and would hang here) so the main server loop is never blocked."""
     import time
     import asyncio
-    from routes.llm_router import EMERGENT_LLM_KEY, ROUTING_POLICY, MODEL_CATALOG
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from routes.llm_router import ROUTING_POLICY, MODEL_CATALOG
+    from core.engine_chat import EngineChat, UserMessage
     t0 = time.time()
     try:
         world = build_world(cfg)
@@ -221,8 +221,14 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
             for m in ensemble:
                 prov = MODEL_CATALOG.get(m, {}).get("provider", "openai")
                 try:
-                    chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"mono-{job_id[:8]}",
-                                   system_message=MONOGRAPH_SYSTEM).with_model(prov, m)
+                    chat = EngineChat(
+                        session_id=f"mono-{job_id[:8]}",
+                        instruction_policy=InstructionPolicy(
+                            policy_id="backend.worldforge.monograph",
+                            version="1",
+                            instructions=MONOGRAPH_SYSTEM.strip(),
+                        ),
+                    ).with_model(prov, m)
                     resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=300)
                     return (resp.content if hasattr(resp, "content") else str(resp)), m
                 except Exception as e:
@@ -344,16 +350,24 @@ def _poster_prompt(world: dict, cfg: WorldConfig, style: str) -> str:
 def _poster_worker(job_id: str, cfg: WorldConfig, style: str):
     import time
     import asyncio
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     t0 = time.time()
     try:
         world = build_world(cfg)
         prompt = _poster_prompt(world, cfg, style)
-        key = os.environ.get("EMERGENT_LLM_KEY")
 
         async def _gen():
-            chat = LlmChat(api_key=key, session_id=f"poster-{job_id[:8]}",
-                           system_message="You generate photorealistic scientific Earth-observation map imagery.")
+            chat = EngineChat(
+                session_id=f"poster-{job_id[:8]}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.worldforge.poster",
+                    version="1",
+                    instructions=(
+                        "You generate photorealistic scientific "
+                        "Earth-observation map imagery."
+                    ),
+                ),
+            )
             chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))
 

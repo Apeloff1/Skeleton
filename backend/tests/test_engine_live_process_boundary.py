@@ -217,7 +217,8 @@ async def test_engine_client_crosses_real_tcp_process_boundary(tmp_path) -> None
                 actor_id="actor-a",
                 tenant_id="tenant-a",
             )
-            assert status["execution_state"] == "admitted"
+            assert status["operation_state"] == "admitted"
+            assert status["execution_state"] == "created"
             assert status["cancellation_requested"] is False
 
             with pytest.raises(EngineAuthorizationError):

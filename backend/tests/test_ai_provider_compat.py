@@ -181,3 +181,52 @@ def test_compat_source_has_no_local_provider_activation() -> None:
     assert "ProviderRegistry.from_env(" not in source
     assert "from core.ai_provider import" not in source
     assert "execute_engine_text" in source
+
+
+def test_legacy_chat_idempotency_binds_forwarded_semantics() -> None:
+    base = LlmChat(
+        session_id="semantic-session",
+        system_message="rules-v1",
+    ).with_max_tokens(1024)
+    same = LlmChat(
+        session_id="semantic-session",
+        system_message="rules-v1",
+    ).with_max_tokens(1024)
+    changed_rules = LlmChat(
+        session_id="semantic-session",
+        system_message="rules-v2",
+    ).with_max_tokens(1024)
+    changed_budget = LlmChat(
+        session_id="semantic-session",
+        system_message="rules-v1",
+    ).with_max_tokens(2048)
+
+    prompt = "same prompt"
+    base_key = base._idempotency_key(prompt)
+
+    assert same._idempotency_key(prompt) == base_key
+    assert changed_rules._idempotency_key(prompt) != base_key
+    assert changed_budget._idempotency_key(prompt) != base_key
+
+
+def test_legacy_chat_idempotency_ignores_unforwarded_routing_hints() -> None:
+    base = (
+        LlmChat(
+            session_id="hint-session",
+            system_message="rules",
+        )
+        .with_model("openai", "model-a")
+        .with_temperature(0.1)
+    )
+    hinted = (
+        LlmChat(
+            session_id="hint-session",
+            system_message="rules",
+        )
+        .with_model("anthropic", "model-b")
+        .with_temperature(0.9)
+    )
+
+    assert hinted._idempotency_key("hello") == base._idempotency_key(
+        "hello"
+    )

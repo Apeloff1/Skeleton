@@ -357,9 +357,6 @@ def _deterministic_fields(gen: dict, text: str) -> dict:
 
 def _llm_enrich(gen: dict, text: str, fields: dict, contexts: dict | None = None) -> dict | None:
     """Optional Claude pass — uses the SAME maxed-brief pattern as the forge."""
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        return None
     try:
         import asyncio
         import json as _json
@@ -381,7 +378,7 @@ def _llm_enrich(gen: dict, text: str, fields: dict, contexts: dict | None = None
                   f"Produce the maximal, precise {gen['type']} gamefile.")
 
         async def _run():
-            chat = LlmChat(api_key=key, session_id=f"tgf-{gen['key']}-{_seed(text)}",
+            chat = LlmChat(session_id=f"tgf-{gen['key']}-{_seed(text)}",
                            system_message=sysmsg)
             chat.with_model("anthropic", "claude-sonnet-4-5-20250929")
             chat.with_max_tokens(8000)   # allow the maxed brief

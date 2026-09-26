@@ -8,6 +8,7 @@ use deeper paths (/{pid}/cover…, /{pid}/cover.png, /{pid}/card.png) so they ne
 shadow the GET /{pid} catch-all in routes.playable.
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
 import os
 import uuid
@@ -19,7 +20,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from routes.playable import _db
-from routes.llm_router import EMERGENT_LLM_KEY
 
 router = APIRouter(prefix="/api/playable", tags=["playable"])
 
@@ -28,10 +28,8 @@ router = APIRouter(prefix="/api/playable", tags=["playable"])
 async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
     """Generate ONE square concept-art cover for a game via Gemini Nano Banana.
     Returns a base64 PNG string (no data: prefix) or None on failure."""
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     from core.render_quality import PHOTOREAL_SUFFIX, upscale_b64
-    if not EMERGENT_LLM_KEY:
-        return None
     prompt = (
         f"Square key art / cover splash for a browser arcade game titled '{title}'. "
         f"Genre: {genre}. Concept: {brief[:300]}. Bold vibrant colors, dramatic cinematic "
@@ -39,8 +37,16 @@ async def _generate_cover_b64(title: str, genre: str, brief: str) -> str | None:
         "rich depth. No text, no words, no logos, no watermark, no UI." + PHOTOREAL_SUFFIX
     )
     try:
-        chat = (LlmChat(api_key=EMERGENT_LLM_KEY, session_id=f"cover-{uuid.uuid4().hex[:8]}",
-                        system_message="You are a AAA game concept artist creating cover key art.")
+        chat = (EngineChat(
+                    session_id=f"cover-{uuid.uuid4().hex[:8]}",
+                    instruction_policy=InstructionPolicy(
+                        policy_id="backend.playable-cover.image-generation",
+                        version="1",
+                        instructions=(
+                            "You are a AAA game concept artist creating cover key art."
+                        ),
+                    ),
+                )
                 .with_model("gemini", "gemini-3.1-flash-image-preview")
                 .with_params(modalities=["image", "text"]))
         _text, images = await asyncio.wait_for(

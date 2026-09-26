@@ -15,7 +15,7 @@ import time
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Callable, Deque, Dict, List, Optional
+from typing import Any, Callable, Deque, Dict, List, Optional, Tuple
 
 
 class SkeletonError(Exception):
@@ -121,12 +121,55 @@ class EventBus:
         self._subscribers: Dict[str, List[Callable[[DomainEvent], None]]] = {}
         self._stats: Dict[str, int] = {"published": 0, "subscribed": 0}
         self._replay: Deque[DomainEvent] = deque(maxlen=replay_capacity)
+        self._names: Dict[Tuple[str, int], str] = {}
 
-    def subscribe(self, topic: str, handler: Callable[[DomainEvent], None]) -> None:
-        """Subscribe a handler to a topic pattern."""
+    def subscribe(
+        self,
+        topic: str,
+        handler: Callable[[DomainEvent], None],
+        *,
+        name: Optional[str] = None,
+    ) -> Callable[[], None]:
+        """Subscribe a handler to a topic pattern.
+
+        Returns an idempotent unsubscribe callable. ``name`` is an optional
+        diagnostic label (surfaced by :meth:`subscriptions`); it never affects
+        routing.
+        """
 
         self._subscribers.setdefault(topic, []).append(handler)
         self._stats["subscribed"] += 1
+        if name:
+            self._names[(topic, id(handler))] = str(name)
+
+        def _unsubscribe() -> None:
+            self.unsubscribe(topic, handler)
+
+        return _unsubscribe
+
+    def unsubscribe(self, topic: str, handler: Callable[[DomainEvent], None]) -> bool:
+        """Remove one registration of ``handler`` from ``topic``; idempotent."""
+
+        handlers = self._subscribers.get(topic)
+        if not handlers or handler not in handlers:
+            return False
+        handlers.remove(handler)
+        if not handlers:
+            del self._subscribers[topic]
+        if handler not in self._subscribers.get(topic, []):
+            self._names.pop((topic, id(handler)), None)
+        return True
+
+    def subscriptions(self) -> Dict[str, List[str]]:
+        """Diagnostic view: topic -> handler labels (name or qualname)."""
+
+        return {
+            topic: [
+                self._names.get((topic, id(h))) or getattr(h, "__qualname__", repr(h))
+                for h in handlers
+            ]
+            for topic, handlers in self._subscribers.items()
+        }
 
     def publish(self, event: DomainEvent) -> DomainEvent:
         """Publish an event and retain it in the bounded replay window."""
@@ -143,9 +186,10 @@ class EventBus:
                     causation_id=event.causation_id,
                 )
         self._replay.append(event)
-        for topic, handlers in self._subscribers.items():
+        # Snapshot: a handler may unsubscribe (itself or others) mid-dispatch.
+        for topic, handlers in list(self._subscribers.items()):
             if self._matches(topic, event.topic):
-                for handler in handlers:
+                for handler in list(handlers):
                     try:
                         handler(event)
                     except Exception:

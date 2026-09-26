@@ -62,8 +62,12 @@ step "walk --era soulslike"
 "$PY" -m skeleton walk --era soulslike
 
 step "cockpit smoke meta-test (optional pytest)"
-if "$PY" -c 'import pytest' 2>/dev/null; then
-  PYTHONPATH=. "$PY" -m pytest \
+# The meta-test itself runs this script; SKELETON_COCKPIT_SMOKE_NESTED breaks
+# the script -> pytest -> script recursion (each level otherwise re-spawns).
+if [ -n "${SKELETON_COCKPIT_SMOKE_NESTED:-}" ]; then
+  echo "SKIP: nested cockpit smoke (called from its own meta-test)"
+elif "$PY" -c 'import pytest' 2>/dev/null; then
+  SKELETON_COCKPIT_SMOKE_NESTED=1 PYTHONPATH=. "$PY" -m pytest \
     skeleton/testing/test_cockpit_smoke_gauntlet.py \
     -q
 else

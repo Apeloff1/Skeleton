@@ -1119,6 +1119,7 @@ class SemanticLensPlane:
         learned_topology_rules: Sequence[LearnedTopologyRule],
         learned_companion_keys: Sequence[str],
         topology_bridge_candidates: Sequence[LensBridgeCandidate],
+        learned_companion_activations: Sequence[LearnedCompanionActivation] = (),
     ) -> SemanticPlaneCoverage:
         selected_families = tuple(
             sorted({spec.family for spec in selection.lenses}, key=lambda item: item.value)
@@ -1172,6 +1173,9 @@ class SemanticLensPlane:
                 ],
                 "learned_companion_keys": sorted(
                     set(learned_companion_keys)
+                ),
+                "learned_companion_activations": sorted(
+                    item.fingerprint for item in learned_companion_activations
                 ),
                 "topology_bridge_candidates": [
                     item.candidate_id for item in topology_bridge_candidates

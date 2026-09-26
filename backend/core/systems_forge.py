@@ -752,9 +752,6 @@ def blueprint(key: str, knobs: dict | None = None, seed: int = 0) -> dict:
 
 
 def _llm_enrich(system: dict, bp: dict, contexts: dict | None = None) -> dict | None:
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        return None
     try:
         import asyncio
         import json as _json
@@ -783,7 +780,7 @@ def _llm_enrich(system: dict, bp: dict, contexts: dict | None = None) -> dict | 
         )
 
         async def _run() -> str:
-            chat = LlmChat(api_key=key, session_id=f"sysforge_{system['key']}",
+            chat = LlmChat(session_id=f"sysforge_{system['key']}",
                            system_message=sysmsg).with_model("anthropic", "claude-sonnet-4-6")
             try:
                 chat = chat.with_max_tokens(900)
