@@ -222,4 +222,3 @@ def test_sensitive_tool_transfer_requires_tenant_binding() -> None:
 
     assert decision.permitted is False
     assert decision.reason_code == "tool_sensitive_data_requires_tenant"
-
