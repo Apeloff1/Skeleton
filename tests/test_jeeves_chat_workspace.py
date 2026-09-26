@@ -1184,3 +1184,80 @@ def test_jeeves_engine_identity_is_scoped_to_canonical_turn(
     assert len(sessions) == 3
     assert sessions[0] == sessions[2]
     assert sessions[0] != sessions[1]
+
+
+def test_idless_pending_jeeves_turn_resumes_with_server_assigned_identity(
+    route,
+    monkeypatch,
+):
+    legacy = _MemoryChatCollection()
+    canonical = _CanonicalConversationAuthority()
+    captured = {"calls": 0, "contexts": []}
+
+    async def seed():
+        authority, thread, tenant_id, owner_id = (
+            await route._ensure_canonical_thread("conversation-idless-resume")
+        )
+        thread, pending = await authority.append_user_message(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content="resume without client id",
+            idempotency_key="jeeves-user:server-assigned-pending",
+            expected_thread_version=thread.version,
+            data_class="internal",
+        )
+        return thread, pending
+
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
+    seeded_thread, pending = asyncio.run(seed())
+
+    async def generate(
+        query,
+        recalled,
+        needs_reasoning,
+        conversation_context="",
+    ):
+        del recalled, needs_reasoning
+        captured["calls"] += 1
+        captured["contexts"].append(conversation_context)
+        assert query == "resume without client id"
+        return {
+            "text": "recovered idless answer",
+            "tier": "free",
+            "model": "test",
+            "engine_execution_id": None,
+            "engine_verification": None,
+            "engine_evidence_refs": [],
+        }
+
+    with _chat_client(
+        route,
+        monkeypatch,
+        legacy,
+        generate,
+        canonical=canonical,
+    ) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-idless-resume",
+                "message": "resume without client id",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["reply"] == "recovered idless answer"
+    assert body["replayed"] is False
+    assert captured["calls"] == 1
+    assert captured["contexts"][0].count("resume without client id") == 1
+
+    messages = canonical.messages[seeded_thread.thread_id]
+    assert len(messages) == 2
+    assert messages[0].message_id == pending.message_id
+    assert messages[0].idempotency_key == "jeeves-user:server-assigned-pending"
+    assert messages[1].causal_user_message_id == pending.message_id
+    assert messages[1].idempotency_key == (
+        "jeeves-assistant:" + pending.idempotency_key
+    )
