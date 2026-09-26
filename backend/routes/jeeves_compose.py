@@ -775,6 +775,14 @@ async def chat(req: ChatReq):
         )
     except HTTPException:
         raise
+    except ConversationConflict as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "canonical conversation turn conflicted; "
+                "retry the same client_message_id"
+            ),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=503,
