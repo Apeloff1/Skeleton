@@ -67,7 +67,7 @@ jobs:
           "PyJWT==2.14.0"
           "python-dotenv==1.2.3"
 
-      - name: Run canonical conversation authority contracts
+      - name: Run canonical backend conversation authority contracts
         run: >-
           python -m pytest -q --noconftest -p pytest_asyncio.plugin
           backend/tests/test_ai_chat_conversation_authority.py
@@ -75,6 +75,13 @@ jobs:
           backend/tests/test_conversation_regeneration.py
           backend/tests/test_conversation_regeneration_route.py
           backend/tests/test_conversation_governance.py
+
+      # backend/tests and repository-root tests are both explicit Python
+      # packages named "tests"; isolate them in separate interpreters so one
+      # package cannot poison import resolution for the other.
+      - name: Run Jeeves backend compatibility contracts
+        run: >-
+          python -m pytest -q --noconftest -p pytest_asyncio.plugin
           tests/test_jeeves_chat_workspace.py
 
   jeeves-workspace-reconstruction:
