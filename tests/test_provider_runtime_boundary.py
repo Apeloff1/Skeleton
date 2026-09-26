@@ -143,6 +143,21 @@ def test_external_research_mirror_is_not_a_runtime_provider_surface(tmp_path: Pa
     assert audit_repository(tmp_path) == []
 
 
+def test_canonical_ai_provider_copy_is_nonexecuting_mirror(tmp_path: Path) -> None:
+    source = (
+        "import os\n"
+        "from openai import AsyncOpenAI\n"
+        "key = os.getenv('OPENAI_API_KEY')\n"
+    )
+    _write(tmp_path, "skeleton/provider_runtime.py", source)
+    _write(tmp_path, "skeleton/ai/runtime/provider_runtime.py", source)
+
+    assert audit_repository(tmp_path) == []
+    discovered = discover_provider_surfaces(tmp_path)
+    assert "skeleton/provider_runtime.py" in discovered
+    assert "skeleton/ai/runtime/provider_runtime.py" not in discovered
+
+
 def test_live_ai_research_surface_still_rejects_provider_sdk_imports(tmp_path: Path) -> None:
     _write(tmp_path, "skeleton/ai/research/live.py", "import openai\n")
 
