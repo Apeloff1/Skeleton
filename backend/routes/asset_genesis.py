@@ -15,6 +15,7 @@ loop). Results are held in-memory and PERSISTED on the first /job poll that obse
 completion (the poll handler runs on the main loop, so the motor `_db` is safe).
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 
 import os
 import uuid
@@ -155,9 +156,18 @@ def _gen_one(prompt: str, tag: str) -> tuple[str | None, str]:
     from core.render_quality import PHOTOREAL_SUFFIX, upscale_b64
 
     async def _go():
-        chat = (EngineChat(api_key=EMERGENT_LLM_KEY, session_id=f"asset-{tag}",
-                        system_message="You are a AAA game concept artist producing clean, "
-                                       "production-ready game art assets.")
+        chat = (EngineChat(
+                    api_key=EMERGENT_LLM_KEY,
+                    session_id=f"asset-{tag}",
+                    instruction_policy=InstructionPolicy(
+                        policy_id="backend.asset-genesis.image-generation",
+                        version="1",
+                        instructions=(
+                            "You are a AAA game concept artist producing clean, "
+                            "production-ready game art assets."
+                        ),
+                    ),
+                )
                 .with_model("gemini", "gemini-3.1-flash-image-preview")
                 .with_params(modalities=["image", "text"]))
         return await chat.send_message_multimodal_response(UserMessage(text=prompt + PHOTOREAL_SUFFIX))
