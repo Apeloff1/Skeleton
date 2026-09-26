@@ -195,7 +195,7 @@ async def _llm_async(prompt: str, system: str, ensemble: list) -> dict:
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.playable.generation",
                     version="1",
-                    instructions=system,
+                    instructions=system.strip(),
                 ),
             ).with_model(provider, model)
             resp = await chat.send_message(UserMessage(text=prompt))
