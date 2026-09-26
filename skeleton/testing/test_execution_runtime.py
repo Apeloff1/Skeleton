@@ -1219,3 +1219,115 @@ async def test_canonical_verification_receipt_is_persisted_before_terminal_resul
     assert stored.result_ref == "execution-result:exec-1"
     assert stored.claim_digest == payload["claim_digest"]
     assert repo.verification_receipts_for_execution("exec-1") == (stored,)
+
+
+@pytest.mark.asyncio
+async def test_default_verification_materializes_tool_result_evidence() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:readme"
+
+    await tools.register(_manifest(), handler)
+    provider = FakeProvider(
+        [
+            _tool_response("call-evidence"),
+            _text_response(
+                "The repository README was inspected.",
+                response_id="resp-evidence-final",
+            ),
+        ]
+    )
+    runtime = _runtime(
+        repo,
+        provider,
+        tools,
+        verification_hook=None,
+    )
+
+    result = await runtime.start(
+        _request(allowed_tools=("repo.read",)),
+        instructions="Use the tool evidence before answering.",
+        prompt="Inspect README and summarize the result.",
+        context_digest="1" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    assert result.result.status == "completed"
+    assert result.result.verification_receipt["outcome"] == "passed"
+    assert result.result.verification_receipt["disposition"] == "publish"
+    assert result.result.verification_receipt["claim_kind"] == "structured_output"
+    assert len(result.result.evidence_refs) == 1
+    assert result.result.evidence_refs[0].startswith("evidence:")
+    checkpoint = repo.latest_checkpoint("exec-1")
+    assert checkpoint is not None
+    rows = checkpoint.payload["tool_verification_evidence"]
+    assert len(rows) == 1
+    assert rows[0]["receipt_id"] == result.result.tool_receipts[0]
+    assert rows[0]["effect"] == "read_only"
+    assert rows[0]["result_digest"] == hashlib.sha256(
+        rows[0]["result"].encode("utf-8")
+    ).hexdigest()
+
+
+@pytest.mark.asyncio
+async def test_reversible_tool_action_without_independent_verifier_fails_closed() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "artifact:write-result"
+
+    async def postcondition(_request, _result_ref):
+        return True
+
+    await tools.register(
+        _manifest("repo.write", approval_required=True),
+        handler,
+        postcondition=postcondition,
+    )
+    provider = FakeProvider(
+        [
+            _tool_response("call-write", tool_id="repo.write"),
+            _text_response(
+                "The write completed.",
+                response_id="resp-write-final",
+            ),
+        ]
+    )
+    runtime = _runtime(
+        repo,
+        provider,
+        tools,
+        verification_hook=None,
+    )
+    request = _request(allowed_tools=("repo.write",))
+
+    suspended = await runtime.start(
+        request,
+        instructions="Perform the authorized write.",
+        prompt="Write the requested change.",
+        context_digest="2" * 64,
+        now=_now(),
+    )
+    assert suspended.pending_approvals
+    approval = suspended.pending_approvals[0]
+
+    result = await runtime.resume(
+        request.execution_id,
+        approval_refs={approval.call_id: approval.approval_ref},
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.usage["error_code"] == "verification_blocked"
+    receipt = result.result.verification_receipt
+    assert receipt["claim_kind"] == "action_outcome"
+    assert receipt["policy"]["require_postcondition"] is True
+    assert receipt["disposition"] == "block"
+    assert "independent_origin_requirement_unsatisfied" in receipt["issues"]
