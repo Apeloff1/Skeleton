@@ -56,7 +56,7 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "remember_verification_receipt",
         "verification_receipt(",
         "verification_receipts_for_execution",
-        "verification receipts",
+        "verification_receipts_for_claim",
     ),
     "skeleton/intelligence/execution_runtime.py": (
         "materialize_verification_receipt",
@@ -69,6 +69,16 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
         "observe_tool_postcondition",
         "ToolPostconditionError",
         "ToolExecutionReceipt",
+    ),
+    "skeleton/retrieval/verification.py": (
+        "validate_citation",
+        "ground_claim",
+        "population",
+        "environment",
+        "jurisdiction",
+        "temporal_scope_stale",
+        "temporal_scope_future",
+        "model_evidence_non_authoritative",
     ),
 }
 
