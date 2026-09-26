@@ -38,7 +38,6 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 router = APIRouter(prefix="/education", tags=["Interactive Education"])
 
-EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
 
 # ============================================================================
 # DATA MODELS
@@ -211,7 +210,6 @@ ACHIEVEMENTS = [
 async def call_education_ai(prompt: str, system_prompt: str) -> str:
     try:
         chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
             session_id=f"edu-{uuid.uuid4().hex[:8]}",
             system_message=system_prompt
         ).with_model("openai", "gpt-4o")
