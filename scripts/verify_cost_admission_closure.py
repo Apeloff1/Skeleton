@@ -92,7 +92,6 @@ BOUNDARIES: dict[str, tuple[str, ...]] = {
 }
 
 MIRROR_PAIRS: tuple[tuple[str, str], ...] = (
-    ("skeleton/provider_runtime.py", "skeleton/ai/runtime/provider_runtime.py"),
     (
         "skeleton/skills/tool_runtime.py",
         "skeleton/ai/runtime/skills/tool_runtime.py",
