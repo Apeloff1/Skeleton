@@ -6,6 +6,7 @@
 ╚══════════════════════════════════════════════════════════════════════════╝
 """
 from __future__ import annotations
+from skeleton.context.instruction_policy import InstructionPolicy
 import os
 import re
 from datetime import datetime, timezone
@@ -110,8 +111,14 @@ async def pitch(pid: str):
         try:
             import uuid
             from core.engine_chat import EngineChat, UserMessage
-            chat = EngineChat(session_id=f"pitch-{uuid.uuid4().hex[:8]}",
-                           system_message="You are a punchy game-marketing copywriter.").with_model("openai", "gpt-4o-mini")
+            chat = EngineChat(
+                session_id=f"pitch-{uuid.uuid4().hex[:8]}",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.snowball-wins.marketing-pitch",
+                    version="1",
+                    instructions="You are a punchy game-marketing copywriter.",
+                ),
+            ).with_model("openai", "gpt-4o-mini")
             import asyncio
             resp = await asyncio.wait_for(chat.send_message(UserMessage(
                 text=f"Write ONE vivid 2-sentence store pitch for '{title}' ({genre}). Premise: {brief}")), timeout=30)
