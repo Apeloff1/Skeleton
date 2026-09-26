@@ -134,6 +134,7 @@ def _authority(
         "engine:cancel",
         "engine:events",
         "engine:approve",
+        "engine:admission",
     ),
     issued_at: datetime | None = None,
     expires_at: datetime | None = None,
@@ -1140,3 +1141,85 @@ def test_submit_meters_execution_and_submission_storage_without_replay_double_co
         replay_snapshot["metered_by_category"]["storage"]["storage_bytes"]
         == storage["storage_bytes"]
     )
+
+def test_external_storage_admission_is_replay_safe_and_tenant_scoped(
+    tmp_path,
+) -> None:
+    service, _runtime, ledger = _admitted_service(tmp_path)
+
+    first = service.consume_external_storage_write(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        capability="conversation-persistence",
+        resource_id="conversation-message",
+        write_id="thread-a:idem-1",
+        storage_bytes=128,
+        now=_now(),
+    )
+    replay = service.consume_external_storage_write(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        capability="conversation-persistence",
+        resource_id="conversation-message",
+        write_id="thread-a:idem-1",
+        storage_bytes=128,
+        now=_now() + timedelta(seconds=1),
+    )
+
+    assert first.replayed is False
+    assert replay.replayed is True
+    assert replay.operation_id == first.operation_id
+    assert replay.receipt_id == first.receipt_id
+    snapshot = ledger.snapshot("tenant-a")
+    assert snapshot["committed"]["storage_bytes"] == 128
+    assert snapshot["usage_events"] == 1
+
+    with pytest.raises(
+        EngineServiceError,
+        match="external storage admission identity conflict",
+    ):
+        service.consume_external_storage_write(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-a:idem-1",
+            storage_bytes=129,
+            now=_now() + timedelta(seconds=2),
+        )
+
+    with pytest.raises(EngineAuthorityError, match="tenant denied"):
+        service.consume_external_storage_write(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-b",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-b:idem-1",
+            storage_bytes=64,
+            now=_now(),
+        )
+
+
+def test_external_storage_admission_requires_dedicated_scope(tmp_path) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+        )
+    )
+
+    with pytest.raises(EngineAuthorityError, match="admission scope denied"):
+        service.consume_external_storage_write(
+            verified_service_principal="backend-service",
+            tenant_id="tenant-a",
+            capability="conversation-persistence",
+            resource_id="conversation-message",
+            write_id="thread-a:idem-scope",
+            storage_bytes=64,
+            now=_now(),
+        )
+
