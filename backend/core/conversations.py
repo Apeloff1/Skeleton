@@ -141,11 +141,62 @@ class MongoConversationAuthority:
         database=core_db,
         *,
         storage_admitter: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
+        governance_registrar: Callable[..., Awaitable[Mapping[str, Any]]] | None = None,
     ) -> None:
         self.database = database
         self.threads = database["conversation_threads"]
         self.messages = database["conversation_messages"]
         self.storage_admitter = storage_admitter
+        self.governance_registrar = governance_registrar
+
+    async def _register_governance(
+        self,
+        *,
+        record_id: str,
+        tenant_id: str,
+        source_ref: str,
+        data_class: str,
+        created_at: datetime,
+    ) -> Mapping[str, Any] | None:
+        registrar = self.governance_registrar
+        if registrar is None:
+            return None
+        try:
+            receipt = await registrar(
+                mode="register",
+                plane="conversation",
+                record_id=str(record_id),
+                tenant_id=str(tenant_id),
+                source_ref=str(source_ref),
+                data_class=str(data_class),
+                purposes=("model-inference", "retrieval-synthesis"),
+                deletion_targets=("conversation",),
+                created_at=created_at.astimezone(timezone.utc).timestamp(),
+                exportable=True,
+            )
+        except Exception as exc:
+            raise ConversationStorageUnavailable(
+                "conversation governance registration is unavailable"
+            ) from exc
+        if not isinstance(receipt, Mapping):
+            raise ConversationStorageUnavailable(
+                "conversation governance registration returned invalid receipt"
+            )
+        record = receipt.get("record")
+        if not isinstance(record, Mapping):
+            raise ConversationStorageUnavailable(
+                "conversation governance registration receipt is malformed"
+            )
+        if (
+            record.get("record_id") != str(record_id)
+            or record.get("tenant_id") != str(tenant_id)
+            or record.get("owner_plane") != "conversation"
+            or record.get("state") != "active"
+        ):
+            raise ConversationStorageUnavailable(
+                "conversation governance registration identity mismatch"
+            )
+        return receipt
 
     async def _admit_storage(
         self,
@@ -257,6 +308,13 @@ class MongoConversationAuthority:
             resource_id="conversation-thread",
             write_id="thread:" + thread.thread_id,
             payload=thread.as_dict(),
+        )
+        await self._register_governance(
+            record_id=thread.thread_id,
+            tenant_id=thread.tenant_id,
+            source_ref="conversation-thread://" + thread.thread_id,
+            data_class=thread.data_class,
+            created_at=thread.created_at,
         )
         try:
             await self.threads.insert_one(_thread_doc(thread))
@@ -579,6 +637,18 @@ class MongoConversationAuthority:
                         "activate_branch": bool(activate_branch),
                     },
                 },
+            )
+            await self._register_governance(
+                record_id=message.message_id,
+                tenant_id=tenant_id,
+                source_ref=(
+                    "conversation-message://"
+                    + message.thread_id
+                    + "/"
+                    + message.message_id
+                ),
+                data_class=message.data_class,
+                created_at=message.created_at,
             )
             await self.messages.insert_one(prepared)
         except ConversationConflict:
@@ -1067,7 +1137,12 @@ conversation_authority = MongoConversationAuthority(
         None
         if _conversation_engine_client is None
         else _conversation_engine_client.admit_storage_write
-    )
+    ),
+    governance_registrar=(
+        None
+        if _conversation_engine_client is None
+        else _conversation_engine_client.reconcile_governed_write
+    ),
 )
 
 
