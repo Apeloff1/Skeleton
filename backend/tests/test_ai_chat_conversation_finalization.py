@@ -15,6 +15,7 @@ from skeleton.contracts.conversation import (
     ConversationThreadState,
 )
 from skeleton.persistence.conversation_repository import (
+    ConversationConflict,
     ConversationStorageUnavailable,
 )
 
@@ -338,3 +339,62 @@ async def test_chat_retry_after_assistant_commit_failure_preserves_engine_identi
     assert response["ai_result_id"] == (
         "engine-result:" + second.execution_request.execution_id
     )
+
+
+@pytest.mark.asyncio
+async def test_chat_blocks_different_turn_while_prior_user_turn_is_incomplete(
+    monkeypatch,
+) -> None:
+    import routes.ai as route
+
+    thread, pending_user = _thread_and_user_message()
+    pending_user = ConversationMessage(
+        message_id=pending_user.message_id,
+        thread_id=pending_user.thread_id,
+        branch_id=pending_user.branch_id,
+        sequence=pending_user.sequence,
+        author_type=pending_user.author_type,
+        created_at=pending_user.created_at,
+        idempotency_key="prior-pending-turn",
+        content="Prior unfinished question.",
+        data_class=pending_user.data_class,
+    )
+    calls = {"append": 0, "engine": 0}
+
+    async def active_transcript(*_args, **_kwargs):
+        return (pending_user,)
+
+    async def forbidden_append(*_args, **_kwargs):
+        calls["append"] += 1
+        raise AssertionError("different turn must not append while prior is pending")
+
+    def forbidden_engine():
+        calls["engine"] += 1
+        raise AssertionError("engine must not start for blocked concurrent turn")
+
+    monkeypatch.setattr(
+        route,
+        "conversation_authority",
+        SimpleNamespace(
+            active_transcript=active_transcript,
+            append_user_message=forbidden_append,
+        ),
+    )
+    monkeypatch.setattr(route.EngineClient, "from_env", forbidden_engine)
+
+    request = route.AIChatRequest(
+        message="New concurrent question.",
+        thread_id=thread.thread_id,
+        idempotency_key="new-turn",
+        expected_thread_version=thread.version,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await route.ai_chat(
+            request,
+            user={"tenant_id": "tenant-a", "email": "owner-a"},
+        )
+
+    assert exc.value.status_code == 409
+    assert "previous canonical turn is incomplete" in exc.value.detail
+    assert calls == {"append": 0, "engine": 0}
