@@ -249,3 +249,33 @@ def test_sqlite_snapshot_verification_rejects_restore_drift(tmp_path) -> None:
         match="differs from backup",
     ):
         drill.verify_sqlite_snapshot(expected, actual)
+
+
+def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
+    tmp_path,
+) -> None:
+    result = drill.run_engine_sqlite_bundle_drill(
+        tmp_path / "engine-bundle",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["bundle_digest"] == result["restored_bundle_digest"]
+    assert set(result["stores"]) == {
+        "execution",
+        "pressure",
+        "quota",
+        "submissions",
+        "tool_receipts",
+    }
+    for store in result["stores"].values():
+        assert store["backup_digest"] == store["restore_digest"]
+
+    verified = result["verified"]
+    assert verified["execution_state"] == "routing"
+    assert verified["checkpoint_version"] == 1
+    assert verified["approval_ref"] == "approval:engine-recovery"
+    assert verified["tool_reservation_status"] == "in_doubt"
+    assert verified["quota_committed_input_tokens"] == 90
+    assert verified["pressure_active"] == 1
+    assert verified["pressure_queued"] == 1
