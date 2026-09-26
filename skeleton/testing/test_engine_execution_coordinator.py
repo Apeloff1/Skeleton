@@ -919,4 +919,3 @@ async def test_coordinator_rehydrates_execution_admission_after_local_restart(
         == first_lease.quota_reservation.reservation_id
     )
     assert ledger.snapshot("tenant-a")["active_reservations"] == 1
-
