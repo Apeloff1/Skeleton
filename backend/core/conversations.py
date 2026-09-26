@@ -126,6 +126,7 @@ def _message_from_doc(doc: dict[str, Any]) -> ConversationMessage:
         context_compiler_version=doc.get("context_compiler_version"),
         attachment_refs=tuple(doc.get("attachment_refs") or ()),
         tool_receipt_refs=tuple(doc.get("tool_receipt_refs") or ()),
+        memory_refs=tuple(doc.get("memory_refs") or ()),
         citation_refs=tuple(doc.get("citation_refs") or ()),
         artifact_refs=tuple(doc.get("artifact_refs") or ()),
         data_class=str(doc.get("data_class") or "confidential"),
@@ -625,6 +626,7 @@ class MongoConversationAuthority:
             and existing.context_compiler_version == candidate.context_compiler_version
             and existing.attachment_refs == candidate.attachment_refs
             and existing.tool_receipt_refs == candidate.tool_receipt_refs
+            and existing.memory_refs == candidate.memory_refs
             and existing.citation_refs == candidate.citation_refs
             and existing.artifact_refs == candidate.artifact_refs
             and existing.data_class == candidate.data_class
@@ -969,6 +971,7 @@ class MongoConversationAuthority:
         branch_id: str | None = None,
         supersedes_message_id: str | None = None,
         tool_receipt_refs: tuple[str, ...] = (),
+        memory_refs: tuple[str, ...] = (),
         citation_refs: tuple[str, ...] = (),
         artifact_refs: tuple[str, ...] = (),
         data_class: str = "confidential",
@@ -997,6 +1000,7 @@ class MongoConversationAuthority:
             context_source_snapshot=context_source_snapshot,
             context_compiler_version=context_compiler_version,
             tool_receipt_refs=tool_receipt_refs,
+            memory_refs=memory_refs,
             citation_refs=citation_refs,
             artifact_refs=artifact_refs,
             data_class=data_class,
@@ -1025,6 +1029,7 @@ class MongoConversationAuthority:
         context_source_snapshot: tuple[tuple[str, str], ...] = (),
         context_compiler_version: str | None = None,
         tool_receipt_refs: tuple[str, ...] = (),
+        memory_refs: tuple[str, ...] = (),
         citation_refs: tuple[str, ...] = (),
         artifact_refs: tuple[str, ...] = (),
     ) -> tuple[ConversationThread, ConversationMessage]:
@@ -1079,6 +1084,7 @@ class MongoConversationAuthority:
             branch_id=str(uuid4()),
             supersedes_message_id=prior.message_id,
             tool_receipt_refs=tool_receipt_refs,
+            memory_refs=memory_refs,
             citation_refs=citation_refs,
             artifact_refs=artifact_refs,
             data_class=prior.data_class,
