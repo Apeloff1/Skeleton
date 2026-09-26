@@ -486,7 +486,7 @@
       "plane": "tool-runtime",
       "stage": 1,
       "gap_status": "open",
-      "implementation_state": "in_progress",
+      "implementation_state": "implemented_pending_verification",
       "closure_decision": "open",
       "evidence_present": [
         "skeleton/skills/tool_contract.py typed ToolManifest/ToolExecutionRequest/ToolExecutionReceipt contracts",
@@ -518,7 +518,10 @@
         "backend/tests/test_tool_registry_canonical_delegate.py governed result restart/fail-closed/capacity/retention regression suite",
         "skeleton/testing/test_tool_runtime.py malformed nested schema and rich manifest invariant coverage",
         "skeleton/testing/test_execution_runtime.py enabled-only minimal model-visible tool inventory proof",
-        "backend/services/tool_registry.py governed durable result classification/retention binding"
+        "backend/services/tool_registry.py governed durable result classification/retention binding",
+        ".github/workflows/tool-runtime-closure.yml dedicated exact-head tool-runtime closure workflow",
+        "scripts/verify_tool_runtime_closure.py independent ownership/lineage/delegation/mirror/dependency verifier",
+        "tests/test_tool_runtime_independent_verifier.py independent verifier regression suite"
       ],
       "closure_evidence_required": [
         "tool manifest schema validation/fuzz tests",
@@ -533,12 +536,13 @@
         "tool receipt lineage binds operation/execution/turn/call identity"
       ],
       "outstanding_evidence": [
-        "exact-head App Assembly and provider-surface isolation evidence"
+        "fresh exact-head Tool Runtime Closure Gate"
       ],
       "blockers": [
         "dependency must close: gap-governance-registry",
         "dependency must close: gap-cost-admission",
-        "dependency must close: gap-provider-surface-convergence"
+        "dependency must close: gap-provider-surface-convergence",
+        "fresh exact-head Tool Runtime Closure Gate"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
