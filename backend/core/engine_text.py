@@ -13,6 +13,7 @@ import hashlib
 from typing import Mapping, Sequence
 from uuid import NAMESPACE_URL, uuid5
 
+from core.route_privacy import require_route_provider_transfer
 from core.engine_client import (
     EngineClient,
     EngineClientError,
@@ -255,6 +256,22 @@ async def execute_engine_text(
 
     if not isinstance(request, EngineTextRequest):
         raise TypeError("request must be EngineTextRequest")
+    try:
+        require_route_provider_transfer(
+            provider_id="skeleton-engine",
+            data_class=request.data_class,
+            purpose=request.purpose,
+            tenant_id=request.tenant_id,
+            source="backend.engine_text",
+        )
+    except Exception as exc:
+        from skeleton.vault.data_governance import DataGovernanceDenied
+
+        if isinstance(exc, DataGovernanceDenied):
+            raise EngineTextError(
+                "route privacy denied engine text request"
+            ) from exc
+        raise
     active_client = client
     if active_client is None:
         try:
