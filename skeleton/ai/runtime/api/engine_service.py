@@ -42,8 +42,9 @@ from skeleton.intelligence.quota import QuotaError
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
 from skeleton.vault.data_governance import DataGovernanceDenied
-from skeleton.vault.data_lifecycle import LifecycleError
+from skeleton.vault.data_lifecycle import DeletionPlan, LifecycleError
 from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import LifecycleExecutor
 from skeleton.persistence.execution_repository import (
     ExecutionRepositoryConflict,
     ExecutionRepositoryError,
@@ -1464,6 +1465,7 @@ class EngineExecutionService:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         governance_registry: GovernanceRegistry | None = None,
+        governance_lifecycle_executor: LifecycleExecutor | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -1481,11 +1483,22 @@ class EngineExecutionService:
             and not isinstance(governance_registry, GovernanceRegistry)
         ):
             raise TypeError("governance_registry must be GovernanceRegistry")
+        if (
+            governance_lifecycle_executor is not None
+            and not isinstance(
+                governance_lifecycle_executor,
+                LifecycleExecutor,
+            )
+        ):
+            raise TypeError(
+                "governance_lifecycle_executor must be LifecycleExecutor"
+            )
         self.repository = repository
         self.submissions = submissions
         self.authorities = authorities
         self.admission_runtime = admission_runtime
         self.governance_registry = governance_registry
+        self.governance_lifecycle_executor = governance_lifecycle_executor
         self._usage_meter = (
             None
             if admission_runtime is None
@@ -1919,6 +1932,92 @@ class EngineExecutionService:
                     "reason": action.reason,
                 }
                 for action in plan.actions
+            ],
+        }
+
+    async def execute_external_governance_engine_targets(
+        self,
+        *,
+        verified_service_principal: str,
+        tenant_id: str,
+        plan_id: str,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Execute outstanding non-conversation lifecycle actions in-engine."""
+
+        registry = self.governance_registry
+        executor = self.governance_lifecycle_executor
+        if registry is None or executor is None:
+            raise EngineServiceError(
+                "engine governance lifecycle execution is unavailable"
+            )
+        _principal, tenant = self._authorize_external_governance(
+            verified_service_principal=verified_service_principal,
+            tenant_id=tenant_id,
+        )
+        plan_key = _bounded_storage_text(
+            plan_id,
+            "plan_id",
+            maximum=512,
+        )
+        try:
+            pending = registry.lifecycle.pending_deletion_plan(
+                plan_key,
+                tenant_id=tenant,
+            )
+        except (LifecycleError, DataGovernanceDenied) as exc:
+            raise EngineServiceError(
+                "external governance deletion plan is unavailable"
+            ) from exc
+
+        engine_actions = tuple(
+            action
+            for action in pending.actions
+            if action.target != "conversation"
+        )
+        if not engine_actions:
+            return {
+                "schema_version": 1,
+                "plan_id": pending.plan_id,
+                "tenant_id": pending.tenant_id,
+                "executed_targets": [],
+                "receipts": [],
+            }
+
+        engine_plan = DeletionPlan(
+            plan_id=pending.plan_id,
+            tenant_id=pending.tenant_id,
+            reason=pending.reason,
+            actions=engine_actions,
+            created_at=pending.created_at,
+        )
+        timestamp = (
+            None
+            if now is None
+            else _aware(
+                now,
+                "governance_execution.now",
+            ).timestamp()
+        )
+        try:
+            result = await executor.execute_deletion_plan(
+                engine_plan,
+                now=timestamp,
+            )
+        except Exception as exc:
+            raise EngineServiceError(
+                "engine governance target execution failed"
+            ) from exc
+        return {
+            "schema_version": 1,
+            "plan_id": result.plan_id,
+            "tenant_id": pending.tenant_id,
+            "executed_targets": sorted(
+                {action.target for action in engine_actions}
+            ),
+            "receipts": [
+                receipt.as_dict()
+                for receipt in result.receipts
             ],
         }
 
