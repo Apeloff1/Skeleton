@@ -466,6 +466,10 @@ async def test_governed_conversation_export_uses_registry_inventory() -> None:
         created_at=_now(),
         idempotency_key="export-me",
         content="exported answer",
+        parent_message_id=str(uuid4()),
+        causal_user_message_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        ai_result_id="engine-result:export",
     )
     await db["conversation_threads"].insert_one(
         {**thread.as_dict(), "_id": thread.thread_id}
