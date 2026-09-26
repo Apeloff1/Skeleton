@@ -51,6 +51,15 @@ GOOGLE_VENDOR_MODULES = {
     "google.genai",
     "google.generativeai",
 }
+NETWORK_TRANSPORT_ROOTS = {
+    "aiohttp",
+    "http.client",
+    "httpx",
+    "requests",
+    "socket",
+    "urllib",
+    "urllib.request",
+}
 CREDENTIAL_KEYS = {
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
@@ -206,6 +215,25 @@ def _provider_urls(tree: ast.AST) -> set[str]:
     return found
 
 
+def _network_transport_imports(tree: ast.AST) -> set[str]:
+    """Return executable network modules, excluding inert URL metadata."""
+
+    found: set[str] = set()
+    for node in ast.walk(tree):
+        modules: list[str] = []
+        if isinstance(node, ast.Import):
+            modules.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.append(node.module)
+        for module in modules:
+            if module in NETWORK_TRANSPORT_ROOTS or any(
+                module.startswith(root + ".")
+                for root in NETWORK_TRANSPORT_ROOTS
+            ):
+                found.add(module)
+    return found
+
+
 def _parse_source(path: Path) -> tuple[str, ast.AST]:
     try:
         source = path.read_text(encoding="utf-8")
@@ -310,10 +338,26 @@ def _surface_map(contract: Mapping[str, Any]) -> tuple[dict[str, dict[str, Any]]
 
 
 def _source_edges(tree: ast.AST) -> dict[str, list[str]]:
+    sdk = _sdk_imports(tree)
+    credentials = _credential_reads(tree)
+    provider_urls = _provider_urls(tree)
+    transports = _network_transport_imports(tree)
+
+    # A provider URL in a static catalog is metadata, not an executable
+    # transport. Count network ownership only when executable transport or SDK
+    # capability is present alongside provider context.
+    network_edges: set[str] = set()
+    if transports and (sdk or credentials or provider_urls):
+        network_edges.update(transports)
+    if sdk:
+        network_edges.update("sdk:" + module for module in sdk)
+    if provider_urls and (sdk or credentials or transports):
+        network_edges.update("url:" + url for url in provider_urls)
+
     return {
-        "sdk_client": sorted(_sdk_imports(tree)),
-        "credential": sorted(_credential_reads(tree)),
-        "network_transport": sorted(_provider_urls(tree)),
+        "sdk_client": sorted(sdk),
+        "credential": sorted(credentials),
+        "network_transport": sorted(network_edges),
     }
 
 
@@ -415,7 +459,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 "edge_classes": sorted(active),
                 "sdk_imports": edges["sdk_client"],
                 "credential_reads": edges["credential"],
-                "provider_urls": edges["network_transport"],
+                "network_transport_edges": edges["network_transport"],
+                "provider_urls": sorted(_provider_urls(tree)),
                 "declared_surface_id": (
                     None if declared is None else declared.get("id")
                 ),
