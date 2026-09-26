@@ -395,6 +395,24 @@ def reconcile_governed_write(
     return receipt.as_dict()
 
 
+@router.post("/governance/retention/plan")
+def plan_governance_retention(
+    body: EngineGovernancePlanExecutionBody,
+    request: Request,
+    service: EngineExecutionService = Depends(_engine_service),
+    service_token: str = Depends(_engine_service_token),
+) -> dict[str, Any]:
+    principal = _verified_service_principal(request, service_token)
+    try:
+        return service.plan_external_governance_retention(
+            verified_service_principal=principal,
+            tenant_id=body.tenant_id,
+        )
+    except Exception as exc:
+        _raise_engine_error(exc)
+        raise
+
+
 @router.post("/governance/deletions")
 def request_governance_deletion(
     body: EngineGovernanceDeletionPlanBody,
