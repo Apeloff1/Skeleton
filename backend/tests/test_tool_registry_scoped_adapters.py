@@ -208,6 +208,7 @@ async def test_web_search_drops_private_loopback_and_userinfo_results(registry, 
     result = await registry.invoke(
         "web_search",
         {"query": "safe query", "max_results": 4},
+        data_class="public",
     )
 
     assert result["ok"] is True
@@ -254,11 +255,31 @@ async def test_privileged_compatibility_handlers_delegate_to_adapter_owners(
             "citation": "",
         }
 
-    monkeypatch.setattr(registry._VAULT_OWNER, "execute", vault)
-    monkeypatch.setattr(registry._JEEVES_OWNER, "execute", jeeves)
-    monkeypatch.setattr(registry._SANDBOX_OWNER, "execute", sandbox)
-    monkeypatch.setattr(registry._DATABASE_OWNER, "execute", database)
-    monkeypatch.setattr(registry._NETWORK_OWNER, "execute", network)
+    monkeypatch.setattr(
+        registry,
+        "_VAULT_OWNER",
+        SimpleNamespace(execute=vault),
+    )
+    monkeypatch.setattr(
+        registry,
+        "_JEEVES_OWNER",
+        SimpleNamespace(execute=jeeves),
+    )
+    monkeypatch.setattr(
+        registry,
+        "_SANDBOX_OWNER",
+        SimpleNamespace(execute=sandbox),
+    )
+    monkeypatch.setattr(
+        registry,
+        "_DATABASE_OWNER",
+        SimpleNamespace(execute=database),
+    )
+    monkeypatch.setattr(
+        registry,
+        "_NETWORK_OWNER",
+        SimpleNamespace(execute=network),
+    )
 
     vault_result = await registry._tool_vault_query(
         {"topic": "physics"}
