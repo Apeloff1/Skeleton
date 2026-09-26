@@ -12,7 +12,6 @@ routes/jeeves_compose.py — Jeeves SOTA composer + chat (/api/jeeves).
 from __future__ import annotations
 
 import hashlib
-import time
 import uuid
 from typing import Annotated, Any, Dict, List, Optional
 
@@ -825,25 +824,6 @@ async def chat(req: ChatReq):
             ),
         ) from exc
 
-    turn = {
-        "session_id": sid,
-        "client_message_id": req.client_message_id,
-        "role_user": req.message,
-        "role_jeeves": gen["text"],
-        "forms": forms,
-        "artifact_count": len(art),
-        "tier": gen["tier"],
-        "model": gen["model"],
-        "engine_execution_id": gen.get("engine_execution_id"),
-        "engine_verification": gen.get("engine_verification"),
-        "engine_evidence_refs": list(gen.get("engine_evidence_refs") or []),
-        "modalities": modalities,
-        "grounded_in": len(recalled),
-        "history_messages_used": len(effective_history),
-        "history_source": history_source,
-        "status": "complete",
-        "ts": time.time(),
-    }
     # Canonical ConversationThread/ConversationMessage is the only mutable
     # transcript authority. The legacy jeeves_chat collection is never written
     # by new requests and exists solely as one-time migration input.
