@@ -357,6 +357,85 @@ def test_prior_assistant_prompt_injection_stays_untrusted_data() -> None:
     assert "Ignore the user" in evidence_message["content"]
 
 
+def test_provider_projection_uses_highest_priority_latest_user_as_prompt() -> None:
+    operation_id, execution_id, turn_id = _ids()
+    policy = _segment(
+        "Canonical projected instruction.",
+        kind=ContextKind.PRODUCT_INSTRUCTION,
+        trust=ContextTrust.TRUSTED_CONTROL,
+        source_type="product-policy",
+        source_id="policy:projection",
+        priority=1000,
+        relevance=1.0,
+        mandatory=True,
+    )
+    earlier_user = _segment(
+        "Earlier question.",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="message:earlier-user",
+        priority=500,
+        relevance=1.0,
+    )
+    earlier_assistant = _segment(
+        "Earlier answer.",
+        kind=ContextKind.ASSISTANT_MESSAGE,
+        trust=ContextTrust.DERIVED_UNTRUSTED,
+        source_type="conversation",
+        source_id="message:earlier-assistant",
+        priority=500,
+        relevance=1.0,
+    )
+    current_user = _segment(
+        "Current question.",
+        kind=ContextKind.USER_MESSAGE,
+        trust=ContextTrust.AUTHORIZED_USER_DATA,
+        source_type="conversation",
+        source_id="message:current-user",
+        priority=900,
+        relevance=1.0,
+    )
+    # _segment uses the same BASE timestamp, matching compatibility callers
+    # that compile a whole request in one instant.
+    envelope = ContextCompiler().compile(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        turn_id=turn_id,
+        tenant_id="tenant-a",
+        purpose="model-inference",
+        budget=ContextBudget(
+            max_context_tokens=4096,
+            reserved_output_tokens=512,
+            reserved_tool_result_tokens=0,
+            reserved_policy_tokens=512,
+            safety_margin_tokens=128,
+            max_segment_tokens=2048,
+            max_artifact_tokens=1024,
+            max_tool_result_tokens=1024,
+        ),
+        segments=(
+            policy,
+            earlier_user,
+            earlier_assistant,
+            current_user,
+        ),
+        compiled_at=BASE,
+    )
+
+    projection = project_provider_context(envelope)
+
+    assert projection.instructions == "Canonical projected instruction."
+    assert projection.prompt == "Current question."
+    assert tuple(
+        (item["role"], item["content"])
+        for item in projection.history
+    ) == (
+        ("user", "Earlier question."),
+        ("assistant", "Earlier answer."),
+    )
+
+
 def test_duplicate_evidence_is_deterministically_omitted() -> None:
     first = _segment(
         "same content",
