@@ -226,7 +226,7 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
                         instruction_policy=InstructionPolicy(
                             policy_id="backend.worldforge.monograph",
                             version="1",
-                            instructions=MONOGRAPH_SYSTEM,
+                            instructions=MONOGRAPH_SYSTEM.strip(),
                         ),
                     ).with_model(prov, m)
                     resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=300)
