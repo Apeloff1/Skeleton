@@ -180,6 +180,7 @@ async def build_desktop(b: DesktopBody, user=Depends(_editor)):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(binary, os.path.basename(binary))
     tenant = _tenant_id(user)
+    binary_bytes = os.path.getsize(binary)
     rec = _governed_register(
         build_id=build_id,
         game_name=safe_name,
@@ -187,9 +188,9 @@ async def build_desktop(b: DesktopBody, user=Depends(_editor)):
         payload=zip_path.read_bytes(),
         tenant_id=tenant,
     )
-    zip_path.unlink(missing_ok=True)
+    shutil.rmtree(workdir, ignore_errors=True)
     rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
-    rec["binary_bytes"] = os.path.getsize(binary)
+    rec["binary_bytes"] = binary_bytes
     rec["platform"] = "linux-x86_64"
     rec["ok"] = True
     return rec
@@ -261,7 +262,7 @@ async def build_godot(b: BuildBody, user=Depends(_editor)):
         payload=zip_path.read_bytes(),
         tenant_id=tenant,
     )
-    zip_path.unlink(missing_ok=True)
+    shutil.rmtree(workdir, ignore_errors=True)
     rec["download_url"] = f"/api/gameforge/build/download/{build_id}"
     rec["importable_godot_project"] = True
     rec["engine_validated"] = engine_validated
