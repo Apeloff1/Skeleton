@@ -5,6 +5,7 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
+from skeleton.context.instruction_policy import InstructionPolicy
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -197,10 +198,16 @@ async def generate_sprite(request: Sprite2DRequest):
     generation_prompt = ""
     if LLM_AVAILABLE:
         try:
-            llm = EngineChat(model="gpt-4o")
-            llm.add_message("system", """You are an expert pixel artist and game asset designer. 
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.asset-pipeline.sprite-spec",
+                    version="1",
+                    instructions="""You are an expert pixel artist and game asset designer. 
             Generate detailed, professional asset creation specifications and prompts for AI image generators.
-            Include specific details about colors, shapes, shading, and style consistency.""")
+            Include specific details about colors, shapes, shading, and style consistency.""",
+                ),
+            )
             llm.add_message("user", f"""Create a detailed asset generation specification for:
             
             Description: {request.description}
@@ -272,9 +279,15 @@ async def generate_3d_model(request: Model3DRequest):
     generation_prompt = ""
     if LLM_AVAILABLE:
         try:
-            llm = EngineChat(model="gpt-4o")
-            llm.add_message("system", """You are an expert 3D artist and game asset designer.
-            Generate detailed, professional 3D model specifications and prompts for AI 3D generators like Meshy, Tripo, and manual modeling.""")
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.asset-pipeline.model-spec",
+                    version="1",
+                    instructions="""You are an expert 3D artist and game asset designer.
+            Generate detailed, professional 3D model specifications and prompts for AI 3D generators like Meshy, Tripo, and manual modeling.""",
+                ),
+            )
             llm.add_message("user", f"""Create a detailed 3D asset generation specification for:
             
             Description: {request.description}
@@ -412,8 +425,17 @@ async def generate_asset_batch(request: AssetBatchRequest):
     # Generate style guide if AI available
     if LLM_AVAILABLE and request.consistent_style:
         try:
-            llm = EngineChat(model="gpt-4o")
-            llm.add_message("system", "You are a game art director. Create consistent style guides for game assets.")
+            llm = EngineChat(
+                model="gpt-4o",
+                instruction_policy=InstructionPolicy(
+                    policy_id="backend.asset-pipeline.style-guide",
+                    version="1",
+                    instructions=(
+                        "You are a game art director. Create consistent "
+                        "style guides for game assets."
+                    ),
+                ),
+            )
             llm.add_message("user", f"""Create a style guide for a {request.game_type} game with {request.art_style} art style.
             Project: {request.project_name}
             Assets needed: {len(request.assets)}
