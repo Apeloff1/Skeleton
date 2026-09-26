@@ -694,15 +694,18 @@
         "skeleton/context/sources/tool.py successful durable tool-receipt result adapter with operation/execution/turn/call/governance provenance",
         "skeleton/context/compiler.py deterministic trust-aware packing, omission ledger and provider-neutral projection",
         "skeleton/testing/test_context_compiler.py deterministic digest/packing, mandatory policy, tenant/data-class, injection and budget regressions",
-        "skeleton/testing/test_context_compiler.py tool-result lineage/fail-closed/result-limit regressions"
+        "skeleton/testing/test_context_compiler.py tool-result lineage/fail-closed/result-limit regressions",
+        "backend/core/engine_client.py derives EngineContextHandoff instructions/prompt/history from project_provider_context(ContextEnvelope) whenever canonical projection content exists",
+        "backend/core/engine_client.py prevents legacy caller text/history from overriding projected ContextEnvelope content",
+        "backend/routes/ai.py binds compatibility prompts as USER_MESSAGE ContextSegments so prompt content participates in context_digest",
+        "backend/tests/test_engine_client.py proves attacker-supplied legacy instructions/prompt/history cannot override canonical projected context"
       ],
       "remaining": [
         "implement provenance-preserving compaction with source/digest retention",
-        "make cognitive runtime consume ContextEnvelope/provider projection rather than preassembled instructions/prompt/history",
-        "bind compiler-produced context_id/context_digest/source snapshot to provider turn construction",
-        "migrate backend/routes/ai.py and backend/services/ai_assistant_svc.py prompt assembly to compatibility delegation",
+        "migrate remaining direct feature prompt/provider assembly to ContextCompiler compatibility delegation",
         "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
-        "collect exact-head validation and independent closure evidence"
+        "prove canonical model turns cannot bypass digest-bound ContextEnvelope projection",
+        "collect fresh exact-head validation and independent closure evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
