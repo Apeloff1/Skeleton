@@ -993,3 +993,54 @@ async def test_resume_commits_staged_terminal_intent_without_replaying_verificat
     assert result.result.artifact_refs == ("artifact:recover",)
     assert repo.finalization_intent("exec-1") is None
     assert len(repo.pending_outbox(execution_id="exec-1")) == 1
+
+@pytest.mark.asyncio
+async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("metered answer", response_id="resp-meter-storage")]
+    )
+    events = []
+
+    def meter(resource_id, write_id, payload, meter_now):
+        events.append((resource_id, write_id, payload, meter_now))
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        storage_meter=meter,
+    )
+    result = await runtime.start(
+        _request(
+            context_policy={
+                "capability": "assistant.chat",
+                "verification_profile": "assistant_proposal",
+            }
+        ),
+        instructions="Answer.",
+        prompt="Return a bounded answer.",
+        context_digest="d" * 64,
+        now=_now(),
+    )
+
+    assert result.completed is True
+    assert result.result is not None
+    resources = [item[0] for item in events]
+    assert "execution-checkpoint" in resources
+    assert "execution-turn" in resources
+    assert "execution-finalization-intent" in resources
+    assert "execution-result" in resources
+
+    write_ids = [item[1] for item in events]
+    assert len(write_ids) == len(set(write_ids))
+    assert any(item.startswith("checkpoint:exec-1:") for item in write_ids)
+    assert any(item.startswith("turn:exec-1:") for item in write_ids)
+    assert "intent:exec-1" in write_ids
+    assert "result:exec-1" in write_ids
+
+    for _resource_id, _write_id, payload, meter_now in events:
+        assert payload is not None
+        assert meter_now == _now()
+
