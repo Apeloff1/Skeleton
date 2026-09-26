@@ -9,7 +9,6 @@ remain in worldforge.py and can migrate here in a later pass.
 """
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime, timezone
 
@@ -349,7 +348,6 @@ def _poster_worker(job_id: str, cfg: WorldConfig, style: str):
     try:
         world = build_world(cfg)
         prompt = _poster_prompt(world, cfg, style)
-        key = os.environ.get("EMERGENT_LLM_KEY")
 
         async def _gen():
             chat = LlmChat(session_id=f"poster-{job_id[:8]}",
