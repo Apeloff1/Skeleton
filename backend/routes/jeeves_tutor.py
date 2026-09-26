@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / '.env')
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from core.engine_chat import EngineChat, UserMessage
 from motor.motor_asyncio import AsyncIOMotorClient
 # ★ Consolidated 2026-02 — shared MongoDB client (lazy connect, fast timeouts)
 from core.databases import client as _SHARED_MONGO_CLIENT
@@ -208,7 +208,7 @@ Always be helpful, accurate, and adapt to the user's level."""
     last_err: Optional[Exception] = None
     for attempt in range(1, attempts + 1):
         try:
-            chat = LlmChat(
+            chat = EngineChat(
                 session_id=session_id or f"jeeves-{uuid.uuid4().hex[:8]}",
                 system_message=system,
             ).with_model("openai", "gpt-4o")
