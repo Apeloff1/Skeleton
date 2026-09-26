@@ -342,4 +342,3 @@ def test_canonical_registration_and_reconciliation_are_audited_without_payload()
     rendered_spans = repr([span.to_dict() for span in spans])
     assert "TOP-SECRET-SOURCE" not in rendered_spans
     assert "tenant-secret-a" not in rendered_spans
-
