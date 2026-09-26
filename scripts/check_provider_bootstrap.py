@@ -64,6 +64,7 @@ _AI_SURFACE_PATH_TERMS = (
 _NON_PROVIDER_NETWORK_PATH_PREFIXES = ("skeleton/ai/research/legacy/",)
 _NON_RUNTIME_PROVIDER_MIRROR_PREFIXES = (
     "skeleton/ai/research/external/",
+    "skeleton/ai/runtime/provider_runtime.py",
 )
 _NETWORK_TRANSPORT_ROOTS = frozenset(
     {
