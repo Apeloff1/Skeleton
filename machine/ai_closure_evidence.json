@@ -529,7 +529,17 @@
         "skeleton/context/compiler.py",
         "skeleton/context/sources/conversation.py",
         "skeleton/context/sources/retrieval.py",
-        "skeleton/testing/test_context_compiler.py"
+        "skeleton/testing/test_context_compiler.py",
+        "skeleton/context/sources/conversation.py canonical conversation message adapter",
+        "skeleton/context/sources/retrieval.py ACL/provenance-bound retrieval adapter",
+        "skeleton/context/sources/memory.py active tenant-bound canonical memory adapter",
+        "skeleton/context/sources/artifact.py authorized materialized artifact adapter",
+        "skeleton/context/sources/skill.py trusted declarative skill instruction adapter",
+        "skeleton/context/sources/tool.py trusted minimal tool-schema adapter",
+        "skeleton/context/sources/tool.py successful durable tool-receipt result adapter with operation/execution/turn/call/governance provenance",
+        "skeleton/context/compiler.py deterministic trust-aware packing, omission ledger and provider-neutral projection",
+        "skeleton/testing/test_context_compiler.py deterministic digest/packing, mandatory policy, tenant/data-class, injection and budget regressions",
+        "skeleton/testing/test_context_compiler.py tool-result lineage/fail-closed/result-limit regressions"
       ],
       "closure_evidence_required": [
         "deterministic context snapshot/digest tests",
@@ -545,17 +555,12 @@
         "legacy control-prompt source scan and compatibility prompt-parity tests"
       ],
       "outstanding_evidence": [
-        "deterministic context snapshot/digest tests",
-        "same canonical inputs produce same selected segment order under fixed budget",
-        "system/policy segments cannot be displaced by untrusted content",
-        "client history injection cannot enter trusted instruction tier",
-        "cross-tenant memory/retrieval/artifact segments are denied",
-        "token budget/output headroom tests",
-        "oversized tool/artifact result externalization tests",
         "summary/compaction provenance tests",
-        "citation/source ids survive context projection",
-        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly by product routes",
-        "legacy control-prompt source scan and compatibility prompt-parity tests"
+        "citation/source ids survive context projection across compaction",
+        "provider request is produced from ContextEnvelope by the cognitive runtime rather than directly from preassembled prompt/history",
+        "legacy control-prompt source scan and compatibility prompt-parity tests",
+        "fresh exact-head context compiler and App Assembly validation",
+        "declared dependency-gap closure and independent verification"
       ],
       "blockers": [
         "dependency must close: gap-conversation-state-authority",
