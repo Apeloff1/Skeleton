@@ -144,3 +144,50 @@ def test_skeleton_runtime_declares_canonical_mongo_driver_dependencies() -> None
     assert '"pymongo==4.18.1"' in pyproject
     assert "SKL_MONGO_URI=" in compose
     assert "SKL_MONGO_DATABASE=skeleton" in compose
+
+def test_server_state_restores_durable_governance_audit_chain(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    lifecycle_path = tmp_path / "governance-lifecycle.sqlite3"
+    audit_path = tmp_path / "governance-audit.jsonl"
+    monkeypatch.setenv(
+        "SKL_GOVERNANCE_LIFECYCLE_PATH",
+        str(lifecycle_path),
+    )
+    monkeypatch.setenv(
+        "SKL_GOVERNANCE_AUDIT_PATH",
+        str(audit_path),
+    )
+
+    first = ServerState()
+    registry = first.bind_governance_registry()
+    assert first.governance_audit_log is not None
+    assert first.governance_audit_timeline is not None
+    assert first.governance_lifecycle_adapters is not None
+
+    registry.register_canonical_write(
+        "memory",
+        record_id="memory-audit-restart",
+        tenant_id="tenant-a",
+        source_ref="memory://assistant/memory-audit-restart",
+        data_class="confidential",
+        purposes=("model-inference",),
+        created_at=10.0,
+    )
+    assert audit_path.exists()
+    assert first.governance_audit_log.tamper_check() == (True, -1)
+    first.close_governance_registry()
+
+    restarted = ServerState()
+    restored = restarted.bind_governance_registry()
+    assert restored.export_inventory("tenant-a")["count"] == 1
+    entries = restarted.governance_audit_log.query(
+        action="governance.lifecycle.register",
+        limit=20,
+    )
+    assert len(entries) == 1
+    assert entries[0].outcome == "success"
+    assert restarted.governance_audit_log.tamper_check() == (True, -1)
+    restarted.close_governance_registry()
+
