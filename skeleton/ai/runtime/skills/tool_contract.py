@@ -263,17 +263,35 @@ def _validate_value(schema: Mapping[str, Any], value: object, *, path: str) -> N
                 _validate_value(additional, item, path=f"{path}.{name}")
 
 
+def validate_json_schema(
+    schema: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Normalize and validate the supported canonical JSON-schema subset."""
+
+    return _schema(schema, "input_schema")
+
+
+def validate_json_value(
+    schema: Mapping[str, Any],
+    value: object,
+    *,
+    path: str = "value",
+) -> None:
+    """Validate one deterministic JSON value against the canonical schema subset."""
+
+    normalized_schema = validate_json_schema(schema)
+    _validate_value(normalized_schema, value, path=path)
+
+
 def validate_tool_arguments(
     schema: Mapping[str, Any],
     arguments: Mapping[str, Any],
 ) -> None:
     """Validate runtime arguments against the supported canonical schema subset."""
 
-    normalized_schema = _schema(schema, "input_schema")
-    _validate_schema_shape(normalized_schema)
     if not isinstance(arguments, Mapping):
         raise ToolContractError("arguments must be an object")
-    _validate_value(normalized_schema, dict(arguments), path="arguments")
+    validate_json_value(schema, dict(arguments), path="arguments")
 
 
 def canonical_json_digest(value: Mapping[str, Any]) -> str:
