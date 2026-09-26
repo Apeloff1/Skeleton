@@ -17,7 +17,9 @@ class TestGameForgeRouteLogic(unittest.TestCase):
 
         forge = GameForge(genesis=state.genesis, bus=state.genesis.bus)
         result = forge.intake({"genre": "strategy", "theme": "cyberpunk"})
-        self.assertEqual(result["era"], "neon_dystopia")
+        # Brief votes a canonical, compilable era; the setting label is separate.
+        self.assertEqual(result["era"], "grand_strategy")
+        self.assertEqual(result["setting"], "neon_dystopia")
         self.assertIn("strategy", result["vision"])
 
     def test_run_logic_matches_api_shape(self):
@@ -34,7 +36,8 @@ class TestGameForgeRouteLogic(unittest.TestCase):
 
         self.assertEqual(response["status"], "generated")
         self.assertEqual(response["game"]["title"], "Testlands")
-        self.assertEqual(response["game"]["era"], "medieval_fantasy")
+        self.assertEqual(response["game"]["era"], "crpg")
+        self.assertTrue(response["game"]["blueprint_id"].startswith("bp-"))
 
 
 if __name__ == "__main__":
