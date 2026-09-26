@@ -148,6 +148,10 @@ FinalizationBindingHook = Callable[
     [AIExecutionRequest, str, Mapping[str, object]],
     ExecutionFinalizationBindings | Awaitable[ExecutionFinalizationBindings],
 ]
+StorageMeter = Callable[
+    [str, str, object, datetime | None],
+    None,
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,6 +313,7 @@ class CognitiveExecutionRuntime:
         tool_result_resolver: ToolResultResolver | None = None,
         verification_hook: VerificationHook | None = None,
         finalization_binding_hook: FinalizationBindingHook | None = None,
+        storage_meter: StorageMeter | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteExecutionRepository):
             raise TypeError("repository must be SQLiteExecutionRepository")
@@ -324,7 +329,39 @@ class CognitiveExecutionRuntime:
         )
         self.verification_hook = verification_hook
         self.finalization_binding_hook = finalization_binding_hook
+        self.storage_meter = storage_meter
         self._verification_runtime = VerificationRuntime()
+
+    def _meter_storage(
+        self,
+        resource_id: str,
+        write_id: str,
+        payload: object,
+        *,
+        now: datetime | None = None,
+    ) -> None:
+        if self.storage_meter is None:
+            return
+        self.storage_meter(resource_id, write_id, payload, now)
+
+    def _append_turn(
+        self,
+        turn: AgentTurn,
+        *,
+        expected_execution_version: int,
+        now: datetime | None = None,
+    ) -> AIExecution:
+        self._meter_storage(
+            "execution-turn",
+            "turn:" + turn.execution_id + ":" + turn.turn_id,
+            turn.as_dict(),
+            now=now,
+        )
+        return self._append_turn(
+            turn,
+            expected_execution_version=expected_execution_version,
+            now=now,
+        )
 
     @staticmethod
     async def _default_tool_result_resolver(
@@ -437,6 +474,17 @@ class CognitiveExecutionRuntime:
         *,
         now: datetime | None = None,
     ) -> tuple[AIExecution, str]:
+        self._meter_storage(
+            "execution-checkpoint",
+            (
+                "checkpoint:"
+                + execution.execution_id
+                + ":"
+                + str(execution.checkpoint_version + 1)
+            ),
+            payload,
+            now=now,
+        )
         checkpoint = self.repository.checkpoint(
             execution.execution_id,
             payload,
@@ -559,6 +607,12 @@ class CognitiveExecutionRuntime:
                 )
             staged = self.repository.finalization_intent(execution_id)
             if staged is not None:
+                self._meter_storage(
+                    "execution-result",
+                    "result:" + execution_id,
+                    staged.result.as_dict(),
+                    now=now,
+                )
                 terminal = self.repository.finalize_staged(
                     execution_id,
                     now=now,
@@ -1800,9 +1854,21 @@ class CognitiveExecutionRuntime:
         *,
         now: datetime | None,
     ) -> ExecutionRunResult:
+        self._meter_storage(
+            "execution-finalization-intent",
+            "intent:" + execution.execution_id,
+            result.as_dict(),
+            now=now,
+        )
         self.repository.stage_finalization(
             result,
             expected_execution_version=execution.version,
+            now=now,
+        )
+        self._meter_storage(
+            "execution-result",
+            "result:" + execution.execution_id,
+            result.as_dict(),
             now=now,
         )
         terminal = self.repository.finalize_staged(
@@ -1966,4 +2032,5 @@ __all__ = [
     "ExecutionRunResult",
     "ExecutionVerificationDecision",
     "PendingApproval",
+    "StorageMeter",
 ]
