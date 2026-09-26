@@ -11,6 +11,8 @@ routes/jeeves_compose.py — Jeeves SOTA composer + chat (/api/jeeves).
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
+
 import hashlib
 import uuid
 from typing import Annotated, Any, Dict, List, Optional
@@ -44,6 +46,12 @@ JEEVES_CHAT_POLICY = InstructionPolicy(
         "is available. Be precise."
     ),
 )
+
+_ENGINE_EXECUTION_SCOPE: ContextVar[str | None] = ContextVar(
+    "jeeves_engine_execution_scope",
+    default=None,
+)
+
 
 
 # ── shared helpers ─────────────────────────────────────────────
@@ -102,8 +110,15 @@ async def _generate_text(query: str, recalled: List[Dict], needs_reasoning: bool
     # Generative escalation is engine-owned. Product routes never activate
     # provider SDKs or credentials directly.
     prompt = f"CANON:\n{ctx}\n\nQ: {conversation_context or query}"
+    execution_scope = _ENGINE_EXECUTION_SCOPE.get()
     identity = hashlib.sha256(
-        (query + "\x1f" + prompt).encode("utf-8")
+        (
+            str(execution_scope or "semantic")
+            + "\x1f"
+            + query
+            + "\x1f"
+            + prompt
+        ).encode("utf-8")
     ).hexdigest()
     try:
         chat = EngineChat(
@@ -835,15 +850,38 @@ async def chat(req: ChatReq):
         pass
 
     needs_reasoning = len(req.message.split()) > 4 or bool(req.image_base64)
-    if req.context or effective_history:
-        gen = await _generate_text(
-            req.message,
-            recalled,
-            needs_reasoning,
-            conversation_prompt(req.message, req.context, effective_history),
+    execution_scope = (
+        "jeeves-chat:"
+        + sid
+        + ":"
+        + (
+            req.client_message_id
+            or canonical_turn[2].message_id
         )
-    else:
-        gen = await _generate_text(req.message, recalled, needs_reasoning)
+    )
+    execution_scope_token = _ENGINE_EXECUTION_SCOPE.set(
+        execution_scope
+    )
+    try:
+        if req.context or effective_history:
+            gen = await _generate_text(
+                req.message,
+                recalled,
+                needs_reasoning,
+                conversation_prompt(
+                    req.message,
+                    req.context,
+                    effective_history,
+                ),
+            )
+        else:
+            gen = await _generate_text(
+                req.message,
+                recalled,
+                needs_reasoning,
+            )
+    finally:
+        _ENGINE_EXECUTION_SCOPE.reset(execution_scope_token)
 
     ds = _derive_dataset(recalled)
     artifact_forms = [f for f in forms if f != "text"]
