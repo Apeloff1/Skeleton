@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
 import json
 import time
 from typing import Iterable, Protocol
@@ -28,6 +29,8 @@ from skeleton.memory.core import CAGStore, Chunk, InMemoryTFIDFStore, MAGStore
 from skeleton.memory.store import MemoryStore
 from skeleton.memory.types import MemoryChunk
 from skeleton.memory.vector import VectorStore
+from skeleton.vault.data_lifecycle import LifecycleError, LifecycleState
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.persistence.memory_repository import (
     MemoryProjectionEvent,
     MemoryProjectionEventCorruption,
@@ -218,33 +221,167 @@ def _fence_projection_event(
     return False
 
 
+def _retrieval_projection_identity(
+    projection: MemoryProjection,
+    record: MemoryRecord,
+) -> tuple[str, str]:
+    material = (
+        record.tenant_id
+        + "\x1f"
+        + projection.name
+        + "\x1f"
+        + record.memory_id
+    ).encode("utf-8")
+    digest = hashlib.sha256(material).hexdigest()
+    return (
+        "retrieval-" + digest[:40],
+        "retrieval://" + digest,
+    )
+
+
+def _is_governed_retrieval_projection(
+    projection: MemoryProjection,
+) -> bool:
+    return (
+        getattr(projection, "governance_plane", None)
+        == "retrieval"
+    )
+
+
+def _ensure_retrieval_record(
+    governance: GovernanceRegistry,
+    projection: MemoryProjection,
+    record: MemoryRecord,
+) -> str:
+    record_id, source_ref = _retrieval_projection_identity(
+        projection,
+        record,
+    )
+    try:
+        current = governance.lifecycle.get(record_id)
+    except LifecycleError:
+        current = None
+
+    if current is not None:
+        state = current.get("state")
+        if state == LifecycleState.DELETED.value:
+            if record.state is MemoryState.ACTIVE:
+                raise ValueError(
+                    "deleted retrieval projection cannot be revived"
+                )
+            return record_id
+        if state == LifecycleState.DELETE_PENDING.value:
+            return record_id
+
+    governance.reconcile_canonical_write(
+        "retrieval",
+        record_id=record_id,
+        tenant_id=record.tenant_id,
+        source_ref=source_ref,
+        data_class=record.data_class,
+        purposes=("retrieval-synthesis",),
+        deletion_targets=("retrieval",),
+        created_at=record.created_at.timestamp(),
+        retention_until=(
+            None
+            if record.expires_at is None
+            else record.expires_at.timestamp()
+        ),
+        exportable=False,
+    )
+    return record_id
+
+
+def _apply_projection_record(
+    projection: MemoryProjection,
+    record: MemoryRecord,
+    *,
+    governance: GovernanceRegistry | None,
+) -> tuple[int, int]:
+    governed = (
+        governance is not None
+        and _is_governed_retrieval_projection(projection)
+    )
+
+    if record.state is MemoryState.ACTIVE:
+        if governed:
+            assert governance is not None
+            _ensure_retrieval_record(
+                governance,
+                projection,
+                record,
+            )
+        projection.upsert(record)
+        return 1, 0
+
+    retrieval_record_id: str | None = None
+    plan = None
+    if governed:
+        assert governance is not None
+        retrieval_record_id = _ensure_retrieval_record(
+            governance,
+            projection,
+            record,
+        )
+        lifecycle = governance.lifecycle.get(
+            retrieval_record_id
+        )
+        if lifecycle["state"] == LifecycleState.DELETED.value:
+            projection.delete(record.memory_id)
+            return 0, 1
+        plan = governance.request_deletion(
+            record.tenant_id,
+            record_ids=(retrieval_record_id,),
+            reason="canonical-memory-tombstone",
+        )
+
+    projection.delete(record.memory_id)
+
+    if (
+        governance is not None
+        and retrieval_record_id is not None
+        and plan is not None
+    ):
+        retrieval_actions = tuple(
+            action
+            for action in plan.actions
+            if action.record_id == retrieval_record_id
+            and action.target == "retrieval"
+        )
+        if len(retrieval_actions) != 1:
+            raise RuntimeError(
+                "retrieval deletion plan is missing physical target"
+            )
+        governance.acknowledge_deletion(
+            plan.plan_id,
+            retrieval_record_id,
+            "retrieval",
+        )
+    return 0, 1
+
+
 def _dispatch_event(
     event: MemoryProjectionEvent,
     projections: tuple[MemoryProjection, ...],
+    *,
+    governance: GovernanceRegistry | None = None,
 ) -> ProjectionEventDispatch:
     results: list[ProjectionResult] = []
     for projection in projections:
         try:
-            if event.action == "upsert":
-                projection.upsert(event.record)
-                results.append(
-                    ProjectionResult(
-                        projection=projection.name,
-                        state=ProjectionState.HEALTHY,
-                        upserted=1,
-                    )
+            upserted, deleted = _apply_projection_record(
+                projection,
+                event.record,
+                governance=governance,
+            )
+            results.append(
+                ProjectionResult(
+                    projection=projection.name,
+                    state=ProjectionState.HEALTHY,
+                    upserted=upserted,
+                    deleted=deleted,
                 )
-            elif event.action == "delete":
-                projection.delete(event.memory_id)
-                results.append(
-                    ProjectionResult(
-                        projection=projection.name,
-                        state=ProjectionState.HEALTHY,
-                        deleted=1,
-                    )
-                )
-            else:
-                raise ValueError(f"unsupported projection action: {event.action}")
+            )
         except Exception as exc:
             results.append(
                 ProjectionResult(
@@ -335,6 +472,8 @@ def _materialized_content(record: MemoryRecord) -> str:
 class TFIDFStoreProjection:
     """Derived adapter for the built-in sparse in-process RAG store."""
 
+    governance_plane = "retrieval"
+
     def __init__(self, name: str, store: InMemoryTFIDFStore) -> None:
         normalized = str(name).strip()
         if not normalized:
@@ -362,6 +501,8 @@ class TFIDFStoreProjection:
 
 class VectorStoreProjection:
     """Derived adapter for the dense vector store."""
+
+    governance_plane = "retrieval"
 
     def __init__(self, name: str, store: VectorStore) -> None:
         normalized = str(name).strip()
@@ -463,6 +604,7 @@ class MemoryProjectionCoordinator:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         rebuild_budget: ResourceBudget | None = None,
+        governance: GovernanceRegistry | None = None,
     ) -> None:
         if not isinstance(repository, SQLiteMemoryRepository):
             raise TypeError("repository must be SQLiteMemoryRepository")
@@ -471,9 +613,15 @@ class MemoryProjectionCoordinator:
             and not isinstance(admission_runtime, AdmissionRuntime)
         ):
             raise TypeError("admission_runtime must be AdmissionRuntime")
+        if governance is not None and not isinstance(
+            governance,
+            GovernanceRegistry,
+        ):
+            raise TypeError("governance must be GovernanceRegistry")
         self.repository = repository
         self.admission_runtime = admission_runtime
         self.rebuild_budget = rebuild_budget or ResourceBudget()
+        self.governance = governance
 
     def export_subject(
         self,
@@ -515,12 +663,13 @@ class MemoryProjectionCoordinator:
             upserted = deleted = 0
             try:
                 for record in records:
-                    if record.state is MemoryState.ACTIVE:
-                        projection.upsert(record)
-                        upserted += 1
-                    else:
-                        projection.delete(record.memory_id)
-                        deleted += 1
+                    added, removed = _apply_projection_record(
+                        projection,
+                        record,
+                        governance=self.governance,
+                    )
+                    upserted += added
+                    deleted += removed
                 results.append(
                     ProjectionResult(
                         projection=projection.name,
@@ -633,7 +782,11 @@ class MemoryProjectionCoordinator:
                     superseded=True,
                 )
                 if superseded
-                else _dispatch_event(event, projection_list)
+                else _dispatch_event(
+                    event,
+                    projection_list,
+                    governance=self.governance,
+                )
             )
             if attempt.degraded:
                 attempts.append(attempt)
@@ -757,6 +910,7 @@ class AsyncMemoryProjectionCoordinator:
         *,
         admission_runtime: AdmissionRuntime | None = None,
         rebuild_budget: ResourceBudget | None = None,
+        governance: GovernanceRegistry | None = None,
     ) -> None:
         if not isinstance(repository, MongoMemoryRepository):
             raise TypeError("repository must be MongoMemoryRepository")
@@ -765,9 +919,15 @@ class AsyncMemoryProjectionCoordinator:
             and not isinstance(admission_runtime, AdmissionRuntime)
         ):
             raise TypeError("admission_runtime must be AdmissionRuntime")
+        if governance is not None and not isinstance(
+            governance,
+            GovernanceRegistry,
+        ):
+            raise TypeError("governance must be GovernanceRegistry")
         self.repository = repository
         self.admission_runtime = admission_runtime
         self.rebuild_budget = rebuild_budget or ResourceBudget()
+        self.governance = governance
 
     async def export_subject(
         self,
@@ -809,12 +969,13 @@ class AsyncMemoryProjectionCoordinator:
             upserted = deleted = 0
             try:
                 for record in records:
-                    if record.state is MemoryState.ACTIVE:
-                        projection.upsert(record)
-                        upserted += 1
-                    else:
-                        projection.delete(record.memory_id)
-                        deleted += 1
+                    added, removed = _apply_projection_record(
+                        projection,
+                        record,
+                        governance=self.governance,
+                    )
+                    upserted += added
+                    deleted += removed
                 results.append(
                     ProjectionResult(
                         projection=projection.name,
@@ -900,7 +1061,11 @@ class AsyncMemoryProjectionCoordinator:
                     superseded=True,
                 )
                 if superseded
-                else _dispatch_event(event, projection_list)
+                else _dispatch_event(
+                    event,
+                    projection_list,
+                    governance=self.governance,
+                )
             )
             if attempt.degraded:
                 attempts.append(attempt)
