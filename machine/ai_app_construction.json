@@ -1700,7 +1700,7 @@
       "plane": "application-api",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical conversation authority, engine-backed regeneration, browser reconstruction, durable engine result lineage, governed delete/export, and bounded cross-plane retention/deletion propagation are implemented. Remaining work is declared dependency closure plus fresh exact-head evidence.",
+      "gap": "Canonical conversation authority, terminal-result assistant commit/replay, crash-resumable user turns, serialized pending-turn concurrency, engine-backed regeneration, Jeeves legacy-to-canonical migration, browser reconstruction, durable engine-result lineage, governed delete/export/retention, and bounded cross-plane lifecycle propagation are implemented. Remaining closure is lower-stage dependency closure plus fresh exact-head evidence.",
       "construction": [
         "define ConversationThread and ConversationMessage canonical envelopes with tenant/user ownership and monotonic ordering",
         "persist thread/message authority in backend core Mongo rather than client memory or provider history",
@@ -1726,9 +1726,9 @@
         "browser refresh/reconnect reconstructs the same canonical transcript",
         "conversation retention expiry propagation test"
       ],
-      "verification_state": "conversation-authority-functional-cutover-complete-dependency-evidence-open",
+      "verification_state": "implemented-pending-dependency-and-exact-head-closure",
       "progress": {
-        "state": "in_progress",
+        "state": "implemented_pending_closure",
         "completed": [
           "ConversationThread and ConversationMessage canonical envelopes",
           "tenant/owner binding, monotonic sequence and optimistic thread version contract",
@@ -1764,11 +1764,17 @@
           "conversation deletion selects only canonical conversation rows plus explicitly referenced governed records",
           "engine-owned linked deletion targets execute through lifecycle adapters before conversation physical deletion",
           "distributed deletion plan execution is retry-safe through pending unacknowledged action reads",
-          "conversation deletion API claims completion only after linked governance propagation succeeds"
+          "conversation deletion API claims completion only after linked governance propagation succeeds",
+          "assistant terminal-result commit is retry-stable across post-engine storage failure",
+          "different concurrent turns are blocked while one canonical user turn is incomplete",
+          "same pending Jeeves turn resumes after crash without duplicating current query into history",
+          "idless Jeeves pending turn resumes using the server-assigned canonical idempotency identity",
+          "Jeeves optimistic turn races surface as retryable 409 conflicts",
+          "frontend reconstructConversation validates canonical thread identity/order/version and regeneration uses engine-backed API"
         ],
         "remaining": [
           "close gap-state-authority-convergence and gap-governance-registry",
-          "collect fresh exact-head Conversation Authority Closure Gate and independent verifier evidence"
+          "collect fresh exact-head Conversation Authority Closure Gate evidence after final PR head stabilizes"
         ]
       }
     },
@@ -2176,7 +2182,7 @@
       "plane": "memory",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical long-term memory is production-bound to governed Mongo authority with tenant/namespace isolation, idempotency/version fencing, immutable revision history, retention/tombstones and durable projection outbox. Vector/TFIDF/MAG/CAG/process stores are derived. Server startup binds the canonical writer and exposes fail-closed health. Product chat now activates memory_write_intent only through explicit user/product opt-in and persists only verified final output through the governed engine boundary. Remaining closure is lower-stage dependency closure, fresh exact-head evidence, and independent verification.",
+      "gap": "Canonical long-term memory is production-bound to governed Mongo authority with tenant/namespace isolation, idempotency/version fencing, immutable revision history, retention/tombstones and durable projection outbox. Vector/TFIDF/MAG/CAG/process stores are derived. Server startup binds the canonical writer and exposes fail-closed health. The cognitive engine accepts only explicit verified-final-output memory intents and commits them after verification through governed writeback. /ai/chat now exposes an explicit authenticated memory_policy opt-in that delegates engine:memory only for verified final output and fails closed when the canonical engine is unavailable. Destructive Mongo recovery includes canonical memory, revisions/idempotency/outbox and rebuilds only active derived memory. Remaining closure is lower-stage dependency closure, fresh exact-head evidence, and independent verification.",
       "construction": [
         "reuse skeleton/frontier MemoryContract and RetrieverContract as canonical storage-neutral boundaries",
         "define durable MemoryRecord and MemoryWriteProposal contracts with tenant/user/namespace/data-class/purpose/provenance/retention/version metadata",
@@ -2219,11 +2225,15 @@
           "destructive Mongo recovery includes canonical memory revisions/idempotency/outbox and active-only rebuild",
           "product-owned explicit chat memory policy activates only verified-final-output long-term persistence",
           "default chat never delegates engine:memory authority",
-          "memory opt-in fails closed without the canonical engine and returned memory_refs bind back to canonical assistant messages"
+          "memory opt-in fails closed without the canonical engine and returned memory_refs bind back to canonical assistant messages",
+          "product-owned /ai/chat memory_policy explicit opt-in for verified final output",
+          "memory opt-in delegates engine:memory only through canonical engine execution",
+          "memory opt-in fails closed without canonical engine and never falls back to legacy provider execution",
+          "canonical assistant messages persist returned engine memory refs"
         ],
         "remaining": [
           "close gap-state-authority-convergence and gap-governance-registry",
-          "collect fresh exact-head State Recovery Drill, memory regressions, App Assembly and Backend Quality evidence",
+          "collect fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR head stabilizes",
           "obtain independent closure verification"
         ]
       }
@@ -5134,7 +5144,7 @@
     "migration_rule": "legacy /ai/chat conversation_history remains compatibility-only and must not be treated as authoritative history after canonical conversation APIs land",
     "schema_version": 1,
     "contract_version": "1.0.0",
-    "status": "implementation-in-progress",
+    "status": "implemented-pending-closure",
     "gap": "gap-conversation-state-authority",
     "implemented_surfaces": [
       "canonical envelopes",
@@ -5145,13 +5155,17 @@
       "frontend conversation client",
       "server-authoritative /ai/chat context compilation",
       "caller-history rejection/ignore boundaries",
-      "Jeeves canonical engine delegation"
+      "Jeeves canonical engine delegation",
+      "Jeeves compatibility-store migration to canonical conversation authority",
+      "engine-backed regenerate orchestration",
+      "governed deletion/export/retention lifecycle",
+      "frontend canonical reconstruction and regeneration",
+      "crash-resumable canonical pending turns",
+      "serialized pending-turn concurrency and retryable optimistic conflicts"
     ],
     "remaining_surfaces": [
-      "Jeeves compatibility-store cutover to canonical conversation authority",
-      "cognitive-loop regenerate orchestration",
-      "governance lifecycle completion",
-      "frontend workspace server reconstruction"
+      "declared dependency closure",
+      "fresh exact-head closure evidence after final PR stabilization"
     ]
   },
   "tool_runtime_blueprint": {
@@ -7014,11 +7028,13 @@
       "explicit verified-final-output memory intent contract",
       "engine finalization hook into governed canonical memory writer",
       "failed-verification memory write prohibition",
-      "destructive Mongo restore including canonical memory revisions/idempotency/outbox and active-only rebuild"
+      "destructive Mongo restore including canonical memory revisions/idempotency/outbox and active-only rebuild",
+      "explicit authenticated /ai/chat long-term-memory policy activation",
+      "canonical-engine-only verified memory opt-in",
+      "assistant-message memory reference propagation"
     ],
     "remaining_surfaces": [
-      "product-owned activation of explicit long-term-memory policies",
-      "fresh exact-head validation",
+      "fresh exact-head validation after final PR stabilization",
       "declared dependency closure",
       "independent closure verification"
     ]
