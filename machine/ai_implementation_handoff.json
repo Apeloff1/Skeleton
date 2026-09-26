@@ -195,14 +195,19 @@
         "retention-expiry deletion planning",
         "multi-target deletion receipts",
         "registry-derived most-restrictive classification",
-        "registry-derived provider context enforced across text, image, and speech provider I/O"
+        "registry-derived provider context enforced across text, image, and speech provider I/O",
+        "backend/core/conversations.py authoritative conversation writes are registered and support governed delete/export",
+        "skeleton/vault/governance_audit.py and governance_registry.py audit canonical registration/reconcile/delete/export decisions",
+        "skeleton/api/server.py composes durable governance audit timeline and lifecycle adapter registry",
+        "skeleton/testing/test_governance_audit.py and test_governance_runtime_binding.py prove redaction and restart durability"
       ],
       "remaining": [
-        "register memory/retrieval/artifact records at their canonical write boundaries",
-        "propagate deletion actions through real storage adapters",
-        "bind export inventory to durable domain repositories",
         "bridge provider privacy ceilings into every application route",
-        "audit retention/deletion access through the canonical observability plane"
+        "register retrieval/artifact records at canonical write boundaries",
+        "compose retrieval/artifact lifecycle adapters into production runtime",
+        "complete derived memory projection/index deletion acknowledgement",
+        "bridge provider/tool privacy ceilings into every application route",
+        "collect exact-head and independent governance closure evidence"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
