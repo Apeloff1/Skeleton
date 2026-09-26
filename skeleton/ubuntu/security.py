@@ -63,7 +63,7 @@ def validate_security_apparmor(identifier: str, desired: str = "present", *, ena
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-apparmor:"+identifier, ("ubuntu","security","apparmor",identifier,desired), "validated security-apparmor")
+    return UbuntuAction("security-apparmor:"+identifier, ("ubuntu","security","apparmor",identifier,desired), "reconcile security-apparmor")
 
 def plan_security_apparmor(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-apparmor plan."""
@@ -123,7 +123,7 @@ def validate_security_audit(identifier: str, desired: str = "present", *, enable
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-audit:"+identifier, ("ubuntu","security","audit",identifier,desired), "validated security-audit")
+    return UbuntuAction("security-audit:"+identifier, ("ubuntu","security","audit",identifier,desired), "reconcile security-audit")
 
 def plan_security_audit(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-audit plan."""
@@ -183,7 +183,7 @@ def validate_security_permissions(identifier: str, desired: str = "present", *, 
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-permissions:"+identifier, ("ubuntu","security","permissions",identifier,desired), "validated security-permissions")
+    return UbuntuAction("security-permissions:"+identifier, ("ubuntu","security","permissions",identifier,desired), "reconcile security-permissions")
 
 def plan_security_permissions(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-permissions plan."""
@@ -243,7 +243,7 @@ def validate_security_limits(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-limits:"+identifier, ("ubuntu","security","limits",identifier,desired), "validated security-limits")
+    return UbuntuAction("security-limits:"+identifier, ("ubuntu","security","limits",identifier,desired), "reconcile security-limits")
 
 def plan_security_limits(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-limits plan."""
@@ -303,7 +303,7 @@ def validate_security_sysctl(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-sysctl:"+identifier, ("ubuntu","security","sysctl",identifier,desired), "validated security-sysctl")
+    return UbuntuAction("security-sysctl:"+identifier, ("ubuntu","security","sysctl",identifier,desired), "reconcile security-sysctl")
 
 def plan_security_sysctl(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-sysctl plan."""
@@ -363,7 +363,7 @@ def validate_security_ssh(identifier: str, desired: str = "present", *, enabled:
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-ssh:"+identifier, ("ubuntu","security","ssh",identifier,desired), "validated security-ssh")
+    return UbuntuAction("security-ssh:"+identifier, ("ubuntu","security","ssh",identifier,desired), "reconcile security-ssh")
 
 def plan_security_ssh(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-ssh plan."""
@@ -423,7 +423,7 @@ def validate_security_sudo(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-sudo:"+identifier, ("ubuntu","security","sudo",identifier,desired), "validated security-sudo")
+    return UbuntuAction("security-sudo:"+identifier, ("ubuntu","security","sudo",identifier,desired), "reconcile security-sudo")
 
 def plan_security_sudo(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-sudo plan."""
@@ -483,7 +483,7 @@ def validate_security_secrets(identifier: str, desired: str = "present", *, enab
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-secrets:"+identifier, ("ubuntu","security","secrets",identifier,desired), "validated security-secrets")
+    return UbuntuAction("security-secrets:"+identifier, ("ubuntu","security","secrets",identifier,desired), "reconcile security-secrets")
 
 def plan_security_secrets(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-secrets plan."""
@@ -543,7 +543,7 @@ def validate_security_cert(identifier: str, desired: str = "present", *, enabled
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-cert:"+identifier, ("ubuntu","security","cert",identifier,desired), "validated security-cert")
+    return UbuntuAction("security-cert:"+identifier, ("ubuntu","security","cert",identifier,desired), "reconcile security-cert")
 
 def plan_security_cert(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-cert plan."""
@@ -603,7 +603,7 @@ def validate_security_kernel(identifier: str, desired: str = "present", *, enabl
     errors = _policy_errors(desired, enabled=enabled, restart=False)
     if errors:
         raise ValueError("; ".join(errors))
-    return UbuntuAction("security-kernel:"+identifier, ("ubuntu","security","kernel",identifier,desired), "validated security-kernel")
+    return UbuntuAction("security-kernel:"+identifier, ("ubuntu","security","kernel",identifier,desired), "reconcile security-kernel")
 
 def plan_security_kernel(identifiers: Sequence[str]) -> UbuntuPlan:
     """Create a deterministic security-kernel plan."""
