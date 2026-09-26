@@ -653,7 +653,7 @@ async def generate_agent_responses(user_message: str, chat_id: str, user_id: str
                 instruction_policy=InstructionPolicy(
                     policy_id="backend.pipeline-agents.groupchat",
                     version="1",
-                    instructions=system_prompt,
+                    instructions=system_prompt.strip(),
                 ),
             ).with_model("openai", "gpt-4o")
             
