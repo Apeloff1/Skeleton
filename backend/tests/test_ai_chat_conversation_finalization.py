@@ -7,15 +7,13 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from core.conversations import ConversationStorageUnavailable
 from core.engine_client import EngineUnavailableError
 from skeleton.contracts.conversation import (
     ConversationAuthorType,
     ConversationMessage,
     ConversationThread,
     ConversationThreadState,
-)
-from skeleton.persistence.conversation_repository import (
-    ConversationStorageUnavailable,
 )
 
 
