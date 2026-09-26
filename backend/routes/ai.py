@@ -28,7 +28,13 @@ from core.engine_client import (
     command_from_context,
 )
 from routes.gameforge_auth import require_role
-from skeleton.contracts.context import ContextBudget, ContextEnvelope
+from skeleton.contracts.context import (
+    ContextBudget,
+    ContextEnvelope,
+    ContextKind,
+    ContextSegment,
+    ContextTrust,
+)
 from skeleton.contracts.conversation import ConversationAuthorType
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
@@ -411,16 +417,26 @@ async def call_llm(
                 created_at=now,
                 mandatory=True,
             ),
-            artifact_segment(
-                artifact_id="ai-compat-prompt:" + turn_id,
+            ContextSegment.from_content(
+                segment_id=str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_URL,
+                        "backend-ai-compat-prompt:" + turn_id,
+                    )
+                ),
+                kind=ContextKind.USER_MESSAGE,
+                source_type="legacy-engine-request",
+                source_id="ai-compat-prompt:" + turn_id,
                 content=prompt_text,
+                trust_level=ContextTrust.AUTHORIZED_USER_DATA,
+                data_class="internal",
                 tenant_id="default",
                 purpose="model-inference",
-                created_at=now,
-                data_class="internal",
-                retention_class="ephemeral-ai-request",
                 priority=800,
                 relevance=1.0,
+                created_at=now,
+                provenance=("backend-ai-compat",),
+                retention_class="ephemeral-ai-request",
             ),
         ]
         context_envelope = ContextCompiler().compile(
