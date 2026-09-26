@@ -77,6 +77,14 @@ def _receipt_from_json(raw: object) -> ToolExecutionReceipt:
         error_code=payload.get("error_code"),
         approval_ref=payload.get("approval_ref"),
         compensation_ref=payload.get("compensation_ref"),
+        data_class=payload.get("data_class", "internal"),
+        transfer_purpose=payload.get(
+            "transfer_purpose",
+            "tool-execution",
+        ),
+        governance_decision_ref=payload.get(
+            "governance_decision_ref"
+        ),
         metered_tool_calls=int(payload.get("metered_tool_calls", 1)),
         schema_version=int(payload.get("schema_version", 1)),
     )
@@ -122,6 +130,8 @@ class SQLiteToolReceiptStore:
                     request_id TEXT NOT NULL,
                     tool_id TEXT NOT NULL,
                     arguments_digest TEXT NOT NULL,
+                    data_class TEXT NOT NULL DEFAULT 'internal',
+                    transfer_purpose TEXT NOT NULL DEFAULT 'tool-execution',
                     state TEXT NOT NULL,
                     reserved_at TEXT NOT NULL,
                     receipt_json TEXT,
@@ -146,6 +156,17 @@ class SQLiteToolReceiptStore:
                     self._connection.execute(
                         f"ALTER TABLE tool_execution_receipt ADD COLUMN {column} TEXT"
                     )
+            if "data_class" not in existing_columns:
+                self._connection.execute(
+                    "ALTER TABLE tool_execution_receipt "
+                    "ADD COLUMN data_class TEXT NOT NULL DEFAULT 'internal'"
+                )
+            if "transfer_purpose" not in existing_columns:
+                self._connection.execute(
+                    "ALTER TABLE tool_execution_receipt "
+                    "ADD COLUMN transfer_purpose TEXT NOT NULL "
+                    "DEFAULT 'tool-execution'"
+                )
 
     def reserve(
         self,
@@ -181,9 +202,10 @@ class SQLiteToolReceiptStore:
                         INSERT INTO tool_execution_receipt(
                             namespace, tenant_id, operation_id,
                             execution_id, turn_id, call_id, idempotency_key,
-                            request_id, tool_id, arguments_digest, state,
+                            request_id, tool_id, arguments_digest,
+                            data_class, transfer_purpose, state,
                             reserved_at, receipt_json, completed_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NULL, NULL)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, NULL, NULL)
                         """,
                         (
                             self.namespace,
@@ -196,6 +218,8 @@ class SQLiteToolReceiptStore:
                             request.request_id,
                             request.tool_id,
                             request.arguments_digest,
+                            request.data_class,
+                            request.transfer_purpose,
                             instant.isoformat(),
                         ),
                     )
@@ -208,9 +232,11 @@ class SQLiteToolReceiptStore:
                     or row["execution_id"] != request.execution_id
                     or row["turn_id"] != request.turn_id
                     or row["call_id"] != request.call_id
+                    or row["data_class"] != request.data_class
+                    or row["transfer_purpose"] != request.transfer_purpose
                 ):
                     raise ToolReceiptConflict(
-                        "idempotency key replayed with different tool or arguments or lineage"
+                        "idempotency key replayed with different tool, arguments, lineage, or privacy context"
                     )
                 if row["state"] == "committed":
                     receipt = _receipt_from_json(row["receipt_json"])
@@ -249,6 +275,8 @@ class SQLiteToolReceiptStore:
             or receipt.tool_id != request.tool_id
             or receipt.idempotency_key != request.idempotency_key
             or receipt.arguments_digest != request.arguments_digest
+            or receipt.data_class != request.data_class
+            or receipt.transfer_purpose != request.transfer_purpose
         ):
             raise ToolReceiptConflict(
                 "receipt does not match durable tool reservation"
@@ -289,6 +317,8 @@ class SQLiteToolReceiptStore:
                     or row["execution_id"] != request.execution_id
                     or row["turn_id"] != request.turn_id
                     or row["call_id"] != request.call_id
+                    or row["data_class"] != request.data_class
+                    or row["transfer_purpose"] != request.transfer_purpose
                 ):
                     raise ToolReceiptConflict(
                         "durable reservation does not match receipt"
