@@ -382,7 +382,7 @@ async def test_backend_client_crosses_authenticated_engine_boundary_idempotently
 
     assert ack["operation_id"] == context.operation_id
     assert ack["execution_id"] == context.execution_id
-    assert ack["state"] == "admitted"
+    assert ack["state"] == "created"
     accepted_at = ack["accepted_at"]
 
     retry = _command(
@@ -406,7 +406,7 @@ async def test_backend_client_crosses_authenticated_engine_boundary_idempotently
     )
     assert status["operation_id"] == context.operation_id
     assert status["execution_id"] == context.execution_id
-    assert status["execution_state"] == "admitted"
+    assert status["execution_state"] == "created"
     assert status["cancellation_requested"] is False
 
     with pytest.raises(EngineAuthorizationError):
