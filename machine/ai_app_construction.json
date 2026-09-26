@@ -2055,7 +2055,7 @@
       "plane": "governance",
       "priority": "P0",
       "status": "open",
-      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, governed derived vector/TF-IDF projection registration and tombstone acknowledgement, payload-free WORM governance audit linkage, canonical artifact registration plus production delete/export/retention composition, and canonical lifecycle adapters now exist. Remaining closure is route-wide provider/tool privacy enforcement, exact-head validation and independent verification.",
+      "gap": "A restart-safe SQLite lifecycle registry, canonical provider-transfer policy, durable API governance owner, governed memory lifecycle, authoritative conversation registration/delete/export, governed tenant-scoped retrieval registration/delete/export/retention, governed derived vector/TF-IDF projection lifecycle, governed canonical artifact write/delete/export/retention, payload-free WORM governance audit linkage, and canonical lifecycle adapters now exist. Remaining closure is route-wide provider/tool privacy enforcement plus exact-head and independent verification.",
       "construction": [
         "define data classes and transfer purposes",
         "bind data class to memory, artifact, retrieval and provider payloads",
@@ -2069,7 +2069,7 @@
         "export completeness test",
         "retention expiry test"
       ],
-      "status_detail": "canonical lifecycle and registry contracts enforce tenant, purpose, retention/deletion/export metadata; memory, authoritative conversations, governed retrieval, derived vector/TF-IDF projections, and the production governed artifact store are executable and audit-linked; route-wide privacy enforcement plus exact-head/independent closure evidence remain",
+      "status_detail": "canonical lifecycle and registry contracts now cover memory, authoritative conversations, governed retrieval, derived vector/TF-IDF projections, and canonical artifacts with production lifecycle composition; route-wide provider/tool privacy enforcement and final exact-head verification remain",
       "evidence_present": [
         "restart-safe SQLite DataLifecycleRegistry with fail-closed snapshot validation",
         "ServerState owns durable GovernanceRegistry at SKL_GOVERNANCE_LIFECYCLE_PATH",
@@ -2095,13 +2095,17 @@
         "skeleton/testing/test_governance_runtime_binding.py proves ServerState retrieval lifecycle composition",
         "skeleton/memory/projection.py registers derived vector/TF-IDF retrieval projections before mutation and acknowledges lifecycle deletion only after physical projection removal",
         "skeleton/api/server.py passes the canonical GovernanceRegistry into the production AsyncMemoryProjectionCoordinator",
-        "skeleton/testing/test_memory_projection.py proves registration-before-mutation and physical-delete-before-ack retrieval lifecycle behavior"
+        "skeleton/testing/test_memory_projection.py proves registration-before-mutation and physical-delete-before-ack retrieval lifecycle behavior",
+        "skeleton/artifact_plane/governance.py registers canonical artifact lifecycle metadata before atomic filesystem mutation",
+        "skeleton/vault/lifecycle_adapters.py GovernedArtifactLifecycleAdapter performs tenant-bound physical delete/export",
+        "skeleton/api/server.py binds canonical governed artifact store and lifecycle adapters at startup",
+        "skeleton/testing/test_lifecycle_adapters.py proves registration-before-mutation, export/delete and retention expiry",
+        "skeleton/testing/test_governance_runtime_binding.py proves production ServerState artifact lifecycle composition",
+        "skeleton/ai/runtime/api/server.py byte-identical canonical startup mirror"
       ],
       "outstanding_evidence": [
         "bridge provider and tool privacy ceilings into every application route",
-        "exact-head Stage-0/App Assembly verification and independent signoff",
-        "register artifact records at remaining canonical write boundaries",
-        "compose artifact physical delete/export/retention adapters in the production runtime"
+        "exact-head Stage-0/App Assembly verification and independent signoff"
       ]
     },
     {
