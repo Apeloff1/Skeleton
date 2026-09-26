@@ -162,7 +162,8 @@
         "integration": [
           "skeleton/provider_runtime.py",
           "skeleton/skills",
-          ".github/workflows/governance-closure.yml"
+          ".github/workflows/governance-closure.yml",
+          "scripts/verify_governance_closure.py"
         ],
         "tests": [
           "skeleton/testing/test_data_governance.py",
@@ -174,7 +175,8 @@
           "skeleton/testing/test_memory_projection.py",
           "backend/tests/test_route_privacy.py",
           "backend/tests/test_conversation_storage_admission.py",
-          "backend/tests/test_gameforge_artifact_builder.py"
+          "backend/tests/test_gameforge_artifact_builder.py",
+          "tests/test_governance_independent_verifier.py"
         ]
       },
       "ordered_steps": [
@@ -233,11 +235,14 @@
         "backend/routes/gameforge_build.py composes production builds into the canonical governed artifact owner with bounded retention",
         "backend/tests/test_route_privacy.py and test_gameforge_artifact_builder.py provide focused executable closure evidence",
         "skeleton/testing/test_governance_runtime_binding.py proves physical artifact retention expiry",
-        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes"
+        ".github/workflows/governance-closure.yml runs canonical lifecycle/audit, governed memory/projection, route privacy, conversation governance and governed artifact regressions on exact-head changes",
+        "scripts/verify_governance_closure.py independent source-only governance blueprint/state-topology/boundary/mirror verifier",
+        "tests/test_governance_independent_verifier.py adversarial verifier regression coverage",
+        ".github/workflows/governance-closure.yml exact-head Independent governance verifier job with SHA-bound receipt"
       ],
       "remaining": [
         "collect fresh exact-head Governance Closure Gate and Stage-0/App Assembly evidence",
-        "obtain independent governance closure verification"
+        "collect fresh exact-head Governance Closure Gate independent verifier receipt"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
