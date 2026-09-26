@@ -24,6 +24,34 @@ export type ChatResponse = {
 
 export type Transport = (body: ChatBody, signal: AbortSignal) => Promise<ChatResponse>;
 
+export type ChatHistoryTurn = {
+  client_message_id?: string;
+  role_user?: string;
+  role_jeeves?: string;
+  user_ts?: number;
+  assistant_ts?: number;
+  ts?: number;
+  model?: string;
+  tier?: string;
+  forms?: string[];
+  artifact_count?: number;
+  canonical_user_message_id?: string;
+  canonical_assistant_message_id?: string;
+};
+
+export type ChatHistoryResponse = {
+  ok?: boolean;
+  available?: boolean;
+  session_id?: string;
+  turns?: ChatHistoryTurn[];
+  history_source?: string;
+  canonical_thread_id?: string | null;
+};
+
+export type HistoryTransport = (
+  sessionId: string,
+) => Promise<ChatHistoryResponse>;
+
 export type WorkspaceSnapshot = {
   workspace: Workspace;
   ready: boolean;
@@ -52,7 +80,11 @@ export class WorkspaceController {
   private loading: Promise<void> | null = null;
   private attachments = new Map<string, Attachment>();
 
-  constructor(private storage: WorkspaceStorage, private transport: Transport) {}
+  constructor(
+    private storage: WorkspaceStorage,
+    private transport: Transport,
+    private historyTransport?: HistoryTransport,
+  ) {}
 
   getSnapshot = (): WorkspaceSnapshot => this.snapshot;
 
@@ -73,15 +105,112 @@ export class WorkspaceController {
     return this.loading;
   }
 
+  private canonicalMessages(turns: ChatHistoryTurn[]): Message[] {
+    const messages: Message[] = [];
+    turns.slice(-Math.floor(MAX_MESSAGES / 2)).forEach((turn, index) => {
+      const userText = typeof turn.role_user === 'string'
+        ? turn.role_user.slice(0, MAX_TEXT) : '';
+      const assistantText = typeof turn.role_jeeves === 'string'
+        ? turn.role_jeeves.slice(0, MAX_TEXT) : '';
+      if (!userText || !assistantText) return;
+
+      const assistantSeconds = typeof turn.assistant_ts === 'number'
+        && Number.isFinite(turn.assistant_ts)
+        ? turn.assistant_ts
+        : typeof turn.ts === 'number' && Number.isFinite(turn.ts)
+          ? turn.ts : Date.now() / 1000;
+      const userSeconds = typeof turn.user_ts === 'number'
+        && Number.isFinite(turn.user_ts)
+        ? turn.user_ts : Math.max(0, assistantSeconds - 0.001);
+      const clientId = typeof turn.client_message_id === 'string'
+        && /^[A-Za-z0-9_-]{1,128}$/.test(turn.client_message_id)
+        ? turn.client_message_id : null;
+      const canonicalUserId = typeof turn.canonical_user_message_id === 'string'
+        ? turn.canonical_user_message_id.slice(0, 128) : '';
+      const canonicalAssistantId = typeof turn.canonical_assistant_message_id === 'string'
+        ? turn.canonical_assistant_message_id.slice(0, 128) : '';
+
+      messages.push({
+        id: clientId || canonicalUserId || `canonical-user-${index}`,
+        role: 'user',
+        text: userText,
+        createdAt: Math.round(userSeconds * 1000),
+        status: 'complete',
+      });
+      messages.push({
+        id: canonicalAssistantId || `canonical-assistant-${index}`,
+        role: 'jeeves',
+        text: assistantText,
+        createdAt: Math.round(assistantSeconds * 1000),
+        status: 'complete',
+        tier: typeof turn.tier === 'string' ? turn.tier.slice(0, 80) : undefined,
+        model: typeof turn.model === 'string' ? turn.model.slice(0, 120) : undefined,
+        forms: Array.isArray(turn.forms)
+          ? turn.forms.filter((item): item is string => typeof item === 'string').slice(0, 10)
+          : undefined,
+        artifactCount: typeof turn.artifact_count === 'number'
+          ? Math.max(0, Math.min(100, Math.floor(turn.artifact_count))) : 0,
+      });
+    });
+    return messages;
+  }
+
+  private async rehydrateServerTranscripts(
+    workspace: Workspace,
+  ): Promise<{ workspace: Workspace; failed: number }> {
+    if (!this.historyTransport) return { workspace, failed: 0 };
+
+    let failed = 0;
+    const conversations = await Promise.all(
+      workspace.conversations.map(async conversation => {
+        if (!conversation.sessionId) return conversation;
+        try {
+          const result = await this.historyTransport!(conversation.sessionId);
+          if (
+            result.ok === false
+            || result.available === false
+            || result.session_id !== conversation.sessionId
+            || !Array.isArray(result.turns)
+          ) {
+            throw new Error('canonical conversation history unavailable');
+          }
+          const messages = this.canonicalMessages(result.turns);
+          const newest = messages.at(-1)?.createdAt || conversation.updatedAt;
+          return {
+            ...conversation,
+            messages,
+            updatedAt: Math.max(conversation.updatedAt, newest),
+            sessionUpdatedAt: Date.now(),
+          };
+        } catch {
+          failed += 1;
+          return conversation;
+        }
+      }),
+    );
+    return {
+      workspace: { ...workspace, conversations },
+      failed,
+    };
+  }
+
   private async load(): Promise<void> {
     this.emit({ loadError: null, saveState: 'loading' });
     try {
       const saved = await this.storage.getItem(WORKSPACE_KEY);
       const legacy = saved === null ? await this.storage.getItem(LEGACY_KEY) : null;
-      const workspace = saved !== null ? decodeWorkspace(saved)
+      const local = saved !== null ? decodeWorkspace(saved)
         : legacy !== null ? migrateLegacy(legacy) : this.snapshot.workspace;
-      this.emit({ workspace, ready: true, saveState: 'saved' });
-      // Migration is additive: retain the legacy key as a recovery copy.
+      const hydrated = await this.rehydrateServerTranscripts(local);
+      this.emit({
+        workspace: hydrated.workspace,
+        ready: true,
+        saveState: 'saved',
+        notice: hydrated.failed
+          ? 'Some chats could not be refreshed from the server. Showing the last device cache for those chats.'
+          : null,
+      });
+      // Local persistence is a rebuildable cache plus drafts/workspace metadata.
       this.queueSave();
     } catch {
       this.emit({
