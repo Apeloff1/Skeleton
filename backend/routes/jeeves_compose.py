@@ -410,7 +410,12 @@ async def _load_canonical_history(
             owner_id=owner_id,
         )
         if not messages:
-            legacy_rows = await _legacy_complete_rows(session_id)
+            try:
+                legacy_rows = await _legacy_complete_rows(session_id)
+            except Exception:
+                # Legacy jeeves_chat is migration input only. Its absence must
+                # never downgrade a healthy canonical conversation authority.
+                legacy_rows = []
             if legacy_rows:
                 await _import_legacy_rows_to_canonical(
                     session_id,
