@@ -31,6 +31,7 @@ def test_gate_preserves_canonical_middleware_stack() -> None:
         gate.AccessLogMiddleware,
         gate.RequestIdMiddleware,
         gate.RateLimiterMiddleware,
+        gate.RoutePrivacyMiddleware,
     ]
 
 
