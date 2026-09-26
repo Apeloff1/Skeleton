@@ -35,6 +35,7 @@ export type Message = {
 export type Conversation = {
   id: string;
   handoffId?: string;
+  canonicalThreadId?: string;
   title: string;
   createdAt: number;
   updatedAt: number;
@@ -61,9 +62,33 @@ export type ChatBody = {
   client_message_id?: string;
   force_all_forms: boolean;
   context: string;
-  history: { role: 'user' | 'assistant'; content: string }[];
   image_base64?: string;
   pdf_base64?: string;
+};
+
+export type CanonicalChatTurn = {
+  session_id: string;
+  client_message_id?: string | null;
+  role_user?: string | null;
+  role_jeeves?: string | null;
+  status?: string;
+  ts?: number;
+  operation_id?: string | null;
+  ai_result_id?: string | null;
+  engine_execution_id?: string | null;
+  canonical_thread_id?: string | null;
+  canonical_user_message_id?: string | null;
+  canonical_assistant_message_id?: string | null;
+};
+
+export type ChatHistoryProjection = {
+  ok?: boolean;
+  session_id: string;
+  turns: CanonicalChatTurn[];
+  count?: number;
+  available?: boolean;
+  history_source?: string;
+  canonical_thread_id?: string | null;
 };
 
 export function newId(): string {
@@ -133,6 +158,7 @@ function restoreConversation(value: unknown, now: number): Conversation | null {
   return {
     id: text(item.id, 100), title: text(item.title, 100).trim() || 'Untitled conversation',
     handoffId: typeof item.handoffId === 'string' && /^[a-zA-Z0-9_-]{1,120}$/.test(item.handoffId) ? item.handoffId : undefined,
+    canonicalThreadId: typeof item.canonicalThreadId === 'string' && item.canonicalThreadId.length <= 128 ? item.canonicalThreadId : undefined,
     createdAt: timestamp(item.createdAt, now), updatedAt: timestamp(item.updatedAt, now),
     pinned: item.pinned === true, archived: item.archived === true,
     draft: text(item.draft), context: text(item.context, MAX_CONTEXT), allForms: item.allForms === true,
@@ -162,7 +188,7 @@ export function encodeWorkspace(workspace: Workspace): string {
     version: 1, activeId: workspace.activeId,
     conversations: workspace.conversations.slice(0, MAX_CONVERSATIONS).map(c => ({
       id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt,
-      handoffId: c.handoffId,
+      handoffId: c.handoffId, canonicalThreadId: c.canonicalThreadId,
       pinned: c.pinned, archived: c.archived, draft: c.draft.slice(0, MAX_TEXT),
       context: c.context.slice(0, MAX_CONTEXT), allForms: c.allForms,
       sessionId: c.sessionId, sessionUpdatedAt: c.sessionUpdatedAt,
@@ -224,32 +250,129 @@ export function buildChatBody(
   conversation: Conversation,
   message: string,
   attachment?: Attachment,
-  now = Date.now(),
+  _now = Date.now(),
   clientMessageId?: string,
 ): ChatBody {
-  // Only completed user/assistant exchanges enter the history; omit failed and in-flight turns.
-  const history = conversation.messages.filter(m => m.status === 'complete').slice(-20)
-    .map(m => ({ role: m.role === 'jeeves' ? 'assistant' as const : 'user' as const, content: m.text.slice(0, 4000) }));
-  // Preserve the newest context while keeping the whole request under 24k history characters.
-  let remaining = 24_000;
-  const bounded = history.reverse().filter(m => {
-    if (m.content.length > remaining) return false;
-    remaining -= m.content.length;
-    return true;
-  }).reverse();
-  const serverSessionId = (
-    conversation.sessionId
-    && now >= conversation.sessionUpdatedAt
-    && now - conversation.sessionUpdatedAt <= SESSION_TTL
-  ) ? conversation.sessionId : conversation.id;
+  // Canonical ConversationThread/ConversationMessage is the transcript owner.
+  // The browser cache never sends its transcript back as provider context.
+  const serverSessionId = conversation.sessionId || conversation.id;
   return {
     message,
     session_id: serverSessionId,
     ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
     force_all_forms: conversation.allForms,
     context: conversation.context,
-    history: bounded,
     ...(attachment?.modality === 'image' ? { image_base64: attachment.base64 } : {}),
     ...(attachment?.modality === 'pdf' ? { pdf_base64: attachment.base64 } : {}),
+  };
+}
+
+function canonicalTurnText(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`Canonical Jeeves history has invalid ${field}.`);
+  }
+  return value.slice(0, MAX_TEXT);
+}
+
+function canonicalTurnId(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && /^[A-Za-z0-9:_-]{1,160}$/.test(value)) return value;
+  return fallback;
+}
+
+export function projectCanonicalHistory(
+  conversation: Conversation,
+  projection: ChatHistoryProjection,
+  now = Date.now(),
+): Conversation {
+  const expectedSession = conversation.sessionId || conversation.id;
+  if (projection.session_id !== expectedSession) {
+    throw new Error('Canonical Jeeves history belongs to a different session.');
+  }
+  if (projection.ok === false || projection.available === false) return conversation;
+  if (!Array.isArray(projection.turns)) {
+    throw new Error('Canonical Jeeves history is malformed.');
+  }
+
+  const localById = new Map(conversation.messages.map(message => [message.id, message]));
+  const projected: Message[] = [];
+  const canonicalIds = new Set<string>();
+  let previousTimestamp = 0;
+
+  projection.turns.forEach((turn, index) => {
+    if (!turn || turn.session_id !== expectedSession) {
+      throw new Error('Canonical Jeeves history contains a foreign session turn.');
+    }
+    if (turn.status && turn.status !== 'complete') {
+      throw new Error('Canonical Jeeves history contains a non-terminal turn.');
+    }
+    const userText = canonicalTurnText(turn.role_user, 'user text');
+    const assistantText = canonicalTurnText(turn.role_jeeves, 'assistant text');
+    const userId = canonicalTurnId(
+      turn.client_message_id,
+      canonicalTurnId(turn.canonical_user_message_id, `canonical-user-${index}`),
+    );
+    const assistantId = canonicalTurnId(
+      turn.canonical_assistant_message_id,
+      `${userId}:assistant`,
+    );
+    if (canonicalIds.has(userId) || canonicalIds.has(assistantId) || userId === assistantId) {
+      throw new Error('Canonical Jeeves history contains duplicate message identity.');
+    }
+    canonicalIds.add(userId);
+    canonicalIds.add(assistantId);
+
+    const seconds = (
+      typeof turn.ts === 'number'
+      && Number.isFinite(turn.ts)
+      && turn.ts >= 0
+    ) ? turn.ts : 0;
+    const baseTimestamp = seconds > 0
+      ? Math.floor(seconds * 1000)
+      : Math.max(now, previousTimestamp + 2);
+    if (baseTimestamp < previousTimestamp) {
+      throw new Error('Canonical Jeeves history is not ordered.');
+    }
+    previousTimestamp = baseTimestamp + 1;
+
+    const localUser = localById.get(userId);
+    projected.push({
+      ...(localUser || {}),
+      id: userId,
+      role: 'user',
+      text: userText,
+      createdAt: baseTimestamp,
+      status: 'complete',
+      error: undefined,
+    });
+
+    const localAssistant = localById.get(assistantId);
+    projected.push({
+      ...(localAssistant || {}),
+      id: assistantId,
+      role: 'jeeves',
+      text: assistantText,
+      createdAt: baseTimestamp + 1,
+      status: 'complete',
+      error: undefined,
+    });
+  });
+
+  const unresolved = conversation.messages.filter(message => (
+    message.role === 'user'
+    && message.status !== 'complete'
+    && !canonicalIds.has(message.id)
+  ));
+  const messages = [...projected, ...unresolved].slice(-MAX_MESSAGES);
+  const updatedAt = messages.reduce(
+    (latest, item) => Math.max(latest, item.createdAt),
+    conversation.updatedAt,
+  );
+  return {
+    ...conversation,
+    canonicalThreadId: projection.canonical_thread_id || conversation.canonicalThreadId,
+    sessionId: projection.session_id,
+    sessionUpdatedAt: now,
+    updatedAt,
+    messages,
   };
 }
