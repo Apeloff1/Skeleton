@@ -980,11 +980,14 @@
           "skeleton/eval",
           "skeleton/retrieval/verification.py",
           "skeleton/skills/verification.py",
-          ".github/workflows/cognitive-execution-closure.yml"
+          ".github/workflows/cognitive-execution-closure.yml",
+          "scripts/verify_verification_evidence_closure.py",
+          ".github/workflows/verification-evidence-closure.yml"
         ],
         "tests": [
           "skeleton/testing/test_verification_runtime.py",
-          "skeleton/testing/test_execution_runtime.py"
+          "skeleton/testing/test_execution_runtime.py",
+          "tests/test_verification_evidence_independent_verifier.py"
         ]
       },
       "ordered_steps": [
@@ -1025,15 +1028,17 @@
         "skeleton/intelligence/execution_runtime.py materializes canonical VerificationReceipt and stores it before committing terminal AIExecutionResult",
         "skeleton/testing/test_verification_runtime.py covers scope integrity, model-evidence non-authority, independent-origin policy, contradiction, tool postconditions, observable receipt privacy, semantic-provider routing, fail-closed outage, repair lineage, citation rebinding and bounded repair budgets",
         "skeleton/testing/test_execution_runtime.py proves canonical verification receipt persistence, fail-closed missing evidence and verification-before-finalization ordering",
-        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head"
+        ".github/workflows/cognitive-execution-closure.yml runs canonical verification evidence contracts on exact PR head",
+        "scripts/verify_verification_evidence_closure.py independently audits verification contracts, policy, semantic runtime, retrieval scope rules, tool postconditions, durable receipt persistence, AI-tree mirror parity and dependency state",
+        "tests/test_verification_evidence_independent_verifier.py covers exact-head receipt, mirror drift, false closure with open dependencies and dependency drift",
+        ".github/workflows/verification-evidence-closure.yml runs canonical verification contracts and an independent exact-head verifier receipt"
       ],
       "remaining": [
         "materialize authorized execution evidence into EvidenceReference values in production finalization",
         "wire SemanticVerificationRuntime through the canonical production provider adapter when policy requires independent semantic verification",
         "bind durable tool receipts and postcondition observations into production action verification",
         "integrate qualified/abstain/repair/block disposition handling into execution finalization",
-        "collect exact-head cognitive verification evidence and close lower-stage dependencies",
-        "obtain independent closure verification"
+        "collect fresh exact-head Verification Evidence/Cognitive Execution closure evidence and close lower-stage dependencies"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
