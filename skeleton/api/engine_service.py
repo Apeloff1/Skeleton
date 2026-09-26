@@ -1965,7 +1965,7 @@ class EngineExecutionService:
                 plan_key,
                 tenant_id=tenant,
             )
-        except LifecycleError as exc:
+        except (LifecycleError, DataGovernanceDenied) as exc:
             raise EngineServiceError(
                 "external governance deletion plan is unavailable"
             ) from exc
