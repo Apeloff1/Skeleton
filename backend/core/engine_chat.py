@@ -18,6 +18,7 @@ from core.engine_text import (
     EngineTextResponse,
     execute_engine_text,
 )
+from skeleton.context.instruction_policy import InstructionPolicy
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -65,6 +66,13 @@ class EngineChat:
         session_id: str | None = None,
         system_message: str | None = None,
         model: str | None = None,
+        instruction_policy: InstructionPolicy | None = None,
+        tenant_id: str = "default",
+        actor_id: str = "backend-product",
+        capability: str = "assistant.chat",
+        verification_profile: str = "assistant_proposal",
+        data_class: str = "internal",
+        purpose: str = "model-inference",
         **_: Any,
     ) -> None:
         positional = list(args)
@@ -81,7 +89,55 @@ class EngineChat:
                 "EngineChat accepts at most three compatibility positional arguments"
             )
         self.session_id = str(session_id or "")
-        self.system_message = str(system_message or "")
+        if instruction_policy is not None and not isinstance(
+            instruction_policy,
+            InstructionPolicy,
+        ):
+            raise TypeError(
+                "instruction_policy must be InstructionPolicy"
+            )
+        explicit_system = str(system_message or "")
+        if (
+            instruction_policy is not None
+            and explicit_system
+            and explicit_system != instruction_policy.instructions
+        ):
+            raise ValueError(
+                "system_message cannot override instruction_policy"
+            )
+        self.instruction_policy = instruction_policy
+        self.system_message = (
+            instruction_policy.instructions
+            if instruction_policy is not None
+            else explicit_system
+        )
+        self.tenant_id = str(tenant_id).strip()
+        self.actor_id = str(actor_id).strip()
+        self.capability = str(capability).strip()
+        self.verification_profile = str(
+            verification_profile
+        ).strip()
+        self.data_class = str(data_class).strip().lower()
+        self.purpose = str(purpose).strip()
+        if not all(
+            (
+                self.tenant_id,
+                self.actor_id,
+                self.capability,
+                self.verification_profile,
+                self.purpose,
+            )
+        ):
+            raise ValueError(
+                "engine chat runtime identity must be non-empty"
+            )
+        if self.data_class not in {
+            "public",
+            "internal",
+            "confidential",
+            "restricted",
+        }:
+            raise ValueError("engine chat data_class is invalid")
         self._provider_hint: str | None = None
         self._model_hint: str | None = (
             str(model).strip() if model else None
@@ -101,7 +157,28 @@ class EngineChat:
         self,
         system_message: str,
     ) -> "EngineChat":
+        if self.instruction_policy is not None:
+            raise ValueError(
+                "instruction policy owns system instructions"
+            )
         self.system_message = str(system_message or "")
+        return self
+
+    def with_instruction_policy(
+        self,
+        policy: InstructionPolicy,
+    ) -> "EngineChat":
+        if not isinstance(policy, InstructionPolicy):
+            raise TypeError("policy must be InstructionPolicy")
+        if (
+            self.system_message
+            and self.system_message != policy.instructions
+        ):
+            raise ValueError(
+                "existing system_message conflicts with policy"
+            )
+        self.instruction_policy = policy
+        self.system_message = policy.instructions
         return self
 
     def with_max_tokens(self, max_tokens: int) -> "EngineChat":
@@ -187,15 +264,25 @@ class EngineChat:
             self.system_message.strip()
             or "Respond helpfully to the user request."
         )
+        policy = self.instruction_policy
         request = EngineTextRequest(
             instructions=instructions,
             prompt=prompt,
             idempotency_key=self._idempotency_key(prompt),
+            instruction_policy_id=(
+                None if policy is None else policy.policy_id
+            ),
+            instruction_policy_version=(
+                None if policy is None else policy.version
+            ),
             history=tuple(self._history),
-            tenant_id="default",
-            actor_id="backend-product",
-            capability="assistant.chat",
+            tenant_id=self.tenant_id,
+            actor_id=self.actor_id,
+            capability=self.capability,
+            verification_profile=self.verification_profile,
             max_output_tokens=self._max_output_tokens,
+            data_class=self.data_class,
+            purpose=self.purpose,
         )
         response: EngineTextResponse = await execute_engine_text(
             request
