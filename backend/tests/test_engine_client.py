@@ -1434,4 +1434,3 @@ async def test_governance_write_client_rejects_malformed_lists_before_io() -> No
         )
 
     assert called is False
-
