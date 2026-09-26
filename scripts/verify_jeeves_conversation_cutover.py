@@ -23,6 +23,10 @@ ROUTE = Path("backend/routes/jeeves_compose.py")
 CONVERSATIONS = Path("backend/core/conversations.py")
 CONTRACT = Path("skeleton/contracts/conversation.py")
 WORKSPACE_TEST = Path("tests/test_jeeves_chat_workspace.py")
+WORKSPACE_CONTROLLER = Path("frontend/features/Jeeves/WorkspaceController.ts")
+WORKSPACE_MODEL = Path("frontend/features/Jeeves/workspace.ts")
+CHAT_WORKSPACE = Path("frontend/features/Jeeves/ChatWorkspace.tsx")
+WORKSPACE_CONTROLLER_TEST = Path("frontend/scripts/test-jeeves-workspace.cjs")
 
 REQUIRED_ROUTE_TOKENS = (
     "_canonical_authority",
@@ -128,7 +132,20 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     contract_path = root / CONTRACT
     test_path = root / WORKSPACE_TEST
 
-    required = (route_path, authority_path, contract_path, test_path)
+    controller_path = root / WORKSPACE_CONTROLLER
+    workspace_model_path = root / WORKSPACE_MODEL
+    chat_workspace_path = root / CHAT_WORKSPACE
+    controller_test_path = root / WORKSPACE_CONTROLLER_TEST
+    required = (
+        route_path,
+        authority_path,
+        contract_path,
+        test_path,
+        controller_path,
+        workspace_model_path,
+        chat_workspace_path,
+        controller_test_path,
+    )
     for path in required:
         if not path.is_file():
             errors.append(
@@ -151,6 +168,10 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     authority = _read(authority_path)
     contract = _read(contract_path)
     tests = _read(test_path)
+    controller = _read(controller_path)
+    workspace_model = _read(workspace_model_path)
+    chat_workspace = _read(chat_workspace_path)
+    controller_tests = _read(controller_test_path)
 
     for token in REQUIRED_ROUTE_TOKENS:
         if token not in route:
@@ -182,6 +203,47 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     ):
         if token not in tests:
             errors.append(f"Jeeves cutover regression is missing: {token}")
+
+    for token in (
+        "HistoryTransport",
+        "canonicalMessages",
+        "rehydrateServerTranscripts",
+        "canonical conversation history unavailable",
+        "sessionUpdatedAt: Date.now()",
+    ):
+        if token not in controller:
+            errors.append(
+                f"WorkspaceController lost canonical reconstruction token: {token}"
+            )
+    for token in (
+        "sessionIdentity",
+        "sessionId,",
+        "sessionUpdatedAt: sessionId ? sessionUpdatedAt : 0",
+    ):
+        if token not in workspace_model:
+            errors.append(
+                f"workspace model lost durable session token: {token}"
+            )
+    if "sessionFresh" in workspace_model:
+        errors.append("workspace model regained TTL-based canonical session expiry")
+    for token in (
+        "ChatHistoryResponse",
+        "/api/jeeves/chat/",
+        "?limit=50",
+    ):
+        if token not in chat_workspace:
+            errors.append(
+                f"ChatWorkspace lost canonical history transport token: {token}"
+            )
+    for token in (
+        "remount replaces stale device transcript with canonical server history",
+        "remount keeps device cache with notice when canonical history is unavailable",
+        "durable backend session identity survives timestamp age and skew",
+    ):
+        if token not in controller_tests:
+            errors.append(
+                f"Jeeves remount regression is missing: {token}"
+            )
 
     legacy_reads = _verify_legacy_reads(route, errors)
     digests = {
