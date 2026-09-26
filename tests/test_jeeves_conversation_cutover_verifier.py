@@ -49,7 +49,13 @@ class MongoConversationAuthority:
     async def active_transcript(self):
         pass
 
-# idempotency_key
+    async def governed_record_ids_for_thread(self):
+        pass
+
+    async def delete_thread_with_governance(self):
+        pass
+
+# idempotency_key memory_refs governance_engine_target_executor
 """,
         "skeleton/contracts/conversation.py": """
 class ConversationThread:
@@ -61,7 +67,7 @@ class ConversationMessage:
 class ConversationAuthorType:
     pass
 
-# idempotency_key causal_user_message_id operation_id ai_result_id
+# idempotency_key causal_user_message_id operation_id ai_result_id memory_refs
 """,
         "tests/test_jeeves_chat_workspace.py": """
 def test_jeeves_chat_legacy_collection_is_migration_read_only():
@@ -146,6 +152,20 @@ async def test_regenerate_route_never_commits_when_engine_unavailable():
 async def test_regenerate_route_rejects_stale_version_before_engine_resolution():
     pass
 """,
+        "backend/tests/test_conversation_governance.py": """
+def test_thread_governance_selection_includes_only_explicit_linked_records():
+    pass
+
+def test_governed_deletion_removes_message_before_thread_and_acks():
+    pass
+""",
+        "backend/tests/test_conversations_api.py": """
+def test_delete_executes_governed_propagation_before_claiming_completion():
+    pass
+
+def test_delete_never_claims_completion_when_governance_propagation_fails():
+    pass
+""",
     }
     for rel, source in files.items():
         path = root / rel
@@ -167,7 +187,7 @@ def test_cutover_verifier_accepts_migration_read_only_legacy_store(
     assert receipt["errors"] == []
     assert receipt["head_sha"] == "conversation-head"
     assert receipt["legacy_read_accesses"] == 1
-    assert len(receipt["digests"]) == 10
+    assert len(receipt["digests"]) == 12
 
 
 def test_cutover_verifier_rejects_legacy_write(tmp_path: Path) -> None:
