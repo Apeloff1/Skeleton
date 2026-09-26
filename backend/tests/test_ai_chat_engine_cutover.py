@@ -220,10 +220,17 @@ def test_configured_chat_routes_through_engine_and_commits_engine_lineage(
     assert command.delegated_authority.service_principal == "codedock-backend"
     assert command.compiled_context.context_id == body["context"]["context_id"]
     assert command.compiled_context.context_digest == body["context"]["context_digest"]
-    assert command.compiled_context.history == (
+    assert command.compiled_context.history[:2] == (
         ("user", "prior question"),
         ("assistant", "prior answer"),
     )
+    assert len(command.compiled_context.history) == 3
+    evidence_role, evidence_text = command.compiled_context.history[2]
+    assert evidence_role == "user"
+    assert "BEGIN UNTRUSTED CONTEXT DATA" in evidence_text
+    assert "kind=artifact" in evidence_text
+    assert "ephemeral code evidence" in evidence_text
+    assert "END UNTRUSTED CONTEXT DATA" in evidence_text
     assert "conversation:" + initial.thread_id in command.context_seed_refs
     assert any(
         ref.startswith("ephemeral-context-sha256:")
