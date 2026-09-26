@@ -164,7 +164,7 @@ def intake(answers: Mapping[str, str]) -> Intake:
 
 def _beat_intake(answers: Mapping[str, str]) -> Intake:
     ballots: Dict[str, int] = {}
-    axis_acc = {a: [] for a in AXES}  # type: Dict[str, List[float]]
+    axis_acc: Dict[str, List[float]] = {a: [] for a in AXES}
     used = {}
     phrases = []
     for beat in BEATS:
