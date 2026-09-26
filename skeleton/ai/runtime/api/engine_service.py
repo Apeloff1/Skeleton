@@ -38,6 +38,7 @@ from skeleton.intelligence.admission_runtime import (
     AdmissionRuntime,
     AdmissionRuntimeError,
 )
+from skeleton.intelligence.quota import QuotaError
 from skeleton.provider_contract import ProviderToolDefinition
 from skeleton.skills.tool_contract import ToolExecutionRequest, approval_ref_for_request
 from skeleton.vault.data_governance import DataGovernanceDenied
@@ -1596,7 +1597,12 @@ class EngineExecutionService:
             None,
         )
         if callable(completion_reader):
-            existing = completion_reader(tenant, operation_id)
+            try:
+                existing = completion_reader(tenant, operation_id)
+            except QuotaError:
+                # First-use in-memory ledgers have no tenant state until
+                # AdmissionRuntime provisions the configured default quota.
+                existing = None
             if existing is not None:
                 if existing.actual.storage_bytes != storage_bytes:
                     raise EngineServiceError(
