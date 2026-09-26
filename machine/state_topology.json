@@ -848,9 +848,9 @@
         "confidential"
       ],
       "transaction_scope": "single canonical memory record/version plus lifecycle metadata; repository transaction where multi-record lifecycle updates require it",
-      "consistency": "durable SQLite reference and Mongo repository contracts enforce tenant/user namespace authority, idempotent writes, optimistic version fencing, immutable predecessor-linked revisions, tombstones, expiry, and durable projection-outbox intent; derived vector/MAG/CAG/index state remains non-authoritative and advances only from canonical records",
+      "consistency": "MongoMemoryRepository is the production tenant/namespace authority with idempotent writes, optimistic version fencing, immutable revision lineage, tombstones, expiry and durable projection-outbox intent; AsyncGovernedMemoryWriter gates writes through policy/governance/admission; MongoMemoryLifecycleAdapter executes governed canonical export/tombstone deletion; all vector/MAG/CAG/index state remains derived.",
       "retention": "governance-controlled by retention_class and expiry; deletion/export are first-class lifecycle operations",
-      "backup_restore": "required; restore canonical memory before rebuilding vector, MAG/CAG compatibility, or process-local projections",
+      "backup_restore": "canonical memory is part of authoritative Mongo recovery and must be restored and verified before any vector/MAG/CAG/search projection rebuild; lifecycle state is restored with governance before export/delete/retention actions resume",
       "migration": "preserve memory_id, tenant/user/namespace, kind, content reference/digest, provenance, authority class, retention, dedupe/idempotency key, complete version/revision lineage, tombstone state, and unpublished projection-outbox events",
       "derived_from": [],
       "rebuildable": false,
@@ -869,7 +869,8 @@
         "skeleton/api/server.py",
         "skeleton/memory/writeback.py",
         "skeleton/testing/test_governance_runtime_binding.py",
-        "pyproject.toml"
+        "pyproject.toml",
+        "skeleton/vault/lifecycle_adapters.py"
       ]
     }
   ],
