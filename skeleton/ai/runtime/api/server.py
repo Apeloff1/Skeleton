@@ -77,11 +77,45 @@ class ServerState:
         self.engine_execution_service: Optional[Any] = None
         self.engine_execution_coordinator: Optional[Any] = None
         self.engine_tool_receipt_store: Optional[Any] = None
+        self.governance_lifecycle: Optional[Any] = None
+        self.governance_registry: Optional[Any] = None
         self.jeeves_sam: Optional[Any] = None
         self.jeeves_clom: Optional[Any] = None
         self.jeeves_krem: Optional[Any] = None
         self.jeeves_memory: Optional[Any] = None
         self._swarm_bind_lock = RLock()
+
+    def bind_governance_registry(self) -> Any:
+        """Bind one restart-safe lifecycle/governance owner for the API process."""
+
+        if self.governance_registry is not None:
+            return self.governance_registry
+
+        from pathlib import Path
+
+        from skeleton.vault.data_lifecycle import DataLifecycleRegistry
+        from skeleton.vault.governance_registry import GovernanceRegistry
+
+        path = os.environ.get(
+            "SKL_GOVERNANCE_LIFECYCLE_PATH",
+            ":memory:",
+        ).strip() or ":memory:"
+        if path != ":memory:":
+            Path(path).expanduser().parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+        lifecycle = DataLifecycleRegistry(path)
+        self.governance_lifecycle = lifecycle
+        self.governance_registry = GovernanceRegistry(lifecycle)
+        return self.governance_registry
+
+    def close_governance_registry(self) -> None:
+        lifecycle = self.governance_lifecycle
+        if lifecycle is not None:
+            lifecycle.close()
+        self.governance_registry = None
+        self.governance_lifecycle = None
 
     def bind_swarm_runtime(self, runtime: Any) -> Any:
         """Replace the live swarm runtime and atomically rebind dependent control planes."""
@@ -485,6 +519,7 @@ def create_app() -> Any:
         if state.genesis is None:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
+        state.bind_governance_registry()
         state.bind_engine_execution_service()
         await state.recover_engine_executions()
 
@@ -492,6 +527,7 @@ def create_app() -> Any:
     async def shutdown():
         state = get_state()
         await state.close_engine_execution_service()
+        state.close_governance_registry()
         state.close_operation_runtime()
 
     @app.get("/")

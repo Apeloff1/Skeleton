@@ -13,6 +13,8 @@ from skeleton.memory.policy import (
     MemoryWriteDecision,
 )
 from skeleton.persistence.memory_repository import SQLiteMemoryRepository
+from skeleton.vault.governance_registry import GovernanceRegistry
+from skeleton.vault.lifecycle_adapters import SQLiteMemoryLifecycleAdapter
 
 
 class MemoryWritebackError(RuntimeError):
@@ -49,11 +51,25 @@ class GovernedMemoryWriter:
         self,
         repository: SQLiteMemoryRepository,
         *,
+        governance: GovernanceRegistry,
         policy: MemoryPolicyEngine | None = None,
+        purposes: tuple[str, ...] = (
+            "model-inference",
+            "retrieval-synthesis",
+        ),
     ) -> None:
         if not isinstance(repository, SQLiteMemoryRepository):
             raise TypeError("repository must be SQLiteMemoryRepository")
+        if not isinstance(governance, GovernanceRegistry):
+            raise TypeError("governance must be GovernanceRegistry")
+        normalized_purposes = tuple(
+            dict.fromkeys(str(value).strip().lower() for value in purposes)
+        )
+        if not normalized_purposes or any(not value for value in normalized_purposes):
+            raise ValueError("purposes must contain non-empty values")
         self.repository = repository
+        self.governance = governance
+        self.purposes = normalized_purposes
         self.policy = policy or MemoryPolicyEngine()
         self._lock = threading.RLock()
         self._staged: dict[str, StagedMemoryWrite] = {}
@@ -101,6 +117,44 @@ class GovernedMemoryWriter:
             ):
                 raise MemoryWriteDenied(staged.policy.reason)
             record = self.repository.commit(staged.proposal, now=now)
+            try:
+                self.governance.reconcile_canonical_write(
+                    "memory",
+                    record_id=record.memory_id,
+                    tenant_id=record.tenant_id,
+                    source_ref=SQLiteMemoryLifecycleAdapter.source_ref(
+                        record.namespace,
+                        record.memory_id,
+                    ),
+                    data_class=record.data_class,
+                    purposes=self.purposes,
+                    deletion_targets=("memory",),
+                    created_at=record.created_at.timestamp(),
+                    retention_until=(
+                        None
+                        if record.expires_at is None
+                        else record.expires_at.timestamp()
+                    ),
+                    exportable=True,
+                )
+            except Exception as exc:
+                try:
+                    self.repository.tombstone(
+                        record.memory_id,
+                        tenant_id=record.tenant_id,
+                        namespace=record.namespace,
+                        expected_version=record.version,
+                        now=now,
+                    )
+                except Exception as tombstone_exc:
+                    raise MemoryWritebackError(
+                        "governance registration failed and memory could not be "
+                        "tombstoned fail-closed"
+                    ) from tombstone_exc
+                raise MemoryWritebackError(
+                    "governance registration failed; memory was tombstoned "
+                    "fail-closed"
+                ) from exc
             self._staged.pop(key, None)
             return record
 

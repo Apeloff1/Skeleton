@@ -92,6 +92,35 @@ class MemoryRevision:
 
 
 @dataclass(frozen=True, slots=True)
+class MemoryProjectionEventHeader:
+    """Projection outbox identity that is safe to read even if payload JSON corrupts."""
+
+    event_id: str
+    tenant_id: str
+    namespace: str
+    memory_id: str
+    memory_version: int
+    action: str
+    created_at: datetime
+    published_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.event_id, str) or not self.event_id:
+            raise MemoryRepositoryError("projection event id must be non-empty")
+        if self.action not in _PROJECTION_ACTIONS:
+            raise MemoryRepositoryError("projection action is invalid")
+        if isinstance(self.memory_version, bool) or self.memory_version < 1:
+            raise MemoryRepositoryError("projection memory version is invalid")
+        _utc(self.created_at)
+        if self.published_at is not None:
+            published = _utc(self.published_at)
+            if published < _utc(self.created_at):
+                raise MemoryRepositoryError(
+                    "projection publish time cannot precede creation"
+                )
+
+
+@dataclass(frozen=True, slots=True)
 class MemoryProjectionEvent:
     """Durable derived-store work emitted from canonical memory mutations."""
 
@@ -519,6 +548,19 @@ class SQLiteMemoryRepository:
         )
 
     @staticmethod
+    def _projection_event_header(row: sqlite3.Row) -> MemoryProjectionEventHeader:
+        return MemoryProjectionEventHeader(
+            event_id=row["event_id"],
+            tenant_id=row["tenant_id"],
+            namespace=row["namespace"],
+            memory_id=row["memory_id"],
+            memory_version=int(row["memory_version"]),
+            action=row["action"],
+            created_at=_parse_time(row["created_at"], "created_at"),
+            published_at=_parse_time(row["published_at"], "published_at"),
+        )
+
+    @staticmethod
     def _projection_event(row: sqlite3.Row) -> MemoryProjectionEvent:
         return MemoryProjectionEvent(
             event_id=row["event_id"],
@@ -769,6 +811,32 @@ class SQLiteMemoryRepository:
                 ),
             ).fetchall()
             return tuple(self._revision(row) for row in rows)
+
+    def pending_projection_event_headers(
+        self,
+        *,
+        limit: int = 100,
+    ) -> tuple[MemoryProjectionEventHeader, ...]:
+        """Read pending outbox identity without deserializing untrusted snapshots."""
+
+        if isinstance(limit, bool) or not isinstance(limit, int):
+            raise TypeError("projection event limit must be an integer")
+        if limit < 1:
+            raise ValueError("projection event limit must be positive")
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT event_id, tenant_id, namespace, memory_id, memory_version,
+                       action, created_at, published_at
+                FROM canonical_memory_projection_outbox
+                WHERE repository_namespace = ?
+                  AND published_at IS NULL
+                ORDER BY created_at ASC, memory_id ASC, memory_version ASC, event_id ASC
+                LIMIT ?
+                """,
+                (self.repository_namespace, limit),
+            ).fetchall()
+            return tuple(self._projection_event_header(row) for row in rows)
 
     def pending_projection_events(
         self,
@@ -1770,6 +1838,7 @@ class MongoMemoryRepository:
 __all__ = [
     "MemoryConflict",
     "MemoryProjectionEvent",
+    "MemoryProjectionEventHeader",
     "MemoryRevision",
     "MemoryNotFound",
     "MemoryRepositoryError",

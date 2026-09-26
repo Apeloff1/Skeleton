@@ -559,7 +559,7 @@ class MemoryProjectionCoordinator:
             published += 1
 
         remaining = len(
-            self.repository.pending_projection_events(limit=limit)
+            self.repository.pending_projection_event_headers(limit=limit)
         )
         return ProjectionDispatchReport(
             attempted_events=len(attempts),

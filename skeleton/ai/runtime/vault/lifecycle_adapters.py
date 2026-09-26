@@ -18,6 +18,10 @@ import inspect
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from skeleton.observability.correlation import correlation_scope, get_correlation_id
+from skeleton.persistence.memory_repository import (
+    MemoryNotFound,
+    SQLiteMemoryRepository,
+)
 from skeleton.vault.governance_audit import GovernanceAuditTimeline
 from skeleton.vault.data_lifecycle import (
     DataLifecycleRegistry,
@@ -159,6 +163,83 @@ class MemoryDeletionAdapter:
 
     async def delete(self, action: DeletionAction) -> None:
         await _await_if_needed(self.store.delete(action.record_id))
+
+
+class SQLiteMemoryLifecycleAdapter:
+    """Tenant-scoped lifecycle adapter for canonical SQLite memory authority."""
+
+    _PREFIX = "memory://"
+
+    def __init__(self, repository: SQLiteMemoryRepository) -> None:
+        if not isinstance(repository, SQLiteMemoryRepository):
+            raise TypeError("repository must be SQLiteMemoryRepository")
+        self.repository = repository
+
+    @classmethod
+    def source_ref(cls, namespace: str, memory_id: str) -> str:
+        normalized_namespace = str(namespace).strip()
+        normalized_id = str(memory_id).strip()
+        if not normalized_namespace or not normalized_id:
+            raise LifecycleAdapterError("memory source reference fields are required")
+        if "/" in normalized_namespace:
+            raise LifecycleAdapterError("memory namespace cannot contain '/'")
+        return cls._PREFIX + normalized_namespace + "/" + normalized_id
+
+    @classmethod
+    def _parse_source_ref(cls, source_ref: object) -> tuple[str, str]:
+        raw = str(source_ref).strip()
+        if not raw.startswith(cls._PREFIX):
+            raise LifecycleAdapterError("memory source reference is invalid")
+        tail = raw[len(cls._PREFIX) :]
+        namespace, separator, memory_id = tail.partition("/")
+        if (
+            not separator
+            or not namespace
+            or not memory_id
+            or "/" in memory_id
+        ):
+            raise LifecycleAdapterError("memory source reference is invalid")
+        return namespace, memory_id
+
+    async def delete(self, action: DeletionAction) -> None:
+        namespace, memory_id = self._parse_source_ref(action.source_ref)
+        if memory_id != action.record_id:
+            raise LifecycleAdapterError("memory lifecycle identity mismatch")
+        try:
+            current = self.repository.get(
+                memory_id,
+                tenant_id=action.tenant_id,
+                namespace=namespace,
+                include_tombstoned=True,
+            )
+        except MemoryNotFound:
+            return
+        if not current.active:
+            return
+        self.repository.tombstone(
+            memory_id,
+            tenant_id=action.tenant_id,
+            namespace=namespace,
+            expected_version=current.version,
+        )
+
+    async def export(
+        self,
+        record: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
+        namespace, memory_id = self._parse_source_ref(record.get("source_ref"))
+        if memory_id != str(record.get("record_id")):
+            raise LifecycleAdapterError("memory lifecycle identity mismatch")
+        try:
+            current = self.repository.get(
+                memory_id,
+                tenant_id=str(record["tenant_id"]),
+                namespace=namespace,
+                include_tombstoned=False,
+            )
+        except MemoryNotFound:
+            return None
+        return current.as_dict()
 
 
 class RetrievalIndexDeletionAdapter:
@@ -411,4 +492,5 @@ __all__ = [
     "MemoryDeletionAdapter",
     "MongoCollectionLifecycleAdapter",
     "RetrievalIndexDeletionAdapter",
+    "SQLiteMemoryLifecycleAdapter",
 ]
