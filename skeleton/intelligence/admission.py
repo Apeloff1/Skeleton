@@ -118,7 +118,7 @@ class UsageEstimate:
     output_tokens: int = 0
     cost_usd: float = 0.0
     wall_seconds: float = 0.0
-    provider_attempts: int = 1
+    provider_attempts: int = 0
     tool_calls: int = 0
     artifact_bytes: int = 0
     storage_bytes: int = 0
@@ -133,10 +133,7 @@ class UsageEstimate:
             "storage_bytes",
         ):
             value = getattr(self, field_name)
-            if field_name == "provider_attempts":
-                _positive_int(value, field=field_name)
-            else:
-                _nonnegative_int(value, field=field_name)
+            _nonnegative_int(value, field=field_name)
         _finite_nonnegative(self.cost_usd, field="cost_usd")
         _finite_nonnegative(self.wall_seconds, field="wall_seconds")
 
