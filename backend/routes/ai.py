@@ -527,6 +527,9 @@ async def call_llm(
         "context_compiler_version": context_envelope.compiler_version,
         "engine_verification": result.verification,
         "engine_evidence_refs": list(result.evidence_refs),
+        "engine_tool_receipts": list(result.tool_receipts),
+        "engine_memory_refs": list(result.memory_refs),
+        "engine_artifact_refs": list(result.artifact_refs),
     }
 
 
@@ -831,6 +834,9 @@ async def ai_chat(
             "engine_execution_id": engine_result.execution_id,
             "engine_verification": engine_result.verification,
             "engine_evidence_refs": list(engine_result.evidence_refs),
+            "engine_tool_receipts": list(engine_result.tool_receipts),
+            "engine_memory_refs": list(engine_result.memory_refs),
+            "engine_artifact_refs": list(engine_result.artifact_refs),
         }
     else:
         result = await call_llm(
@@ -884,6 +890,18 @@ async def ai_chat(
                 context_digest=context_envelope.context_digest,
                 context_source_snapshot=context_envelope.source_snapshot,
                 context_compiler_version=context_envelope.compiler_version,
+                tool_receipt_refs=tuple(
+                    result.get("engine_tool_receipts") or ()
+                ),
+                memory_refs=tuple(
+                    result.get("engine_memory_refs") or ()
+                ),
+                citation_refs=tuple(
+                    result.get("engine_evidence_refs") or ()
+                ),
+                artifact_refs=tuple(
+                    result.get("engine_artifact_refs") or ()
+                ),
             )
         )
     except Exception as exc:
@@ -899,6 +917,9 @@ async def ai_chat(
         "engine_execution_id": result.get("engine_execution_id"),
         "engine_verification": result.get("engine_verification"),
         "engine_evidence_refs": result.get("engine_evidence_refs", []),
+        "engine_tool_receipts": result.get("engine_tool_receipts", []),
+        "engine_memory_refs": result.get("engine_memory_refs", []),
+        "engine_artifact_refs": result.get("engine_artifact_refs", []),
         "latency_ms": result.get("latency_ms"),
         "replayed": False,
         "operation_id": operation_id,
