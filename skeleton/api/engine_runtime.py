@@ -9,6 +9,7 @@ from typing import Iterable
 from skeleton.api.engine_service import (
     EngineExecutionCommand,
     EngineExecutionService,
+    EngineServiceError,
 )
 from skeleton.contracts.ai_execution import AIExecutionResult
 from skeleton.intelligence.execution_runtime import (
@@ -143,6 +144,14 @@ class EngineExecutionCoordinator:
     ) -> None:
         execution_id = command.execution_request.execution_id
         try:
+            self.service.ensure_execution_admission(command)
+        except EngineServiceError:
+            await self._finalize_failure(
+                execution_id,
+                "execution_admission_denied",
+            )
+            return
+        try:
             provider = self.provider_registry.require_active()
         except ProviderUnavailableError:
             await self._finalize_failure(
@@ -204,6 +213,10 @@ class EngineExecutionCoordinator:
                     execution_id,
                     approval_refs=approval_refs,
                 )
+            if self.service.repository.result(execution_id) is not None:
+                self.service.complete_execution_admission(
+                    execution_id
+                )
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -249,6 +262,10 @@ class EngineExecutionCoordinator:
             repository.finalize(
                 result,
                 expected_execution_version=current.version,
+                now=now,
+            )
+            self.service.complete_execution_admission(
+                execution_id,
                 now=now,
             )
         except Exception:
