@@ -518,7 +518,7 @@ async def get_therapeutic_response(
     # For intense negative emotions, use AI for more personalized response
     if intensity > 0.7 and emotional_state in ["frustrated", "overwhelmed", "discouraged"]:
         try:
-            chat = EngineChat(api_key=EMERGENT_LLM_KEY)
+            chat = EngineChat()
             ai_prompt = f"""You are Jeeves, an emotionally intelligent AI tutor. The user is feeling {emotional_state} (intensity: {intensity}).
             
 Context: {context or 'Learning programming'}
