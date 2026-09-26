@@ -15,8 +15,23 @@ router = APIRouter(prefix="/sota", tags=["SOTA 2026"])
 # LLM Setup
 from core.engine_chat import EngineChat, UserMessage
 from core.engine_text import EngineTextError
+from skeleton.context.instruction_policy import InstructionPolicy
 
 LLM_AVAILABLE = True
+
+
+def _policy_chat(policy_id: str, instructions: str) -> EngineChat:
+    """Bind one SOTA control prompt to a stable, versioned policy identity."""
+
+    return EngineChat(
+        instruction_policy=InstructionPolicy(
+            policy_id=policy_id,
+            version="1",
+            instructions=instructions,
+        ),
+        actor_id="sota-2026",
+        capability="assistant.compat",
+    ).with_model("openai", "gpt-4o")
 
 
 # ============================================================================
@@ -99,15 +114,16 @@ async def predictive_assistance(request: PredictiveRequest):
         return {"predictions": [], "error": "LLM not available"}
     
     try:
-        chat = EngineChat(
-            system_message="""You are a predictive coding assistant. Based on the code and context:
+        chat = _policy_chat(
+            "backend.sota.predictive",
+            """You are a predictive coding assistant. Based on the code and context:
 1. Predict what the user will likely code next (next 1-3 lines)
 2. Identify what they might be trying to achieve
 3. Suggest proactive improvements
 4. Flag potential issues before they occur
 
-Be concise and actionable. Output JSON format."""
-        ).with_model("openai", "gpt-4o")
+Be concise and actionable. Output JSON format.""",
+        )
         
         prompt = f"""Code ({request.language}):
 ```{request.language}
@@ -152,15 +168,18 @@ async def auto_refactor(request: RefactorRequest):
     }
     
     try:
-        chat = EngineChat(
-            system_message=f"""You are an expert code refactoring agent. {focus_prompts.get(request.focus, focus_prompts['all'])}
+        focus = request.focus if request.focus in focus_prompts else "all"
+        behavior = "preserve" if request.preserve_behavior else "improve"
+        chat = _policy_chat(
+            f"backend.sota.refactor.{focus}.{behavior}",
+            f"""You are an expert code refactoring agent. {focus_prompts[focus]}
 
 Rules:
 1. {'Preserve exact behavior' if request.preserve_behavior else 'May change behavior for improvements'}
 2. Explain each change briefly
 3. Return the complete refactored code
-4. List improvements made"""
-        ).with_model("openai", "gpt-4o")
+4. List improvements made""",
+        )
         
         prompt = f"""Refactor this {request.language} code:
 
@@ -204,9 +223,10 @@ async def multi_model_orchestration(request: MultiModelRequest):
     
     try:
         for strategy in strategies:
-            chat = EngineChat(
-                system_message=f"You are an expert programmer. {strategy['focus']}"
-            ).with_model("openai", "gpt-4o")
+            chat = _policy_chat(
+                "backend.sota.multi-model." + strategy["name"],
+                f"You are an expert programmer. {strategy['focus']}",
+            )
             
             prompt = request.task
             if request.code:
@@ -223,9 +243,11 @@ async def multi_model_orchestration(request: MultiModelRequest):
         # Synthesize results based on consensus mode
         if request.consensus_mode == "best":
             # Use another call to pick the best
-            synth_chat = EngineChat(
-                system_message="You are an expert at evaluating code solutions. Pick the best one and explain why."
-            ).with_model("openai", "gpt-4o")
+            synth_chat = _policy_chat(
+                "backend.sota.multi-model.synthesis",
+                "You are an expert at evaluating code solutions. "
+                "Pick the best one and explain why.",
+            )
             
             synth_prompt = f"Task: {request.task}\n\nThree solutions:\n"
             for i, r in enumerate(results):
@@ -256,8 +278,9 @@ async def advanced_code_intelligence(request: CodeIntelRequest):
         return {"analysis": {}, "error": "LLM not available"}
     
     try:
-        chat = EngineChat(
-            system_message="""You are a code analysis expert. Provide deep insights about code:
+        chat = _policy_chat(
+            "backend.sota.code-intel",
+            """You are a code analysis expert. Provide deep insights about code:
 - Complexity analysis (cyclomatic, cognitive)
 - Design pattern detection
 - Improvement suggestions
@@ -265,8 +288,8 @@ async def advanced_code_intelligence(request: CodeIntelRequest):
 - Potential bugs
 - Performance bottlenecks
 
-Be specific and actionable."""
-        ).with_model("openai", "gpt-4o")
+Be specific and actionable.""",
+        )
         
         prompt = f"""Analyze this {request.language} code:
 
@@ -298,15 +321,16 @@ async def smart_autocomplete(request: AutoCompleteRequest):
         return {"completions": [], "error": "LLM not available"}
     
     try:
-        chat = EngineChat(
-            system_message="""You are an intelligent code autocomplete system. Given code and cursor position:
+        chat = _policy_chat(
+            "backend.sota.autocomplete",
+            """You are an intelligent code autocomplete system. Given code and cursor position:
 1. Provide 3-5 relevant completions
 2. Include multi-line completions when appropriate
 3. Suggest imports if needed
 4. Consider the broader context
 
-Return completions as a JSON array with {text, description, kind} for each."""
-        ).with_model("openai", "gpt-4o")
+Return completions as a JSON array with {text, description, kind} for each.""",
+        )
         
         # Get code before cursor
         lines = request.code.split('\n')
@@ -353,9 +377,15 @@ async def explain_like_expert(code: str, language: str = "python", expertise_lev
     }
     
     try:
-        chat = EngineChat(
-            system_message=f"You are a principal engineer. {level_prompts.get(expertise_level, level_prompts['senior'])}"
-        ).with_model("openai", "gpt-4o")
+        level = (
+            expertise_level
+            if expertise_level in level_prompts
+            else "senior"
+        )
+        chat = _policy_chat(
+            "backend.sota.explain." + level,
+            f"You are a principal engineer. {level_prompts[level]}",
+        )
         
         prompt = f"""Explain this {language} code:
 
