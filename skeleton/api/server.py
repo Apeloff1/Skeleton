@@ -340,6 +340,7 @@ class ServerState:
                             "engine:approve",
                             "engine:media",
                             "engine:admission",
+                            "engine:governance",
                         }
                     ),
                     tenant_ids=settings.allowed_tenants,
@@ -421,6 +422,7 @@ class ServerState:
             submissions,
             authorities,
             admission_runtime=execution_admission_runtime,
+            governance_registry=self.bind_governance_registry(),
         )
         provider_registry = ProviderRegistry.from_env(
             admission_runtime=provider_admission_runtime,
