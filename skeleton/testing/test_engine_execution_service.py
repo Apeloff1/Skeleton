@@ -1473,6 +1473,87 @@ async def test_external_governance_engine_execution_skips_conversation_owner(
     ] == [("thread-linked", "conversation")]
 
 
+@pytest.mark.asyncio
+async def test_external_retention_plan_replays_pending_conversation_owner(
+    tmp_path,
+) -> None:
+    lifecycle = DataLifecycleRegistry()
+    governance = GovernanceRegistry(lifecycle)
+    adapters = LifecycleAdapterRegistry()
+    memory_adapter = _RecordingDeletionAdapter()
+    adapters.register_deletion("memory", memory_adapter)
+    executor = LifecycleExecutor(lifecycle, adapters)
+    service = EngineExecutionService(
+        SQLiteExecutionRepository(tmp_path / "execution-retention.sqlite3"),
+        SQLiteEngineSubmissionStore(tmp_path / "submissions-retention.sqlite3"),
+        _registry(
+            scopes=(
+                "engine:submit",
+                "engine:read",
+                "engine:governance",
+            )
+        ),
+        governance_registry=governance,
+        governance_lifecycle_executor=executor,
+    )
+    governance.register_canonical_write(
+        "conversation",
+        record_id="thread-retention",
+        tenant_id="tenant-a",
+        source_ref="conversation-thread://thread-retention",
+        data_class="confidential",
+        purposes=("model-inference",),
+        deletion_targets=("conversation",),
+        created_at=10.0,
+        retention_until=15.0,
+    )
+    governance.register_canonical_write(
+        "memory",
+        record_id="memory-retention",
+        tenant_id="tenant-a",
+        source_ref="memory://assistant/memory-retention",
+        data_class="confidential",
+        purposes=("assistant-memory",),
+        deletion_targets=("memory",),
+        created_at=10.0,
+        retention_until=15.0,
+    )
+
+    plan = service.plan_external_governance_retention(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert plan["plan_id"]
+    assert {
+        (row["record_id"], row["target"])
+        for row in plan["actions"]
+    } == {
+        ("thread-retention", "conversation"),
+        ("memory-retention", "memory"),
+    }
+
+    engine_result = await service.execute_external_governance_engine_targets(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        plan_id=plan["plan_id"],
+        now=_now(),
+    )
+    assert engine_result["executed_targets"] == ["memory"]
+    assert memory_adapter.deleted == [("memory-retention", "memory")]
+
+    replay = service.plan_external_governance_retention(
+        verified_service_principal="backend-service",
+        tenant_id="tenant-a",
+        now=_now(),
+    )
+    assert replay["plan_id"] == plan["plan_id"]
+    assert [
+        (row["record_id"], row["target"])
+        for row in replay["actions"]
+    ] == [("thread-retention", "conversation")]
+
+
 def test_external_governance_deletion_plan_ack_and_inventory_are_tenant_fenced(
     tmp_path,
 ) -> None:
