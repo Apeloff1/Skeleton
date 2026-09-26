@@ -185,3 +185,67 @@ def test_failed_phase_stops_recovery_journal() -> None:
 
     assert len(journal.events) == 1
     assert journal.events[0].status == "failed"
+
+
+def test_operation_sqlite_restore_preserves_authority_and_outbox_order(
+    tmp_path,
+) -> None:
+    result = drill.run_operation_sqlite_drill(
+        tmp_path / "sqlite-recovery",
+        cleanup=False,
+    )
+
+    assert result["status"] == "passed"
+    assert result["backup_digest"] == result["restore_digest"]
+    journal = result["journal"]
+    assert journal["complete"] is True
+    phases = [event["phase"] for event in journal["events"]]
+    assert phases == [
+        "seed_operation_authority",
+        "backup_operation_authority",
+        "destroy_operation_authority",
+        "restore_operation_authority",
+        "verify_operation_authority",
+        "reconcile_operation_outbox",
+        "ready",
+    ]
+    verification = journal["events"][4]["evidence"]
+    assert verification["state"] == "admitted"
+    assert verification["version"] == 4
+    assert verification["pending_outbox"] == 4
+    reconciliation = journal["events"][5]["evidence"]
+    assert reconciliation["remaining"] == 0
+    assert reconciliation["published"] == 4
+    assert reconciliation["event_types"] == [
+        "operation.created",
+        "operation.validated",
+        "operation.authorized",
+        "operation.admitted",
+    ]
+    assert len(set(reconciliation["event_ids"])) == 4
+
+
+def test_sqlite_snapshot_verification_rejects_restore_drift(tmp_path) -> None:
+    source = tmp_path / "source.sqlite"
+    conn = drill.sqlite3.connect(str(source))
+    try:
+        conn.execute("CREATE TABLE authority (id TEXT PRIMARY KEY, value TEXT)")
+        conn.execute("INSERT INTO authority VALUES ('a', 'one')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    expected = drill.capture_sqlite_database(source)
+    conn = drill.sqlite3.connect(str(source))
+    try:
+        conn.execute("UPDATE authority SET value = 'two' WHERE id = 'a'")
+        conn.commit()
+    finally:
+        conn.close()
+    actual = drill.capture_sqlite_database(source)
+
+    with pytest.raises(
+        drill.RecoveryDrillError,
+        match="differs from backup",
+    ):
+        drill.verify_sqlite_snapshot(expected, actual)
