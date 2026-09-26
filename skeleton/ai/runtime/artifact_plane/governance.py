@@ -232,15 +232,20 @@ class GovernedArtifactStore:
             created_at=timestamp,
         )
 
+    def path_for(self, tenant_id: str, artifact_id: str) -> Path:
+        """Return the canonical governed file path for a validated identity."""
+
+        return self._path(tenant_id, artifact_id)
+
     def read_bytes(self, tenant_id: str, artifact_id: str) -> bytes | None:
-        path = self._path(tenant_id, artifact_id)
+        path = self.path_for(tenant_id, artifact_id)
         try:
             return path.read_bytes()
         except FileNotFoundError:
             return None
 
     def remove(self, tenant_id: str, artifact_id: str) -> bool:
-        path = self._path(tenant_id, artifact_id)
+        path = self.path_for(tenant_id, artifact_id)
         try:
             path.unlink()
         except FileNotFoundError:
