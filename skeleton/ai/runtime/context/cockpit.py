@@ -20,6 +20,8 @@ Command language (one statement per apply):
   IMPORT TRACT <slot>   (copies from this cockpit's own-system; interchange is in-process)
   OWN
   SHADOW
+  BIND ARCHETYPE <name|auto>   (pins the forge archetype GameForgeRun uses)
+  COMPOSE <vision>             (previews the vision-derived blueprint)
 Unknown verbs raise CockpitError. apply() is the only mutation path;
 the pipeline reads the cockpit, never the other way around.
 """
@@ -53,6 +55,8 @@ class Cockpit:
     history: List[str] = field(default_factory=list)
     blend: Optional[Tuple[str, str, float]] = None
     generation: Optional[str] = None
+    archetype: Optional[str] = None
+    last_composition: Optional[Dict[str, Any]] = None
     _cortex: Any = field(default=None, repr=False)
 
     @property
@@ -76,6 +80,8 @@ class Cockpit:
             "oracle": self.last_oracle.to_dict() if self.last_oracle else None,
             "blend": list(self.blend) if self.blend else None,
             "generation": self.generation,
+            "archetype": self.archetype,
+            "composition": dict(self.last_composition) if self.last_composition else None,
             "history": list(self.history[-20:]),
         }
 
@@ -111,6 +117,28 @@ class Cockpit:
             spec = get_generation(key)
             self.generation = spec["key"]
             result = {"generation": spec["key"], "label": spec["label"], "viewport": spec["viewport"]}
+        elif verb == "BIND" and args and args[0].upper() == "ARCHETYPE":
+            if len(args) < 2:
+                raise CockpitError("BIND ARCHETYPE <name|auto>")
+            from skeleton.context.pipeline import COMPOSE_ARCHETYPES
+            from skeleton.forge.archetypes import default_library
+            name = args[1].strip().lower()
+            known = sorted(set(default_library().names()) | set(COMPOSE_ARCHETYPES))
+            if name not in known:
+                raise CockpitError("unknown archetype", context={"archetype": name, "known": known})
+            self.archetype = name
+            result = {"archetype": name, "composed": name in COMPOSE_ARCHETYPES}
+        elif verb == "COMPOSE":
+            text = " ".join(args).strip()
+            if not text:
+                raise CockpitError("COMPOSE <vision>")
+            from skeleton.forge.universal import Forge
+            from skeleton.forge.vision_compose import compose_from_vision, describe
+            _, composition = compose_from_vision(Forge(), text)
+            preview = composition.to_dict()
+            preview["summary"] = describe(preview)
+            self.last_composition = preview
+            result = preview
         elif verb == "SET" and args and args[0].upper() == "AXIS":
             if len(args) < 3:
                 raise CockpitError("SET AXIS <name> <value>")

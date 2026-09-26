@@ -122,6 +122,53 @@ class TestGameForgeAuto(unittest.TestCase):
         self.assertIsNone(payload["forge"]["composition"])
 
 
+class TestCockpitArchetype(unittest.TestCase):
+    def test_bind_archetype_pins_pipeline(self):
+        from skeleton.context.cockpit import Cockpit
+        from skeleton.context.pipeline import GameForgeRun
+
+        cockpit = Cockpit()
+        out = cockpit.apply("BIND ARCHETYPE auto")
+        self.assertEqual(out["result"], {"archetype": "auto", "composed": True})
+        self.assertEqual(cockpit.snapshot()["archetype"], "auto")
+        payload = GameForgeRun(cockpit=cockpit).execute(HEIST)
+        self.assertTrue(payload["succeeded"])
+        self.assertIn("combat", payload["forge"]["composition"]["features"])
+
+    def test_explicit_archetype_beats_cockpit_pin(self):
+        from skeleton.context.cockpit import Cockpit
+        from skeleton.context.pipeline import GameForgeRun
+
+        cockpit = Cockpit()
+        cockpit.apply("BIND ARCHETYPE auto")
+        payload = GameForgeRun(cockpit=cockpit).execute(HEIST, archetype="extraction")
+        self.assertIsNone(payload["forge"]["composition"])
+
+    def test_bind_unknown_archetype_rejected(self):
+        from skeleton.context.cockpit import Cockpit, CockpitError
+
+        cockpit = Cockpit()
+        with self.assertRaises(CockpitError):
+            cockpit.apply("BIND ARCHETYPE teleporter")
+        with self.assertRaises(CockpitError):
+            cockpit.apply("BIND ARCHETYPE")
+        self.assertIsNone(cockpit.archetype)
+
+    def test_compose_preview_is_recorded(self):
+        from skeleton.context.cockpit import Cockpit, CockpitError
+
+        cockpit = Cockpit()
+        height = cockpit.ledger.height
+        out = cockpit.apply(f'COMPOSE "{HEIST}"')
+        self.assertTrue(out["result"]["summary"].startswith("6 systems"))
+        self.assertEqual(
+            cockpit.snapshot()["composition"]["features"], out["result"]["features"]
+        )
+        self.assertEqual(cockpit.ledger.height, height + 1)
+        with self.assertRaises(CockpitError):
+            cockpit.apply("COMPOSE")
+
+
 class TestComposeRoute(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

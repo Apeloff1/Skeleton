@@ -49,7 +49,7 @@ class GameForgeRun:
         return cls(cockpit=cockpit, live=True)
 
     def execute(self, vision: str, *, era: Optional[str] = None,
-                archetype: str = "extraction",
+                archetype: Optional[str] = None,
                 target: str = "godot",
                 project_root: Optional[str] = None,
                 answers: Optional[Dict[str, str]] = None,
@@ -65,6 +65,8 @@ class GameForgeRun:
             cockpit.tensor = taken.tensor
         if generation is None:
             generation = getattr(cockpit, "generation", None)
+        # Explicit argument > cockpit pin (BIND ARCHETYPE) > canonical preset.
+        archetype = archetype or getattr(cockpit, "archetype", None) or "extraction"
         try:
             from skeleton.cortex.era_bind import resolve
             bound = resolve(vision or era or "")
