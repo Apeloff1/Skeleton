@@ -2367,7 +2367,7 @@
       "plane": "model-provider",
       "priority": "P0",
       "status": "open",
-      "gap": "Provider transport and credentials are structurally centralized in skeleton/provider_runtime.py across async/sync text, structured/tool interaction, image generation/variation/editing, speech, backend compatibility, and Jeeves compatibility. Focused async/media regressions and fail-closed media input validation now exist; closure awaits fresh exact-head provider discovery/SDK/network isolation CI evidence and independent verification.",
+      "gap": "Provider transport, credentials, async/sync text, structured/tool interaction, image generation/variation/editing, speech, backend compatibility, Jeeves compatibility, and application-isolation enforcement are implementation-complete under skeleton/provider_runtime.py. A dedicated Provider Surface Closure Gate now binds exact-head inventory, bootstrap, SDK/network isolation, async/media/schema/stream regressions, capability validation, and engine cross-service isolation. Remaining closure is a fresh green exact-head gate plus independent verification.",
       "construction": [
         "promote async runtime provider implementation to skeleton/provider_runtime.py",
         "add dependency-free synchronous adapter under the same governance/admission/receipt boundary",
@@ -2387,7 +2387,8 @@
         "media provider boundary regression suite",
         "application media surfaces contain no direct provider credentials or SDK imports"
       ],
-      "verification_state": "pending-current-head-ci"
+      "verification_state": "provider-surface-closure-gate-pending",
+      "status_detail": "implementation-complete pending exact-head Provider Surface Closure Gate and independent verification"
     }
   ],
   "gap_closure_policy": {
@@ -7607,7 +7608,7 @@
   "provider_surface_convergence_blueprint": {
     "schema_version": 1,
     "blueprint_version": "1.0.0",
-    "status": "in-progress",
+    "status": "implemented-pending-closure",
     "gap": "gap-provider-surface-convergence",
     "canonical_owner": "skeleton/provider_runtime.py",
     "objective": "There is exactly one runtime model-provider transport/credential owner; every other provider-facing module is a declaration, adapter or compatibility facade without independent credentials or raw provider network execution.",
@@ -7679,7 +7680,10 @@
       "undeclared provider denial",
       "compatibility application modules contain no provider credential reads or raw provider SDK/network transport",
       "async text/image/variation/edit/speech canonical runtime regressions",
-      "malformed media size/mask/speed fail-closed before provider I/O"
+      "malformed media size/mask/speed fail-closed before provider I/O",
+      ".github/workflows/provider-surface-closure.yml exact-head provider closure gate",
+      "scripts/check_provider_bootstrap.py emits exact-head secret-free provider inventory receipt",
+      "Provider Surface Closure Gate runs SDK/network isolation, async/sync/media/schema/stream and engine cross-service provider regressions"
     ],
     "application_isolation_surfaces": [
       {
