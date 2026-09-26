@@ -376,7 +376,11 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
     discovered: list[dict[str, Any]] = []
     canonical_provider = root / CANONICAL_PROVIDER_RUNTIME
     provider_mirror = root / CANONICAL_PROVIDER_MIRROR
-    if provider_mirror.exists():
+    if not canonical_provider.is_file():
+        errors.append("canonical provider runtime source is missing")
+    if not provider_mirror.is_file():
+        errors.append("canonical provider runtime AI mirror is missing")
+    if canonical_provider.is_file() and provider_mirror.is_file():
         try:
             canonical_bytes = canonical_provider.read_bytes()
             mirror_bytes = provider_mirror.read_bytes()
@@ -391,6 +395,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                     "canonical provider runtime AI mirror drifted from source"
                 )
 
+    observed_by_owner: dict[str, set[str]] = {}
     for path in _production_python_files(root):
         scanned += 1
         rel_path = path.relative_to(root)
@@ -403,6 +408,7 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         if not active:
             continue
         declared = owner_map.get(rel)
+        observed_by_owner[rel] = set(active)
         discovered.append(
             {
                 "path": rel,
@@ -434,6 +440,35 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
                 f"{rel} owns undeclared provider edges: "
                 + ", ".join(sorted(forbidden))
             )
+        missing = allowed - active
+        if missing:
+            errors.append(
+                f"{rel} lost declared provider edges: "
+                + ", ".join(sorted(missing))
+            )
+
+    for owner, declared in sorted(owner_map.items()):
+        owner_path = root / owner
+        if not owner_path.is_file():
+            errors.append(f"declared provider owner is missing: {owner}")
+            continue
+        expected = set()
+        if declared.get("credential_owner") is True:
+            expected.add("credential")
+        if declared.get("network_transport_owner") is True:
+            expected.add("network_transport")
+        if declared.get("sdk_client_owner") is True:
+            expected.add("sdk_client")
+        if expected and owner != CANONICAL_PROVIDER_MIRROR.as_posix():
+            observed = observed_by_owner.get(owner, set())
+            missing = expected - observed
+            if missing:
+                message = (
+                    f"{owner} lost declared provider edges: "
+                    + ", ".join(sorted(missing))
+                )
+                if message not in errors:
+                    errors.append(message)
 
     declared_payload = [
         {
