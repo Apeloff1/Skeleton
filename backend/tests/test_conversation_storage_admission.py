@@ -16,6 +16,7 @@ from skeleton.contracts.conversation import (
     ConversationThread,
     ConversationThreadState,
 )
+from skeleton.persistence.conversation_repository import ConversationConflict
 
 
 def _now():
@@ -623,18 +624,18 @@ async def test_assistant_append_requires_causal_parent_to_be_user_message() -> N
         return None
 
     async def find_one(_query):
-        return {
-            **prior_assistant.as_dict(),
-            "_id": prior_assistant.message_id,
-            "_commit_state": "committed",
-        }
+        doc = prior_assistant.as_dict()
+        doc["created_at"] = prior_assistant.created_at
+        doc["_id"] = prior_assistant.message_id
+        doc["_commit_state"] = "committed"
+        return doc
 
     authority._recover_prepared = recover
     authority._message_by_idempotency = by_idempotency
     authority.messages = SimpleNamespace(find_one=find_one)
 
     with pytest.raises(
-        Exception,
+        ConversationConflict,
         match="assistant result must bind its causal user message",
     ):
         await authority.append_message(
@@ -674,18 +675,18 @@ async def test_assistant_append_requires_parent_and_causal_user_identity_match()
         return None
 
     async def find_one(_query):
-        return {
-            **user_message.as_dict(),
-            "_id": user_message.message_id,
-            "_commit_state": "committed",
-        }
+        doc = user_message.as_dict()
+        doc["created_at"] = user_message.created_at
+        doc["_id"] = user_message.message_id
+        doc["_commit_state"] = "committed"
+        return doc
 
     authority._recover_prepared = recover
     authority._message_by_idempotency = by_idempotency
     authority.messages = SimpleNamespace(find_one=find_one)
 
     with pytest.raises(
-        Exception,
+        ConversationConflict,
         match="assistant result must bind its causal user message",
     ):
         await authority.append_message(
