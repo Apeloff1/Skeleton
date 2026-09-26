@@ -9,6 +9,7 @@ from skeleton.api.server import (
     _canonical_memory_mongo_configured,
 )
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
+from skeleton.memory.projection import AsyncMemoryProjectionCoordinator
 from skeleton.memory.writeback import AsyncGovernedMemoryWriter
 from skeleton.persistence.memory_repository import MongoMemoryRepository
 
@@ -90,6 +91,14 @@ async def test_server_state_binds_one_governed_admitted_mongo_memory_writer() ->
     assert writer.repository is state.canonical_memory_repository
     assert writer.admission_runtime is admission
     assert writer.governance is state.governance_registry
+    assert isinstance(
+        state.canonical_memory_projection_coordinator,
+        AsyncMemoryProjectionCoordinator,
+    )
+    assert (
+        state.canonical_memory_projection_coordinator.admission_runtime
+        is admission
+    )
     assert state.canonical_memory_mongo_client is None
 
     assert set(database.collections) == {
@@ -106,6 +115,7 @@ async def test_server_state_binds_one_governed_admitted_mongo_memory_writer() ->
     await state.close_canonical_memory_writer()
     assert state.canonical_memory_writer is None
     assert state.canonical_memory_repository is None
+    assert state.canonical_memory_projection_coordinator is None
     state.close_governance_registry()
 
 
