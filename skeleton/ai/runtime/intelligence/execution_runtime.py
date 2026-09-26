@@ -857,6 +857,10 @@ class CognitiveExecutionRuntime:
                 ),
                 tenant_id=tenant_id,
                 operation_id=execution.operation_id,
+                admission_operation_id=_stable_uuid(
+                    "skeleton-provider-admission",
+                    execution.execution_id + ":" + turn_id,
+                ),
                 execution_id=execution.execution_id,
                 turn_id=turn_id,
                 context_id=(
