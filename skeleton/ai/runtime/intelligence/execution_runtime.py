@@ -1912,7 +1912,7 @@ class CognitiveExecutionRuntime:
                     now=now,
                 )
             result_text = resolved.strip()
-            manifest, postcondition_observed = (
+            manifest, _postcondition_registered = (
                 await self.tool_runtime.verification_metadata(call.tool_id)
             )
             receipt_ids.append(receipt.receipt_id)
@@ -1943,7 +1943,9 @@ class CognitiveExecutionRuntime:
                         "side_effect_class": (
                             manifest.side_effect_class.value
                         ),
-                        "postcondition_observed": postcondition_observed,
+                        "postcondition_observed": (
+                            receipt.postcondition_verified
+                        ),
                         "observed_at": receipt.finished_at.isoformat(),
                         "execution_id": receipt.execution_id,
                         "turn_id": receipt.turn_id,
