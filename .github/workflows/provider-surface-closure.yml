@@ -28,6 +28,7 @@ on:
       - "skeleton/testing/test_engine_cross_service_boundary.py"
       - "tests/test_provider_capability_matrix.py"
       - "tests/test_provider_surface_independent_verifier.py"
+      - "machine/provider_capability_matrix.json"
       - "machine/ai_app_construction.json"
       - "machine/ai_closure_evidence.json"
       - "machine/ai_implementation_handoff.json"
@@ -80,6 +81,11 @@ jobs:
           python scripts/check_provider_bootstrap.py
           --evidence-out .provider-surface-evidence.json
           --print-evidence
+
+      - name: Validate canonical provider capability matrix
+        run: >-
+          python scripts/check_provider_capability_matrix.py
+          machine/provider_capability_matrix.json
 
       - name: Validate provider capability matrix contract
         run: >-
