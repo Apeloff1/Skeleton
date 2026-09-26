@@ -7714,6 +7714,20 @@
           "network_transport",
           "sdk_client"
         ]
+      },
+      {
+        "path": "backend/routes/jeeves_compose.py",
+        "role": "Jeeves product chat/compose adapter delegating generative execution to canonical Skeleton engine",
+        "required_tokens": [
+          "EngineTextRequest",
+          "execute_engine_text",
+          "backend.jeeves.chat"
+        ],
+        "forbidden_edge_classes": [
+          "credential",
+          "network_transport",
+          "sdk_client"
+        ]
       }
     ],
     "application_isolation_rule": "Application, media, compatibility, presentation and tool-registry modules may prepare or delegate provider work but may not own provider credentials, vendor SDK clients, or raw provider transport."
