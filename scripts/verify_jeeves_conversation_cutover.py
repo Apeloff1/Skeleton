@@ -214,9 +214,12 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
 
     for token in (
         "HistoryTransport",
-        "canonicalMessages",
+        "projectCanonicalHistory",
         "rehydrateServerTranscripts",
+        "refreshCanonical",
         "canonical conversation history unavailable",
+        "response.canonical_message_id",
+        "response.canonical_thread_id",
         "sessionUpdatedAt: Date.now()",
     ):
         if token not in controller:
@@ -227,6 +230,8 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         "sessionIdentity",
         "sessionId,",
         "sessionUpdatedAt: sessionId ? sessionUpdatedAt : 0",
+        "projectCanonicalHistory",
+        "The browser cache never sends its transcript back as provider context",
     ):
         if token not in workspace_model:
             errors.append(
@@ -234,10 +239,20 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
             )
     if "sessionFresh" in workspace_model:
         errors.append("workspace model regained TTL-based canonical session expiry")
+    build_start = workspace_model.find("export function buildChatBody(")
+    projection_start = workspace_model.find(
+        "function canonicalTurnText",
+        build_start,
+    )
+    if build_start < 0 or projection_start < 0:
+        errors.append("workspace model lost canonical buildChatBody boundary")
+    elif "history:" in workspace_model[build_start:projection_start]:
+        errors.append("Jeeves buildChatBody regained caller transcript authority")
     for token in (
         "ChatHistoryResponse",
         "/api/jeeves/chat/",
         "?limit=50",
+        "controller.refreshCanonical()",
     ):
         if token not in chat_workspace:
             errors.append(
@@ -247,6 +262,9 @@ def verify_repository(root: Path = ROOT) -> dict[str, Any]:
         "remount replaces stale device transcript with canonical server history",
         "remount keeps device cache with notice when canonical history is unavailable",
         "durable backend session identity survives timestamp age and skew",
+        "outgoing Jeeves requests never serialize the device-local transcript",
+        "canonical projection preserves unresolved local user work only",
+        "successful send caches canonical thread and assistant identities",
     ):
         if token not in controller_tests:
             errors.append(
