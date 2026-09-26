@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import importlib.util
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -169,35 +168,53 @@ def test_local_response_does_not_claim_to_have_answered_without_evidence(route, 
     assert result["model"] == "local-extractive"
 
 
-def test_unavailable_paid_provider_is_not_labeled_as_paid_generation(route, monkeypatch):
+def test_unavailable_paid_engine_is_not_labeled_as_paid_generation(
+    route,
+    monkeypatch,
+):
+    async def unavailable(_request):
+        raise route.EngineTextError("engine unavailable")
+
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
-    monkeypatch.delenv("EMERGENT_LLM_KEY", raising=False)
+    monkeypatch.setattr(route, "execute_engine_text", unavailable)
+
     result = asyncio.run(route._generate_text("question", [], True))
+
     assert result["tier"] == "local"
     assert result["model"] == "unavailable-fallback"
 
 
-def test_paid_provider_receives_conversation_context_as_user_data(route, monkeypatch):
+def test_paid_generation_uses_engine_and_keeps_context_as_user_data(
+    route,
+    monkeypatch,
+):
     seen = {}
 
-    class Chat:
-        def __init__(self, **kwargs):
-            seen["system"] = kwargs["system_message"]
+    async def execute(request):
+        seen["request"] = request
+        return SimpleNamespace(text="engine answer")
 
-        def with_model(self, *args):
-            return self
-
-        async def send_message(self, message):
-            seen["text"] = message.text
-            return "provider answer"
-
-    monkeypatch.setitem(sys.modules, "emergentintegrations.llm.chat", SimpleNamespace(LlmChat=Chat, UserMessage=lambda **kwargs: SimpleNamespace(**kwargs)))
     monkeypatch.setattr(route.free_tier, "decide", lambda _: "paid")
-    monkeypatch.setenv("EMERGENT_LLM_KEY", "test-not-a-real-key")
-    result = asyncio.run(route._generate_text("follow-up", [], True, "PROJECT_CONTEXT_SENTINEL"))
-    assert "PROJECT_CONTEXT_SENTINEL" in seen["text"]
-    assert "PROJECT_CONTEXT_SENTINEL" not in seen["system"]
-    assert result["text"] == "provider answer"
+    monkeypatch.setattr(route, "execute_engine_text", execute)
+
+    result = asyncio.run(
+        route._generate_text(
+            "follow-up",
+            [],
+            True,
+            "PROJECT_CONTEXT_SENTINEL",
+        )
+    )
+
+    request = seen["request"]
+    assert "PROJECT_CONTEXT_SENTINEL" in request.prompt
+    assert "PROJECT_CONTEXT_SENTINEL" not in request.instructions
+    assert request.instruction_policy_id == "backend.jeeves.chat"
+    assert request.instruction_policy_version == "1"
+    assert request.actor_id == "jeeves-compose"
+    assert result["text"] == "engine answer"
+    assert result["tier"] == "paid"
+    assert result["model"] == "skeleton-engine"
 
 
 
