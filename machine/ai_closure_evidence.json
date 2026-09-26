@@ -75,7 +75,12 @@
         "skeleton/intelligence/shared_pressure.py restart-safe SQLite cross-process concurrency and queue coordinator",
         "skeleton/testing/test_shared_pressure.py cross-process overbooking, tenant fairness, queue caps, lease expiry, owner fencing, soft shedding and atomic promotion regressions",
         "skeleton/intelligence/admission_runtime.py shared pressure snapshot/acquire/release integration",
-        "skeleton/ai/runtime/intelligence/shared_pressure.py byte-identical canonical AI runtime mirror"
+        "skeleton/ai/runtime/intelligence/shared_pressure.py byte-identical canonical AI runtime mirror",
+        "skeleton/api/engine_service.py meters durable execution-state and submission payloads through the operation admission lease before persistence",
+        "skeleton/intelligence/execution_runtime.py meters checkpoint, turn, finalization-intent and terminal-result payloads with deterministic write identities",
+        "skeleton/api/engine_runtime.py binds cognitive storage metering to the same operation-level admission lease",
+        "skeleton/testing/test_engine_execution_service.py proves durable engine write metering and replay stability",
+        "skeleton/testing/test_execution_runtime.py proves cognitive checkpoint/turn/result storage metering"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -85,15 +90,12 @@
       ],
       "outstanding_evidence": [
         "admission at every expensive non-provider action",
-        "fresh exact-head durable quota/admission verification",
-        "fresh exact-head estimate-vs-actual admission telemetry verification",
-        "actual storage usage accounting across artifact/storage write paths",
-        "exact-head validation of tool/artifact/storage metering and estimate-vs-actual telemetry",
-        "fresh exact-head validation of independent storage byte admission and SQLite migration"
+        "fresh exact-head validation of metered durable engine/cognitive storage writes",
+        "admission at remaining expensive conversation/retrieval/memory persistence boundaries"
       ],
       "blockers": [
         "admission at every expensive non-provider action",
-        "actual storage usage accounting across artifact/storage write paths"
+        "admission at remaining expensive conversation/retrieval/memory persistence boundaries"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
