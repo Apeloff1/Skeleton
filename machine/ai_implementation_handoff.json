@@ -698,11 +698,19 @@
         "backend/core/engine_client.py derives EngineContextHandoff instructions/prompt/history from project_provider_context(ContextEnvelope) whenever canonical projection content exists",
         "backend/core/engine_client.py prevents legacy caller text/history from overriding projected ContextEnvelope content",
         "backend/routes/ai.py binds compatibility prompts as USER_MESSAGE ContextSegments so prompt content participates in context_digest",
-        "backend/tests/test_engine_client.py proves attacker-supplied legacy instructions/prompt/history cannot override canonical projected context"
+        "backend/tests/test_engine_client.py proves attacker-supplied legacy instructions/prompt/history cannot override canonical projected context",
+        "skeleton/context/compaction.py provides deterministic single-segment evidence compaction with hard token bounds",
+        "context compaction preserves tenant, purpose, data class, retention class, source content digest and derived_from lineage",
+        "trusted-control and mandatory context cannot enter the compaction path",
+        "skeleton/context/compiler.py optionally compacts oversized eligible evidence while preserving the original source_snapshot",
+        "compiler omission_reasons record compacted_to:<derived-segment-id> for replay/audit",
+        "skeleton/testing/test_context_compiler.py covers compaction lineage, trust downgrade, hard token bounds, control refusal and compiler admission",
+        "backend/services/ai_assistant_svc.py delegates model execution through EngineTextRequest/execute_engine_text and owns no provider transport or credentials",
+        "backend/services/ai_hub_svc.py delegates model execution through the same canonical engine-text compatibility boundary"
       ],
       "remaining": [
-        "implement provenance-preserving compaction with source/digest retention",
-        "migrate remaining direct feature prompt/provider assembly to ContextCompiler compatibility delegation",
+        "add semantic/multi-segment summary policy only where deterministic excerpt compaction is insufficient",
+        "run repository-wide source scan and migrate any remaining direct provider/prompt construction",
         "migrate duplicate route/service control prompts to versioned instruction-policy resolution",
         "prove canonical model turns cannot bypass digest-bound ContextEnvelope projection",
         "collect fresh exact-head validation and independent closure evidence"
