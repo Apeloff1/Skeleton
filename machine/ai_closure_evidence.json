@@ -84,7 +84,11 @@
         "skeleton/memory/writeback.py GovernedMemoryWriter meters canonical SQLite memory writes before commit when admission is bound",
         "skeleton/memory/writeback.py AsyncGovernedMemoryWriter applies the same policy/admission/governance/tombstone contract to MongoMemoryRepository",
         "skeleton/testing/test_memory_writeback.py proves admitted SQLite memory persistence, no-lease denial and replay-stable metering",
-        "skeleton/testing/test_mongo_memory_repository.py proves admitted Mongo memory persistence, replay stability, no-lease denial and fail-closed governance tombstoning"
+        "skeleton/testing/test_mongo_memory_repository.py proves admitted Mongo memory persistence, replay stability, no-lease denial and fail-closed governance tombstoning",
+        "backend/core/conversations.py canonical Mongo thread/message/state writes admit storage through the engine before mutation",
+        "backend/core/engine_client.py bounded authenticated external storage admission client",
+        "skeleton/api/engine_routes.py /admission/storage canonical engine boundary",
+        "backend/tests/test_conversation_storage_admission.py fail-closed and replay-stable conversation admission regressions"
       ],
       "closure_evidence_required": [
         "budget denial test",
@@ -96,13 +100,11 @@
         "admission at every expensive non-provider action",
         "fresh exact-head validation of metered durable engine/cognitive storage writes",
         "bind AsyncGovernedMemoryWriter into the live production Mongo memory construction path",
-        "admission at authoritative conversation persistence boundaries",
         "admission at expensive derived retrieval/index rebuild boundaries where allocation is material"
       ],
       "blockers": [
         "admission at every expensive non-provider action",
-        "live production Mongo memory writer binding still needs the admitted AsyncGovernedMemoryWriter",
-        "authoritative conversation persistence has no shared cross-process admission lease"
+        "live production Mongo memory writer binding still needs the admitted AsyncGovernedMemoryWriter"
       ],
       "close_when": [
         "all declared dependency gaps are closed",
