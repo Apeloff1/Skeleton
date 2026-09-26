@@ -363,4 +363,3 @@ def test_durable_store_rejects_privacy_context_change_for_same_identity(
 
     with pytest.raises(Exception, match="privacy context"):
         store.reserve(conflicting, now=_now())
-
