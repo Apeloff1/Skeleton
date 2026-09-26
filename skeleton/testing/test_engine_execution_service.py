@@ -29,6 +29,8 @@ from skeleton.contracts.operation import OperationEnvelope
 from skeleton.intelligence.admission_runtime import AdmissionRuntime
 from skeleton.intelligence.quota import TenantQuota, TenantQuotaLedger
 from skeleton.persistence.execution_repository import SQLiteExecutionRepository
+from skeleton.vault.data_lifecycle import DataLifecycleRegistry
+from skeleton.vault.governance_registry import GovernanceRegistry
 from skeleton.provider_contract import ProviderToolCall
 from skeleton.skills.tool_contract import (
     ToolExecutionRequest,
@@ -1222,3 +1224,149 @@ def test_external_storage_admission_requires_dedicated_scope(tmp_path) -> None:
             storage_bytes=64,
             now=_now(),
         )
+
+def test_external_governance_write_registers_replays_and_reconciles(
+    tmp_path,
+) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    lifecycle = DataLifecycleRegistry(tmp_path / "governance.sqlite3")
+    service.governance_registry = GovernanceRegistry(lifecycle)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+            "engine:admission",
+            "engine:governance",
+        )
+    )
+
+    first = service.reconcile_external_governed_write(
+        verified_service_principal="backend-service",
+        mode="register",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="internal",
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+        retention_until=200.0,
+        exportable=True,
+    )
+    replay = service.reconcile_external_governed_write(
+        verified_service_principal="backend-service",
+        mode="register",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="internal",
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+        retention_until=200.0,
+        exportable=True,
+    )
+    reconciled = service.reconcile_external_governed_write(
+        verified_service_principal="backend-service",
+        mode="reconcile",
+        plane="conversation",
+        record_id="message-1",
+        tenant_id="tenant-a",
+        source_ref="conversation-message://thread-1/message-1",
+        data_class="confidential",
+        purposes=("model-inference", "retrieval-synthesis"),
+        deletion_targets=("conversation",),
+        created_at=100.0,
+        retention_until=300.0,
+        exportable=True,
+    )
+
+    assert first.as_dict() == replay.as_dict()
+    assert first.record["owner_plane"] == "conversation"
+    assert first.record["state"] == "active"
+    assert reconciled.record["data_class"] == "confidential"
+    assert reconciled.record["retention_until"] == 300.0
+    assert lifecycle.get("message-1") == reconciled.record
+    lifecycle.close()
+
+
+def test_external_governance_write_requires_dedicated_scope(tmp_path) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    lifecycle = DataLifecycleRegistry(tmp_path / "governance-scope.sqlite3")
+    service.governance_registry = GovernanceRegistry(lifecycle)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+            "engine:admission",
+        )
+    )
+
+    with pytest.raises(
+        EngineAuthorityError,
+        match="governance scope denied",
+    ):
+        service.reconcile_external_governed_write(
+            verified_service_principal="backend-service",
+            mode="register",
+            plane="conversation",
+            record_id="message-scope",
+            tenant_id="tenant-a",
+            source_ref="conversation-message://thread/message-scope",
+            data_class="internal",
+            purposes=("model-inference",),
+        )
+    lifecycle.close()
+
+
+def test_external_governance_write_rejects_cross_tenant_and_bad_lists(
+    tmp_path,
+) -> None:
+    service, _runtime, _ledger = _admitted_service(tmp_path)
+    lifecycle = DataLifecycleRegistry(tmp_path / "governance-bounds.sqlite3")
+    service.governance_registry = GovernanceRegistry(lifecycle)
+    service.authorities = _registry(
+        scopes=(
+            "engine:submit",
+            "engine:read",
+            "engine:cancel",
+            "engine:events",
+            "engine:approve",
+            "engine:admission",
+            "engine:governance",
+        )
+    )
+
+    with pytest.raises(EngineAuthorityError, match="tenant denied"):
+        service.reconcile_external_governed_write(
+            verified_service_principal="backend-service",
+            mode="register",
+            plane="memory",
+            record_id="memory-1",
+            tenant_id="tenant-b",
+            source_ref="memory://assistant/memory-1",
+            data_class="internal",
+            purposes=("model-inference",),
+        )
+
+    with pytest.raises(EngineServiceError, match="purposes"):
+        service.reconcile_external_governed_write(
+            verified_service_principal="backend-service",
+            mode="register",
+            plane="memory",
+            record_id="memory-2",
+            tenant_id="tenant-a",
+            source_ref="memory://assistant/memory-2",
+            data_class="internal",
+            purposes=(), 
+        )
+    lifecycle.close()
+
