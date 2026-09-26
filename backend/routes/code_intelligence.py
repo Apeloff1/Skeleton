@@ -12,11 +12,10 @@ from datetime import datetime
 
 router = APIRouter(prefix="/intelligence", tags=["Code Intelligence"])
 
-try:
-    from core.engine_chat import EngineChat, UserMessage
-    LLM_AVAILABLE = True
-except Exception:
-    LLM_AVAILABLE = False
+from core.engine_chat import EngineChat, UserMessage
+from core.engine_text import EngineTextError
+
+LLM_AVAILABLE = True
 
 # ============================================================================
 # REQUEST MODELS
@@ -107,7 +106,7 @@ async def call_llm(system: str, prompt: str) -> str:
         chat = EngineChat(system_message=system).with_model("openai", "gpt-4o")
         response = await chat.send_message(UserMessage(text=prompt))
         return response.content if hasattr(response, 'content') else str(response)
-    except Exception:
+    except EngineTextError:
         return "llm_request_failed"
 
 # ============================================================================
