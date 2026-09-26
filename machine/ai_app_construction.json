@@ -2176,7 +2176,7 @@
       "plane": "memory",
       "priority": "P0",
       "status": "open",
-      "gap": "Canonical long-term memory is production-bound to governed Mongo authority with tenant/namespace isolation, idempotency/version fencing, immutable revision history, retention/tombstones and durable projection outbox. Vector/TFIDF/MAG/CAG/process stores are derived. Server startup binds the canonical writer and exposes fail-closed health. The cognitive engine now accepts only explicit verified-final-output memory intents and commits them after verification through governed writeback. Destructive Mongo recovery includes canonical memory, revisions/idempotency/outbox and rebuilds only active derived memory. Remaining closure is lower-stage dependency closure, fresh exact-head evidence, product-owned policy activation for intended long-term-memory journeys, and independent verification.",
+      "gap": "Canonical long-term memory is production-bound to governed Mongo authority with tenant/namespace isolation, idempotency/version fencing, immutable revision history, retention/tombstones and durable projection outbox. Vector/TFIDF/MAG/CAG/process stores are derived. Server startup binds the canonical writer and exposes fail-closed health. Product chat now activates memory_write_intent only through explicit user/product opt-in and persists only verified final output through the governed engine boundary. Remaining closure is lower-stage dependency closure, fresh exact-head evidence, and independent verification.",
       "construction": [
         "reuse skeleton/frontier MemoryContract and RetrieverContract as canonical storage-neutral boundaries",
         "define durable MemoryRecord and MemoryWriteProposal contracts with tenant/user/namespace/data-class/purpose/provenance/retention/version metadata",
@@ -2201,7 +2201,7 @@
         "retrieval provenance points back to canonical memory records",
         "memory outage produces explicit degraded continuity behavior"
       ],
-      "verification_state": "memory-authority-verified-finalization-and-destructive-recovery-implemented-pending-closure",
+      "verification_state": "memory-authority-product-policy-activated-pending-dependency-and-exact-head-closure",
       "progress": {
         "state": "implemented_pending_closure",
         "completed": [
@@ -2216,10 +2216,12 @@
           "explicit verified-final-output memory intent contract",
           "engine finalization binding into governed canonical memory writer",
           "failed verification cannot invoke memory finalization",
-          "destructive Mongo recovery includes canonical memory revisions/idempotency/outbox and active-only rebuild"
+          "destructive Mongo recovery includes canonical memory revisions/idempotency/outbox and active-only rebuild",
+          "product-owned explicit chat memory policy activates only verified-final-output long-term persistence",
+          "default chat never delegates engine:memory authority",
+          "memory opt-in fails closed without the canonical engine and returned memory_refs bind back to canonical assistant messages"
         ],
         "remaining": [
-          "activate memory_write_intent only from explicit product/user policies that intend long-term persistence",
           "close gap-state-authority-convergence and gap-governance-registry",
           "collect fresh exact-head State Recovery Drill, memory regressions, App Assembly and Backend Quality evidence",
           "obtain independent closure verification"
