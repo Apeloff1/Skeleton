@@ -341,3 +341,62 @@ async def test_governed_artifact_retention_expiry_physically_deletes_bytes(
     assert len(record_receipts) == 1
     assert record_receipts[0].target == "artifact"
     state.close_governance_registry()
+
+
+def test_health_reports_canonical_memory_disabled_when_not_configured(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("SKL_MONGO_URI", raising=False)
+    state = ServerState()
+
+    health = state.is_healthy()
+
+    assert health["checks"]["canonical_memory"] == {
+        "configured": False,
+        "bound": False,
+        "status": "disabled",
+        "error": None,
+    }
+
+
+def test_health_fails_closed_when_configured_memory_authority_is_unbound(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "SKL_MONGO_URI",
+        "mongodb://canonical-memory.example:27017",
+    )
+    state = ServerState()
+
+    health = state.is_healthy()
+
+    assert health["overall"] is False
+    assert health["checks"]["canonical_memory"]["configured"] is True
+    assert health["checks"]["canonical_memory"]["bound"] is False
+    assert health["checks"]["canonical_memory"]["status"] == "unavailable"
+    assert "configured but not bound" in (
+        health["checks"]["canonical_memory"]["error"]
+    )
+
+
+def test_health_reports_configured_memory_ready_only_when_full_bundle_bound(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv(
+        "SKL_MONGO_URI",
+        "mongodb://canonical-memory.example:27017",
+    )
+    state = ServerState()
+    state.canonical_memory_repository = object()
+    state.canonical_memory_writer = object()
+    state.canonical_memory_projection_coordinator = object()
+
+    health = state.is_healthy()
+
+    assert health["checks"]["canonical_memory"] == {
+        "configured": True,
+        "bound": True,
+        "status": "ready",
+        "error": None,
+    }
+    assert health["overall"] is True
