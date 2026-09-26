@@ -280,4 +280,87 @@ def test_existing_receipt_database_migrates_nullable_lineage_columns(tmp_path) -
         ).fetchall()
     }
 
-    assert {"execution_id", "turn_id", "call_id"}.issubset(columns)
+    assert {
+        "execution_id",
+        "turn_id",
+        "call_id",
+        "data_class",
+        "transfer_purpose",
+    }.issubset(columns)
+
+def test_durable_receipt_preserves_privacy_context_across_restart(
+    tmp_path,
+) -> None:
+    path = tmp_path / "tool-privacy-receipts.sqlite3"
+    request = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=str(uuid4()),
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="privacy-restart-key",
+        arguments={"path": "README.md"},
+        requested_at=_now(),
+        data_class="public",
+        transfer_purpose="verification",
+    )
+    calls = []
+
+    first_store = SQLiteToolReceiptStore(path)
+    first_runtime = ToolRuntime(receipt_store=first_store)
+    first_runtime.register(
+        _manifest(),
+        lambda _request: calls.append("first") or "artifact:privacy",
+    )
+    original = first_runtime.execute(request, now=_now())
+    first_store.close()
+
+    assert original.data_class == "public"
+    assert original.transfer_purpose == "verification"
+    assert original.governance_decision_ref.startswith("gov-tool-")
+
+    reopened = SQLiteToolReceiptStore(path)
+    second_runtime = ToolRuntime(receipt_store=reopened)
+    second_runtime.register(
+        _manifest(),
+        lambda _request: calls.append("duplicate") or "artifact:duplicate",
+    )
+    replay = second_runtime.execute(request, now=_now())
+
+    assert replay == original
+    assert replay.data_class == "public"
+    assert replay.transfer_purpose == "verification"
+    assert calls == ["first"]
+
+
+def test_durable_store_rejects_privacy_context_change_for_same_identity(
+    tmp_path,
+) -> None:
+    path = tmp_path / "tool-privacy-conflict.sqlite3"
+    operation_id = str(uuid4())
+    first = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=operation_id,
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key="privacy-conflict-key",
+        arguments={"path": "README.md"},
+        requested_at=_now(),
+        data_class="internal",
+    )
+    store = SQLiteToolReceiptStore(path)
+    store.reserve(first, now=_now())
+
+    conflicting = ToolExecutionRequest(
+        request_id=str(uuid4()),
+        operation_id=operation_id,
+        tenant_id="tenant-a",
+        tool_id="repo.read",
+        idempotency_key=first.idempotency_key,
+        arguments={"path": "README.md"},
+        requested_at=_now(),
+        data_class="public",
+    )
+
+    with pytest.raises(Exception, match="privacy context"):
+        store.reserve(conflicting, now=_now())
+
