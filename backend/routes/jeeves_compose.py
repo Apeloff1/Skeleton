@@ -699,7 +699,10 @@ async def _claim_idempotent_turn(
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="canonical conversation replay is unavailable; retry later",
+            detail=(
+                "canonical conversation authority is unavailable; "
+                "retry later"
+            ),
         ) from exc
 
 
