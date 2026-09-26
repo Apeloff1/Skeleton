@@ -7,7 +7,6 @@ Every selection resolves to concrete forge directives (the actual change).
 """
 from __future__ import annotations
 
-import os
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -75,12 +74,6 @@ def flavor(req: FlavorReq):
         return {"error": "unknown_option"}
     base = {"axis": req.axis_key, "option": opt["id"], "label": opt["label"],
             "tier": opt["tier"], "effect": opt["effect"]}
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        base["flavor"] = (f"{opt['label']} ({opt['tier']}): applies "
-                          + ", ".join(f"{k}={v}" for k, v in opt["effect"].items()) + ".")
-        base["llm"] = False
-        return base
     try:
         import asyncio
         from emergentintegrations.llm.chat import LlmChat, UserMessage
