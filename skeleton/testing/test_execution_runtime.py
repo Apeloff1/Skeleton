@@ -138,6 +138,8 @@ def _manifest(
     tool_id: str = "repo.read",
     *,
     approval_required: bool = False,
+    data_policy: str = "internal:test",
+    network_policy: str = "none",
 ) -> ToolManifest:
     return ToolManifest(
         tool_id=tool_id,
@@ -155,6 +157,8 @@ def _manifest(
             else ToolEffect.READ_ONLY
         ),
         approval_required=approval_required,
+        data_policy=data_policy,
+        network_policy=network_policy,
     )
 
 
@@ -292,6 +296,93 @@ async def test_provider_tool_projection_is_minimal_and_excludes_disabled_tools()
     ):
         assert internal_field not in provider_payload
 
+
+
+
+@pytest.mark.asyncio
+async def test_provider_projection_filters_tools_by_privacy_ceiling() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+
+    async def handler(_request):
+        return "search:1"
+
+    await tools.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        handler,
+    )
+    runtime = _runtime(repo, FakeProvider([]), tools)
+
+    internal = await runtime._provider_tools(
+        {
+            "allowed_tool_ids": ["web.search"],
+            "tenant_id": "tenant-a",
+            "tool_data_class": "internal",
+            "tool_purpose": "tool-execution",
+        }
+    )
+    public = await runtime._provider_tools(
+        {
+            "allowed_tool_ids": ["web.search"],
+            "tenant_id": "tenant-a",
+            "tool_data_class": "public",
+            "tool_purpose": "tool-execution",
+        }
+    )
+
+    assert internal == ()
+    assert [item.tool_id for item in public] == ["web.search"]
+
+
+@pytest.mark.asyncio
+async def test_cognitive_tool_request_preserves_privacy_context() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    tool_requests = []
+
+    async def handler(request):
+        tool_requests.append(request)
+        return "search:privacy"
+
+    await tools.register(
+        _manifest(
+            "web.search",
+            data_policy="public:untrusted",
+            network_policy="public-search:bounded-egress",
+        ),
+        handler,
+    )
+    provider = FakeProvider(
+        [
+            _tool_response("call-search", tool_id="web.search"),
+            _text_response("public answer", response_id="resp-public"),
+        ]
+    )
+    runtime = _runtime(repo, provider, tools)
+    request = _request(
+        allowed_tools=("web.search",),
+        context_policy={
+            "data_class": "public",
+            "tool_purpose": "verification",
+        },
+    )
+
+    result = await runtime.start(
+        request,
+        instructions="Use the public search tool.",
+        prompt="Verify the public fact.",
+        context_digest="9" * 64,
+        now=_now(),
+    )
+
+    assert result.result.final_output == "public answer"
+    assert len(tool_requests) == 1
+    assert tool_requests[0].data_class == "public"
+    assert tool_requests[0].transfer_purpose == "verification"
 
 @pytest.mark.asyncio
 async def test_model_tool_model_round_trip_uses_canonical_receipt_lineage() -> None:
