@@ -23,6 +23,7 @@ from skeleton.contracts.verification import (
     EvidenceRelation,
     PostconditionObservation,
     VerificationClaim,
+    VerificationLevel,
     VerificationOutcome,
     VerificationRisk,
 )
@@ -2016,6 +2017,207 @@ class CognitiveExecutionRuntime:
             now=now,
         )
 
+    @staticmethod
+    def _risk_max(
+        left: VerificationRisk,
+        right: VerificationRisk,
+    ) -> VerificationRisk:
+        order = {
+            VerificationRisk.LOW: 0,
+            VerificationRisk.MEDIUM: 1,
+            VerificationRisk.HIGH: 2,
+            VerificationRisk.CRITICAL: 3,
+        }
+        return left if order[left] >= order[right] else right
+
+    def _tool_verification_material(
+        self,
+        execution: AIExecution,
+        payload: Mapping[str, object],
+        *,
+        claim_id: str,
+        tenant_id: str,
+    ) -> tuple[
+        tuple[EvidenceReference, ...],
+        dict[str, str],
+        tuple[PostconditionObservation, ...],
+        ClaimKind,
+        VerificationRisk,
+        str | None,
+        bool,
+    ]:
+        raw_rows = payload.get("tool_verification_evidence", [])
+        if not isinstance(raw_rows, list):
+            raise CognitiveExecutionError(
+                "tool verification evidence checkpoint is corrupt"
+            )
+
+        context_policy = dict(execution.request.context_policy)
+        risk = VerificationRisk.LOW
+        raw_risk = context_policy.get("verification_risk")
+        if raw_risk is not None:
+            try:
+                risk = VerificationRisk(str(raw_risk).strip().lower())
+            except ValueError as exc:
+                raise CognitiveExecutionError(
+                    "execution verification_risk is invalid"
+                ) from exc
+
+        evidence: list[EvidenceReference] = []
+        evidence_text: dict[str, str] = {}
+        postconditions: list[PostconditionObservation] = []
+        action_effect: str | None = None
+        externally_observable = False
+        effect_rank = {
+            None: 0,
+            "read_only": 1,
+            "reversible": 2,
+            "irreversible": 3,
+        }
+
+        for raw in raw_rows:
+            if not isinstance(raw, Mapping):
+                raise CognitiveExecutionError(
+                    "tool verification evidence entry is corrupt"
+                )
+            receipt_id = str(raw.get("receipt_id") or "").strip()
+            tool_id = str(raw.get("tool_id") or "").strip()
+            result_text = raw.get("result")
+            result_digest = str(raw.get("result_digest") or "").strip()
+            effect = str(raw.get("effect") or "").strip().lower()
+            side_effect = str(
+                raw.get("side_effect_class") or "none"
+            ).strip().lower()
+            raw_tool_risk = str(
+                raw.get("risk_class") or "low"
+            ).strip().lower()
+            raw_observed = str(raw.get("observed_at") or "").strip()
+
+            if (
+                not receipt_id
+                or not tool_id
+                or not isinstance(result_text, str)
+                or not result_text
+                or effect not in {
+                    "read_only",
+                    "reversible",
+                    "irreversible",
+                }
+            ):
+                raise CognitiveExecutionError(
+                    "tool verification evidence entry is incomplete"
+                )
+            actual_digest = hashlib.sha256(
+                result_text.encode("utf-8")
+            ).hexdigest()
+            if result_digest != actual_digest:
+                raise CognitiveExecutionError(
+                    "tool verification evidence digest mismatch"
+                )
+            try:
+                observed_at = datetime.fromisoformat(raw_observed)
+            except ValueError as exc:
+                raise CognitiveExecutionError(
+                    "tool verification evidence time is invalid"
+                ) from exc
+            if (
+                observed_at.tzinfo is None
+                or observed_at.utcoffset() is None
+            ):
+                raise CognitiveExecutionError(
+                    "tool verification evidence time must be timezone-aware"
+                )
+            observed_at = observed_at.astimezone(timezone.utc)
+
+            try:
+                tool_risk = VerificationRisk(raw_tool_risk)
+            except ValueError as exc:
+                raise CognitiveExecutionError(
+                    "tool verification risk class is invalid"
+                ) from exc
+            risk = self._risk_max(risk, tool_risk)
+
+            evidence_id = _stable_uuid(
+                "skeleton-tool-result-evidence",
+                execution.execution_id + ":" + receipt_id,
+            )
+            result_ref = raw.get("result_ref")
+            locator = (
+                str(result_ref).strip()
+                if result_ref is not None and str(result_ref).strip()
+                else "tool-receipt:" + receipt_id
+            )
+            provenance = [
+                "tool-receipt:" + receipt_id,
+                "execution:" + execution.execution_id,
+            ]
+            for field, prefix in (
+                ("turn_id", "turn:"),
+                ("call_id", "call:"),
+                ("governance_decision_ref", "governance:"),
+            ):
+                value = raw.get(field)
+                if value is not None and str(value).strip():
+                    provenance.append(prefix + str(value).strip())
+
+            item = EvidenceReference(
+                evidence_id=evidence_id,
+                claim_id=claim_id,
+                tenant_id=tenant_id,
+                source_id="tool:" + tool_id,
+                origin_id="tool:" + tool_id,
+                content_digest=result_digest,
+                locator=locator,
+                relation=EvidenceRelation.SUPPORTS,
+                producer=EvidenceProducer.TOOL,
+                observed_at=observed_at,
+                provenance_refs=tuple(provenance),
+            )
+            evidence.append(item)
+            evidence_text[evidence_id] = result_text
+
+            if effect_rank[effect] > effect_rank[action_effect]:
+                action_effect = effect
+            if side_effect != "none":
+                externally_observable = True
+
+            if effect != "read_only" and raw.get("postcondition_observed") is True:
+                postconditions.append(
+                    PostconditionObservation(
+                        observation_id=_stable_uuid(
+                            "skeleton-tool-postcondition-observation",
+                            execution.execution_id + ":" + receipt_id,
+                        ),
+                        postcondition_id=_stable_uuid(
+                            "skeleton-tool-postcondition",
+                            execution.execution_id + ":" + receipt_id,
+                        ),
+                        operation_id=_tool_operation_uuid(
+                            execution.operation_id
+                        ),
+                        tenant_id=tenant_id,
+                        observed_at=observed_at,
+                        passed=True,
+                        evidence_ids=(evidence_id,),
+                        result_ref=locator,
+                    )
+                )
+
+        claim_kind = (
+            ClaimKind.ACTION_OUTCOME
+            if action_effect in {"reversible", "irreversible"}
+            else ClaimKind.STRUCTURED_OUTPUT
+        )
+        return (
+            tuple(evidence),
+            evidence_text,
+            tuple(postconditions),
+            claim_kind,
+            risk,
+            action_effect,
+            externally_observable,
+        )
+
     async def _verify_candidate(
         self,
         execution: AIExecution,
@@ -2045,6 +2247,7 @@ class CognitiveExecutionRuntime:
         )
         if not isinstance(tenant_id, str) or not tenant_id.strip():
             raise CognitiveExecutionError("execution tenant_id is invalid")
+        tenant_id = tenant_id.strip()
         instant = (
             datetime.now(timezone.utc)
             if now is None
@@ -2063,9 +2266,37 @@ class CognitiveExecutionRuntime:
             "verification_profile",
             "evidence_required",
         )
-        if verification_profile == "evidence_required":
-            claim_kind = ClaimKind.STRUCTURED_OUTPUT
-        elif verification_profile == "assistant_proposal":
+        if verification_profile not in {
+            "evidence_required",
+            "assistant_proposal",
+        }:
+            raise CognitiveExecutionError(
+                "unsupported execution verification_profile"
+            )
+
+        claim_id = _stable_uuid(
+            "skeleton-execution-verification-claim",
+            execution.execution_id
+            + ":"
+            + hashlib.sha256(candidate.encode("utf-8")).hexdigest(),
+        )
+
+        (
+            evidence,
+            evidence_text,
+            postconditions,
+            evidence_claim_kind,
+            risk,
+            action_effect,
+            externally_observable,
+        ) = self._tool_verification_material(
+            execution,
+            self._checkpoint_payload(execution.execution_id),
+            claim_id=claim_id,
+            tenant_id=tenant_id,
+        )
+
+        if verification_profile == "assistant_proposal":
             capability = execution.request.context_policy.get("capability")
             allowed_tool_ids = execution.request.tool_policy.get(
                 "allowed_tool_ids",
@@ -2080,22 +2311,21 @@ class CognitiveExecutionRuntime:
                     "assistant_proposal verification requires tool-free execution"
                 )
             claim_kind = ClaimKind.HYPOTHESIS
+            risk = VerificationRisk.LOW
+            action_effect = None
+            externally_observable = False
+            evidence = ()
+            evidence_text = {}
+            postconditions = ()
         else:
-            raise CognitiveExecutionError(
-                "unsupported execution verification_profile"
-            )
+            claim_kind = evidence_claim_kind
 
         claim = VerificationClaim(
-            claim_id=_stable_uuid(
-                "skeleton-execution-verification-claim",
-                execution.execution_id
-                + ":"
-                + hashlib.sha256(candidate.encode("utf-8")).hexdigest(),
-            ),
-            tenant_id=tenant_id.strip(),
+            claim_id=claim_id,
+            tenant_id=tenant_id,
             text=candidate.strip(),
             kind=claim_kind,
-            risk=VerificationRisk.LOW,
+            risk=risk,
             created_at=instant,
             operation_id=_tool_operation_uuid(execution.operation_id),
             turn_id=turn_id,
@@ -2105,18 +2335,50 @@ class CognitiveExecutionRuntime:
             ),
             context_digest=context_digest,
             provenance_refs=tuple(
-                str(item) for item in self._checkpoint_payload(
+                str(item)
+                for item in self._checkpoint_payload(
                     execution.execution_id
                 ).get("provider_receipts", [])
             ),
             generated_by_model=True,
         )
+
         assessment = self._verification_runtime.verify(
             claim,
+            evidence=evidence,
+            postconditions=postconditions,
             verified_at=instant,
             verifier_id="execution-runtime:canonical-stage3",
+            action_effect=action_effect,
+            externally_observable_action=externally_observable,
         )
-        policy = assessment.policy
+
+        semantic = None
+        if (
+            assessment.policy.level >= VerificationLevel.INDEPENDENT
+            or (
+                execution.request.context_policy.get(
+                    "semantic_verification_required"
+                )
+                is True
+            )
+        ):
+            adapter = self.semantic_verification_adapter
+            if adapter is None:
+                semantic = None
+            else:
+                semantic = await SemanticVerificationRuntime(adapter).finalize(
+                    claim,
+                    evidence=evidence,
+                    evidence_text=evidence_text,
+                    postconditions=postconditions,
+                    verified_at=instant,
+                    action_effect=action_effect,
+                    externally_observable_action=externally_observable,
+                    force_semantic=True,
+                )
+                assessment = semantic.final_assessment
+
         canonical_receipt = materialize_verification_receipt(
             claim,
             assessment,
@@ -2129,8 +2391,16 @@ class CognitiveExecutionRuntime:
             canonical_receipt.as_dict(),
             now=instant,
         )
-        self.repository.remember_verification_receipt(
-            canonical_receipt
+        self.repository.remember_verification_receipt(canonical_receipt)
+
+        disposition = (
+            semantic.disposition
+            if semantic is not None
+            else (
+                FinalizationDisposition.PUBLISH
+                if assessment.policy_satisfied
+                else FinalizationDisposition.BLOCK
+            )
         )
         receipt = canonical_receipt.as_dict()
         receipt.update(
@@ -2138,24 +2408,77 @@ class CognitiveExecutionRuntime:
                 "verification_profile": verification_profile,
                 "claim_kind": claim.kind.value,
                 "risk": claim.risk.value,
+                "disposition": disposition.value,
+                "action_effect": action_effect,
+                "externally_observable_action": externally_observable,
                 "policy": {
-                    "level": int(policy.level),
-                    "required_modes": list(policy.required_modes),
-                    "min_independent_origins": policy.min_independent_origins,
-                    "allow_model_only_evidence": policy.allow_model_only_evidence,
-                    "require_postcondition": policy.require_postcondition,
-                    "reasons": list(policy.reasons),
+                    "level": int(assessment.policy.level),
+                    "required_modes": list(
+                        assessment.policy.required_modes
+                    ),
+                    "min_independent_origins": (
+                        assessment.policy.min_independent_origins
+                    ),
+                    "allow_model_only_evidence": (
+                        assessment.policy.allow_model_only_evidence
+                    ),
+                    "require_postcondition": (
+                        assessment.policy.require_postcondition
+                    ),
+                    "reasons": list(assessment.policy.reasons),
                 },
             }
         )
+        if semantic is not None:
+            receipt["semantic"] = {
+                "rounds": [
+                    {
+                        "round_index": item.round_index,
+                        "verdict": item.verdict.value,
+                        "provider": item.provider,
+                        "model": item.model,
+                        "request_id": item.request_id,
+                        "issues": list(item.issues),
+                    }
+                    for item in semantic.semantic_rounds
+                ],
+                "repair_lineage": [
+                    {
+                        "round_index": item.round_index,
+                        "original_claim_id": item.original_claim_id,
+                        "repaired_claim_id": item.repaired_claim_id,
+                        "original_claim_digest": item.original_claim_digest,
+                        "repaired_claim_digest": item.repaired_claim_digest,
+                        "provider": item.provider,
+                        "model": item.model,
+                        "request_id": item.request_id,
+                        "issues": list(item.issues),
+                    }
+                    for item in semantic.repair_lineage
+                ],
+                "issues": list(semantic.issues),
+            }
+
         evidence_refs = tuple(
             "evidence:" + evidence_id
             for evidence_id in canonical_receipt.supporting_evidence_ids
         )
+        published = (
+            disposition is FinalizationDisposition.PUBLISH
+            and assessment.policy_satisfied
+            and assessment.outcome is VerificationOutcome.PASSED
+        )
+        final_output = (
+            semantic.final_claim.text
+            if semantic is not None
+            else candidate.strip()
+        )
         return ExecutionVerificationDecision(
-            passed=assessment.policy_satisfied,
+            passed=published,
             receipt=receipt,
             evidence_refs=evidence_refs,
+            disposition=disposition.value,
+            final_output=final_output,
         )
 
     async def _finalization_bindings(
