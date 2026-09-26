@@ -2359,8 +2359,12 @@ class CognitiveExecutionRuntime:
             externally_observable_action=externally_observable,
         )
 
-        semantic = None
-        if (
+        exact_evidence_match = any(
+            item.content_digest
+            == hashlib.sha256(candidate.strip().encode("utf-8")).hexdigest()
+            for item in evidence
+        )
+        semantic_required = (
             assessment.policy.level >= VerificationLevel.INDEPENDENT
             or (
                 execution.request.context_policy.get(
@@ -2368,10 +2372,14 @@ class CognitiveExecutionRuntime:
                 )
                 is True
             )
-        ):
+            or (bool(evidence) and not exact_evidence_match)
+        )
+        semantic = None
+        semantic_missing = False
+        if semantic_required:
             adapter = self.semantic_verification_adapter
             if adapter is None:
-                semantic = None
+                semantic_missing = True
             else:
                 semantic = await SemanticVerificationRuntime(adapter).finalize(
                     claim,
@@ -2400,12 +2408,16 @@ class CognitiveExecutionRuntime:
         self.repository.remember_verification_receipt(canonical_receipt)
 
         disposition = (
-            semantic.disposition
-            if semantic is not None
+            FinalizationDisposition.BLOCK
+            if semantic_missing
             else (
-                FinalizationDisposition.PUBLISH
-                if assessment.policy_satisfied
-                else FinalizationDisposition.BLOCK
+                semantic.disposition
+                if semantic is not None
+                else (
+                    FinalizationDisposition.PUBLISH
+                    if assessment.policy_satisfied
+                    else FinalizationDisposition.BLOCK
+                )
             )
         )
         receipt = canonical_receipt.as_dict()
@@ -2417,6 +2429,10 @@ class CognitiveExecutionRuntime:
                 "disposition": disposition.value,
                 "action_effect": action_effect,
                 "externally_observable_action": externally_observable,
+                "semantic_required": semantic_required,
+                "semantic_available": (
+                    self.semantic_verification_adapter is not None
+                ),
                 "policy": {
                     "level": int(assessment.policy.level),
                     "required_modes": list(
@@ -2435,7 +2451,13 @@ class CognitiveExecutionRuntime:
                 },
             }
         )
-        if semantic is not None:
+        if semantic_missing:
+            receipt["semantic"] = {
+                "rounds": [],
+                "repair_lineage": [],
+                "issues": ["semantic_verifier_required_but_unavailable"],
+            }
+        elif semantic is not None:
             receipt["semantic"] = {
                 "rounds": [
                     {
