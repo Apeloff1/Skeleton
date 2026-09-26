@@ -132,7 +132,7 @@ jobs:
 
       - name: Run independent exact-head cost admission scan
         env:
-          GITHUB_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
+          EVIDENCE_HEAD_SHA: "${{ github.event.pull_request.head.sha || github.sha }}"
         run: >-
           python scripts/verify_cost_admission_closure.py
           --evidence-out .cost-admission-independent.json
