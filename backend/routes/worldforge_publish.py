@@ -208,7 +208,7 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
     import time
     import asyncio
     from routes.llm_router import ROUTING_POLICY, MODEL_CATALOG
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     t0 = time.time()
     try:
         world = build_world(cfg)
@@ -220,7 +220,7 @@ def _monograph_worker(job_id: str, cfg: WorldConfig):
             for m in ensemble:
                 prov = MODEL_CATALOG.get(m, {}).get("provider", "openai")
                 try:
-                    chat = LlmChat(session_id=f"mono-{job_id[:8]}",
+                    chat = EngineChat(session_id=f"mono-{job_id[:8]}",
                                    system_message=MONOGRAPH_SYSTEM).with_model(prov, m)
                     resp = await asyncio.wait_for(chat.send_message(UserMessage(text=prompt)), timeout=300)
                     return (resp.content if hasattr(resp, "content") else str(resp)), m
@@ -343,14 +343,14 @@ def _poster_prompt(world: dict, cfg: WorldConfig, style: str) -> str:
 def _poster_worker(job_id: str, cfg: WorldConfig, style: str):
     import time
     import asyncio
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    from core.engine_chat import EngineChat, UserMessage
     t0 = time.time()
     try:
         world = build_world(cfg)
         prompt = _poster_prompt(world, cfg, style)
 
         async def _gen():
-            chat = LlmChat(session_id=f"poster-{job_id[:8]}",
+            chat = EngineChat(session_id=f"poster-{job_id[:8]}",
                            system_message="You generate photorealistic scientific Earth-observation map imagery.")
             chat.with_model("gemini", "gemini-3.1-flash-image-preview").with_params(modalities=["image", "text"])
             return await chat.send_message_multimodal_response(UserMessage(text=prompt))
