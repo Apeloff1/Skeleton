@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -400,3 +402,122 @@ def test_health_reports_configured_memory_ready_only_when_full_bundle_bound(
         "error": None,
     }
     assert health["overall"] is True
+
+
+class _RecordingMemoryWriter:
+    def __init__(self) -> None:
+        self.proposals = []
+
+    def stage(self, proposal):
+        self.proposals.append(proposal)
+        return SimpleNamespace(proposal=proposal)
+
+    async def commit(self, proposal_id, *, now=None):
+        assert self.proposals
+        assert self.proposals[-1].proposal_id == proposal_id
+        return SimpleNamespace(memory_id="memory-finalized-1")
+
+
+@pytest.mark.asyncio
+async def test_verified_memory_finalization_is_noop_without_explicit_intent() -> None:
+    state = ServerState()
+    request = SimpleNamespace(
+        operation_id=str(uuid4()),
+        execution_id=str(uuid4()),
+        context_policy={
+            "tenant_id": "tenant-a",
+            "context_digest": "a" * 64,
+            "data_class": "internal",
+        },
+    )
+
+    bindings = await state.bind_verified_memory_finalization(
+        request,
+        "verified answer",
+        {},
+    )
+
+    assert bindings.memory_refs == ()
+
+
+@pytest.mark.asyncio
+async def test_verified_memory_finalization_fails_closed_without_authority() -> None:
+    state = ServerState()
+    request = SimpleNamespace(
+        operation_id=str(uuid4()),
+        execution_id=str(uuid4()),
+        context_policy={
+            "tenant_id": "tenant-a",
+            "context_digest": "a" * 64,
+            "data_class": "confidential",
+            "memory_write_intent": {
+                "subject_id": "user-a",
+                "namespace": "assistant",
+                "kind": "semantic",
+                "data_class": "confidential",
+                "content_from": "verified_final_output",
+                "provenance_refs": [],
+            },
+        },
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="canonical memory authority is required",
+    ):
+        await state.bind_verified_memory_finalization(
+            request,
+            "verified answer",
+            {},
+        )
+
+
+@pytest.mark.asyncio
+async def test_verified_memory_finalization_commits_governed_proposal() -> None:
+    state = ServerState()
+    writer = _RecordingMemoryWriter()
+    state.canonical_memory_writer = writer
+    operation_id = str(uuid4())
+    execution_id = str(uuid4())
+    request = SimpleNamespace(
+        operation_id=operation_id,
+        execution_id=execution_id,
+        context_policy={
+            "tenant_id": "tenant-a",
+            "context_digest": "b" * 64,
+            "data_class": "confidential",
+            "memory_write_intent": {
+                "subject_id": "user-a",
+                "namespace": "assistant",
+                "kind": "semantic",
+                "data_class": "confidential",
+                "content_from": "verified_final_output",
+                "provenance_refs": ["conversation:thread-a"],
+            },
+        },
+    )
+
+    bindings = await state.bind_verified_memory_finalization(
+        request,
+        "verified durable outcome",
+        {
+            "provider_receipts": ["provider-receipt-1"],
+            "tool_receipts": ["tool-receipt-1"],
+        },
+    )
+
+    assert bindings.memory_refs == ("memory:memory-finalized-1",)
+    assert len(writer.proposals) == 1
+    proposal = writer.proposals[0]
+    assert proposal.tenant_id == "tenant-a"
+    assert proposal.subject_id == "user-a"
+    assert proposal.namespace == "assistant"
+    assert proposal.content == "verified durable outcome"
+    assert proposal.source_operation_id == operation_id
+    assert proposal.data_class == "confidential"
+    assert "execution:" + execution_id in proposal.provenance_refs
+    assert "context:" + ("b" * 64) in proposal.provenance_refs
+    assert "verified-final-output" in proposal.provenance_refs
+    assert "provider:provider-receipt-1" in proposal.provenance_refs
+    assert "tool:tool-receipt-1" in proposal.provenance_refs
+    assert "conversation:thread-a" in proposal.provenance_refs
