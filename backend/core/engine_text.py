@@ -28,6 +28,7 @@ from skeleton.contracts.context import (
 )
 from skeleton.context.compiler import ContextCompiler
 from skeleton.context.instruction_policy import InstructionPolicy
+from skeleton.vault.data_governance import DataGovernanceDenied
 
 
 class EngineTextError(RuntimeError):
