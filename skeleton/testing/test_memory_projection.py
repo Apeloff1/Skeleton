@@ -680,9 +680,9 @@ def test_retrieval_projection_registers_governance_before_physical_mutation() ->
     )
 
     assert report.degraded is True
-    inventory = governance.export_inventory("tenant-a")
-    assert inventory["count"] == 1
-    governed = inventory["records"][0]
+    inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(inventory) == 1
+    governed = inventory[0]
     assert governed["owner_plane"] == "retrieval"
     assert governed["state"] == "active"
     assert governed["exportable"] is False
@@ -716,9 +716,9 @@ def test_governed_vector_projection_acknowledges_only_after_physical_delete() ->
     assert first.degraded is False
     assert store.stats()["documents"] == 1
 
-    active_inventory = governance.export_inventory("tenant-a")
-    assert active_inventory["count"] == 1
-    retrieval_record = active_inventory["records"][0]
+    active_inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(active_inventory) == 1
+    retrieval_record = active_inventory[0]
     assert retrieval_record["owner_plane"] == "retrieval"
     assert retrieval_record["state"] == "active"
     assert retrieval_record["exportable"] is False
@@ -739,8 +739,11 @@ def test_governed_vector_projection_acknowledges_only_after_physical_delete() ->
 
     assert deleted.degraded is False
     assert store.stats()["documents"] == 0
-    final_inventory = governance.export_inventory("tenant-a")
-    assert final_inventory["records"][0]["state"] == "deleted"
+    final_inventory = governance.lifecycle.inventory(
+        "tenant-a",
+        include_deleted=True,
+    )
+    assert final_inventory[0]["state"] == "deleted"
     receipts = governance.lifecycle.receipts(tenant_id="tenant-a")
     assert len(receipts) == 1
     assert receipts[0].target == retrieval_record["deletion_targets"][0]
@@ -777,8 +780,9 @@ async def test_tenant_lifecycle_plan_deletes_bound_vector_projection() -> None:
     assert synced.degraded is False
     assert store.stats()["documents"] == 1
 
-    inventory = governance.export_inventory("tenant-a")
-    retrieval_record = inventory["records"][0]
+    inventory = governance.lifecycle.inventory("tenant-a")
+    assert len(inventory) == 1
+    retrieval_record = inventory[0]
     target = retrieval_record["deletion_targets"][0]
     assert target.startswith("memory-projection-")
 
