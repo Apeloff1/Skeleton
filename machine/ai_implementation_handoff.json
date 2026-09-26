@@ -440,7 +440,9 @@
         "integration": [
           "backend/routes/conversations.py",
           "backend/routes/ai.py",
-          "frontend/src/product/conversationClient.ts"
+          "frontend/src/product/conversationClient.ts",
+          "backend/routes/jeeves_compose.py",
+          "frontend/src/product/conversationProjection.ts"
         ],
         "tests": [
           "skeleton/testing/test_conversation_repository.py",
@@ -448,7 +450,11 @@
           "backend/tests/test_conversation_governance.py",
           "skeleton/testing/test_data_lifecycle.py",
           "skeleton/testing/test_engine_execution_service.py",
-          "skeleton/testing/test_context_compiler.py"
+          "skeleton/testing/test_context_compiler.py",
+          "backend/tests/test_ai_chat_conversation_finalization.py",
+          "tests/test_jeeves_chat_workspace.py",
+          "backend/tests/test_conversation_regeneration_route.py",
+          "frontend/scripts/test-conversation-projection.mjs"
         ]
       },
       "ordered_steps": [
@@ -532,11 +538,16 @@
         "backend/routes/conversations.py exposes an admin-only tenant retention sweep over the canonical split-owner lifecycle protocol",
         "skeleton/testing/test_data_lifecycle.py proves retention retries return only outstanding actions from the same plan",
         "skeleton/testing/test_engine_execution_service.py proves engine retention acknowledges engine-owned memory while leaving conversation targets pending for backend authority",
-        "backend/tests/test_conversation_governance.py proves split-owner retention executes engine then conversation targets under one plan identity"
+        "backend/tests/test_conversation_governance.py proves split-owner retention executes engine then conversation targets under one plan identity",
+        "backend/tests/test_ai_chat_conversation_finalization.py retry-stable terminal commit and pending-turn serialization",
+        "tests/test_jeeves_chat_workspace.py crash-resume/idless-resume/concurrency/race coverage",
+        "frontend/src/product/conversationProjection.ts deterministic canonical reconstruction",
+        "frontend/scripts/test-conversation-projection.mjs refresh/reconnect projection regressions",
+        "backend/tests/test_conversation_regeneration_route.py engine-routed regeneration ordering"
       ],
       "remaining": [
         "close gap-state-authority-convergence and gap-governance-registry",
-        "collect fresh exact-head Conversation Authority Closure Gate and independent verifier receipt"
+        "collect fresh exact-head Conversation Authority Closure Gate after final PR stabilization"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
     },
@@ -569,7 +580,8 @@
           "skeleton/context",
           "backend/core/engine_client.py",
           "skeleton/api/engine_runtime.py",
-          "skeleton/api/server.py"
+          "skeleton/api/server.py",
+          "backend/routes/ai.py"
         ],
         "tests": [
           "skeleton/testing/test_memory_authority.py",
@@ -580,7 +592,8 @@
           "skeleton/testing/test_execution_runtime.py",
           "skeleton/testing/test_governance_runtime_binding.py",
           "backend/tests/test_engine_client.py",
-          "skeleton/testing/test_state_recovery_drill.py"
+          "skeleton/testing/test_state_recovery_drill.py",
+          "backend/tests/test_ai_chat_memory_policy.py"
         ]
       },
       "ordered_steps": [
@@ -628,11 +641,13 @@
         "scripts/state_recovery_drill.py destructive Mongo recovery now includes canonical memory records, idempotency receipts, revision history and projection outbox; derived rebuild includes active canonical memory and excludes tombstones",
         "backend/routes/ai.py exposes AIChatMemoryPolicy as an explicit opt-in product/user long-term-memory policy and emits no memory_write_intent by default",
         "backend/routes/ai.py translates opt-in only into content_from=verified_final_output with stable conversation/user-policy provenance and fails closed when the canonical engine is unavailable",
-        "backend/tests/test_ai_chat_engine_cutover.py proves default chat has no engine:memory scope, explicit preference persistence delegates engine:memory and commits returned memory_refs, and opt-in without the canonical engine never falls back to local/provider execution"
+        "backend/tests/test_ai_chat_engine_cutover.py proves default chat has no engine:memory scope, explicit preference persistence delegates engine:memory and commits returned memory_refs, and opt-in without the canonical engine never falls back to local/provider execution",
+        "backend/routes/ai.py explicit AIChatMemoryPolicy opt-in",
+        "backend/tests/test_ai_chat_memory_policy.py end-to-end delegated engine memory policy and fail-closed no-engine behavior"
       ],
       "remaining": [
         "close gap-state-authority-convergence and gap-governance-registry",
-        "collect fresh exact-head State Recovery Drill, memory regression, App Assembly and Backend Quality evidence",
+        "collect fresh exact-head memory/runtime/App Assembly/Backend Quality evidence after final PR stabilization",
         "obtain independent closure verification"
       ],
       "rollback_rule": "preserve canonical state and compatibility surface until replacement path has passed focused tests and its dependent integration evidence"
