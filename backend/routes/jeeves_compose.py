@@ -522,94 +522,6 @@ async def _commit_canonical_assistant_turn(
     )
 
 
-async def _canonical_replay_turn(
-    session_id: str,
-    client_message_id: str,
-    user_message: str,
-    compatibility_turn: Dict[str, Any],
-) -> Dict[str, Any]:
-    authority, thread, tenant_id, owner_id = (
-        await _ensure_canonical_thread(session_id)
-    )
-    messages = await authority.active_transcript(
-        thread.thread_id,
-        tenant_id=tenant_id,
-        owner_id=owner_id,
-    )
-    user_key = _canonical_user_idempotency(client_message_id)
-    canonical_user = next(
-        (
-            message
-            for message in messages
-            if message.idempotency_key == user_key
-        ),
-        None,
-    )
-    if canonical_user is None:
-        raise HTTPException(
-            status_code=409,
-            detail="canonical conversation replay state is incomplete",
-        )
-    if canonical_user.content != user_message:
-        raise HTTPException(
-            status_code=409,
-            detail="client_message_id was already used for different content",
-        )
-    assistant_key = "jeeves-assistant:" + client_message_id
-    canonical_assistant = next(
-        (
-            message
-            for message in messages
-            if message.idempotency_key == assistant_key
-            and message.causal_user_message_id
-            == canonical_user.message_id
-        ),
-        None,
-    )
-    if canonical_assistant is None:
-        raise HTTPException(
-            status_code=409,
-            detail="this message is already being processed; retry after it completes",
-        )
-    return {
-        "ok": True,
-        "session_id": session_id,
-        "reply": canonical_assistant.content,
-        "forms": list(compatibility_turn.get("forms") or ["text"]),
-        "tier": str(compatibility_turn.get("tier") or "canonical"),
-        "model": str(
-            compatibility_turn.get("model")
-            or (
-                "skeleton-engine"
-                if str(canonical_assistant.ai_result_id or "").startswith(
-                    "engine-result:"
-                )
-                else "canonical-jeeves"
-            )
-        ),
-        "modalities": list(
-            compatibility_turn.get("modalities") or ["text"]
-        ),
-        "artifacts": [],
-        "artifact_count": int(
-            compatibility_turn.get("artifact_count") or 0
-        ),
-        "grounded_in": int(
-            compatibility_turn.get("grounded_in") or 0
-        ),
-        "persisted": True,
-        "history_messages_used": int(
-            compatibility_turn.get("history_messages_used") or 0
-        ),
-        "history_source": "canonical",
-        "replayed": True,
-        "operation_id": canonical_assistant.operation_id,
-        "ai_result_id": canonical_assistant.ai_result_id,
-        "canonical_thread_id": thread.thread_id,
-        "canonical_message_id": canonical_assistant.message_id,
-    }
-
-
 async def _canonical_history_turn_rows(
     session_id: str,
     *,
@@ -669,25 +581,6 @@ async def _canonical_history_turn_rows(
 
 
 _MAX_SERVER_HISTORY_MESSAGES = 20
-
-
-def _turn_id(session_id: str, client_message_id: str) -> str:
-    material = f"{session_id}\x1f{client_message_id}".encode("utf-8")
-    return "jeeves-turn-" + hashlib.sha256(material).hexdigest()[:32]
-
-
-def _history_from_turn_rows(
-    rows: List[Dict[str, Any]],
-) -> List[HistoryMessage]:
-    messages: List[HistoryMessage] = []
-    for row in rows:
-        user = row.get("role_user")
-        assistant = row.get("role_jeeves")
-        if isinstance(user, str) and user.strip():
-            messages.append(HistoryMessage(role="user", content=user[:4000]))
-        if isinstance(assistant, str) and assistant.strip():
-            messages.append(HistoryMessage(role="assistant", content=assistant[:4000]))
-    return messages[-_MAX_SERVER_HISTORY_MESSAGES:]
 
 
 async def _load_server_history(
