@@ -41,6 +41,8 @@ on:
       - "skeleton/testing/test_provider_surface_inventory.py"
       - "scripts/check_context_execution_boundary.py"
       - "tests/test_context_execution_boundary.py"
+      - "scripts/check_instruction_policy_boundary.py"
+      - "tests/test_instruction_policy_boundary.py"
       - "skeleton/provider_contract.py"
       - "skeleton/provider_runtime.py"
       - "skeleton/testing/test_operation_stream.py"
@@ -348,6 +350,9 @@ jobs:
       - name: Validate context execution boundary
         run: python scripts/check_context_execution_boundary.py
 
+      - name: Validate instruction policy boundary
+        run: python scripts/check_instruction_policy_boundary.py
+
       - name: Install full assembly test runtime
         if: steps.scope.outputs.full == 'true'
         run: >-
@@ -434,7 +439,7 @@ jobs:
           backend/services/rag_state_repository.py backend/services/rag_service.py
           backend/services/game_llm_service.py backend/routes/llm_router.py
           scripts/check_ai_app_construction.py scripts/check_ai_master_plan.py scripts/check_ai_edge_case_catalog.py scripts/check_ai_exotic_systems_catalog.py scripts/check_ai_p0_edge_case_matrix.py scripts/check_ai_full_edge_case_matrix.py scripts/check_ai_engineering_pass.py scripts/check_ai_engineering_task_matrix.py scripts/check_ai_adversarial_closure.py scripts/check_ai_build_accountability.py scripts/check_ai_execution_frontier.py scripts/check_ai_assistant_control_plane.py scripts/ai_accountability.py scripts/state_recovery_drill.py scripts/check_capability_interfaces.py
-          scripts/check_state_topology.py scripts/check_provider_bootstrap.py scripts/check_context_execution_boundary.py
+          scripts/check_state_topology.py scripts/check_provider_bootstrap.py scripts/check_context_execution_boundary.py scripts/check_instruction_policy_boundary.py
 
       - name: Audit repository-wide assembly contracts
         if: steps.scope.outputs.full == 'true'
@@ -535,6 +540,7 @@ jobs:
           skeleton/testing/test_windows_installer.py
           tests/test_provider_runtime_boundary.py
           tests/test_context_execution_boundary.py
+          tests/test_instruction_policy_boundary.py
           tests/test_jeeves_local_provider_policy.py
           tests/test_jeeves_chat_workspace.py
 
