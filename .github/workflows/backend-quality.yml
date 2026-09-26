@@ -17,6 +17,7 @@ on:
       - "scripts/check_architecture_boundaries.py"
       - "scripts/check_provider_runtime_boundary.py"
       - "scripts/check_context_execution_boundary.py"
+      - "scripts/check_instruction_policy_boundary.py"
       - "scripts/check_quality_gate_parity.py"
       - "scripts/check_repository_python_sast.py"
       - "scripts/container_digest_refresh.py"
@@ -24,6 +25,7 @@ on:
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
       - "tests/test_context_execution_boundary.py"
+      - "tests/test_instruction_policy_boundary.py"
       - "backend/tests/test_conversation_governance.py"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
@@ -40,6 +42,7 @@ on:
       - "scripts/check_architecture_boundaries.py"
       - "scripts/check_provider_runtime_boundary.py"
       - "scripts/check_context_execution_boundary.py"
+      - "scripts/check_instruction_policy_boundary.py"
       - "scripts/check_quality_gate_parity.py"
       - "scripts/check_repository_python_sast.py"
       - "scripts/container_digest_refresh.py"
@@ -47,6 +50,7 @@ on:
       - "tests/test_architecture_boundaries.py"
       - "tests/test_provider_runtime_boundary.py"
       - "tests/test_context_execution_boundary.py"
+      - "tests/test_instruction_policy_boundary.py"
       - "backend/tests/test_conversation_governance.py"
       - ".github/workflows/**"
       - "!.github/workflows/branch-clean.yml"
@@ -158,6 +162,14 @@ jobs:
         run: |
           python scripts/check_context_execution_boundary.py
           PYTHONPATH=. python -m pytest -q --noconftest tests/test_context_execution_boundary.py
+      - name: Instruction policy boundary gate
+        if: steps.scope.outputs.full == 'true'
+        working-directory: .
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: |
+          python scripts/check_instruction_policy_boundary.py
+          PYTHONPATH=. python -m pytest -q --noconftest tests/test_instruction_policy_boundary.py
       - name: Production layer boundary gate
         if: steps.scope.outputs.full == 'true'
         run: python scripts/check_architecture_boundaries.py
