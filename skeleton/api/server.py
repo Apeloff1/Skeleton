@@ -182,6 +182,8 @@ class ServerState:
         if self.canonical_artifact_store is not None:
             return self.canonical_artifact_store
 
+        from pathlib import Path
+
         from skeleton.artifact_plane.governance import GovernedArtifactStore
         from skeleton.vault.lifecycle_adapters import (
             GovernedArtifactLifecycleAdapter,
@@ -817,6 +819,7 @@ def create_app() -> Any:
             from skeleton.genesis import Genesis
             state.wire_from_genesis(Genesis(seed=42).boot())
         state.bind_governance_registry()
+        state.bind_canonical_artifact_store()
         state.bind_canonical_retrieval_index()
         state.bind_engine_execution_service()
         if _canonical_memory_mongo_configured():
