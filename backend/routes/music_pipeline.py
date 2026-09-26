@@ -79,7 +79,7 @@ async def call_music_ai(prompt: str, system_prompt: str) -> str:
             instruction_policy=InstructionPolicy(
                 policy_id="backend.music-pipeline.generation",
                 version="1",
-                instructions=system_prompt,
+                instructions=system_prompt.strip(),
             ),
         ).with_model("openai", "gpt-4o")
         
