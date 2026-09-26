@@ -248,9 +248,6 @@ def _llm_enrich(spec: dict, user_prompt: str) -> dict | None:
             f"Produce a polished, game-ready {spec.get('category') or spec.get('name') or 'asset'} "
             f"for the {spec.get('era_label') or spec.get('era') or 'modern'} era. "
             f"Honour these style axes: {_axes}. Make it cohesive and believable.")
-    key = os.environ.get("EMERGENT_LLM_KEY")
-    if not key:
-        return None
     try:
         import asyncio
         import json as _json
@@ -337,7 +334,7 @@ def _llm_enrich(spec: dict, user_prompt: str) -> dict | None:
 
         async def _run(feedback: str = "") -> str:
             sid = f"forge_{spec.get('preset_id') or spec.get('category') or 'x'}"
-            chat = LlmChat(api_key=key, session_id=sid,
+            chat = LlmChat(session_id=sid,
                            system_message=sysmsg).with_model("anthropic", "claude-sonnet-4-6")
             try:
                 chat = chat.with_max_tokens(2200)  # verbose 128-word descriptors
