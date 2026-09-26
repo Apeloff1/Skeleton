@@ -1127,3 +1127,60 @@ def test_jeeves_turn_version_race_is_retryable_conflict(
     assert "canonical conversation turn conflicted" in response.text
     assert "same client_message_id" in response.text
     assert calls["generate"] == 0
+
+
+def test_jeeves_engine_identity_is_scoped_to_canonical_turn(
+    route,
+    monkeypatch,
+):
+    sessions = []
+
+    class CaptureChat:
+        def __init__(self, *_args, session_id=None, **_kwargs):
+            sessions.append(session_id)
+
+        def with_max_tokens(self, *_args, **_kwargs):
+            return self
+
+        async def send_message(self, _message):
+            return SimpleNamespace(
+                text="engine answer",
+                execution_id="engine-execution",
+                verification="verified",
+                evidence_refs=(),
+            )
+
+    monkeypatch.setattr(route, "EngineChat", CaptureChat)
+    monkeypatch.setattr(
+        route.free_tier,
+        "decide",
+        lambda _needs_reasoning: "paid",
+    )
+
+    async def generate(scope):
+        token = route._ENGINE_EXECUTION_SCOPE.set(scope)
+        try:
+            return await route._generate_text(
+                "identical question",
+                [],
+                True,
+            )
+        finally:
+            route._ENGINE_EXECUTION_SCOPE.reset(token)
+
+    first = asyncio.run(
+        generate("jeeves-chat:session-a:message-1")
+    )
+    second = asyncio.run(
+        generate("jeeves-chat:session-b:message-1")
+    )
+    replay = asyncio.run(
+        generate("jeeves-chat:session-a:message-1")
+    )
+
+    assert first["text"] == "engine answer"
+    assert second["text"] == "engine answer"
+    assert replay["text"] == "engine answer"
+    assert len(sessions) == 3
+    assert sessions[0] == sessions[2]
+    assert sessions[0] != sessions[1]
