@@ -2175,7 +2175,7 @@
       "plane": "cost-capacity",
       "priority": "P0",
       "status": "open",
-      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, and aggregate estimate-vs-actual telemetry now share one contract. Remaining implementation work is admission at expensive conversation/retrieval/memory persistence boundaries plus exact-head and independent verification.",
+      "gap": "Request admission, restart-safe durable tenant quota reservation, durable cross-process pressure coordination, provider/media lease enforcement, manifest-aware tool metering, independently budgeted artifact/storage writes, metered engine execution persistence, governed SQLite/Mongo memory-write admission boundaries, and aggregate estimate-vs-actual telemetry now share one contract. Remaining implementation work is live Mongo memory binding, shared cross-process conversation persistence admission, material retrieval/index rebuild admission, and exact-head/independent verification.",
       "construction": [
         "define per-request and per-tenant budgets",
         "meter input/output tokens and provider cost",
@@ -2189,7 +2189,7 @@
         "concurrency saturation test",
         "cost telemetry test"
       ],
-      "status_detail": "shared AdmissionRuntime composes request budgets, durable SQLite tenant quota reservations, durable shared concurrency/queue pressure, provider/media leases, manifest-aware tool cost/call usage, independent artifact/storage usage, engine execution/submission/checkpoint/turn/result persistence metering, failure release, actual usage reconciliation, and payload-free estimate/actual/delta telemetry; conversation/retrieval/memory persistence admission and final exact-head verification remain"
+      "status_detail": "shared AdmissionRuntime covers provider/media, tool, artifact/storage, engine execution persistence and governed memory write boundaries with durable quota/shared-pressure coordination; live production Mongo writer binding plus conversation/retrieval cross-process admission remain"
     },
     {
       "id": "gap-provider-redundancy",
@@ -7381,7 +7381,9 @@
       "shared pressure includes tenant fairness, lease expiry reaping, owner fencing, soft shedding and atomic queue promotion",
       "AdmissionRuntime consumes shared pressure snapshots and durable leases while preserving local counters as cache",
       "engine execution/submission/checkpoint/turn/finalization/result persistence is metered through operation-level storage admission",
-      "storage write identities are deterministic so restart replay does not double-charge durable usage"
+      "storage write identities are deterministic so restart replay does not double-charge durable usage",
+      "governed SQLite and Mongo memory writers meter source-operation storage before canonical commit",
+      "memory governance failure tombstones canonical memory fail-closed after admitted write"
     ]
   },
   "provider_surface_convergence_blueprint": {
