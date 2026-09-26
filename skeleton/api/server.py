@@ -270,6 +270,9 @@ class ServerState:
         from skeleton.persistence.memory_repository import (
             MongoMemoryRepository,
         )
+        from skeleton.vault.lifecycle_adapters import (
+            MongoMemoryLifecycleAdapter,
+        )
 
         if database is None:
             from motor.motor_asyncio import AsyncIOMotorClient
@@ -284,9 +287,20 @@ class ServerState:
 
         repository = MongoMemoryRepository(database)
         await repository.ensure_indexes()
+
+        governance = self.bind_governance_registry()
+        adapters = self.governance_lifecycle_adapters
+        if adapters is None:
+            raise RuntimeError(
+                "governance lifecycle adapters are unavailable"
+            )
+        memory_lifecycle = MongoMemoryLifecycleAdapter(repository)
+        adapters.register_deletion("memory", memory_lifecycle)
+        adapters.register_export("memory", memory_lifecycle)
+
         writer = AsyncGovernedMemoryWriter(
             repository,
-            governance=self.bind_governance_registry(),
+            governance=governance,
             admission_runtime=admission_runtime,
         )
         self.canonical_memory_repository = repository
@@ -295,8 +309,8 @@ class ServerState:
             AsyncMemoryProjectionCoordinator(
                 repository,
                 admission_runtime=admission_runtime,
-                governance=self.bind_governance_registry(),
-                lifecycle_adapters=self.governance_lifecycle_adapters,
+                governance=governance,
+                lifecycle_adapters=adapters,
             )
         )
         return writer
