@@ -592,4 +592,3 @@ def test_governed_artifact_governance_failure_prevents_file_mutation(
         )
 
     assert store.read_bytes("tenant-a", "blocked.bin") is None
-
