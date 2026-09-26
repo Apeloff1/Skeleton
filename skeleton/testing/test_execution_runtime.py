@@ -1134,3 +1134,50 @@ async def test_cognitive_runtime_meters_checkpoint_turn_and_terminal_storage() -
     for _resource_id, _write_id, payload, meter_now in events:
         assert payload is not None
         assert meter_now == _now()
+
+
+@pytest.mark.asyncio
+async def test_failed_verification_never_invokes_finalization_binding() -> None:
+    repo = SQLiteExecutionRepository()
+    tools = AsyncToolRuntime()
+    provider = FakeProvider(
+        [_text_response("unverified claim", response_id="resp-no-memory")]
+    )
+    binding_calls = []
+
+    def verify(_request, _candidate, _context_digest):
+        return ExecutionVerificationDecision(
+            passed=False,
+            receipt={
+                "outcome": "failed",
+                "policy_satisfied": False,
+                "verifier_id": "test:no-memory-on-failure",
+            },
+            evidence_refs=("evidence:verification-failure",),
+        )
+
+    def forbidden_binding(*args):
+        binding_calls.append(args)
+        raise AssertionError(
+            "finalization binding must not run after failed verification"
+        )
+
+    runtime = CognitiveExecutionRuntime(
+        repo,
+        provider,
+        tools,
+        verification_hook=verify,
+        finalization_binding_hook=forbidden_binding,
+    )
+    result = await runtime.start(
+        _request(),
+        instructions="Answer only when verified.",
+        prompt="Produce a candidate.",
+        context_digest="e" * 64,
+        now=_now(),
+    )
+
+    assert result.result is not None
+    assert result.result.status == "failed"
+    assert result.result.memory_refs == ()
+    assert binding_calls == []
