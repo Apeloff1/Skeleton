@@ -186,6 +186,17 @@ class EngineExecutionCoordinator:
             provider,
             self.tool_runtime,
             verification_hook=self.verification_hook,
+            storage_meter=(
+                lambda resource_id, write_id, payload, meter_now=None: (
+                    self.service.meter_execution_storage(
+                        command,
+                        resource_id,
+                        write_id,
+                        payload,
+                        now=meter_now,
+                    )
+                )
+            ),
         )
         history = tuple(
             AIMessage(role=role, content=content)
