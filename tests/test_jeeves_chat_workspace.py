@@ -1030,3 +1030,62 @@ def test_incomplete_canonical_turn_resumes_after_crash_without_duplicate_history
     assert replay.json()["replayed"] is True
     assert replay.json()["reply"] == "resumed answer"
     assert captured["calls"] == 1
+
+
+def test_pending_canonical_turn_blocks_different_concurrent_turn(
+    route,
+    monkeypatch,
+):
+    legacy = _MemoryChatCollection()
+    canonical = _CanonicalConversationAuthority()
+    calls = {"count": 0}
+
+    async def seed():
+        authority, thread, tenant_id, owner_id = (
+            await route._ensure_canonical_thread("conversation-pending")
+        )
+        thread, pending = await authority.append_user_message(
+            thread.thread_id,
+            tenant_id=tenant_id,
+            owner_id=owner_id,
+            content="first pending question",
+            idempotency_key=route._canonical_user_idempotency("pending-1"),
+            expected_thread_version=thread.version,
+            data_class="internal",
+        )
+        return thread, pending
+
+    monkeypatch.setattr(route, "_canonical_authority", lambda: canonical)
+    seeded_thread, pending = asyncio.run(seed())
+
+    async def generate(*_args, **_kwargs):
+        calls["count"] += 1
+        return {
+            "text": "must not run",
+            "tier": "free",
+            "model": "test",
+        }
+
+    with _chat_client(
+        route,
+        monkeypatch,
+        legacy,
+        generate,
+        canonical=canonical,
+    ) as transport:
+        response = transport.post(
+            "/api/jeeves/chat",
+            json={
+                "session_id": "conversation-pending",
+                "client_message_id": "pending-2",
+                "message": "second question",
+            },
+        )
+
+    assert response.status_code == 409
+    assert "previous canonical turn is incomplete" in response.text
+    assert calls["count"] == 0
+    messages = canonical.messages[seeded_thread.thread_id]
+    assert len(messages) == 1
+    assert messages[0].message_id == pending.message_id
+    assert messages[0].content == "first pending question"
