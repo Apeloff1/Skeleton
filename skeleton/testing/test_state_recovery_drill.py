@@ -280,3 +280,42 @@ def test_engine_sqlite_bundle_restore_preserves_authoritative_ledgers(
     assert verified["quota_committed_input_tokens"] == 90
     assert verified["pressure_active"] == 1
     assert verified["pressure_queued"] == 1
+
+
+def test_derived_rebuild_includes_only_active_canonical_memory() -> None:
+    snapshot = {
+        "collections": {
+            "canonical_memory_records": {
+                "documents": [
+                    {
+                        "memory_id": "memory-active",
+                        "tenant_id": "tenant-a",
+                        "subject_id": "user-a",
+                        "state": "active",
+                        "content": "remember this",
+                    },
+                    {
+                        "memory_id": "memory-deleted",
+                        "tenant_id": "tenant-a",
+                        "subject_id": "user-a",
+                        "state": "tombstoned",
+                        "content": "do not project this",
+                    },
+                ]
+            }
+        }
+    }
+
+    projection = drill.rebuild_derived_projection(snapshot)
+
+    assert projection["count"] == 1
+    assert projection["records"] == [
+        {
+            "source": "canonical_memory_records",
+            "record_id": "memory-active",
+            "tenant_or_user": "tenant-a",
+            "digest": drill.digest_payload(
+                snapshot["collections"]["canonical_memory_records"]["documents"][0]
+            ),
+        }
+    ]
