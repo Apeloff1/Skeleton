@@ -133,6 +133,45 @@ test('remount replaces stale device transcript with canonical server history', a
   );
 });
 
+test('explicit reconnect refresh reprojects the active chat from server authority', async () => {
+  const workspace = W.createWorkspace();
+  workspace.conversations[0].sessionId = 'server-refresh';
+  const disk = storage({ [W.WORKSPACE_KEY]: W.encodeWorkspace(workspace) });
+  let generation = 0;
+
+  const store = await controller(
+    undefined,
+    disk,
+    async sessionId => ({
+      ok: true,
+      available: true,
+      session_id: sessionId,
+      canonical_thread_id: 'thread-refresh',
+      turns: [{
+        session_id: sessionId,
+        client_message_id: 'refresh-user',
+        role_user: generation === 0 ? 'first question' : 'fresh question',
+        role_jeeves: generation === 0 ? 'first answer' : 'fresh answer',
+        status: 'complete',
+        ts: generation === 0 ? 10 : 20,
+        canonical_assistant_message_id: 'refresh-assistant',
+      }],
+    }),
+  );
+
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['first question', 'first answer'],
+  );
+  generation = 1;
+  assert.equal(await store.refreshCanonical(), true);
+  assert.deepEqual(
+    store.active.messages.map(item => item.text),
+    ['fresh question', 'fresh answer'],
+  );
+  assert.equal(store.active.canonicalThreadId, 'thread-refresh');
+});
+
 test('remount keeps device cache with notice when canonical history is unavailable', async () => {
   const workspace = W.createWorkspace();
   Object.assign(workspace.conversations[0], {
